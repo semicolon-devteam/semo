@@ -73,6 +73,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 | ------------------- | ----------------------- | ---------------------------------------------- |
 | 도움 요청           | 대화형 응답 (직접 처리) | "/SAX:help", "도움말", "뭘 해야 하지"          |
 | SAX init 커밋       | `sax-init` 프로세스     | "SAX init", "SAX 설치 커밋", "SAX init 커밋해줘" |
+| **Git 커밋/푸시**   | `skill:git-workflow`    | `git commit`, `git push`, 커밋, 푸시           |
 | 피드백              | `skill:feedback`        | "/SAX:feedback", "피드백", "피드백해줘", "버그 신고" |
 | SAX 동작 오류 지적  | `skill:feedback` (문제 해결 후) | "왜 이렇게 만들었어", "왜 이렇게 동작해", "의도한 대로 안 되네" |
 | 온보딩 요청         | `onboarding-master`     | "/SAX:onboarding", "처음", "신규", "온보딩"    |
@@ -112,6 +113,60 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 [SAX] Agent 위임: {target_agent} (사유: {reason})
 
 {target_agent의 응답 또는 직접 처리}
+```
+
+## Git 명령 인터셉트
+
+> **🔴 CRITICAL**: 모든 Git commit/push 명령은 반드시 `skill:git-workflow`를 통해 처리합니다.
+
+### 인터셉트 대상
+
+다음 패턴 감지 시 **즉시** `skill:git-workflow`로 라우팅:
+
+| 패턴 | 예시 |
+|------|------|
+| `git commit` | `git commit -m "..."`, `git commit --no-verify` |
+| `git push` | `git push origin`, `git push -u origin` |
+| 한글 커밋 요청 | "커밋해줘", "푸시해줘", "커밋하고 푸시해줘" |
+| PR 요청 | "PR 만들어줘", "풀리퀘스트 생성해줘" |
+
+### 인터셉트 동작
+
+```markdown
+[SAX] Orchestrator: Git 명령 감지 → skill:git-workflow 라우팅
+
+⚠️ Git 작업은 팀 표준 준수를 위해 `skill:git-workflow`를 통해 처리됩니다.
+
+**감지된 명령**: {detected_command}
+**라우팅 사유**:
+- 이슈 번호 자동 추출
+- Gitmoji 커밋 메시지 형식
+- Atomic commit 검증
+- --no-verify 사용 방지
+
+[SAX] Skill 호출: git-workflow
+```
+
+### --no-verify 차단
+
+`--no-verify` 또는 `-n` 플래그 감지 시:
+
+```markdown
+[SAX] Orchestrator: ⛔ --no-verify 사용 감지
+
+🚫 **차단됨**: `--no-verify` 플래그는 사용할 수 없습니다.
+
+**사유**: Pre-commit hook은 코드 품질을 보장합니다.
+- TypeScript 타입 체크
+- ESLint 검사
+- 테스트 실행
+
+**해결 방법**:
+1. `npm run lint` 실행 후 에러 수정
+2. `npx tsc --noEmit` 실행 후 타입 에러 수정
+3. 에러 수정 후 다시 커밋 요청
+
+에러 수정을 도와드릴까요?
 ```
 
 ## SAX init 프로세스

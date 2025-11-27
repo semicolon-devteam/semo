@@ -65,7 +65,35 @@ Git 작업을 Semicolon 팀 표준에 맞게 자동화합니다.
 2. **Gitmoji 사용**: 타입에 맞는 이모지 필수
 3. **Atomic Commit**: 5개 이상 파일 → 분할 커밋 제안
 4. **Pre-commit 준수**: lint/typecheck 통과 필수
-5. **NEVER --no-verify**: pre-commit hook 우회 금지
+5. **NEVER --no-verify**: pre-commit hook 우회 **절대 금지**
+
+## --no-verify 차단 (NON-NEGOTIABLE)
+
+> **🔴 CRITICAL**: `--no-verify` 또는 `-n` 플래그는 **어떤 상황에서도** 사용하지 않습니다.
+
+### 차단 동작
+
+`--no-verify` 감지 시 **즉시 중단**하고 다음 메시지 출력:
+
+```markdown
+[SAX] skill:git-workflow: ⛔ --no-verify 차단
+
+🚫 **커밋 중단**: `--no-verify` 플래그는 사용할 수 없습니다.
+
+**사유**: Pre-commit hook 우회는 코드 품질을 저하시킵니다.
+
+**현재 상태 확인**:
+1. `npm run lint` - ESLint 검사
+2. `npx tsc --noEmit` - TypeScript 타입 체크
+
+에러 수정을 도와드릴까요?
+```
+
+### 예외 없음
+
+- 사용자가 명시적으로 요청해도 **거부**
+- 긴급 상황이라도 **거부**
+- 유일한 예외: 사용자가 "hook 우회 허용" 설정을 명시적으로 활성화한 경우 (기본값: 비활성화)
 
 ## Related
 
