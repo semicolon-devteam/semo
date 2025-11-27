@@ -58,30 +58,48 @@ Agent/Skill → references/ → sax-core/ → docs 레포 문서
 2. 새 문서 생성 시 기존 문서 참조(@import)
 3. 절대로 동일 내용을 복사하지 않음
 
-### 3. 서브모듈 수정 시 동기화 필수 원칙
+### 3. 서브모듈 수정 시 로컬 동기화 필수 원칙
 
-> **sax-meta 서브모듈 수정 시 현재 환경에도 반드시 동기화한다.**
+> **🔴 sax-meta 서브모듈 수정 후 반드시 로컬 `.claude/` 환경에 동기화한다.**
 
-SAX-Meta를 submodule로 설치하여 사용하는 환경(SAX 개발 워크스페이스)에서는:
+SAX-Meta를 submodule로 설치한 환경에서 작업 시, **sax-meta 수정 = 해당 환경의 `.claude/sax-meta/`도 수정**이라고 가정합니다.
 
-- `sax-meta/` (배포용 패키지 소스) 수정 시
-- `.claude/sax-meta/` (submodule로 설치된 sax-meta)에도 동기화 필요
+**적용 조건**:
 
-**이유**: SAX-Meta 사용 환경은 모든 SAX 패키지를 개발/관리하는 개발자 환경이므로, 배포용 패키지 수정과 동시에 현재 사용 중인 환경에도 즉시 반영되어야 함.
+- 현재 워크스페이스에 `.claude/sax-meta/` 서브모듈이 존재하는 경우
+- sax-meta 패키지 소스를 수정한 경우
 
-**동기화 방법**:
+**필수 동기화 대상**:
 
-```bash
-# sax-meta 서브모듈 업데이트
-cd .claude/sax-meta
-git pull origin main
-```
+- `sax-meta/` 수정 시 → `.claude/sax-meta/` 동기화
+- `sax-core/` 수정 시 → `.claude/sax-core/` 동기화
 
-**작업 순서**:
+**작업 순서** (필수):
 
 1. `sax-meta/` 에서 변경사항 작업
 2. `sax-meta/` 커밋 및 푸시
-3. `.claude/sax-meta/` 에서 `git pull` 로 동기화
+3. **`.claude/sax-meta/` 에서 `git pull origin main` 로 즉시 동기화**
+
+**동기화 명령**:
+
+```bash
+# sax-meta 동기화
+cd .claude/sax-meta && git pull origin main
+
+# sax-core 동기화 (필요시)
+cd .claude/sax-core && git pull origin main
+```
+
+**자동화 패턴**:
+
+sax-meta 커밋/푸시 후 다음 명령을 연속 실행:
+
+```bash
+# 패키지 푸시 후 로컬 동기화까지 한 번에
+cd sax-meta && git push origin main && cd ../.claude/sax-meta && git pull origin main
+```
+
+> ⚠️ **동기화 누락 시**: 로컬 환경의 SAX가 최신 상태가 아니게 되어 개발 중 혼란 발생
 
 ### 4. 패키지 접두사 명령 규칙
 
