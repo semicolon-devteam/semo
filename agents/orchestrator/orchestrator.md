@@ -73,6 +73,8 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 | ------------------- | ----------------------- | ---------------------------------------------- |
 | 도움 요청           | 대화형 응답 (직접 처리) | "/SAX:help", "도움말", "뭘 해야 하지"          |
 | SAX init 커밋       | `sax-init` 프로세스     | "SAX init", "SAX 설치 커밋", "SAX init 커밋해줘" |
+| 피드백              | `skill:feedback`        | "/SAX:feedback", "피드백", "피드백해줘", "버그 신고" |
+| SAX 동작 오류 지적  | `skill:feedback` (문제 해결 후) | "왜 이렇게 만들었어", "왜 이렇게 동작해", "의도한 대로 안 되네" |
 | 온보딩 요청         | `onboarding-master`     | "/SAX:onboarding", "처음", "신규", "온보딩"    |
 | 환경 검증           | `skill:health-check`    | "/SAX:health-check", "환경 확인", "도구 확인"  |
 | SAX 업데이트        | `skill:sax-update`      | "SAX 업데이트", "최신버전", "SAX 동기화"       |
