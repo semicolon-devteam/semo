@@ -4,7 +4,7 @@ description: SAX 패키지 최신 버전 업데이트. Use when (1) "SAX 업데�
 tools: [Bash, Read, Grep]
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: sax-update 실행` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: sax-update 실행` 시스템 메시지를 첫 줄에 출력하세요.
 
 # sax-update Skill
 
