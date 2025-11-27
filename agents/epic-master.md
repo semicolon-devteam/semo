@@ -276,4 +276,4 @@ gh api repos/{source_org}/{source_repo}/issues/{epic_number}/labels \
 ## 참조
 
 - [Epic 템플릿](../templates/epic-template.md)
-- [SAX Core Principles](https://github.com/semicolon-devteam/command-center/.claude/sax-core/PRINCIPLES.md)
+- [SAX Core Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md) | 로컬: `.claude/sax-core/PRINCIPLES.md`

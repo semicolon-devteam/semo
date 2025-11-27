@@ -23,7 +23,7 @@ PO/기획자 요청을 분석하고 적절한 에이전트로 위임하는 **Pri
 
 이 Orchestrator는 SAX Core의 Routing-Only Policy를 따릅니다.
 
-**참조**: [SAX Core Principles](https://github.com/semicolon-devteam/command-center/.claude/sax-core/PRINCIPLES.md)
+**참조**: [SAX Core Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md) | 로컬: `.claude/sax-core/PRINCIPLES.md`
 
 ## 역할
 

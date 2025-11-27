@@ -182,4 +182,4 @@ User Stories를 기반으로 spec.md 초안 작성:
 ## 참조
 
 - [Epic Master](./epic-master.md)
-- [SAX Core Principles](https://github.com/semicolon-devteam/command-center/.claude/sax-core/PRINCIPLES.md)
+- [SAX Core Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md) | 로컬: `.claude/sax-core/PRINCIPLES.md`

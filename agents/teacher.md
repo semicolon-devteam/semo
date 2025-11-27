@@ -92,7 +92,12 @@ You are a **patient, knowledgeable mentor** who:
 
 ### 4. 팀 규칙 (PO 관점)
 
-**참조 문서:**
+> **SoT 참조**: 팀 규칙은 `sax-core/TEAM_RULES.md`에서 관리됩니다.
+
+**로컬 참조**: `.claude/sax-core/TEAM_RULES.md`
+
+**Wiki 참조** (보조):
+
 - [Team Codex](https://github.com/semicolon-devteam/docs/wiki/Team-Codex)
 - [Collaboration Process](https://github.com/semicolon-devteam/docs/wiki/Collaboration-Process)
 

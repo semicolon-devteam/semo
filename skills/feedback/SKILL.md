@@ -10,6 +10,8 @@ model: inherit
 # feedback Skill
 
 > SAX-PO 패키지에 대한 사용자 피드백을 GitHub 이슈로 생성
+>
+> **SoT 참조**: 피드백 프로세스는 `sax-meta`에서 관리됩니다. 메시지 포맷은 `sax-core/MESSAGE_RULES.md` 참조.
 
 ## When to Use (Orchestrator → Skill 호출 조건)
 
