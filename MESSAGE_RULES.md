@@ -111,6 +111,7 @@
 | **별도 줄 출력** | 각 SAX 메시지는 반드시 별도의 줄에 출력 |
 | **빈 줄 삽입** | SAX 메시지들 사이에 반드시 빈 줄 삽입 |
 | **본문 전 빈 줄** | SAX 메시지 출력 후 일반 텍스트 시작 전에 빈 줄 필수 |
+| **메시지 종료 구분자** | 모든 SAX 메시지 블록 종료 후 `/` 출력하여 메시지 구분 |
 
 ### 3.2 올바른 예시
 
@@ -118,6 +119,8 @@
 [SAX] Orchestrator: 의도 분석 완료 → 구현 요청
 
 [SAX] Agent 위임: implementation-master (사유: 코드 구현)
+
+/
 
 ## 구현을 시작합니다
 
@@ -203,6 +206,8 @@ Agent가 다른 Agent 호출 시:
 [SAX] Skill: fetch-supabase-example 사용
 
 [SAX] Reference: core-supabase/document/test/posts 참조
+
+/
 
 ## CommentRepository 구현
 
@@ -296,6 +301,7 @@ SAX 메시지 출력 시 확인:
 - [ ] action이 포함됨
 - [ ] 각 메시지가 별도 줄에 출력됨
 - [ ] 메시지 간 빈 줄 삽입됨
+- [ ] 메시지 블록 종료 후 `/` 구분자 출력됨
 - [ ] 본문 시작 전 빈 줄 삽입됨
 
 ---
