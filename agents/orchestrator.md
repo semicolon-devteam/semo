@@ -1,9 +1,9 @@
 ---
 name: orchestrator
 description: |
-  SAX-Meta orchestrator for package development. PROACTIVELY delegate when:
-  (1) Agent CRUD requested, (2) Skill lifecycle needed, (3) Command changes required,
-  (4) Architecture decisions, (5) Version management. Routes to specialized agents.
+  SAX-Meta orchestrator for package development. PROACTIVELY delegate on ALL user requests.
+  Whenever user requests: (1) Agent CRUD, (2) Skill lifecycle, (3) Command changes,
+  (4) Architecture decisions, (5) Version management, (6) Package operations. Routes to specialized agents.
 tools:
   - read_file
   - list_dir
