@@ -11,6 +11,37 @@ model: inherit
 
 > SAX-Next 패키지에 대한 사용자 피드백을 GitHub 이슈로 생성
 
+## When to Use (Orchestrator → Skill 호출 조건)
+
+이 Skill은 Orchestrator에서 **자동으로 호출**됩니다:
+
+| 감지 키워드 | 호출 조건 |
+|-------------|-----------|
+| `/SAX:feedback` | 명시적 피드백 명령 |
+| `피드백`, `피드백해줘`, `버그 신고`, `제안할게` | 피드백 의도 표현 |
+| `SAX가 왜`, `SAX 동작이`, `[SAX] 메시지가`, `SAX 결과가` | SAX 동작 오류 지적 |
+
+**호출 흐름**:
+
+```text
+User → Orchestrator (의도 분석) → skill:feedback 라우팅 → feedback Skill 실행
+```
+
+**애매한 경우 확인 질문**:
+
+SAX와 무관한 오류 지적일 수 있는 경우, Orchestrator가 먼저 확인합니다:
+
+```markdown
+[SAX] Orchestrator: 의도 확인 필요
+
+⚠️ SAX 관련 피드백인가요?
+
+- **예**: SAX Agent/Skill/Command의 동작 문제
+- **아니오**: 일반 코드나 프로젝트 문제
+
+"SAX 피드백이야" 또는 "아니야"로 응답해주세요.
+```
+
 ## Purpose
 
 SAX-Next 패키지 사용 중 발생한 버그 또는 개선 제안을 GitHub 이슈로 생성하여 협업 매니저(Reus)에게 전달합니다.
