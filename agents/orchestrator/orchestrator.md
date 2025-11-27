@@ -74,6 +74,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 | 도움 요청           | 대화형 응답 (직접 처리) | "/SAX:help", "도움말", "뭘 해야 하지"          |
 | 온보딩 요청         | `onboarding-master`     | "/SAX:onboarding", "처음", "신규", "온보딩"    |
 | 환경 검증           | `skill:health-check`    | "/SAX:health-check", "환경 확인", "도구 확인"  |
+| SAX 업데이트        | `skill:sax-update`      | "SAX 업데이트", "최신버전", "SAX 동기화"       |
 | 진행도 확인         | `skill:task-progress`   | "/SAX:task-progress", "어디까지", "현황"       |
 | 업무 시작           | 복합 로직 (자동화)      | 이슈 URL (cm-office#32), "할당받았다"         |
 | 기술/지식 학습      | `teacher`               | 특정 기술 개념 질문, 팀 철학/프로세스 학습     |
