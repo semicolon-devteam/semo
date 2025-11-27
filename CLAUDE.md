@@ -5,19 +5,61 @@
 ## Package Info
 
 - **Package**: SAX-Next
-- **Version**: 📌 [sax/VERSION](https://github.com/semicolon-devteam/docs/blob/main/sax/VERSION) 참조
-- **Target**: cm-template, cm-\* 프로젝트 (Next.js 기반)
+- **Version**: 📌 [VERSION](./VERSION) 참조
+- **Target**: cm-template, cm-* 프로젝트 (Next.js 기반)
 - **Audience**: Frontend/Fullstack 개발자
-- **Extends**: SAX-Core
 
-## SAX Core 상속
+---
 
-이 패키지는 SAX Core의 기본 원칙을 상속합니다.
+## 🔴 SAX Core 필수 참조 (NON-NEGOTIABLE)
 
-@sax-core/PRINCIPLES.md
-@sax-core/MESSAGE_RULES.md
+> **모든 응답 전에 반드시 sax-core 문서를 참조합니다.**
 
-> 📖 Core 문서는 `.claude/sax-core/` 디렉토리에서 자동 로드됩니다.
+### 필수 참조 파일
+
+| 파일 | 용도 | 참조 시점 |
+|------|------|----------|
+| `sax-core/PRINCIPLES.md` | SAX 핵심 원칙 | 모든 작업 전 |
+| `sax-core/MESSAGE_RULES.md` | 메시지 포맷 규칙 | 모든 응답 시 |
+
+### 참조 방법
+
+```bash
+# 로컬 설치된 경우
+.claude/sax-core/PRINCIPLES.md
+.claude/sax-core/MESSAGE_RULES.md
+
+# 또는 GitHub API
+gh api repos/semicolon-devteam/sax-core/contents/PRINCIPLES.md --jq '.content' | base64 -d
+```
+
+---
+
+## 🔴 Orchestrator 위임 필수 (NON-NEGOTIABLE)
+
+> **모든 사용자 요청은 반드시 Orchestrator를 통해 라우팅됩니다.**
+
+### 동작 규칙
+
+1. **사용자 요청 수신 시**: 즉시 `agents/orchestrator/orchestrator.md` 읽기
+2. **Orchestrator가 적절한 Agent/Skill 결정**
+3. **SAX 메시지 포맷으로 라우팅 결과 출력**
+
+### 예외 없음
+
+- 단순 질문도 Orchestrator 거침
+- 직접 Agent/Skill 호출 금지
+- CLAUDE.md에서 Agent 목록 참조하지 않음 (Orchestrator가 관리)
+
+### 메시지 포맷 (sax-core/MESSAGE_RULES.md 준수)
+
+```markdown
+[SAX] Orchestrator: 의도 분석 완료 → {intent_category}
+
+[SAX] Agent 위임: {agent_name} (사유: {reason})
+```
+
+---
 
 ## Workflow: SDD + ADD
 
@@ -47,6 +89,8 @@ skill:check-team-codex → 팀 코덱스 준수 확인
 skill:validate-architecture → DDD 아키텍처 검증
 ```
 
+---
+
 ## Architecture: DDD 4-Layer
 
 ```text
@@ -58,46 +102,7 @@ src/app/{domain}/
 └── page.tsx
 ```
 
-## Package Components
-
-### Agents
-
-| Agent | 역할 | 파일 |
-|-------|------|------|
-| orchestrator | 요청 라우팅 | `agents/orchestrator/` |
-| spec-master | SDD Phase 1-3 | `agents/spec-master.md` |
-| database-master | DB 및 Supabase 통합 | `agents/database-master.md` |
-| advisor | 조언 제공 | `agents/advisor.md` |
-| teacher | 학습 안내 | `agents/teacher.md` |
-| onboarding-master | 신규 개발자 온보딩 | `agents/onboarding-master.md` |
-
-### Skills
-
-| Skill | 역할 | 파일 |
-|-------|------|------|
-| health-check | 개발 환경 검증 | `skills/health-check/` |
-| task-progress | 워크플로우 진행도 확인 | `skills/task-progress/` |
-| spec | SDD 명세 워크플로우 | `skills/spec/` |
-| implement | ADD 구현 워크플로우 | `skills/implement/` |
-| verify | Phase 5 종합 검증 | `skills/verify/` |
-| check-team-codex | 팀 코덱스 검증 | `skills/check-team-codex/` |
-| validate-architecture | DDD 아키텍처 검증 | `skills/validate-architecture/` |
-| scaffold-domain | 도메인 구조 생성 | `skills/scaffold-domain/` |
-| fetch-supabase-example | Supabase 패턴 참조 | `skills/fetch-supabase-example/` |
-| git-workflow | Git 워크플로우 자동화 | `skills/git-workflow/` |
-| create-issues | GitHub Issues 생성 | `skills/create-issues/` |
-| project-kickoff | 프로젝트 시작 가이드 | `skills/project-kickoff/` |
-| migration-analyzer | 마이그레이션 분석 | `skills/migration-analyzer/` |
-| constitution | 프로젝트 헌법 | `skills/constitution/` |
-
-### Commands
-
-| Command | 역할 | 파일 |
-|---------|------|------|
-| /SAX:onboarding | 신규 개발자 온보딩 | `commands/onboarding.md` |
-| /SAX:health-check | 개발 환경 검증 | `commands/health-check.md` |
-| /SAX:task-progress | 워크플로우 진행도 확인 | `commands/task-progress.md` |
-| /SAX:help | 대화형 도우미 | `commands/help.md` |
+---
 
 ## PO 연동 (SAX-PO)
 
@@ -110,37 +115,9 @@ SAX-PO에서 생성된 Epic은 다음과 같이 연동됩니다:
 5. **개발자 (SAX-Next)**: `skill:implement`로 구현
 6. **개발자 (SAX-Next)**: `skill:verify`로 검증
 
-## Installation & Update
-
-### 설치 방법
-
-```bash
-# docs 레포에서 deploy.sh 사용 (권장)
-cd /path/to/semicolon/docs
-./sax/scripts/deploy.sh sax-next /path/to/project
-
-# 또는 수동 설치
-cd /path/to/project
-mkdir -p .claude
-cp -r /path/to/docs/sax/core .claude/sax-core
-cp -r /path/to/docs/sax/packages/sax-next/* .claude/
-```
-
-### 업데이트 후 커밋 규칙
-
-> ⚠️ **중요**: SAX 패키지 동기화(업데이트) 완료 후 **반드시 커밋**을 수행합니다.
-
-**커밋 메시지 형식**:
-
-```text
-📝 [SAX] Sync to vX.X.X
-```
+---
 
 ## References
 
-- [SAX Core - Principles](https://github.com/semicolon-devteam/docs/blob/main/sax/core/PRINCIPLES.md)
-- [SAX Core - Message Rules](https://github.com/semicolon-devteam/docs/blob/main/sax/core/MESSAGE_RULES.md)
-- [SAX Core - Packaging](https://github.com/semicolon-devteam/docs/blob/main/sax/core/PACKAGING.md)
-- [SAX Changelog Index](https://github.com/semicolon-devteam/docs/blob/main/sax/CHANGELOG/INDEX.md)
-- [Team Codex](https://github.com/semicolon-devteam/docs/wiki/Team-Codex)
-- [Development Philosophy](https://github.com/semicolon-devteam/docs/wiki/Development-Philosophy)
+- [SAX Core - Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
+- [SAX Core - Message Rules](https://github.com/semicolon-devteam/sax-core/blob/main/MESSAGE_RULES.md)
