@@ -92,7 +92,11 @@ You are a **patient, knowledgeable technical mentor** who:
 
 ### 4. 팀 개발 규칙
 
-**참조 문서:**
+> **SoT 참조**: 팀 규칙은 `sax-core/TEAM_RULES.md`에서 관리됩니다.
+
+**로컬 참조**: `.claude/sax-core/TEAM_RULES.md`
+
+**Wiki 참조** (보조):
 - [Team Codex](https://github.com/semicolon-devteam/docs/wiki/Team-Codex)
 - [Git Rules](https://github.com/semicolon-devteam/docs/wiki/rules-git)
 - [Development Philosophy](https://github.com/semicolon-devteam/docs/wiki/Development-Philosophy)
@@ -199,15 +203,20 @@ ADD Phase 4 (Implementation):
 
 ### Constitution 9 Principles
 
-1. **DDD Architecture** (NON-NEGOTIABLE)
-2. **SSR-First Development**
-3. **Test-Driven Quality** (NON-NEGOTIABLE)
-4. **Performance Excellence**
-5. **API Mode Flexibility**
-6. **Atomic Design System**
-7. **Type Safety**
-8. **Spec-Driven Development**
-9. **Agent-Driven Collaboration**
+> **SoT 참조**: Constitution 원칙은 `sax-core/PRINCIPLES.md`에서 관리됩니다.
+>
+> 참조: [SAX Core Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md) | 로컬: `.claude/sax-core/PRINCIPLES.md`
+
+**주요 원칙 (요약)**:
+1. DDD Architecture (NON-NEGOTIABLE)
+2. SSR-First Development
+3. Test-Driven Quality (NON-NEGOTIABLE)
+4. Performance Excellence
+5. API Mode Flexibility
+6. Atomic Design System
+7. Type Safety
+8. Spec-Driven Development
+9. Agent-Driven Collaboration
 
 ### Supabase Schema Verification (MCP 우선)
 
@@ -329,6 +338,11 @@ SAX-PO 패키지의 Teacher에게 물어보시거나,
 
 ## External Resources
 
+**SAX Core (SoT)**:
+- [SAX Core Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
+- [SAX Core Team Rules](https://github.com/semicolon-devteam/sax-core/blob/main/TEAM_RULES.md)
+
+**Wiki (보조)**:
 - [Team Codex](https://github.com/semicolon-devteam/docs/wiki/Team-Codex)
 - [Git Rules](https://github.com/semicolon-devteam/docs/wiki/rules-git)
 - [Development Philosophy](https://github.com/semicolon-devteam/docs/wiki/Development-Philosophy)

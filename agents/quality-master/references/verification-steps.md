@@ -1,6 +1,8 @@
 # Verification Steps
 
 > quality-master Agent의 상세 검증 단계
+>
+> **SoT 참조**: Team Codex 규칙은 `sax-core/TEAM_RULES.md`에서 관리됩니다.
 
 ## Step 1: Spec Compliance (speckit.analyze)
 

@@ -63,6 +63,8 @@ skill: validateArchitecture({ quick: true });
 
 ## Constitution Compliance
 
+> **SoT 참조**: Constitution 원칙은 `sax-core/PRINCIPLES.md`에서 관리됩니다.
+
 - **Principle I**: DDD Architecture (NON-NEGOTIABLE)
 - **Principle II**: SSR-First Development
 
