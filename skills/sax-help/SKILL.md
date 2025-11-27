@@ -86,16 +86,106 @@ Epic 작성 → Epic 검토 → Task 분해 → GitHub Issue 생성 → Spec 초
 2. 위 출력 포맷으로 도움말 출력
 3. 사용자 추가 질문 대기
 
+## 대화형 워크플로우
+
+### Step 1: 상황 파악
+
+사용자의 현재 상황을 파악합니다:
+
+```markdown
+[SAX] Skill: sax-help 실행
+
+## 🤝 SAX 도우미 (PO/기획자)
+
+무엇을 도와드릴까요?
+
+### 💭 질문 유형을 선택하세요
+
+1. **📍 PO 워크플로우**: "PO가 뭘 하는지 알고 싶어요"
+2. **🎯 Epic 생성**: "Epic을 만들고 싶어요"
+3. **📝 Spec 초안**: "개발자에게 전달할 명세가 필요해요"
+4. **🔄 개발팀 협업**: "개발자와 어떻게 협업하나요?"
+5. **📊 진행도 확인**: "프로젝트 진행 상황을 보고 싶어요"
+6. **❓ 기타**: "다른 질문이 있어요"
+
+번호를 선택하거나 자유롭게 질문해주세요.
+```
+
+### Step 2: 맞춤형 응답
+
+사용자 선택에 따라 적절한 정보 제공:
+
+- **1️⃣ PO 워크플로우**: PO 역할 및 프로세스 설명
+- **2️⃣ Epic 생성**: epic-master Agent 위임
+- **3️⃣ Spec 초안**: spec-writer Agent 위임
+- **4️⃣ 개발팀 협업**: 협업 방법 안내
+- **5️⃣ 진행도 확인**: GitHub Projects 활용법 안내
+- **6️⃣ 기타**: 자유 질문 응답
+
+### Step 3: 추가 질문 유도
+
+```markdown
+---
+
+**도움이 되셨나요?**
+
+다른 궁금한 점이 있으시면 언제든 물어보세요:
+- "Epic 만들어줘" → Epic 생성
+- "Spec 초안 작성해줘" → Spec 초안
+- "/SAX:help" → 도움말 처음으로
+
+**단축키**:
+- `/SAX:health-check` - 환경 재검증
+- `epic-master` - Epic 전문 Agent
+```
+
+## Integration with Other Tools
+
+### epic-master Agent
+
+```markdown
+User: "Epic을 어떻게 만들어?"
+→ [SAX] Agent: epic-master 호출 (트리거: Epic 학습 요청)
+→ Epic 개념 설명
+→ Epic 생성 예시
+→ 실습 제안
+```
+
+### spec-writer Agent
+
+```markdown
+User: "Spec 초안은 뭐야?"
+→ [SAX] Agent: spec-writer 호출 (트리거: Spec 학습 요청)
+→ Spec 초안 개념 설명
+→ 작성 방법 안내
+```
+
+### teacher Agent
+
+```markdown
+User: "PO 협업 방식을 알고 싶어요"
+→ [SAX] Agent: teacher 호출 (트리거: 프로세스 학습 요청)
+→ PO 워크플로우 상세 설명
+→ 예시 제공
+→ 실습 제안
+```
+
 ## SAX Message Format
 
 ```markdown
 [SAX] Skill: sax-help 실행
 
-/
-
-# SAX-PO 도움말
+## 🤝 SAX 도우미 (PO/기획자)
 ...
 ```
+
+## Critical Rules
+
+1. **대화형 접근**: 사용자가 질문을 선택하거나 자유롭게 물어볼 수 있도록
+2. **PO 맥락 유지**: PO/기획자 관점의 응답
+3. **단계적 안내**: 한 번에 한 단계씩, 명확하게
+4. **추가 질문 유도**: 항상 "더 궁금한 점?" 질문
+5. **Agent 위임**: 복잡한 질문은 적절한 Agent로 위임
 
 ## Related
 
