@@ -5,40 +5,61 @@
 ## Package Info
 
 - **Package**: SAX-PO
-- **Version**: 📌 [sax/VERSION](https://github.com/semicolon-devteam/docs/blob/main/sax/VERSION) 참조
+- **Version**: 📌 [VERSION](./VERSION) 참조
 - **Target**: docs repository
 - **Audience**: PO, 기획자
-- **Extends**: SAX-Core
 
-## SAX Core 상속
+---
 
-이 패키지는 SAX Core의 기본 원칙을 상속합니다.
+## 🔴 SAX Core 필수 참조 (NON-NEGOTIABLE)
 
-@sax-core/PRINCIPLES.md
-@sax-core/MESSAGE_RULES.md
+> **모든 응답 전에 반드시 sax-core 문서를 참조합니다.**
 
-> 📖 Core 문서는 `.claude/sax-core/` 디렉토리에서 자동 로드됩니다.
+### 필수 참조 파일
 
-## 설치 대상
+| 파일 | 용도 | 참조 시점 |
+|------|------|----------|
+| `sax-core/PRINCIPLES.md` | SAX 핵심 원칙 | 모든 작업 전 |
+| `sax-core/MESSAGE_RULES.md` | 메시지 포맷 규칙 | 모든 응답 시 |
 
-이 패키지는 `semicolon-devteam/docs` 레포지토리의 `.claude/` 디렉토리에 설치됩니다.
-
-### docs 레포 한정 동기화 규칙
-
-> ⚠️ **중요**: docs 레포지토리에서 SAX-PO 개선 작업 시, 다음 두 위치를 **동시에** 업데이트해야 합니다:
-
-| 위치 | 역할 |
-|------|------|
-| `.claude/sax-po/` | SAX-PO 실제 사용 (설치된 상태) |
-| `sax/packages/sax-po/` | SAX-PO 패키지 소스 (배포용) |
-
-**동기화 명령**:
+### 참조 방법
 
 ```bash
-rsync -av --delete --exclude='.git' \
-  sax/packages/sax-po/ \
-  .claude/sax-po/
+# 로컬 설치된 경우
+.claude/sax-core/PRINCIPLES.md
+.claude/sax-core/MESSAGE_RULES.md
+
+# 또는 GitHub API
+gh api repos/semicolon-devteam/sax-core/contents/PRINCIPLES.md --jq '.content' | base64 -d
 ```
+
+---
+
+## 🔴 Orchestrator 위임 필수 (NON-NEGOTIABLE)
+
+> **모든 사용자 요청은 반드시 Orchestrator를 통해 라우팅됩니다.**
+
+### 동작 규칙
+
+1. **사용자 요청 수신 시**: 즉시 `agents/orchestrator.md` 읽기
+2. **Orchestrator가 적절한 Agent/Skill 결정**
+3. **SAX 메시지 포맷으로 라우팅 결과 출력**
+
+### 예외 없음
+
+- 단순 질문도 Orchestrator 거침
+- 직접 Agent/Skill 호출 금지
+- CLAUDE.md에서 Agent 목록 참조하지 않음 (Orchestrator가 관리)
+
+### 메시지 포맷 (sax-core/MESSAGE_RULES.md 준수)
+
+```markdown
+[SAX] Orchestrator: 의도 분석 완료 → {intent_category}
+
+[SAX] Agent 위임: {agent_name} (사유: {reason})
+```
+
+---
 
 ## 개발자 연동
 
@@ -51,73 +72,9 @@ SAX-PO로 생성된 Epic은 개발자(SAX-Next)와 다음과 같이 연동됩니
 5. **개발자**: spec.md 보완 후 `/speckit.plan`, `/speckit.tasks`
 6. **개발자**: Draft Task Issue 업데이트 (tasks/ 내용 반영, draft 라벨 제거)
 
-## Package Components
-
-### Agents
-
-| Agent | 역할 | 파일 |
-|-------|------|------|
-| orchestrator | 요청 라우팅 | `agents/orchestrator.md` |
-| epic-master | Epic 생성 | `agents/epic-master.md` |
-| draft-task-creator | Draft Task 생성 | `agents/draft-task-creator.md` |
-| spec-writer | Spec 초안 작성 | `agents/spec-writer.md` |
-| onboarding-master | 신규 사용자 온보딩 | `agents/onboarding-master.md` |
-| teacher | 학습 안내 | `agents/teacher.md` |
-
-### Skills
-
-| Skill | 역할 | 파일 |
-|-------|------|------|
-| health-check | 개발 환경 검증 | `skills/health-check/` |
-| assign-project-label | 프로젝트 라벨 및 Projects 연결 | `skills/assign-project-label/` |
-| detect-project-from-epic | Epic 프로젝트 라벨 감지 | `skills/detect-project-from-epic/` |
-| check-backend-duplication | core-backend 중복 체크 | `skills/check-backend-duplication/` |
-| assign-estimation-point | Estimation Point 할당 | `skills/assign-estimation-point/` |
-| generate-acceptance-criteria | AC 자동 생성 | `skills/generate-acceptance-criteria/` |
-| create-design-task | 디자인 Task 생성 | `skills/create-design-task/` |
-| validate-task-completeness | Draft Task 필수 항목 검증 | `skills/validate-task-completeness/` |
-| auto-label-by-scope | Epic 범위 기반 자동 라벨링 | `skills/auto-label-by-scope/` |
-| estimate-epic-timeline | Epic 전체 일정 예측 | `skills/estimate-epic-timeline/` |
-| check-team-codex | 팀 규칙 검증 | `skills/check-team-codex/` |
-
-### Commands
-
-| Command | 역할 | 파일 |
-|---------|------|------|
-| /SAX:onboarding | 신규 PO/기획자 온보딩 | `commands/SAX/onboarding.md` |
-| /SAX:health-check | 개발 환경 검증 | `commands/SAX/health-check.md` |
-| /SAX:help | 대화형 도우미 (PO/기획자) | `commands/SAX/help.md` |
-
-### Templates
-
-| Template | 역할 | 파일 |
-|----------|------|------|
-| epic-template | Epic 이슈 본문 | `templates/epic-template.md` |
-
-## Installation & Update
-
-### 설치 방법
-
-docs 레포지토리에 설치:
-
-```bash
-cd semicolon-devteam/docs
-cp -r sax/packages/sax-po/* .claude/
-```
-
-### 업데이트 후 커밋 규칙
-
-> ⚠️ **중요**: SAX 패키지 동기화(업데이트) 완료 후 **반드시 커밋**을 수행합니다.
-
-**커밋 메시지 형식**:
-
-```text
-📝 [SAX] Sync to vX.X.X
-```
+---
 
 ## References
 
-- [SAX Core - Principles](https://github.com/semicolon-devteam/docs/blob/main/sax/core/PRINCIPLES.md)
-- [SAX Core - Message Rules](https://github.com/semicolon-devteam/docs/blob/main/sax/core/MESSAGE_RULES.md)
-- [SAX Core - Packaging](https://github.com/semicolon-devteam/docs/blob/main/sax/core/PACKAGING.md)
-- [SAX Changelog Index](https://github.com/semicolon-devteam/docs/blob/main/sax/CHANGELOG/INDEX.md)
+- [SAX Core - Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
+- [SAX Core - Message Rules](https://github.com/semicolon-devteam/sax-core/blob/main/MESSAGE_RULES.md)
