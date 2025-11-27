@@ -1,9 +1,9 @@
 ---
 name: orchestrator
 description: |
-  SAX-Next orchestrator for developers. PROACTIVELY delegate when:
-  (1) Spec/implementation requests, (2) Quality verification, (3) Learning/advice needed,
-  (4) Database/architecture tasks, (5) Code review. Routes to specialized agents.
+  SAX-Next orchestrator for developers. PROACTIVELY delegate on ALL user requests.
+  Whenever user requests: (1) Spec/implementation, (2) Quality verification, (3) Learning/advice,
+  (4) Database/architecture, (5) Code review, (6) SAX updates. Routes to specialized agents.
 tools:
   - read_file
   - list_dir
@@ -78,7 +78,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 | SAX 동작 오류 지적  | `skill:feedback`        | "SAX가 왜", "SAX 동작이", "[SAX] 메시지가"     |
 | 온보딩 요청         | `onboarding-master`     | "/SAX:onboarding", "처음", "신규", "온보딩"    |
 | 환경 검증           | `skill:health-check`    | "/SAX:health-check", "환경 확인", "도구 확인"  |
-| SAX 업데이트        | `skill:sax-update`      | "SAX 업데이트", "최신버전", "SAX 동기화"       |
+| SAX 업데이트        | `version-updater`       | "SAX 업데이트", "최신버전", "SAX 동기화", "패키지 업데이트" |
 | 진행도 확인         | `skill:task-progress`   | "/SAX:task-progress", "어디까지", "현황"       |
 | 업무 시작           | 복합 로직 (자동화)      | 이슈 URL (cm-office#32), "할당받았다"         |
 | 기술/지식 학습      | `teacher`               | 특정 기술 개념 질문, 팀 철학/프로세스 학습     |
