@@ -1,38 +1,38 @@
 ---
 name: check-team-codex
-description: Validate code against Semicolon Team Codex rules. Use when (1) before committing code, (2) during code review process, (3) after implementation for quality gate, (4) CI/CD automated quality check, (5) onboarding new team members to team standards.
+description: Validate code against Team Codex standards. Use when (1) before committing, (2) code review, (3) quality gate enforcement.
 tools: [Bash, Read, Grep]
 ---
-
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: check-team-codex 호출 - {검증 대상}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Check Team Codex Skill
 
 > 코드를 Semicolon 팀 표준에 맞게 자동 검증
 
-## Purpose
+## 규칙 참조 (SoT)
 
-Semicolon Team Codex에 정의된 팀 표준에 따라 코드를 자동으로 검증하여 모든 프로젝트의 일관성과 품질을 보장합니다.
+> **모든 Team Codex 규칙은 sax-core/TEAM_RULES.md에서 관리됩니다.**
 
-## When to Use
+```bash
+# 로컬 참조
+.claude/sax-core/TEAM_RULES.md
 
-- **Before committing**: Pre-commit 검증
-- **During code review**: 표준 준수 확인
-- **After implementation**: Quality gate 검증
-- **CI/CD integration**: 자동화된 품질 체크
-- **Onboarding**: 신규 팀원 표준 학습 지원
+# 원격 참조
+gh api repos/semicolon-devteam/sax-core/contents/TEAM_RULES.md --jq '.content' | base64 -d
+```
+
+**참조 섹션**:
+
+- `2. Code Quality (Team Codex)` - 검증 항목, 금지 사항, Severity Levels
+- `6. Quality Gates` - Pre-commit, Pre-PR 검증
 
 ## Quick Start
 
 ```bash
-# 커밋 전 필수 체크 (Pre-commit)
+# Pre-commit 필수 체크
 npm run lint && npx tsc --noEmit
 
-# 전체 검증 (Pre-PR)
+# Pre-PR 전체 검증
 npm run lint && npx tsc --noEmit && npm test
-
-# 디버그 코드 확인
-grep -r "console\.log\|debugger" src/ --exclude-dir=node_modules --exclude="*.test.*"
 ```
 
 **기대 결과**:
@@ -41,25 +41,17 @@ grep -r "console\.log\|debugger" src/ --exclude-dir=node_modules --exclude="*.te
 - ✅ TypeScript: 0 errors
 - ✅ No debug code found
 
-## Advanced Usage
+## When to Use
 
-상세한 규칙과 검증 방법은 다음을 참조하세요:
+- Before committing code
+- During code review
+- After implementation (quality gate)
+- Onboarding new team members
 
-- **[Team Codex Rules](references/codex-rules.md)** - Git 컨벤션, 코드 품질, DDD 아키텍처 규칙
-- **[Validation Checks](references/validation-checks.md)** - 6가지 검증 항목 및 bash 명령어
-- **[Execution Flow](references/execution-flow.md)** - Quick/Full/CI-CD 검증 워크플로우 및 출력 형식
-- **[Integration Examples](references/integration.md)** - Git Hook, VS Code Task, Package.json 통합 예제
+## Severity Levels
 
-## SAX Message
-
-```markdown
-[SAX] Skill: check-team-codex 사용
-
-[SAX] Reference: Team Codex 규칙 (Git/Code/DDD/Test) 참조
-```
-
-## Related
-
-- [Team Codex Wiki](https://github.com/semicolon-devteam/docs/wiki/Team-Codex)
-- [DDD Architecture Guide](../../CLAUDE.md)
-- [Conventional Commits](https://www.conventionalcommits.org/)
+| Level | 항목 | 조치 |
+|-------|------|------|
+| 🔴 CRITICAL | ESLint/TS 에러, hook 우회, 아키텍처 위반 | PR 차단 |
+| 🟡 WARNING | Debug 코드, any 타입, TODO 주석 | 수정 권장 |
+| 🟢 INFO | 스타일 제안, 성능 힌트 | 선택적 |

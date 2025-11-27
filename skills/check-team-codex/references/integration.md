@@ -1,5 +1,7 @@
 # Integration Examples
 
+> **SoT 참조**: Team Codex 규칙은 `sax-core/TEAM_RULES.md` 섹션 2에서 관리됩니다.
+
 ## Git Hook (Husky)
 
 ```bash
