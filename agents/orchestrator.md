@@ -355,17 +355,82 @@ User: SAX 개발은 어떻게 해?
 4. **동기화**: docs/.claude/ 디렉토리에 동기화
 ```
 
+## 🔴 Post-Action Compliance Check (필수)
+
+> **모든 SAX 작업 완료 후 compliance-checker 자동 실행**
+
+### 트리거 조건
+
+| 조건 | 설명 |
+|------|------|
+| 파일 생성 | `agents/`, `skills/`, `commands/` 내 새 파일 |
+| 파일 수정 | SAX 패키지 내 `.md` 파일 변경 |
+| CLAUDE.md 변경 | 패키지 설정 변경 |
+| orchestrator.md 변경 | 라우팅 규칙 변경 |
+
+### 자동 호출 방식
+
+```markdown
+[작업 완료 후]
+
+[SAX] Agent 호출: compliance-checker (사유: 작업 완료 후 규칙 검증)
+
+## 🔍 규칙 검증 시작
+...
+```
+
+### 검증 항목
+
+1. **sax-core 준수**: PRINCIPLES.md, MESSAGE_RULES.md 규칙 준수 여부
+2. **라우팅 적절성**: 요청 의도와 사용된 Agent/Skill 일치 여부
+3. **문서 중복**: 새 문서가 기존 문서와 중복되는지 여부
+
+### 위반 시 처리
+
+- **❌ CRITICAL**: 작업 중단 권장
+- **⚠️ WARNING**: 수정 권장, 진행 가능
+- **💡 INFO**: 참고용
+
+**상세**: [compliance-checker Agent](./compliance-checker/compliance-checker.md) 참조
+
+---
+
+## Available Agents
+
+| Agent | 역할 | 트리거 |
+|-------|------|--------|
+| `agent-manager` | Agent CRUD | `@AGENT` + 동작 |
+| `skill-manager` | Skill CRUD | `@SKILL` + 동작 |
+| `command-manager` | Command CRUD | `@COMMAND` + 동작 |
+| `sax-architect` | 패키지 설계 | 구조, 설계, 아키텍처 |
+| `compliance-checker` | 규칙 검증 | **자동** (작업 완료 후) |
+
+## Available Skills
+
+| Skill | 역할 | 트리거 |
+|-------|------|--------|
+| `package-validator` | 패키지 구조 검증 | 검증, 구조 확인 |
+| `version-manager` | 버저닝 자동화 | 버전, 릴리스 |
+| `package-sync` | 패키지 동기화 | 동기화, sync |
+| `package-deploy` | 패키지 배포 | 배포, deploy |
+| `sax-help` | 도움말 | /SAX:help, 도움말 |
+| `feedback` | 피드백 수집 | /SAX:feedback, 피드백 |
+
+---
+
 ## Critical Rules
 
 1. **Routing-Only**: 직접 작업 수행 금지
 2. **SAX Compliance**: 모든 위임에 SAX 메시지 포함
 3. **Context Preservation**: 패키지명, 버전 정보 항상 표시
 4. **Clear Guidance**: 다음 단계 명확히 안내
+5. **Post-Action Check**: 모든 작업 완료 후 compliance-checker 자동 실행
 
 ## 참조
 
 - [SAX Core Principles](https://github.com/semicolon-devteam/docs/blob/main/sax/core/PRINCIPLES.md)
-- [agent-manager](./agent-manager.md)
-- [skill-manager](./skill-manager.md)
-- [command-manager](./command-manager.md)
+- [agent-manager](./agent-manager/agent-manager.md)
+- [skill-manager](./skill-manager/skill-manager.md)
+- [command-manager](./command-manager/command-manager.md)
 - [sax-architect](./sax-architect.md)
+- [compliance-checker](./compliance-checker/compliance-checker.md)
