@@ -23,7 +23,8 @@ trigger: "/SAX:health-check"
 2. 선택 도구 (postgresql)
 3. GitHub 인증 및 Organization 멤버십
 4. 레포지토리 접근 권한 (docs, core-supabase)
-5. Slack 워크스페이스 참여 (수동 확인)
+5. 외부 서비스 접근 (API 문서 사이트)
+6. Slack 워크스페이스 참여 (수동 확인)
 
 ## Expected Output
 
@@ -47,6 +48,8 @@ trigger: "/SAX:health-check"
 ✅ semicolon-devteam 멤버십: 확인
 ✅ docs 레포 접근: 가능
 ✅ core-supabase 레포 접근: 가능
+
+✅ API 문서 사이트: 접근 가능
 
 ✅ Slack 워크스페이스 참여: 확인
 

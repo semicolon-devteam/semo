@@ -60,7 +60,32 @@ core_supabase_access:
   error: "core-supabase 레포 접근 불가. Private repo 권한 확인 필요"
 ```
 
-## 3. Slack 참여 (수동 확인)
+## 3. 외부 서비스 접근
+
+```yaml
+api_docs:
+  url: "https://core-interface-ashen.vercel.app/#/"
+  method: "curl_check"
+  command: "curl -s -o /dev/null -w '%{http_code}' 'https://core-interface-ashen.vercel.app'"
+  expected: "200"
+  required: true
+  error: "API 문서 사이트 접근 불가. 네트워크 연결 또는 VPN 확인 필요"
+  note: "Semicolon API 명세 문서 (Swagger UI)"
+```
+
+### 검증 로직
+
+```bash
+# API 문서 접근 확인
+HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' 'https://core-interface-ashen.vercel.app' --max-time 10)
+if [ "$HTTP_CODE" = "200" ]; then
+  echo "✅ API 문서 사이트: 접근 가능"
+else
+  echo "❌ API 문서 사이트: 접근 불가 (HTTP $HTTP_CODE)"
+fi
+```
+
+## 4. Slack 참여 (수동 확인)
 
 ```yaml
 slack_workspace:
@@ -96,7 +121,7 @@ claude_json_check:
         - "SAX.currentTask" (object: repo, issue, branch)
 ```
 
-## 검증 로직
+### Claude Config 검증 로직
 
 ```bash
 # 1. 파일 존재 확인

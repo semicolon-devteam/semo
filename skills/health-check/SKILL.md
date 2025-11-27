@@ -36,6 +36,12 @@ tools: [Bash, Read, Grep]
 | docs 접근 | `gh api repos/semicolon-devteam/docs/contents/README.md` |
 | core-supabase | `gh api repos/semicolon-devteam/core-supabase/contents/README.md` |
 
+### 외부 서비스
+
+| 항목 | 검증 방법 |
+|------|----------|
+| API 문서 사이트 | `curl` HTTP 200 체크 (`https://core-interface-ashen.vercel.app`) |
+
 ### SAX 메타데이터
 
 - 파일: `~/.claude.json`
