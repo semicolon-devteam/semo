@@ -53,12 +53,14 @@ echo "sax-po: $(cat .claude/sax-po/VERSION 2>/dev/null || cat .claude/VERSION)"
 ### Step 3: 업데이트 실행
 
 **Submodule 방식**:
+
 ```bash
 cd .claude/sax-core && git fetch origin && git pull origin main
 cd .claude/sax-po && git fetch origin && git pull origin main
 ```
 
 **복사 방식**:
+
 ```markdown
 ⚠️ 복사 방식으로 설치되어 있습니다.
 
@@ -68,7 +70,62 @@ cd .claude/sax-po && git fetch origin && git pull origin main
 3. 또는 `git submodule add`로 submodule 방식으로 전환
 ```
 
-### Step 4: 업데이트 결과 출력
+### Step 4: 심링크 재설정
+
+> **🔴 필수**: 업데이트 후 심링크가 올바르게 설정되어 있는지 확인하고 재설정합니다.
+
+```bash
+# .claude 디렉토리로 이동
+cd .claude
+
+# 기존 심링크 확인 및 재설정
+# CLAUDE.md 심링크
+if [ -L "CLAUDE.md" ]; then
+  rm CLAUDE.md
+fi
+ln -sf sax-po/CLAUDE.md CLAUDE.md
+
+# agents 심링크
+if [ -L "agents" ]; then
+  rm agents
+fi
+ln -sf sax-po/agents agents
+
+# skills 심링크
+if [ -L "skills" ]; then
+  rm skills
+fi
+ln -sf sax-po/skills skills
+
+# commands 심링크 (SAX/commands)
+mkdir -p SAX
+if [ -L "SAX/commands" ]; then
+  rm SAX/commands
+fi
+ln -sf ../sax-po/commands SAX/commands
+
+cd ..
+```
+
+**심링크 확인**:
+
+```bash
+ls -la .claude/CLAUDE.md
+ls -la .claude/agents
+ls -la .claude/skills
+ls -la .claude/SAX/commands
+```
+
+**예상 출력**:
+
+```text
+.claude/CLAUDE.md -> sax-po/CLAUDE.md
+.claude/agents -> sax-po/agents
+.claude/skills -> sax-po/skills
+.claude/SAX/commands -> ../sax-po/commands
+```
+
+### Step 5: 업데이트 결과 출력
 
 ```markdown
 [SAX] Update: 업데이트 완료
@@ -79,6 +136,28 @@ cd .claude/sax-po && git fetch origin && git pull origin main
 | sax-po | 0.1.0 | 0.2.0 |
 
 ✅ SAX 패키지가 최신 버전으로 업데이트되었습니다.
+
+**심링크 상태**:
+- CLAUDE.md -> sax-po/CLAUDE.md ✅
+- agents/ -> sax-po/agents/ ✅
+- skills/ -> sax-po/skills/ ✅
+- SAX/commands/ -> sax-po/commands/ ✅
+```
+
+### Step 6: 서브모듈 커밋 (선택)
+
+업데이트 후 서브모듈 변경사항을 커밋할 수 있습니다:
+
+```bash
+git add .claude/sax-core .claude/sax-po
+git commit -m "📦 Update SAX packages
+
+- sax-core: {old_version} → {new_version}
+- sax-po: {old_version} → {new_version}
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
 
 ## SAX Message Format
