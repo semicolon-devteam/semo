@@ -273,6 +273,7 @@ rsync -av --delete \
 
 | Script | 역할 | 파일 |
 |--------|------|------|
+| install-sax.sh | SAX 패키지 설치 스크립트 | `scripts/install-sax.sh` |
 | sync_packages.sh | 패키지 동기화 자동화 | `scripts/sync_packages.sh` |
 
 ### Templates
@@ -285,9 +286,63 @@ rsync -av --delete \
 
 ## Installation & Usage
 
-### SAX-Meta 사용 방법
+### SAX 패키지 설치 (일반 프로젝트)
 
-SAX-Meta는 별도 설치가 필요 없습니다. docs 레포지토리에서 직접 사용합니다.
+빈 디렉토리 또는 기존 프로젝트에 SAX 패키지를 설치하려면 `install-sax.sh` 스크립트를 사용합니다.
+
+**설치 방법 1: curl로 직접 실행**
+
+```bash
+# sax-po 설치 (PO/기획자용)
+curl -fsSL https://raw.githubusercontent.com/semicolon-devteam/sax-meta/main/scripts/install-sax.sh | bash -s po
+
+# sax-next 설치 (Next.js 개발자용)
+curl -fsSL https://raw.githubusercontent.com/semicolon-devteam/sax-meta/main/scripts/install-sax.sh | bash -s next
+
+# sax-meta 설치 (SAX 패키지 관리자용)
+curl -fsSL https://raw.githubusercontent.com/semicolon-devteam/sax-meta/main/scripts/install-sax.sh | bash -s meta
+```
+
+**설치 방법 2: 스크립트 다운로드 후 실행**
+
+```bash
+# 스크립트 다운로드
+curl -O https://raw.githubusercontent.com/semicolon-devteam/sax-meta/main/scripts/install-sax.sh
+chmod +x install-sax.sh
+
+# 실행
+./install-sax.sh po    # sax-po 설치
+./install-sax.sh next  # sax-next 설치
+./install-sax.sh meta  # sax-meta 설치
+```
+
+**설치 결과 구조**:
+
+```text
+your-project/
+├── .claude/
+│   ├── CLAUDE.md -> sax-{package}/CLAUDE.md
+│   ├── agents/ -> sax-{package}/agents/
+│   ├── skills/ -> sax-{package}/skills/
+│   ├── sax-core/          (git submodule)
+│   └── sax-{package}/     (git submodule)
+└── ...
+```
+
+**설치 후 작업**:
+
+```bash
+# 변경사항 커밋
+git add .
+git commit -m "🔧 Install SAX packages"
+
+# 업데이트 (나중에)
+git submodule update --remote
+```
+
+### SAX-Meta 사용 방법 (개발자용)
+
+SAX-Meta는 SAX 패키지를 관리하는 개발자를 위한 도구입니다. docs 레포지토리에서 직접 사용합니다.
 
 docs 레포지토리에서 SAX 관련 작업 요청 시 자동으로 SAX-Meta 컨텍스트가 활성화됩니다.
 
