@@ -58,7 +58,32 @@ Agent/Skill → references/ → sax-core/ → docs 레포 문서
 2. 새 문서 생성 시 기존 문서 참조(@import)
 3. 절대로 동일 내용을 복사하지 않음
 
-### 3. 작업 완료 후 버저닝 체크 필수 원칙
+### 3. 서브모듈 수정 시 동기화 필수 원칙
+
+> **sax-meta 서브모듈 수정 시 현재 환경에도 반드시 동기화한다.**
+
+SAX-Meta를 submodule로 설치하여 사용하는 환경(SAX 개발 워크스페이스)에서는:
+
+- `sax-meta/` (배포용 패키지 소스) 수정 시
+- `.claude/sax-meta/` (submodule로 설치된 sax-meta)에도 동기화 필요
+
+**이유**: SAX-Meta 사용 환경은 모든 SAX 패키지를 개발/관리하는 개발자 환경이므로, 배포용 패키지 수정과 동시에 현재 사용 중인 환경에도 즉시 반영되어야 함.
+
+**동기화 방법**:
+
+```bash
+# sax-meta 서브모듈 업데이트
+cd .claude/sax-meta
+git pull origin main
+```
+
+**작업 순서**:
+
+1. `sax-meta/` 에서 변경사항 작업
+2. `sax-meta/` 커밋 및 푸시
+3. `.claude/sax-meta/` 에서 `git pull` 로 동기화
+
+### 4. 작업 완료 후 버저닝 체크 필수 원칙
 
 > **모든 SAX 작업 완료 후 버저닝 필요 여부를 반드시 체크한다.**
 
