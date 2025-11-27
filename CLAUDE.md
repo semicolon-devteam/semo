@@ -290,7 +290,24 @@ rsync -av --delete \
 
 빈 디렉토리 또는 기존 프로젝트에 SAX 패키지를 설치하려면 `install-sax.sh` 스크립트를 사용합니다.
 
-**설치 방법 1: curl로 직접 실행**
+**설치 방법 1: GitHub CLI 사용 (권장 - private repo 지원)**
+
+```bash
+# 스크립트 다운로드 및 실행
+gh api repos/semicolon-devteam/sax-meta/contents/scripts/install-sax.sh \
+  --jq '.content' | base64 -d > install-sax.sh
+chmod +x install-sax.sh
+
+# 실행
+./install-sax.sh po    # sax-po 설치
+./install-sax.sh next  # sax-next 설치
+./install-sax.sh meta  # sax-meta 설치
+
+# 설치 후 스크립트 삭제
+rm install-sax.sh
+```
+
+**설치 방법 2: curl로 직접 실행 (public repo만)**
 
 ```bash
 # sax-po 설치 (PO/기획자용)
@@ -303,18 +320,7 @@ curl -fsSL https://raw.githubusercontent.com/semicolon-devteam/sax-meta/main/scr
 curl -fsSL https://raw.githubusercontent.com/semicolon-devteam/sax-meta/main/scripts/install-sax.sh | bash -s meta
 ```
 
-**설치 방법 2: 스크립트 다운로드 후 실행**
-
-```bash
-# 스크립트 다운로드
-curl -O https://raw.githubusercontent.com/semicolon-devteam/sax-meta/main/scripts/install-sax.sh
-chmod +x install-sax.sh
-
-# 실행
-./install-sax.sh po    # sax-po 설치
-./install-sax.sh next  # sax-next 설치
-./install-sax.sh meta  # sax-meta 설치
-```
+> ⚠️ **참고**: curl 방식은 sax-meta 레포지토리가 public인 경우에만 작동합니다. private repo인 경우 GitHub CLI 방식을 사용하세요.
 
 **설치 결과 구조**:
 
