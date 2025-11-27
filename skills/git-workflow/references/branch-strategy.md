@@ -1,29 +1,6 @@
 # Branch Strategy
 
-## Branch Creation
-
-**형식**: `{issue-number}-{feature-name}`
-
-```bash
-# 이슈 번호 기반 브랜치 생성
-create_feature_branch() {
-  ISSUE_NUM=$1
-  FEATURE_NAME=$2
-  git checkout -b "${ISSUE_NUM}-${FEATURE_NAME}"
-}
-
-# 예시
-git checkout -b "42-user-profile-edit"
-git checkout -b "001-dynamic-gnb-menus"
-```
-
-## Branch Naming Rules
-
-| 유형 | 패턴 | 예시 |
-|------|------|------|
-| Feature | `{issue}-{feature}` | `35-comment-ui` |
-| Fix | `fix/{issue}-{description}` | `fix/42-login-redirect` |
-| Hotfix | `hotfix/{issue}-{description}` | `hotfix/99-critical-bug` |
+> **SoT 참조**: 브랜치 전략은 `sax-core/TEAM_RULES.md` 섹션 1.1에서 관리됩니다.
 
 ## Issue Onboarding Workflow
 

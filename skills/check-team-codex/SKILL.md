@@ -1,92 +1,59 @@
 ---
 name: check-team-codex
-description: Validate code against Team Codex standards. Use when (1) before creating commits, (2) during verification phase, (3) quality gate enforcement, (4) checking commit format/ESLint/TypeScript/debug code compliance.
+description: Validate code against Team Codex standards. Use when (1) before creating commits, (2) during verification phase, (3) quality gate enforcement.
 tools: [Bash, Read, Grep]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: check-team-codex 호출 - {검증 유형}` 시스템 메시지를 첫 줄에 출력하세요.
-
 # Check Team Codex Skill
 
-**Purpose**: Enforce Semicolon team coding standards and conventions
+> 코드를 Semicolon 팀 표준에 맞게 자동 검증
+
+## 규칙 참조 (SoT)
+
+> **모든 Team Codex 규칙은 sax-core/TEAM_RULES.md에서 관리됩니다.**
+
+```bash
+# 로컬 참조
+.claude/sax-core/TEAM_RULES.md
+
+# 원격 참조
+gh api repos/semicolon-devteam/sax-core/contents/TEAM_RULES.md --jq '.content' | base64 -d
+```
+
+**참조 섹션**:
+- `2. Code Quality (Team Codex)` - 검증 항목, 금지 사항, Severity Levels
+- `6. Quality Gates` - Pre-commit, Pre-PR 검증
+
+## Quick Start
+
+```bash
+# Pre-commit 필수 체크
+npm run lint && npx tsc --noEmit
+
+# Debug 코드 확인
+grep -r "console\.log\|debugger" src/ --exclude-dir=node_modules
+
+# any 타입 확인
+grep -r ":\s*any\|as any" src/
+```
 
 ## When to Use
-
-Agents should invoke this skill when:
 
 - Before creating commits
 - During verification phase
 - After implementation completion
-- Pre-commit validation needed
 - Quality gates in v0.4.x CODE phase
-
-## Quick Start
-
-### Check Commands
-
-```bash
-# 1. Commit messages
-git log --oneline -10
-
-# 2. ESLint
-npm run lint
-
-# 3. TypeScript
-npx tsc --noEmit
-
-# 4. Debug code
-grep -r "console\.log" src/
-grep -r "debugger" src/
-
-# 5. 'any' types
-grep -r ":\s*any" src/
-grep -r "as any" src/
-```
-
-## Usage
-
-```javascript
-// Full check (all validations)
-skill: checkTeamCodex();
-
-// Specific checks
-skill: checkTeamCodex({ checks: ["commits", "eslint", "typescript"] });
-
-// Quick check (ESLint + TypeScript only)
-skill: checkTeamCodex({ quick: true });
-```
 
 ## Severity Levels
 
-| Level | Items | Action |
-|-------|-------|--------|
-| 🔴 **CRITICAL** | ESLint/TypeScript errors, hook bypass, architecture violations | Blocks PR |
-| 🟡 **WARNING** | Debug code, 'any' types, TODO comments | Should fix |
-| 🟢 **INFO** | Style suggestions, performance hints | Nice to have |
-
-## Critical Rules
-
-1. **Zero Tolerance for ESLint/TypeScript Errors**
-2. **No Debug Code in Commits**: Always clean before commit
-3. **Never Bypass Pre-commit Hooks**: Fix errors, don't skip
-4. **Explicit Types**: Avoid 'any', use proper typing
-5. **Commit Format**: MUST follow type(scope): subject
-
-## Dependencies
-
-- `npm run lint` - ESLint
-- `npx tsc --noEmit` - TypeScript
-- `git log` - Commit history
-- `grep` - Code pattern search
+| Level | 항목 | 조치 |
+|-------|------|------|
+| 🔴 CRITICAL | ESLint/TS 에러, hook 우회, 아키텍처 위반 | PR 차단 |
+| 🟡 WARNING | Debug 코드, any 타입, TODO 주석 | 수정 권장 |
+| 🟢 INFO | 스타일 제안, 성능 힌트 | 선택적 |
 
 ## Related Skills
 
-- `verify` - Uses this skill for comprehensive verification
-- `implement` - Uses this skill in v0.4.x CODE phase
-
-## References
-
-For detailed documentation, see:
-
-- [Check Items](references/check-items.md) - All 7 check categories with commands
-- [Output Format](references/output-format.md) - Report templates, return values, quick fixes
+- `verify` - 종합 검증에서 사용
+- `implement` - v0.4.x CODE phase에서 사용
+- `git-workflow` - 커밋 전 품질 검사

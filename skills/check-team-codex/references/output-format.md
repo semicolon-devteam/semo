@@ -1,5 +1,7 @@
 # Output Format
 
+> **SoT 참조**: 검증 항목과 Severity Levels는 `sax-core/TEAM_RULES.md` 섹션 2에서 관리됩니다.
+
 ## Full Report Example
 
 ```markdown

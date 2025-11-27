@@ -1,49 +1,13 @@
 # Commit Guide
 
-## Issue Number Extraction
+> **SoT 참조**: 커밋 규칙은 `sax-core/TEAM_RULES.md` 섹션 1.2, 1.3에서 관리됩니다.
 
-**🔴 CRITICAL**: 모든 커밋 메시지에 브랜치명 기반 이슈 번호를 포함합니다.
+## 이슈 번호 추출 스크립트
 
 ```bash
 # 현재 브랜치에서 이슈 번호 추출
-get_issue_number() {
-  ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+|/[0-9]+' | grep -oE '[0-9]+' | head -1)
-  if [ -n "$ISSUE_NUM" ]; then
-    echo "#$ISSUE_NUM"
-  else
-    echo ""
-  fi
-}
+ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+|/[0-9]+' | grep -oE '[0-9]+' | head -1)
 ```
-
-**브랜치 패턴 → 이슈 번호**:
-
-| 브랜치명 | 추출된 이슈 번호 |
-|----------|------------------|
-| `35-comment-ui` | `#35` |
-| `001-dynamic-gnb-menus` | `#001` |
-| `fix/42-login-bug` | `#42` |
-| `feature/auth-refactor` | (없음) |
-| `dev`, `main` | (없음) |
-
-## Commit Message Format
-
-**형식**: `:gitmoji: #issue-number subject`
-
-### Gitmoji 매핑
-
-| Gitmoji | Type | 사용 시점 |
-|---------|------|-----------|
-| ✨ `:sparkles:` | feat | 새 기능 추가 |
-| 🐛 `:bug:` | fix | 버그 수정 |
-| 🔧 `:wrench:` | chore | 설정, 구조 변경 |
-| ✅ `:white_check_mark:` | test | 테스트 추가/수정 |
-| ♻️ `:recycle:` | refactor | 리팩토링 |
-| 📝 `:memo:` | docs | 문서 작성/수정 |
-| 🎨 `:art:` | style | 코드 스타일/포맷 |
-| 🔥 `:fire:` | remove | 코드/파일 삭제 |
-| 🚀 `:rocket:` | deploy | 배포 관련 |
-| 🔄 `:arrows_counterclockwise:` | sync | 동기화, 업데이트 |
 
 ## Auto Type Detection
 

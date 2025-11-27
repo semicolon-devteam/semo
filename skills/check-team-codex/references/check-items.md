@@ -1,102 +1,21 @@
-# Check Items Detail
+# Check Items
 
-## 1. Commit Message Format
+> **SoT 참조**: 모든 검증 규칙은 `sax-core/TEAM_RULES.md`에서 관리됩니다.
 
-**📚 Reference**: [Git Rules - Commit Messages](https://github.com/semicolon-devteam/docs/wiki/rules-git)
+## 검증 명령어 요약
 
-```bash
-# Check last 10 commits
-git log --oneline -10
-```
+| 항목 | 명령어 |
+|------|--------|
+| ESLint | `npm run lint` |
+| TypeScript | `npx tsc --noEmit` |
+| Debug 코드 | `grep -r "console\.log\|debugger" src/` |
+| any 타입 | `grep -r ":\s*any\|as any" src/` |
+| hook 우회 | `git log -1 --format=%B \| grep -i "no-verify"` |
 
-- Validate against Git Rules documentation (GIT-CM-xxx rules)
-- 규칙 상세 내용은 위 링크 참조 (직접 명시하지 않음)
+## 상세 규칙
 
-## 2. ESLint Compliance
-
-```bash
-npm run lint
-```
-
-- Zero errors expected
-- Zero warnings expected (strict mode)
-- Custom rules from `.eslintrc.json`
-
-## 3. TypeScript Strict Mode
-
-```bash
-npx tsc --noEmit
-```
-
-- Zero type errors expected
-- Strict mode enabled
-- No implicit any
-- Strict null checks
-
-## 4. Debug Code Detection
-
-Search patterns:
-
-```bash
-# Find console.log
-grep -r "console\.log" src/
-
-# Find debugger statements
-grep -r "debugger" src/
-```
-
-- Search for `console.log`
-- Search for `console.debug`
-- Search for `debugger`
-- Check for commented-out code blocks
-- Detect TODO comments in production code
-
-## 5. 'any' Type Detection
-
-```bash
-grep -r ":\s*any" src/
-grep -r "as any" src/
-```
-
-- Report all 'any' usages
-- Categorize by severity
-- Suggest explicit types
-
-## 6. Pre-commit Hook Bypass Check
-
-```bash
-git log -1 --format=%B | grep -i "no-verify"
-```
-
-- Detect `--no-verify` or `-n` flag usage
-- Flag as CRITICAL violation
-- Team Codex prohibits hook bypassing
-
-## 7. Architecture Compliance
-
-- Verify no `'use client'` in Repository files
-- Check no direct Supabase imports in components
-- Validate Factory Pattern for API clients
-- Ensure proper layer separation
-
-## Severity Levels
-
-### 🔴 CRITICAL (Blocks PR)
-
-- ESLint errors
-- TypeScript errors
-- Pre-commit hook bypass
-- Architecture violations
-
-### 🟡 WARNING (Should fix)
-
-- Debug code (console.log, debugger)
-- 'any' types
-- TODO comments
-- ESLint warnings
-
-### 🟢 INFO (Nice to have)
-
-- Code style suggestions
-- Performance hints
-- Documentation improvements
+**sax-core/TEAM_RULES.md 참조**:
+- 섹션 2.1: 필수 검증 항목
+- 섹션 2.2: 금지 사항
+- 섹션 2.5: Severity Levels
+- 섹션 6: Quality Gates

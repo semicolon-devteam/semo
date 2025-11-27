@@ -1,5 +1,7 @@
 # PR Process
 
+> **SoT 참조**: Quality Gates는 `sax-core/TEAM_RULES.md` 섹션 6에서 관리됩니다.
+
 ## Pull Request Creation
 
 **자동 PR 생성 워크플로우**:
