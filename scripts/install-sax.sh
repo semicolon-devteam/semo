@@ -311,19 +311,23 @@ setup_symlinks() {
         print_success "심링크 생성: skills/ -> $repo_name/skills/"
     fi
 
-    # commands 심링크
+    # commands 심링크 (.claude/SAX/commands 로 생성)
     if [ -d "$package_path/commands" ]; then
-        local commands_link="$CLAUDE_DIR/commands"
+        # SAX 디렉토리 생성
+        local sax_dir="$CLAUDE_DIR/SAX"
+        mkdir -p "$sax_dir"
+
+        local commands_link="$sax_dir/commands"
 
         if [ -L "$commands_link" ]; then
             rm "$commands_link"
         elif [ -d "$commands_link" ]; then
-            print_info "기존 commands/를 commands.backup/으로 백업합니다"
+            print_info "기존 SAX/commands/를 SAX/commands.backup/으로 백업합니다"
             mv "$commands_link" "$commands_link.backup"
         fi
 
-        ln -s "$repo_name/commands" "$commands_link"
-        print_success "심링크 생성: commands/ -> $repo_name/commands/"
+        ln -s "../$repo_name/commands" "$commands_link"
+        print_success "심링크 생성: SAX/commands/ -> $repo_name/commands/"
     fi
 }
 
@@ -341,6 +345,8 @@ print_summary() {
     echo "  ├── CLAUDE.md -> sax-$package/CLAUDE.md"
     echo "  ├── agents/ -> sax-$package/agents/"
     echo "  ├── skills/ -> sax-$package/skills/"
+    echo "  ├── SAX/"
+    echo "  │   └── commands/ -> sax-$package/commands/"
     echo "  ├── sax-core/          (서브모듈)"
     echo "  └── sax-$package/      (서브모듈)"
     echo ""
