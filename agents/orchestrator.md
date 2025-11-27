@@ -64,6 +64,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 
 | User Intent | Route To | Detection Keywords |
 |-------------|----------|-------------------|
+| SAX init 커밋 | `sax-init` 프로세스 | "SAX init", "SAX 설치 커밋", "SAX init 커밋해줘" |
 | Agent 생성/수정/삭제/분석 | `agent-manager` | "Agent 만들어", "새 Agent", "Agent 추가", "Agent 수정", "Agent 변경", "Agent 삭제", "Agent 제거", "Agent 검토", "Agent 분석", "Agent 리스트업" |
 | Skill 생성/수정/삭제/분석 | `skill-manager` | "Skill 만들어", "새 Skill", "Skill 추가", "Skill 수정", "Skill 변경", "Skill 삭제", "Skill 제거", "Skill 검토", "Skill 분석", "Skill 리스트업" |
 | Command 생성/수정/삭제/분석 | `command-manager` | "Command 만들어", "슬래시 커맨드", "/sc:", "Command 수정", "Command 변경", "Command 삭제", "Command 제거", "Command 검토", "Command 분석" |
@@ -88,6 +89,85 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 
 ```markdown
 [SAX] Orchestrator: 라우팅 실패 → 적절한 Agent 없음
+```
+
+## SAX init 프로세스
+
+**SAX init 커밋** 요청 감지 시 다음 프로세스를 직접 처리합니다:
+
+### 사전 검사
+
+1. **Git 저장소 확인**
+   - Git 초기화 안됨 → `onboarding-master`로 인계 (있는 경우) 또는 직접 안내
+
+   ```markdown
+   [SAX] Orchestrator: Git 저장소 미감지
+
+   ⚠️ Git 저장소가 초기화되지 않았습니다.
+
+   다음 명령어로 Git을 초기화하세요:
+   git init
+   git remote add origin <your-repo-url>
+
+   이후 다시 "SAX init 커밋해줘"를 실행하세요.
+   ```
+
+2. **변경사항 확인**
+   - SAX 설치 외 다른 변경사항 존재 → 사용자에게 안내
+
+   ```markdown
+   [SAX] Orchestrator: 미커밋 변경사항 감지
+
+   ⚠️ SAX 설치 외 다른 변경사항이 있습니다.
+
+   **옵션**:
+   1. 모든 변경사항을 함께 커밋
+   2. SAX 관련 파일만 커밋 (.claude/, .gitmodules)
+   3. 취소하고 먼저 다른 변경사항 정리
+
+   어떻게 진행할까요?
+   ```
+
+### SAX init 커밋 실행
+
+검사 통과 시 직접 실행:
+
+```bash
+# 1. SAX 관련 파일 스테이징
+git add .claude/ .gitmodules
+
+# 2. 커밋 생성
+git commit -m "🔧 Initialize SAX-Meta package
+
+- Add sax-core submodule
+- Add sax-meta submodule
+- Configure symlinks for CLAUDE.md, agents/, skills/
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+
+# 3. 푸시
+git push origin HEAD
+```
+
+### 완료 메시지
+
+```markdown
+[SAX] SAX init 완료!
+
+✅ SAX-Meta 설치가 커밋되었습니다.
+
+**커밋 내용**:
+- .claude/sax-core (서브모듈)
+- .claude/sax-meta (서브모듈)
+- .claude/CLAUDE.md → sax-meta/CLAUDE.md
+- .claude/agents/ → sax-meta/agents/
+- .claude/skills/ → sax-meta/skills/
+
+**다음 단계**:
+- `/SAX:help`로 사용 가능한 명령어 확인
+- `새 Agent 만들어줘`로 SAX 패키지 개발 시작
 ```
 
 ## 워크플로우 가이드
