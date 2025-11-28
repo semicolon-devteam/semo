@@ -83,6 +83,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 | 업무 시작           | 복합 로직 (자동화)      | 이슈 URL (cm-office#32), "할당받았다"         |
 | 기술/지식 학습      | `teacher`               | 특정 기술 개념 질문, 팀 철학/프로세스 학습     |
 | 전략적 조언         | `advisor`               | `~하면 좋을까?`, 자동화/개선 제안              |
+| 아이디어 탐색       | `skill:spec` (Phase 0)  | "아이디어가 있는데", "뭔가 만들고 싶어", "이런 거 되나" |
 | 기능 명세           | `spec-master`           | `기능 추가해줘`, 새 기능 요청 (명세 없음)      |
 | 코드 구현           | `implementation-master` | `구현해줘`, `코드 작성해줘` (명세 있음)        |
 | UI/프론트엔드 디자인 | `skill:frontend-design` | "UI 디자인", "화면 설계", "컴포넌트 디자인"   |
@@ -316,6 +317,7 @@ git push origin HEAD
 - `skill:fetch-team-context` - 팀 표준 참조
 - `skill:fast-track` - 경미한 수정 빠른 처리
 - `skill:frontend-design` - UI/프론트엔드 디자인
+- `skill:spec` - SDD 명세 (Phase 0 Brainstorming 포함)
 
 ## References
 
