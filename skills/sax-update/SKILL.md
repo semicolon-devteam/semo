@@ -153,15 +153,16 @@ ls -la .claude/commands/SAX
 
 ```bash
 git add .claude/sax-core .claude/sax-po
-git commit -m "📦 Update SAX packages
-
-- sax-core: {old_version} → {new_version}
-- sax-po: {old_version} → {new_version}
+git commit -m ":bookmark: [SAX] Sync to v{new_version}
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
 ```
+
+**커밋 메시지 형식**: `:bookmark: [SAX] Sync to v{version}`
+
+- `{version}`: 업데이트된 메인 패키지(sax-po)의 버전
 
 ## SAX Message Format
 
