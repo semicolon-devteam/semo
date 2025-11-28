@@ -44,13 +44,11 @@
 ✅ skills → sax-po/skills
 ✅ commands/SAX → ../sax-po/commands
 
-## MCP 서버 설정
+## 글로벌 MCP 서버 설정 (~/.claude.json)
 
-✅ settings.local.json 존재
-✅ MCP: context7 설정됨
-✅ MCP: github 설정됨
-⚠️  MCP: sequential-thinking 미설정 (선택)
-✅ GitHub MCP 토큰 설정됨
+✅ mcpServers 필드 존재
+✅ 글로벌 MCP: context7 설정됨
+✅ 글로벌 MCP: sequential-thinking 설정됨
 
 === 결과 ===
 ✅ 모든 필수 항목 통과
@@ -108,14 +106,22 @@ gh auth login
 - GitHub Organization 멤버십 확인
 - 관리자에게 권한 요청
 
-### 6. MCP 서버 설정
+### 6. 글로벌 MCP 서버 설정
 
 ```bash
-# settings.local.json 복사
-cp .claude/sax-po/settings.local.json .claude/settings.local.json
-
-# GitHub 토큰 설정 (https://github.com/settings/tokens에서 생성)
-# 필요 권한: repo, read:org
+# ~/.claude.json에 mcpServers 추가
+jq '. + {
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    }
+  }
+}' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
 ```
 
 **재검증**: `/SAX:health-check` 명령어로 다시 확인하세요.

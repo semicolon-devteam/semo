@@ -10,7 +10,7 @@
    - 인증 상태 확인
    - Slack 참여 확인 (수동)
    - SAX 패키지 설치 확인
-   - MCP 서버 설정 확인
+   - 글로벌 MCP 서버 설정 확인 (~/.claude.json)
    ↓
 3. 결과 집계
    - 필수 항목 통과/실패 카운트
@@ -62,18 +62,16 @@ Orchestrator가 다음 조건에서 health-check를 자동으로 트리거합니
 - core-supabase 레포 접근
 - SAX 패키지 설치 (.claude/sax-core, .claude/sax-po)
 - 심링크 연결 (CLAUDE.md, agents, skills, commands/SAX)
-- MCP 서버 설정 (context7, github)
+- 글로벌 MCP 서버 설정 (context7, sequential-thinking)
 
 ### 🟡 Warning (선택)
 
 - PostgreSQL 클라이언트
 - Slack 참여 (수동 확인)
-- MCP: sequential-thinking
 
 ### 🟢 Info (참고)
 
 - SAX 메타데이터 (첫 실행 시 자동 생성)
-- GitHub MCP 토큰 설정
 
 ## 트러블슈팅
 
@@ -126,23 +124,28 @@ brew install node@18
 brew install node
 ```
 
-### MCP 서버 설정 문제
+### 글로벌 MCP 서버 설정 문제
 
 ```bash
-# 1. settings.local.json 존재 확인
-ls -la .claude/settings.local.json
+# 1. ~/.claude.json 존재 확인
+cat ~/.claude.json | jq '.mcpServers'
 
-# 2. 패키지 템플릿에서 복사
-cp .claude/sax-po/settings.local.json .claude/settings.local.json
+# 2. mcpServers가 없으면 추가
+jq '. + {
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    }
+  }
+}' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
 
-# 3. GitHub 토큰 설정 필요
-# settings.local.json 내 GITHUB_PERSONAL_ACCESS_TOKEN 값을 실제 토큰으로 변경
-
-# GitHub 토큰 생성:
-# 1. https://github.com/settings/tokens 접속
-# 2. "Generate new token (classic)" 선택
-# 3. 필요 권한: repo, read:org
-# 4. 생성된 토큰을 settings.local.json에 입력
+# 3. 설정 확인
+cat ~/.claude.json | jq '.mcpServers'
 ```
 
 ### SAX 패키지/심링크 문제
