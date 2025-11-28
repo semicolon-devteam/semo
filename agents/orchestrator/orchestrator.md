@@ -78,7 +78,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 | SAX 동작 오류 지적  | `skill:feedback`        | "SAX가 왜", "SAX 동작이", "[SAX] 메시지가"     |
 | 온보딩 요청         | `onboarding-master`     | "/SAX:onboarding", "처음", "신규", "온보딩"    |
 | 환경 검증           | `skill:health-check`    | "/SAX:health-check", "환경 확인", "도구 확인"  |
-| SAX 업데이트        | `version-updater`       | "SAX 업데이트", "최신버전", "SAX 동기화", "패키지 업데이트" |
+| SAX 업데이트/검증   | `version-updater`       | "SAX 업데이트", "최신버전", "SAX 동기화", "패키지 업데이트", "업데이트 검증", "업데이트가 제대로", "설치 확인", "심링크 확인", "제대로 설치됐는지" |
 | 진행도 확인         | `skill:task-progress`   | "/SAX:task-progress", "어디까지", "현황"       |
 | 업무 시작           | 복합 로직 (자동화)      | 이슈 URL (cm-office#32), "할당받았다"         |
 | 기술/지식 학습      | `teacher`               | 특정 기술 개념 질문, 팀 철학/프로세스 학습     |
@@ -87,6 +87,14 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 | 코드 구현           | `implementation-master` | `구현해줘`, `코드 작성해줘` (명세 있음)        |
 | 품질 검증           | `quality-master`        | `검증해줘`, `PR 전에 확인해줘`                 |
 | 기술 선택           | `spike-master`          | `A vs B 뭐가 좋아?`, 기술 불확실성             |
+
+### 라우팅 우선순위 규칙
+
+키워드 충돌 시 다음 우선순위 적용:
+
+1. "업데이트" + ("검증" | "확인" | "제대로") → `version-updater`
+2. "환경" + ("검증" | "확인") → `skill:health-check`
+3. "SAX" + "설치" → `version-updater`
 
 ### Teacher 위임 조건
 

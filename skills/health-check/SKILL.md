@@ -49,6 +49,16 @@ tools: [Bash, Read, Grep]
 - 파일: `~/.claude.json`
 - 필수 필드: `SAX.role`, `SAX.position`, `SAX.boarded`, `SAX.healthCheckPassed`
 
+### SAX 패키지 설치 상태
+
+| 항목 | 검증 방법 |
+|------|----------|
+| 패키지 디렉토리 | `.claude/sax-core/`, `.claude/sax-next/` 존재 확인 |
+| CLAUDE.md 심링크 | `.claude/CLAUDE.md` → `sax-next/CLAUDE.md` |
+| agents 심링크 | `.claude/agents` → `sax-next/agents` |
+| skills 심링크 | `.claude/skills` → `sax-next/skills` |
+| commands 심링크 | `.claude/SAX/commands` → `../sax-next/commands` |
+
 ## 재검증 정책
 
 - **온보딩 시**: 필수 실행
