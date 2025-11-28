@@ -35,6 +35,25 @@
   - healthCheckPassed: true
   - lastHealthCheck: 2025-11-25T10:30:00Z
 
+## SAX 패키지 설치
+
+✅ sax-core: 설치됨
+✅ sax-next: 설치됨
+✅ CLAUDE.md → sax-next/CLAUDE.md
+✅ agents → sax-next/agents
+✅ skills → sax-next/skills
+✅ commands/SAX → ../sax-next/commands
+
+## MCP 서버 설정
+
+✅ settings.local.json 존재
+✅ MCP: context7 설정됨
+✅ MCP: github 설정됨
+✅ MCP: sequential-thinking 설정됨
+⚠️  MCP: playwright 미설정 (선택)
+⚠️  MCP: magic 미설정 (선택)
+✅ GitHub MCP 토큰 설정됨
+
 === 결과 ===
 ✅ 모든 필수 항목 통과
 ⚠️  1개 선택 항목 미설치 (PostgreSQL)
@@ -85,6 +104,16 @@ gh auth login
 ### 5. docs 레포 접근
 - GitHub Organization 멤버십 확인
 - 관리자에게 권한 요청
+
+### 6. MCP 서버 설정
+
+```bash
+# settings.local.json 복사
+cp .claude/sax-next/settings.local.json .claude/settings.local.json
+
+# GitHub 토큰 설정 (https://github.com/settings/tokens에서 생성)
+# 필요 권한: repo, read:org
+```
 
 **재검증**: `/SAX:health-check` 명령어로 다시 확인하세요.
 ```

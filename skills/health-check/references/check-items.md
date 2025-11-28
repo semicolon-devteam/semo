@@ -168,11 +168,14 @@ symlinks_valid:
       expected_target: "sax-next/agents"
     - path: ".claude/skills"
       expected_target: "sax-next/skills"
-    - path: ".claude/SAX/commands"
+    - path: ".claude/commands/SAX"
       expected_target: "../sax-next/commands"
+      critical: true  # 🔴 누락 시 /SAX:* 명령어 인식 불가
   required: true
   error: "심링크 연결 오류. `SAX 업데이트해줘` 실행하여 심링크 재설정 필요"
 ```
+
+> **🔴 중요**: `commands/SAX` 심링크가 누락되면 `/SAX:help`, `/SAX:health-check` 등 모든 SAX 명령어가 인식되지 않습니다.
 
 ### 패키지 검증 로직
 
@@ -204,5 +207,108 @@ check_symlink() {
 check_symlink ".claude/CLAUDE.md" "sax-next/CLAUDE.md"
 check_symlink ".claude/agents" "sax-next/agents"
 check_symlink ".claude/skills" "sax-next/skills"
-check_symlink ".claude/SAX/commands" "../sax-next/commands"
+check_symlink ".claude/commands/SAX" "../sax-next/commands"
+```
+
+## 6. MCP 서버 설정 상태
+
+```yaml
+mcp_settings:
+  file: ".claude/settings.local.json"
+  check_type: "json_field"
+  required: true
+  error: "MCP 설정 파일 없음. settings.local.json 생성 필요"
+
+required_mcps:
+  - name: "context7"
+    description: "라이브러리 문서 조회"
+    required: true
+  - name: "github"
+    description: "GitHub API 연동"
+    required: true
+  - name: "sequential-thinking"
+    description: "구조적 사고 분석"
+    required: false
+  - name: "playwright"
+    description: "E2E 테스트 및 브라우저 자동화"
+    required: false
+  - name: "magic"
+    description: "UI 컴포넌트 생성 (21st.dev)"
+    required: false
+```
+
+### MCP 검증 로직
+
+```bash
+# 1. settings.local.json 존재 확인
+if [ -f ".claude/settings.local.json" ]; then
+  echo "✅ settings.local.json 존재"
+else
+  echo "❌ settings.local.json 없음"
+  echo "  → SAX 패키지의 settings.local.json 복사 필요"
+fi
+
+# 2. MCP 서버 설정 확인 (jq 사용)
+check_mcp() {
+  local mcp_name=$1
+  local required=$2
+  if jq -e ".mcpServers.$mcp_name" .claude/settings.local.json > /dev/null 2>&1; then
+    echo "✅ MCP: $mcp_name 설정됨"
+  else
+    if [ "$required" = "true" ]; then
+      echo "❌ MCP: $mcp_name 미설정 (필수)"
+    else
+      echo "⚠️  MCP: $mcp_name 미설정 (선택)"
+    fi
+  fi
+}
+
+check_mcp "context7" "true"
+check_mcp "github" "true"
+check_mcp "sequential-thinking" "false"
+check_mcp "playwright" "false"
+check_mcp "magic" "false"
+
+# 3. GitHub 토큰 설정 확인
+GITHUB_TOKEN=$(jq -r '.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN // ""' .claude/settings.local.json 2>/dev/null)
+if [ -n "$GITHUB_TOKEN" ] && [ "$GITHUB_TOKEN" != "<YOUR_GITHUB_TOKEN>" ]; then
+  echo "✅ GitHub MCP 토큰 설정됨"
+else
+  echo "⚠️  GitHub MCP 토큰 미설정"
+  echo "  → settings.local.json에서 GITHUB_PERSONAL_ACCESS_TOKEN 설정 필요"
+fi
+```
+
+### MCP 설정 템플릿
+
+SAX-Next 권장 MCP 설정:
+
+```json
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "<YOUR_TOKEN>"
+      }
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mcp-server-playwright"]
+    },
+    "magic": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mcp-server-magic"]
+    }
+  }
+}
 ```
