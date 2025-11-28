@@ -104,7 +104,7 @@ cat .claude/sax-po/VERSION
 ls -la .claude/CLAUDE.md
 ls -la .claude/agents
 ls -la .claude/skills
-ls -la .claude/SAX/commands
+ls -la .claude/commands/SAX
 
 # 서브모듈 상태
 git submodule status
@@ -129,7 +129,7 @@ git submodule status
 | CLAUDE.md | sax-po/CLAUDE.md | ✅ |
 | agents/ | sax-po/agents/ | ✅ |
 | skills/ | sax-po/skills/ | ✅ |
-| SAX/commands/ | sax-po/commands/ | ✅ |
+| commands/SAX/ | sax-po/commands/ | ✅ |
 
 **다음 단계** (선택):
 - 서브모듈 변경사항 커밋: "SAX 커밋해줘"
@@ -180,8 +180,7 @@ cd .claude
 ln -sf sax-po/CLAUDE.md CLAUDE.md
 ln -sf sax-po/agents agents
 ln -sf sax-po/skills skills
-mkdir -p SAX && ln -sf ../sax-po/commands SAX/commands
-```
+mkdir -p commands && ln -sf ../sax-po/commands commands/SAX
 ```
 
 ### 복사 방식 설치
@@ -228,7 +227,7 @@ gh api repos/semicolon-devteam/sax-po/contents/VERSION --jq '.content' | base64 
 ls -la .claude/CLAUDE.md
 ls -la .claude/agents
 ls -la .claude/skills
-ls -la .claude/SAX/commands
+ls -la .claude/commands/SAX
 ```
 
 ### Verification Step 4: 검증 결과 보고
@@ -252,7 +251,7 @@ ls -la .claude/SAX/commands
 | CLAUDE.md | sax-po/CLAUDE.md | ✅/❌ |
 | agents/ | sax-po/agents/ | ✅/❌ |
 | skills/ | sax-po/skills/ | ✅/❌ |
-| SAX/commands/ | sax-po/commands/ | ✅/❌ |
+| commands/SAX/ | sax-po/commands/ | ✅/❌ |
 
 ### 결론
 

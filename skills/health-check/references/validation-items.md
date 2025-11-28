@@ -169,7 +169,7 @@ symlinks_valid:
     - path: ".claude/skills"
       expected_target: "sax-po/skills"
       critical: true
-    - path: ".claude/SAX/commands"
+    - path: ".claude/commands/SAX"
       expected_target: "../sax-po/commands"
       critical: true  # 🔴 누락 시 /SAX:* 명령어 인식 불가
   required: true
@@ -208,5 +208,5 @@ check_symlink() {
 check_symlink ".claude/CLAUDE.md" "sax-po/CLAUDE.md"
 check_symlink ".claude/agents" "sax-po/agents"
 check_symlink ".claude/skills" "sax-po/skills"
-check_symlink ".claude/SAX/commands" "../sax-po/commands"
+check_symlink ".claude/commands/SAX" "../sax-po/commands"
 ```

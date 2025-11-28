@@ -72,9 +72,9 @@ cd .claude/sax-po && git fetch origin && git pull origin main
 
 ### Step 4: 심링크 재설정
 
-> **🔴 필수**: 업데이트 후 **모든 심링크(CLAUDE.md, agents, skills, SAX/commands)**가 올바르게 설정되어 있는지 확인하고 재설정합니다.
+> **🔴 필수**: 업데이트 후 **모든 심링크(CLAUDE.md, agents, skills, commands/SAX)**가 올바르게 설정되어 있는지 확인하고 재설정합니다.
 >
-> ⚠️ **주의**: `SAX/commands` 심링크가 누락되면 `/SAX:*` 명령어가 인식되지 않습니다.
+> ⚠️ **주의**: `commands/SAX` 심링크가 누락되면 `/SAX:*` 명령어가 인식되지 않습니다.
 
 ```bash
 # .claude 디렉토리로 이동
@@ -99,12 +99,13 @@ if [ -L "skills" ]; then
 fi
 ln -sf sax-po/skills skills
 
-# 🔴 commands 심링크 (SAX/commands) - 필수!
-mkdir -p SAX
-if [ -L "SAX/commands" ]; then
-  rm SAX/commands
+# 🔴 commands/SAX 심링크 - 필수!
+# Claude Code는 .claude/commands/SAX/*.md 에서 /SAX:* 명령어 인식
+mkdir -p commands
+if [ -L "commands/SAX" ]; then
+  rm commands/SAX
 fi
-ln -sf ../sax-po/commands SAX/commands
+ln -sf ../sax-po/commands commands/SAX
 
 cd ..
 ```
@@ -115,7 +116,7 @@ cd ..
 ls -la .claude/CLAUDE.md
 ls -la .claude/agents
 ls -la .claude/skills
-ls -la .claude/SAX/commands
+ls -la .claude/commands/SAX
 ```
 
 **예상 출력**:
@@ -124,7 +125,7 @@ ls -la .claude/SAX/commands
 .claude/CLAUDE.md -> sax-po/CLAUDE.md
 .claude/agents -> sax-po/agents
 .claude/skills -> sax-po/skills
-.claude/SAX/commands -> ../sax-po/commands
+.claude/commands/SAX -> ../sax-po/commands
 ```
 
 ### Step 5: 업데이트 결과 출력
@@ -143,7 +144,7 @@ ls -la .claude/SAX/commands
 - CLAUDE.md -> sax-po/CLAUDE.md ✅
 - agents/ -> sax-po/agents/ ✅
 - skills/ -> sax-po/skills/ ✅
-- SAX/commands/ -> sax-po/commands/ ✅
+- commands/SAX/ -> sax-po/commands/ ✅
 ```
 
 ### Step 6: 서브모듈 커밋 (선택)
