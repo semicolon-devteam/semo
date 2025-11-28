@@ -145,3 +145,62 @@ fi
 - macOS: `~/.claude.json`
 - Linux/WSL2: `~/.claude.json` (Linux 파일시스템 내)
 - Windows: `~/.claude.json` (WSL2 사용 시 Linux 경로 우선)
+
+## 5. SAX 패키지 설치 상태
+
+```yaml
+sax_package_installed:
+  check_type: "directory_exists"
+  paths:
+    - ".claude/sax-core/"
+    - ".claude/sax-po/"
+  required: true
+  error: "SAX 패키지 미설치. `SAX 업데이트해줘` 실행 필요"
+
+symlinks_valid:
+  check_type: "symlink_target"
+  items:
+    - path: ".claude/CLAUDE.md"
+      expected_target: "sax-po/CLAUDE.md"
+    - path: ".claude/agents"
+      expected_target: "sax-po/agents"
+    - path: ".claude/skills"
+      expected_target: "sax-po/skills"
+    - path: ".claude/SAX/commands"
+      expected_target: "../sax-po/commands"
+  required: true
+  error: "심링크 연결 오류. `SAX 업데이트해줘` 실행하여 심링크 재설정 필요"
+```
+
+### 검증 로직
+
+```bash
+# 1. 패키지 디렉토리 존재 확인
+if [ -d ".claude/sax-core" ] && [ -d ".claude/sax-po" ]; then
+  echo "✅ SAX 패키지 설치됨"
+else
+  echo "❌ SAX 패키지 미설치"
+  echo "  → `SAX 업데이트해줘` 실행 필요"
+fi
+
+# 2. 심링크 상태 확인
+check_symlink() {
+  local path=$1
+  local expected=$2
+  if [ -L "$path" ]; then
+    actual=$(readlink "$path")
+    if [ "$actual" = "$expected" ]; then
+      echo "✅ $path → $expected"
+    else
+      echo "⚠️  $path → $actual (예상: $expected)"
+    fi
+  else
+    echo "❌ $path 심링크 아님 또는 없음"
+  fi
+}
+
+check_symlink ".claude/CLAUDE.md" "sax-po/CLAUDE.md"
+check_symlink ".claude/agents" "sax-po/agents"
+check_symlink ".claude/skills" "sax-po/skills"
+check_symlink ".claude/SAX/commands" "../sax-po/commands"
+```

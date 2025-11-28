@@ -35,6 +35,16 @@ gh api user/orgs --jq '.[].login' | grep semicolon-devteam
 
 # SAX 메타데이터 확인
 cat ~/.claude.json | jq '.SAX'
+
+# SAX 패키지 설치 상태 확인
+ls -la .claude/sax-po/ 2>/dev/null && echo "✅ sax-po 설치됨"
+ls -la .claude/sax-core/ 2>/dev/null && echo "✅ sax-core 설치됨"
+
+# 심링크 상태 확인
+ls -la .claude/CLAUDE.md
+ls -la .claude/agents
+ls -la .claude/skills
+ls -la .claude/SAX/commands
 ```
 
 **기대 결과**:
@@ -43,14 +53,31 @@ cat ~/.claude.json | jq '.SAX'
 - ✅ GitHub 인증 완료
 - ✅ semicolon-devteam 멤버십 확인
 - ✅ SAX 메타데이터 존재
+- ✅ SAX 패키지 설치됨 (sax-core, sax-po)
+- ✅ 심링크 정상 연결됨
 
 ## Advanced Usage
 
 상세한 검증 항목과 워크플로우는 다음을 참조하세요:
 
-- **[Validation Items](references/validation-items.md)** - 4가지 검증 카테고리 (도구, 인증, Slack, claude.json)
+- **[Validation Items](references/validation-items.md)** - 5가지 검증 카테고리 (도구, 인증, Slack, claude.json, 패키지 설치)
 - **[Output Formats](references/output-formats.md)** - 성공/실패 시 출력 예제
 - **[Workflow](references/workflow.md)** - 실행 흐름 및 재검증 정책
+
+## 패키지 이상 발견 시
+
+심링크 오류 또는 패키지 미설치 감지 시:
+
+```markdown
+[SAX] health-check: ⚠️ 패키지 설치 이상 감지
+
+**문제**:
+- ❌ 심링크 연결 오류: .claude/CLAUDE.md
+- ❌ sax-po 패키지 미설치
+
+**해결**:
+`SAX 업데이트해줘`를 실행하여 패키지를 설치/심링크를 재설정하세요.
+```
 
 ## SAX Message
 
