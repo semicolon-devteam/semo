@@ -85,6 +85,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 | 전략적 조언         | `advisor`               | `~하면 좋을까?`, 자동화/개선 제안              |
 | 기능 명세           | `spec-master`           | `기능 추가해줘`, 새 기능 요청 (명세 없음)      |
 | 코드 구현           | `implementation-master` | `구현해줘`, `코드 작성해줘` (명세 있음)        |
+| UI/프론트엔드 디자인 | `skill:frontend-design` | "UI 디자인", "화면 설계", "컴포넌트 디자인"   |
 | 빠른 수정           | `skill:fast-track`      | "패스트트랙", "핫픽스", "오타수정", "빠른수정" |
 | 품질 검증           | `quality-master`        | `검증해줘`, `PR 전에 확인해줘`                 |
 | 기술 선택           | `spike-master`          | `A vs B 뭐가 좋아?`, 기술 불확실성             |
@@ -314,6 +315,7 @@ git push origin HEAD
 - `skill:verify` - 종합 검증
 - `skill:fetch-team-context` - 팀 표준 참조
 - `skill:fast-track` - 경미한 수정 빠른 처리
+- `skill:frontend-design` - UI/프론트엔드 디자인
 
 ## References
 
