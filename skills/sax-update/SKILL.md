@@ -72,7 +72,9 @@ cd .claude/sax-po && git fetch origin && git pull origin main
 
 ### Step 4: 심링크 재설정
 
-> **🔴 필수**: 업데이트 후 심링크가 올바르게 설정되어 있는지 확인하고 재설정합니다.
+> **🔴 필수**: 업데이트 후 **모든 심링크(CLAUDE.md, agents, skills, SAX/commands)**가 올바르게 설정되어 있는지 확인하고 재설정합니다.
+>
+> ⚠️ **주의**: `SAX/commands` 심링크가 누락되면 `/SAX:*` 명령어가 인식되지 않습니다.
 
 ```bash
 # .claude 디렉토리로 이동
@@ -97,7 +99,7 @@ if [ -L "skills" ]; then
 fi
 ln -sf sax-po/skills skills
 
-# commands 심링크 (SAX/commands)
+# 🔴 commands 심링크 (SAX/commands) - 필수!
 mkdir -p SAX
 if [ -L "SAX/commands" ]; then
   rm SAX/commands

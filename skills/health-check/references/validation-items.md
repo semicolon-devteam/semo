@@ -162,15 +162,21 @@ symlinks_valid:
   items:
     - path: ".claude/CLAUDE.md"
       expected_target: "sax-po/CLAUDE.md"
+      critical: true
     - path: ".claude/agents"
       expected_target: "sax-po/agents"
+      critical: true
     - path: ".claude/skills"
       expected_target: "sax-po/skills"
+      critical: true
     - path: ".claude/SAX/commands"
       expected_target: "../sax-po/commands"
+      critical: true  # 🔴 누락 시 /SAX:* 명령어 인식 불가
   required: true
   error: "심링크 연결 오류. `SAX 업데이트해줘` 실행하여 심링크 재설정 필요"
 ```
+
+> **🔴 중요**: `SAX/commands` 심링크가 누락되면 `/SAX:help`, `/SAX:health-check` 등 모든 SAX 명령어가 인식되지 않습니다.
 
 ### 검증 로직
 
