@@ -59,16 +59,13 @@ tools: [Bash, Read, Grep]
 | skills 심링크 | `.claude/skills` → `sax-next/skills` |
 | commands 심링크 | `.claude/commands/SAX` → `../sax-next/commands` |
 
-### MCP 서버 설정 상태
+### 글로벌 MCP 서버 설정 상태 (~/.claude.json)
 
 | 항목 | 필수 | 설명 |
 |------|------|------|
-| settings.local.json | ✅ | `.claude/settings.local.json` 파일 존재 |
+| mcpServers 필드 | ✅ | `~/.claude.json`에 mcpServers 존재 |
 | context7 | ✅ | 라이브러리 문서 조회 |
-| github | ✅ | GitHub API 연동 |
-| sequential-thinking | ⚠️ | 구조적 사고 분석 (선택) |
-| playwright | ⚠️ | E2E 테스트 및 브라우저 자동화 (선택) |
-| magic | ⚠️ | UI 컴포넌트 생성 (선택) |
+| sequential-thinking | ✅ | 구조적 사고 분석 |
 
 ## 재검증 정책
 

@@ -49,7 +49,33 @@ model: sonnet
 - 모든 필수 항목 통과까지 반복
 
 **성공 시**:
+
 - Phase 1으로 진행
+
+### 글로벌 MCP 설정 확인
+
+health-check에서 글로벌 MCP 설정이 누락된 경우, 다음 설정을 안내합니다:
+
+```bash
+# ~/.claude.json에 mcpServers 추가
+jq '. + {
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    }
+  }
+}' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
+```
+
+**필수 MCP 서버**:
+
+- `context7`: 라이브러리 문서 조회
+- `sequential-thinking`: 구조적 사고 분석
 
 ## Phase 1: 조직 참여 확인
 

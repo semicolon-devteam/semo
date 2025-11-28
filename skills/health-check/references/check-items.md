@@ -210,78 +210,64 @@ check_symlink ".claude/skills" "sax-next/skills"
 check_symlink ".claude/commands/SAX" "../sax-next/commands"
 ```
 
-## 6. MCP 서버 설정 상태
+## 6. 글로벌 MCP 서버 설정 상태
+
+> **참고**: 글로벌 `~/.claude.json`에 MCP 설정을 등록하면 모든 프로젝트에서 공통으로 사용됩니다.
 
 ```yaml
-mcp_settings:
-  file: ".claude/settings.local.json"
+global_mcp_settings:
+  file: "~/.claude.json"
   check_type: "json_field"
+  field: "mcpServers"
   required: true
-  error: "MCP 설정 파일 없음. settings.local.json 생성 필요"
+  error: "글로벌 MCP 설정 없음. ~/.claude.json에 mcpServers 추가 필요"
 
 required_mcps:
   - name: "context7"
     description: "라이브러리 문서 조회"
     required: true
-  - name: "github"
-    description: "GitHub API 연동"
-    required: true
   - name: "sequential-thinking"
     description: "구조적 사고 분석"
-    required: false
-  - name: "playwright"
-    description: "E2E 테스트 및 브라우저 자동화"
-    required: false
-  - name: "magic"
-    description: "UI 컴포넌트 생성 (21st.dev)"
-    required: false
+    required: true
 ```
 
-### MCP 검증 로직
+### 글로벌 MCP 검증 로직
 
 ```bash
-# 1. settings.local.json 존재 확인
-if [ -f ".claude/settings.local.json" ]; then
-  echo "✅ settings.local.json 존재"
+# 1. ~/.claude.json 존재 확인
+if [ -f ~/.claude.json ]; then
+  echo "✅ ~/.claude.json 파일 존재"
 else
-  echo "❌ settings.local.json 없음"
-  echo "  → SAX 패키지의 settings.local.json 복사 필요"
+  echo "❌ ~/.claude.json 파일 없음"
+  echo "  → Claude Code 첫 실행 또는 설정 파일 생성 필요"
+  exit 1
 fi
 
-# 2. MCP 서버 설정 확인 (jq 사용)
-check_mcp() {
+# 2. mcpServers 필드 존재 확인
+if jq -e '.mcpServers' ~/.claude.json > /dev/null 2>&1; then
+  echo "✅ mcpServers 필드 존재"
+else
+  echo "❌ mcpServers 필드 없음"
+  echo "  → ~/.claude.json에 mcpServers 설정 추가 필요"
+fi
+
+# 3. 필수 MCP 서버 설정 확인
+check_global_mcp() {
   local mcp_name=$1
-  local required=$2
-  if jq -e ".mcpServers.$mcp_name" .claude/settings.local.json > /dev/null 2>&1; then
-    echo "✅ MCP: $mcp_name 설정됨"
+  if jq -e ".mcpServers.$mcp_name" ~/.claude.json > /dev/null 2>&1; then
+    echo "✅ 글로벌 MCP: $mcp_name 설정됨"
   else
-    if [ "$required" = "true" ]; then
-      echo "❌ MCP: $mcp_name 미설정 (필수)"
-    else
-      echo "⚠️  MCP: $mcp_name 미설정 (선택)"
-    fi
+    echo "❌ 글로벌 MCP: $mcp_name 미설정 (필수)"
   fi
 }
 
-check_mcp "context7" "true"
-check_mcp "github" "true"
-check_mcp "sequential-thinking" "false"
-check_mcp "playwright" "false"
-check_mcp "magic" "false"
-
-# 3. GitHub 토큰 설정 확인
-GITHUB_TOKEN=$(jq -r '.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN // ""' .claude/settings.local.json 2>/dev/null)
-if [ -n "$GITHUB_TOKEN" ] && [ "$GITHUB_TOKEN" != "<YOUR_GITHUB_TOKEN>" ]; then
-  echo "✅ GitHub MCP 토큰 설정됨"
-else
-  echo "⚠️  GitHub MCP 토큰 미설정"
-  echo "  → settings.local.json에서 GITHUB_PERSONAL_ACCESS_TOKEN 설정 필요"
-fi
+check_global_mcp "context7"
+check_global_mcp "sequential-thinking"
 ```
 
-### MCP 설정 템플릿
+### 글로벌 MCP 설정 템플릿
 
-SAX-Next 권장 MCP 설정:
+`~/.claude.json`에 추가할 MCP 설정:
 
 ```json
 {
@@ -290,25 +276,30 @@ SAX-Next 권장 MCP 설정:
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp"]
     },
-    "github": {
+    "sequential-thinking": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "<YOUR_TOKEN>"
-      }
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    }
+  }
+}
+```
+
+### 설정 방법
+
+기존 `~/.claude.json`에 `mcpServers` 필드가 없는 경우:
+
+```bash
+# jq를 사용하여 mcpServers 추가
+jq '. + {
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
     },
     "sequential-thinking": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
-    },
-    "playwright": {
-      "command": "npx",
-      "args": ["-y", "@anthropic-ai/mcp-server-playwright"]
-    },
-    "magic": {
-      "command": "npx",
-      "args": ["-y", "@anthropic-ai/mcp-server-magic"]
     }
   }
-}
+}' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
 ```
