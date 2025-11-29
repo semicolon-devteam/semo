@@ -47,7 +47,8 @@
 | Skill, 스킬 + (생성/수정/삭제/검토) | `skill-manager` |
 | Command, 커맨드 + (생성/수정/삭제/검토) | `command-manager` |
 | 검증, validate, 패키지 체크 | `package-validator` |
-| 버전, 릴리스, CHANGELOG | `version-manager` |
+| 버전 올려, 릴리스, CHANGELOG | `version-manager` |
+| 버전 체크, 업데이트 확인, SAX 업데이트 | `version-updater` |
 | 동기화, sync | `package-sync` |
 | 구조, 설계, 아키텍처 | `sax-architect` |
 
@@ -122,12 +123,29 @@ skill-manager가 sax-next/skills/ 에 Skill 생성
 
 ## 🔴 새 세션 시작 시 버전 체크 (NON-NEGOTIABLE)
 
-> **새 세션에서 첫 작업 전, SAX 패키지 버전을 확인하고 업데이트를 제안합니다.**
+> **⚠️ 새 세션에서 사용자 요청 처리 전, 반드시 version-updater를 먼저 호출합니다.**
 
-### 트리거 조건
+### 필수 실행 조건
 
-- 새 Claude Code 세션 시작 (대화 기록 없음)
-- SAX가 설치된 프로젝트 (.claude/sax-* 존재)
+다음 조건을 **모두** 만족하면 version-updater **즉시 호출**:
+
+1. 사용자의 첫 메시지가 도착함
+2. SAX가 설치됨 (`.claude/sax-*` 디렉토리 존재)
+3. 이전 대화 기록이 없음 (새 세션)
+
+### 🔴 필수 동작 순서
+
+```text
+1. 새 세션 감지
+   ↓
+2. [SAX] Skill 호출: version-updater (자동)
+   ↓
+3. 버전 체크 결과 출력
+   ↓
+4. 사용자 요청 처리 시작
+```
+
+> **예외 없음**: 어떤 요청이 들어와도 version-updater를 먼저 실행합니다.
 
 ### 체크 워크플로우
 
@@ -147,22 +165,35 @@ fi
 ### 업데이트 가능 시 출력
 
 ```markdown
-[SAX] version-updater: 업데이트 가능
+[SAX] Skill: version-updater 호출 (자동)
 
 📦 **SAX 업데이트 알림**
 
-현재 버전: {local_version}
-최신 버전: {remote_version}
+| 패키지 | 현재 버전 | 최신 버전 | 상태 |
+|--------|----------|----------|------|
+| sax-meta | {local} | {remote} | ⬆️ 업데이트 가능 |
 
 업데이트하려면: "SAX 업데이트해줘"
 ```
 
-### 최신 상태 시 출력 (선택)
+### 최신 상태 시 출력
 
 ```markdown
-[SAX] version-updater: 최신 버전 확인 ✅
+[SAX] Skill: version-updater 호출 (자동)
 
-SAX {version}이 설치되어 있습니다.
+✅ SAX {version} - 최신 버전입니다.
+```
+
+### 위반 시 경고
+
+version-updater 호출 없이 작업 진행 시:
+
+```markdown
+[SAX] Compliance Warning: 세션 시작 시 버전 체크 누락
+
+⚠️ 새 세션에서 version-updater가 호출되지 않았습니다.
+
+**필수 조치**: 지금 version-updater를 호출하세요.
 ```
 
 ---

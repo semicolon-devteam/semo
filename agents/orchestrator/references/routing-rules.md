@@ -46,7 +46,8 @@
 | Skill 관리 | `skill-manager` | `@SKILL` + CRUD |
 | Command 관리 | `command-manager` | `@COMMAND` + CRUD |
 | 패키지 검증 | `skill:package-validator` | "검증", "구조 확인", "validate" |
-| 버전 관리 | `skill:version-manager` | "버전", "릴리스", "CHANGELOG" |
+| 버전 관리 | `skill:version-manager` | "버전 올려", "릴리스", "CHANGELOG" |
+| 버전 체크 | `skill:version-updater` | "버전 체크", "업데이트 확인", "SAX 업데이트", "최신 버전" |
 | 패키지 동기화 | `skill:package-sync` | "동기화", "sync" |
 | 패키지 배포 | `skill:package-deploy` | "배포", "deploy", "설치" |
 | 패키지 설계 | `sax-architect` | "구조", "설계", "아키텍처" |
