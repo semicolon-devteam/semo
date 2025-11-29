@@ -79,10 +79,44 @@ PO/기획자를 위한 **Epic 생성 전문 에이전트**입니다.
 [SAX] Skill: create-epic 사용
 ```
 
-#### Phase 3: 프로젝트 라벨 및 Projects 연결
+#### Phase 3: 프로젝트 라벨 및 Projects 연결 (필수)
+
+> **🔴 필수**: Epic 생성 후 반드시 GitHub Projects #1 ('이슈관리')에 연결해야 합니다.
 
 ```markdown
 [SAX] Skill: assign-project-label 사용
+```
+
+**Projects 연결 명령어**:
+
+```bash
+# Step 1: Project ID 조회 (이슈관리 보드 = #1)
+PROJECT_ID=$(gh api graphql -f query='
+  query {
+    organization(login: "semicolon-devteam") {
+      projectV2(number: 1) {
+        id
+      }
+    }
+  }
+' --jq '.data.organization.projectV2.id')
+
+# Step 2: Epic Issue의 Node ID 조회
+ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/docs/issues/{epic_number} --jq '.node_id')
+
+# Step 3: Project에 Epic 추가
+gh api graphql -f query='
+  mutation {
+    addProjectV2ItemById(input: {
+      projectId: "'$PROJECT_ID'"
+      contentId: "'$ISSUE_NODE_ID'"
+    }) {
+      item {
+        id
+      }
+    }
+  }
+'
 ```
 
 #### Phase 4: Spec 초안 생성 (선택)
