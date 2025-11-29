@@ -1,7 +1,6 @@
 ---
-name: /SAX:task-progress
+name: task-progress
 description: 개발자 워크플로우 진행도 확인 및 자동화
-trigger: "/SAX:task-progress"
 ---
 
 # /SAX:task-progress Command
@@ -88,7 +87,7 @@ gh project item-edit --id {item_id} --field-id {status_field_id} --project-id {p
 gh project item-edit --id {item_id} --field-id {status_field_id} --project-id {project_id} --text "리뷰요청"
 ```
 
-## References
+## Related
 
-- [task-progress Skill](../skills/task-progress/skill.md)
-- [SAX Core PRINCIPLES.md](https://github.com/semicolon-devteam/docs/blob/main/sax/core/PRINCIPLES.md)
+- [task-progress Skill](../../skills/task-progress/SKILL.md)
+- [SAX Core PRINCIPLES.md](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)

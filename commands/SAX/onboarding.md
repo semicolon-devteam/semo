@@ -1,7 +1,6 @@
 ---
-name: /SAX:onboarding
+name: onboarding
 description: 신규 개발자 온보딩 프로세스 시작
-trigger: "/SAX:onboarding"
 ---
 
 # /SAX:onboarding Command
@@ -40,7 +39,7 @@ Phase 0: 환경 진단
 ...
 ```
 
-## References
+## Related
 
-- [onboarding-master Agent](../agents/onboarding-master.md)
-- [health-check Skill](../skills/health-check/skill.md)
+- [onboarding-master Agent](../../agents/onboarding-master/onboarding-master.md)
+- [health-check Skill](../../skills/health-check/SKILL.md)

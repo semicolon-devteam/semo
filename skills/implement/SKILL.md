@@ -8,6 +8,11 @@ tools: [Read, Write, Edit, Bash]
 
 # Implement Skill
 
+@./../_shared/development-workflow.md
+@./../_shared/ddd-patterns.md
+@./../_shared/test-templates.md
+@./../_shared/commit-guide.md
+
 **Purpose**: Orchestrate Agent-Driven Development (ADD) Phase 4 implementation workflow
 
 ## When to Use
@@ -55,7 +60,4 @@ skill: implement({ resume: "v0.3.x" }); // Resume from phase
 
 ## References
 
-For detailed documentation, see:
-
 - [Phase Workflow](references/phase-workflow.md) - Phase details, gate control, output format
-- [Commit Strategy](references/commit-strategy.md) - Atomic commits, error handling, resume

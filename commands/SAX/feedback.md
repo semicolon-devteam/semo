@@ -1,7 +1,6 @@
 ---
-name: /SAX:feedback
+name: feedback
 description: SAX-Next 패키지에 대한 피드백 (버그 리포트, 개선 제안) 수집 및 GitHub 이슈 생성
-trigger: "/SAX:feedback"
 ---
 
 # /SAX:feedback Command
@@ -93,5 +92,5 @@ gh issue create \
 
 ## Related
 
-- [feedback Skill](../skills/feedback/SKILL.md)
-- [Orchestrator](../agents/orchestrator/orchestrator.md)
+- [feedback Skill](../../skills/feedback/SKILL.md)
+- [Orchestrator](../../agents/orchestrator/orchestrator.md)

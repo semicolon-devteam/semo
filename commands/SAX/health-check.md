@@ -1,7 +1,6 @@
 ---
-name: /SAX:health-check
+name: health-check
 description: 개발 환경 검증 및 인증 상태 확인
-trigger: "/SAX:health-check"
 ---
 
 # /SAX:health-check Command
@@ -84,7 +83,7 @@ npm install -g pnpm
 **재검증**: `/SAX:health-check` 명령어로 다시 확인하세요.
 ```
 
-## References
+## Related
 
-- [health-check Skill](../skills/health-check/skill.md)
-- [SAX Core MESSAGE_RULES.md](https://github.com/semicolon-devteam/docs/blob/main/sax/core/MESSAGE_RULES.md)
+- [health-check Skill](../../skills/health-check/SKILL.md)
+- [SAX Core MESSAGE_RULES.md](https://github.com/semicolon-devteam/sax-core/blob/main/MESSAGE_RULES.md)

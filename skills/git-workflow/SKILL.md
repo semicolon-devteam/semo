@@ -11,6 +11,9 @@ triggers:
 
 # Git Workflow Skill
 
+@./../_shared/commit-guide.md
+@./../_shared/quality-gates.md
+
 > Git 작업을 Semicolon 팀 표준에 맞게 자동화
 
 ## 규칙 참조 (SoT)
@@ -74,6 +77,5 @@ ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+|/[0-9]+' | grep -oE '[
 
 ## References
 
-- [Commit Guide](references/commit-guide.md) - 커밋 상세 (sax-core 보완)
-- [Branch Strategy](references/branch-strategy.md) - 브랜치 전략 (sax-core 보완)
+- [Branch Strategy](references/branch-strategy.md) - 브랜치 전략
 - [PR Process](references/pr-process.md) - PR 프로세스

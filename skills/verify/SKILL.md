@@ -9,6 +9,10 @@ location: project
 
 # Verify Skill
 
+@./../_shared/quality-gates.md
+@./../_shared/ddd-patterns.md
+@./../_shared/browser-testing.md
+
 **Purpose**: Multi-layered quality verification before PR submission with integrated spec analysis
 
 ## Quick Start
@@ -66,10 +70,9 @@ skill: verify({ browserTest: true, mcp: "playwright" });
 
 ## Related
 
-- [Verification Layers Detail](references/verification-layers.md)
-- [Browser Testing Guide](references/browser-testing.md)
-- [Output Format](references/output-format.md)
-- [Severity Guide](references/severity-guide.md)
+- [Verification Layers Detail](references/verification-layers.md) - Layer-specific checks
+- [Output Format](references/output-format.md) - Report format
+- [Severity Guide](references/severity-guide.md) - Issue classification
 
 ## Related Skills
 

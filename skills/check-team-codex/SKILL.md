@@ -6,6 +6,9 @@ tools: [Bash, Read, Grep]
 
 # Check Team Codex Skill
 
+@./../_shared/quality-gates.md
+@./../_shared/nextjs-commands.md
+
 > 코드를 Semicolon 팀 표준에 맞게 자동 검증
 
 ## 규칙 참조 (SoT)
@@ -57,3 +60,8 @@ grep -r ":\s*any\|as any" src/
 - `verify` - 종합 검증에서 사용
 - `implement` - v0.4.x CODE phase에서 사용
 - `git-workflow` - 커밋 전 품질 검사
+
+## References
+
+- [Check Items](references/check-items.md) - Detailed check items
+- [Output Format](references/output-format.md) - Report format

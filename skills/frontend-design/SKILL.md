@@ -1,13 +1,7 @@
-# frontend-design Skill
-
-> 차별화된 프로덕션 수준의 프론트엔드 UI를 설계하고 구현
-
-## Metadata
-
-```yaml
+---
 name: frontend-design
-version: 1.0.0
-package: sax-next
+description: 차별화된 프로덕션 수준의 프론트엔드 UI 설계 및 구현. Use when (1) UI/UX 디자인 필요, (2) 컴포넌트 디자인, (3) 화면 설계 및 구현, (4) Design Thinking 기반 프론트엔드 개발.
+tools: [Read, Write, Edit, Bash]
 triggers:
   - UI 디자인
   - 프론트엔드 디자인
@@ -16,7 +10,13 @@ triggers:
   - frontend-design
   - UI 구현
   - 화면 구현
-```
+---
+
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: frontend-design 실행 - {Phase}` 시스템 메시지를 첫 줄에 출력하세요.
+
+# frontend-design Skill
+
+> 차별화된 프로덕션 수준의 프론트엔드 UI를 설계하고 구현
 
 ## Purpose
 

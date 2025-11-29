@@ -1,5 +1,7 @@
 # SSR-First Rules
 
+> **Constitution Principle II**: SSR-First Development
+
 ## Server Component (Default)
 
 ```typescript
@@ -13,7 +15,11 @@ export default async function PostsPage() {
 // ❌ WRONG: Unnecessary 'use client'
 'use client';
 export default function PostsPage() { }
+```
 
+## Client Component (Only When Needed)
+
+```typescript
 // ✅ CORRECT: Client component when needed
 'use client';
 export function PostsFilter() {
@@ -22,14 +28,7 @@ export function PostsFilter() {
 }
 ```
 
-## Checks
-
-- Pages are Server Components by default
-- `'use client'` only when necessary
-- No event handlers in Server Components
-- Client components minimized
-
-## When Client Components Are Needed
+## When to Use Client Components
 
 | Pattern | Server | Client |
 |---------|--------|--------|
@@ -43,13 +42,13 @@ export function PostsFilter() {
 ## Remove Unnecessary 'use client'
 
 ```typescript
-// Before
+// Before (불필요한 use client)
 'use client';
 export function PostsHeader() {
   return <h1>Posts</h1>;
 }
 
-// After
+// After (Server Component)
 export function PostsHeader() {
   return <h1>Posts</h1>;
 }
@@ -66,8 +65,12 @@ import { usePosts } from "@/app/posts/_hooks";
 import { PostsApiClient } from "@/app/posts/_api-clients/posts.client";
 ```
 
-Checks:
+## Validation Checklist
 
-- All layers export via `index.ts`
-- External imports use barrel exports
-- No circular dependencies
+- [ ] Pages are Server Components by default
+- [ ] `'use client'` only when necessary
+- [ ] No event handlers in Server Components
+- [ ] Client components minimized
+- [ ] All layers export via `index.ts`
+- [ ] External imports use barrel exports
+- [ ] No circular dependencies

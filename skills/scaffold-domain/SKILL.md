@@ -8,6 +8,9 @@ tools: [Bash, Write]
 
 # Scaffold Domain Skill
 
+@./../_shared/ddd-patterns.md
+@./../_shared/test-templates.md
+
 **Purpose**: Generate complete DDD 4-layer architecture structure for a new domain
 
 ## When to Use
@@ -89,8 +92,5 @@ Each domain gets 6 standard components:
 
 ## References
 
-For detailed documentation, see:
-
 - [Layer Templates](references/layer-templates.md) - Repository, API Client, Hooks, Components boilerplate
-- [Test Templates](references/test-templates.md) - Vitest test boilerplates for each layer
 - [Output Format](references/output-format.md) - Success output, naming conventions, error handling

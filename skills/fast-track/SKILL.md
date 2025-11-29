@@ -1,13 +1,7 @@
-# fast-track Skill
-
-> 개발자 주도의 경미한 수정사항을 Epic→Task 프로세스 없이 빠르게 처리
-
-## Metadata
-
-```yaml
+---
 name: fast-track
-version: 1.0.0
-package: sax-next
+description: 경미한 수정사항 빠른 처리 및 사후 이슈 생성. Use when (1) 오타/문구 수정, (2) 스타일 미세조정, (3) 버그 핫픽스, (4) 코드 정리 (3파일 이하, 30분 이내).
+tools: [Read, Write, Edit, Bash, GitHub CLI]
 triggers:
   - 패스트트랙
   - fast-track
@@ -17,7 +11,13 @@ triggers:
   - hotfix
   - 오타수정
   - typo
-```
+---
+
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: fast-track 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+
+# fast-track Skill
+
+> 개발자 주도의 경미한 수정사항을 Epic→Task 프로세스 없이 빠르게 처리
 
 ## Purpose
 

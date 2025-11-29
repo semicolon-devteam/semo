@@ -8,6 +8,9 @@ tools: [Bash, Read, Grep]
 
 # Validate Architecture Skill
 
+@./../_shared/ddd-patterns.md
+@./../_shared/ssr-rules.md
+
 **Purpose**: Ensure DDD 4-layer architecture compliance and pattern adherence
 
 ## Quick Start
@@ -70,9 +73,7 @@ skill: validateArchitecture({ quick: true });
 
 ## Related
 
-- [Layer Patterns](references/layer-patterns.md)
-- [SSR Rules](references/ssr-rules.md)
-- [Output Format](references/output-format.md)
+- [Output Format](references/output-format.md) - Skill-specific output
 
 ## Related Skills
 
