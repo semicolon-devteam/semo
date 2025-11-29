@@ -67,10 +67,21 @@ For each task:
 - Add issue references to each task
 - Add summary section with all created issues
 
-### Phase 6: Report
+### Phase 6: Complete Draft Tasks (Optional)
+
+Draft Task가 존재하는 경우:
+
+- `skill:complete-draft-task` 호출
+- Draft 라벨 제거 및 AC 추가
+- Epic Sub-issue 연결
+
+> 📚 상세: [complete-draft-task Skill](../complete-draft-task/SKILL.md)
+
+### Phase 7: Report
 
 - Generate summary with issue URLs
 - Report by layer grouping
+- Draft → Task 변환 요약 (해당 시)
 - Provide next steps
 
 ## Issue Format
@@ -107,5 +118,6 @@ Depends on: #[issue-number]
 - [Dependency Handling](references/dependency-handling.md) - Dependency chain management
 - [Epic Creation](references/epic-creation.md) - How to create parent Epics
 - [Error Handling](references/error-handling.md) - Error scenarios and success criteria
+- [complete-draft-task](../complete-draft-task/SKILL.md) - Draft Task → 완성된 Task 변환
 - `spec` - Generates tasks.md that feeds this skill
 - `implement` - Uses created issues for tracking

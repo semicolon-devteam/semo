@@ -94,6 +94,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 | 품질 검증           | `quality-master`        | `검증해줘`, `PR 전에 확인해줘`                 |
 | 구현 여부 확인      | `skill:verify-implementation` | `~구현됐어?`, `{repo}#{number} 구현 확인`, 이슈 구현 여부 |
 | 기술 선택           | `spike-master`          | `A vs B 뭐가 좋아?`, 기술 불확실성             |
+| Draft Task 완성     | `skill:complete-draft-task` | "Draft Task 완성", "draft 라벨 제거", "Task 변환" |
 
 ### 라우팅 우선순위 규칙
 
@@ -330,6 +331,7 @@ git push origin HEAD
 - `skill:fast-track` - 경미한 수정 빠른 처리
 - `skill:frontend-design` - UI/프론트엔드 디자인
 - `skill:spec` - SDD 명세 (Phase 0 Brainstorming 포함)
+- `skill:complete-draft-task` - Draft Task → 완성된 Task 변환
 
 ## References
 
