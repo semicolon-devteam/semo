@@ -23,7 +23,7 @@ sax-update Skill을 호출하여 실제 업데이트를 수행합니다.
 업데이트 후 다음을 검증합니다:
 
 1. **버전 확인**: VERSION 파일 확인
-2. **심링크 상태**: 모든 심링크가 올바르게 설정되었는지 확인
+2. **심링크/복사 상태**: 모든 심링크(또는 복사본)가 올바르게 설정되었는지 확인
 3. **서브모듈 상태**: git submodule status 확인
 
 ```bash
@@ -31,7 +31,7 @@ sax-update Skill을 호출하여 실제 업데이트를 수행합니다.
 cat .claude/sax-core/VERSION
 cat .claude/sax-po/VERSION
 
-# 심링크 확인
+# 심링크/복사 상태 확인
 ls -la .claude/CLAUDE.md
 ls -la .claude/agents
 ls -la .claude/skills
@@ -39,6 +39,15 @@ ls -la .claude/commands/SAX
 
 # 서브모듈 상태
 git submodule status
+```
+
+### Windows 환경 (복사 모드)
+
+Windows에서는 심링크 대신 복사본이 사용됩니다. 업데이트 후 복사본 갱신이 필요합니다:
+
+```bash
+# 복사본 갱신 (install-sax.sh --update 사용)
+./install-sax.sh po --update
 ```
 
 ## Step 4: 결과 보고
