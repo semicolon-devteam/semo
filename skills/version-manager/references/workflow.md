@@ -1,6 +1,6 @@
 # Workflow
 
-> version-manager의 7단계 버저닝 프로세스
+> version-manager의 8단계 버저닝 프로세스
 
 ## Input Schema
 
@@ -117,6 +117,23 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 - `sax/CHANGELOG/{new_version}.md`
 - `sax/CHANGELOG/INDEX.md`
 
+## Phase 8: 푸시 (필수)
+
+> **🔴 필수 단계**: 버저닝은 푸시까지 완료해야 완료로 간주됩니다.
+
+```bash
+# 원격 저장소에 푸시
+git push origin main
+```
+
+**서브모듈 환경**: 각 패키지(sax-meta, sax-po, sax-next)가 별도 레포인 경우 개별 푸시 필요
+
+```bash
+cd sax-meta && git push origin main
+cd sax-po && git push origin main
+cd sax-next && git push origin main
+```
+
 ## Validation
 
 **버저닝 전**:
@@ -133,3 +150,4 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 - ✅ INDEX.md Latest Version 업데이트 확인
 - ✅ Keep a Changelog 형식 준수 확인
 - ✅ 커밋 완료 확인 (`git log -1`)
+- ✅ **푸시 완료 확인** (`git status` - "Your branch is up to date")

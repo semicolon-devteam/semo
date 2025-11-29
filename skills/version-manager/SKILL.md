@@ -35,13 +35,13 @@ cat sax/VERSION
 echo "3.15.0" > sax/VERSION
 
 # 4. CHANGELOG 생성
-touch sax/CHANGELOG/3.15.0.md
+touch sax/CHANGELOG/v3.15.0.md
 
 # 5. INDEX.md 업데이트
 # Latest Version, Version History 섹션 업데이트
 
 # 6. 커밋 (CLAUDE.md 버저닝 커밋 형식 준수)
-git commit -m "🔖 [SAX] 3.15.0: {변경 요약}
+git add -A && git commit -m "🔖 [SAX] 3.15.0: {변경 요약}
 
 - 상세 변경 내용 1
 - 상세 변경 내용 2
@@ -49,6 +49,9 @@ git commit -m "🔖 [SAX] 3.15.0: {변경 요약}
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
+
+# 7. 푸시 (🔴 필수)
+git push origin main
 ```
 
 ## Semantic Versioning 요약
@@ -65,19 +68,23 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 [SAX] Skill: version-manager 사용
 
 [SAX] Versioning: {old_version} → {new_version} ({version_type})
+
+[SAX] Versioning: 커밋 완료 → 푸시 진행
+
+[SAX] Versioning: 완료 (푸시 성공)
 ```
 
 ## Related
 
-- [sax-architect Agent](../../agents/sax-architect.md)
+- [sax-architect Agent](../../agents/sax-architect/sax-architect.md)
 - [package-validator Skill](../package-validator/SKILL.md)
-- [SAX Core - Principles](https://github.com/semicolon-devteam/docs/blob/main/sax/core/PRINCIPLES.md)
+- [SAX Core - Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
 
 ## References
 
 For detailed documentation, see:
 
 - [Semantic Versioning Rules](references/semantic-versioning.md) - MAJOR/MINOR/PATCH 상세 규칙
-- [Workflow](references/workflow.md) - 6단계 버저닝 프로세스
+- [Workflow](references/workflow.md) - 8단계 버저닝 프로세스 (커밋 & 푸시 포함)
 - [Changelog Format](references/changelog-format.md) - Keep a Changelog 템플릿
 - [Output Format](references/output-format.md) - 성공/실패 출력, Edge Cases
