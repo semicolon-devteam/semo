@@ -153,6 +153,84 @@ gh api repos/semicolon-devteam/core-backend/issues/{issue_number}/labels \
   -f labels[]="draft"
 ```
 
+#### 2.5. Projects 보드 연결 (필수)
+
+> **🔴 필수**: 생성된 Draft Task를 GitHub Projects #1 ('이슈관리')에 연결합니다.
+
+```bash
+# Step 1: Project ID 조회 (이슈관리 보드 = #1)
+PROJECT_ID=$(gh api graphql -f query='
+  query {
+    organization(login: "semicolon-devteam") {
+      projectV2(number: 1) {
+        id
+      }
+    }
+  }
+' --jq '.data.organization.projectV2.id')
+
+# Step 2: Draft Task Issue의 Node ID 조회
+ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/core-backend/issues/{issue_number} \
+  --jq '.node_id')
+
+# Step 3: Project에 Draft Task 추가
+gh api graphql -f query='
+  mutation {
+    addProjectV2ItemById(input: {
+      projectId: "'$PROJECT_ID'"
+      contentId: "'$ISSUE_NODE_ID'"
+    }) {
+      item {
+        id
+      }
+    }
+  }
+'
+```
+
+#### 2.6. Assignee 할당 (대화형)
+
+> **💬 대화형**: 사용자에게 담당자 할당 여부를 질문합니다.
+
+**Step 1: 할당 가능한 담당자 목록 조회**
+
+```bash
+# 레포지토리의 할당 가능한 담당자 목록 조회
+gh api repos/semicolon-devteam/core-backend/assignees --jq '.[].login'
+```
+
+**Step 2: 사용자에게 질문**
+
+```markdown
+### 👤 Assignee 할당
+
+**Draft Task**: [Backend] {task_title} (#{issue_number})
+
+**할당 가능한 담당자**:
+1. @{assignee_1}
+2. @{assignee_2}
+3. @{assignee_3}
+...
+
+담당자를 지정하시겠습니까?
+- 번호 또는 GitHub 아이디를 입력하세요
+- 지정하지 않으려면 "스킵" 또는 "나중에"라고 입력하세요
+```
+
+**Step 3: 사용자 응답에 따른 처리**
+
+```bash
+# 사용자가 담당자를 지정한 경우
+gh api repos/semicolon-devteam/core-backend/issues/{issue_number} \
+  -X PATCH \
+  -f assignees[]="{selected_assignee}"
+```
+
+**스킵 시**:
+```markdown
+✅ Assignee 지정 없이 진행합니다. 나중에 수동으로 할당 가능합니다.
+```
+
 ### 3. 프론트엔드 작업 처리
 
 **프론트엔드 작업 감지 시**:
@@ -215,6 +293,85 @@ gh api repos/semicolon-devteam/{service_repo}/issues/{issue_number}/labels \
   -f labels[]="draft"
 ```
 
+#### 3.3. Projects 보드 연결 (필수)
+
+> **🔴 필수**: 생성된 Draft Task를 GitHub Projects #1 ('이슈관리')에 연결합니다.
+
+```bash
+# Step 1: Project ID 조회 (이슈관리 보드 = #1)
+PROJECT_ID=$(gh api graphql -f query='
+  query {
+    organization(login: "semicolon-devteam") {
+      projectV2(number: 1) {
+        id
+      }
+    }
+  }
+' --jq '.data.organization.projectV2.id')
+
+# Step 2: Draft Task Issue의 Node ID 조회
+ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/{service_repo}/issues/{issue_number} \
+  --jq '.node_id')
+
+# Step 3: Project에 Draft Task 추가
+gh api graphql -f query='
+  mutation {
+    addProjectV2ItemById(input: {
+      projectId: "'$PROJECT_ID'"
+      contentId: "'$ISSUE_NODE_ID'"
+    }) {
+      item {
+        id
+      }
+    }
+  }
+'
+```
+
+#### 3.4. Assignee 할당 (대화형)
+
+> **💬 대화형**: 사용자에게 담당자 할당 여부를 질문합니다.
+
+**Step 1: 할당 가능한 담당자 목록 조회**
+
+```bash
+# 레포지토리의 할당 가능한 담당자 목록 조회
+gh api repos/semicolon-devteam/{service_repo}/assignees --jq '.[].login'
+```
+
+**Step 2: 사용자에게 질문**
+
+```markdown
+### 👤 Assignee 할당
+
+**Draft Task**: [Frontend] {task_title} (#{issue_number})
+
+**할당 가능한 담당자**:
+1. @{assignee_1}
+2. @{assignee_2}
+3. @{assignee_3}
+...
+
+담당자를 지정하시겠습니까?
+- 번호 또는 GitHub 아이디를 입력하세요
+- 지정하지 않으려면 "스킵" 또는 "나중에"라고 입력하세요
+```
+
+**Step 3: 사용자 응답에 따른 처리**
+
+```bash
+# 사용자가 담당자를 지정한 경우
+gh api repos/semicolon-devteam/{service_repo}/issues/{issue_number} \
+  -X PATCH \
+  -f assignees[]="{selected_assignee}"
+```
+
+**스킵 시**:
+
+```markdown
+✅ Assignee 지정 없이 진행합니다. 나중에 수동으로 할당 가능합니다.
+```
+
 ### 4. 디자인 작업 처리
 
 **디자인 작업 필요 시**:
@@ -226,6 +383,18 @@ gh api repos/semicolon-devteam/{service_repo}/issues/{issue_number}/labels \
 # Sub-issue 연결
 # design 라벨 부여
 ```
+
+#### 4.1. Projects 보드 연결 (필수)
+
+> **🔴 필수**: 생성된 Design Task를 GitHub Projects #1 ('이슈관리')에 연결합니다.
+
+```bash
+# 2.5와 동일한 방식으로 Projects 연결
+```
+
+#### 4.2. Assignee 할당 (대화형)
+
+> **💬 대화형**: 디자인 담당자 할당 여부를 질문합니다. (2.6, 3.4와 동일한 방식)
 
 ### 5. GitHub Projects 필드 업데이트
 
@@ -273,6 +442,8 @@ gh api repos/semicolon-devteam/docs/issues/{epic_number}/labels \
 # - draft 라벨
 # - Epic Sub-issue 관계
 # - Projects 필드
+# - Projects #1 ('이슈관리') 연결 (필수)
+# - Assignee (선택 - 사용자 응답에 따름)
 ```
 
 **검증 실패 시**:
@@ -287,13 +458,13 @@ gh api repos/semicolon-devteam/docs/issues/{epic_number}/labels \
 ### 📋 생성된 Tasks
 
 **Backend** (core-backend):
-- [#123] 사용자 차단 API 구현 (8 Points)
+- [#123] 사용자 차단 API 구현 (8 Points) → @{assignee}
 
 **Frontend** (cm-introduction-new):
-- [#456] 사용자 차단 UI 구현 (10 Points)
+- [#456] 사용자 차단 UI 구현 (10 Points) → @{assignee}
 
 **Design**:
-- [#789] 사용자 차단 화면 디자인 (3 Points)
+- [#789] 사용자 차단 화면 디자인 (3 Points) → 미지정
 
 ### 📊 전체 일정 예측
 
@@ -305,10 +476,91 @@ gh api repos/semicolon-devteam/docs/issues/{epic_number}/labels \
 - `fullstack`
 - `design`
 
+### 📌 Projects 연결
+
+모든 Draft Tasks가 Projects #1 ('이슈관리')에 연결되었습니다.
+
+### 👤 Assignee 현황
+
+| Task | Assignee | 상태 |
+|------|----------|------|
+| [#123] Backend | @{assignee} | ✅ 할당됨 |
+| [#456] Frontend | @{assignee} | ✅ 할당됨 |
+| [#789] Design | - | ⏭️ 스킵됨 |
+
 ### ✅ 검증 결과
 
 모든 Draft Tasks가 필수 항목을 포함하고 있습니다.
+
+### 📢 Slack 알림
+
+개발자에게 Slack 알림이 전송되었습니다.
+- 채널: #_협업
+- 멘션: @{assignee1}, @{assignee2}
 ```
+
+### 10. Slack 알림 전송
+
+> **🔔 자동 호출**: Draft Task 생성 완료 후 자동으로 notify-slack Skill 호출
+
+[SAX] Skill: notify-slack 사용
+
+**전달 정보**:
+
+```yaml
+epic:
+  number: {epic_number}
+  title: "{epic_title}"
+  url: "https://github.com/semicolon-devteam/docs/issues/{epic_number}"
+  project: "{project_name}"
+
+tasks:
+  - repo: "{repo_name}"
+    number: {task_number}
+    title: "{task_title}"
+    assignee: "{github_id}"
+    points: {points}
+```
+
+**Slack 메시지 전송**:
+
+```bash
+SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb"
+
+curl -X POST https://slack.com/api/chat.postMessage \
+  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "channel": "#_협업",
+    "text": "📋 새로운 Draft Task가 생성되었습니다",
+    "blocks": [
+      {
+        "type": "header",
+        "text": {"type": "plain_text", "text": "📋 새로운 Draft Task가 생성되었습니다"}
+      },
+      {
+        "type": "section",
+        "fields": [
+          {"type": "mrkdwn", "text": "*Epic*\n<{epic_url}|#{epic_number} {epic_title}>"},
+          {"type": "mrkdwn", "text": "*프로젝트*\n{project_name}"}
+        ]
+      },
+      {"type": "divider"},
+      {
+        "type": "section",
+        "text": {"type": "mrkdwn", "text": "*Draft Tasks*\n• <{task_url}|#{task_number} {task_title}> - <@{slack_id}> ({points} Points)"}
+      },
+      {
+        "type": "context",
+        "elements": [{"type": "mrkdwn", "text": "spec 검토 후 구현을 시작해주세요! 🚀"}]
+      }
+    ]
+  }'
+```
+
+**Slack ID 매핑 참조**:
+
+[SAX] Reference: skills/notify-slack/references/slack-id-mapping.md 참조
 
 ## SAX Messages
 
@@ -338,6 +590,8 @@ Skills 호출 시:
 [SAX] Skill: auto-label-by-scope 사용
 
 [SAX] Skill: estimate-epic-timeline 사용
+
+[SAX] Skill: notify-slack 사용
 ```
 
 ## Error Handling
@@ -383,5 +637,6 @@ Epic 본문의 "📦 대상 레포지토리" 섹션을 확인하고 체크해주
 
 - [epic-master Agent](./epic-master.md)
 - [orchestrator Agent](./orchestrator.md)
+- [notify-slack Skill](../skills/notify-slack/SKILL.md)
 - [Skills](../skills/)
 - [Epic Template](../templates/epic-template.md)
