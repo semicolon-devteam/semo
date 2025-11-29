@@ -1,8 +1,10 @@
 ---
 name: template-skill
-description: Template for creating new SAX skills. Use when creating a new skill that extends SAX capabilities with specialized workflows or domain knowledge.
+description: SAX Skill 템플릿. Use when (1) 새 Skill 생성, (2) Skill 구조 참고, (3) 표준 형식 확인.
 tools: [Read, Write]
 ---
+
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: template-skill 참조` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Template Skill
 

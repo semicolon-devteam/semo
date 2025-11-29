@@ -1,7 +1,6 @@
 ---
-name: /SAX:onboarding
+name: onboarding
 description: 신규 PO/기획자 온보딩 프로세스 시작
-trigger: "/SAX:onboarding"
 ---
 
 # /SAX:onboarding Command
@@ -47,8 +46,8 @@ Phase 2: PO 워크플로우
 5. 진행도 추적
 ```
 
-## References
+## Related
 
-- [onboarding-master Agent](../agents/onboarding-master.md)
-- [health-check Skill](../skills/health-check/skill.md)
-- [epic-master Agent](../agents/epic-master.md)
+- [onboarding-master Agent](../../agents/onboarding-master/onboarding-master.md)
+- [health-check Skill](../../skills/health-check/SKILL.md)
+- [epic-master Agent](../../agents/epic-master.md)

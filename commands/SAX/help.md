@@ -1,7 +1,6 @@
 ---
-name: /SAX:help
+name: help
 description: SAX-PO 도움말 - sax-help skill 호출
-trigger: "/SAX:help"
 ---
 
 # /SAX:help Command
@@ -23,4 +22,6 @@ SAX-PO 패키지 사용 가이드를 표시합니다.
 [SAX] Skill 호출: sax-help
 ```
 
-**상세 구현**: [sax-help Skill](../../skills/sax-help/SKILL.md) 참조
+## Related
+
+- [sax-help Skill](../../skills/sax-help/SKILL.md)

@@ -4,6 +4,8 @@ description: Validate code against Team Codex standards. Use when (1) before com
 tools: [Bash, Read, Grep]
 ---
 
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: check-team-codex 호출 - {검증 범위}` 시스템 메시지를 첫 줄에 출력하세요.
+
 # Check Team Codex Skill
 
 > 코드를 Semicolon 팀 표준에 맞게 자동 검증
