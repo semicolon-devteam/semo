@@ -15,6 +15,46 @@ git status
 git log --oneline -5
 ```
 
+## Step 1.5: Check Existing Draft PR
+
+> **🔴 중요**: 구현 작업 시작 전 반드시 기존 PR 존재 여부 확인
+
+```bash
+# 현재 브랜치에서 이슈 번호 추출
+ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+' | head -1)
+
+# 해당 브랜치의 PR 확인
+gh pr list --head $(git branch --show-current) --json number,state,title,isDraft
+
+# 또는 이슈에 연결된 PR 확인
+gh pr list --search "#{ISSUE_NUM}" --json number,state,title,isDraft
+```
+
+**Draft PR 존재 시 출력**:
+
+```markdown
+[SAX] Context 분석
+
+📋 **이슈**: #{issue_number}
+🌿 **브랜치**: {branch_name}
+📝 **PR**: #{pr_number} (Draft) ← 기존 PR 감지
+
+기존 Draft PR을 기반으로 작업을 계속합니다.
+```
+
+**Draft PR 없을 시**:
+
+```markdown
+[SAX] Context 분석
+
+📋 **이슈**: #{issue_number}
+🌿 **브랜치**: {branch_name}
+📝 **PR**: 없음
+
+Draft PR을 먼저 생성하시겠습니까?
+> "Draft PR 생성해줘"
+```
+
 ## Step 2: Check Specification Artifacts
 
 ```bash
