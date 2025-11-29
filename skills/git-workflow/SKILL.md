@@ -39,7 +39,19 @@ gh api repos/semicolon-devteam/sax-core/contents/TEAM_RULES.md --jq '.content' |
 |----------|-------------|
 | **Commit** | 이슈 번호 자동 추출 + Gitmoji 커밋 |
 | **Branch** | `{issue}-{feature}` 형식 생성 |
-| **PR** | gh cli로 자동 PR 생성 |
+| **PR** | gh cli로 Draft PR 생성 (`Related #이슈`) |
+| **Status** | Project 이슈카드 상태 자동 변경 |
+
+## Project 상태 관리
+
+> 이슈가 `이슈카드` Project (ID: 1)에 연결되어 있다고 가정
+
+| 시점 | 상태 변경 |
+|------|----------|
+| 작업 시작 | → **작업중** |
+| PR 머지 | → **테스트중** |
+
+**상세**: [Project Status](references/project-status.md)
 
 ## 이슈 번호 추출
 
@@ -79,3 +91,4 @@ ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+|/[0-9]+' | grep -oE '[
 
 - [Branch Strategy](references/branch-strategy.md) - 브랜치 전략
 - [PR Process](references/pr-process.md) - PR 프로세스
+- [Project Status](references/project-status.md) - 이슈 상태 관리

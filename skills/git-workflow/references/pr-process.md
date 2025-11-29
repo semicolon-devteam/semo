@@ -4,21 +4,25 @@
 
 ## Pull Request Creation
 
+> **중요**: PR은 Draft로 생성하고, `Closes` 대신 `Related`를 사용합니다.
+> (dev 병합 후 stg 리뷰가 필요하므로 PR 머지 시 이슈가 자동 닫히면 안됨)
+
 **자동 PR 생성 워크플로우**:
 
 ```bash
 # 1. 현재 브랜치 푸시
 git push -u origin $(git branch --show-current)
 
-# 2. PR 생성 (gh cli)
+# 2. Draft PR 생성 (gh cli)
 gh pr create \
+  --draft \
   --title "✨ #${ISSUE_NUM} ${PR_TITLE}" \
   --body "$(cat <<'EOF'
 ## Summary
 - [변경 사항 요약]
 
 ## Related Issue
-- Closes #${ISSUE_NUM}
+- Related #${ISSUE_NUM}
 
 ## Test Plan
 - [ ] 테스트 항목 1
@@ -27,6 +31,17 @@ gh pr create \
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 EOF
 )"
+```
+
+**PR 머지 후 자동 처리**:
+
+PR이 머지되면 연결된 이슈의 Project Status를 **테스트중**으로 변경:
+
+```bash
+# PR 본문에서 이슈 번호 추출
+ISSUE_NUM=$(gh pr view --json body --jq '.body' | grep -oE 'Related #[0-9]+' | grep -oE '[0-9]+')
+
+# Project Status 변경 (상세: project-status.md 참조)
 ```
 
 ## Pre-commit Checks
@@ -130,7 +145,7 @@ Skill Response:
 진행할까요? (Y/n)
 ```
 
-### Example 3: Create PR
+### Example 3: Create Draft PR
 
 ```markdown
 User: PR 만들어줘
@@ -144,13 +159,29 @@ Skill Response:
 
 📝 **PR 정보**:
 - Title: `✨ #35 댓글 UI 구현`
+- Type: **Draft** (리뷰 후 Ready로 전환)
 - Labels: `feature`, `frontend`
 
 🚀 **실행 계획**:
 1. git push -u origin 35-comment-ui
-2. gh pr create --title "..." --body "..."
+2. gh pr create --draft --title "..." --body "Related #35..."
 
 진행할까요? (Y/n)
+```
+
+### Example 5: PR 머지 후
+
+```markdown
+[SAX] skill:git-workflow: PR 머지 완료
+
+✅ **PR #42**: `✨ #35 댓글 UI 구현` → dev 병합 완료
+
+📋 **이슈 상태 변경**:
+- 이슈: #35
+- 상태: 작업중 → **테스트중**
+- Project: 이슈카드
+
+다음 단계: STG 환경에서 테스트 진행
 ```
 
 ### Example 4: Issue Onboarding
@@ -165,23 +196,28 @@ Skill Response:
 - Repository: `cm-office`
 - Issue: #132
 - Title: `User Profile Upload`
+- 현재 상태: 할일
 
 ---
 
-### ✅ Step 1: 브랜치 확인
+### ✅ Step 1: 이슈 상태 변경
+📋 **상태 변경**: 할일 → **작업중**
+(Project: 이슈카드)
+
+### ✅ Step 2: 브랜치 확인
 현재 브랜치: `dev` ✅
 
-### ✅ Step 2: 소스 최신화
+### ✅ Step 3: 소스 최신화
 ```bash
 git pull origin dev
 ```
 
-### ✅ Step 3: 피처 브랜치 생성
+### ✅ Step 4: 피처 브랜치 생성
 ```bash
 git checkout -b 132-user-profile-upload
 ```
 
-### 🎯 Step 4: 다음 단계
+### 🎯 Step 5: 다음 단계
 브랜치 생성 후 Speckit 워크플로우를 시작하세요:
 1. `/speckit.specify` - 명세 작성
 2. `/speckit.plan` - 계획 수립
