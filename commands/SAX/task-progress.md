@@ -24,17 +24,27 @@ description: 개발자 워크플로우 진행도 확인 및 자동화
 ## 10-Step Developer Workflow
 
 ```text
-1. 업무할당
+1. 업무할당 (검수대기 → 검수완료)
 2. GitHub Project 상태 변경 (검수완료 → 작업중)
 3. Feature 브랜치 생성
 4. Draft PR 생성
 5. Speckit 기반 구현 (Spec → Plan → Tasks)
 6. 테스트코드 작성 및 테스트 진행
 7. 린트 및 빌드 통과
-8. 푸시 및 리뷰 진행
-9. dev 머지
-10. GitHub Project 상태 변경 (작업중 → 리뷰요청) 및 작업완료일 설정
+8. 푸시 및 리뷰 요청 (작업중 → 리뷰요청)
+9. PR 승인 및 dev 머지 (리뷰요청 → 테스트중)
+10. STG 환경 QA 테스트 (테스트중 → 병합됨)
 ```
+
+### GitHub Project 상태 조회
+
+> **⚠️ SoT**: 상태 목록은 GitHub Project에서 직접 조회합니다.
+
+```bash
+gh api graphql -f query='query { organization(login: "semicolon-devteam") { projectV2(number: 1) { field(name: "Status") { ... on ProjectV2SingleSelectField { options { name color } } } } } }' --jq '.data.organization.projectV2.field.options[]'
+```
+
+> 📌 상세: [project-status.md](../../skills/git-workflow/references/project-status.md)
 
 ## Expected Output
 

@@ -7,15 +7,50 @@
 이슈가 연결된 GitHub Project의 Status 필드를 자동으로 관리합니다.
 
 **전제 조건**:
-- 이슈가 `이슈카드` Project (ID: 1)에 연결되어 있음
+
+- 이슈가 `이슈관리` Project (번호: 1)에 연결되어 있음
 - Status 필드가 존재함
+
+## 전체 상태 목록
+
+> **⚠️ SoT**: 상태 목록은 GitHub Project에서 직접 조회합니다.
+
+### 상태 조회 명령
+
+```bash
+# GitHub Project 상태 목록 조회
+gh api graphql -f query='
+  query {
+    organization(login: "semicolon-devteam") {
+      projectV2(number: 1) {
+        field(name: "Status") {
+          ... on ProjectV2SingleSelectField {
+            options {
+              name
+              color
+              description
+            }
+          }
+        }
+      }
+    }
+  }
+' --jq '.data.organization.projectV2.field.options[] | "| \(.name) | \(.color) | \(.description // "-") |"'
+```
+
+> 📌 상태 목록이 필요할 때 위 명령어로 직접 조회하세요. 하드코딩된 목록은 실제 설정과 다를 수 있습니다.
 
 ## 상태 전환 규칙
 
 | 트리거 | 변경 전 상태 | 변경 후 상태 |
 |--------|-------------|-------------|
-| 이슈 작업 시작 | 대기중, 할일 등 | **작업중** |
-| PR 머지 완료 | 작업중 | **테스트중** |
+| 이슈 작업 시작 | 검수대기, 검수완료 | **작업중** |
+| 확인 요청 | 작업중 | **확인요청** |
+| 리뷰 요청 (PR Ready) | 작업중 | **리뷰요청** |
+| 리뷰 후 수정 필요 | 리뷰요청 | **수정요청** |
+| PR 머지 완료 | 리뷰요청 | **테스트중** |
+| QA 테스트 통과 | 테스트중 | **병합됨** |
+| 작업 취소 | Any | **버려짐** |
 
 ## API 워크플로우
 
@@ -130,7 +165,29 @@ Project: 이슈카드
 📋 **이슈**: {repo}#{number}
 🔄 **상태 변경**: 작업중 → **테스트중**
 
-다음 단계: STG 환경에서 테스트 진행
+다음 단계: STG 환경에서 QA 테스트 진행
+```
+
+### QA 테스트 통과 시 → "병합됨"
+
+**트리거**:
+
+- QA 담당자가 STG 환경에서 테스트 통과 확인
+- SAX-QA에서 `test-pass` 처리
+
+**조건**:
+- PR 본문에 `Related #{number}` 형식으로 이슈 연결
+- 이슈가 Project에 연결되어 있음
+- 현재 상태가 "테스트중"
+
+**출력**:
+```markdown
+[SAX] skill:git-workflow: 이슈 상태 변경
+
+📋 **이슈**: {repo}#{number}
+🔄 **상태 변경**: 테스트중 → **병합됨**
+
+다음 단계: 프로덕션 배포 진행
 ```
 
 ## 에러 처리
@@ -142,7 +199,7 @@ Project: 이슈카드
 
 **이슈**: {repo}#{number}
 
-이슈를 '이슈카드' Project에 연결한 후 다시 시도해주세요.
+이슈를 '이슈관리' Project에 연결한 후 다시 시도해주세요.
 ```
 
 ### 권한 오류

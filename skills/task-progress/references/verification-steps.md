@@ -135,14 +135,50 @@ result:
   - 머지 완료 시 체크
 ```
 
-## 10. GitHub Project 상태 변경 (리뷰요청) 및 완료일 설정
+## 10. GitHub Project 상태 변경 및 완료일 설정
 
 ```yaml
 method: "gh_project_status_update"
-check:
-  - dev 머지 완료 후 status가 "리뷰요청"인지
-auto_action:
-  - status "작업중" → "리뷰요청" 자동 변경
-  - 작업완료일 필드에 현재 날짜 설정
-  - gh project item-edit 명령 사용
+workflow:
+  # PR Ready 요청 시
+  pr_ready:
+    check: PR이 Draft → Ready로 변경되었는지
+    auto_action:
+      - status "작업중" → "리뷰요청" 자동 변경
+
+  # dev 머지 완료 시
+  dev_merge:
+    check: PR이 dev 브랜치에 머지되었는지
+    auto_action:
+      - status "리뷰요청" → "테스트중" 자동 변경
+      - 작업완료일 필드에 현재 날짜 설정
+
+  # QA 테스트 통과 시
+  qa_pass:
+    check: SAX-QA에서 test-pass 처리되었는지
+    auto_action:
+      - status "테스트중" → "병합됨" 자동 변경
 ```
+
+## GitHub Project 상태 조회
+
+> **⚠️ SoT**: 상태 목록은 GitHub Project에서 직접 조회합니다.
+
+```bash
+# 상태 목록 조회
+gh api graphql -f query='
+  query {
+    organization(login: "semicolon-devteam") {
+      projectV2(number: 1) {
+        field(name: "Status") {
+          ... on ProjectV2SingleSelectField {
+            options { name color }
+          }
+        }
+      }
+    }
+  }
+' --jq '.data.organization.projectV2.field.options[]'
+```
+
+> 📌 상세 API 워크플로우: [project-status.md](../../git-workflow/references/project-status.md) 참조
