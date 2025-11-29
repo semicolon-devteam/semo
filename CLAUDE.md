@@ -69,6 +69,56 @@
 
 ---
 
+## 🔴 로컬 매니저 필수 사용 (NON-NEGOTIABLE)
+
+> **Agent/Skill/Command 생성/수정/삭제는 접두사와 관계없이 반드시 로컬 `.claude/agents/` 매니저를 통해 처리합니다.**
+
+### 규칙
+
+| 작업 유형 | 필수 매니저 | 위치 |
+|----------|------------|------|
+| Agent CRUD | `agent-manager` | `.claude/agents/agent-manager/` |
+| Skill CRUD | `skill-manager` | `.claude/agents/skill-manager/` |
+| Command CRUD | `command-manager` | `.claude/agents/command-manager/` |
+
+### 접두사와 매니저의 관계
+
+```text
+[next] 스킬 만들어줘
+  ↓
+Orchestrator: 의도 분석 → Skill 생성
+  ↓
+❌ sax-next/agents/skill-manager (존재하지 않음)
+✅ .claude/agents/skill-manager (항상 이 매니저 사용)
+  ↓
+skill-manager가 sax-next/skills/ 에 Skill 생성
+```
+
+### 이유
+
+1. **매니저 중앙화**: 모든 패키지의 Agent/Skill/Command는 sax-meta의 매니저가 관리
+2. **품질 일관성**: 동일한 검증 기준 적용 (Progressive Disclosure, Frontmatter 등)
+3. **표준 준수**: Anthropic Skills 표준을 중앙에서 적용
+
+### 위반 감지
+
+접두사가 있고 CRUD 키워드가 감지되었는데 로컬 매니저를 거치지 않으면:
+
+```markdown
+[SAX] Compliance Warning: 로컬 매니저 우회 감지
+
+⚠️ {작업 유형} 작업이 매니저 없이 수행되었습니다.
+
+**예상 흐름**: Orchestrator → skill-manager → Skill 생성
+**실제 흐름**: Orchestrator → 직접 Skill 생성
+
+**조치 필요**:
+1. 생성된 파일을 skill-manager로 감사
+2. 표준 준수 여부 확인
+```
+
+---
+
 ## 🔴 새 세션 시작 시 버전 체크 (NON-NEGOTIABLE)
 
 > **새 세션에서 첫 작업 전, SAX 패키지 버전을 확인하고 업데이트를 제안합니다.**
