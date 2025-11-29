@@ -19,17 +19,40 @@ tools: [Bash, Read, Grep]
 ## Quick Start
 
 ```bash
-# 방법 1: deploy.sh 스크립트 사용 (권장)
-./sax/scripts/deploy.sh sax-next /path/to/target-project
+# 방법 1: install-sax.sh 스크립트 사용 (권장)
+./install-sax.sh next
 
 # 방법 2: 업데이트 모드
-./sax/scripts/deploy.sh sax-next /path/to/target-project --update
+./install-sax.sh next --update
 
 # 방법 3: 수동 배포
 mkdir -p /path/to/project/.claude/agents
 mkdir -p /path/to/project/.claude/skills
 cp -r sax/packages/sax-next/agents/* /path/to/project/.claude/agents/
 cp -r sax/packages/sax-next/skills/* /path/to/project/.claude/skills/
+```
+
+## Windows 지원
+
+> Windows 환경에서는 심링크 대신 **직접 복사** 방식을 사용합니다.
+
+### OS 자동 감지
+
+install-sax.sh가 OS를 자동 감지하여 적절한 방식을 선택합니다:
+
+- **Linux/macOS**: 심링크 사용
+- **Windows** (Git Bash, MSYS, Cygwin): 복사 사용
+
+### Windows 업데이트 주의사항
+
+Windows 복사 모드에서는 원본 업데이트 후 복사본 갱신이 필요합니다:
+
+```bash
+# 원본 업데이트
+git submodule update --remote
+
+# 복사본 갱신
+./install-sax.sh next --update
 ```
 
 ## Supported Packages
@@ -59,7 +82,7 @@ cp -r sax/packages/sax-next/skills/* /path/to/project/.claude/skills/
 
 - [package-sync Skill](../package-sync/SKILL.md) - docs 내부 동기화
 - [version-manager Skill](../version-manager/SKILL.md) - 버저닝
-- [deploy.sh Script](../../../scripts/deploy.sh) - 배포 스크립트
+- [install-sax.sh Script](../../scripts/install-sax.sh) - 설치/배포 스크립트
 
 ## References
 

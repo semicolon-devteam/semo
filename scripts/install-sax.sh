@@ -23,6 +23,42 @@ SAX_CORE_REPO="sax-core"
 CLAUDE_DIR=".claude"
 FORCE_MODE=false
 UPDATE_MODE=false
+OS_TYPE=""
+
+# OS 감지 함수
+# Windows는 MSYS, MinGW, Cygwin, Git Bash 등으로 실행됨
+detect_os() {
+    case "$(uname -s)" in
+        Linux*)     OS_TYPE="Linux";;
+        Darwin*)    OS_TYPE="macOS";;
+        CYGWIN*)    OS_TYPE="Windows";;
+        MINGW*)     OS_TYPE="Windows";;
+        MSYS*)      OS_TYPE="Windows";;
+        *)          OS_TYPE="Unknown";;
+    esac
+}
+
+# 심링크 또는 복사 수행
+# Windows에서는 심링크 대신 복사 사용 (관리자 권한/개발자 모드 불필요)
+create_link_or_copy() {
+    local source=$1
+    local target=$2
+    local display_source=$3  # 출력용 상대 경로
+
+    if [ "$OS_TYPE" = "Windows" ]; then
+        # Windows: 복사 사용
+        if [ -d "$source" ]; then
+            cp -r "$source" "$target"
+        else
+            cp "$source" "$target"
+        fi
+        print_success "복사 완료: $target (Windows 모드)"
+    else
+        # Linux/macOS: 심링크 사용
+        ln -s "$display_source" "$target"
+        print_success "심링크 생성: $target -> $display_source"
+    fi
+}
 
 # 출력 함수
 print_header() {
@@ -264,9 +300,13 @@ setup_symlinks() {
     local repo_name="sax-$package"
     local package_path="$CLAUDE_DIR/$repo_name"
 
-    print_step "$repo_name 심링크 설정 중..."
+    if [ "$OS_TYPE" = "Windows" ]; then
+        print_step "$repo_name 복사 설정 중... (Windows 모드)"
+    else
+        print_step "$repo_name 심링크 설정 중..."
+    fi
 
-    # CLAUDE.md 심링크
+    # CLAUDE.md 심링크/복사
     if [ -f "$package_path/CLAUDE.md" ]; then
         local claude_md_link="$CLAUDE_DIR/CLAUDE.md"
 
@@ -277,11 +317,10 @@ setup_symlinks() {
             mv "$claude_md_link" "$claude_md_link.backup"
         fi
 
-        ln -s "$repo_name/CLAUDE.md" "$claude_md_link"
-        print_success "심링크 생성: CLAUDE.md -> $repo_name/CLAUDE.md"
+        create_link_or_copy "$package_path/CLAUDE.md" "$claude_md_link" "$repo_name/CLAUDE.md"
     fi
 
-    # agents 심링크
+    # agents 심링크/복사
     if [ -d "$package_path/agents" ]; then
         local agents_link="$CLAUDE_DIR/agents"
 
@@ -292,11 +331,10 @@ setup_symlinks() {
             mv "$agents_link" "$agents_link.backup"
         fi
 
-        ln -s "$repo_name/agents" "$agents_link"
-        print_success "심링크 생성: agents/ -> $repo_name/agents/"
+        create_link_or_copy "$package_path/agents" "$agents_link" "$repo_name/agents"
     fi
 
-    # skills 심링크
+    # skills 심링크/복사
     if [ -d "$package_path/skills" ]; then
         local skills_link="$CLAUDE_DIR/skills"
 
@@ -307,11 +345,10 @@ setup_symlinks() {
             mv "$skills_link" "$skills_link.backup"
         fi
 
-        ln -s "$repo_name/skills" "$skills_link"
-        print_success "심링크 생성: skills/ -> $repo_name/skills/"
+        create_link_or_copy "$package_path/skills" "$skills_link" "$repo_name/skills"
     fi
 
-    # commands 심링크 (.claude/SAX/commands 로 생성)
+    # commands 심링크/복사 (.claude/SAX/commands 로 생성)
     if [ -d "$package_path/commands" ]; then
         # SAX 디렉토리 생성
         local sax_dir="$CLAUDE_DIR/SAX"
@@ -326,8 +363,7 @@ setup_symlinks() {
             mv "$commands_link" "$commands_link.backup"
         fi
 
-        ln -s "../$repo_name/commands" "$commands_link"
-        print_success "심링크 생성: SAX/commands/ -> $repo_name/commands/"
+        create_link_or_copy "$package_path/commands" "$commands_link" "../$repo_name/commands"
     fi
 }
 
@@ -341,14 +377,33 @@ print_summary() {
     echo ""
     echo "설치된 구조:"
     echo ""
-    echo "  .claude/"
-    echo "  ├── CLAUDE.md -> sax-$package/CLAUDE.md"
-    echo "  ├── agents/ -> sax-$package/agents/"
-    echo "  ├── skills/ -> sax-$package/skills/"
-    echo "  ├── SAX/"
-    echo "  │   └── commands/ -> sax-$package/commands/"
-    echo "  ├── sax-core/          (서브모듈)"
-    echo "  └── sax-$package/      (서브모듈)"
+
+    if [ "$OS_TYPE" = "Windows" ]; then
+        # Windows: 복사 모드
+        echo "  .claude/"
+        echo "  ├── CLAUDE.md          (복사됨)"
+        echo "  ├── agents/            (복사됨)"
+        echo "  ├── skills/            (복사됨)"
+        echo "  ├── SAX/"
+        echo "  │   └── commands/      (복사됨)"
+        echo "  ├── sax-core/          (서브모듈)"
+        echo "  └── sax-$package/      (서브모듈, 원본)"
+        echo ""
+        echo -e "${YELLOW}⚠ Windows 모드 주의사항:${NC}"
+        echo "  - 원본 업데이트 후 복사본도 갱신이 필요합니다"
+        echo "  - 업데이트: ./install-sax.sh $package --update"
+    else
+        # Linux/macOS: 심링크 모드
+        echo "  .claude/"
+        echo "  ├── CLAUDE.md -> sax-$package/CLAUDE.md"
+        echo "  ├── agents/ -> sax-$package/agents/"
+        echo "  ├── skills/ -> sax-$package/skills/"
+        echo "  ├── SAX/"
+        echo "  │   └── commands/ -> sax-$package/commands/"
+        echo "  ├── sax-core/          (서브모듈)"
+        echo "  └── sax-$package/      (서브모듈)"
+    fi
+
     echo ""
     echo -e "${CYAN}════════════════════════════════════════════════════════════${NC}"
     echo -e "${CYAN}  다음 단계${NC}"
@@ -447,9 +502,17 @@ parse_args() {
 main() {
     print_header
 
+    # OS 감지
+    detect_os
+
     parse_args "$@"
 
     print_info "선택된 패키지: sax-$PACKAGE"
+    print_info "감지된 OS: $OS_TYPE"
+
+    if [ "$OS_TYPE" = "Windows" ]; then
+        print_warning "Windows 환경 감지 - 심링크 대신 복사 모드로 설치합니다"
+    fi
 
     if [ "$FORCE_MODE" = true ]; then
         print_warning "강제 모드 활성화 - 기존 설치를 삭제합니다"
