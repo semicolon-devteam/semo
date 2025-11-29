@@ -1,6 +1,6 @@
 # Review Phases
 
-> review-task Skill의 5단계 리뷰 프로세스
+> review-task Skill의 6단계 리뷰 프로세스
 
 ## Phase 1: 메타데이터 검증
 
@@ -255,4 +255,166 @@ const canPR =
 const verdict = canPR
   ? '✅ PR 가능'
   : '🔴 PR 차단 - 수정 필요';
+```
+
+---
+
+## Phase 6: PR 리뷰 코멘트 작성
+
+> Phase 1-5 완료 후, 대상 PR에 리뷰 코멘트를 자동 작성
+
+### 6.1 PR 탐색
+
+```bash
+# 현재 브랜치의 PR 조회
+gh pr list --head $(git branch --show-current) --json number,url,state,title,isDraft
+
+# 결과 예시
+# [{"number": 42, "url": "https://github.com/...", "state": "OPEN", "title": "메타태그 구현", "isDraft": false}]
+```
+
+**PR 상태 확인**:
+
+| 상태 | 처리 |
+|------|------|
+| PR 없음 | `⚠️ PR이 없습니다. PR 생성 후 다시 시도하세요.` |
+| Draft PR | `⚠️ Draft PR입니다. Ready for Review 전환 후 다시 시도하세요.` |
+| Open PR | ✅ 리뷰 코멘트 작성 진행 |
+| Merged/Closed | `⚠️ PR이 이미 머지/종료되었습니다.` |
+
+### 6.2 리뷰 타입 결정
+
+Phase 1-5 결과에 따라 리뷰 타입 자동 결정:
+
+```javascript
+const getCriticalCount = (results) =>
+  results.filter(r => r.severity === 'critical').length;
+
+const getWarningCount = (results) =>
+  results.filter(r => r.severity === 'warning').length;
+
+const determineReviewType = (criticalCount, warningCount) => {
+  if (criticalCount > 0) return 'REQUEST_CHANGES';
+  if (warningCount > 0) return 'COMMENT';
+  return 'APPROVE';
+};
+```
+
+**리뷰 타입 매핑**:
+
+| Critical | Warning | 리뷰 타입 | gh 옵션 |
+|----------|---------|----------|---------|
+| 0 | 0 | APPROVE | `--approve` |
+| 0 | 1+ | COMMENT | `--comment` |
+| 1+ | any | REQUEST_CHANGES | `--request-changes` |
+
+### 6.3 리뷰 코멘트 생성
+
+**코멘트 템플릿**:
+
+```markdown
+## 🔍 SAX Review: #{issue_number}
+
+### 리뷰 결과
+
+| Phase | 상태 | 요약 |
+|-------|------|------|
+| 메타데이터 | {status} | {summary} |
+| 테스트 구조 | {status} | {summary} |
+| 아키텍처 | {status} | {summary} |
+| 기능 구현 | {status} | {summary} |
+| 품질 게이트 | {status} | {summary} |
+
+### {Critical/Warning 상세 (있는 경우)}
+
+{상세 내용}
+
+---
+
+🤖 *SAX review-task Skill에 의해 자동 생성됨*
+```
+
+### 6.4 리뷰 제출
+
+```bash
+# APPROVE
+gh pr review {pr_number} --approve --body "$(cat <<'EOF'
+## 🔍 SAX Review: #{issue_number}
+
+### ✅ 리뷰 통과
+
+모든 검증 항목을 통과했습니다.
+
+| Phase | 상태 |
+|-------|------|
+| 메타데이터 | ✅ |
+| 테스트 구조 | ✅ |
+| 아키텍처 | ✅ |
+| 기능 구현 | ✅ |
+| 품질 게이트 | ✅ |
+
+---
+🤖 *SAX review-task Skill*
+EOF
+)"
+
+# COMMENT (경고 있음)
+gh pr review {pr_number} --comment --body "$(cat <<'EOF'
+## 🔍 SAX Review: #{issue_number}
+
+### 🟡 경고 사항
+
+PR 진행 가능하나, 다음 사항 검토 권장:
+
+{warning_details}
+
+---
+🤖 *SAX review-task Skill*
+EOF
+)"
+
+# REQUEST_CHANGES (Critical 있음)
+gh pr review {pr_number} --request-changes --body "$(cat <<'EOF'
+## 🔍 SAX Review: #{issue_number}
+
+### 🔴 수정 필요
+
+다음 항목 수정 후 재요청 바랍니다:
+
+{critical_details}
+
+---
+🤖 *SAX review-task Skill*
+EOF
+)"
+```
+
+### 6.5 사용자 확인 (선택적)
+
+리뷰 코멘트 작성 전 사용자 확인 옵션:
+
+**자동 모드** (기본):
+
+```bash
+# 명시적 요청 시 자동 작성
+"리뷰하고 PR에 코멘트 남겨줘"
+```
+
+**확인 모드**:
+
+```bash
+# 리뷰 완료 후 질문
+"PR에 리뷰 코멘트 작성할까요? (Y/n)"
+```
+
+### 6.6 결과 보고
+
+```markdown
+## PR 리뷰 코멘트 작성 완료
+
+**PR**: #{pr_number} - {pr_title}
+**리뷰 타입**: {APPROVE|COMMENT|REQUEST_CHANGES}
+**URL**: {pr_url}
+
+리뷰 코멘트가 성공적으로 작성되었습니다.
 ```
