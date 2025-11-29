@@ -301,14 +301,15 @@ setup_symlinks() {
     local package=$1
     local repo_name="sax-$package"
     local package_path="$CLAUDE_DIR/$repo_name"
+    local core_path="$CLAUDE_DIR/sax-core"
 
     if [ "$OS_TYPE" = "Windows" ]; then
-        print_step "$repo_name 복사 설정 중... (Windows 모드)"
+        print_step "$repo_name 병합 설정 중... (Windows 모드)"
     else
-        print_step "$repo_name 심링크 설정 중..."
+        print_step "$repo_name + sax-core 병합 심링크 설정 중..."
     fi
 
-    # CLAUDE.md 심링크/복사
+    # CLAUDE.md 심링크/복사 (패키지 것 사용)
     if [ -f "$package_path/CLAUDE.md" ]; then
         local claude_md_link="$CLAUDE_DIR/CLAUDE.md"
 
@@ -322,33 +323,11 @@ setup_symlinks() {
         create_link_or_copy "$package_path/CLAUDE.md" "$claude_md_link" "$repo_name/CLAUDE.md"
     fi
 
-    # agents 심링크/복사
-    if [ -d "$package_path/agents" ]; then
-        local agents_link="$CLAUDE_DIR/agents"
+    # agents 병합 (실제 디렉토리 생성 후 개별 심링크)
+    setup_merged_dir "agents" "$package" "$core_path" "$package_path"
 
-        if [ -L "$agents_link" ]; then
-            rm "$agents_link"
-        elif [ -d "$agents_link" ]; then
-            print_info "기존 agents/를 agents.backup/으로 백업합니다"
-            mv "$agents_link" "$agents_link.backup"
-        fi
-
-        create_link_or_copy "$package_path/agents" "$agents_link" "$repo_name/agents"
-    fi
-
-    # skills 심링크/복사
-    if [ -d "$package_path/skills" ]; then
-        local skills_link="$CLAUDE_DIR/skills"
-
-        if [ -L "$skills_link" ]; then
-            rm "$skills_link"
-        elif [ -d "$skills_link" ]; then
-            print_info "기존 skills/를 skills.backup/으로 백업합니다"
-            mv "$skills_link" "$skills_link.backup"
-        fi
-
-        create_link_or_copy "$package_path/skills" "$skills_link" "$repo_name/skills"
-    fi
+    # skills 병합 (실제 디렉토리 생성 후 개별 심링크)
+    setup_merged_dir "skills" "$package" "$core_path" "$package_path"
 
     # commands 심링크/복사 (.claude/SAX/commands 로 생성)
     if [ -d "$package_path/commands" ]; then
@@ -369,6 +348,74 @@ setup_symlinks() {
     fi
 }
 
+# 병합 디렉토리 설정 (sax-core 기본 + 패키지 우선)
+setup_merged_dir() {
+    local dir_type=$1    # "agents" or "skills"
+    local package=$2
+    local core_path=$3
+    local package_path=$4
+
+    local target_dir="$CLAUDE_DIR/$dir_type"
+
+    # 기존 심링크 또는 디렉토리 처리
+    if [ -L "$target_dir" ]; then
+        rm "$target_dir"
+    elif [ -d "$target_dir" ]; then
+        # 기존 병합 디렉토리면 내부 심링크만 삭제
+        if [ -f "$target_dir/.merged" ]; then
+            find "$target_dir" -maxdepth 1 -type l -delete
+        else
+            print_info "기존 $dir_type/를 $dir_type.backup/으로 백업합니다"
+            mv "$target_dir" "$target_dir.backup"
+        fi
+    fi
+
+    # 병합 디렉토리 생성
+    mkdir -p "$target_dir"
+    touch "$target_dir/.merged"
+
+    # 1. sax-core 컴포넌트 심링크 (기본)
+    if [ -d "$core_path/$dir_type" ]; then
+        for item in "$core_path/$dir_type/"*/; do
+            if [ -d "$item" ]; then
+                local name=$(basename "$item")
+                local item_link="$target_dir/$name"
+
+                if [ "$OS_TYPE" = "Windows" ]; then
+                    cp -r "$item" "$item_link"
+                    print_success "  [core] $name 복사됨"
+                else
+                    ln -s "../sax-core/$dir_type/$name" "$item_link"
+                    print_success "  [core] $name -> sax-core/$dir_type/$name"
+                fi
+            fi
+        done
+    fi
+
+    # 2. 패키지 컴포넌트 심링크 (덮어쓰기)
+    if [ -d "$package_path/$dir_type" ]; then
+        for item in "$package_path/$dir_type/"*/; do
+            if [ -d "$item" ]; then
+                local name=$(basename "$item")
+                local item_link="$target_dir/$name"
+
+                # core 것이 있으면 삭제 (패키지 우선)
+                if [ -L "$item_link" ] || [ -d "$item_link" ]; then
+                    rm -rf "$item_link"
+                fi
+
+                if [ "$OS_TYPE" = "Windows" ]; then
+                    cp -r "$item" "$item_link"
+                    print_success "  [pkg] $name 복사됨 (우선)"
+                else
+                    ln -s "../sax-$package/$dir_type/$name" "$item_link"
+                    print_success "  [pkg] $name -> sax-$package/$dir_type/$name"
+                fi
+            fi
+        done
+    fi
+}
+
 print_summary() {
     local package=$1
 
@@ -377,35 +424,49 @@ print_summary() {
     echo -e "${GREEN}  설치 완료!${NC}"
     echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}"
     echo ""
-    echo "설치된 구조:"
+    echo "설치된 구조 (병합 모드):"
     echo ""
 
     if [ "$OS_TYPE" = "Windows" ]; then
         # Windows: 복사 모드
         echo "  .claude/"
-        echo "  ├── CLAUDE.md          (복사됨)"
-        echo "  ├── agents/            (복사됨)"
-        echo "  ├── skills/            (복사됨)"
+        echo "  ├── CLAUDE.md              (패키지 복사)"
+        echo "  ├── agents/                (병합 디렉토리)"
+        echo "  │   ├── orchestrator/      [pkg] sax-$package"
+        echo "  │   ├── compliance-checker/[core] sax-core"
+        echo "  │   └── .../"
+        echo "  ├── skills/                (병합 디렉토리)"
+        echo "  │   ├── version-updater/   [core] sax-core"
+        echo "  │   └── .../"
         echo "  ├── SAX/"
-        echo "  │   └── commands/      (복사됨)"
-        echo "  ├── sax-core/          (서브모듈)"
-        echo "  └── sax-$package/      (서브모듈, 원본)"
+        echo "  │   └── commands/          (패키지 복사)"
+        echo "  ├── sax-core/              (서브모듈)"
+        echo "  └── sax-$package/          (서브모듈)"
         echo ""
         echo -e "${YELLOW}⚠ Windows 모드 주의사항:${NC}"
         echo "  - 원본 업데이트 후 복사본도 갱신이 필요합니다"
         echo "  - 업데이트: ./install-sax.sh $package --update"
     else
-        # Linux/macOS: 심링크 모드
+        # Linux/macOS: 심링크 병합 모드
         echo "  .claude/"
         echo "  ├── CLAUDE.md -> sax-$package/CLAUDE.md"
-        echo "  ├── agents/ -> sax-$package/agents/"
-        echo "  ├── skills/ -> sax-$package/skills/"
+        echo "  ├── agents/                    (병합 디렉토리)"
+        echo "  │   ├── orchestrator/          -> sax-$package/agents/..."
+        echo "  │   ├── compliance-checker/    -> sax-core/agents/..."
+        echo "  │   └── {패키지별 agent}/      -> sax-$package/agents/..."
+        echo "  ├── skills/                    (병합 디렉토리)"
+        echo "  │   ├── version-updater/       -> sax-core/skills/..."
+        echo "  │   └── {패키지별 skill}/      -> sax-$package/skills/..."
         echo "  ├── SAX/"
-        echo "  │   └── commands/ -> sax-$package/commands/"
-        echo "  ├── sax-core/          (서브모듈)"
-        echo "  └── sax-$package/      (서브모듈)"
+        echo "  │   └── commands/ -> ../sax-$package/commands/"
+        echo "  ├── sax-core/                  (서브모듈, 공통)"
+        echo "  └── sax-$package/              (서브모듈, 패키지)"
     fi
 
+    echo ""
+    echo -e "${BLUE}병합 규칙:${NC}"
+    echo "  - [core] sax-core의 공통 컴포넌트 (compliance-checker, version-updater)"
+    echo "  - [pkg]  sax-$package의 패키지별 컴포넌트 (우선 적용)"
     echo ""
     echo -e "${CYAN}════════════════════════════════════════════════════════════${NC}"
     echo -e "${CYAN}  다음 단계${NC}"

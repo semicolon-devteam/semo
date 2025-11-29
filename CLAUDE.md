@@ -169,12 +169,25 @@ SAX {version}이 설치되어 있습니다.
 
 ## 🔴 SAX Core 필수 참조
 
-> **모든 작업 전 sax-core 문서를 참조합니다.**
+> **모든 작업 전 sax-core 문서 및 공통 컴포넌트를 참조합니다.**
+
+### 문서
 
 | 파일 | 용도 |
 |------|------|
 | `sax-core/PRINCIPLES.md` | SAX 핵심 원칙 |
 | `sax-core/MESSAGE_RULES.md` | 메시지 포맷 규칙 |
+
+### 공통 컴포넌트 (sax-core)
+
+> 설치 시 자동으로 병합되는 공통 Agent/Skill
+
+| 컴포넌트 | 유형 | 역할 |
+|----------|------|------|
+| `compliance-checker` | Agent | 작업 완료 후 규칙 준수 검증 |
+| `version-updater` | Skill | 세션 시작 시 버전 체크 및 업데이트 |
+
+**병합 규칙**: 패키지에 동일 이름 컴포넌트가 있으면 패키지 것 우선
 
 ---
 
