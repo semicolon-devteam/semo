@@ -33,6 +33,82 @@ skill: complete-draft-task({
 
 ## Process
 
+### Phase 0: Projects 이슈관리 보드 확인 (필수)
+
+> **🔴 선행 조건**: Draft Task 작업 전 반드시 Projects "이슈관리" 보드 연결 확인
+
+```bash
+# Issue의 Projects 연결 상태 확인
+gh api graphql -f query='
+  query($owner: String!, $repo: String!, $number: Int!) {
+    repository(owner: $owner, name: $repo) {
+      issue(number: $number) {
+        projectItems(first: 10) {
+          nodes {
+            project {
+              title
+              number
+            }
+          }
+        }
+      }
+    }
+  }
+' -f owner="semicolon-devteam" -f repo="{repo}" -F number={issue_number}
+```
+
+**연결 상태 판단**:
+
+| 상태 | 처리 |
+|------|------|
+| Projects 연결 없음 | ⚠️ 이슈관리 보드 연결 먼저 수행 |
+| 다른 Project만 연결 | ⚠️ 이슈관리 보드 추가 연결 |
+| 이슈관리 보드 연결됨 | ✅ Phase 1로 진행 |
+
+**미연결 시 자동 연결**:
+
+```bash
+# Step 1: Project ID 조회 (이슈관리 보드 = #1)
+PROJECT_ID=$(gh api graphql -f query='
+  query {
+    organization(login: "semicolon-devteam") {
+      projectV2(number: 1) {
+        id
+      }
+    }
+  }
+' --jq '.data.organization.projectV2.id')
+
+# Step 2: Issue Node ID 조회
+ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/{repo}/issues/{issue_number} \
+  --jq '.node_id')
+
+# Step 3: Project에 Issue 추가
+gh api graphql -f query='
+  mutation($projectId: ID!, $contentId: ID!) {
+    addProjectV2ItemById(input: {
+      projectId: $projectId
+      contentId: $contentId
+    }) {
+      item {
+        id
+      }
+    }
+  }
+' -f projectId="$PROJECT_ID" -f contentId="$ISSUE_NODE_ID"
+```
+
+**Phase 0 출력**:
+
+```markdown
+### 📋 Projects 이슈관리 보드 확인
+
+| Issue | 이슈관리 보드 | 조치 |
+|-------|-------------|------|
+| #123 | ❌ 미연결 | ✅ 연결 완료 |
+| #124 | ✅ 연결됨 | - |
+```
+
 ### Phase 1: Draft Task 조회
 
 - GitHub CLI로 Draft Task 정보 조회
@@ -80,6 +156,13 @@ skill: complete-draft-task({
   - Labels: `v0.0.x-config`, `domain:posts`, `task`
   - AC: 3 criteria added
   - Epic: #144
+
+### Projects 이슈관리 보드
+
+| Issue | 상태 |
+|-------|------|
+| #145 | ✅ 연결됨 |
+| #146 | ✅ 연결됨 (자동 연결) |
 
 ### Next Steps
 
