@@ -21,14 +21,14 @@ tools: [Bash, Read, Grep, GitHub CLI]
 
 ```text
 1. 업무할당 (검수대기 → 검수완료)
-2. GitHub Project 상태 변경 (검수완료 → 작업중)
+2. GitHub Project 상태 변경 (검수완료 → 작업중) ← skill:project-board 자동화
 3. Feature 브랜치 생성
 4. Draft PR 생성
 5. Speckit 기반 구현 (Spec → Plan → Tasks)
 6. 테스트코드 작성 및 테스트 진행
 7. 린트 및 빌드 통과
-8. 푸시 및 리뷰 요청 (작업중 → 리뷰요청)
-9. PR 승인 및 dev 머지 (리뷰요청 → 테스트중)
+8. 푸시 및 리뷰 요청 (작업중 → 리뷰요청) ← skill:project-board 자동화
+9. PR 승인 및 dev 머지 (리뷰요청 → 테스트중) ← skill:project-board 자동화
 10. STG 환경 QA 테스트 (테스트중 → 병합됨)
 ```
 
@@ -74,10 +74,53 @@ tools: [Bash, Read, Grep, GitHub CLI]
 }
 ```
 
+## 프로젝트 보드 자동 연동
+
+### 작업 시작 시 (Step 2)
+
+이슈 작업 시작 시 자동으로 상태를 "작업중"으로 변경:
+
+```markdown
+[SAX] Skill: task-progress → 프로젝트 보드 상태 변경
+
+📋 **이슈**: {repo}#{issue_number}
+🔄 **상태 변경**: 검수완료 → **작업중**
+
+✅ 프로젝트 보드 연동 완료
+```
+
+### 리뷰 요청 시 (Step 8)
+
+PR Ready 상태가 되면 자동으로 상태를 "리뷰요청"으로 변경:
+
+```markdown
+[SAX] Skill: task-progress → 프로젝트 보드 상태 변경
+
+📋 **이슈**: {repo}#{issue_number}
+🔀 **PR**: #{pr_number} Ready for Review
+🔄 **상태 변경**: 작업중 → **리뷰요청**
+
+✅ 프로젝트 보드 연동 완료
+```
+
+### 호출 방법
+
+```bash
+# skill: project-board 호출
+skill: project-board({
+  repo: "{repo}",
+  issue_number: {issue_number},
+  target_status: "작업중"  # 또는 "리뷰요청"
+})
+```
+
+> 📖 상세 API: [../project-board/references/api-commands.md](../project-board/references/api-commands.md)
+
 ## Related Skills
 
 - `health-check` - 환경 검증
 - `implement` - 구현 진행
+- `project-board` - 프로젝트 보드 연동
 
 ## References
 
@@ -85,3 +128,4 @@ For detailed documentation, see:
 
 - [Verification Steps](references/verification-steps.md) - 10단계 검증 로직 상세
 - [Automation](references/automation.md) - 자동화 명령, 출력 형식, 메타데이터
+- [Project Board API](../project-board/references/api-commands.md) - 프로젝트 보드 API

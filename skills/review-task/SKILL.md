@@ -62,6 +62,7 @@ triggers:
 | **4. 기능 구현** | Acceptance Criteria 충족 |
 | **5. 품질 게이트** | Lint, TypeScript, 테스트 통과 |
 | **6. PR 리뷰 작성** | 대상 PR에 리뷰 코멘트 자동 작성 |
+| **7. 프로젝트 보드** | PR 머지 후 이슈 상태 "테스트중"으로 변경 |
 
 > 📚 **상세**: [references/review-phases.md](references/review-phases.md)
 
@@ -147,14 +148,55 @@ gh pr review {pr_number} --comment --body "리뷰 내용"
 gh pr review {pr_number} --request-changes --body "리뷰 내용"
 ```
 
+## Phase 7: 프로젝트 보드 상태 변경
+
+PR 머지 완료 후 이슈 상태를 자동으로 "테스트중"으로 변경합니다.
+
+### 트리거
+
+- PR이 `APPROVE` 리뷰를 받고 머지된 후
+- 사용자가 "머지하고 상태 변경해줘" 요청 시
+
+### 프로세스
+
+```markdown
+[SAX] Skill: review-task → 프로젝트 보드 상태 변경
+
+📋 **이슈**: {repo}#{issue_number}
+🔀 **PR**: #{pr_number} 머지 완료
+
+🔄 상태 변경 중...
+- 이전: 리뷰요청
+- 이후: **테스트중**
+
+✅ 완료: {repo}#{issue_number} → 테스트중
+
+다음 단계: STG 환경에서 QA 테스트 진행
+```
+
+### 명령어
+
+```bash
+# skill: project-board 호출
+skill: project-board({
+  repo: "{repo}",
+  issue_number: {issue_number},
+  target_status: "테스트중"
+})
+```
+
+> 📖 상세 API: [../project-board/references/api-commands.md](../project-board/references/api-commands.md)
+
 ## Related Skills
 
 - `verify-implementation` - 요구사항 구현 확인 (경량)
 - `git-workflow` - PR 생성 자동화
 - `check-team-codex` - 팀 컨벤션 검증
 - `verify` - 종합 품질 검증
+- `project-board` - 프로젝트 보드 연동
 
 ## References
 
 - [Review Phases](references/review-phases.md) - 리뷰 단계별 상세
 - [Output Format](references/output-format.md) - 출력 형식 상세
+- [Project Board API](../project-board/references/api-commands.md) - 프로젝트 보드 API

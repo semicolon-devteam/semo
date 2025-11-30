@@ -89,6 +89,35 @@ PO의 Epic→Task 생성 프로세스를 거치지 않고, 개발자가 발견�
 
 > 📖 이슈 템플릿: [references/issue-template.md](references/issue-template.md)
 
+### Step 4: 프로젝트 보드 연동
+
+이슈 생성 후 **반드시** 프로젝트 보드에 연동하고 상태 설정:
+
+```
+[SAX] fast-track → 프로젝트 보드 연동
+
+📋 생성된 이슈: {repo}#{issue_number}
+📊 프로젝트: 이슈관리 (#1)
+
+🔄 작업 진행 중...
+1. ✅ 프로젝트 보드에 이슈 추가
+2. ✅ 상태를 "리뷰요청"으로 설정
+
+✅ 완료: {repo}#{issue_number} → 리뷰요청
+```
+
+**자동 실행 명령**:
+
+```bash
+# 1. 프로젝트에 이슈 추가
+gh project item-add 1 --owner semicolon-devteam --url "https://github.com/semicolon-devteam/{repo}/issues/{issue_number}"
+
+# 2. 상태를 "리뷰요청"으로 변경
+# skill: project-board 호출
+```
+
+> 📖 상세 API: [../project-board/references/api-commands.md](../project-board/references/api-commands.md)
+
 ## Issue Template
 
 ```markdown
@@ -154,13 +183,15 @@ triggers:
 
 1. **적격성 확인 필수**: Step 1 생략 불가
 2. **이슈 생성 필수**: Step 3 생략 불가 (PO 가시성 확보)
-3. **라벨 필수**: `fast-track` 라벨 반드시 포함
-4. **커밋 메시지**: `🏃 [Fast-Track]` 접두사 사용
+3. **프로젝트 보드 연동 필수**: Step 4 생략 불가 (상태 추적)
+4. **라벨 필수**: `fast-track` 라벨 반드시 포함
+5. **커밋 메시지**: `🏃 [Fast-Track]` 접두사 사용
 
 ### 금지 사항
 
 - ❌ 적격성 체크 없이 바로 수정
 - ❌ 이슈 생성 없이 작업 종료
+- ❌ 프로젝트 보드 연동 없이 작업 종료
 - ❌ 부적격 작업을 패스트트랙으로 처리
 - ❌ 3개 파일 초과 수정
 
