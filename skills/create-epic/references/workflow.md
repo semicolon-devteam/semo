@@ -42,24 +42,32 @@ gh issue create \
   --label "epic"
 ```
 
-### 4. Projects 연동
+### 4. Projects 연동 (필수)
 
 ```bash
-# 이슈를 프로젝트에 추가
-gh project item-add {PROJECT_NUMBER} \
-  --owner semicolon-devteam \
-  --url {issue_url}
+# 1. Issue의 node_id 조회
+ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/docs/issues/{issue_number} \
+  --jq '.node_id')
 
-# 타입 필드를 "에픽"으로 설정
-gh project item-edit \
-  --project-id {PROJECT_ID} \
-  --id {ITEM_ID} \
-  --field-id {TYPE_FIELD_ID} \
-  --single-select-option-id {EPIC_OPTION_ID}
+# 2. 이슈관리 Projects (#1)에 추가
+gh api graphql -f query='
+  mutation($projectId: ID!, $contentId: ID!) {
+    addProjectV2ItemById(input: {
+      projectId: $projectId
+      contentId: $contentId
+    }) {
+      item {
+        id
+      }
+    }
+  }
+' -f projectId="PVT_kwDOCr2fqM4A0TQd" -f contentId="$ISSUE_NODE_ID"
 ```
+
+> **Note**: `PVT_kwDOCr2fqM4A0TQd`는 semicolon-devteam의 `이슈관리` Projects (#1) ID입니다.
 
 ## 제약 사항
 
 - docs 레포지토리에만 Epic 생성
 - 기술 상세는 포함하지 않음
-- Projects 연동은 선택적 (실패해도 Epic은 생성됨)
+- **Projects 연동은 필수** (실패 시 재시도 필요)

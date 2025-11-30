@@ -1,6 +1,32 @@
 # Task Finalization Workflow
 
-## 1. GitHub Projects Field Update
+## 1. Add to GitHub Projects (필수)
+
+모든 Draft Task를 `이슈관리` Projects (#1)에 등록:
+
+```bash
+# 1. Issue의 node_id 조회
+ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/{repo}/issues/{issue_number} \
+  --jq '.node_id')
+
+# 2. Projects에 추가
+gh api graphql -f query='
+  mutation($projectId: ID!, $contentId: ID!) {
+    addProjectV2ItemById(input: {
+      projectId: $projectId
+      contentId: $contentId
+    }) {
+      item {
+        id
+      }
+    }
+  }
+' -f projectId="PVT_kwDOCr2fqM4A0TQd" -f contentId="$ISSUE_NODE_ID"
+```
+
+> **Note**: `PVT_kwDOCr2fqM4A0TQd`는 semicolon-devteam의 `이슈관리` Projects (#1) ID입니다.
+
+## 2. GitHub Projects Field Update
 
 For each Draft Task:
 
@@ -13,7 +39,7 @@ For each Draft Task:
 gh api graphql -f query='...'
 ```
 
-## 2. Auto-label Epic
+## 3. Auto-label Epic
 
 ```markdown
 [SAX] Skill: auto-label-by-scope 사용
@@ -27,7 +53,7 @@ gh api repos/semicolon-devteam/docs/issues/{epic_number}/labels \
   -f labels[]="design"
 ```
 
-## 3. Epic Timeline Estimation
+## 4. Epic Timeline Estimation
 
 ```markdown
 [SAX] Skill: estimate-epic-timeline 사용
@@ -35,7 +61,7 @@ gh api repos/semicolon-devteam/docs/issues/{epic_number}/labels \
 
 Sum all Draft Tasks Points and add timeline comment to Epic.
 
-## 4. Task Validation
+## 5. Task Validation
 
 For each Draft Task:
 
@@ -49,13 +75,13 @@ Check required items:
 - [ ] Branch name
 - [ ] draft label
 - [ ] Epic Sub-issue relationship
-- [ ] Projects field
+- [ ] **Projects 등록** (이슈관리 #1)
 
 **If validation fails**:
 - Fill missing items
 - Re-validate
 
-## 5. Completion Report
+## 6. Completion Report
 
 ```markdown
 ## ✅ Draft Tasks 생성 완료
