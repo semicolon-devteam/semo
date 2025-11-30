@@ -62,10 +62,82 @@ curl -X POST https://slack.com/api/chat.postMessage \
 ### 공통 단계
 
 1. **정보 수집**: 호출자로부터 알림 데이터 수신
-2. **ID 매핑**: GitHub ID → Slack ID 변환 (references/slack-id-mapping.md)
+2. **사용자 조회**: Slack API로 동적 사용자 ID 조회
 3. **메시지 구성**: Block Kit 형식으로 구성
 4. **API 호출**: Slack chat.postMessage 호출
 5. **완료 보고**: 결과 메시지 출력
+
+### 동적 사용자 조회 (Step 2)
+
+> **하드코딩된 매핑 테이블 대신 Slack API를 통해 실시간으로 사용자 ID를 조회합니다.**
+
+#### 조회 API 호출
+
+```bash
+SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb"
+
+# 전체 사용자 목록 조회
+curl -s "https://slack.com/api/users.list" \
+  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+  | jq '.members[] | select(.deleted == false and .is_bot == false) | {id, name, real_name, display_name: .profile.display_name}'
+```
+
+#### 매칭 우선순위
+
+사용자 식별자(이름, GitHub ID 등)를 받으면 다음 순서로 매칭:
+
+| 우선순위 | 필드 | 예시 |
+|----------|------|------|
+| 1 | `profile.display_name` | "Reus", "Garden" |
+| 2 | `name` | "reus", "garden92" |
+| 3 | `real_name` | "전준영", "서정원" |
+
+#### 매칭 로직
+
+```bash
+# 예: "Reus" 또는 "전준영"으로 사용자 찾기
+SEARCH_NAME="Reus"
+
+SLACK_ID=$(curl -s "https://slack.com/api/users.list" \
+  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+  | jq -r --arg name "$SEARCH_NAME" '
+    .members[]
+    | select(.deleted == false and .is_bot == false)
+    | select(
+        (.profile.display_name | ascii_downcase) == ($name | ascii_downcase) or
+        (.name | ascii_downcase) == ($name | ascii_downcase) or
+        (.real_name | ascii_downcase) == ($name | ascii_downcase)
+      )
+    | .id
+  ' | head -1)
+
+# 결과: URSQYUNQJ
+```
+
+#### 멘션 형식 생성
+
+```bash
+# Slack ID가 조회되면 멘션 형식으로 변환
+if [ -n "$SLACK_ID" ]; then
+  MENTION="<@$SLACK_ID>"  # <@URSQYUNQJ>
+else
+  MENTION="$SEARCH_NAME"   # 조회 실패 시 이름 그대로 표시
+fi
+```
+
+#### 팀원 참조 (Semicolon)
+
+| Display Name | Slack ID | Real Name |
+|--------------|----------|-----------|
+| Reus | URSQYUNQJ | 전준영 |
+| Garden | URU4UBX9R | 서정원 |
+| kyago | U02G8542V9U | 강용준 |
+| Roki | U08P11ZQY04 | 노영록 |
+| bon | U02V56WM3KD | 장현봉 |
+| dwight.k | U06Q5KECB5J | 강동현 |
+| Yeomso | U080YLC0MFZ | 염현준 |
+
+> **Note**: 위 테이블은 참조용입니다. 실제 멘션 시에는 API를 통해 동적으로 조회합니다.
 
 ### 릴리스 알림 (version-manager 연동)
 
@@ -178,13 +250,17 @@ input:
 Semicolon Notifier 앱을 해당 채널에 추가해주세요.
 ```
 
-### Slack ID 매핑 없음
+### Slack 사용자 조회 실패
 
 ```markdown
 ⚠️ **Slack 멘션 불가**
 
-GitHub ID `{github_id}`의 Slack ID 매핑이 없습니다.
+`{search_name}`에 해당하는 Slack 사용자를 찾을 수 없습니다.
 알림은 전송되지만 멘션은 생략됩니다.
+
+**확인 사항**:
+- Slack 워크스페이스에 가입된 사용자인지 확인
+- display_name, name, real_name 중 하나와 일치하는지 확인
 ```
 
 ## SAX Message Format
@@ -197,6 +273,6 @@ GitHub ID `{github_id}`의 Slack ID 매핑이 없습니다.
 
 ## References
 
-- [Slack ID 매핑](references/slack-id-mapping.md) - GitHub ID ↔ Slack ID
+- [동적 사용자 조회](references/slack-id-mapping.md) - Slack API 사용자 조회 가이드
 - [메시지 템플릿](references/message-templates.md) - Block Kit 템플릿
 - [채널 설정](references/channel-config.md) - 채널 설정 및 권한
