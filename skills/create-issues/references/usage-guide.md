@@ -114,6 +114,16 @@ All issues linked to Epic for tracking.
 
 ---
 
+## Projects Integration (필수)
+
+모든 생성된 Issue는 `이슈관리` Projects (#1)에 자동 등록됩니다.
+
+**Projects ID**: `PVT_kwDOCr2fqM4A0TQd`
+
+✅ **15 issues** added to Projects
+
+---
+
 ## Updated Files
 
 **specs/5-comments/tasks.md**:
@@ -147,6 +157,21 @@ gh issue create --title "[v0.1.x PROJECT] Scaffold domain structure" \
 gh issue edit 146 --add-field "Epic=#144"
 
 # Add dependencies (via body text)
+
+# Add to Projects (필수)
+ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/{repo}/issues/{issue_number} \
+  --jq '.node_id')
+
+gh api graphql -f query='
+  mutation($projectId: ID!, $contentId: ID!) {
+    addProjectV2ItemById(input: {
+      projectId: $projectId
+      contentId: $contentId
+    }) {
+      item { id }
+    }
+  }
+' -f projectId="PVT_kwDOCr2fqM4A0TQd" -f contentId="$ISSUE_NODE_ID"
 ```
 
 ---

@@ -61,6 +61,7 @@ For each task:
 - Create issues in dependency order
 - Track created issue numbers
 - Link dependencies
+- **Add to GitHub Projects** (필수)
 
 ### Phase 5: Update tasks.md
 
@@ -77,11 +78,37 @@ Draft Task가 존재하는 경우:
 
 > 📚 상세: [complete-draft-task Skill](../complete-draft-task/SKILL.md)
 
-### Phase 7: Report
+### Phase 7: Add to GitHub Projects (필수)
+
+생성된 모든 Issue를 `이슈관리` Projects (#1)에 등록:
+
+```bash
+# 각 Issue에 대해 실행
+ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/{repo}/issues/{issue_number} \
+  --jq '.node_id')
+
+gh api graphql -f query='
+  mutation($projectId: ID!, $contentId: ID!) {
+    addProjectV2ItemById(input: {
+      projectId: $projectId
+      contentId: $contentId
+    }) {
+      item {
+        id
+      }
+    }
+  }
+' -f projectId="PVT_kwDOCr2fqM4A0TQd" -f contentId="$ISSUE_NODE_ID"
+```
+
+> **Note**: `PVT_kwDOCr2fqM4A0TQd`는 semicolon-devteam의 `이슈관리` Projects (#1) ID입니다.
+
+### Phase 8: Report
 
 - Generate summary with issue URLs
 - Report by layer grouping
 - Draft → Task 변환 요약 (해당 시)
+- Projects 등록 결과
 - Provide next steps
 
 ## Issue Format
