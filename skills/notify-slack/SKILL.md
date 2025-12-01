@@ -141,62 +141,34 @@ fi
 
 ### 릴리스 알림 (version-manager 연동)
 
-version-manager가 버저닝 완료 후 자동 호출:
+version-manager가 버저닝 완료 후 자동 호출합니다.
 
-```yaml
-input:
-  type: "release"
-  package: "sax-po"
-  version: "0.16.0"
-  changelog: |
-    ## Added
-    - report-bug: 버그 리포트 Skill 추가
+#### 표준 메시지 형식
+
+```text
+🚀 SAX 패키지 업데이트
+
+패키지             버전
+sax-meta          v0.30.0
+
+변경 내역
+• version-manager SKILL.md에 Slack 알림 필수화 명시
+• Quick Start 간소화 (9단계 → 6단계)
+• 누락 시 미완료 상태 경고 추가
+
+🔗 GitHub
 ```
 
-**메시지 블록**:
+#### 메시지 구조
 
-```json
-{
-  "blocks": [
-    {
-      "type": "header",
-      "text": {
-        "type": "plain_text",
-        "text": "🚀 SAX 패키지 업데이트"
-      }
-    },
-    {
-      "type": "section",
-      "fields": [
-        {
-          "type": "mrkdwn",
-          "text": "*패키지*\nsax-po"
-        },
-        {
-          "type": "mrkdwn",
-          "text": "*버전*\n`v0.16.0`"
-        }
-      ]
-    },
-    {
-      "type": "section",
-      "text": {
-        "type": "mrkdwn",
-        "text": "*변경 내역*\n• report-bug: 버그 리포트 Skill 추가"
-      }
-    },
-    {
-      "type": "context",
-      "elements": [
-        {
-          "type": "mrkdwn",
-          "text": "🔗 <https://github.com/semicolon-devteam/sax-po|GitHub>"
-        }
-      ]
-    }
-  ]
-}
-```
+| 섹션 | 내용 |
+|------|------|
+| **Header** | `🚀 SAX 패키지 업데이트` |
+| **Fields** | 패키지 이름 / 버전 (두 열) |
+| **Body** | 변경 내역 (• bullet 형식) |
+| **Footer** | GitHub 링크 |
+
+> **📖 상세 템플릿**: [message-templates.md](references/message-templates.md) 참조
 
 ### 이슈/태스크 알림
 
