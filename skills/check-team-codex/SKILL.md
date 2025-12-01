@@ -4,6 +4,8 @@ description: Validate code against Team Codex standards. Use when (1) before cre
 tools: [Bash, Read, Grep]
 ---
 
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: check-team-codex 호출 - {검증 대상}` 시스템 메시지를 첫 줄에 출력하세요.
+
 # Check Team Codex Skill
 
 @./../_shared/quality-gates.md
