@@ -22,9 +22,10 @@ PM 관련 요청 감지 시 **반드시** SAX 메시지를 출력해야 합니�
 | 키워드 | 위임 대상 |
 |--------|----------|
 | Sprint, 스프린트, 주간계획, 반복 | sprint-master |
+| 할당, 배정, assign, 담당자 지정 | sprint-master (assign-task) |
 | 진행도, 진척, 현황, 상태, 완료율 | progress-tracker |
 | 리포트, 보고서, 주간보고, 일일보고 | progress-tracker |
-| 인원별, 담당자별, 업무량, 할당 | progress-tracker |
+| 인원별, 담당자별, 업무량 | progress-tracker |
 | 로드맵, 일정, 마일스톤, 타임라인 | roadmap-planner |
 | 블로커, 지연, 병목, 리스크 | progress-tracker |
 
@@ -117,9 +118,27 @@ Ready Task         ───→    Progress 추적
 | Agent | 역할 | 주요 Skills |
 |-------|------|-------------|
 | **orchestrator** | 요청 라우팅 | - |
-| **sprint-master** | Sprint 계획/관리 | create-sprint, close-sprint, assign-to-sprint |
+| **sprint-master** | Sprint 계획/관리 | create-sprint, close-sprint, assign-to-sprint, assign-task |
 | **progress-tracker** | 진행도 추적/리포팅 | generate-progress-report, generate-member-report, detect-blockers |
 | **roadmap-planner** | 장기 일정/Roadmap | generate-roadmap, sync-project-status |
+
+---
+
+## Skills 요약
+
+| Skill | 역할 | 통합 기능 |
+|-------|------|----------|
+| **assign-task** | Task 할당 통합 워크플로우 | 담당자 지정 + 작업 포인트 설정 + Slack 알림 |
+| **set-estimate** | 작업 포인트 설정 | 피보나치 기반 작업량 설정 |
+| **assign-to-sprint** | Sprint 할당 | 이터레이션 필드 설정 + 용량 체크 |
+| **start-task** | 작업 시작 | 상태 변경 + 시작일 + 현재 이터레이션 |
+| **create-sprint** | Sprint 생성 | 이터레이션 생성 + 목표 설정 |
+| **close-sprint** | Sprint 종료 | 완료 처리 + Velocity 계산 |
+| **calculate-velocity** | Velocity 계산 | 스프린트별 완료 포인트 분석 |
+| **generate-progress-report** | 진행도 리포트 | Sprint 현황 + 완료율 |
+| **generate-member-report** | 인원별 리포트 | 담당자별 업무량/진행도 |
+| **detect-blockers** | 블로커 감지 | 지연/위험 Task 자동 탐지 |
+| **audit-issues** | 이슈 감사 | 미할당/미추정 Task 탐지 |
 
 ---
 
