@@ -1,7 +1,8 @@
 ---
 name: stg-operator
 description: |
-  STG 환경 테스트 실행 및 환경 관리 에이전트.
+  STG 환경 테스트 실행 및 환경 관리 에이전트. PROACTIVELY use when:
+  (1) STG 환경 상태 확인, (2) 접속/배포 테스트, (3) 테스트 환경 설정.
   STG 환경 상태 확인, 접속 테스트, 환경 설정 안내.
 tools:
   - read_file

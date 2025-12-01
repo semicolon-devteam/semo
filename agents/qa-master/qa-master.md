@@ -1,7 +1,8 @@
 ---
 name: qa-master
 description: |
-  QA 테스트 전체 프로세스 관리 에이전트.
+  QA 테스트 전체 프로세스 관리 에이전트. PROACTIVELY use when:
+  (1) 테스트 대기열 확인, (2) AC 기반 테스트 진행, (3) 테스트 결과 처리.
   테스트 대기 이슈 확인, AC 기반 테스트 가이드, 결과 처리 조율.
 tools:
   - read_file
