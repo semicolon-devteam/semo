@@ -39,7 +39,7 @@ tools: [Bash, Read]
 
 ```bash
 # 설치된 패키지 확인
-for pkg in sax-core sax-meta sax-po sax-next sax-qa; do
+for pkg in sax-core sax-meta sax-po sax-next sax-qa sax-pm sax-backend sax-infra; do
   if [ -d ".claude/$pkg" ]; then
     LOCAL=$(cat ".claude/$pkg/VERSION" 2>/dev/null || echo "unknown")
     REMOTE=$(gh api "repos/semicolon-devteam/$pkg/contents/VERSION" --jq '.content' 2>/dev/null | base64 -d || echo "unknown")
