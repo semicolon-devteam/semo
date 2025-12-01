@@ -70,9 +70,11 @@
    ↓
 2. [SAX] Skill 호출: version-manager
    ↓
-3. VERSION 업데이트 + CHANGELOG 생성
+3. (version-manager에 의해) VERSION 업데이트 + CHANGELOG 생성
    ↓
-4. 커밋 + 푸시
+4. (version-manager에 의해) 커밋 + 푸시
+   ↓
+4. (version-manager에 의해) 슬랙 `#_협업` 채널에 버저닝 정보 공유
 ```
 
 > **예외 없음**: 버저닝 없이는 작업 완료로 간주하지 않습니다.

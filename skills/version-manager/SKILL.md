@@ -46,10 +46,6 @@ git add -A && git commit -m "🔖 [SAX] 3.15.0: {변경 요약}
 - 상세 변경 내용 1
 - 상세 변경 내용 2
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>"
-
 # 7. 푸시 (🔴 필수)
 git push origin main
 

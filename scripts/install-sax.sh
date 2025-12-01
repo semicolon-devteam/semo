@@ -101,6 +101,9 @@ show_usage() {
     echo "  next    - SAX-Next (Next.js 개발자용)"
     echo "  qa      - SAX-QA (QA 테스터용)"
     echo "  meta    - SAX-Meta (SAX 패키지 관리자용)"
+    echo "  pm      - SAX-PM (PM/프로젝트 매니저용)"
+    echo "  backend - SAX-Backend (백엔드 개발자용)"
+    echo "  infra   - SAX-Infra (인프라/DevOps용)"
     echo ""
     echo "옵션:"
     echo "  --force, -f   - 기존 설치 삭제 후 재설치"
@@ -112,6 +115,9 @@ show_usage() {
     echo "  $0 qa --force      # sax-qa 강제 재설치"
     echo "  $0 next --force    # sax-next 강제 재설치"
     echo "  $0 meta --update   # sax-meta 최신 버전 업데이트"
+    echo "  $0 pm              # sax-pm 설치"
+    echo "  $0 backend         # sax-backend 설치"
+    echo "  $0 infra           # sax-infra 설치"
     echo ""
 }
 
@@ -490,21 +496,30 @@ select_package() {
     echo ""
     echo "설치할 패키지를 선택하세요:"
     echo ""
-    echo "  1) sax-po    - PO/기획자용"
-    echo "                 기획 문서 작성, PRD 생성, 요구사항 정리"
+    echo "  1) sax-po      - PO/기획자용"
+    echo "                   기획 문서 작성, PRD 생성, 요구사항 정리"
     echo ""
-    echo "  2) sax-next  - Next.js 개발자용"
-    echo "                 Next.js 프로젝트 개발 지원"
+    echo "  2) sax-next    - Next.js 개발자용"
+    echo "                   Next.js 프로젝트 개발 지원"
     echo ""
-    echo "  3) sax-qa    - QA 테스터용"
-    echo "                 QA 테스트 워크플로우, 이슈 상태 관리"
+    echo "  3) sax-qa      - QA 테스터용"
+    echo "                   QA 테스트 워크플로우, 이슈 상태 관리"
     echo ""
-    echo "  4) sax-meta  - SAX 패키지 관리자용"
-    echo "                 SAX 패키지 개발 및 관리"
+    echo "  4) sax-meta    - SAX 패키지 관리자용"
+    echo "                   SAX 패키지 개발 및 관리"
+    echo ""
+    echo "  5) sax-pm      - PM/프로젝트 매니저용"
+    echo "                   Sprint 관리, 진행도 추적, Roadmap"
+    echo ""
+    echo "  6) sax-backend - 백엔드 개발자용"
+    echo "                   백엔드 API 개발 지원"
+    echo ""
+    echo "  7) sax-infra   - 인프라/DevOps용"
+    echo "                   인프라 구성 및 배포 관리"
     echo ""
     echo "  q) 취소"
     echo ""
-    print_prompt "선택 [1-4]: "
+    print_prompt "선택 [1-7]: "
     read -r choice
 
     case "$choice" in
@@ -519,6 +534,15 @@ select_package() {
             ;;
         4)
             PACKAGE="meta"
+            ;;
+        5)
+            PACKAGE="pm"
+            ;;
+        6)
+            PACKAGE="backend"
+            ;;
+        7)
+            PACKAGE="infra"
             ;;
         q|Q)
             print_info "설치를 취소합니다"
@@ -549,7 +573,7 @@ parse_args() {
                 show_usage
                 exit 0
                 ;;
-            po|next|qa|meta)
+            po|next|qa|meta|pm|backend|infra)
                 PACKAGE=$1
                 shift
                 ;;
