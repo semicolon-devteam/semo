@@ -25,6 +25,48 @@ triggers:
 - Requirement gathering is needed before implementation
 - SDD workflow must be followed (Constitution Principle VIII)
 
+## 🔴 Branch Context (필수)
+
+> **Spec 작성은 반드시 dev 브랜치에서 수행합니다.**
+
+### 브랜치 요구사항
+
+| 조건 | 설명 |
+|------|------|
+| **필수 브랜치** | `dev` |
+| **금지 브랜치** | `main`, `master`, `feature/*` |
+
+### 잘못된 브랜치 경고
+
+```markdown
+⚠️ [SAX] Skill: spec - 브랜치 경고
+
+현재 브랜치: {current_branch}
+필수 브랜치: dev
+
+Spec 작성은 dev 브랜치에서 수행해야 합니다.
+다른 작업자도 Spec을 공유받을 수 있도록 원격에 푸시한 후
+Feature 브랜치를 생성하세요.
+
+👉 `git checkout dev` 후 다시 시도하세요.
+```
+
+### Spec 완료 후 다음 단계
+
+```text
+1. Spec 파일 커밋 (dev 브랜치)
+   git add specs/{domain}/
+   git commit -m "📝 #{이슈번호} Add spec for {도메인}"
+
+2. 원격 dev에 푸시 (팀 공유)
+   git push origin dev
+
+3. Feature 브랜치 생성 (코드 구현용)
+   git checkout -b feature/{issue_number}-{title}
+```
+
+> **목적**: 다른 작업자도 특정 도메인의 Spec을 공유받을 수 있도록 함
+
 ## Phase Flow
 
 ```

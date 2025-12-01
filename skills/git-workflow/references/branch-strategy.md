@@ -2,6 +2,47 @@
 
 > **SoT 참조**: 브랜치 전략은 `sax-core/TEAM_RULES.md` 섹션 1.1에서 관리됩니다.
 
+## 🔴 Spec-First Branching Rule (필수)
+
+> **핵심 원칙**: Spec은 dev 브랜치에서 작성 → 원격 푸시 → Feature 브랜치 생성
+
+### 워크플로우 다이어그램
+
+```text
+dev 브랜치 ─────────────────────────────────────────────────────→
+    │
+    ├── [SDD Phase 1-3] Spec 작성
+    │   └── specs/{domain}/spec.md, plan.md, tasks.md
+    │
+    ├── 커밋: 📝 #{이슈번호} Add spec for {도메인}
+    │
+    ├── git push origin dev (원격 공유)
+    │
+    └── Feature 브랜치 분기
+        │
+        └── feature/{issue_number}-{title} ─────────────────────→
+            │
+            ├── [ADD Phase 4] 코드 구현
+            │
+            └── Draft PR → Ready → Merge
+```
+
+### 브랜치별 허용 작업
+
+| 브랜치 | 허용 작업 | 금지 작업 |
+|--------|----------|----------|
+| `dev` | Spec 작성, 설정 변경 | 기능 코드 구현 |
+| `feature/*` | 코드 구현, 테스트 | Spec 신규 작성 (수정은 허용) |
+| `main` | 릴리스 머지만 | 직접 작업 금지 |
+
+### 목적
+
+- **Spec 공유**: 다른 작업자도 특정 도메인의 Spec을 공유받을 수 있음
+- **일관성**: Feature 브랜치 시작 시 항상 최신 Spec 포함
+- **협업**: 동일 도메인 작업 시 순차 작업 권장 (Spec 충돌 방지)
+
+---
+
 ## Issue Onboarding Workflow
 
 **Purpose**: GitHub Issue URL을 받아 브랜치 생성부터 Speckit 가이드까지 안내
@@ -70,16 +111,42 @@ git checkout -b {issue_num}-{title_slug}
 
 ---
 
-### 🎯 Step 4: 다음 단계
+### ✅ Step 3: Spec 작성 (dev 브랜치에서)
 
-브랜치가 생성되었습니다! 이제 Speckit 워크플로우를 시작하세요:
+> ⚠️ Feature 브랜치 생성 전 dev에서 Spec 먼저 작성
 
-1. **명세 작성**: `/speckit.specify`
-2. **계획 수립**: `/speckit.plan`
-3. **태스크 분해**: `/speckit.tasks`
-4. **구현**: `/speckit.implement`
+```bash
+# dev 브랜치에서 Spec 작성
+/speckit.specify → specs/{domain}/spec.md
+/speckit.plan    → specs/{domain}/plan.md
+/speckit.tasks   → specs/{domain}/tasks.md
 
-**권장**: `/speckit.specify` 실행하여 spec.md 생성
+# Spec 커밋 및 푸시
+git add specs/{domain}/
+git commit -m "📝 #{issue_num} Add spec for {domain}"
+git push origin dev
+```
+
+---
+
+### ✅ Step 4: 피처 브랜치 생성
+
+```bash
+git checkout -b {issue_num}-{title_slug}
+```
+
+---
+
+### 🎯 Step 5: 코드 구현
+
+Feature 브랜치에서 실제 코드 구현:
+
+1. **코드 구현**: `skill:implement` (ADD Phase 4)
+2. **테스트 작성**: 테스트코드 작성
+3. **린트/빌드**: `npm run lint && npx tsc --noEmit`
+4. **PR Ready**: `gh pr ready`
+
+> 📌 Spec은 이미 dev에서 완료됨. Feature 브랜치에서는 코드만 구현.
 ```
 
 ## Auto-Execute Option

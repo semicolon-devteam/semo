@@ -110,15 +110,42 @@ gh api repos/semicolon-devteam/sax-core/contents/PRINCIPLES.md --jq '.content' |
 
 ## Workflow: SDD + ADD
 
-### SDD (Spec-Driven Development) - Phase 1-3
+### Spec-First Branching (NEW)
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ dev 브랜치                                                   │
+│   ├── [SDD Phase 1-3] Spec 작성                             │
+│   │   └── specs/{domain}/spec.md, plan.md, tasks.md         │
+│   ├── 커밋: 📝 #{이슈번호} Add spec for {도메인}             │
+│   └── git push origin dev (원격 공유)                        │
+│                                                              │
+│       └── Feature 브랜치 분기                                │
+│           └── feature/{issue_number}-{title}                 │
+│               ├── [ADD Phase 4] 코드 구현                    │
+│               └── Draft PR → Ready → Merge                   │
+└─────────────────────────────────────────────────────────────┘
+```
+
+> **목적**: 다른 작업자도 특정 도메인의 Spec을 공유받을 수 있도록 함
+
+### 브랜치별 작업 구분
+
+| 브랜치 | 작업 | 산출물 |
+|--------|------|--------|
+| `dev` | SDD (Spec 작성) | spec.md, plan.md, tasks.md |
+| `feature/*` | ADD (코드 구현) | 실제 구현 코드 |
+
+### SDD (Spec-Driven Development) - Phase 1-3 (dev 브랜치)
 
 ```text
 /speckit.specify → specs/{domain}/spec.md
 /speckit.plan → specs/{domain}/plan.md
 /speckit.tasks → specs/{domain}/tasks.md
+→ 커밋 & 푸시 → Feature 브랜치 생성
 ```
 
-### ADD (Agent-Driven Development) - Phase 4
+### ADD (Agent-Driven Development) - Phase 4 (feature 브랜치)
 
 ```text
 v0.0.x CONFIG → 환경 설정

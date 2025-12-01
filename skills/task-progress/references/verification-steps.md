@@ -26,20 +26,57 @@ auto_action:
   - gh project item-edit 명령 사용
 ```
 
-## 3. Feature 브랜치 확인
+## 3. Spec 작성 및 공유 확인
+
+```yaml
+method: "spec_on_dev_check"
+workflow:
+  # dev 브랜치 확인
+  branch_check:
+    command: "git branch --show-current"
+    check: 브랜치가 "dev"인지 확인
+    note: "Spec은 반드시 dev 브랜치에서 작성"
+
+  # Spec 파일 존재 확인
+  spec_files:
+    paths:
+      - "specs/{domain}/spec.md"
+      - "specs/{domain}/plan.md"
+      - "specs/{domain}/tasks.md"
+    check: 필수 파일 3개 존재 여부
+    auto_action:
+      - 없으면 → skill:spec 호출 안내
+      - "dev 브랜치에서 Spec 작성을 먼저 진행하세요"
+
+  # 원격 푸시 확인
+  remote_sync:
+    command: "git log origin/dev..HEAD --oneline -- specs/"
+    check: Spec 파일이 원격 dev에 푸시되었는지
+    auto_action:
+      - 미푸시 상태면 → 커밋 및 푸시 안내
+      - 커밋 메시지: "📝 #{이슈번호} Add spec for {도메인}"
+```
+
+> **핵심 원칙**: Spec은 dev 브랜치에서 작성 → 원격 푸시 → Feature 브랜치 생성
+>
+> **목적**: 다른 작업자도 특정 도메인의 Spec을 공유받을 수 있도록 함
+
+## 4. Feature 브랜치 확인
 
 ```yaml
 method: "git_branch"
 command: "git branch --show-current"
+prerequisite: "Step 3 (Spec 작성 및 공유) 완료 필수"
 check:
-  - 브랜치명이 main/master가 아닌지
+  - 브랜치명이 main/master/dev가 아닌지
   - feature/* 패턴 또는 이슈 번호 포함 확인
 auto_action:
   - 브랜치 없으면 → 생성 제안 및 자동 생성
   - "feature/{issue_number}-{title}" 형식
+  - dev 브랜치에서 분기 (Spec이 포함된 상태)
 ```
 
-## 4. Draft PR 확인
+## 5. Draft PR 확인
 
 ```yaml
 method: "gh_pr_list"
@@ -53,7 +90,7 @@ auto_action:
   - PR 제목: "[Draft] #{issue_number} {issue_title}"
 ```
 
-## 5. Speckit 기반 구현
+## 6. Speckit 기반 구현
 
 ```yaml
 spec:
@@ -77,7 +114,23 @@ tasks_github_sync:
   auto_action: 없으면 sync-tasks skill 호출 안내
 ```
 
-## 6. 테스트코드 작성 확인
+## 7. 코드 구현 (ADD Phase 4)
+
+```yaml
+method: "implementation_check"
+note: "Spec (Step 3)은 이미 dev에서 완료, 여기서는 실제 코드만 구현"
+phases:
+  - CONFIG: 환경 설정
+  - PROJECT: 도메인 구조 생성
+  - TESTS: TDD 테스트 작성
+  - DATA: 타입, 인터페이스 정의
+  - CODE: 구현 코드 작성
+auto_action:
+  - skill:implement 호출
+  - Spec 참조하여 구현 진행
+```
+
+## 8. 테스트코드 작성 확인
 
 ```yaml
 method: "test_files_check"
@@ -90,7 +143,7 @@ auto_action:
   - "implementation-master Agent에게 테스트 작성 요청하세요"
 ```
 
-## 7. 린트 및 빌드 통과 확인
+## 9. 린트 및 빌드 통과 확인
 
 ```yaml
 lint:
@@ -109,7 +162,7 @@ build:
   auto_action: 실패 시 → 빌드 에러 수정 안내
 ```
 
-## 8. 푸시 및 리뷰 진행 확인
+## 10. 푸시 및 리뷰 진행 확인
 
 ```yaml
 push:
@@ -123,7 +176,7 @@ pr_ready:
   auto_action: Draft 상태면 → "gh pr ready" 안내
 ```
 
-## 9. dev 머지 확인
+## 11. dev 머지 확인
 
 ```yaml
 method: "gh_pr_merged"
@@ -135,7 +188,7 @@ result:
   - 머지 완료 시 체크
 ```
 
-## 10. GitHub Project 상태 변경 및 완료일 설정
+## 12. GitHub Project 상태 변경 및 완료일 설정
 
 ```yaml
 method: "gh_project_status_update"

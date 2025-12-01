@@ -22,15 +22,21 @@ tools: [Bash, Read, Grep, GitHub CLI]
 ```text
 1. 업무할당 (검수대기 → 검수완료)
 2. GitHub Project 상태 변경 (검수완료 → 작업중) ← skill:project-board 자동화
-3. Feature 브랜치 생성
-4. Draft PR 생성
-5. Speckit 기반 구현 (Spec → Plan → Tasks)
-6. 테스트코드 작성 및 테스트 진행
-7. 린트 및 빌드 통과
-8. 푸시 및 리뷰 요청 (작업중 → 리뷰요청) ← skill:project-board 자동화
-9. PR 승인 및 dev 머지 (리뷰요청 → 테스트중) ← skill:project-board 자동화
-10. STG 환경 QA 테스트 (테스트중 → 병합됨)
+3. dev 브랜치에서 Spec 작성 (spec.md, plan.md, tasks.md) ← skill:spec
+4. Spec 커밋 & 푸시 (원격에 Spec 공유) ← 📝 #{이슈번호}
+5. Feature 브랜치 생성 (Spec 완료 후)
+6. Draft PR 생성
+7. 실제 코드 구현 (ADD Phase 4) ← skill:implement
+8. 테스트코드 작성 및 테스트 진행
+9. 린트 및 빌드 통과
+10. 푸시 및 리뷰 요청 (작업중 → 리뷰요청) ← skill:project-board 자동화
+11. PR 승인 및 dev 머지 (리뷰요청 → 테스트중) ← skill:project-board 자동화
+12. STG 환경 QA 테스트 (테스트중 → 병합됨)
 ```
+
+> **핵심 변경**: Spec 작성은 dev 브랜치에서 수행 → 원격 푸시 → Feature 브랜치 생성
+>
+> **목적**: 다른 작업자도 특정 도메인의 Spec을 공유받을 수 있도록 함
 
 ### GitHub Project 상태 흐름
 
@@ -89,7 +95,7 @@ tools: [Bash, Read, Grep, GitHub CLI]
 ✅ 프로젝트 보드 연동 완료
 ```
 
-### 리뷰 요청 시 (Step 8)
+### 리뷰 요청 시 (Step 10)
 
 PR Ready 상태가 되면 자동으로 상태를 "리뷰요청"으로 변경:
 
@@ -126,6 +132,6 @@ skill: project-board({
 
 For detailed documentation, see:
 
-- [Verification Steps](references/verification-steps.md) - 10단계 검증 로직 상세
+- [Verification Steps](references/verification-steps.md) - 12단계 검증 로직 상세
 - [Automation](references/automation.md) - 자동화 명령, 출력 형식, 메타데이터
 - [Project Board API](../project-board/references/api-commands.md) - 프로젝트 보드 API
