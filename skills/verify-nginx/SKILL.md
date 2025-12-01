@@ -1,3 +1,11 @@
+---
+name: verify-nginx
+description: Nginx 설정 파일 문법 및 구성 검증. Use when (1) nginx 검증, (2) nginx -t 실행, (3) nginx 수정 후.
+tools: [Bash, Read]
+---
+
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: verify-nginx 호출 - {환경}` 시스템 메시지를 첫 줄에 출력하세요.
+
 # verify-nginx
 
 > Nginx 설정 검증 Skill

@@ -1,3 +1,11 @@
+---
+name: rollback-service
+description: 서비스를 이전 버전으로 롤백. Use when (1) 롤백 요청, (2) 이전 버전 복원, (3) /SAX:rollback 커맨드.
+tools: [Bash, Read, Write]
+---
+
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: rollback-service 호출 - {환경}/{서비스}/{태그}` 시스템 메시지를 첫 줄에 출력하세요.
+
 # rollback-service
 
 > 서비스 롤백 Skill

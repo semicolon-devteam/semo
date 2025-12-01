@@ -1,3 +1,11 @@
+---
+name: scaffold-compose
+description: Docker Compose 서비스 정의 추가. Use when (1) 새 서비스 추가, (2) compose 수정, (3) 서비스 정의 필요.
+tools: [Bash, Read, Write, GitHub CLI]
+---
+
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: scaffold-compose 호출 - {서비스명}` 시스템 메시지를 첫 줄에 출력하세요.
+
 # scaffold-compose
 
 > Docker Compose 서비스 추가 Skill

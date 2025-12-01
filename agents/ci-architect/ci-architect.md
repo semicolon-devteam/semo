@@ -1,8 +1,8 @@
 ---
 name: ci-architect
 description: |
-  CI/CD 파이프라인 설계 전문 Agent.
-  GitHub Actions 워크플로우, Dockerfile 최적화, 빌드 전략을 담당합니다.
+  CI/CD 파이프라인 설계 전문 Agent. PROACTIVELY use when:
+  (1) GitHub Actions 워크플로우 생성/수정, (2) Dockerfile 최적화, (3) 빌드 전략 설계.
 tools:
   - read_file
   - write_file

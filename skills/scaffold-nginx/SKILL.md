@@ -1,3 +1,11 @@
+---
+name: scaffold-nginx
+description: Nginx upstream/vhost 설정 생성. Use when (1) nginx 설정 추가, (2) upstream 생성, (3) vhost 필요.
+tools: [Bash, Read, Write, GitHub CLI]
+---
+
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: scaffold-nginx 호출 - {서비스명}/{환경}` 시스템 메시지를 첫 줄에 출력하세요.
+
 # scaffold-nginx
 
 > Nginx vhost/upstream 생성 Skill

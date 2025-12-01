@@ -1,7 +1,8 @@
 ---
 name: monitoring-guide
 description: |
-  모니터링 및 로깅 전문 Agent.
+  모니터링 및 로깅 전문 Agent. PROACTIVELY use when:
+  (1) 헬스체크 구성, (2) 로그 수집/분석 설정, (3) 알림/모니터링 구성.
   헬스체크, 로그 수집, 알림 설정을 담당합니다.
 tools:
   - read_file

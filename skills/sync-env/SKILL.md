@@ -1,3 +1,11 @@
+---
+name: sync-env
+description: 환경변수 파일 동기화 및 검증. Use when (1) 환경변수 확인, (2) env 체크, (3) 시크릿 동기화.
+tools: [Bash, Read, Write]
+---
+
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: sync-env 호출 - {환경}` 시스템 메시지를 첫 줄에 출력하세요.
+
 # sync-env
 
 > 환경변수 동기화 및 검증 Skill

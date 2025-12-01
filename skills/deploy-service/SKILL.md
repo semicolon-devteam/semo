@@ -1,3 +1,11 @@
+---
+name: deploy-service
+description: Docker Compose 기반 서비스 배포 실행. Use when (1) 배포 요청, (2) 서비스 업데이트, (3) /SAX:deploy 커맨드.
+tools: [Bash, Read]
+---
+
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: deploy-service 호출 - {환경}/{서비스}` 시스템 메시지를 첫 줄에 출력하세요.
+
 # deploy-service
 
 > 서비스 배포 실행 Skill

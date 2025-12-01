@@ -1,3 +1,11 @@
+---
+name: verify-compose
+description: Docker Compose 설정 문법 및 구성 검증. Use when (1) compose 검증, (2) config 확인, (3) compose 수정 후.
+tools: [Bash, Read]
+---
+
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: verify-compose 호출 - {환경}` 시스템 메시지를 첫 줄에 출력하세요.
+
 # verify-compose
 
 > Docker Compose 설정 검증 Skill

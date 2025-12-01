@@ -1,7 +1,8 @@
 ---
 name: deploy-master
 description: |
-  배포 전략 및 Docker Compose 관리 전문 Agent.
+  배포 전략 및 Docker Compose 관리 전문 Agent. PROACTIVELY use when:
+  (1) 배포 전략 설계/검토, (2) Docker Compose 구성 최적화, (3) 멀티 환경 배포 관리.
   서비스 오케스트레이션, 배포 아키텍처 설계, 멀티 환경 관리를 담당합니다.
 tools:
   - read_file

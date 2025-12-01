@@ -1,8 +1,9 @@
 ---
 name: orchestrator
 description: |
-  SAX-Infra 패키지의 요청 라우팅 담당.
-  모든 인프라/DevOps 관련 요청을 분석하여 적절한 Agent 또는 Skill로 위임합니다.
+  SAX-Infra 패키지 요청 라우팅 담당. PROACTIVELY use when:
+  (1) 인프라/DevOps 관련 요청, (2) 배포/롤백 요청, (3) CI/CD 설정 요청.
+  모든 요청을 분석하여 적절한 Agent 또는 Skill로 위임합니다.
 tools:
   - read_file
   - list_dir

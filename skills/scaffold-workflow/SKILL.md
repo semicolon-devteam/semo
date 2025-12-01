@@ -1,3 +1,11 @@
+---
+name: scaffold-workflow
+description: GitHub Actions CI/CD 워크플로우 생성. Use when (1) 워크플로우 생성, (2) CI 추가, (3) GitHub Actions 필요.
+tools: [Bash, Read, Write, GitHub CLI]
+---
+
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: scaffold-workflow 호출 - {서비스 유형}/{서비스명}` 시스템 메시지를 첫 줄에 출력하세요.
+
 # scaffold-workflow
 
 > GitHub Actions 워크플로우 생성 Skill

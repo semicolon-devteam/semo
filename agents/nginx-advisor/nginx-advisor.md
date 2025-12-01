@@ -1,7 +1,8 @@
 ---
 name: nginx-advisor
 description: |
-  Nginx 설정 최적화 전문 Agent.
+  Nginx 설정 최적화 전문 Agent. PROACTIVELY use when:
+  (1) Nginx 설정 검토/최적화, (2) 리버스 프록시 구성, (3) 보안 헤더/Rate Limiting 설정.
   리버스 프록시, 보안 헤더, Rate Limiting, 로드밸런싱을 담당합니다.
 tools:
   - read_file
