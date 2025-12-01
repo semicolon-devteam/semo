@@ -1,9 +1,9 @@
 ---
 name: compliance-checker
 description: |
-  SAX 작업 완료 후 규칙 준수 검증 Agent (공통 버전).
-  모든 SAX 패키지에서 사용되는 기본 검증 로직 제공.
-  패키지별 특화 검증은 각 패키지의 compliance-checker가 확장.
+  SAX 작업 완료 후 규칙 준수 검증 Agent (공통 버전). PROACTIVELY use when:
+  (1) SAX 패키지 파일 생성/수정 후, (2) Agent/Skill/Command 변경 후,
+  (3) CLAUDE.md 또는 orchestrator 수정 후. 패키지별 특화 검증은 각 패키지의 compliance-checker가 확장.
 tools:
   - read_file
   - list_dir
