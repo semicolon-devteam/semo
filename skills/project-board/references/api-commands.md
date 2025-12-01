@@ -142,7 +142,80 @@ query($owner: String!, $repo: String!, $issueNumber: Int!) {
 }
 ```
 
-## 4. 상태 변경 (Mutation)
+## 4. 날짜 필드 조회
+
+### 시작일/종료일 필드 ID 조회
+
+```bash
+gh api graphql -f query='
+query($org: String!, $projectNumber: Int!) {
+  organization(login: $org) {
+    projectV2(number: $projectNumber) {
+      id
+      field(name: "시작일") {
+        ... on ProjectV2Field {
+          id
+          name
+        }
+      }
+    }
+  }
+}' -f org="semicolon-devteam" -F projectNumber=1 --jq '.data.organization.projectV2.field.id'
+```
+
+> **Note**: `종료일` 필드도 동일한 방식으로 조회 (name: "종료일")
+
+## 5. 날짜 필드 업데이트 (Mutation)
+
+### 시작일 설정 (작업중 상태 변경 시)
+
+```bash
+gh api graphql -f query='
+mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $date: Date!) {
+  updateProjectV2ItemFieldValue(
+    input: {
+      projectId: $projectId
+      itemId: $itemId
+      fieldId: $fieldId
+      value: { date: $date }
+    }
+  ) {
+    projectV2Item {
+      id
+    }
+  }
+}' \
+  -f projectId="PVT_xxx" \
+  -f itemId="PVTI_xxx" \
+  -f fieldId="PVTF_시작일_xxx" \
+  -f date="$(date +%Y-%m-%d)"
+```
+
+### 종료일 설정 (리뷰요청 상태 변경 시)
+
+```bash
+gh api graphql -f query='
+mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $date: Date!) {
+  updateProjectV2ItemFieldValue(
+    input: {
+      projectId: $projectId
+      itemId: $itemId
+      fieldId: $fieldId
+      value: { date: $date }
+    }
+  ) {
+    projectV2Item {
+      id
+    }
+  }
+}' \
+  -f projectId="PVT_xxx" \
+  -f itemId="PVTI_xxx" \
+  -f fieldId="PVTF_종료일_xxx" \
+  -f date="$(date +%Y-%m-%d)"
+```
+
+## 6. 상태 변경 (Mutation)
 
 ### Status 업데이트
 
@@ -190,7 +263,7 @@ mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
 }
 ```
 
-## 5. 전체 워크플로우 스크립트
+## 7. 전체 워크플로우 스크립트
 
 ### 이슈 추가 + 상태 설정 통합
 
@@ -264,6 +337,71 @@ mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
     projectV2Item { id }
   }
 }' -f projectId="${PROJECT_ID}" -f itemId="${ITEM_ID}" -f fieldId="${FIELD_ID}" -f optionId="${OPTION_ID}"
+
+# Step 5: 날짜 속성 설정 (상태에 따라)
+TODAY=$(date +%Y-%m-%d)
+
+if [ "${TARGET_STATUS}" = "작업중" ]; then
+  echo "📅 시작일 설정 중: ${TODAY}"
+  # 시작일 필드 ID 조회
+  START_DATE_FIELD_ID=$(gh api graphql -f query='
+  query($org: String!, $projectNumber: Int!) {
+    organization(login: $org) {
+      projectV2(number: $projectNumber) {
+        field(name: "시작일") {
+          ... on ProjectV2Field { id }
+        }
+      }
+    }
+  }' -f org="${ORG}" -F projectNumber=${PROJECT_NUM} --jq '.data.organization.projectV2.field.id')
+
+  # 시작일 설정
+  gh api graphql -f query='
+  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $date: Date!) {
+    updateProjectV2ItemFieldValue(
+      input: {
+        projectId: $projectId
+        itemId: $itemId
+        fieldId: $fieldId
+        value: { date: $date }
+      }
+    ) {
+      projectV2Item { id }
+    }
+  }' -f projectId="${PROJECT_ID}" -f itemId="${ITEM_ID}" -f fieldId="${START_DATE_FIELD_ID}" -f date="${TODAY}"
+  echo "✅ 시작일 설정 완료"
+fi
+
+if [ "${TARGET_STATUS}" = "리뷰요청" ]; then
+  echo "📅 종료일 설정 중: ${TODAY}"
+  # 종료일 필드 ID 조회
+  END_DATE_FIELD_ID=$(gh api graphql -f query='
+  query($org: String!, $projectNumber: Int!) {
+    organization(login: $org) {
+      projectV2(number: $projectNumber) {
+        field(name: "종료일") {
+          ... on ProjectV2Field { id }
+        }
+      }
+    }
+  }' -f org="${ORG}" -F projectNumber=${PROJECT_NUM} --jq '.data.organization.projectV2.field.id')
+
+  # 종료일 설정
+  gh api graphql -f query='
+  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $date: Date!) {
+    updateProjectV2ItemFieldValue(
+      input: {
+        projectId: $projectId
+        itemId: $itemId
+        fieldId: $fieldId
+        value: { date: $date }
+      }
+    ) {
+      projectV2Item { id }
+    }
+  }' -f projectId="${PROJECT_ID}" -f itemId="${ITEM_ID}" -f fieldId="${END_DATE_FIELD_ID}" -f date="${TODAY}"
+  echo "✅ 종료일 설정 완료"
+fi
 
 echo "✅ 완료: ${REPO}#${ISSUE_NUM} → ${TARGET_STATUS}"
 ```

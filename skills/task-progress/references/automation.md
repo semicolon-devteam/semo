@@ -23,10 +23,36 @@ gh project item-edit --id {item_id} --field-id {status_field_id} --project-id {p
 
 # dev 머지 후 (작업중 → 리뷰요청)
 gh project item-edit --id {item_id} --field-id {status_field_id} --project-id {project_id} --text "리뷰요청"
-
-# 작업완료일 설정
-gh project item-edit --id {item_id} --field-id {completion_date_field_id} --project-id {project_id} --date "2025-11-25"
 ```
+
+## 날짜 속성 자동 설정
+
+| 상태 변경 | 설정 속성 | 설명 |
+|----------|----------|------|
+| → **작업중** | `시작일` | 실제 작업 시작 시점 기록 |
+| → **리뷰요청** | `종료일` | dev 소스 머지 및 리뷰 요청 시점 기록 |
+
+```bash
+# 시작일 설정 (작업중 상태 변경 시)
+gh api graphql -f query='
+mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $date: Date!) {
+  updateProjectV2ItemFieldValue(input: {
+    projectId: $projectId, itemId: $itemId, fieldId: $fieldId,
+    value: { date: $date }
+  }) { projectV2Item { id } }
+}' -f projectId="{project_id}" -f itemId="{item_id}" -f fieldId="{시작일_field_id}" -f date="$(date +%Y-%m-%d)"
+
+# 종료일 설정 (리뷰요청 상태 변경 시)
+gh api graphql -f query='
+mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $date: Date!) {
+  updateProjectV2ItemFieldValue(input: {
+    projectId: $projectId, itemId: $itemId, fieldId: $fieldId,
+    value: { date: $date }
+  }) { projectV2Item { id } }
+}' -f projectId="{project_id}" -f itemId="{item_id}" -f fieldId="{종료일_field_id}" -f date="$(date +%Y-%m-%d)"
+```
+
+> **📖 상세 API**: [project-board/references/api-commands.md](../../project-board/references/api-commands.md)
 
 ## SAX 메타데이터 업데이트
 
