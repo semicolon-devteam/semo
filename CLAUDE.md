@@ -69,6 +69,15 @@ SAX {version}이 설치되어 있습니다.
 | `sax-core/PRINCIPLES.md` | SAX 핵심 원칙 | 모든 작업 전 |
 | `sax-core/MESSAGE_RULES.md` | 메시지 포맷 규칙 | 모든 응답 시 |
 
+### 공통 컴포넌트 (sax-core)
+
+| 컴포넌트 | 유형 | 역할 |
+|----------|------|------|
+| `compliance-checker` | Agent | 작업 완료 후 규칙 준수 검증 |
+| `version-updater` | Skill | 세션 시작 시 버전 체크 및 업데이트 |
+| `notify-slack` | Skill | Slack 알림 전송 |
+| `feedback` | Skill | 피드백 수집 및 GitHub 이슈 생성 |
+
 ### 참조 방법
 
 ```bash
