@@ -197,8 +197,10 @@ gh issue list --repo semicolon-devteam/{repo} --state open --json number,title,b
 1. 중복 이슈 검토 후 병합 또는 닫기
 2. 필수 필드 설정 완료
 3. 미연결 이슈를 이슈관리 보드에 추가
-4. 태스크 이슈에 작업량 할당
+4. 태스크 이슈에 작업량 할당 → **`set-estimate` Skill 사용**
 ```
+
+> 💡 **Tip**: 작업량 미할당 Task는 `/SAX:sprint estimate #이슈번호 --point 3` 또는 `set-estimate` Skill로 설정하세요.
 
 ## SAX Message
 
@@ -218,6 +220,7 @@ gh issue list --repo semicolon-devteam/{repo} --state open --json number,title,b
 
 ## Related
 
+- [set-estimate Skill](../set-estimate/SKILL.md) - 작업량 설정
 - [detect-blockers Skill](../detect-blockers/SKILL.md) - 블로커 탐지
 - [sync-project-status Skill](../sync-project-status/SKILL.md) - 프로젝트 상태 동기화
 - [project-board Skill (sax-next)](../../sax-next/skills/project-board/SKILL.md) - Projects 보드 관리

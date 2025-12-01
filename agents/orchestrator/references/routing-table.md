@@ -12,10 +12,12 @@
 - 할당, 배정, assign, add to sprint
 - 종료, close, 완료, 회고, retrospective
 - Velocity, 속도, 생산성
+- 작업량, estimate, point, 포인트, 추정
 
 **위임 사유 템플릿**:
 - Sprint 생성 요청
 - Task Sprint 할당
+- Task 작업량 설정
 - Sprint 종료 처리
 - Velocity 계산
 
@@ -59,6 +61,7 @@
 |--------|-------|------|
 | 도움말, help, 사용법 | sax-help | - |
 | 동기화, sync | sync-project-status | Projects 관련 |
+| 작업량 설정, estimate 설정 | set-estimate | Sprint 할당 없이 작업량만 설정 |
 
 ---
 

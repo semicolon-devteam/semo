@@ -81,6 +81,28 @@
 
 ---
 
+### estimate - 작업량 설정
+
+```bash
+/SAX:sprint estimate #123 --point 3
+/SAX:sprint estimate #123 #124 #125 --point 5
+```
+
+**파라미터**:
+
+- `task_numbers`: 작업량을 설정할 Task 번호들
+- `--point`: 작업량 (피보나치: 1, 2, 3, 5, 8, 13)
+
+**동작**:
+
+1. Task의 Projects Item ID 조회
+2. 작업량 필드 값 설정
+3. 13pt 이상 시 분할 권장 메시지
+
+> 💡 Sprint 할당 없이 작업량만 독립적으로 설정할 때 사용
+
+---
+
 ### close - Sprint 종료
 
 ```bash
@@ -111,13 +133,17 @@
 # 1. Sprint 활성화 (Iteration은 이미 존재)
 /SAX:sprint create "12월 1/4" --goals "댓글 기능 완성"
 
-# 2. Task 할당 (Iteration 필드 설정)
+# 2. 작업량 설정 (백로그 그루밍)
+/SAX:sprint estimate #123 --point 3
+/SAX:sprint estimate #124 #125 --point 5
+
+# 3. Task 할당 (Iteration 필드 설정)
 /SAX:sprint add #123 #124 #125 --to "12월 1/4"
 
-# 3. 진행중 현황 확인
+# 4. 진행중 현황 확인
 /SAX:sprint status
 
-# 4. Sprint 종료 (미완료 이관)
+# 5. Sprint 종료 (미완료 이관)
 /SAX:sprint close "12월 1/4" --carry-to "12월 2/4"
 ```
 
@@ -143,5 +169,6 @@
 ## 연관 Skills
 
 - `create-sprint`: Sprint 활성화
+- `set-estimate`: Task 작업량 설정
 - `assign-to-sprint`: Task Iteration 할당
 - `close-sprint`: Sprint 종료 및 회고

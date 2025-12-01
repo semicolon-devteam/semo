@@ -45,9 +45,23 @@ Sprint 생성 요청
 완료
 ```
 
+### Task 작업량 설정
+
+```text
+작업량 설정 요청
+    ↓
+[SAX] Skill: set-estimate 호출
+    ↓
+1. 대상 Task 확인
+2. 작업량(Point) 설정
+3. 13pt 이상 시 분할 권장
+    ↓
+완료
+```
+
 ### Task Sprint 할당
 
-```
+```text
 Task 할당 요청
     ↓
 [SAX] Skill: assign-to-sprint 호출
@@ -83,6 +97,7 @@ Sprint 종료 요청
 | Skill | 용도 |
 |-------|------|
 | `create-sprint` | Sprint 생성 |
+| `set-estimate` | Task 작업량 설정 |
 | `assign-to-sprint` | Task Sprint 할당 |
 | `close-sprint` | Sprint 종료 |
 | `calculate-velocity` | Velocity 계산 |
