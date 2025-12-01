@@ -74,6 +74,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 
 | User Intent         | Route To                | Detection Keywords                             |
 | ------------------- | ----------------------- | ---------------------------------------------- |
+| **이슈 상태 변경**  | `skill:project-board`   | "상태 변경", "리뷰요청으로", "작업중으로", "테스트중으로", "상태로 만들어", "상태로 변경" |
 | 도움 요청           | `skill:sax-help`        | "/SAX:help", "도움말", "뭘 해야 하지"          |
 | SAX init 커밋       | `sax-init` 프로세스     | "SAX init", "SAX 설치 커밋", "SAX init 커밋해줘" |
 | **Git 커밋/푸시**   | `skill:git-workflow`    | `git commit`, `git push`, 커밋, 푸시           |
@@ -384,6 +385,7 @@ ls specs/{domain}/tasks.md 2>/dev/null
 ### Related Skills
 
 - `skill:git-workflow` - Git/PR 작업
+- `skill:project-board` - GitHub Projects 상태 관리
 - `skill:verify` - 종합 검증
 - `skill:fetch-team-context` - 팀 표준 참조
 - `skill:fast-track` - 경미한 수정 빠른 처리

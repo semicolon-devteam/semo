@@ -40,16 +40,35 @@ gh api repos/semicolon-devteam/sax-core/contents/TEAM_RULES.md --jq '.content' |
 | **Commit** | 이슈 번호 자동 추출 + Gitmoji 커밋 |
 | **Branch** | `{issue}-{feature}` 형식 생성 |
 | **PR** | gh cli로 Draft PR 생성 (`Related #이슈`) |
-| **Status** | Project 이슈카드 상태 자동 변경 |
+| **Status** | Project 이슈카드 상태 자동 변경 → `skill:project-board` 호출 |
 
 ## Project 상태 관리
 
-> 이슈가 `이슈카드` Project (ID: 1)에 연결되어 있다고 가정
+> **🔴 CRITICAL**: 이슈 상태 변경 시 Labels가 아닌 **Projects 보드 Status 필드**를 변경해야 합니다.
 
-| 시점 | 상태 변경 |
-|------|----------|
-| 작업 시작 | → **작업중** |
-| PR 머지 | → **테스트중** |
+### 상태 변경 요청 처리
+
+사용자가 "리뷰요청 상태로 만들어줘", "작업중으로 변경해줘" 등 요청 시:
+
+1. **Labels 변경 금지** - Projects Status 변경이 의도임
+2. **`skill:project-board` 호출** - 실제 상태 변경 처리
+3. 프로젝트 미연결 시 자동 추가 후 상태 변경
+
+```markdown
+[SAX] skill:git-workflow: 상태 변경 요청 감지
+
+📋 **이슈**: {repo}#{number}
+🔄 **요청 상태**: {target_status}
+
+→ skill:project-board 호출
+```
+
+### 자동 상태 변경 시점
+
+| 시점 | 상태 변경 | 처리 방법 |
+|------|----------|----------|
+| 작업 시작 | → **작업중** | `skill:project-board` 호출 |
+| PR 머지 | → **테스트중** | `skill:project-board` 호출 |
 
 **상세**: [Project Status](references/project-status.md)
 
@@ -86,6 +105,7 @@ ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+|/[0-9]+' | grep -oE '[
 
 - `check-team-codex` - 커밋 전 품질 검사
 - `verify` - PR 전 검증
+- `project-board` - Projects 상태 변경
 
 ## References
 
