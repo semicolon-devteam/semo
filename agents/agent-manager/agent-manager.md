@@ -27,6 +27,18 @@ model: sonnet
 
 SAX 패키지의 Agent 라이프사이클 전체를 관리하며, **Claude Code Sub-Agent 최적화 Best Practices**를 준수합니다.
 
+## 🔴 필수: sax-core 공통 Agent 참조
+
+> **Agent 생성/수정/검토 시 sax-core 공통 Agent를 반드시 확인합니다.**
+
+| 공통 Agent | 용도 |
+|------------|------|
+| `compliance-checker` | 규칙 준수 검증 |
+
+- **생성 전**: 동일/유사 역할이 sax-core에 있는지 확인
+- **수정 시**: sax-core Agent와 중복되지 않도록 역할 분리
+- **검토 시**: sax-core 참조 여부 확인
+
 ## Capabilities
 
 - **Agent 생성**: Sub-Agent 최적화 규칙 준수 `.md` 파일 생성

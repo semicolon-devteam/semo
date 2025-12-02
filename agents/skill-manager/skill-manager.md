@@ -27,6 +27,21 @@ model: sonnet
 
 SAX Skill 라이프사이클 전체를 관리하며, Anthropic Skills 표준을 준수합니다.
 
+## 🔴 필수: sax-core 공통 Skill 참조
+
+> **Skill 생성/수정/검토 시 sax-core 공통 Skill을 반드시 확인합니다.**
+
+| 공통 Skill | 용도 |
+|------------|------|
+| `notify-slack` | Slack 알림 |
+| `feedback` | 피드백 수집 |
+| `version-updater` | 버전 체크 |
+| `claude-health` | Claude 상태 체크 |
+
+- **생성 전**: 동일/유사 기능이 sax-core에 있는지 확인
+- **수정 시**: sax-core Skill과 중복되지 않도록 역할 분리
+- **검토 시**: sax-core 참조 여부 확인
+
 ## 🔴 필수: skill-creator Skill 사용
 
 **Skill 생성 시 반드시 `skill-creator` Skill을 사용합니다.**
