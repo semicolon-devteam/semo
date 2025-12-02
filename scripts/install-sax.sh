@@ -230,7 +230,7 @@ handle_existing_installation() {
                 cd - > /dev/null
                 print_success "$name 업데이트 완료"
             fi
-            return 1  # 설치 건너뜀
+            return 2  # 업데이트 완료 (심링크 재설정 필요)
         else
             echo ""
             echo "  선택 옵션:"
@@ -282,11 +282,15 @@ install_sax_core() {
 
     local core_path="$CLAUDE_DIR/sax-core"
 
-    if handle_existing_installation "$core_path" "sax-core"; then
-        # 서브모듈로 추가
+    handle_existing_installation "$core_path" "sax-core"
+    local result=$?
+
+    if [ $result -eq 0 ]; then
+        # 새로 설치 진행
         git submodule add "https://github.com/$SAX_GITHUB_ORG/$SAX_CORE_REPO.git" "$core_path"
         print_success "sax-core 서브모듈 설치 완료"
     fi
+    # result=1: 건너뜀, result=2: 업데이트 완료 (심링크 재설정은 main에서 처리)
 }
 
 install_sax_package() {
@@ -296,11 +300,15 @@ install_sax_package() {
 
     print_step "$repo_name 설치 중..."
 
-    if handle_existing_installation "$package_path" "$repo_name"; then
-        # 서브모듈로 추가
+    handle_existing_installation "$package_path" "$repo_name"
+    local result=$?
+
+    if [ $result -eq 0 ]; then
+        # 새로 설치 진행
         git submodule add "https://github.com/$SAX_GITHUB_ORG/$repo_name.git" "$package_path"
         print_success "$repo_name 서브모듈 설치 완료"
     fi
+    # result=1: 건너뜀, result=2: 업데이트 완료 (심링크 재설정은 main에서 처리)
 }
 
 setup_symlinks() {
@@ -681,7 +689,11 @@ main() {
     create_claude_dir
     install_sax_core
     install_sax_package "$PACKAGE"
+
+    # 심링크/병합 설정 (신규 설치 및 업데이트 모두 실행)
+    # --update 모드에서도 심링크 재설정이 필요함 (새 commands/skills 반영)
     setup_symlinks "$PACKAGE"
+
     print_summary "$PACKAGE"
 }
 
