@@ -44,12 +44,12 @@ SLACK_BOT_TOKEN=xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb
 
 ## Quick Start
 
-```bash
-SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb"
+> **⚠️ 중요**: 토큰을 환경변수로 설정하지 말고 직접 헤더에 넣으세요. 환경변수 확장 문제로 인증 오류가 발생할 수 있습니다.
 
-curl -X POST https://slack.com/api/chat.postMessage \
-  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-  -H "Content-Type: application/json" \
+```bash
+curl -s -X POST https://slack.com/api/chat.postMessage \
+  -H "Authorization: Bearer xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb" \
+  -H "Content-Type: application/json; charset=utf-8" \
   -d '{
     "channel": "#_협업",
     "text": "메시지 내용",
@@ -74,11 +74,9 @@ curl -X POST https://slack.com/api/chat.postMessage \
 #### 조회 API 호출
 
 ```bash
-SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb"
-
 # 전체 사용자 목록 조회
 curl -s "https://slack.com/api/users.list" \
-  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+  -H "Authorization: Bearer xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb" \
   | jq '.members[] | select(.deleted == false and .is_bot == false) | {id, name, real_name, display_name: .profile.display_name}'
 ```
 
@@ -99,7 +97,7 @@ curl -s "https://slack.com/api/users.list" \
 SEARCH_NAME="Reus"
 
 SLACK_ID=$(curl -s "https://slack.com/api/users.list" \
-  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+  -H "Authorization: Bearer xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb" \
   | jq -r --arg name "$SEARCH_NAME" '
     .members[]
     | select(.deleted == false and .is_bot == false)
