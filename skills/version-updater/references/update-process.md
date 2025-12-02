@@ -62,12 +62,22 @@ git stash pop
 cd -
 ```
 
-### 2.2 심링크 재구성 (병합 모드)
+### 2.2 claude-health 호출 (심링크 자동 수정)
 
-```bash
-# install-sax.sh 스크립트의 --refresh-links 옵션 사용
-./install-sax.sh {package} --refresh-links
+업데이트 완료 후 `claude-health` 스킬이 자동으로 호출됩니다:
+
+```markdown
+[SAX] version-updater: 업데이트 완료 → claude-health 호출
 ```
+
+**claude-health 동작**:
+
+1. 패키지 감지 (po, next, qa, meta, pm, backend, infra)
+2. `.claude` 구조 검증 (CLAUDE.md, agents/, skills/, commands/SAX/)
+3. 문제 발견 시 자동 수정 (install-sax.sh와 동일 로직)
+4. 결과 보고
+
+이로써 `install-sax.sh --update`를 별도로 실행할 필요 없이 심링크가 자동으로 관리됩니다.
 
 ### 2.3 전체 업데이트 스크립트
 

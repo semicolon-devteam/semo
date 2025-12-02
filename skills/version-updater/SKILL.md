@@ -56,10 +56,21 @@ cd .claude/{package}
 git fetch origin main
 git reset --hard origin/main
 cd -
-
-# 심링크 재구성 (필요 시)
-# install-sax.sh --refresh-links
 ```
+
+### 3. claude-health 호출
+
+업데이트 완료 후 자동으로 `.claude` 구조 검증 및 수정:
+
+```markdown
+[SAX] version-updater: 업데이트 완료 → claude-health 호출
+```
+
+- 새로운 agent/skill 심링크 자동 생성
+- 삭제된 컴포넌트 심링크 정리
+- 문제 발견 시 자동 수정
+
+> **중요**: 업데이트 후 반드시 `claude-health` 스킬을 호출해야 합니다.
 
 ## Output Format
 
@@ -107,6 +118,21 @@ cd -
 | sax-next | 0.25.0 | 0.26.0 |
 
 업데이트가 완료되었습니다.
+
+---
+
+[SAX] version-updater: 업데이트 완료 → claude-health 호출
+
+## .claude 디렉토리 검증 결과
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| 패키지 | ✅ | sax-next |
+| agents/ | ✅ | 6 symlinks |
+| skills/ | ⚠️ → ✅ | 2개 심링크 추가 |
+| commands/SAX | ✅ | 5 symlinks |
+
+**결과**: 1개 항목 자동 수정됨
 ```
 
 ## SAX Message
