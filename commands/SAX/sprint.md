@@ -148,6 +148,35 @@
 
 ---
 
+### sync - Iteration 일괄 동기화
+
+```bash
+/SAX:sprint sync                 # 실행
+/SAX:sprint sync --dry-run       # 미리보기만
+```
+
+**파라미터**:
+
+- `--dry-run`: 실제 업데이트 없이 변경 예정 목록만 출력 (선택)
+
+**동작**:
+
+1. 현재(Current) Iteration 조회 (오늘 날짜 기준)
+2. 모든 OPEN 상태 이슈 조회
+3. Iteration이 current가 아니거나 없는 이슈 필터링
+4. 각 이슈의 Iteration → current로 업데이트
+5. 결과 리포트 출력
+
+**대상 이슈**:
+
+- OPEN 상태인 이슈 중:
+  - Iteration이 현재가 아닌 이슈 (과거 Iteration)
+  - Iteration이 설정되지 않은 이슈
+
+> 트리거: "iteration 업데이트", "이터레이션 업데이트", "iteration 동기화"
+
+---
+
 ## 예시
 
 ### Sprint 전체 워크플로우
@@ -199,3 +228,4 @@
 - `start-task`: Task 작업 시작 (상태+시작일+이터레이션)
 - `assign-to-sprint`: Task Iteration 할당
 - `close-sprint`: Sprint 종료 및 회고
+- `sync-iteration`: Iteration 일괄 동기화
