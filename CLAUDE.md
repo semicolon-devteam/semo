@@ -115,6 +115,18 @@
 |----------|------|------|
 | `compliance-checker` | Agent | 작업 완료 후 규칙 준수 검증 |
 | `version-updater` | Skill | 세션 시작 시 버전 체크 및 업데이트 |
+| `notify-slack` | Skill | Slack 알림 전송 |
+| `feedback` | Skill | 피드백 수집 및 GitHub 이슈 생성 |
+| `sax-help` | Skill | SAX 도움말 및 팀 컨텍스트 응답 |
+
+### 공통 커맨드 (sax-core)
+
+| 커맨드 | 설명 | 호출 스킬 |
+|--------|------|-----------|
+| `/SAX:help` | SAX 도움말 | sax-help |
+| `/SAX:slack` | Slack 메시지 전송 | notify-slack |
+| `/SAX:update` | SAX 업데이트 | version-updater |
+| `/SAX:feedback` | 피드백 제출 | feedback |
 
 ---
 
