@@ -15,11 +15,51 @@ tools: [Bash, Read]
 
 ## Purpose
 
-모든 SAX 패키지에서 공통으로 사용되는 버전 관리 기능:
+모든 SAX 패키지에서 공통으로 사용되는 버전 관리 및 무결성 검증:
 
-1. **새 세션 시작 시** 자동 버전 체크
+1. **새 세션 시작 시** 자동 버전 체크 + 무결성 검증
 2. **업데이트 가능 시** 사용자에게 알림
 3. **업데이트 실행** 지원
+4. **무결성 검증** 구조 및 동기화 상태 확인
+
+## 무결성 검증 흐름 (3-Phase)
+
+```text
+[세션 시작] → version-updater 호출
+                    ↓
+              ┌─────┴─────┐
+              │ Phase 1   │ 버전 체크
+              └─────┬─────┘
+                    ↓
+              ┌─────┴─────┐
+              │ Phase 2   │ 구조 검증 (claude-health --check-only)
+              └─────┬─────┘
+                    ↓
+              ┌─────┴─────┐
+              │ Phase 3   │ 동기화 검증 (package-sync --check-only)
+              └─────┬─────┘      ※ sax-core 존재 시에만
+                    ↓
+              [무결성 리포트 출력]
+```
+
+### 환경 감지
+
+```bash
+# sax-core 추출 환경 여부 확인
+if [ -d ".claude/sax-core" ]; then
+  ENV_TYPE="full"      # Phase 1-2-3 모두 수행
+else
+  ENV_TYPE="legacy"    # Phase 1-2만 수행 (package-sync 스킵)
+fi
+```
+
+### Phase별 동작
+
+| Phase | 스킬 | 모드 | 문제 시 동작 |
+|-------|------|------|-------------|
+| 1 | (내장) | - | 업데이트 안내 |
+| 2 | claude-health | --check-only | 기본 모드로 재호출 (자동 수정) |
+| 3 | package-sync | --check-only | 기본 모드로 재호출 (동기화 실행) |
 
 ## Trigger
 
@@ -87,19 +127,19 @@ git reset --hard origin/main
 cd -
 ```
 
-### 3. claude-health 호출
+### 3. 무결성 검증 (Phase 2-3)
 
-업데이트 완료 후 자동으로 `.claude` 구조 검증 및 수정:
+업데이트 완료 후 또는 세션 시작 시 무결성 검증:
 
-```markdown
-[SAX] version-updater: 업데이트 완료 → claude-health 호출
+```text
+Phase 2: claude-health --check-only
+  ↓ 문제 발견 시 → claude-health (기본 모드, 자동 수정)
+
+Phase 3: package-sync --check-only (sax-core 환경만)
+  ↓ 문제 발견 시 → package-sync (기본 모드, 동기화 실행)
 ```
 
-- 새로운 agent/skill 심링크 자동 생성
-- 삭제된 컴포넌트 심링크 정리
-- 문제 발견 시 자동 수정
-
-> **중요**: 업데이트 후 반드시 `claude-health` 스킬을 호출해야 합니다.
+> **중요**: 업데이트 후 및 세션 시작 시 반드시 Phase 2-3을 수행해야 합니다.
 
 ## Output Format
 
@@ -132,6 +172,56 @@ cd -
 | sax-next | 0.26.0 | ✅ 최신 |
 
 모든 SAX 패키지가 최신 상태입니다.
+
+---
+
+## 🔍 무결성 검증
+
+### Phase 2: 구조 검증
+| 항목 | 상태 |
+|------|------|
+| sax-core | ✅ |
+| CLAUDE.md | ✅ |
+| agents/ | ✅ |
+| skills/ | ✅ |
+| commands/SAX | ✅ |
+
+### Phase 3: 동기화 검증
+| 유형 | 상태 |
+|------|------|
+| Skills | ✅ 8/8 |
+| Agents | ✅ 5/5 |
+| Commands | ✅ 4/4 |
+
+**무결성**: ✅ 정상
+```
+
+### 무결성 문제 발견 시
+
+```markdown
+[SAX] Skill: version-updater 호출
+
+## ✅ SAX 최신 버전 확인
+(버전 테이블)
+
+---
+
+## 🔍 무결성 검증
+
+### Phase 2: 구조 검증
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| agents/ | ⚠️ | 깨진 심링크 2개 |
+
+→ claude-health 자동 수정 실행...
+→ ✅ 수정 완료
+
+### Phase 3: 동기화 검증
+| 유형 | 상태 |
+|------|------|
+| Skills | ✅ 8/8 |
+
+**무결성**: ✅ 정상 (1개 항목 자동 수정됨)
 ```
 
 ### 업데이트 완료 시

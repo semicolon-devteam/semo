@@ -1,12 +1,52 @@
-# claude-health
+---
+name: claude-health
+description: |
+  .claude 디렉토리 구조 검증 및 자동 수정. Use when:
+  (1) SAX 업데이트 후 무결성 체크, (2) 심링크 깨짐 의심 시,
+  (3) version-updater에서 자동 호출.
+tools: [Bash, Read]
+---
 
-> .claude 디렉토리 구조 검증 및 자동 수정. Use when (1) SAX 업데이트 후 무결성 체크, (2) 심링크 깨짐 의심 시, (3) version-updater에서 자동 호출.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: claude-health 호출` 시스템 메시지를 첫 줄에 출력하세요.
 
-## 시스템 메시지
+# claude-health Skill
 
+> .claude 디렉토리 구조 검증 및 자동 수정
+
+## 호출 모드
+
+| 모드 | 동작 | 사용 상황 |
+|------|------|----------|
+| (기본) | 검증 + 자동 수정 | 수동 호출, 업데이트 후 |
+| `--check-only` | 검증만 수행, 수정 안함 | version-updater Phase 2에서 호출 |
+
+### --check-only 모드
+
+검증만 수행하고 자동 수정하지 않습니다:
+
+**출력 포맷** (version-updater 파싱용):
+
+```markdown
+[SAX] Skill: claude-health --check-only 실행
+
+## 구조 검증 결과
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| sax-core | ✅ | 존재 |
+| sax-{pkg} | ✅ | sax-pm |
+| CLAUDE.md | ✅ | 심링크 유효 |
+| agents/ | ⚠️ | 깨진 심링크 2개 |
+| skills/ | ✅ | 8 symlinks |
+| commands/SAX | ❌ | .merged 마커 누락 |
+
+**결과**: ⚠️ 문제 발견 (자동 수정 필요)
 ```
-[SAX] Skill: claude-health 실행
-```
+
+**결과 상태**:
+
+- `✅ 구조 정상` - 모든 검증 통과
+- `⚠️ 문제 발견` - 수정 필요 (version-updater가 기본 모드로 재호출 결정)
 
 ## Purpose
 
