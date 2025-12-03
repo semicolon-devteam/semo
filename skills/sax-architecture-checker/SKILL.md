@@ -120,6 +120,49 @@ ln -s "sax-$PKG/CLAUDE.md" ".claude/CLAUDE.md"
 **결과**: 2개 항목 자동 수정됨
 ```
 
+## 🔴 세션 재시작 권장
+
+> **심링크 재설정 후에는 세션 재시작을 권장합니다.**
+
+### 재시작이 필요한 경우
+
+| 상황 | 재시작 필요 | 이유 |
+|------|-------------|------|
+| 심링크 디렉토리 → 실제 디렉토리 변환 | ✅ 권장 | Claude Code가 캐시한 경로 무효화 |
+| 새 skill/agent 심링크 추가 | ✅ 권장 | 새 컴포넌트 인식 필요 |
+| 깨진 심링크 수정 | ⚠️ 선택 | 기존 캐시에 따라 다름 |
+| .merged 마커만 추가 | ❌ 불필요 | 경로 변경 없음 |
+
+### 결과 메시지에 안내 포함
+
+심링크가 재설정된 경우 아래 안내를 출력:
+
+```markdown
+⚠️ **세션 재시작 권장**
+
+심링크 구조가 변경되었습니다. Claude Code가 변경된 경로를 인식하도록
+**새 세션을 시작**하는 것을 권장합니다.
+
+재시작 방법: Claude Code 창을 닫고 다시 열기
+```
+
+### 판단 기준
+
+```bash
+# 심링크 재설정 여부 감지
+SYMLINK_CHANGED=false
+
+# 심링크 디렉토리가 실제 디렉토리로 변환된 경우
+if [ "$dir_was_symlink" = true ]; then
+  SYMLINK_CHANGED=true
+fi
+
+# 새 심링크가 생성된 경우
+if [ $new_symlinks_count -gt 0 ]; then
+  SYMLINK_CHANGED=true
+fi
+```
+
 ## References
 
 - [Fix Logic](references/fix-logic.md) - 자동 수정 로직 상세
