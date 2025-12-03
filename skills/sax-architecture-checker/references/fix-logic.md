@@ -5,11 +5,38 @@
 ## 패키지 감지
 
 ```bash
-detect_package() {
+detect_packages() {
+  local pkgs=()
   for pkg in po next qa meta pm backend infra design; do
-    [ -d ".claude/sax-$pkg" ] && echo "$pkg" && return
+    [ -d ".claude/sax-$pkg" ] && pkgs+=("$pkg")
   done
-  echo "unknown"
+  echo "${pkgs[@]}"
+}
+
+detect_package() {
+  local pkgs=($(detect_packages))
+  if [ ${#pkgs[@]} -gt 0 ]; then
+    echo "${pkgs[0]}"
+  else
+    echo "unknown"
+  fi
+}
+
+# 다중 패키지 감지
+check_multiple_packages() {
+  local pkgs=($(detect_packages))
+  if [ ${#pkgs[@]} -gt 1 ]; then
+    echo "🔴 **다중 패키지 설치 감지**"
+    echo ""
+    echo "설치된 패키지: ${pkgs[*]}"
+    echo ""
+    echo "⚠️ 하나의 프로젝트에는 하나의 SAX 패키지만 권장됩니다."
+    echo "충돌로 인해 일부 기능이 정상 동작하지 않을 수 있습니다."
+    echo ""
+    echo "**해결 방법**: \`./install-sax.sh {원하는패키지} --force\`"
+    return 1
+  fi
+  return 0
 }
 
 PKG=$(detect_package)
@@ -165,6 +192,10 @@ fix_commands() {
 
 ```bash
 run_fix() {
+  # 다중 패키지 체크 (최우선)
+  check_multiple_packages
+  local multi_pkg_status=$?
+
   local pkg=$(detect_package)
 
   if [ "$pkg" = "unknown" ]; then
@@ -174,6 +205,11 @@ run_fix() {
 
   echo "패키지: sax-$pkg"
   echo ""
+
+  if [ $multi_pkg_status -ne 0 ]; then
+    echo "⚠️ 다중 패키지 감지됨 - 첫 번째 패키지($pkg)로 수정 진행"
+    echo ""
+  fi
 
   echo "=== CLAUDE.md 수정 ==="
   fix_claude_md "$pkg"
@@ -192,6 +228,11 @@ run_fix() {
   echo ""
 
   echo "완료!"
+
+  if [ $multi_pkg_status -ne 0 ]; then
+    echo ""
+    echo "⚠️ 다중 패키지 문제 해결을 위해 \`./install-sax.sh $pkg --force\` 실행을 권장합니다."
+  fi
 }
 ```
 

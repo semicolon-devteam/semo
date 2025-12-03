@@ -63,9 +63,14 @@ SAX가 설치된 `.claude` 디렉토리의 구조를 검증하고, 문제 발견
 ### 1. 패키지 감지
 
 ```bash
-PKG=$(for p in po next qa meta pm backend infra; do
-  [ -d ".claude/sax-$p" ] && echo $p && break
-done)
+# 설치된 모든 패키지 감지
+INSTALLED_PKGS=()
+for p in po next qa meta pm backend infra design; do
+    [ -d ".claude/sax-$p" ] && INSTALLED_PKGS+=("$p")
+done
+
+# 첫 번째 패키지를 기본으로 사용
+PKG="${INSTALLED_PKGS[0]:-}"
 ```
 
 ### 2. 검증 항목
@@ -162,6 +167,48 @@ if [ $new_symlinks_count -gt 0 ]; then
   SYMLINK_CHANGED=true
 fi
 ```
+
+## 🔴 다중 패키지 감지
+
+> **하나의 프로젝트에는 하나의 SAX 패키지만 지원됩니다.**
+
+### 검증 로직
+
+```bash
+INSTALLED_PKGS=()
+for p in po next qa meta pm backend infra design; do
+    [ -d ".claude/sax-$p" ] && INSTALLED_PKGS+=("$p")
+done
+
+if [ ${#INSTALLED_PKGS[@]} -gt 1 ]; then
+    # 다중 패키지 경고 출력
+fi
+```
+
+### 출력 형식
+
+다중 패키지가 감지된 경우:
+
+```markdown
+🔴 **다중 패키지 설치 감지**
+
+설치된 패키지: sax-next, sax-design
+
+⚠️ 하나의 프로젝트에는 하나의 SAX 패키지만 권장됩니다.
+충돌로 인해 일부 기능이 정상 동작하지 않을 수 있습니다.
+
+**해결 방법**: `./install-sax.sh {원하는패키지} --force`
+```
+
+### 결과 테이블에 포함
+
+다중 패키지 감지 시 검증 결과 테이블 상단에 경고 추가:
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| 다중 패키지 | 🔴 | sax-next, sax-design 동시 설치 |
+| sax-core | ✅ | 존재 |
+| ... | ... | ... |
 
 ## References
 
