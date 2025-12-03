@@ -49,6 +49,12 @@ github_org:
   required: true
   error: "semicolon-devteam Organization 멤버십 없음. 관리자에게 초대 요청"
 
+github_project_scope:
+  command: "gh auth status 2>&1 | grep -q 'project'"
+  required: true
+  error: "GitHub Projects 권한 없음. `gh auth refresh -s project` 실행 필요"
+  note: "SAX-PO에서 Projects Status 변경에 필요 (Epic/Bug 상태 관리)"
+
 docs_access:
   command: "gh api repos/semicolon-devteam/docs/contents/README.md"
   required: true

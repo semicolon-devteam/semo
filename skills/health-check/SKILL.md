@@ -30,6 +30,9 @@ gh --version && git --version && node --version && pnpm --version && supabase --
 # GitHub 인증 상태 확인
 gh auth status
 
+# GitHub Projects 권한 확인 (SAX-PO 필수)
+gh auth status 2>&1 | grep -q 'project' && echo "✅ project 스코프 있음" || echo "❌ project 스코프 없음 - gh auth refresh -s project 실행 필요"
+
 # Organization 멤버십 확인
 gh api user/orgs --jq '.[].login' | grep semicolon-devteam
 
@@ -51,6 +54,7 @@ ls -la .claude/SAX/commands
 
 - ✅ 모든 필수 도구 설치됨
 - ✅ GitHub 인증 완료
+- ✅ GitHub Projects 권한 확인 (project 스코프)
 - ✅ semicolon-devteam 멤버십 확인
 - ✅ SAX 메타데이터 존재
 - ✅ SAX 패키지 설치됨 (sax-core, sax-po)
