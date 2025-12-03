@@ -80,6 +80,86 @@ model: haiku
 1. [권장하는 다음 작업]
 ```
 
+## 🔴 이슈 작업 시작 시 자동 분석 (NON-NEGOTIABLE)
+
+> **⚠️ 이슈 번호와 함께 작업 시작 요청 시, GitHub 이슈를 분석하여 적절한 작업 방식을 추천합니다.**
+
+### 트리거 패턴
+
+| 패턴 | 예시 |
+|------|------|
+| `#{number} 작업` | "#604 작업 시작하자" |
+| `이슈 작업 시작` | "이 이슈 작업 시작하려면?" |
+| `#{number} 시작` | "#132 시작해볼까" |
+
+### 이슈 분석 프로세스
+
+1. **GitHub API로 이슈 정보 조회**
+   ```bash
+   gh issue view {number} --repo {org}/{repo} --json title,labels,body
+   ```
+
+2. **Fast-track 적격성 자동 체크**
+   ```yaml
+   auto_fast_track_eligible:
+     labels: [bug, typo, style, hotfix, UI/UX]
+     estimated_file_count: <= 3
+     complexity: low
+   ```
+
+3. **적격성 판단 후 선택지 제시**
+
+### 이슈 작업 시작 응답 템플릿
+
+```markdown
+[SAX] Agent: advisor 호출 - 이슈 #{number} 작업 방식 선택
+
+📋 **이슈 정보**:
+- 제목: {issue_title}
+- 라벨: {labels}
+- 예상 영향 범위: {estimated_files}개 파일
+
+{if fast_track_eligible}
+✅ **Fast-track 적격** (라벨: {matching_labels})
+
+🔀 **작업 방식을 선택해주세요**:
+
+| 방식 | 적합한 경우 | 예상 소요 |
+|------|------------|----------|
+| **A. Fast-track** (권장) | 경미한 수정, 버그 핫픽스 | 15-30분 |
+| **B. 정식 SDD** | 복잡한 로직, 문서화 필요 | 1-2시간 |
+
+### A. Fast-track
+- 즉시 수정 → 사후 이슈 생성
+- 실행: "패스트트랙으로 진행해줘"
+
+### B. 정식 SDD 프로세스
+- spec.md → plan.md → tasks.md → 구현
+- 실행: "정식 프로세스로 진행해줘"
+{else}
+ℹ️ **정식 SDD 프로세스 권장**
+
+이 이슈는 Fast-track 적격 조건을 충족하지 않습니다:
+- {ineligibility_reason}
+
+**다음 단계**: "스펙부터 작성하자" 또는 `skill:spec`
+{/if}
+```
+
+### Fast-track 적격 라벨
+
+| 라벨 | Fast-track 적격 | 비고 |
+|------|-----------------|------|
+| `bug` | ✅ | 단순 버그 수정 |
+| `typo` | ✅ | 오타 수정 |
+| `style` | ✅ | 스타일 조정 |
+| `hotfix` | ✅ | 긴급 수정 |
+| `UI/UX` | ⚠️ 조건부 | 경미한 UI 수정만 |
+| `enhancement` | ❌ | 기능 추가는 SDD |
+| `feature` | ❌ | 새 기능은 SDD |
+
+---
+
 ## 🔴 작업 방식 선택지 우선 제시 (NON-NEGOTIABLE)
 
 > **⚠️ 기능 구현 관련 질문 시, 구체적인 구현 방안보다 작업 방식 선택지를 먼저 제시합니다.**
