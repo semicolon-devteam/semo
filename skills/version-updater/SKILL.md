@@ -38,15 +38,18 @@ tools: [Bash, Read]
 ### 1. 버전 체크
 
 ```bash
-# 설치된 패키지 확인
-for pkg in sax-core sax-meta sax-po sax-next sax-qa sax-pm sax-backend sax-infra; do
-  if [ -d ".claude/$pkg" ]; then
-    LOCAL=$(cat ".claude/$pkg/VERSION" 2>/dev/null || echo "unknown")
-    REMOTE=$(gh api "repos/semicolon-devteam/$pkg/contents/VERSION" --jq '.content' 2>/dev/null | base64 -d || echo "unknown")
+# 설치된 패키지 동적 확인 (sax-* 패턴)
+for pkg_dir in .claude/sax-*/; do
+  if [ -d "$pkg_dir" ]; then
+    pkg=$(basename "$pkg_dir")
+    LOCAL=$(cat "$pkg_dir/VERSION" 2>/dev/null || echo "unknown")
+    REMOTE=$(gh api "repos/semicolon-devteam/$pkg/contents/VERSION" --jq '.content' 2>/dev/null | base64 -d | tr -d '\n' || echo "unknown")
     echo "$pkg: local=$LOCAL remote=$REMOTE"
   fi
 done
 ```
+
+> **참고**: `sax-*` 패턴을 사용하여 새로운 패키지 추가 시 자동 인식됩니다.
 
 ### 2. 업데이트 실행
 
