@@ -57,6 +57,28 @@ PM 관련 요청 감지 시 **반드시** SAX 메시지를 출력해야 합니�
 
 ---
 
+## 🔴 세션 시작 시 구조 검증 (NON-NEGOTIABLE)
+
+> **새 세션에서 첫 작업 전, .claude 구조 무결성을 검증합니다.**
+
+### 검증 스킬 호출 (폴백 체인)
+
+1. `.claude/skills/sax-architecture-checker/SKILL.md` 존재 시 → 해당 스킬 실행
+2. 없으면 → `.claude/sax-core/skills/sax-architecture-checker/SKILL.md` 실행
+
+### 검증 실행 조건
+
+- 새 Claude Code 세션 시작 (대화 기록 없음)
+- SAX가 설치된 프로젝트 (.claude/sax-* 존재)
+
+### 검증 대상 항목
+
+- CLAUDE.md 심링크 유효성
+- agents/, skills/, commands/SAX/ 병합 디렉토리 상태
+- 깨진 심링크 탐지 및 자동 복구
+
+---
+
 ## 🔴 SAX Core 필수 참조
 
 > **모든 작업 전 sax-core 문서 및 공통 컴포넌트를 참조합니다.**
