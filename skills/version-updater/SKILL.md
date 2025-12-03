@@ -32,7 +32,7 @@ tools: [Bash, Read]
               └─────┬─────┘
                     ↓
               ┌─────┴─────┐
-              │ Phase 2   │ 구조 검증 (claude-health --check-only)
+              │ Phase 2   │ 구조 검증 (sax-architecture-checker --check-only)
               └─────┬─────┘
                     ↓
               ┌─────┴─────┐
@@ -58,7 +58,7 @@ fi
 | Phase | 스킬 | 모드 | 문제 시 동작 |
 |-------|------|------|-------------|
 | 1 | (내장) | - | 업데이트 안내 |
-| 2 | claude-health | --check-only | 기본 모드로 재호출 (자동 수정) |
+| 2 | sax-architecture-checker | --check-only | 기본 모드로 재호출 (자동 수정) |
 | 3 | package-sync | --check-only | 기본 모드로 재호출 (동기화 실행) |
 
 ## Trigger
@@ -132,8 +132,8 @@ cd -
 업데이트 완료 후 또는 세션 시작 시 무결성 검증:
 
 ```text
-Phase 2: claude-health --check-only
-  ↓ 문제 발견 시 → claude-health (기본 모드, 자동 수정)
+Phase 2: sax-architecture-checker --check-only
+  ↓ 문제 발견 시 → sax-architecture-checker (기본 모드, 자동 수정)
 
 Phase 3: package-sync --check-only (sax-core 환경만)
   ↓ 문제 발견 시 → package-sync (기본 모드, 동기화 실행)
@@ -213,7 +213,7 @@ Phase 3: package-sync --check-only (sax-core 환경만)
 |------|------|------|
 | agents/ | ⚠️ | 깨진 심링크 2개 |
 
-→ claude-health 자동 수정 실행...
+→ sax-architecture-checker 자동 수정 실행...
 → ✅ 수정 완료
 
 ### Phase 3: 동기화 검증
@@ -240,7 +240,7 @@ Phase 3: package-sync --check-only (sax-core 환경만)
 
 ---
 
-[SAX] version-updater: 업데이트 완료 → claude-health 호출
+[SAX] version-updater: 업데이트 완료 → sax-architecture-checker 호출
 
 ## .claude 디렉토리 검증 결과
 

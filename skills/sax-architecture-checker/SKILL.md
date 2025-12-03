@@ -1,15 +1,15 @@
 ---
-name: claude-health
+name: sax-architecture-checker
 description: |
   .claude 디렉토리 구조 검증 및 자동 수정. Use when:
   (1) SAX 업데이트 후 무결성 체크, (2) 심링크 깨짐 의심 시,
-  (3) version-updater에서 자동 호출.
+  (3) version-updater에서 자동 호출, (4) 새 세션 시작 시.
 tools: [Bash, Read]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: claude-health 호출` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: sax-architecture-checker 호출` 시스템 메시지를 첫 줄에 출력하세요.
 
-# claude-health Skill
+# sax-architecture-checker Skill
 
 > .claude 디렉토리 구조 검증 및 자동 수정
 
@@ -27,7 +27,7 @@ tools: [Bash, Read]
 **출력 포맷** (version-updater 파싱용):
 
 ```markdown
-[SAX] Skill: claude-health --check-only 실행
+[SAX] Skill: sax-architecture-checker --check-only 실행
 
 ## 구조 검증 결과
 

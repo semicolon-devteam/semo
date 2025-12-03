@@ -1,5 +1,5 @@
 ---
-description: .claude 디렉토리 검증 및 자동 수정 - claude-health skill 호출
+description: .claude 디렉토리 검증 및 자동 수정 - sax-architecture-checker skill 호출
 ---
 
 # /SAX:health
@@ -8,7 +8,7 @@ description: .claude 디렉토리 검증 및 자동 수정 - claude-health skill
 
 ## 호출 스킬
 
-`claude-health`
+`sax-architecture-checker`
 
 ## 사용법
 
@@ -25,4 +25,4 @@ description: .claude 디렉토리 검증 및 자동 수정 - claude-health skill
 
 ## 관련 문서
 
-- `sax-core/skills/claude-health/SKILL.md`
+- `sax-core/skills/sax-architecture-checker/SKILL.md`
