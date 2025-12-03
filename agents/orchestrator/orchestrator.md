@@ -49,6 +49,7 @@ QA 테스터 요청을 분석하고 적절한 에이전트/스킬로 위임하�
 | 피드백 | `skill:feedback` | "/SAX:feedback", "버그 신고" |
 | 환경 검증 | `skill:verify-stg-environment` | "환경 확인", "STG 상태" |
 | SAX 업데이트 | `version-updater` | "SAX 업데이트", "최신버전" |
+| 테스트중 변경 | `skill:change-to-testing` | "테스트중으로 변경", "QA에 넘겨", "/SAX:to-testing" |
 | 테스트 대기열 | `skill:test-queue` | "테스트 대기", "테스트할 이슈", "/SAX:test-queue" |
 | 테스트 실행 | `qa-master` Agent | "테스트 해줘", "확인해줘", "/SAX:run-test" |
 | 테스트 통과 | `skill:report-test-result` | "통과", "Pass", "/SAX:test-pass" |

@@ -15,6 +15,7 @@
 
 | Intent | Skill | Trigger |
 |--------|-------|---------|
+| 테스트중 변경 | `change-to-testing` | "테스트중으로 변경", "QA에 넘겨", "테스트 요청" |
 | 테스트 대기열 | `test-queue` | "/SAX:test-queue", "테스트 대기", "뭐 테스트해" |
 | AC 검증 | `validate-test-cases` | "테스트 케이스 확인", "AC 검증" |
 | 환경 확인 | `verify-stg-environment` | "STG 상태", "환경 확인", "접속 확인" |
@@ -42,6 +43,7 @@
 | `/SAX:test-pass` | `skill:report-test-result` | 테스트 통과 처리 |
 | `/SAX:test-fail` | `skill:report-test-result` | 테스트 실패 처리 |
 | `/SAX:feedback` | `skill:feedback` | 피드백/버그 신고 |
+| `/SAX:to-testing` | `skill:change-to-testing` | 테스트중 상태 변경 + QA 할당 |
 
 ## 우선순위 규칙
 
@@ -80,4 +82,24 @@ User: "cm-office#45 실패야. 버튼 클릭이 안돼"
 [SAX] Orchestrator: 의도 분석 완료 → 테스트 결과 보고
 
 [SAX] Skill 호출: report-test-result (cm-office#45, result: fail, reason: 버튼 클릭 불가)
+```
+
+### Example 4: 테스트중 상태 변경 + QA 자동 할당
+
+```
+User: "cm-office#50 테스트중으로 변경해줘"
+
+[SAX] Orchestrator: 의도 분석 완료 → 테스트중 상태 변경
+
+[SAX] Skill 호출: change-to-testing (cm-office#50)
+```
+
+```
+User: "/SAX:to-testing core-backend#22"
+
+[SAX] Orchestrator: 의도 분석 완료 → 테스트중 상태 변경
+
+[SAX] Skill 호출: change-to-testing (core-backend#22)
+→ 상태 변경: 테스트중
+→ QA 할당: @kokkh (자동)
 ```
