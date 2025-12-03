@@ -11,63 +11,46 @@
 
 ---
 
-## 🔴 새 세션 시작 시 버전 체크 (NON-NEGOTIABLE)
+## 🔴 새 세션 시작 시 초기화 (NON-NEGOTIABLE)
 
-> **새 세션에서 첫 작업 전, SAX 패키지 버전을 확인하고 업데이트를 제안합니다.**
+> **⚠️ 새 세션에서 사용자 요청 처리 전, 반드시 아래 2단계를 순서대로 실행합니다.**
 
 ### 트리거 조건
 
 - 새 Claude Code 세션 시작 (대화 기록 없음)
 - SAX가 설치된 프로젝트 (.claude/sax-* 존재)
 
----
-
-## 🔴 세션 시작 시 구조 검증 (NON-NEGOTIABLE)
-
-> **새 세션에서 첫 작업 전, .claude 구조 무결성을 검증합니다.**
-
-### 검증 스킬 호출 (폴백 체인)
-
-1. `.claude/skills/sax-architecture-checker/SKILL.md` 존재 시 → 해당 스킬 실행
-2. 없으면 → `.claude/sax-core/skills/sax-architecture-checker/SKILL.md` 실행
-
-### 검증 실행 조건
-
-- 새 Claude Code 세션 시작 (대화 기록 없음)
-- SAX가 설치된 프로젝트 (.claude/sax-* 존재)
-
-### 검증 대상 항목
-
-- CLAUDE.md 심링크 유효성
-- agents/, skills/, commands/SAX/ 병합 디렉토리 상태
-- 깨진 심링크 탐지 및 자동 복구
-
-### 체크 워크플로우
+### Step 1: 버전 체크
 
 ```bash
-# 1. 로컬 버전 확인
-LOCAL_VERSION=$(cat .claude/sax-qa/VERSION 2>/dev/null)
-
-# 2. 원격 버전 확인
-REMOTE_VERSION=$(gh api repos/semicolon-devteam/sax-qa/contents/VERSION --jq '.content' | base64 -d 2>/dev/null)
-
-# 3. 비교
-if [ "$LOCAL_VERSION" != "$REMOTE_VERSION" ]; then
-  echo "UPDATE_AVAILABLE"
-fi
+# 로컬 vs 원격 버전 비교
+LOCAL=$(cat .claude/sax-qa/VERSION 2>/dev/null)
+REMOTE=$(gh api repos/semicolon-devteam/sax-qa/contents/VERSION --jq '.content' | base64 -d 2>/dev/null)
 ```
 
-### 업데이트 가능 시 출력
+**업데이트 필요 시**: `[SAX] 업데이트 가능: {local} → {remote}. "SAX 업데이트해줘"`
+
+### Step 2: 구조 검증 (필수)
+
+> **⚠️ Step 1 완료 후 반드시 실행**
+
+**스킬 호출** (폴백 체인):
+
+1. `.claude/skills/sax-architecture-checker/SKILL.md` 존재 → 실행
+2. 없으면 → `.claude/sax-core/skills/sax-architecture-checker/SKILL.md` 실행
+
+**검증 항목**:
+
+- CLAUDE.md 심링크 유효성
+- agents/, skills/, commands/SAX/ 병합 상태
+- 깨진 심링크 탐지 및 자동 복구
+
+### 초기화 완료 출력
 
 ```markdown
-[SAX] version-updater: 업데이트 가능
-
-📦 **SAX 업데이트 알림**
-
-현재 버전: {local_version}
-최신 버전: {remote_version}
-
-업데이트하려면: "SAX 업데이트해줘"
+[SAX] 세션 초기화 완료
+- 버전: {version} ✅
+- 구조: 정상 ✅
 ```
 
 ---
