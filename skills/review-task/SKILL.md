@@ -187,6 +187,85 @@ skill: project-board({
 
 > 📖 상세 API: [../project-board/references/api-commands.md](../project-board/references/api-commands.md)
 
+## 🔴 리뷰 승인 시 다음 단계 제안 (NON-NEGOTIABLE)
+
+> **⚠️ 리뷰 결과가 "✅ 승인" 또는 "✅ PR 가능"인 경우 반드시 다음 단계를 제안합니다.**
+
+### 트리거
+
+- 최종 판정: ✅ 승인 (Critical 0건)
+- 최종 판정: ✅ PR 가능 (경고만 존재)
+
+### 승인 시 출력 템플릿
+
+```markdown
+[SAX] Skill: review-task 완료 - {repo}#{issue_number}
+
+## 🎯 최종 판정: ✅ 승인
+
+| 항목 | 결과 |
+|------|------|
+| 요구사항 충족 | {percentage}% |
+| 코드 품질 | {quality} |
+| 부작용 위험 | {risk_level} |
+
+---
+
+## 🔄 다음 단계
+
+{if pr_exists}
+📋 **PR이 존재합니다**: #{pr_number}
+
+| 옵션 | 설명 | 실행 방법 |
+|------|------|----------|
+| **A. PR 머지** (권장) | 리뷰 통과, 머지 가능 | "머지해줘" |
+| **B. 리뷰어 추가** | 추가 리뷰 필요 시 | "리뷰어 추가해줘" |
+| **C. 추가 수정** | 보완 필요 시 | 수정 내용 설명 |
+{else}
+📋 **PR이 없습니다**
+
+| 옵션 | 설명 | 실행 방법 |
+|------|------|----------|
+| **A. PR 생성** (권장) | 리뷰 통과, PR 생성 | "PR 생성해줘" |
+| **B. 추가 수정** | 보완 필요 시 | 수정 내용 설명 |
+{/if}
+
+어떻게 진행할까요?
+```
+
+### PR 존재 여부 확인
+
+```bash
+# 현재 브랜치의 PR 확인
+gh pr list --head $(git branch --show-current) --json number,url,state
+```
+
+### 머지 실행 시 프로세스
+
+사용자가 "머지해줘" 요청 시:
+
+```markdown
+[SAX] Skill: review-task → PR 머지 진행
+
+📋 **이슈**: {repo}#{issue_number}
+🔀 **PR**: #{pr_number}
+
+1. ✅ PR 머지 실행
+2. ✅ 이슈 상태 → "테스트중" 변경
+3. ✅ QA 담당자 알림 (해당 시)
+
+---
+
+✅ **완료**
+
+- PR #{pr_number} 머지됨
+- {repo}#{issue_number} → 테스트중
+
+**다음**: STG 환경에서 QA 테스트 진행
+```
+
+---
+
 ## Related Skills
 
 - `verify-implementation` - 요구사항 구현 확인 (경량)
