@@ -109,7 +109,45 @@ EOF
   --label "bug"
 ```
 
-### Step 3: 완료 메시지
+### Step 3: Projects #1 연동 + 우선순위 설정 (필수)
+
+```bash
+# 1. Issue의 node_id 조회
+ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/{service-repo}/issues/{issue_number} \
+  --jq '.node_id')
+
+# 2. 이슈관리 Projects (#1)에 추가 및 Item ID 획득
+ITEM_ID=$(gh api graphql -f query='
+  mutation($projectId: ID!, $contentId: ID!) {
+    addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+      item { id }
+    }
+  }
+' -f projectId="PVT_kwDOC01-Rc4AtDz2" -f contentId="$ISSUE_NODE_ID" \
+  --jq '.data.addProjectV2ItemById.item.id')
+
+# 3. 심각도 → 우선순위 자동 매핑 후 설정
+# Critical → P0, High → P1, Medium → P2, Low → P3
+gh api graphql -f query='
+  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+    updateProjectV2ItemFieldValue(input: {
+      projectId: $projectId
+      itemId: $itemId
+      fieldId: $fieldId
+      value: { singleSelectOptionId: $optionId }
+    }) {
+      projectV2Item { id }
+    }
+  }
+' -f projectId="PVT_kwDOC01-Rc4AtDz2" \
+  -f itemId="$ITEM_ID" \
+  -f fieldId="PVTSSF_lADOC01-Rc4AtDz2zg0YPyI" \
+  -f optionId="{mapped_priority_option_id}"
+```
+
+> **심각도 → 우선순위 매핑**: [severity-guide.md](references/severity-guide.md) 참조
+
+### Step 4: 완료 메시지
 
 ```markdown
 [SAX] Bug Report: 이슈 생성 완료
@@ -119,6 +157,8 @@ EOF
 **이슈**: semicolon-devteam/{service-repo}#{이슈번호}
 **제목**: [Bug] {버그 제목}
 **심각도**: {severity}
+**우선순위**: {priority} (심각도에서 자동 설정)
+**Projects**: 이슈관리 (#1)에 연동 완료
 
 ## 🌿 작업 브랜치
 

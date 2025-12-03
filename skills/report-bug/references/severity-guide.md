@@ -75,3 +75,29 @@
 # Low
 --label "bug,low"
 ```
+
+## 심각도 → 우선순위 자동 매핑
+
+버그 이슈는 심각도에 따라 Projects #1 (이슈관리)의 우선순위가 자동으로 설정됩니다:
+
+| 심각도 | 우선순위 | Option ID | 설명 |
+|--------|----------|-----------|------|
+| **Critical** | P0(긴급) | `a20917be` | 즉시 처리 |
+| **High** | P1(높음) | `851dbd77` | 24시간 내 |
+| **Medium** | P2(보통) | `e3b68a2a` | 1주일 내 |
+| **Low** | P3(낮음) | `2ba68eff` | 스프린트 내 |
+
+### 우선순위 설정 코드
+
+```bash
+# 심각도별 Option ID 매핑
+case "$SEVERITY" in
+  "critical") PRIORITY_OPTION_ID="a20917be" ;;  # P0(긴급)
+  "high")     PRIORITY_OPTION_ID="851dbd77" ;;  # P1(높음)
+  "medium")   PRIORITY_OPTION_ID="e3b68a2a" ;;  # P2(보통)
+  "low")      PRIORITY_OPTION_ID="2ba68eff" ;;  # P3(낮음)
+  *)          PRIORITY_OPTION_ID="e3b68a2a" ;;  # 기본값: P2(보통)
+esac
+```
+
+> 상세 설정 방법: [priority-config.md](../../common/priority-config.md) 참조

@@ -32,19 +32,50 @@ gh issue create \
   --body "{rendered_template}" \
   --label "epic"
 
-# 3. Projects 연동 (필수)
+# 3. Projects 연동 + 우선순위 설정 (필수)
 ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/docs/issues/{issue_number} --jq '.node_id')
 
-gh api graphql -f query='
+# 3-1. Projects에 Item 추가 및 Item ID 획득
+ITEM_ID=$(gh api graphql -f query='
   mutation($projectId: ID!, $contentId: ID!) {
     addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
       item { id }
     }
   }
-' -f projectId="PVT_kwDOCr2fqM4A0TQd" -f contentId="$ISSUE_NODE_ID"
+' -f projectId="PVT_kwDOC01-Rc4AtDz2" -f contentId="$ISSUE_NODE_ID" \
+  --jq '.data.addProjectV2ItemById.item.id')
+
+# 3-2. 우선순위 필드 설정
+gh api graphql -f query='
+  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+    updateProjectV2ItemFieldValue(input: {
+      projectId: $projectId
+      itemId: $itemId
+      fieldId: $fieldId
+      value: { singleSelectOptionId: $optionId }
+    }) {
+      projectV2Item { id }
+    }
+  }
+' -f projectId="PVT_kwDOC01-Rc4AtDz2" \
+  -f itemId="$ITEM_ID" \
+  -f fieldId="PVTSSF_lADOC01-Rc4AtDz2zg0YPyI" \
+  -f optionId="{priority_option_id}"
 ```
 
-> **Note**: `PVT_kwDOCr2fqM4A0TQd`는 `이슈관리` Projects (#1) ID입니다.
+> **Note**: `PVT_kwDOC01-Rc4AtDz2`는 `이슈관리` Projects (#1) ID입니다.
+
+## 우선순위 옵션
+
+| 우선순위 | Option ID | 설명 |
+|----------|-----------|------|
+| P0(긴급) | `a20917be` | 즉시 처리 필요 |
+| P1(높음) | `851dbd77` | 이번 스프린트 내 |
+| P2(보통) | `e3b68a2a` | 일반 백로그 **(기본값)** |
+| P3(낮음) | `2ba68eff` | 여유 있을 때 |
+| P4(매우 낮음) | `746928cf` | 나중에 |
+
+> 우선순위 미지정 시 **P2(보통)** 을 기본값으로 사용합니다.
 
 ## 제약 사항
 

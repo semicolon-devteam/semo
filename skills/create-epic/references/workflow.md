@@ -15,9 +15,27 @@ user_stories:
 acceptance_criteria: string[]
 target_repos: string[]   # 대상 레포지토리
 dependencies: string[]
-priority: string         # High/Medium/Low
+priority: string         # P0/P1/P2/P3/P4 (기본: P2)
 complexity: string       # High/Medium/Low
 ```
+
+## 우선순위 선택 프롬프트
+
+Epic 생성 시 사용자에게 우선순위를 물어봅니다:
+
+```markdown
+**우선순위를 선택해주세요** (기본: P2 보통)
+
+| 우선순위 | 설명 |
+|----------|------|
+| P0(긴급) | 즉시 처리 필요 |
+| P1(높음) | 이번 스프린트 내 |
+| P2(보통) | 일반 백로그 |
+| P3(낮음) | 여유 있을 때 |
+| P4(매우 낮음) | 나중에 |
+```
+
+> 미지정 시 **P2(보통)** 이 자동 적용됩니다.
 
 ## 동작 상세
 
@@ -42,15 +60,15 @@ gh issue create \
   --label "epic"
 ```
 
-### 4. Projects 연동 (필수)
+### 4. Projects 연동 + 우선순위 설정 (필수)
 
 ```bash
 # 1. Issue의 node_id 조회
 ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/docs/issues/{issue_number} \
   --jq '.node_id')
 
-# 2. 이슈관리 Projects (#1)에 추가
-gh api graphql -f query='
+# 2. 이슈관리 Projects (#1)에 추가 및 Item ID 획득
+ITEM_ID=$(gh api graphql -f query='
   mutation($projectId: ID!, $contentId: ID!) {
     addProjectV2ItemById(input: {
       projectId: $projectId
@@ -61,10 +79,38 @@ gh api graphql -f query='
       }
     }
   }
-' -f projectId="PVT_kwDOCr2fqM4A0TQd" -f contentId="$ISSUE_NODE_ID"
+' -f projectId="PVT_kwDOC01-Rc4AtDz2" -f contentId="$ISSUE_NODE_ID" \
+  --jq '.data.addProjectV2ItemById.item.id')
+
+# 3. 우선순위 필드 설정
+gh api graphql -f query='
+  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+    updateProjectV2ItemFieldValue(input: {
+      projectId: $projectId
+      itemId: $itemId
+      fieldId: $fieldId
+      value: { singleSelectOptionId: $optionId }
+    }) {
+      projectV2Item { id }
+    }
+  }
+' -f projectId="PVT_kwDOC01-Rc4AtDz2" \
+  -f itemId="$ITEM_ID" \
+  -f fieldId="PVTSSF_lADOC01-Rc4AtDz2zg0YPyI" \
+  -f optionId="{priority_option_id}"
 ```
 
-> **Note**: `PVT_kwDOCr2fqM4A0TQd`는 semicolon-devteam의 `이슈관리` Projects (#1) ID입니다.
+> **Note**: `PVT_kwDOC01-Rc4AtDz2`는 semicolon-devteam의 `이슈관리` Projects (#1) ID입니다.
+
+### 우선순위 Option ID 매핑
+
+| 우선순위 | Option ID |
+|----------|-----------|
+| P0(긴급) | `a20917be` |
+| P1(높음) | `851dbd77` |
+| P2(보통) | `e3b68a2a` |
+| P3(낮음) | `2ba68eff` |
+| P4(매우 낮음) | `746928cf` |
 
 ## 제약 사항
 
