@@ -32,7 +32,7 @@ gh issue create \
   --body "{rendered_template}" \
   --label "epic"
 
-# 3. Projects 연동 + 우선순위 설정 (필수)
+# 3. Projects 연동 + 타입/우선순위 설정 (필수)
 ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/docs/issues/{issue_number} --jq '.node_id')
 
 # 3-1. Projects에 Item 추가 및 Item ID 획득
@@ -45,7 +45,30 @@ ITEM_ID=$(gh api graphql -f query='
 ' -f projectId="PVT_kwDOC01-Rc4AtDz2" -f contentId="$ISSUE_NODE_ID" \
   --jq '.data.addProjectV2ItemById.item.id')
 
-# 3-2. 우선순위 필드 설정
+# 🔴 Projects 연동 검증 (필수)
+if [ -z "$ITEM_ID" ]; then
+  echo "❌ Projects 연동 실패. gh auth refresh -s project 실행 후 재시도 필요"
+  exit 1
+fi
+
+# 3-2. 🔴 타입 필드를 "에픽"으로 설정 (필수)
+gh api graphql -f query='
+  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+    updateProjectV2ItemFieldValue(input: {
+      projectId: $projectId
+      itemId: $itemId
+      fieldId: $fieldId
+      value: { singleSelectOptionId: $optionId }
+    }) {
+      projectV2Item { id }
+    }
+  }
+' -f projectId="PVT_kwDOC01-Rc4AtDz2" \
+  -f itemId="$ITEM_ID" \
+  -f fieldId="PVTSSF_lADOC01-Rc4AtDz2zg2XDtA" \
+  -f optionId="389a3389"
+
+# 3-3. 우선순위 필드 설정
 gh api graphql -f query='
   mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
     updateProjectV2ItemFieldValue(input: {
@@ -64,6 +87,8 @@ gh api graphql -f query='
 ```
 
 > **Note**: `PVT_kwDOC01-Rc4AtDz2`는 `이슈관리` Projects (#1) ID입니다.
+>
+> **타입 옵션**: 에픽(`389a3389`), 버그(`acbe6dfc`), 태스크(`851de036`) - [priority-config.md](../common/priority-config.md) 참조
 
 ## 우선순위 옵션
 

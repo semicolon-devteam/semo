@@ -1,13 +1,22 @@
 # Priority Configuration
 
-> GitHub Projects #1 (이슈관리) 우선순위 필드 설정을 위한 공통 설정
+> GitHub Projects #1 (이슈관리) 우선순위/타입 필드 설정을 위한 공통 설정
 
 ## Project & Field IDs
 
 ```yaml
 Project ID: PVT_kwDOC01-Rc4AtDz2
 Field ID (우선순위): PVTSSF_lADOC01-Rc4AtDz2zg0YPyI
+Field ID (타입): PVTSSF_lADOC01-Rc4AtDz2zg2XDtA
 ```
+
+## 타입 옵션
+
+| 타입 | Option ID | 설명 |
+|------|-----------|------|
+| 에픽 | `389a3389` | Epic 이슈 |
+| 버그 | `acbe6dfc` | Bug 이슈 |
+| 태스크 | `851de036` | Task 이슈 |
 
 ## 우선순위 옵션
 
