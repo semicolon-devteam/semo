@@ -18,6 +18,7 @@
 | Draft Task 생성 | `draft-task-creator` | "Draft Task 생성", "Task 카드 만들어", "Epic에서 Task" |
 | Spec 초안 | `spec-writer` | "Spec 초안", "명세 초안", "개발자에게 전달" |
 | 진행도 확인 | `skill:check-progress` | "진행 상황", "얼마나 됐어" |
+| 버그 취합 | `skill:collect-bug-reports` | "버그 취합", "버그 리포트 취합", "버그 현황", "버그 목록" |
 | 학습 요청 | `teacher` | "알려줘", "배우고 싶어", "어떻게 해야", "설명해줘" |
 | 워크플로우 질문 | 직접 응답 | "다음 뭐해", "뭐부터 해" |
 
