@@ -20,7 +20,7 @@ commit_rules:
   - 본문은 72자에서 줄바꿈
   - 이슈 번호 연결 권장
 
-branch_format: "feature/{domain}-{feature}"
+branch_format: "{issue-number}-{title}"
 ```
 
 ## Workflow Phases
@@ -69,8 +69,8 @@ quality_gates:
 
 ### Branch Strategy
 - main/master: protected
-- feature/{domain}-{feature}: feature branches
-- fix/{issue-number}: bug fixes
+- {issue-number}-{title}: feature branches
+- fix/{issue-number}-{title}: bug fixes
 ```
 
 ### Collaboration Process Summary

@@ -137,7 +137,7 @@ gh api repos/semicolon-devteam/sax-core/contents/PRINCIPLES.md --jq '.content' |
 │   └── git push origin dev (원격 공유)                        │
 │                                                              │
 │       └── Feature 브랜치 분기                                │
-│           └── feature/{issue_number}-{title}                 │
+│           └── {issue_number}-{title}                         │
 │               ├── [ADD Phase 4] 코드 구현                    │
 │               └── Draft PR → Ready → Merge                   │
 └─────────────────────────────────────────────────────────────┘

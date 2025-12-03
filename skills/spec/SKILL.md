@@ -62,7 +62,7 @@ Feature 브랜치를 생성하세요.
    git push origin dev
 
 3. Feature 브랜치 생성 (코드 구현용)
-   git checkout -b feature/{issue_number}-{title}
+   git checkout -b {issue_number}-{title}
 ```
 
 > **목적**: 다른 작업자도 특정 도메인의 Spec을 공유받을 수 있도록 함

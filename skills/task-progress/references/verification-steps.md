@@ -72,7 +72,7 @@ check:
   - feature/* 패턴 또는 이슈 번호 포함 확인
 auto_action:
   - 브랜치 없으면 → 생성 제안 및 자동 생성
-  - "feature/{issue_number}-{title}" 형식
+  - "{issue_number}-{title}" 형식
   - dev 브랜치에서 분기 (Spec이 포함된 상태)
 ```
 
