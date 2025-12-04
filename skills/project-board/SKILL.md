@@ -31,6 +31,7 @@ triggers:
 |----------|----------|-----|
 | → **작업중** | `시작일` | 오늘 날짜 |
 | → **리뷰요청** | `종료일` | 오늘 날짜 |
+| → **테스트중** | `Assignee 추가` | @kokkh (QA 담당자) |
 
 > **🔴 CRITICAL**: 상태 변경 시 해당 날짜 속성도 반드시 함께 설정해야 합니다.
 >
@@ -127,6 +128,15 @@ mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
 }' -f projectId="${PROJECT_ID}" -f itemId="${ITEM_ID}" -f fieldId="${FIELD_ID}" -f optionId="${OPTION_ID}"
 ```
 
+### 5. 테스터 Assignee 추가 (테스트중 상태 시)
+
+> **🔴 CRITICAL**: 테스트중 상태로 변경 시 반드시 QA 담당자(@kokkh)를 Assignee로 추가합니다.
+
+```bash
+# 이슈에 QA 담당자 할당
+gh issue edit ${ISSUE_NUM} --repo semicolon-devteam/${REPO} --add-assignee kokkh
+```
+
 ## 핵심 워크플로우: 상태 변경 요청 처리
 
 > **🔴 중요**: 사용자가 "리뷰요청 상태로 만들어줘" 등 요청 시 이 워크플로우를 따릅니다.
@@ -189,12 +199,12 @@ gh project item-add 1 --owner semicolon-devteam --url "https://github.com/semico
 
 ## 상태 전환 규칙
 
-| 시나리오 | 변경 후 상태 | 설명 |
-|----------|-------------|------|
-| Fast-track 완료 | **리뷰요청** | 사후 이슈 생성 후 바로 리뷰요청 |
-| Speckit 구현 완료 | **리뷰요청** | PR 준비 완료 상태 |
-| PR 머지 완료 | **테스트중** | QA 테스트 대기 |
-| QA 테스트 통과 | **병합됨** | 최종 완료 |
+| 시나리오 | 변경 후 상태 | 추가 동작 |
+|----------|-------------|----------|
+| Fast-track 완료 | **리뷰요청** | 종료일 설정 |
+| Speckit 구현 완료 | **리뷰요청** | 종료일 설정 |
+| PR 머지 완료 | **테스트중** | **@kokkh Assignee 추가** |
+| QA 테스트 통과 | **병합됨** | - |
 
 ## 호출 패턴
 
@@ -218,6 +228,7 @@ skill: project-board({
   issue_number: 456,
   target_status: "테스트중"
 })
+# → 자동으로 @kokkh Assignee 추가
 ```
 
 ### Task-progress에서 호출
@@ -241,6 +252,7 @@ skill: project-board({
 📋 **이슈**: {repo}#{issue_number}
 📊 **프로젝트**: 이슈관리 (#1)
 🔄 **상태 변경**: {이전 상태} → **{새 상태}**
+👤 **Assignee**: @kokkh 추가 (테스트중 상태인 경우)
 
 ✅ 프로젝트 보드 연동 완료
 ```

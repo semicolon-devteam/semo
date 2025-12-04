@@ -158,12 +158,21 @@ Project: 이슈카드
 - PR 본문에 `Related #{number}` 형식으로 이슈 연결
 - 이슈가 Project에 연결되어 있음
 
+**추가 동작**:
+- **QA 담당자(@kokkh) Assignee 자동 추가**
+
+```bash
+# 테스터 할당
+gh issue edit ${ISSUE_NUM} --repo semicolon-devteam/${REPO} --add-assignee kokkh
+```
+
 **출력**:
 ```markdown
 [SAX] skill:git-workflow: 이슈 상태 변경
 
 📋 **이슈**: {repo}#{number}
 🔄 **상태 변경**: 작업중 → **테스트중**
+👤 **Assignee 추가**: @kokkh (QA 담당자)
 
 다음 단계: STG 환경에서 QA 테스트 진행
 ```
