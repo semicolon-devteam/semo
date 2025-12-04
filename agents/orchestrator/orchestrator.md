@@ -93,6 +93,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 | 기능 명세           | `spec-master`           | `기능 추가해줘`, 새 기능 요청 (명세 없음)      |
 | 코드 구현           | `implementation-master` | `구현해줘`, `코드 작성해줘` (명세 있음)        |
 | UI/프론트엔드 디자인 | `skill:frontend-design` | "UI 디자인", "화면 설계", "컴포넌트 디자인"   |
+| **Spring API 연동** | `skill:spring-integration` | "Spring 연동", "API Client", "백엔드 연동", "ApiResponse", "DTO 생성" |
 | 빠른 수정           | `skill:fast-track`      | "패스트트랙", "핫픽스", "오타수정", "빠른수정" |
 | 품질 검증           | `quality-master`        | `검증해줘`, `PR 전에 확인해줘`                 |
 | **태스크 리뷰**     | `skill:review-task`     | `리뷰해줘`, `태스크 리뷰`, `PR 전 검토`, `이슈카드 리뷰` |
@@ -394,6 +395,7 @@ ls specs/{domain}/tasks.md 2>/dev/null
 - `skill:spec` - SDD 명세 (Phase 0 Brainstorming 포함)
 - `skill:complete-draft-task` - Draft Task → 완성된 Task 변환
 - `skill:review-task` - 태스크 이슈카드 기반 구현 리뷰
+- `skill:spring-integration` - Spring Backend API 연동 가이드
 
 ## References
 
