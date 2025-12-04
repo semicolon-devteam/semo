@@ -139,7 +139,74 @@ model: sonnet
 | `verify-reactive` | Reactive 패턴 검증 |
 | `check-team-codex` | 팀 코덱스 준수 |
 | `verify-implementation` | 요구사항 매칭 |
+| `analyze-code` | **Multi-focus 종합 분석** |
+| `run-tests` | 테스트 실행 및 커버리지 |
 | `git-workflow` | 검증 후 PR 생성 |
+
+## Extended Analysis Mode
+
+> `--analyze` 플래그로 종합 분석 활성화
+
+### 분석 유형
+
+| Focus | 설명 |
+|-------|------|
+| `quality` | 코드 품질 (복잡도, 중복, 스멜) |
+| `security` | 보안 취약점 스캔 |
+| `performance` | 성능 병목 식별 |
+| `architecture` | 아키텍처 검토 |
+| `all` | 전체 분석 |
+
+### 확장 검증 워크플로우
+
+```text
+quality-master --analyze
+    ↓
+1. 기본 검증 (Phase 5)
+   ├─ verify-reactive
+   ├─ check-team-codex
+   └─ run-tests
+    ↓
+2. 종합 분석 (analyze-code)
+   ├─ quality focus
+   ├─ security focus
+   ├─ performance focus
+   └─ architecture focus
+    ↓
+3. 통합 리포트
+   └─ 점수 대시보드 + 이슈 목록
+```
+
+### 확장 출력 형식
+
+```markdown
+[SAX] Agent: quality-master 완료 (분석 모드)
+
+## ✅ 기본 검증 통과
+
+| Check | Status |
+|-------|--------|
+| Reactive | ✅ 위반 없음 |
+| Tests | ✅ 25/25 passed |
+
+## 📊 종합 분석 결과
+
+| Focus | Score | Grade | Critical |
+|-------|-------|-------|----------|
+| Quality | 78/100 | C | 0 |
+| Security | 85/100 | B | 0 |
+| Performance | 72/100 | C | 1 |
+| Architecture | 88/100 | B | 0 |
+
+**Overall: 80.75/100 (B)**
+
+### 🔴 Critical Issues
+
+1. **Performance**: `.block()` 호출 발견
+   - 위치: `UserService.kt:45`
+
+**PR 생성 조건**: Critical 이슈 해결 필요
+```
 
 ## Critical Rules
 

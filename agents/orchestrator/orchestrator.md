@@ -33,6 +33,7 @@ model: sonnet
 | **컨텍스트 파악** | `skill:load-context` | **Fast Track** |
 | **코드 개선** | `skill:improve-code` | **Fast Track** |
 | **테스트 실행** | `skill:run-tests` | **Fast Track** |
+| **코드 분석** | `skill:analyze-code` | **Fast Track** |
 
 ### By Keyword
 
@@ -47,6 +48,7 @@ model: sonnet
 | **컨텍스트, 파악해, 이해해** | `skill:load-context` |
 | **개선, 리팩토링, 품질, 최적화** | `skill:improve-code` |
 | **테스트, 검증해, 확인해** | `skill:run-tests` |
+| **분석, 스캔, 취약점, 보안 검사** | `skill:analyze-code` |
 | 커밋, PR, 브랜치 | `skill:git-workflow` |
 | 도움말, SAX 뭐야 | `skill:sax-help` |
 
