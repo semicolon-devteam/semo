@@ -6,13 +6,14 @@
 
 | 이름 | GitHub ID | Slack Display Name | Slack ID | 역할 |
 |------|-----------|-------------------|----------|------|
-| 전준영 | reus-jeon | Reus | URSQYUNQJ | PO/개발 |
-| 서정원 | Garden0312 | Garden | URU4UBX9R | 개발 |
-| 강용준 | kokkh | kyago | U02G8542V9U | QA |
-| 노영록 | swon3210 | Roki | U08P11ZQY04 | 개발 |
-| 장현봉 | bon-jang | bon | U02V56WM3KD | 개발 |
-| 강동현 | DwightKSchrute | dwight.k | U06Q5KECB5J | 개발 |
-| 염현준 | yeomso | Yeomso | U080YLC0MFZ | 개발 |
+| 전준영 | reus-jeon | Reus | URSQYUNQJ | 프론트/리더 |
+| 서정원 | garden92 | Garden | URU4UBX9R | 인프라/리더 |
+| 고권희 | kokkh | Goni | U02G8542V9U | QA |
+| 강용준 | kyago | kyago | ? | 백엔드/리더 |
+| 노영록 | Roki-Noh | Roki | U08P11ZQY04 | PO/리더 |
+| 장현봉 | Brightbong92 | bon | U02V56WM3KD | 프론트 |
+| 강동현 | gtod8010 | dwight.k | U06Q5KECB5J | 프론트 |
+| 염현준 | Yeomsoyam | Yeomso | U080YLC0MFZ | 디자인/리더 |
 
 ## 사용 방법
 

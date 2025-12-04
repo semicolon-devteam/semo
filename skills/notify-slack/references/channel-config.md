@@ -80,16 +80,19 @@ curl -X GET "https://slack.com/api/conversations.list" \
 
 ## 테스트 명령
 
-```bash
-SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7"
+> **⚠️ 중요**: 쉘 이스케이프 문제를 방지하기 위해 **heredoc 방식**을 사용하세요.
 
-curl -X POST https://slack.com/api/chat.postMessage \
-  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "channel": "#_협업",
-    "text": "🧪 SAX notify-slack 테스트 메시지"
-  }'
+```bash
+# ✅ 권장: heredoc 방식
+curl -s -X POST 'https://slack.com/api/chat.postMessage' \
+  -H 'Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7' \
+  -H 'Content-Type: application/json; charset=utf-8' \
+  -d @- << 'EOF'
+{
+  "channel": "C09KNL91QBZ",
+  "text": "SAX notify-slack 테스트 메시지"
+}
+EOF
 ```
 
 ## 참고

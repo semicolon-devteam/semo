@@ -48,18 +48,23 @@ SLACK_BOT_TOKEN=xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7
 
 ## Quick Start
 
-> **⚠️ 중요**: 토큰을 환경변수로 설정하지 말고 직접 헤더에 넣으세요. 환경변수 확장 문제로 인증 오류가 발생할 수 있습니다.
+> **⚠️ 중요**: 쉘 이스케이프 문제를 방지하기 위해 **heredoc 방식**을 사용하세요.
 
 ```bash
-curl -s -X POST https://slack.com/api/chat.postMessage \
-  -H "Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7" \
-  -H "Content-Type: application/json; charset=utf-8" \
-  -d '{
-    "channel": "#_협업",
-    "text": "메시지 내용",
-    "blocks": [...]
-  }'
+# ✅ 권장: heredoc 방식 (쉘 이스케이프 문제 방지)
+curl -s -X POST 'https://slack.com/api/chat.postMessage' \
+  -H 'Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7' \
+  -H 'Content-Type: application/json; charset=utf-8' \
+  -d @- << 'EOF'
+{
+  "channel": "C09KNL91QBZ",
+  "text": "메시지 내용",
+  "blocks": [...]
+}
+EOF
 ```
+
+> **🔴 주의**: `-d '{...}'` 형식은 한글, 특수문자, 줄바꿈 등에서 쉘 이스케이프 오류가 발생할 수 있습니다.
 
 ## Workflow
 

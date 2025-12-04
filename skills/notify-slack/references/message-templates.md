@@ -80,64 +80,51 @@ sax-meta          v0.30.0
 | `{version}` | 새 버전 (v 접두사 없이) | `0.30.0` |
 | `{changelog_bullets}` | 변경 내역 (• bullet 형식) | `• feature A 추가\n• bug B 수정` |
 
-### curl 명령어 예시
+### curl 명령어 예시 (heredoc 방식 권장)
+
+> **⚠️ 중요**: 쉘 이스케이프 문제를 방지하기 위해 **heredoc 방식**을 사용하세요.
 
 ```bash
-SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7"
-CHANNEL_ID="C09KNL91QBZ"  # #_협업
-
-# 변수 설정
-PACKAGE="sax-meta"
-VERSION="0.30.0"
-CHANGES="• version-manager SKILL.md에 Slack 알림 필수화 명시\n• Quick Start 간소화 (9단계 → 6단계)\n• 누락 시 미완료 상태 경고 추가"
-
-curl -X POST https://slack.com/api/chat.postMessage \
-  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-  -H "Content-Type: application/json; charset=utf-8" \
-  -d "{
-    \"channel\": \"$CHANNEL_ID\",
-    \"text\": \"🚀 SAX 패키지 업데이트 - $PACKAGE v$VERSION\",
-    \"blocks\": [
-      {
-        \"type\": \"header\",
-        \"text\": {
-          \"type\": \"plain_text\",
-          \"text\": \"🚀 SAX 패키지 업데이트\",
-          \"emoji\": true
-        }
-      },
-      {
-        \"type\": \"section\",
-        \"fields\": [
-          {
-            \"type\": \"mrkdwn\",
-            \"text\": \"*패키지*\\n$PACKAGE\"
-          },
-          {
-            \"type\": \"mrkdwn\",
-            \"text\": \"*버전*\\n\`v$VERSION\`\"
-          }
-        ]
-      },
-      {
-        \"type\": \"section\",
-        \"text\": {
-          \"type\": \"mrkdwn\",
-          \"text\": \"*변경 내역*\\n$CHANGES\"
-        }
-      },
-      {
-        \"type\": \"context\",
-        \"elements\": [
-          {
-            \"type\": \"mrkdwn\",
-            \"text\": \"🔗 <https://github.com/semicolon-devteam/$PACKAGE|GitHub>\"
-          }
-        ]
+# ✅ 권장: heredoc 방식 (쉘 이스케이프 문제 방지)
+curl -s -X POST 'https://slack.com/api/chat.postMessage' \
+  -H 'Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7' \
+  -H 'Content-Type: application/json; charset=utf-8' \
+  -d @- << 'EOF'
+{
+  "channel": "C09KNL91QBZ",
+  "text": "SAX 패키지 업데이트: sax-meta v0.30.0",
+  "blocks": [
+    {
+      "type": "header",
+      "text": {
+        "type": "plain_text",
+        "text": "SAX 패키지 업데이트"
       }
-    ]
-  }"
+    },
+    {
+      "type": "section",
+      "fields": [
+        {"type": "mrkdwn", "text": "*패키지*\nsax-meta"},
+        {"type": "mrkdwn", "text": "*버전*\nv0.30.0"}
+      ]
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*변경 내역*\n• version-manager SKILL.md에 Slack 알림 필수화 명시\n• Quick Start 간소화 (9단계 → 6단계)\n• 누락 시 미완료 상태 경고 추가"
+      }
+    },
+    {
+      "type": "context",
+      "elements": [{"type": "mrkdwn", "text": "<https://github.com/semicolon-devteam/sax-meta|GitHub>"}]
+    }
+  ]
+}
+EOF
 ```
+
+> **🔴 주의**: `-d "{...}"` 형식 (쌍따옴표 + 이스케이프)은 한글, 특수문자에서 오류가 발생할 수 있습니다.
 
 ### 변경 내역 작성 규칙
 
@@ -284,13 +271,29 @@ curl -X POST https://slack.com/api/chat.postMessage \
 
 ## curl 명령어 템플릿
 
-```bash
-SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7"
+### 파일 기반 방식
 
-curl -X POST https://slack.com/api/chat.postMessage \
-  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-  -H "Content-Type: application/json" \
+```bash
+# message.json 파일에 메시지 저장 후 전송
+curl -s -X POST 'https://slack.com/api/chat.postMessage' \
+  -H 'Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7' \
+  -H 'Content-Type: application/json; charset=utf-8' \
   -d '@message.json'
+```
+
+### heredoc 방식 (권장)
+
+```bash
+# 쉘 이스케이프 문제 없이 직접 전송
+curl -s -X POST 'https://slack.com/api/chat.postMessage' \
+  -H 'Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7' \
+  -H 'Content-Type: application/json; charset=utf-8' \
+  -d @- << 'EOF'
+{
+  "channel": "C09KNL91QBZ",
+  "text": "메시지 내용"
+}
+EOF
 ```
 
 ## Block Kit Builder
