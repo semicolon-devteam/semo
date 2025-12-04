@@ -81,43 +81,53 @@ PO/기획자를 위한 **Epic 생성 전문 에이전트**입니다.
 
 #### Phase 3: 프로젝트 라벨 및 Projects 연결 (필수)
 
-> **🔴 필수**: Epic 생성 후 반드시 GitHub Projects #1 ('이슈관리')에 연결해야 합니다.
+> **🔴 필수**: Epic 생성 후 반드시 GitHub Projects #1 ('이슈관리')에 연결하고, 타입 필드를 "에픽"으로 설정해야 합니다.
 
 ```markdown
 [SAX] Skill: assign-project-label 사용
 ```
 
-**Projects 연결 명령어**:
+**Projects 연결 + 타입 설정 명령어**:
 
 ```bash
-# Step 1: Project ID 조회 (이슈관리 보드 = #1)
-PROJECT_ID=$(gh api graphql -f query='
-  query {
-    organization(login: "semicolon-devteam") {
-      projectV2(number: 1) {
-        id
-      }
-    }
-  }
-' --jq '.data.organization.projectV2.id')
+# Step 1: Project ID (이슈관리 보드 = #1)
+PROJECT_ID="PVT_kwDOC01-Rc4AtDz2"
 
 # Step 2: Epic Issue의 Node ID 조회
 ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/docs/issues/{epic_number} --jq '.node_id')
 
-# Step 3: Project에 Epic 추가
-gh api graphql -f query='
-  mutation {
+# Step 3: Project에 Epic 추가 및 Item ID 획득
+ITEM_ID=$(gh api graphql -f query='
+  mutation($projectId: ID!, $contentId: ID!) {
     addProjectV2ItemById(input: {
-      projectId: "'$PROJECT_ID'"
-      contentId: "'$ISSUE_NODE_ID'"
+      projectId: $projectId
+      contentId: $contentId
     }) {
-      item {
-        id
-      }
+      item { id }
     }
   }
-'
+' -f projectId="$PROJECT_ID" -f contentId="$ISSUE_NODE_ID" \
+  --jq '.data.addProjectV2ItemById.item.id')
+
+# Step 4: 🔴 타입 필드를 "에픽"으로 설정 (필수)
+gh api graphql -f query='
+  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+    updateProjectV2ItemFieldValue(input: {
+      projectId: $projectId
+      itemId: $itemId
+      fieldId: $fieldId
+      value: { singleSelectOptionId: $optionId }
+    }) {
+      projectV2Item { id }
+    }
+  }
+' -f projectId="$PROJECT_ID" \
+  -f itemId="$ITEM_ID" \
+  -f fieldId="PVTSSF_lADOC01-Rc4AtDz2zg2XDtA" \
+  -f optionId="389a3389"
 ```
+
+> **타입 Option ID**: 에픽=`389a3389`, 버그=`acbe6dfc`, 태스크=`851de036`
 
 #### Phase 4: Spec 초안 생성 (선택)
 

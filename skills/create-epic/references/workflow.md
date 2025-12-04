@@ -60,7 +60,7 @@ gh issue create \
   --label "epic"
 ```
 
-### 4. Projects 연동 + 우선순위 설정 (필수)
+### 4. Projects 연동 + 타입/우선순위 설정 (필수)
 
 ```bash
 # 1. Issue의 node_id 조회
@@ -82,7 +82,24 @@ ITEM_ID=$(gh api graphql -f query='
 ' -f projectId="PVT_kwDOC01-Rc4AtDz2" -f contentId="$ISSUE_NODE_ID" \
   --jq '.data.addProjectV2ItemById.item.id')
 
-# 3. 우선순위 필드 설정
+# 3. 🔴 타입 필드를 "에픽"으로 설정 (필수)
+gh api graphql -f query='
+  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+    updateProjectV2ItemFieldValue(input: {
+      projectId: $projectId
+      itemId: $itemId
+      fieldId: $fieldId
+      value: { singleSelectOptionId: $optionId }
+    }) {
+      projectV2Item { id }
+    }
+  }
+' -f projectId="PVT_kwDOC01-Rc4AtDz2" \
+  -f itemId="$ITEM_ID" \
+  -f fieldId="PVTSSF_lADOC01-Rc4AtDz2zg2XDtA" \
+  -f optionId="389a3389"
+
+# 4. 우선순위 필드 설정
 gh api graphql -f query='
   mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
     updateProjectV2ItemFieldValue(input: {
@@ -101,6 +118,14 @@ gh api graphql -f query='
 ```
 
 > **Note**: `PVT_kwDOC01-Rc4AtDz2`는 semicolon-devteam의 `이슈관리` Projects (#1) ID입니다.
+
+### 타입 Option ID
+
+| 타입 | Option ID |
+|------|-----------|
+| 에픽 | `389a3389` |
+| 버그 | `acbe6dfc` |
+| 태스크 | `851de036` |
 
 ### 우선순위 Option ID 매핑
 
