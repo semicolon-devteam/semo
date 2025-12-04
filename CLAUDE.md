@@ -11,14 +11,19 @@
 
 ---
 
-## 🔴 새 세션 시작 시 초기화 (NON-NEGOTIABLE)
+## 🔴 업데이트 체크 규칙 (NON-NEGOTIABLE)
 
-> **⚠️ 새 세션에서 사용자 요청 처리 전, 반드시 아래 2단계를 순서대로 실행합니다.**
+> **⚠️ 사용자의 첫 번째 메시지 처리 전에 버전 체크를 수행합니다.**
 
-### 트리거 조건
+### 자동 트리거 조건
 
-- 새 Claude Code 세션 시작 (대화 기록 없음)
-- SAX가 설치된 프로젝트 (.claude/sax-* 존재)
+다음 조건 중 **하나라도 충족** 시 버전 체크 실행:
+
+| 조건 | 설명 |
+|------|------|
+| **첫 번째 응답 전** | 대화에서 `[SAX_INITIALIZED]` 마커가 없으면 체크 |
+| **명시적 요청** | 사용자가 `/SAX:update` 또는 "업데이트 체크해줘" 요청 |
+| **컨텍스트 복원 후** | 이전 세션 요약에 `[SAX_INITIALIZED]` 없으면 체크 |
 
 ### Step 1: 버전 체크
 
@@ -28,11 +33,14 @@ LOCAL=$(cat .claude/sax-next/VERSION 2>/dev/null)
 REMOTE=$(gh api repos/semicolon-devteam/sax-next/contents/VERSION --jq '.content' | base64 -d 2>/dev/null)
 ```
 
-**업데이트 필요 시**: `[SAX] 업데이트 가능: {local} → {remote}. "SAX 업데이트해줘"`
+**결과 처리**:
 
-### Step 2: 구조 검증 (필수)
+- `LOCAL == REMOTE`: 최신 버전
+- `LOCAL < REMOTE`: `[SAX] 업데이트 가능: {local} → {remote}. "/SAX:update"로 업데이트`
 
-> **⚠️ Step 1 완료 후 반드시 실행**
+### Step 2: 구조 검증
+
+> **Step 1 완료 후 실행**
 
 **스킬 호출** (폴백 체인):
 
@@ -48,10 +56,16 @@ REMOTE=$(gh api repos/semicolon-devteam/sax-next/contents/VERSION --jq '.content
 ### 초기화 완료 출력
 
 ```markdown
+[SAX_INITIALIZED]
 [SAX] 세션 초기화 완료
 - 버전: {version} ✅
 - 구조: 정상 ✅
 ```
+
+### 체크 결과 캐싱
+
+- **동일 대화 내 재체크 불필요**: 컨텍스트에 `[SAX_INITIALIZED]` 마커 존재 시 스킵
+- **마커 형식**: `[SAX_INITIALIZED]` (초기화 완료 출력 첫 줄에 포함)
 
 ---
 
