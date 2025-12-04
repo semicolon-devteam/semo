@@ -2,6 +2,8 @@
 
 > Slack API를 통한 실시간 사용자 ID 조회 방법
 
+> 📖 **Slack 설정**: [sax-core/_shared/slack-config.md](../../../_shared/slack-config.md) 참조
+
 ## 개요
 
 notify-slack Skill은 **하드코딩된 매핑 테이블 대신 Slack API를 통해 동적으로 사용자를 조회**합니다.
@@ -19,7 +21,7 @@ notify-slack Skill은 **하드코딩된 매핑 테이블 대신 Slack API를 통
 전체 워크스페이스 사용자 목록 조회:
 
 ```bash
-SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb"
+SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7"
 
 curl -s "https://slack.com/api/users.list" \
   -H "Authorization: Bearer $SLACK_BOT_TOKEN"

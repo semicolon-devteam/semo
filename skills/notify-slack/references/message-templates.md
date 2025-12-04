@@ -2,6 +2,8 @@
 
 > notify-slack Skill에서 사용하는 Slack Block Kit 메시지 템플릿
 
+> 📖 **Slack 설정**: [sax-core/_shared/slack-config.md](../../../_shared/slack-config.md) 참조
+
 ## 릴리스 알림 템플릿 (표준)
 
 > **🔴 필수**: version-manager 완료 후 반드시 이 템플릿으로 알림을 전송해야 합니다.
@@ -81,7 +83,7 @@ sax-meta          v0.30.0
 ### curl 명령어 예시
 
 ```bash
-SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb"
+SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7"
 CHANNEL_ID="C09KNL91QBZ"  # #_협업
 
 # 변수 설정
@@ -283,7 +285,7 @@ curl -X POST https://slack.com/api/chat.postMessage \
 ## curl 명령어 템플릿
 
 ```bash
-SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb"
+SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7"
 
 curl -X POST https://slack.com/api/chat.postMessage \
   -H "Authorization: Bearer $SLACK_BOT_TOKEN" \

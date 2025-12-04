@@ -100,7 +100,7 @@ gh api repos/semicolon-devteam/docs/contents/sax/core/TEAM_RULES.md \
 
 ```bash
 curl -s "https://slack.com/api/users.list" \
-  -H "Authorization: Bearer xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb" \
+  -H "Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7" \
   | jq '.members[] | select(.deleted == false and .is_bot == false) | {name, real_name}'
 ```
 

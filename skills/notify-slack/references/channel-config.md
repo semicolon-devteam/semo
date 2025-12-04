@@ -2,6 +2,8 @@
 
 > Slack 알림 대상 채널 설정 및 권한 관리
 
+> 📖 **중앙 설정**: [sax-core/_shared/slack-config.md](../../../_shared/slack-config.md) 참조
+
 ## 대상 채널
 
 | 채널 | 용도 | 우선순위 |
@@ -20,7 +22,7 @@
 ### 방법 2: API로 조회
 
 ```bash
-SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb"
+SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7"
 
 curl -X GET "https://slack.com/api/conversations.list" \
   -H "Authorization: Bearer $SLACK_BOT_TOKEN" | jq '.channels[] | {id, name}'
@@ -79,7 +81,7 @@ curl -X GET "https://slack.com/api/conversations.list" \
 ## 테스트 명령
 
 ```bash
-SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb"
+SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7"
 
 curl -X POST https://slack.com/api/chat.postMessage \
   -H "Authorization: Bearer $SLACK_BOT_TOKEN" \

@@ -30,10 +30,14 @@ model: inherit
 
 ### Slack Bot Token
 
+> 📖 **중앙 설정**: [sax-core/_shared/slack-config.md](../../_shared/slack-config.md) 참조
+>
+> 🔴 토큰 갱신 시 `slack-config.md` 파일만 수정하세요.
+
 **Semicolon Notifier** 앱 사용:
 
 ```
-SLACK_BOT_TOKEN=xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb
+SLACK_BOT_TOKEN=xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7
 ```
 
 ### 기본 채널
@@ -48,7 +52,7 @@ SLACK_BOT_TOKEN=xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb
 
 ```bash
 curl -s -X POST https://slack.com/api/chat.postMessage \
-  -H "Authorization: Bearer xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb" \
+  -H "Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7" \
   -H "Content-Type: application/json; charset=utf-8" \
   -d '{
     "channel": "#_협업",
@@ -76,7 +80,7 @@ curl -s -X POST https://slack.com/api/chat.postMessage \
 ```bash
 # 전체 사용자 목록 조회
 curl -s "https://slack.com/api/users.list" \
-  -H "Authorization: Bearer xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb" \
+  -H "Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7" \
   | jq '.members[] | select(.deleted == false and .is_bot == false) | {id, name, real_name, display_name: .profile.display_name}'
 ```
 
@@ -97,7 +101,7 @@ curl -s "https://slack.com/api/users.list" \
 SEARCH_NAME="Reus"
 
 SLACK_ID=$(curl -s "https://slack.com/api/users.list" \
-  -H "Authorization: Bearer xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb" \
+  -H "Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7" \
   | jq -r --arg name "$SEARCH_NAME" '
     .members[]
     | select(.deleted == false and .is_bot == false)

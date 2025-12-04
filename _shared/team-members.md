@@ -26,7 +26,7 @@ GITHUB_ID="reus-jeon"
 # 2. Slack API로 사용자 ID 조회
 SLACK_NAME="Reus"
 SLACK_ID=$(curl -s "https://slack.com/api/users.list" \
-  -H "Authorization: Bearer xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb" \
+  -H "Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7" \
   | jq -r --arg name "$SLACK_NAME" '
     .members[]
     | select(.deleted == false and .is_bot == false)
