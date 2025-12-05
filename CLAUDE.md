@@ -25,6 +25,7 @@
 | `[next]` | sax-next 패키지 작업 |
 | `[qa]` | sax-qa 패키지 작업 |
 | `[core]` | sax-core 패키지 작업 |
+| `[ms]` | sax-ms 패키지 작업 |
 | `[all]` | 모든 패키지 작업 |
 
 **접두사 감지 시 첫 출력**:
@@ -54,6 +55,7 @@
 | sax-next | `sax-next/VERSION` | `sax-next/CHANGELOG/` |
 | sax-qa | `sax-qa/VERSION` | `sax-qa/CHANGELOG/` |
 | sax-core | `sax-core/VERSION` | `sax-core/CHANGELOG/` |
+| sax-ms | `sax-ms/VERSION` | `sax-ms/CHANGELOG/` |
 
 ### 버전 타입
 
@@ -181,7 +183,9 @@ Agent/Skill → references/ → sax-core/ → docs 레포 문서
 | `[qa]` | sax-qa만 |
 | `[core]` | sax-core만 |
 | `[meta]` | sax-meta만 |
+| `[ms]` | sax-ms만 |
 | `[po \| next]` | 복수 패키지 |
+| `[ms \| next]` | 복수 패키지 |
 | `[all]` / (없음) | 모든 패키지 |
 
 > **접두사는 "작업 대상"을 지정할 뿐, 라우팅은 항상 로컬 `.claude/` 매니저를 통합니다.**
