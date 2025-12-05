@@ -33,7 +33,7 @@ model: sonnet
 | 목업 생성 | 목업, mockup, UI 만들어, 화면 만들어 | design-master → generate-mockup | Agent → Skill |
 | 핸드오프 | 핸드오프, handoff, 개발 전달, 스펙 문서 | design-master → design-handoff | Agent → Skill |
 | Figma 작업 | Figma, 피그마, 디자인 가져와, 디자인 불러와 | design-master | Agent |
-| 환경 검증 | 환경 확인, 설정 확인, 도구 확인, health | health-check | Skill |
+| 환경 검증 | 환경 확인, 설정 확인, 도구 확인, health | `/SAX:health` | Command (sax-core) |
 | 온보딩 | 처음이에요, 신규, 온보딩, 시작 | onboarding-master | Agent |
 | 도움말 | 도움, help, 뭐 할 수 있어 | sax-help | Skill (sax-core) |
 | 피드백 | 피드백, 건의, 오류 신고 | feedback | Skill (sax-core) |
@@ -118,7 +118,7 @@ model: sonnet
 
 | Skill | 역할 | 파일 |
 |-------|------|------|
-| health-check | 환경 검증 | [health-check/SKILL.md](../../skills/health-check/SKILL.md) |
+| health-check | 환경 검증 (패키지별) | [health-check/SKILL.md](../../skills/health-check/SKILL.md) |
 | generate-mockup | 목업 생성 | [generate-mockup/SKILL.md](../../skills/generate-mockup/SKILL.md) |
 | design-handoff | 핸드오프 문서 | [design-handoff/SKILL.md](../../skills/design-handoff/SKILL.md) |
 
@@ -129,7 +129,7 @@ model: sonnet
 | Command | 호출 대상 | 파일 |
 |---------|----------|------|
 | `/SAX:onboarding` | onboarding-master Agent | [onboarding.md](../../commands/SAX/onboarding.md) |
-| `/SAX:health-check` | health-check Skill | [health-check.md](../../commands/SAX/health-check.md) |
+| `/SAX:health` | 환경 + 구조 통합 검증 | sax-core (commands/SAX/health.md) |
 | `/SAX:mockup` | generate-mockup Skill | [mockup.md](../../commands/SAX/mockup.md) |
 | `/SAX:handoff` | design-handoff Skill | [handoff.md](../../commands/SAX/handoff.md) |
 
