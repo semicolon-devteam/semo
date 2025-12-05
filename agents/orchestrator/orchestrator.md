@@ -50,7 +50,7 @@ PO/기획자 요청을 분석하고 적절한 에이전트로 위임하는 **Pri
 | SAX init 커밋 | `sax-init` 프로세스 | "SAX init 커밋해줘" |
 | 피드백 | `skill:feedback` | "/SAX:feedback", "버그 신고" |
 | 온보딩 | `onboarding-master` | "처음", "신규", "온보딩" |
-| 환경 검증 | `skill:health-check` | "환경 확인", "도구 확인" |
+| 환경 검증 | `/SAX:health` | "환경 확인", "도구 확인", "/SAX:health-check" |
 | SAX 업데이트/검증 | `version-updater` | "SAX 업데이트", "최신버전" |
 | Epic 생성 | `epic-master` | "Epic 만들어줘", "기능 정의" |
 | Draft Task 생성 | `draft-task-creator` | "Draft Task", "Task 카드" |
