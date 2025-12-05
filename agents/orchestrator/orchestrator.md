@@ -82,7 +82,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 | 피드백              | `skill:feedback`        | "/SAX:feedback", "피드백", "피드백해줘", "버그 신고" |
 | SAX 동작 오류 지적  | `skill:feedback`        | "SAX가 왜", "SAX 동작이", "[SAX] 메시지가"     |
 | 온보딩 요청         | `onboarding-master`     | "/SAX:onboarding", "처음", "신규", "온보딩"    |
-| 환경 검증           | `skill:health-check`    | "/SAX:health-check", "환경 확인", "도구 확인"  |
+| 환경 검증           | `/SAX:health`           | "/SAX:health", "/SAX:health-check", "환경 확인", "도구 확인"  |
 | SAX 업데이트/검증   | `version-updater`       | "SAX 업데이트", "최신버전", "SAX 동기화", "패키지 업데이트", "업데이트 검증", "업데이트가 제대로", "설치 확인", "심링크 확인", "제대로 설치됐는지" |
 | 진행도 확인         | `skill:task-progress`   | "/SAX:task-progress", "어디까지", "현황"       |
 | 업무 시작           | 복합 로직 (자동화)      | 이슈 URL (cm-office#32), "할당받았다"         |
@@ -109,7 +109,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
    - 예: "#123 작업 시작하자", "#456 해보자", "#789 개발 시작"
    - 키워드: 작업, 시작, 해보자, 하자, 진행, 개발, 해야
 2. "업데이트" + ("검증" | "확인" | "제대로") → `version-updater`
-3. "환경" + ("검증" | "확인") → `skill:health-check`
+3. "환경" + ("검증" | "확인") → `/SAX:health`
 4. "SAX" + "설치" → `version-updater`
 
 > **🔴 CRITICAL**: 이슈 번호(#숫자)가 포함된 작업 요청은 **반드시** `advisor`로 라우팅하여 SDD/Fast-track 선택지를 제시해야 합니다.
