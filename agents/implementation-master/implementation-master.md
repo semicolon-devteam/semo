@@ -47,13 +47,6 @@ v0.4.x: CODE      - Repository → API Client → Hooks → Components
 
 ## Quick Workflow
 
-### Step 0: Verify Spec Exists
-
-```bash
-ls -la specs/*/tasks.md
-# If no specs, suggest running /spec first
-```
-
 ### Step 1: Start with speckit.implement
 
 ```bash
@@ -62,15 +55,15 @@ ls -la specs/*/tasks.md
 
 ### Step 2: Phase-Gated Execution
 
+> 📚 **Phase Gate 상세**: [references/phase-workflow.md](references/phase-workflow.md)
+
 각 Phase 완료 후 반드시 사용자 승인 요청:
 
 ```markdown
 ✅ Phase v0.X.x Complete: [PHASE NAME]
 
 **Completed**: [작업 목록]
-
-**Ready for v0.Y.x ([NEXT PHASE])**:
-- [다음 작업 목록]
+**Ready for v0.Y.x**: [다음 작업 목록]
 
 Proceed to v0.Y.x? (yes/no)
 ```
@@ -85,11 +78,11 @@ Proceed to v0.Y.x? (yes/no)
 
 ### 2. Test-Driven Development
 
+> 📚 **테스트 패턴**: [references/test-patterns.md](references/test-patterns.md)
+
 - v0.2.x (TESTS) MUST complete before v0.4.x (CODE)
 - Tests written first, implementation makes them pass
 - Constitution Principle III is non-negotiable
-
-> 📚 **테스트 패턴**: [references/test-patterns.md](references/test-patterns.md)
 
 ### 3. Supabase Patterns
 
@@ -101,7 +94,7 @@ Proceed to v0.Y.x? (yes/no)
 ### 4. API Spec Patterns
 
 - **자동 트리거**: `/api/v1/*` 경로 구현 시 `skill:fetch-api-spec` 자동 호출
-- Follow DTO naming convention (Operation ID prefix: `GetMeResponse`)
+- Follow DTO naming convention (Operation ID prefix)
 - Reference: [Swagger UI](https://core-interface-ashen.vercel.app/)
 
 ### 5. DDD Compliance
@@ -127,29 +120,9 @@ Proceed to v0.Y.x? (yes/no)
 
 ### 8. Bug Fix: 엔지니어 테스트 코멘트
 
-버그 이슈(`[Bug]` 라벨 또는 `fix/` 브랜치) 구현 착수 시, 이슈에 엔지니어 테스트 요구사항 코멘트 추가:
+> 📚 **버그 수정 워크플로우**: [references/phase-workflow.md](references/phase-workflow.md)
 
-```bash
-gh issue comment {issue-number} --body "$(cat <<'EOF'
-## 🔬 엔지니어 테스트 요구사항
-
-### 수정 대상 파일
-- `{파일경로}:{라인범위}`
-
-### 테스트 요구사항
-- [ ] 유닛 테스트: `{테스트파일경로}`
-- [ ] 통합 테스트: `{통합테스트경로}` (해당 시)
-
-### 검증 방법
-\`\`\`bash
-npm run test -- {테스트파일}
-\`\`\`
-
----
-🔬 SAX implementation-master에 의해 자동 생성됨
-EOF
-)"
-```
+버그 이슈(`[Bug]` 라벨 또는 `fix/` 브랜치) 구현 착수 시, 이슈에 엔지니어 테스트 요구사항 코멘트 추가
 
 **코멘트 작성 시점**: Phase v0.2.x (TESTS) 시작 전, 버그 분석 완료 후
 
@@ -163,18 +136,15 @@ You **build on top** of speckit.implement:
 
 ## Error Handling
 
+> 📚 **에러 처리 가이드**: [references/phase-workflow.md](references/phase-workflow.md)
+
 ### If Phase Fails
 
 ```markdown
 ❌ Phase v0.X.x Failed: [PHASE NAME]
 
 **Error**: [Error message]
-
-**Resolution**:
-1. Check error details
-2. Fix the issue
-3. Retry the failed phase
-4. Do NOT advance to next phase
+**Resolution**: Check → Fix → Retry → Do NOT advance
 ```
 
 ### If Tests Fail
@@ -183,23 +153,12 @@ You **build on top** of speckit.implement:
 ❌ Tests Failing
 
 **Failed Tests**: X/Y
-
-**Action Required**:
-1. Review test failures
-2. Fix implementation
-3. Re-run tests
-4. DO NOT mark phase complete until tests pass
+**Action**: Review → Fix → Re-run → Do NOT mark complete
 ```
 
 ## 🔴 구현 완료 후 다음 단계 제안 (NON-NEGOTIABLE)
 
 > **⚠️ v0.4.x Phase 완료 후 반드시 다음 단계를 제안합니다.**
-
-### 트리거
-
-- v0.4.x (CODE) Phase 완료 시
-- 모든 테스트 통과 후
-- 품질 게이트 (Lint, TypeScript) 통과 후
 
 ### 완료 메시지 템플릿
 
@@ -210,15 +169,7 @@ You **build on top** of speckit.implement:
 
 | Phase | 상태 | 요약 |
 |-------|------|------|
-| v0.0.x CONFIG | ✅ | 의존성 설정 완료 |
-| v0.1.x PROJECT | ✅ | DDD 구조 생성 |
-| v0.2.x TESTS | ✅ | 테스트 작성 완료 |
-| v0.3.x DATA | ✅ | 타입/스키마 정의 |
-| v0.4.x CODE | ✅ | 구현 완료 |
-
-**구현 파일**:
-- `{file1}`: {description}
-- `{file2}`: {description}
+| v0.0.x ~ v0.4.x | ✅ | All phases complete |
 
 ---
 
