@@ -39,559 +39,125 @@ Epic Issue를 분석하여 서비스 레포 및 core-backend에 Draft Task Issue
 
 ## Workflow
 
-### 0. Precondition Check
+### Phase 0: Precondition Check
 
 **필수 확인사항**:
 1. Epic Issue URL 또는 번호 확보
 2. Epic 본문에 대상 레포지토리 명시 확인
 3. Epic의 디자인 필드 확인
 
-### 1. Epic 읽기 및 분석
+### Phase 1: Epic 분석
 
-```bash
-# Epic Issue 조회
-gh api repos/semicolon-devteam/docs/issues/{epic_number}
-
-# Epic 본문 파싱:
-# - User Stories 추출
-# - 대상 레포지토리 확인
-# - 디자인 요구사항 확인
-# - 완료 조건 파악
-```
-
-**분석 결과**:
+Epic Issue를 조회하여 다음을 파악합니다:
+- User Stories 추출
+- 대상 레포지토리 확인
 - 백엔드 작업 여부 (키워드: API, 서버, 데이터베이스, RPC)
 - 프론트엔드 작업 여부 (키워드: UI, 화면, 컴포넌트, 페이지)
 - 디자인 작업 여부 (디자인 필드 체크 상태)
 
-### 2. 백엔드 작업 처리
+### Phase 2: 백엔드 작업 처리
 
-**백엔드 작업 감지 시**:
+> 📖 **상세 워크플로우**: [backend-workflow.md](references/backend-workflow.md)
 
-#### 2.1. 중복 체크
+**주요 단계**:
+1. check-backend-duplication Skill로 중복 체크
+2. 중복 없으면 core-backend에 Draft Task 생성
+3. Sub-issue 연결 및 draft 라벨 부여
+4. Projects 보드 연결 (**필수**)
+5. Assignee 할당 (대화형)
 
-[SAX] Skill: check-backend-duplication 사용
+### Phase 3: 프론트엔드 작업 처리
 
-```bash
-# core-backend 도메인 + Service 레벨 중복 체크
-```
+> 📖 **상세 워크플로우**: [frontend-workflow.md](references/frontend-workflow.md)
 
-**중복 발견 시**:
-```markdown
-### ⚠️ core-backend 중복 확인
+**주요 단계**:
+1. 서비스 레포에 Draft Task 생성
+2. Sub-issue 연결 및 draft 라벨 부여
+3. Projects 보드 연결 (**필수**)
+4. Assignee 할당 (대화형)
 
-**도메인**: {domain}
-**기존 구현**: {existing_function}
-**파일**: {file_path}
+### Phase 4: 디자인 작업 처리
 
-**권장 사항**:
-- core-backend Task는 생성하지 않습니다.
-- 프론트엔드에서 기존 API 활용
-```
+> 📖 **상세 워크플로우**: [design-workflow.md](references/design-workflow.md)
 
-→ Epic에 위 코멘트 추가, core-backend Task 생성 **스킵**
+**디자인 필드 체크 시**:
+1. Epic에 디자인 코멘트 추가
+2. 디자인팀에 Slack 알림 전송 (#_디자인 채널)
 
-**중복 없음 시**:
+### Phase 5: 최종화
 
-#### 2.2. core-backend Draft Task 생성
+> 📖 **상세 워크플로우**: [finalization.md](references/finalization.md)
 
-```bash
-# core-backend에 Draft Task Issue 생성
-gh api repos/semicolon-devteam/core-backend/issues \
-  -f title="[Backend] {task_title}" \
-  -f body="{task_body}"
-```
+**완료 단계**:
+1. GitHub Projects 필드 업데이트
+2. Epic 라벨 자동 할당
+3. Epic 일정 예측 (생성된 Task Point 합산)
+4. Task 검증
+5. 완료 보고
+6. Slack 알림 전송 (#_협업)
 
-**Task 본문 구조**:
-
-```markdown
-# [Backend] {task_title}
-
-## 📌 작업 개요
-
-{Epic에서 추출한 백엔드 작업 설명}
-
-## ✅ Acceptance Criteria
-
-[SAX] Skill: generate-acceptance-criteria 사용
-
-- [ ] {criterion_1}
-- [ ] {criterion_2}
-- [ ] 테스트 코드 작성 완료
-- [ ] 린트 체크 통과
-
-## 📊 Estimation
-
-[SAX] Skill: assign-estimation-point 사용
-
-- [x] API 엔드포인트 구현 (3점)
-- [x] 비즈니스 로직 구현 (5점)
-
-**Point**: 8점
-
-## 🌿 Branch
-
-`feature/{epic-number}-{domain}-backend`
-
-## 🔗 Related Epic
-
-Closes semicolon-devteam/docs#{epic_number}
-```
-
-#### 2.3. Sub-issue 연결
-
-```bash
-# Epic 본문에 Sub-issue 체크리스트 추가
-# Epic 본문 업데이트:
-# - [ ] semicolon-devteam/core-backend#123
-```
-
-#### 2.4. draft 라벨 부여
-
-```bash
-gh api repos/semicolon-devteam/core-backend/issues/{issue_number}/labels \
-  -f labels[]="draft"
-```
-
-#### 2.5. Projects 보드 연결 (필수)
-
-> **🔴 필수**: 생성된 Draft Task를 GitHub Projects #1 ('이슈관리')에 연결합니다.
-
-```bash
-# Step 1: Project ID 조회 (이슈관리 보드 = #1)
-PROJECT_ID=$(gh api graphql -f query='
-  query {
-    organization(login: "semicolon-devteam") {
-      projectV2(number: 1) {
-        id
-      }
-    }
-  }
-' --jq '.data.organization.projectV2.id')
-
-# Step 2: Draft Task Issue의 Node ID 조회
-ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/core-backend/issues/{issue_number} \
-  --jq '.node_id')
-
-# Step 3: Project에 Draft Task 추가
-gh api graphql -f query='
-  mutation {
-    addProjectV2ItemById(input: {
-      projectId: "'$PROJECT_ID'"
-      contentId: "'$ISSUE_NODE_ID'"
-    }) {
-      item {
-        id
-      }
-    }
-  }
-'
-```
-
-#### 2.6. Assignee 할당 (대화형)
-
-> **💬 대화형**: 사용자에게 담당자 할당 여부를 질문합니다.
-
-**Step 1: 할당 가능한 담당자 목록 조회**
-
-```bash
-# 레포지토리의 할당 가능한 담당자 목록 조회
-gh api repos/semicolon-devteam/core-backend/assignees --jq '.[].login'
-```
-
-**Step 2: 사용자에게 질문**
+## 완료 메시지 템플릿
 
 ```markdown
-### 👤 Assignee 할당
+[SAX] Agent: draft-task-creator 완료
 
-**Draft Task**: [Backend] {task_title} (#{issue_number})
-
-**할당 가능한 담당자**:
-1. @{assignee_1}
-2. @{assignee_2}
-3. @{assignee_3}
-...
-
-담당자를 지정하시겠습니까?
-- 번호 또는 GitHub 아이디를 입력하세요
-- 지정하지 않으려면 "스킵" 또는 "나중에"라고 입력하세요
-```
-
-**Step 3: 사용자 응답에 따른 처리**
-
-```bash
-# 사용자가 담당자를 지정한 경우
-gh api repos/semicolon-devteam/core-backend/issues/{issue_number} \
-  -X PATCH \
-  -f assignees[]="{selected_assignee}"
-```
-
-**스킵 시**:
-```markdown
-✅ Assignee 지정 없이 진행합니다. 나중에 수동으로 할당 가능합니다.
-```
-
-### 3. 프론트엔드 작업 처리
-
-**프론트엔드 작업 감지 시**:
-
-#### 3.1. 서비스 레포 Draft Task 생성
-
-```bash
-# 예: cm-introduction-new
-gh api repos/semicolon-devteam/{service_repo}/issues \
-  -f title="[Frontend] {task_title}" \
-  -f body="{task_body}"
-```
-
-**Task 본문 구조**:
-
-```markdown
-# [Frontend] {task_title}
-
-## 📌 작업 개요
-
-{Epic에서 추출한 프론트 작업 설명}
-
-## ✅ Acceptance Criteria
-
-[SAX] Skill: generate-acceptance-criteria 사용
-
-- [ ] {criterion_1}
-- [ ] UI 컴포넌트 구현 완료
-- [ ] API 연동 완료
-- [ ] 테스트 코드 작성
-- [ ] 린트 및 타입 체크 통과
-
-## 📊 Estimation
-
-[SAX] Skill: assign-estimation-point 사용
-
-- [x] organisms UI 컴포넌트 (3점)
-- [x] 기본 Form 작업 (5점)
-- [x] API 연동 (2점)
-
-**Point**: 10점
-
-## 🌿 Branch
-
-`feature/{epic-number}-{domain}-frontend`
-
-## 🔗 Related Epic
-
-Closes semicolon-devteam/docs#{epic_number}
-```
-
-#### 3.2. Sub-issue 연결 및 draft 라벨
-
-```bash
-# Epic 본문에 추가
-# - [ ] semicolon-devteam/{service_repo}#456
-
-# draft 라벨
-gh api repos/semicolon-devteam/{service_repo}/issues/{issue_number}/labels \
-  -f labels[]="draft"
-```
-
-#### 3.3. Projects 보드 연결 (필수)
-
-> **🔴 필수**: 생성된 Draft Task를 GitHub Projects #1 ('이슈관리')에 연결합니다.
-
-```bash
-# Step 1: Project ID 조회 (이슈관리 보드 = #1)
-PROJECT_ID=$(gh api graphql -f query='
-  query {
-    organization(login: "semicolon-devteam") {
-      projectV2(number: 1) {
-        id
-      }
-    }
-  }
-' --jq '.data.organization.projectV2.id')
-
-# Step 2: Draft Task Issue의 Node ID 조회
-ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/{service_repo}/issues/{issue_number} \
-  --jq '.node_id')
-
-# Step 3: Project에 Draft Task 추가
-gh api graphql -f query='
-  mutation {
-    addProjectV2ItemById(input: {
-      projectId: "'$PROJECT_ID'"
-      contentId: "'$ISSUE_NODE_ID'"
-    }) {
-      item {
-        id
-      }
-    }
-  }
-'
-```
-
-#### 3.4. Assignee 할당 (대화형)
-
-> **💬 대화형**: 사용자에게 담당자 할당 여부를 질문합니다.
-
-**Step 1: 할당 가능한 담당자 목록 조회**
-
-```bash
-# 레포지토리의 할당 가능한 담당자 목록 조회
-gh api repos/semicolon-devteam/{service_repo}/assignees --jq '.[].login'
-```
-
-**Step 2: 사용자에게 질문**
-
-```markdown
-### 👤 Assignee 할당
-
-**Draft Task**: [Frontend] {task_title} (#{issue_number})
-
-**할당 가능한 담당자**:
-1. @{assignee_1}
-2. @{assignee_2}
-3. @{assignee_3}
-...
-
-담당자를 지정하시겠습니까?
-- 번호 또는 GitHub 아이디를 입력하세요
-- 지정하지 않으려면 "스킵" 또는 "나중에"라고 입력하세요
-```
-
-**Step 3: 사용자 응답에 따른 처리**
-
-```bash
-# 사용자가 담당자를 지정한 경우
-gh api repos/semicolon-devteam/{service_repo}/issues/{issue_number} \
-  -X PATCH \
-  -f assignees[]="{selected_assignee}"
-```
-
-**스킵 시**:
-
-```markdown
-✅ Assignee 지정 없이 진행합니다. 나중에 수동으로 할당 가능합니다.
-```
-
-### 4. 디자인 작업 처리
-
-**디자인 작업 필요 시**:
-
-[SAX] Skill: create-design-task 사용
-
-```bash
-# 서비스 레포에 디자인 Task 생성
-# Sub-issue 연결
-# design 라벨 부여
-```
-
-#### 4.1. Projects 보드 연결 (필수)
-
-> **🔴 필수**: 생성된 Design Task를 GitHub Projects #1 ('이슈관리')에 연결합니다.
-
-```bash
-# 2.5와 동일한 방식으로 Projects 연결
-```
-
-#### 4.2. Assignee 할당 (대화형)
-
-> **💬 대화형**: 디자인 담당자 할당 여부를 질문합니다. (2.6, 3.4와 동일한 방식)
-
-### 5. GitHub Projects 필드 업데이트
-
-**각 Draft Task별**:
-
-[SAX] Skill: assign-estimation-point 사용
-
-```bash
-# Projects '작업량' 필드에 Point 입력
-gh api graphql -f query='...'
-```
-
-### 6. Epic 라벨 자동 할당
-
-[SAX] Skill: auto-label-by-scope 사용
-
-```bash
-# Epic에 자동 라벨 추가
-# backend, frontend, design, fullstack
-gh api repos/semicolon-devteam/docs/issues/{epic_number}/labels \
-  -f labels[]="fullstack" \
-  -f labels[]="design"
-```
-
-### 7. Epic 일정 예측
-
-[SAX] Skill: estimate-epic-timeline 사용
-
-```bash
-# 모든 Draft Tasks Point 합산
-# Epic에 일정 예측 코멘트 추가
-```
-
-### 8. Task 검증
-
-**각 Draft Task별**:
-
-[SAX] Skill: validate-task-completeness 사용
-
-```bash
-# 필수 항목 모두 포함되었는지 확인
-# - AC
-# - Estimation
-# - 브랜치명
-# - draft 라벨
-# - Epic Sub-issue 관계
-# - Projects 필드
-# - Projects #1 ('이슈관리') 연결 (필수)
-# - Assignee (선택 - 사용자 응답에 따름)
-```
-
-**검증 실패 시**:
-- 누락 항목 보완
-- 재검증
-
-### 9. 완료 보고
-
-```markdown
 ## ✅ Draft Tasks 생성 완료
 
 ### 📋 생성된 Tasks
 
-**Backend** (core-backend):
-- [#123] 사용자 차단 API 구현 (8 Points) → @{assignee}
-
-**Frontend** (cm-introduction-new):
-- [#456] 사용자 차단 UI 구현 (10 Points) → @{assignee}
-
-**Design**:
-- [#789] 사용자 차단 화면 디자인 (3 Points) → 미지정
+**Backend**: semicolon-devteam/core-backend#{number} - {title}
+**Frontend**: semicolon-devteam/{service_repo}#{number} - {title}
+**Design**: 디자인 요청 알림 (#_디자인)
 
 ### 📊 전체 일정 예측
 
-**총 작업량**: 21 Points
-**예상 기간**: 10.5일 (약 2주)
+- Backend: {점수}점 ({예상 일수}일)
+- Frontend: {점수}점 ({예상 일수}일)
+- **총 예상 기간**: {total_days}일
 
 ### 🏷️ Epic 라벨
 
-- `fullstack`
-- `design`
+`epic:{service}`, `{status}`, `{priority}`
 
 ### 📌 Projects 연결
 
-모든 Draft Tasks가 Projects #1 ('이슈관리')에 연결되었습니다.
+모든 Task가 `이슈관리` Projects (#1)에 등록되었습니다.
 
 ### 👤 Assignee 현황
 
-| Task | Assignee | 상태 |
-|------|----------|------|
-| [#123] Backend | @{assignee} | ✅ 할당됨 |
-| [#456] Frontend | @{assignee} | ✅ 할당됨 |
-| [#789] Design | - | ⏭️ 스킵됨 |
+- Backend: @{assignee} (또는 "미할당")
+- Frontend: @{assignee} (또는 "미할당")
 
 ### ✅ 검증 결과
 
-모든 Draft Tasks가 필수 항목을 포함하고 있습니다.
+- [ ] AC 완성도: {percentage}%
+- [ ] Estimation 정확도: 검토 필요
+- [ ] Projects 연결: ✅
+- [ ] 라벨 부여: ✅
 
 ### 📢 Slack 알림
 
-개발자에게 Slack 알림이 전송되었습니다.
-- 채널: #_협업
-- 멘션: @{assignee1}, @{assignee2}
+#_협업 채널에 Draft Task 생성 완료 알림을 전송했습니다.
 ```
-
-### 10. Slack 알림 전송
-
-> **🔔 자동 호출**: Draft Task 생성 완료 후 자동으로 notify-slack Skill 호출
-
-[SAX] Skill: notify-slack 사용
-
-**전달 정보**:
-
-```yaml
-epic:
-  number: {epic_number}
-  title: "{epic_title}"
-  url: "https://github.com/semicolon-devteam/docs/issues/{epic_number}"
-  project: "{project_name}"
-
-tasks:
-  - repo: "{repo_name}"
-    number: {task_number}
-    title: "{task_title}"
-    assignee: "{github_id}"
-    points: {points}
-```
-
-**Slack 메시지 전송**:
-
-```bash
-SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-eGiyqdlLJkMwrHoX4HUtrOCb"
-
-curl -X POST https://slack.com/api/chat.postMessage \
-  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "channel": "#_협업",
-    "text": "📋 새로운 Draft Task가 생성되었습니다",
-    "blocks": [
-      {
-        "type": "header",
-        "text": {"type": "plain_text", "text": "📋 새로운 Draft Task가 생성되었습니다"}
-      },
-      {
-        "type": "section",
-        "fields": [
-          {"type": "mrkdwn", "text": "*Epic*\n<{epic_url}|#{epic_number} {epic_title}>"},
-          {"type": "mrkdwn", "text": "*프로젝트*\n{project_name}"}
-        ]
-      },
-      {"type": "divider"},
-      {
-        "type": "section",
-        "text": {"type": "mrkdwn", "text": "*Draft Tasks*\n• <{task_url}|#{task_number} {task_title}> - <@{slack_id}> ({points} Points)"}
-      },
-      {
-        "type": "context",
-        "elements": [{"type": "mrkdwn", "text": "spec 검토 후 구현을 시작해주세요! 🚀"}]
-      }
-    ]
-  }'
-```
-
-**Slack ID 매핑 참조**:
-
-[SAX] Reference: skills/notify-slack/references/slack-id-mapping.md 참조
 
 ## SAX Messages
 
-작업 시작 시:
-
 ```markdown
-[SAX] Agent: draft-task-creator 호출 (트리거: Epic 생성 완료)
-```
+[SAX] Agent: draft-task-creator 호출 - Epic #{epic_number}
 
-Skills 호출 시:
+[SAX] Phase: Epic 분석 중...
+[SAX] Phase: 백엔드 작업 감지 → core-backend Task 생성
+[SAX] Phase: 프론트엔드 작업 감지 → {service_repo} Task 생성
+[SAX] Phase: 디자인 작업 감지 → 디자인팀 알림
 
-```markdown
-[SAX] Skill: check-backend-duplication 사용
+[SAX] Skill: check-backend-duplication 호출
+[SAX] Skill: generate-acceptance-criteria 호출
+[SAX] Skill: assign-estimation-point 호출
 
-[SAX] Reference: core-backend/domain/{domain}/service 참조
+[SAX] Phase: Projects 보드 연결 완료
+[SAX] Phase: Epic 라벨 및 일정 예측 완료
 
-[SAX] Skill: generate-acceptance-criteria 사용
-
-[SAX] Skill: assign-estimation-point 사용
-
-[SAX] Reference: docs/wiki/Estimation-Guide 참조
-
-[SAX] Skill: create-design-task 사용
-
-[SAX] Skill: validate-task-completeness 사용
-
-[SAX] Skill: auto-label-by-scope 사용
-
-[SAX] Skill: estimate-epic-timeline 사용
-
-[SAX] Skill: notify-slack 사용
+[SAX] Agent: draft-task-creator 완료 (생성: Backend 1개, Frontend 1개)
 ```
 
 ## Error Handling
@@ -599,44 +165,57 @@ Skills 호출 시:
 ### Epic URL 없음
 
 ```markdown
-⚠️ **Epic URL이 필요합니다**
+❌ **Epic URL이 제공되지 않았습니다**
 
-Epic Issue URL 또는 번호를 제공해주세요.
+Epic Issue 번호 또는 URL을 제공해주세요.
 
-예: `https://github.com/semicolon-devteam/docs/issues/123`
-또는: `#123`
+**예시**:
+- `#123`
+- `https://github.com/semicolon-devteam/docs/issues/123`
 ```
 
 ### 대상 레포 미명시
 
 ```markdown
-⚠️ **대상 레포지토리가 Epic에 명시되지 않았습니다**
+⚠️ **Epic 본문에 대상 레포지토리가 명시되지 않았습니다**
 
-Epic 본문의 "📦 대상 레포지토리" 섹션을 확인하고 체크해주세요.
+Epic 본문에 `**대상 레포**: cm-introduction-new` 형식으로 추가해주세요.
 ```
 
 ### GitHub API 오류
 
 ```markdown
-⚠️ **GitHub API 오류 발생**
+❌ **GitHub API 오류**
 
-{error_message}
+Task 생성 중 오류가 발생했습니다: {error_message}
 
-재시도하거나 수동으로 Issue를 생성해주세요.
+**권장 조치**:
+- GitHub 인증 토큰 확인
+- 레포지토리 권한 확인
+- 네트워크 연결 확인
 ```
 
 ## Best Practices
 
-1. **Epic 분석 정확성**: User Stories를 꼼꼼히 분석하여 누락 없이 Task 생성
-2. **중복 방지**: core-backend 중복 체크 필수
-3. **완전성 보장**: 모든 Task에 AC, Estimation, 브랜치명 포함
-4. **일관성 유지**: Task 명명 규칙 준수 (`[Backend]`, `[Frontend]`, `[Design]`)
-5. **검증 철저**: validate-task-completeness로 최종 확인
+1. **Epic 분석 철저히**: Epic 본문과 코멘트를 모두 읽어 누락된 요구사항 방지
+2. **중복 체크 필수**: core-backend 중복 확인으로 불필요한 작업 방지
+3. **AC 품질**: generate-acceptance-criteria Skill로 검증 가능한 AC 작성
+4. **Point 정확도**: assign-estimation-point Skill로 일관된 기준 적용
+5. **Projects 연결**: 모든 Task를 `이슈관리` Projects에 등록 (**필수**)
+6. **Slack 알림**: 팀원들에게 즉시 공유
 
 ## Related
 
-- [epic-master Agent](./epic-master.md)
-- [orchestrator Agent](./orchestrator.md)
-- [notify-slack Skill](../skills/notify-slack/SKILL.md)
-- [Skills](../skills/)
-- [Epic Template](../templates/epic-template.md)
+- [epic-master Agent](./epic-master.md) - Epic 생성 Agent
+- [generate-acceptance-criteria Skill](../skills/generate-acceptance-criteria/SKILL.md)
+- [assign-estimation-point Skill](../skills/assign-estimation-point/SKILL.md)
+- [check-backend-duplication Skill](../skills/check-backend-duplication/SKILL.md)
+
+## References
+
+| 문서 | 용도 |
+|------|------|
+| [backend-workflow.md](references/backend-workflow.md) | 백엔드 작업 상세 워크플로우 |
+| [frontend-workflow.md](references/frontend-workflow.md) | 프론트엔드 작업 상세 워크플로우 |
+| [design-workflow.md](references/design-workflow.md) | 디자인 작업 워크플로우 |
+| [finalization.md](references/finalization.md) | Projects 연결, 라벨링, 완료 보고 |
