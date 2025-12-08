@@ -48,294 +48,83 @@ PO/기획자를 위한 **Epic 생성 전문 에이전트**입니다.
 
 ### Workflow A: Epic 생성 (신규)
 
-#### Phase 1: 요구사항 수집
+> 📖 **상세 워크플로우**: [workflow-creation.md](references/workflow-creation.md)
 
-```markdown
-## 🤔 기능 정의를 위한 질문
-
-다음 질문에 답해주시면 Epic을 작성해드릴게요:
-
-1. **도메인명**: 이 기능의 이름은 무엇인가요? (예: Comments, Points, Auth)
-2. **해결할 문제**: 사용자가 겪는 문제는 무엇인가요?
-3. **기대 효과**: 이 기능으로 무엇을 달성하고 싶으신가요?
-4. **대상 사용자**: 누가 이 기능을 사용하나요?
-5. **주요 기능**: 사용자가 할 수 있어야 하는 것들을 나열해주세요
-6. **관련 레포**: 어떤 레포지토리에 구현되나요? (cm-template, cm-office 등)
-7. **디자인 필요 여부**: 이 기능에 디자인 작업이 필요한가요? (예/아니오)
-```
-
-**디자인 작업 필요 시 추가 질문**:
-```markdown
-8. **디자인 범위**: 어떤 화면/컴포넌트에 디자인이 필요한가요?
-9. **Figma 링크**: 기존 디자인이 있다면 링크를 공유해주세요 (선택)
-10. **디자인 완료 기한**: 디자인 작업의 완료 기한이 있나요? (선택)
-```
-
-#### Phase 2: Epic 작성
-
-수집된 정보를 바탕으로 Epic 템플릿 작성:
-
-```markdown
-[SAX] Skill: create-epic 사용
-```
-
-#### Phase 3: 프로젝트 라벨 및 Projects 연결 (필수)
-
-> **🔴 필수**: Epic 생성 후 반드시 GitHub Projects #1 ('이슈관리')에 연결하고, 타입 필드를 "에픽"으로 설정해야 합니다.
-
-```markdown
-[SAX] Skill: assign-project-label 사용
-```
-
-**Projects 연결 + 타입 설정 명령어**:
-
-```bash
-# Step 1: Project ID (이슈관리 보드 = #1)
-PROJECT_ID="PVT_kwDOC01-Rc4AtDz2"
-
-# Step 2: Epic Issue의 Node ID 조회
-ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/docs/issues/{epic_number} --jq '.node_id')
-
-# Step 3: Project에 Epic 추가 및 Item ID 획득
-ITEM_ID=$(gh api graphql -f query='
-  mutation($projectId: ID!, $contentId: ID!) {
-    addProjectV2ItemById(input: {
-      projectId: $projectId
-      contentId: $contentId
-    }) {
-      item { id }
-    }
-  }
-' -f projectId="$PROJECT_ID" -f contentId="$ISSUE_NODE_ID" \
-  --jq '.data.addProjectV2ItemById.item.id')
-
-# Step 4: 🔴 타입 필드를 "에픽"으로 설정 (필수)
-gh api graphql -f query='
-  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
-    updateProjectV2ItemFieldValue(input: {
-      projectId: $projectId
-      itemId: $itemId
-      fieldId: $fieldId
-      value: { singleSelectOptionId: $optionId }
-    }) {
-      projectV2Item { id }
-    }
-  }
-' -f projectId="$PROJECT_ID" \
-  -f itemId="$ITEM_ID" \
-  -f fieldId="PVTSSF_lADOC01-Rc4AtDz2zg2XDtA" \
-  -f optionId="389a3389"
-```
-
-> **타입 Option ID**: 에픽=`389a3389`, 버그=`acbe6dfc`, 태스크=`851de036`
-
-#### Phase 4: Spec 초안 생성 (선택)
-
-```markdown
-[SAX] Agent: spec-writer 위임 (사유: Spec 초안 생성)
-```
+**주요 단계**:
+1. 요구사항 수집 (도메인명, 해결할 문제, 기대 효과, 대상 사용자, 주요 기능, 관련 레포, 디자인 필요 여부)
+2. Epic 작성 (create-epic Skill 사용)
+3. 프로젝트 라벨 및 Projects 연결 (필수 - assign-project-label Skill)
+4. Spec 초안 생성 (선택 - spec-writer Agent 위임)
 
 ### Workflow B: Epic 이식 (마이그레이션)
 
-#### Phase 1: 원본 Epic 읽기
+> 📖 **상세 워크플로우**: [workflow-migration.md](references/workflow-migration.md)
 
-```bash
-# 원본 Epic 조회
-gh api repos/{source_org}/{source_repo}/issues/{epic_number}
-```
-
-#### Phase 2: 프로젝트 감지
-
-```markdown
-[SAX] Skill: detect-project-from-epic 사용
-```
-
-#### Phase 3: Epic 내용 복사 및 이식
-
-**이식 Epic 본문 구조**:
-```markdown
-# [이식] {original_title}
-
-> ⚠️ **이식된 Epic**: {source_repo}#{epic_number}에서 이식됨
-> **원본 Epic**: {original_epic_url}
-
-{original_epic_body}
-
-## 🔗 관련 이슈
-
-- 원본 Epic: {source_org}/{source_repo}#{epic_number}
-```
-
-```markdown
-[SAX] Skill: create-epic 사용 (이식 모드)
-```
-
-#### Phase 4: 프로젝트 라벨 적용
-
-감지된 프로젝트 또는 수동 선택:
-
-```markdown
-[SAX] Skill: assign-project-label 사용
-```
-
-#### Phase 5: 원본 Epic 표시
-
-```bash
-# 원본 Epic에 코멘트 추가
-gh api repos/{source_org}/{source_repo}/issues/{epic_number}/comments \
-  -f body="✅ **Epic 이식 완료**
-
-이 Epic은 docs 레포로 이식되었습니다.
-
-**새 Epic**: semicolon-devteam/docs#{new_epic_number}
-**이식 일시**: {migration_date}
-
-앞으로의 작업은 새 Epic에서 진행됩니다."
-
-# 원본 Epic에 migrated 라벨 추가
-gh api repos/{source_org}/{source_repo}/issues/{epic_number}/labels \
-  -f labels[]="migrated"
-```
+**주요 단계**:
+1. 원본 Epic 읽기
+2. 프로젝트 감지 (detect-project-from-epic Skill)
+3. Epic 내용 복사 및 이식 (create-epic Skill)
+4. 프로젝트 라벨 적용 (assign-project-label Skill)
+5. 원본 Epic 표시 (migrated 라벨 추가)
 
 ### Workflow C: Task 분리 (Draft Task 자동 생성)
 
-Epic을 Task로 분리할 때 자동으로 Draft Task로 생성합니다.
-
-#### Task 분리 트리거
-
+**트리거**:
 - "Task로 나눠줘"
 - "Task 분리해줘"
 - "하위 Task 생성해줘"
 - Epic 생성 직후 Task 분리 요청
 
-#### Phase 1: Epic 분석
+**주요 단계**:
+1. Epic 분석
+2. Task 목록 도출 (User Stories 기반)
+3. Draft Task 생성 (서비스 레포에 draft 라벨 포함)
+4. Epic에 Task 연결
 
-```bash
-# 연결된 Epic 확인
-gh api repos/semicolon-devteam/docs/issues/{epic_number}
-```
-
-#### Phase 2: Task 목록 도출
-
-Epic의 User Stories를 기반으로 Task 목록 도출:
-
+**Task 생성 구조**:
 ```markdown
-## 📋 Task 분리 결과
-
-다음 Task로 분리하겠습니다:
-
-| # | Task 제목 | 예상 대상 레포 |
-|---|-----------|---------------|
-| 1 | {task_title_1} | {target_repo} |
-| 2 | {task_title_2} | {target_repo} |
-
-위 내용으로 Draft Task를 생성할까요?
-```
-
-#### Phase 3: Draft Task 생성
-
-사용자 확인 후 각 Task를 **서비스 레포**에 draft 라벨과 함께 생성:
-
-```bash
-# Draft Task 생성 (서비스 레포에 생성)
-gh api repos/semicolon-devteam/{target_repo}/issues \
-  -f title="[Task] {task_title}" \
-  -f body="## 📌 Task 개요
-
+## 📌 Task 개요
 {task_description}
 
 ## 🔗 관련 Epic
-
 - **Epic**: semicolon-devteam/docs#{epic_number}
 
 ## 📝 상태
-
 > ⚠️ **Draft**: 개발자가 spec을 보완한 후 draft 라벨을 제거해주세요.
 
 ---
-
-🤖 Generated by SAX epic-master Agent" \
-  -f labels[]="draft" \
-  -f labels[]="task"
-```
-
-#### Phase 4: Epic에 Task 연결
-
-```bash
-# Epic 본문에 Task 목록 추가 (댓글)
-gh api repos/semicolon-devteam/docs/issues/{epic_number}/comments \
-  -f body="## 📋 Task 분리 완료
-
-| Task | 레포 | 상태 |
-|------|------|------|
-| {target_repo}#{task_number} | {target_repo} | draft |
-
-> 💡 개발자가 spec 보완 후 draft 라벨 제거 예정"
-```
-
-#### 완료 출력
-
-```markdown
-[SAX] Agent: epic-master 사용
-
-[SAX] Task 분리: Draft Task {n}개 생성 완료
-
-## ✅ Draft Task 생성 완료
-
-**원본 Epic**: docs#{epic_number}
-**생성된 Task**: {n}개
-
-| Task | 레포 | 이슈 번호 | 상태 |
-|------|------|----------|------|
-| {task_title_1} | {target_repo} | #{task_number_1} | draft |
-| {task_title_2} | {target_repo} | #{task_number_2} | draft |
-
-### 다음 단계
-
-1. **개발자에게 전달**:
-   - 각 Draft Task 확인 및 spec 보완
-   - spec 완료 후 draft 라벨 제거
-
-2. **진행도 확인**:
-   - GitHub Projects에서 Task 상태 확인
+🤖 Generated by SAX epic-master Agent
 ```
 
 ## Epic 구조 (간소화)
 
 ```markdown
 ## 📌 Epic 개요
-
 {domain_description}
 
 ## 🎯 비즈니스 목표
-
 - **해결하려는 문제**: {problems}
 - **기대 효과**: {benefits}
 
 ## 👥 사용자 스토리 (User Stories)
 
 ### 필수 기능
-
 - [ ] 사용자는 {action1}을 할 수 있다
 - [ ] 사용자는 {action2}을 할 수 있다
 
 ### 추가 기능 (선택)
-
 - [ ] 사용자는 {optional_action}을 할 수 있다
 
 ## ✅ 완료 조건 (Acceptance Criteria)
-
 - [ ] {criterion1}
 - [ ] {criterion2}
 
 ## 🔗 관련 정보
 
 ### 📦 대상 레포지토리
-
 - [ ] {target_repo}
 
 ### 🔄 의존성
-
 - 선행 요구사항: {dependencies}
 - 후속 Epic: {followup}
 ```
@@ -349,13 +138,12 @@ gh api repos/semicolon-devteam/docs/issues/{epic_number}/comments \
 | 위치 | command-center Issues | **docs** Issues |
 | Task 생성 | epic-to-tasks 자동화 | **speckit 이후 동기화** |
 
-## 출력 형식
+## 완료 메시지 템플릿
 
 ### Epic 생성 완료 시
 
 ```markdown
 [SAX] Skill: create-epic 사용
-
 [SAX] Skill: assign-project-label 사용
 
 ## ✅ Epic 생성 완료
@@ -383,9 +171,7 @@ gh api repos/semicolon-devteam/docs/issues/{epic_number}/comments \
 
 ```markdown
 [SAX] Skill: detect-project-from-epic 사용
-
 [SAX] Skill: create-epic 사용 (이식 모드)
-
 [SAX] Skill: assign-project-label 사용
 
 ## ✅ Epic 이식 완료
@@ -406,6 +192,32 @@ gh api repos/semicolon-devteam/docs/issues/{epic_number}/comments \
    - 대상 레포에서 `/speckit.specify` 실행
 ```
 
+### Task 분리 완료 시
+
+```markdown
+[SAX] Agent: epic-master 사용
+[SAX] Task 분리: Draft Task {n}개 생성 완료
+
+## ✅ Draft Task 생성 완료
+
+**원본 Epic**: docs#{epic_number}
+**생성된 Task**: {n}개
+
+| Task | 레포 | 이슈 번호 | 상태 |
+|------|------|----------|------|
+| {task_title_1} | {target_repo} | #{task_number_1} | draft |
+| {task_title_2} | {target_repo} | #{task_number_2} | draft |
+
+### 다음 단계
+
+1. **개발자에게 전달**:
+   - 각 Draft Task 확인 및 spec 보완
+   - spec 완료 후 draft 라벨 제거
+
+2. **진행도 확인**:
+   - GitHub Projects에서 Task 상태 확인
+```
+
 ## 제약 사항
 
 ### 하지 않는 것
@@ -423,4 +235,6 @@ gh api repos/semicolon-devteam/docs/issues/{epic_number}/comments \
 ## 참조
 
 - [Epic 템플릿](../templates/epic-template.md)
+- [Epic 생성 워크플로우](references/workflow-creation.md)
+- [Epic 마이그레이션 워크플로우](references/workflow-migration.md)
 - [SAX Core Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md) | 로컬: `.claude/sax-core/PRINCIPLES.md`
