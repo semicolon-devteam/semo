@@ -4,6 +4,8 @@ description: Spring Backend API integration guide for Next.js. Use when (1) impl
 tools: [Bash, Read, GitHub CLI]
 ---
 
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: spring-integration 호출 - Spring API 연동 가이드` 시스템 메시지를 첫 줄에 출력하세요.
+
 # Spring Integration Skill
 
 **Purpose**: Next.js 개발자가 Spring Backend(core-backend) API를 연동할 때 필요한 패턴과 가이드 제공
