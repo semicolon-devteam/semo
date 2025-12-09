@@ -147,11 +147,14 @@ jq '. + {
     "role": "fulltime",
     "position": "po",
     "boarded": true,
-    "boardedAt": "2025-11-25T10:30:00Z",
-    "healthCheckPassed": true
+    "boardedAt": "2025-12-09T10:30:00Z",
+    "healthCheckPassed": true,
+    "lastHealthCheck": "2025-12-09T10:30:00Z"
   }
 }
 ```
+
+> **참조**: [SAX Core Metadata Schema](https://github.com/semicolon-devteam/sax-core/blob/main/_shared/metadata-schema.md)
 
 ## 참조
 
