@@ -47,7 +47,51 @@ tools: [Bash, Read, Grep]
 ### SAX 메타데이터
 
 - 파일: `~/.claude.json`
-- 필수 필드: `SAX.role`, `SAX.position`, `SAX.boarded`, `SAX.healthCheckPassed`
+- 필수 필드: `SAX.role`, `SAX.position`, `SAX.boarded`, `SAX.boardedAt`, `SAX.healthCheckPassed`, `SAX.lastHealthCheck`
+- 검증 스크립트:
+
+```bash
+# SAX 필드 존재 확인
+cat ~/.claude.json | jq -e '.SAX' >/dev/null 2>&1 || echo "❌ SAX 메타데이터 없음"
+
+# 필수 필드 검증
+REQUIRED_FIELDS=("role" "position" "boarded" "boardedAt" "healthCheckPassed" "lastHealthCheck")
+for field in "${REQUIRED_FIELDS[@]}"; do
+  cat ~/.claude.json | jq -e ".SAX.$field" >/dev/null 2>&1 || echo "❌ 필수 필드 누락: $field"
+done
+
+# position 값 검증 (developer)
+POSITION=$(cat ~/.claude.json | jq -r '.SAX.position')
+VALID_POSITIONS=("developer" "po" "designer" "qa" "pm" "backend" "infra" "msa")
+if [[ ! " ${VALID_POSITIONS[@]} " =~ " ${POSITION} " ]]; then
+  echo "❌ 잘못된 position 값: $POSITION"
+fi
+```
+
+**검증 성공 시**:
+```markdown
+✅ SAX 메타데이터: 정상
+  - role: fulltime
+  - position: developer
+  - boarded: true
+  - boardedAt: 2025-12-09T10:30:00Z
+  - healthCheckPassed: true
+  - lastHealthCheck: 2025-12-09T10:30:00Z
+```
+
+**검증 실패 시**:
+```markdown
+❌ SAX 메타데이터: 오류 발견
+
+**문제**:
+- ❌ 필수 필드 누락: lastHealthCheck
+- ❌ 잘못된 position 값: dev (올바른 값: developer)
+
+**해결**:
+온보딩 프로세스를 완료하거나 `/SAX:onboarding`을 실행하세요.
+```
+
+> **참조**: [SAX Core Metadata Schema](https://github.com/semicolon-devteam/sax-core/blob/main/_shared/metadata-schema.md)
 
 ### SAX 패키지 설치 상태
 
