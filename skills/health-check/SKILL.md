@@ -113,6 +113,64 @@ ls -la .agent/workflows/ 2>/dev/null && echo "✅ Antigravity workflows 존재"
 | Slack 워크스페이스 | ✅ | 수동 확인 |
 | Figma 팀 접근권한 | ⚠️ 권장 | 수동 확인 |
 
+### Category 7: SAX 메타데이터
+
+- 파일: `~/.claude.json`
+- 필수 필드: `SAX.role`, `SAX.position`, `SAX.boarded`, `SAX.boardedAt`, `SAX.healthCheckPassed`, `SAX.lastHealthCheck`
+- 디자이너 전용 필드: `SAX.packageSpecific.antigravitySetup`, `SAX.packageSpecific.mcpServers`
+
+**검증 스크립트**:
+```bash
+# SAX 필드 존재 확인
+cat ~/.claude.json | jq -e '.SAX' >/dev/null 2>&1 || echo "❌ SAX 메타데이터 없음"
+
+# 필수 필드 검증
+REQUIRED_FIELDS=("role" "position" "boarded" "boardedAt" "healthCheckPassed" "lastHealthCheck")
+for field in "${REQUIRED_FIELDS[@]}"; do
+  cat ~/.claude.json | jq -e ".SAX.$field" >/dev/null 2>&1 || echo "❌ 필수 필드 누락: $field"
+done
+
+# position 값 검증 (designer)
+POSITION=$(cat ~/.claude.json | jq -r '.SAX.position')
+if [ "$POSITION" != "designer" ]; then
+  echo "❌ position 값이 'designer'가 아님: $POSITION"
+fi
+
+# 디자이너 전용 필드 검증 (선택)
+ANTIGRAVITY_SETUP=$(cat ~/.claude.json | jq -r '.SAX.packageSpecific.antigravitySetup')
+if [ "$ANTIGRAVITY_SETUP" == "null" ]; then
+  echo "ℹ️ Antigravity 설정 상태 미기록 (선택 사항)"
+fi
+```
+
+**검증 성공 시**:
+```markdown
+✅ SAX 메타데이터: 정상
+  - role: fulltime
+  - position: designer
+  - boarded: true
+  - boardedAt: 2025-12-09T10:30:00Z
+  - healthCheckPassed: true
+  - lastHealthCheck: 2025-12-09T10:30:00Z
+  - packageSpecific.antigravitySetup: false
+  - packageSpecific.mcpServers.magic: true
+  - packageSpecific.mcpServers.playwright: true
+```
+
+**검증 실패 시**:
+```markdown
+❌ SAX 메타데이터: 오류 발견
+
+**문제**:
+- ❌ 필수 필드 누락: lastHealthCheck
+- ❌ 잘못된 position 값: design (올바른 값: designer)
+
+**해결**:
+온보딩 프로세스를 완료하거나 `/SAX:onboarding`을 실행하세요.
+```
+
+> **참조**: [SAX Core Metadata Schema](https://github.com/semicolon-devteam/sax-core/blob/main/_shared/metadata-schema.md)
+
 ---
 
 ## 출력 형식
