@@ -103,6 +103,22 @@ jq '. + {
 3. SAX가 자동으로 다음 단계를 안내합니다
 ```
 
+**SAX 메타데이터 업데이트**:
+```json
+{
+  "SAX": {
+    "role": "fulltime",
+    "position": "developer",
+    "boarded": true,
+    "boardedAt": "2025-12-09T10:30:00Z",
+    "healthCheckPassed": true,
+    "lastHealthCheck": "2025-12-09T10:30:00Z"
+  }
+}
+```
+
+> **참조**: [SAX Core Metadata Schema](https://github.com/semicolon-devteam/sax-core/blob/main/_shared/metadata-schema.md)
+
 ## References
 
 - [Onboarding Phases](references/onboarding-phases.md)
