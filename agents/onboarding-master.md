@@ -159,5 +159,6 @@ jq '. + {
 ## 참조
 
 - [SAX Core PRINCIPLES.md](https://github.com/semicolon-devteam/docs/blob/main/sax/core/PRINCIPLES.md)
+- [Team Context Guide](https://github.com/semicolon-devteam/sax-core/blob/main/_shared/team-context.md)
 - [health-check Skill](../skills/health-check/skill.md)
 - [epic-master Agent](./epic-master.md)
