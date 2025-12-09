@@ -1,10 +1,22 @@
 # Backend Draft Task Workflow
 
-## 1. Duplication Check
+## 🔴 레포지토리 라우팅 (NON-NEGOTIABLE)
+
+> **Backend 작업은 예외 없이 `semicolon-devteam/core-backend`에 생성합니다.**
+
+| 키워드 | 대상 레포 | 변경 가능 |
+|--------|----------|----------|
+| API, 서버, 데이터베이스, RPC, 엔드포인트 | `core-backend` | ❌ 불가 |
+
+⚠️ Epic의 "대상 레포" 필드와 관계없이 Backend 작업은 **무조건** core-backend입니다.
+
+## 1. Duplication Check (필수 - 스킵 금지)
 
 ```markdown
-[SAX] Skill: check-backend-duplication 사용
+[SAX] Skill: check-backend-duplication 호출 - Epic #{epic_number}
 ```
+
+**🔴 이 단계는 반드시 실행해야 합니다. 스킵 시 Issue #13 위반.**
 
 Check core-backend domain + Service level for duplicates.
 

@@ -59,9 +59,17 @@ Epic Issue를 조회하여 다음을 파악합니다:
 
 > 📖 **상세 워크플로우**: [backend-workflow.md](references/backend-workflow.md)
 
+**🔴 레포지토리 라우팅 (NON-NEGOTIABLE)**:
+
+| 작업 유형 | 대상 레포 | 예외 |
+|----------|----------|------|
+| Backend (API, 서버, DB, RPC) | `semicolon-devteam/core-backend` | **없음** |
+
+> ⚠️ Epic의 "대상 레포"가 다른 레포를 명시하더라도, **Backend 작업은 무조건 core-backend**에 생성합니다.
+
 **주요 단계**:
-1. check-backend-duplication Skill로 중복 체크
-2. 중복 없으면 core-backend에 Draft Task 생성
+1. **check-backend-duplication Skill 호출** (**필수** - 스킵 금지)
+2. 중복 없으면 `semicolon-devteam/core-backend`에 Draft Task 생성
 3. Sub-issue 연결 및 draft 라벨 부여
 4. Projects 보드 연결 (**필수**)
 5. Assignee 할당 (대화형)
