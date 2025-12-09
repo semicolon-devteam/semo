@@ -80,9 +80,9 @@ PKG="${INSTALLED_PKGS[0]:-}"
 | sax-core | 디렉토리 존재 | - |
 | sax-{pkg} | 디렉토리 존재 | - |
 | CLAUDE.md | 심링크 유효성 | 재생성 |
-| agents/ | .merged 마커 + 심링크 | 재생성 |
-| skills/ | .merged 마커 + 심링크 | 재생성 |
-| commands/SAX/ | .merged 마커 + 심링크 | 재생성 |
+| agents/ | .merged 마커 + 심링크 + **누락 감지** | 재생성 + 추가 |
+| skills/ | .merged 마커 + 심링크 + **누락 감지** | 재생성 + 추가 |
+| commands/SAX/ | .merged 마커 + 심링크 + **누락 감지** | 재생성 + 추가 |
 
 ### 3. 검증 실행
 
@@ -94,6 +94,13 @@ find .claude -type l ! -exec test -e {} \; -print 2>/dev/null
 [ -f ".claude/agents/.merged" ] && echo "agents: OK" || echo "agents: MISSING"
 [ -f ".claude/skills/.merged" ] && echo "skills: OK" || echo "skills: MISSING"
 [ -f ".claude/commands/SAX/.merged" ] && echo "commands/SAX: OK" || echo "commands/SAX: MISSING"
+
+# 🔴 누락 심링크 감지 (NEW - Issue #7)
+# sax-core와 sax-{pkg}의 컴포넌트가 .claude/{dir}에 모두 심링크되어 있는지 확인
+for skill in .claude/sax-core/skills/*/; do
+  name=$(basename "$skill")
+  [ ! -e ".claude/skills/$name" ] && echo "skills: MISSING $name"
+done
 ```
 
 ### 4. 자동 수정

@@ -394,3 +394,336 @@ fi
 
 1. **기본 (sax-core)**: 공통 컴포넌트
 2. **우선 (sax-{pkg})**: 패키지별 컴포넌트 (동일 이름이면 덮어쓰기)
+
+## 🔴 누락 심링크 감지 (NEW - Issue #7 대응)
+
+> **문제**: 패키지 업데이트 후 새로 추가된 스킬/에이전트/커맨드의 심링크가 생성되지 않음
+>
+> **해결**: 소스 디렉토리와 병합 디렉토리를 비교하여 누락된 심링크 자동 감지 및 생성
+
+### 누락 감지 로직
+
+```bash
+# 누락된 심링크 감지 함수
+# 반환: 누락된 컴포넌트 목록 (newline 구분)
+detect_missing_symlinks() {
+  local dir_type=$1  # agents, skills
+  local pkg=$2
+  local missing=""
+
+  # 1. sax-core에서 누락된 것 찾기
+  if [ -d ".claude/sax-core/$dir_type" ]; then
+    for item in .claude/sax-core/$dir_type/*/; do
+      if [ -d "$item" ]; then
+        local name=$(basename "$item")
+        local target=".claude/$dir_type/$name"
+
+        # 병합 디렉토리에 없으면 누락
+        if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+          missing="$missing[core] $name\n"
+        fi
+      fi
+    done
+  fi
+
+  # 2. sax-{pkg}에서 누락된 것 찾기
+  if [ -d ".claude/sax-$pkg/$dir_type" ]; then
+    for item in .claude/sax-$pkg/$dir_type/*/; do
+      if [ -d "$item" ]; then
+        local name=$(basename "$item")
+        local target=".claude/$dir_type/$name"
+
+        # 병합 디렉토리에 없으면 누락
+        if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+          missing="$missing[pkg] $name\n"
+        fi
+      fi
+    done
+  fi
+
+  echo -e "$missing"
+}
+
+# commands/SAX 누락 감지
+detect_missing_commands() {
+  local pkg=$1
+  local missing=""
+
+  # 1. sax-core 커맨드 누락 확인
+  if [ -d ".claude/sax-core/commands/SAX" ]; then
+    for item in .claude/sax-core/commands/SAX/*.md; do
+      if [ -f "$item" ]; then
+        local name=$(basename "$item")
+        local target=".claude/commands/SAX/$name"
+
+        if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+          missing="$missing[core] $name\n"
+        fi
+      fi
+    done
+  fi
+
+  # 2. sax-{pkg} 커맨드 누락 확인
+  if [ -d ".claude/sax-$pkg/commands/SAX" ]; then
+    for item in .claude/sax-$pkg/commands/SAX/*.md; do
+      if [ -f "$item" ]; then
+        local name=$(basename "$item")
+        local target=".claude/commands/SAX/$name"
+
+        if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+          missing="$missing[pkg] $name\n"
+        fi
+      fi
+    done
+  fi
+
+  echo -e "$missing"
+}
+```
+
+### 누락 심링크 자동 생성
+
+```bash
+# 누락된 심링크만 생성 (기존 것 유지)
+fix_missing_symlinks() {
+  local dir_type=$1  # agents, skills
+  local pkg=$2
+  local added=0
+
+  echo "=== $dir_type/ 누락 심링크 확인 ==="
+
+  # 병합 디렉토리 확인/생성
+  ensure_real_directory ".claude/$dir_type"
+  [ ! -f ".claude/$dir_type/.merged" ] && touch ".claude/$dir_type/.merged"
+
+  # 1. sax-core 누락 심링크 생성
+  if [ -d ".claude/sax-core/$dir_type" ]; then
+    for item in .claude/sax-core/$dir_type/*/; do
+      if [ -d "$item" ]; then
+        local name=$(basename "$item")
+        local target=".claude/$dir_type/$name"
+
+        # 없으면 생성
+        if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+          cd ".claude/$dir_type"
+          create_link_or_copy "../sax-core/$dir_type/$name" "$name"
+          echo "  ✅ [core] $name 추가됨"
+          cd ../..
+          added=$((added + 1))
+        fi
+      fi
+    done
+  fi
+
+  # 2. sax-{pkg} 누락 심링크 생성 (우선 적용)
+  if [ -d ".claude/sax-$pkg/$dir_type" ]; then
+    for item in .claude/sax-$pkg/$dir_type/*/; do
+      if [ -d "$item" ]; then
+        local name=$(basename "$item")
+        local target=".claude/$dir_type/$name"
+
+        # 없으면 생성
+        if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+          cd ".claude/$dir_type"
+          create_link_or_copy "../sax-$pkg/$dir_type/$name" "$name"
+          echo "  ✅ [pkg] $name 추가됨"
+          cd ../..
+          added=$((added + 1))
+        fi
+      fi
+    done
+  fi
+
+  if [ $added -eq 0 ]; then
+    echo "  (누락 없음)"
+  else
+    echo "  → $added개 심링크 추가됨"
+  fi
+
+  return $added
+}
+
+# commands/SAX 누락 심링크 생성
+fix_missing_commands() {
+  local pkg=$1
+  local added=0
+
+  echo "=== commands/SAX/ 누락 심링크 확인 ==="
+
+  # 병합 디렉토리 확인/생성
+  ensure_real_directory ".claude/commands"
+  ensure_real_directory ".claude/commands/SAX"
+  [ ! -f ".claude/commands/SAX/.merged" ] && touch ".claude/commands/SAX/.merged"
+
+  # 1. sax-core 커맨드 누락 생성
+  if [ -d ".claude/sax-core/commands/SAX" ]; then
+    for item in .claude/sax-core/commands/SAX/*.md; do
+      if [ -f "$item" ]; then
+        local name=$(basename "$item")
+        local target=".claude/commands/SAX/$name"
+
+        if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+          cd ".claude/commands/SAX"
+          create_link_or_copy "../../sax-core/commands/SAX/$name" "$name"
+          echo "  ✅ [core] $name 추가됨"
+          cd ../../..
+          added=$((added + 1))
+        fi
+      fi
+    done
+  fi
+
+  # 2. sax-{pkg} 커맨드 누락 생성
+  if [ -d ".claude/sax-$pkg/commands/SAX" ]; then
+    for item in .claude/sax-$pkg/commands/SAX/*.md; do
+      if [ -f "$item" ]; then
+        local name=$(basename "$item")
+        local target=".claude/commands/SAX/$name"
+
+        if [ ! -e "$target" ] && [ ! -L "$target" ]; then
+          cd ".claude/commands/SAX"
+          create_link_or_copy "../../sax-$pkg/commands/SAX/$name" "$name"
+          echo "  ✅ [pkg] $name 추가됨"
+          cd ../../..
+          added=$((added + 1))
+        fi
+      fi
+    done
+  fi
+
+  if [ $added -eq 0 ]; then
+    echo "  (누락 없음)"
+  else
+    echo "  → $added개 심링크 추가됨"
+  fi
+
+  return $added
+}
+```
+
+### 통합 누락 체크 및 수정
+
+```bash
+# 전체 누락 심링크 체크 및 수정
+# --check-only 모드: 감지만 수행, 수정 안함
+# 기본 모드: 감지 + 자동 수정
+run_missing_check() {
+  local pkg=$(detect_package)
+  local check_only=${1:-false}
+  local total_missing=0
+  local total_added=0
+
+  echo ""
+  echo "## 누락 심링크 검사"
+  echo ""
+
+  # agents 누락 확인
+  local agents_missing=$(detect_missing_symlinks "agents" "$pkg")
+  if [ -n "$agents_missing" ]; then
+    echo "### agents/ 누락 발견:"
+    echo -e "$agents_missing"
+    total_missing=$((total_missing + $(echo -e "$agents_missing" | grep -c '\[' || echo 0)))
+  fi
+
+  # skills 누락 확인
+  local skills_missing=$(detect_missing_symlinks "skills" "$pkg")
+  if [ -n "$skills_missing" ]; then
+    echo "### skills/ 누락 발견:"
+    echo -e "$skills_missing"
+    total_missing=$((total_missing + $(echo -e "$skills_missing" | grep -c '\[' || echo 0)))
+  fi
+
+  # commands 누락 확인
+  local commands_missing=$(detect_missing_commands "$pkg")
+  if [ -n "$commands_missing" ]; then
+    echo "### commands/SAX/ 누락 발견:"
+    echo -e "$commands_missing"
+    total_missing=$((total_missing + $(echo -e "$commands_missing" | grep -c '\[' || echo 0)))
+  fi
+
+  if [ $total_missing -eq 0 ]; then
+    echo "✅ 모든 심링크가 동기화되어 있습니다."
+    return 0
+  fi
+
+  echo ""
+  echo "**총 $total_missing개 누락 발견**"
+
+  # --check-only 모드면 여기서 종료
+  if [ "$check_only" = true ]; then
+    echo ""
+    echo "**결과**: ⚠️ 누락 발견 (자동 수정 필요)"
+    return 1
+  fi
+
+  # 자동 수정 실행
+  echo ""
+  echo "## 자동 수정 실행"
+  echo ""
+
+  fix_missing_symlinks "agents" "$pkg"
+  total_added=$((total_added + $?))
+
+  fix_missing_symlinks "skills" "$pkg"
+  total_added=$((total_added + $?))
+
+  fix_missing_commands "$pkg"
+  total_added=$((total_added + $?))
+
+  echo ""
+  echo "✅ $total_added개 심링크가 추가되었습니다."
+
+  # 심링크 변경 시 세션 재시작 권장
+  if [ $total_added -gt 0 ]; then
+    echo ""
+    echo "⚠️ **세션 재시작 권장**"
+    echo ""
+    echo "새 스킬/에이전트가 추가되었습니다."
+    echo "Claude Code가 변경된 경로를 인식하도록 **새 세션을 시작**하는 것을 권장합니다."
+  fi
+
+  return 0
+}
+```
+
+### --check-only 모드 출력 형식
+
+```markdown
+[SAX] Skill: sax-architecture-checker --check-only 실행
+
+## 구조 검증 결과
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| sax-core | ✅ | 존재 |
+| sax-{pkg} | ✅ | sax-po |
+| CLAUDE.md | ✅ | 심링크 유효 |
+| agents/ | ✅ | 5 symlinks |
+| skills/ | ⚠️ | 누락 1개 (list-bugs) |
+| commands/SAX | ✅ | 6 symlinks |
+
+**결과**: ⚠️ 문제 발견 (자동 수정 필요)
+```
+
+### 기본 모드 출력 형식
+
+```markdown
+[SAX] Skill: sax-architecture-checker 실행
+
+## .claude 디렉토리 검증 결과
+
+| 항목 | 상태 | 비고 |
+|------|------|------|
+| 패키지 | ✅ | sax-po |
+| CLAUDE.md | ✅ | sax-po/CLAUDE.md |
+| agents/ | ✅ | 5 symlinks |
+| skills/ | ⚠️ → ✅ | 1개 심링크 추가 (list-bugs) |
+| commands/SAX | ✅ | 6 symlinks |
+
+**결과**: 1개 항목 자동 수정됨
+
+⚠️ **세션 재시작 권장**
+
+새 스킬/에이전트가 추가되었습니다.
+Claude Code가 변경된 경로를 인식하도록 **새 세션을 시작**하는 것을 권장합니다.
+```
