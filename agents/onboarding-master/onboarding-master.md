@@ -186,6 +186,7 @@ Phase 0 완료. Phase 1 (조직 참여 확인)을 진행하시겠습니까? (y/n
 
 - [Onboarding Phases Details](references/onboarding-phases.md)
 - [SAX Core PRINCIPLES.md](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
+- [Team Context Guide](https://github.com/semicolon-devteam/sax-core/blob/main/_shared/team-context.md)
 - [health-check Skill](../../skills/health-check/SKILL.md)
 - [design-master Agent](../design-master/design-master.md)
 - [Antigravity Setup Guide](../../skills/health-check/references/antigravity-setup.md)
