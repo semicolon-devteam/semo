@@ -4,16 +4,20 @@
 
 ## 팀원 매핑 테이블
 
+> 🔴 **Slack ID는 참조용입니다.** 실제 멘션 시에는 반드시 Slack API를 통해 동적으로 조회하세요.
+>
+> 마지막 동기화: 2025-12-09
+
 | 이름 | GitHub ID | Slack Display Name | Slack ID | 역할 |
 |------|-----------|-------------------|----------|------|
 | 전준영 | reus-jeon | Reus | URSQYUNQJ | 프론트/리더 |
 | 서정원 | garden92 | Garden | URU4UBX9R | 인프라/리더 |
-| 고권희 | kokkh | Goni | U02G8542V9U | QA |
-| 강용준 | kyago | kyago | ? | 백엔드/리더 |
+| 고권희 | kokkh | Goni | U09NRR79YCW | QA |
+| 강용준 | kyago | kyago | U02G8542V9U | 백엔드/리더 |
 | 노영록 | Roki-Noh | Roki | U08P11ZQY04 | PO/리더 |
-| 장현봉 | Brightbong92 | bon | U02V56WM3KD | 프론트 |
-| 강동현 | gtod8010 | dwight.k | U06Q5KECB5J | 프론트 |
-| 염현준 | Yeomsoyam | Yeomso | U080YLC0MFZ | 디자인/리더 |
+| 장현봉 | Brightbong92 | bon | U09LF7ZS5GR | 프론트 |
+| 강동현 | gtod8010 | dwight.k | U01KNHM6PK3 | 프론트 |
+| 염현준 | Yeomsoyam | Yeomso | U01KH8V6ZHP | 디자인/리더 |
 
 ## 사용 방법
 
@@ -46,16 +50,19 @@ MENTION="<@$SLACK_ID>"
 
 ```bash
 # GitHub ID로 Slack Display Name 조회
+# 🔴 이 매핑은 GitHub ID → Slack Display Name 변환용입니다.
+# 🔴 실제 Slack ID는 반드시 API를 통해 동적으로 조회하세요.
 get_slack_name() {
   local github_id="$1"
   case "$github_id" in
     "reus-jeon") echo "Reus" ;;
-    "Garden0312") echo "Garden" ;;
-    "kokkh") echo "kyago" ;;
-    "swon3210") echo "Roki" ;;
-    "bon-jang") echo "bon" ;;
-    "DwightKSchrute") echo "dwight.k" ;;
-    "yeomso") echo "Yeomso" ;;
+    "garden92") echo "Garden" ;;
+    "kokkh") echo "Goni" ;;
+    "kyago") echo "kyago" ;;
+    "Roki-Noh") echo "Roki" ;;
+    "Brightbong92") echo "bon" ;;
+    "gtod8010") echo "dwight.k" ;;
+    "Yeomsoyam") echo "Yeomso" ;;
     *) echo "$github_id" ;;  # 매핑 없으면 GitHub ID 그대로 반환
   esac
 }
@@ -63,6 +70,9 @@ get_slack_name() {
 # 사용 예시
 SLACK_NAME=$(get_slack_name "reus-jeon")  # "Reus"
 ```
+
+> **🔴 중요**: Slack ID는 하드코딩하지 마세요! 반드시 Slack API를 통해 동적으로 조회해야 합니다.
+> 하드코딩된 Slack ID는 사용자 탈퇴/재가입, 워크스페이스 변경 등으로 무효화될 수 있습니다.
 
 ## 역할별 담당자
 

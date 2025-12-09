@@ -134,17 +134,21 @@ fi
 
 #### 팀원 참조 (Semicolon)
 
-| Display Name | Slack ID | Real Name |
-|--------------|----------|-----------|
-| Reus | URSQYUNQJ | 전준영 |
-| Garden | URU4UBX9R | 서정원 |
-| kyago | U02G8542V9U | 강용준 |
-| Roki | U08P11ZQY04 | 노영록 |
-| bon | U02V56WM3KD | 장현봉 |
-| dwight.k | U06Q5KECB5J | 강동현 |
-| Yeomso | U080YLC0MFZ | 염현준 |
+> 🔴 **중요**: 아래 Slack ID는 참조용입니다. **실제 멘션 시에는 반드시 Slack API를 통해 동적으로 조회하세요.**
+> Slack ID는 사용자 탈퇴/재가입, 워크스페이스 변경 등으로 변경될 수 있습니다.
 
-> **Note**: 위 테이블은 참조용입니다. 실제 멘션 시에는 API를 통해 동적으로 조회합니다.
+| Display Name | Real Name | GitHub ID |
+|--------------|-----------|-----------|
+| Reus | 전준영 | reus-jeon |
+| Garden | 서정원 | garden92 |
+| Goni | 고권희 | kokkh |
+| kyago | 강용준 | kyago |
+| Roki | 노영록 | Roki-Noh |
+| bon | 장현봉 | Brightbong92 |
+| dwight.k | 강동현 | gtod8010 |
+| Yeomso | 염현준 | Yeomsoyam |
+
+> 📖 전체 매핑 정보: [sax-core/_shared/team-members.md](../../_shared/team-members.md)
 
 ### 릴리스 알림 (version-manager 연동)
 
