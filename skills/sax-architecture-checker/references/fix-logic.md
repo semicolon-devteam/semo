@@ -2,6 +2,82 @@
 
 > install-sax.sh와 동일한 로직으로 .claude 구조 수정
 
+## 🔴 Windows 환경 지원
+
+> **Windows에서는 심링크 생성에 관리자 권한 또는 개발자 모드가 필요합니다.**
+> 심링크 실패 시 자동으로 파일/디렉토리 복사로 폴백합니다.
+
+### OS 감지
+
+```bash
+detect_os() {
+  case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*) echo "windows" ;;
+    Darwin) echo "macos" ;;
+    Linux) echo "linux" ;;
+    *) echo "unknown" ;;
+  esac
+}
+
+OS=$(detect_os)
+```
+
+### 심링크 생성 (폴백 포함)
+
+```bash
+# 심링크 시도, 실패 시 복사로 폴백
+# 반환값: 0=심링크 성공, 1=복사로 대체
+SYMLINK_FALLBACK_USED=false
+
+create_link_or_copy() {
+  local target=$1
+  local link_path=$2
+
+  # 기존 파일/심링크 제거
+  rm -rf "$link_path"
+
+  # 심링크 시도
+  if ln -s "$target" "$link_path" 2>/dev/null; then
+    return 0
+  fi
+
+  # 실패 시 파일/디렉토리 복사
+  if [ -d "$(dirname "$link_path")/$target" ]; then
+    cp -r "$(dirname "$link_path")/$target" "$link_path"
+  elif [ -f "$(dirname "$link_path")/$target" ]; then
+    cp "$(dirname "$link_path")/$target" "$link_path"
+  else
+    echo "  ❌ 대상 없음: $target"
+    return 2
+  fi
+
+  SYMLINK_FALLBACK_USED=true
+  echo "  ⚠️ 심링크 실패 → 복사로 대체: $(basename "$link_path")"
+  return 1
+}
+```
+
+### 폴백 사용 시 안내 메시지
+
+```bash
+print_fallback_warning() {
+  if [ "$SYMLINK_FALLBACK_USED" = true ]; then
+    echo ""
+    echo "⚠️ **Windows 환경 알림**"
+    echo ""
+    echo "일부 심링크가 파일 복사로 대체되었습니다."
+    echo "원본 파일 수정 시 수동으로 다시 설치해야 합니다:"
+    echo "\`\`\`"
+    echo "./install-sax.sh {패키지} --force"
+    echo "\`\`\`"
+    echo ""
+    echo "심링크를 사용하려면:"
+    echo "1. Windows 설정 → 개발자용 → 개발자 모드 활성화"
+    echo "2. 또는 관리자 권한으로 터미널 실행"
+  fi
+}
+```
+
 ## 패키지 감지
 
 ```bash
@@ -48,13 +124,21 @@ PKG=$(detect_package)
 fix_claude_md() {
   local pkg=$1
 
-  # 기존 제거 (심링크 또는 파일)
-  rm -f ".claude/CLAUDE.md"
+  cd .claude
 
-  # 새 심링크 생성
-  ln -s "sax-$pkg/CLAUDE.md" ".claude/CLAUDE.md"
+  # create_link_or_copy 사용 (심링크 또는 복사)
+  create_link_or_copy "sax-$pkg/CLAUDE.md" "CLAUDE.md"
+  local result=$?
 
-  echo "Fixed: CLAUDE.md -> sax-$pkg/CLAUDE.md"
+  cd ..
+
+  if [ $result -eq 0 ]; then
+    echo "Fixed: CLAUDE.md -> sax-$pkg/CLAUDE.md (symlink)"
+  elif [ $result -eq 1 ]; then
+    echo "Fixed: CLAUDE.md (copied from sax-$pkg/CLAUDE.md)"
+  else
+    echo "Error: CLAUDE.md 생성 실패"
+  fi
 }
 ```
 
@@ -97,26 +181,30 @@ fix_merged_dir() {
 
   # 1. sax-core 심링크 (기본 레이어)
   if [ -d ".claude/sax-core/$dir_type" ]; then
-    for item in .claude/sax-core/$dir_type/*/; do
+    cd ".claude/$dir_type"
+    for item in ../sax-core/$dir_type/*/; do
       if [ -d "$item" ]; then
         local name=$(basename "$item")
-        ln -sfn "../sax-core/$dir_type/$name" ".claude/$dir_type/$name"
+        create_link_or_copy "../sax-core/$dir_type/$name" "$name"
         echo "  [core] $name"
       fi
     done
+    cd ../..
   fi
 
   # 2. sax-{pkg} 심링크 (우선 레이어, 덮어쓰기)
   if [ -d ".claude/sax-$pkg/$dir_type" ]; then
-    for item in .claude/sax-$pkg/$dir_type/*/; do
+    cd ".claude/$dir_type"
+    for item in ../sax-$pkg/$dir_type/*/; do
       if [ -d "$item" ]; then
         local name=$(basename "$item")
         # core 것이 있으면 제거 (패키지 우선)
-        rm -f ".claude/$dir_type/$name"
-        ln -sfn "../sax-$pkg/$dir_type/$name" ".claude/$dir_type/$name"
+        rm -rf "$name"
+        create_link_or_copy "../sax-$pkg/$dir_type/$name" "$name"
         echo "  [pkg] $name"
       fi
     done
+    cd ../..
   fi
 
   # 3. 🔴 검증: 심링크 실제 접근 가능 여부 확인
@@ -152,25 +240,29 @@ fix_commands() {
 
   # 1. sax-core 커맨드 심링크
   if [ -d ".claude/sax-core/commands/SAX" ]; then
-    for item in .claude/sax-core/commands/SAX/*.md; do
+    cd ".claude/commands/SAX"
+    for item in ../../sax-core/commands/SAX/*.md; do
       if [ -f "$item" ]; then
         local name=$(basename "$item")
-        ln -sfn "../../sax-core/commands/SAX/$name" ".claude/commands/SAX/$name"
+        create_link_or_copy "../../sax-core/commands/SAX/$name" "$name"
         echo "  [core] $name"
       fi
     done
+    cd ../../..
   fi
 
   # 2. sax-{pkg} 커맨드 심링크 (우선)
   if [ -d ".claude/sax-$pkg/commands/SAX" ]; then
-    for item in .claude/sax-$pkg/commands/SAX/*.md; do
+    cd ".claude/commands/SAX"
+    for item in ../../sax-$pkg/commands/SAX/*.md; do
       if [ -f "$item" ]; then
         local name=$(basename "$item")
-        rm -f ".claude/commands/SAX/$name"
-        ln -sfn "../../sax-$pkg/commands/SAX/$name" ".claude/commands/SAX/$name"
+        rm -rf "$name"
+        create_link_or_copy "../../sax-$pkg/commands/SAX/$name" "$name"
         echo "  [pkg] $name"
       fi
     done
+    cd ../../..
   fi
 
   # 3. 🔴 검증: 심링크 실제 접근 가능 여부 확인
@@ -233,6 +325,9 @@ run_fix() {
     echo ""
     echo "⚠️ 다중 패키지 문제 해결을 위해 \`./install-sax.sh $pkg --force\` 실행을 권장합니다."
   fi
+
+  # Windows 폴백 사용 시 안내
+  print_fallback_warning
 }
 ```
 
