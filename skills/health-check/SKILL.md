@@ -95,8 +95,59 @@ gh auth status 2>&1 | grep 'project'
 ### SAX 메타데이터
 
 - 파일: `~/.claude.json`
-- 필수 필드: `SAX.role`, `SAX.position`, `SAX.boarded`, `SAX.healthCheckPassed`
+- 필수 필드: `SAX.role`, `SAX.position`, `SAX.boarded`, `SAX.boardedAt`, `SAX.healthCheckPassed`, `SAX.lastHealthCheck`
 - PM 전용 필드: `SAX.packageSpecific.githubProjectsAuth`
+
+**검증 스크립트**:
+```bash
+# SAX 필드 존재 확인
+cat ~/.claude.json | jq -e '.SAX' >/dev/null 2>&1 || echo "❌ SAX 메타데이터 없음"
+
+# 필수 필드 검증
+REQUIRED_FIELDS=("role" "position" "boarded" "boardedAt" "healthCheckPassed" "lastHealthCheck")
+for field in "${REQUIRED_FIELDS[@]}"; do
+  cat ~/.claude.json | jq -e ".SAX.$field" >/dev/null 2>&1 || echo "❌ 필수 필드 누락: $field"
+done
+
+# position 값 검증 (pm)
+POSITION=$(cat ~/.claude.json | jq -r '.SAX.position')
+if [ "$POSITION" != "pm" ]; then
+  echo "❌ position 값이 'pm'이 아님: $POSITION"
+fi
+
+# PM 전용 필드 검증
+GITHUB_PROJECTS_AUTH=$(cat ~/.claude.json | jq -r '.SAX.packageSpecific.githubProjectsAuth')
+if [ "$GITHUB_PROJECTS_AUTH" != "true" ]; then
+  echo "⚠️ GitHub Projects 권한 미설정 (project 스코프 필요)"
+fi
+```
+
+**검증 성공 시**:
+```markdown
+✅ SAX 메타데이터: 정상
+  - role: fulltime
+  - position: pm
+  - boarded: true
+  - boardedAt: 2025-12-09T10:30:00Z
+  - healthCheckPassed: true
+  - lastHealthCheck: 2025-12-09T10:30:00Z
+  - packageSpecific.githubProjectsAuth: true
+```
+
+**검증 실패 시**:
+```markdown
+❌ SAX 메타데이터: 오류 발견
+
+**문제**:
+- ❌ 필수 필드 누락: lastHealthCheck
+- ⚠️ GitHub Projects 권한 미설정
+
+**해결**:
+1. 온보딩 프로세스를 완료하거나 `/SAX:onboarding`을 실행하세요.
+2. GitHub Projects 권한: `gh auth refresh -s project` 실행
+```
+
+> **참조**: [SAX Core Metadata Schema](https://github.com/semicolon-devteam/sax-core/blob/main/_shared/metadata-schema.md)
 
 ### SAX 패키지 설치 상태
 
