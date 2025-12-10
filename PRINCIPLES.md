@@ -1,6 +1,6 @@
 # SAX Core Principles
 
-> **SAX (Semicolon Agent eXperience)**: Semicolon 팀의 AI 에이전트 협업 표준
+> **SAX (Semicolon AI Transformation)**: Semicolon 팀의 AI 에이전트 협업 표준
 
 ## 1. 핵심 원칙
 

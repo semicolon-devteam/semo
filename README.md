@@ -1,6 +1,6 @@
 # SAX-Core
 
-> SAX (Semicolon Agent eXperience) 프레임워크의 핵심 원칙과 규칙
+> SAX (Semicolon AI Transformation) 프레임워크의 핵심 원칙과 규칙
 
 ## Overview
 

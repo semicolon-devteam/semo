@@ -77,7 +77,7 @@ SAX 사용법, 패키지 정보, Semicolon 팀 컨텍스트에 대한 질문에 
 ```markdown
 [SAX] Skill: sax-help 응답
 
-## SAX (Semicolon Agent eXperience)
+## SAX (Semicolon AI Transformation)
 
 SAX는 Semicolon 팀의 Claude Code 확장 프레임워크입니다.
 
