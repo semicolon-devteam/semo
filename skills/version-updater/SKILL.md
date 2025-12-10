@@ -22,7 +22,7 @@ tools: [Bash, Read]
 3. **업데이트 실행** 지원
 4. **무결성 검증** 구조 및 동기화 상태 확인
 
-## 무결성 검증 흐름 (3-Phase)
+## 무결성 검증 흐름 (4-Phase)
 
 ```text
 [세션 시작] → version-updater 호출
@@ -38,6 +38,10 @@ tools: [Bash, Read]
               ┌─────┴─────┐
               │ Phase 3   │ 동기화 검증 (package-sync --check-only)
               └─────┬─────┘      ※ sax-core 존재 시에만
+                    ↓
+              ┌─────┴─────┐
+              │ Phase 4   │ 메모리 복원 (skill:memory sync)
+              └─────┬─────┘      ※ .claude/memory/ 존재 시에만
                     ↓
               [무결성 리포트 출력]
 ```
@@ -60,6 +64,7 @@ fi
 | 1 | (내장) | - | 업데이트 안내 |
 | 2 | sax-architecture-checker | --check-only | 기본 모드로 재호출 (자동 수정) |
 | 3 | package-sync | --check-only | 기본 모드로 재호출 (동기화 실행) |
+| 4 | skill:memory | sync | 저장된 결정/선호도 복원 |
 
 ## Trigger
 
@@ -219,6 +224,13 @@ Phase 3: package-sync --check-only (sax-core 환경만)
 | Skills | ✅ 8/8 |
 | Agents | ✅ 5/5 |
 | Commands | ✅ 4/4 |
+
+### Phase 4: 메모리 복원
+| 항목 | 상태 |
+|------|------|
+| 결정 사항 | ✅ 3건 로드 |
+| 선호도 | ✅ 2건 로드 |
+| 프로젝트 맥락 | ✅ 로드 |
 
 **무결성**: ✅ 정상
 ```
