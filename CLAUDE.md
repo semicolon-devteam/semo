@@ -1,3 +1,7 @@
+<!-- SEMO Framework -->
+> **SEMO** = "Semicolon Orchestrate" - AI 에이전트 오케스트레이션 프레임워크
+> (이전 명칭: SAX - Semicolon AI Transformation)
+
 # SAX-QA Package Configuration
 
 > QA 테스터를 위한 SAX 패키지
