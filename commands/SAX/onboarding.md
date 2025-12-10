@@ -1,52 +1,32 @@
 ---
 name: onboarding
-description: 신규 PM 온보딩 프로세스 시작
+description: "[DEPRECATED] sax-core /SAX:onboarding 사용 권장"
 ---
 
-# /SAX:onboarding Command
+# /SAX:onboarding Command (DEPRECATED)
 
-신규 PM(Project Manager)을 위한 온보딩 프로세스를 시작합니다.
+> **⚠️ DEPRECATED**: 이 명령어는 폐기되었습니다. `sax-core`의 통합 온보딩 명령어를 사용하세요.
 
-## Trigger
+## Migration
 
-- `/SAX:onboarding` 명령어
-- "처음이에요", "신규", "온보딩 시작" 키워드
-
-## Action
-
-`onboarding-master` Agent를 호출하여 5단계 온보딩 프로세스를 안내합니다.
-
-## Process
+기존 패키지별 온보딩 명령어는 `sax-core`의 통합 온보딩으로 대체되었습니다.
 
 ```text
-1. 환경 진단 (skill:health-check)
-2. 조직 참여 확인 (Slack, GitHub, GitHub Projects)
-3. SAX 개념 학습 (PM 워크플로우)
-4. 실습 (Sprint 생성 → 진행도 추적 → 보고서 생성)
-5. 온보딩 완료 및 메타데이터 저장
+[기존] 패키지별 /SAX:onboarding → onboarding-master Agent
+[신규] 통합 /SAX:onboarding → sax-core/skill:onboarding → skill:onboarding-{package}
 ```
 
-## Expected Output
+## 신규 동작
 
-```markdown
-[SAX] Orchestrator: 의도 분석 완료 → 온보딩 요청
+`/SAX:onboarding` 실행 시:
 
-[SAX] Agent: onboarding-master 호출 (트리거: /SAX:onboarding)
+1. `sax-core/skill:onboarding` 호출
+2. Phase 0-2: 환경 진단, 조직 참여, SAX 학습 (공통)
+3. Phase 3: 설치된 패키지의 `skill:onboarding-{package}` 자동 호출
+4. Phase 4: 온보딩 완료
 
-=== SAX-PM 온보딩 프로세스 시작 ===
+## 참조
 
-Phase 0: 환경 진단
-...
-
-Phase 2: PM 워크플로우
-1. Sprint 생성 ("/SAX:sprint create")
-2. Epic/Task 할당 ("skill:assign-task")
-3. 진행도 추적 ("/SAX:progress")
-4. 보고서 생성 ("/SAX:report")
-5. Sprint 종료 ("skill:close-sprint")
-```
-
-## Related
-
-- [onboarding-master Agent](../../agents/onboarding-master/onboarding-master.md)
-- [health-check Skill](../../skills/health-check/SKILL.md)
+- [sax-core/commands/SAX/onboarding.md](https://github.com/semicolon-devteam/sax-core/blob/main/commands/SAX/onboarding.md)
+- [sax-core/skills/onboarding/SKILL.md](https://github.com/semicolon-devteam/sax-core/blob/main/skills/onboarding/SKILL.md)
+- [onboarding-pm Skill](../../skills/onboarding-pm/SKILL.md)
