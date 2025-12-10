@@ -254,9 +254,13 @@ Claude: 선호도 적용
 4. 세션 초기화 완료
 ```
 
-### MCP 연동 (선택)
+### MCP 연동 (권장)
 
-Memory MCP 서버가 설치된 경우 연동 가능:
+Memory MCP 서버가 설치된 경우 자동으로 MCP를 우선 사용합니다.
+
+> 📖 **설정 가이드**: [_shared/mcp-config.md](../../_shared/mcp-config.md)
+
+#### MCP 설정
 
 ```json
 // ~/.claude.json
@@ -268,6 +272,37 @@ Memory MCP 서버가 설치된 경우 연동 가능:
     }
   }
 }
+```
+
+#### 저장소 우선순위
+
+| 순위 | 저장소 | 조건 | 장점 |
+|------|--------|------|------|
+| 1 | Memory MCP | MCP 서버 활성화 시 | 더 강력한 영속화, 크로스 프로젝트 공유 |
+| 2 | .claude/memory/ | MCP 없을 때 (폴백) | 프로젝트별 독립 관리, 설정 불필요 |
+
+#### MCP 감지 로직
+
+```bash
+# MCP 서버 활성화 여부 확인
+if [ -f ~/.claude.json ]; then
+  MCP_MEMORY=$(cat ~/.claude.json | jq -r '.mcpServers.memory // empty')
+  if [ -n "$MCP_MEMORY" ]; then
+    echo "Memory MCP 사용"
+  else
+    echo ".claude/memory/ 파일 사용"
+  fi
+fi
+```
+
+#### MCP 사용 시 동작
+
+```text
+skill:memory save decision "api-pattern" "JSON Envelope"
+    ↓
+1. ~/.claude.json에서 MCP 설정 확인
+2. MCP 활성화 → MCP 서버에 저장 (mcp_memory_save)
+3. MCP 비활성화 → .claude/memory/decisions.json에 저장
 ```
 
 ## SAX Message Format
