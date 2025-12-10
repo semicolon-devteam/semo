@@ -115,7 +115,51 @@ SAX는 다음 조건에서 Sequential Thinking을 자동으로 활용합니다:
 - "설계", "분석", "계획" 키워드 포함 시
 - 복잡한 아키텍처 관련 요청 시
 
-### 3. Filesystem MCP (선택)
+### 3. Doppler MCP (보안 권장)
+
+비밀 관리를 위한 Doppler MCP 서버입니다. API 토큰, 비밀 키 등을 중앙에서 관리합니다.
+
+```json
+{
+  "mcpServers": {
+    "doppler": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-doppler"],
+      "env": {
+        "DOPPLER_TOKEN": "${DOPPLER_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+**특징**:
+- 중앙 집중식 비밀 관리
+- 환경별 구성 분리 (dev/staging/prod)
+- 접근 로그 및 감사
+- 자동 로테이션 지원
+
+**SAX 비밀 관리**:
+
+| 비밀 | 용도 | Doppler 경로 |
+|------|------|--------------|
+| `SLACK_BOT_TOKEN` | Slack 알림 | `sax/dev/SLACK_BOT_TOKEN` |
+| `GITHUB_TOKEN` | GitHub API | `sax/dev/GITHUB_TOKEN` |
+| `ANTHROPIC_API_KEY` | Promptfoo 평가 | `sax/dev/ANTHROPIC_API_KEY` |
+
+**사용 방법**:
+
+```bash
+# Doppler CLI로 비밀 조회
+doppler secrets get SLACK_BOT_TOKEN --plain
+
+# Skill에서 환경 변수로 사용
+SLACK_TOKEN=$SLACK_BOT_TOKEN curl -s -X POST ...
+```
+
+> 📖 상세: [security/SECURITY_AUDIT.md](../security/SECURITY_AUDIT.md)
+
+### 4. Filesystem MCP (선택)
 
 파일 시스템 접근을 위한 MCP 서버입니다.
 
@@ -145,12 +189,19 @@ SAX는 다음 조건에서 Sequential Thinking을 자동으로 활용합니다:
     "sequential-thinking": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "doppler": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/mcp-doppler"],
+      "env": {
+        "DOPPLER_TOKEN": "${DOPPLER_TOKEN}"
+      }
     }
   }
 }
 ```
 
-> **💡 권장**: Memory + Sequential Thinking 조합으로 SAX의 핵심 기능을 최대한 활용할 수 있습니다.
+> **💡 권장**: Memory + Sequential Thinking + Doppler 조합으로 SAX의 핵심 기능을 최대한 활용할 수 있습니다.
 
 ## SAX Memory Skill 연동
 
