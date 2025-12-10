@@ -1,3 +1,7 @@
+<!-- SEMO Framework -->
+> **SEMO** = "Semicolon Orchestrate" - AI 에이전트 오케스트레이션 프레임워크
+> (이전 명칭: SAX - Semicolon AI Transformation)
+
 # SAX-Backend Package Configuration
 
 > Spring Boot 백엔드 개발자를 위한 SAX 패키지
