@@ -348,6 +348,37 @@ setup_symlinks() {
 
     # commands/SAX 병합 (sax-core 기본 + 패키지 우선)
     setup_merged_commands "$package" "$core_path" "$package_path"
+
+    # _shared 심링크 (sax-core/_shared 참조용)
+    setup_shared_link "$core_path"
+}
+
+# _shared 심링크 설정 (sax-core/_shared 참조용)
+setup_shared_link() {
+    local core_path=$1
+    local shared_link="$CLAUDE_DIR/_shared"
+    local shared_source="$core_path/_shared"
+
+    if [ ! -d "$shared_source" ]; then
+        print_warning "sax-core/_shared 디렉토리가 없습니다. 심링크를 건너뜁니다."
+        return
+    fi
+
+    # 기존 심링크 또는 디렉토리 처리
+    if [ -L "$shared_link" ]; then
+        rm "$shared_link"
+    elif [ -d "$shared_link" ]; then
+        print_info "기존 _shared/를 _shared.backup/으로 백업합니다"
+        mv "$shared_link" "$shared_link.backup"
+    fi
+
+    if [ "$OS_TYPE" = "Windows" ]; then
+        cp -r "$shared_source" "$shared_link"
+        print_success "_shared 복사 완료 (Windows 모드)"
+    else
+        ln -s "sax-core/_shared" "$shared_link"
+        print_success "_shared -> sax-core/_shared"
+    fi
 }
 
 # 병합 commands/SAX 설정 (sax-core 기본 + 패키지 우선)
@@ -505,6 +536,7 @@ print_summary() {
         # Windows: 복사 모드
         echo "  .claude/"
         echo "  ├── CLAUDE.md              (패키지 복사)"
+        echo "  ├── _shared/               (sax-core 복사)"
         echo "  ├── agents/                (병합 디렉토리)"
         echo "  │   ├── orchestrator/      [pkg] sax-$package"
         echo "  │   ├── compliance-checker/[core] sax-core"
@@ -526,6 +558,7 @@ print_summary() {
         # Linux/macOS: 심링크 병합 모드
         echo "  .claude/"
         echo "  ├── CLAUDE.md -> sax-$package/CLAUDE.md"
+        echo "  ├── _shared/  -> sax-core/_shared"
         echo "  ├── agents/                    (병합 디렉토리)"
         echo "  │   ├── orchestrator/          -> sax-$package/agents/..."
         echo "  │   ├── compliance-checker/    -> sax-core/agents/..."
