@@ -106,6 +106,7 @@ show_usage() {
     echo "  infra   - SAX-Infra (인프라/DevOps용)"
     echo "  design  - SAX-Design (UI/UX 디자이너용)"
     echo "  ms      - SAX-MS (마이크로서비스 개발자용)"
+    echo "  mvp     - SAX-MVP (그린필드 MVP 개발자용)"
     echo ""
     echo "옵션:"
     echo "  --force, -f   - 기존 설치 삭제 후 재설치"
@@ -628,9 +629,12 @@ select_package() {
     echo "  9) sax-ms      - 마이크로서비스 개발자용"
     echo "                   MS 아키텍처 설계, 이벤트 스키마, 워커 구현"
     echo ""
+    echo "  10) sax-mvp    - 그린필드 MVP 개발자용"
+    echo "                   세미콜론 생태계 기반 MVP 개발, Antigravity 통합"
+    echo ""
     echo "  q) 취소"
     echo ""
-    print_prompt "선택 [1-9]: "
+    print_prompt "선택 [1-10]: "
     read -r choice </dev/tty
 
     case "$choice" in
@@ -661,6 +665,9 @@ select_package() {
         9)
             PACKAGE="ms"
             ;;
+        10)
+            PACKAGE="mvp"
+            ;;
         q|Q)
             print_info "설치를 취소합니다"
             exit 0
@@ -690,7 +697,7 @@ parse_args() {
                 show_usage
                 exit 0
                 ;;
-            po|next|qa|meta|pm|backend|infra|design|ms)
+            po|next|qa|meta|pm|backend|infra|design|ms|mvp)
                 PACKAGE=$1
                 shift
                 ;;
