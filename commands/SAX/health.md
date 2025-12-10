@@ -1,5 +1,5 @@
 ---
-description: SAX 환경 및 구조 통합 검증 - 개발 환경 + .claude 디렉토리 검증
+description: SAX 환경 및 구조 통합 검증 - 개발 환경 + .claude 디렉토리 + 토큰 리포트
 ---
 
 # /SAX:health
@@ -38,6 +38,27 @@ SAX 환경 및 구조 통합 검증
 3. 문제 발견 시 자동 수정 (install-sax.sh 동일 로직)
 4. 결과 보고
 
+### Phase 3: 토큰 사용량 리포트
+
+SAX 구조의 토큰 사용량을 분석하여 비용 가시성 제공:
+
+1. **CLAUDE.md 크기**: 메인 설정 파일 토큰 추정
+2. **문서 크기**: PRINCIPLES.md, MESSAGE_RULES.md 등
+3. **Agent/Skill 정의**: 전체 Agent/Skill 파일 크기
+4. **세션 초기화 비용**: 예상 토큰 소비량
+
+**토큰 추정 방식**:
+- 약 4자 = 1 토큰 (영문 기준)
+- 약 2자 = 1 토큰 (한글 기준)
+
+### Phase 4: 메모리 상태 확인 (선택)
+
+`.claude/memory/` 디렉토리 존재 시:
+
+1. 저장된 결정 사항 수
+2. 저장된 선호도 수
+3. 마지막 동기화 시간
+
 ## 출력 예시
 
 ```markdown
@@ -58,12 +79,34 @@ SAX 환경 및 구조 통합 검증
 
 | 항목 | 상태 | 비고 |
 |------|------|------|
-| sax-core | ✅ | 존재 |
+| sax-core | ✅ | v0.23.0 |
+| sax-meta | ✅ | v0.48.0 |
 | sax-next | ✅ | 설치됨 |
 | CLAUDE.md | ✅ | 심링크 유효 |
 | agents/ | ✅ | 12 symlinks |
-| skills/ | ✅ | 8 symlinks |
-| commands/SAX | ✅ | 6 symlinks |
+| skills/ | ✅ | 14 symlinks |
+| commands/SAX | ✅ | 7 symlinks |
+
+=== Phase 3: 토큰 사용량 리포트 ===
+
+| 항목 | 줄 수 | 예상 토큰 |
+|------|-------|----------|
+| CLAUDE.md | 238 | ~950 |
+| PRINCIPLES.md | 358 | ~1,430 |
+| MESSAGE_RULES.md | 312 | ~1,250 |
+| Agent/Skill 정의 | 2,000 | ~8,000 |
+| 팀 컨텍스트 | 1,500 | ~6,000 |
+| **총 예상** | **4,408** | **~17,630** |
+
+💡 **권장**: 세션 초기화 토큰 < 20,000
+
+=== Phase 4: 메모리 상태 ===
+
+| 항목 | 값 |
+|------|------|
+| 저장된 결정 | 3건 |
+| 저장된 선호도 | 5건 |
+| 마지막 동기화 | 2025-12-10 10:00 |
 
 === 결과 ===
 ✅ 모든 항목 정상
@@ -75,8 +118,10 @@ SAX 환경 및 구조 통합 검증
 - `/SAX:health-check` (하위호환)
 - "환경 확인", "도구 확인", "설치 확인"
 - "SAX 상태", "심링크 확인", ".claude 확인"
+- "토큰 사용량", "비용 확인"
 
 ## 관련 문서
 
 - `sax-core/skills/sax-architecture-checker/SKILL.md`
+- `sax-core/skills/memory/SKILL.md`
 - `{패키지}/skills/health-check/SKILL.md`
