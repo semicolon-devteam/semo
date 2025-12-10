@@ -15,7 +15,7 @@
 
 ### 1. 세션 초기화
 
-> 📖 상세: [sax-core/_shared/INIT_SETUP.md](sax-core/_shared/INIT_SETUP.md)
+> 📖 상세: [_shared/INIT_SETUP.md](../_shared/INIT_SETUP.md)
 
 새 세션 시작 시 자동 실행 (4-Phase):
 ```text
@@ -24,11 +24,11 @@
 
 ### 2. SAX Core 참조
 
-> 📖 상세: [sax-core/_shared/SAX_CORE_REFERENCE.md](sax-core/_shared/SAX_CORE_REFERENCE.md)
+> 📖 상세: [_shared/SAX_CORE_REFERENCE.md](../_shared/SAX_CORE_REFERENCE.md)
 
 ### 3. Orchestrator 위임
 
-> 📖 상세: [sax-core/_shared/ORCHESTRATOR_RULES.md](sax-core/_shared/ORCHESTRATOR_RULES.md)
+> 📖 상세: [_shared/ORCHESTRATOR_RULES.md](../_shared/ORCHESTRATOR_RULES.md)
 
 모든 요청 → `agents/orchestrator.md` → Agent/Skill 라우팅
 
