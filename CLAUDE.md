@@ -157,15 +157,18 @@ REMOTE=$(gh api repos/semicolon-devteam/sax-meta/contents/VERSION --jq '.content
 | `feedback` | Skill | 피드백 수집 및 GitHub 이슈 생성 |
 | `sax-help` | Skill | SAX 도움말 및 팀 컨텍스트 응답 |
 
-### 공통 커맨드 (sax-core)
+### 공통 커맨드
 
-| 커맨드 | 설명 | 호출 스킬 |
-|--------|------|-----------|
-| `/SAX:help` | SAX 도움말 | sax-help |
-| `/SAX:slack` | Slack 메시지 전송 | notify-slack |
-| `/SAX:update` | SAX 업데이트 | version-updater |
-| `/SAX:feedback` | 피드백 제출 | feedback |
-| `/SAX:audit` | SAX 패키지 품질 감사 | audit-sax |
+> **SEMO 커맨드 권장**: `/SEMO:*` 사용을 권장합니다. `/SAX:*`는 병행 기간 동안 유지됩니다.
+
+| SEMO 커맨드 | SAX 커맨드 (레거시) | 설명 | 호출 스킬 |
+|-------------|-------------------|------|-----------|
+| `/SEMO:help` | `/SAX:help` | 도움말 | sax-help |
+| `/SEMO:slack` | `/SAX:slack` | Slack 메시지 전송 | notify-slack |
+| `/SEMO:update` | `/SAX:update` | 패키지 업데이트 | version-updater |
+| `/SEMO:feedback` | `/SAX:feedback` | 피드백 제출 | feedback |
+| `/SEMO:audit` | `/SAX:audit` | 패키지 품질 감사 | audit-sax |
+| `/SEMO:health` | `/SAX:health` | 환경/구조 검증 | - |
 
 ---
 
@@ -243,3 +246,5 @@ po|next|qa|meta|pm|backend|infra|design|ms|{name})
 - [Orchestrator](agents/orchestrator/orchestrator.md) - 라우팅 규칙 및 Agent/Skill 목록
 - [SAX Core - Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
 - [SAX Core - Message Rules](https://github.com/semicolon-devteam/sax-core/blob/main/MESSAGE_RULES.md)
+- [SAX → SEMO 마이그레이션 가이드](../docs/SAX_TO_SEMO_MIGRATION.md) - 리브랜딩 전환 가이드
+- [SEMO 네이밍 규칙](../docs/SEMO_NAMING_CONVENTION.md) - SAX → SEMO 용어 매핑
