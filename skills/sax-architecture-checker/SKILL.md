@@ -36,6 +36,7 @@ tools: [Bash, Read]
 | sax-core | ✅ | 존재 |
 | sax-{pkg} | ✅ | sax-pm |
 | CLAUDE.md | ✅ | 심링크 유효 |
+| _shared | ✅ | sax-core/_shared |
 | agents/ | ⚠️ | 깨진 심링크 2개 |
 | skills/ | ✅ | 8 symlinks |
 | commands/SAX | ❌ | .merged 마커 누락 |
@@ -80,6 +81,7 @@ PKG="${INSTALLED_PKGS[0]:-}"
 | sax-core | 디렉토리 존재 | - |
 | sax-{pkg} | 디렉토리 존재 | - |
 | CLAUDE.md | 심링크 유효성 | 재생성 |
+| _shared | 심링크 유효성 (sax-core/_shared) | 재생성 |
 | agents/ | .merged 마커 + 심링크 + **누락 감지** | 재생성 + 추가 |
 | skills/ | .merged 마커 + 심링크 + **누락 감지** | 재생성 + 추가 |
 | commands/SAX/ | .merged 마커 + 심링크 + **누락 감지** | 재생성 + 추가 |
@@ -94,6 +96,16 @@ find .claude -type l ! -exec test -e {} \; -print 2>/dev/null
 [ -f ".claude/agents/.merged" ] && echo "agents: OK" || echo "agents: MISSING"
 [ -f ".claude/skills/.merged" ] && echo "skills: OK" || echo "skills: MISSING"
 [ -f ".claude/commands/SAX/.merged" ] && echo "commands/SAX: OK" || echo "commands/SAX: MISSING"
+
+# _shared 심링크 확인 (sax-core/_shared 참조용)
+if [ -L ".claude/_shared" ]; then
+  target=$(readlink ".claude/_shared")
+  [ "$target" = "sax-core/_shared" ] && echo "_shared: OK" || echo "_shared: WRONG_TARGET ($target)"
+elif [ -d ".claude/_shared" ]; then
+  echo "_shared: DIRECTORY (should be symlink)"
+else
+  echo "_shared: MISSING"
+fi
 
 # 🔴 누락 심링크 감지 (NEW - Issue #7)
 # sax-core와 sax-{pkg}의 컴포넌트가 .claude/{dir}에 모두 심링크되어 있는지 확인
@@ -112,6 +124,10 @@ done
 rm -f ".claude/CLAUDE.md"
 ln -s "sax-$PKG/CLAUDE.md" ".claude/CLAUDE.md"
 
+# _shared 심링크 수정
+rm -rf ".claude/_shared"
+ln -s "sax-core/_shared" ".claude/_shared"
+
 # 병합 디렉토리 수정
 # → references/fix-logic.md 참조
 ```
@@ -125,6 +141,7 @@ ln -s "sax-$PKG/CLAUDE.md" ".claude/CLAUDE.md"
 |------|------|------|
 | 패키지 | ✅ | sax-pm |
 | CLAUDE.md | ✅ | sax-pm/CLAUDE.md |
+| _shared | ✅ | sax-core/_shared |
 | agents/ | ⚠️ → ✅ | 심링크 2개 재생성 |
 | skills/ | ✅ | 8 symlinks |
 | commands/SAX | ❌ → ✅ | 디렉토리 생성 + 4 symlinks |
