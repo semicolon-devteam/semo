@@ -22,7 +22,7 @@ import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 
-const VERSION = "2.0.0";
+const VERSION = "2.0.1";
 const SEMO_REPO = "https://github.com/semicolon-devteam/semo.git";
 
 // 확장 패키지 정의
@@ -36,6 +36,7 @@ const EXTENSION_PACKAGES: Record<string, { name: string; desc: string; detect: s
   design: { name: "Design", desc: "디자인 핸드오프 (3 agents, 4 skills)", detect: [] },
   ms: { name: "Microservice", desc: "마이크로서비스 아키텍처 (5 agents, 5 skills)", detect: [] },
   mvp: { name: "MVP", desc: "MVP 빠른 개발 (4 agents, 6 skills)", detect: [] },
+  meta: { name: "Meta", desc: "SEMO 프레임워크 자체 개발/관리 (6 agents, 7 skills)", detect: ["semo-core", "semo-skills", "packages/meta"] },
 };
 
 const program = new Command();
