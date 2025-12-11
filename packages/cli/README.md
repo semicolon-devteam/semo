@@ -1,4 +1,4 @@
-# @semicolon/semo-cli
+# @team-semicolon/semo-cli
 
 > SEMO CLI - AI Agent Orchestration Framework Installer
 
@@ -7,7 +7,7 @@
 Gemini의 하이브리드 전략에 따라 SEMO를 자동 설치하는 CLI 도구입니다.
 
 ```bash
-npx @semicolon/semo-cli init
+npx @team-semicolon/semo-cli init
 ```
 
 ## 동작 방식
@@ -34,7 +34,7 @@ semo-system/
   "mcpServers": {
     "semo-integrations": {
       "command": "npx",
-      "args": ["-y", "@semicolon/semo-mcp"]
+      "args": ["-y", "@team-semicolon/semo-mcp"]
     }
   }
 }
