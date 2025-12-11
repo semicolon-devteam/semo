@@ -118,51 +118,129 @@ supabase --version
 
 ## Phase 1: MCP 서버 검증
 
+### 🔴 필수: 실제 연결 테스트 (NON-NEGOTIABLE)
+
+> **⚠️ 중요**: MCP 서버는 **실제 호출 테스트**를 통해 검증해야 합니다.
+> 단순히 "설정 파일이 있다"는 것만으로는 연결 확인이 아닙니다.
+
 ### 필수 MCP 서버
 
-| Server | 용도 | 검증 방법 |
-|--------|------|----------|
-| Context7 | 문서 검색 | `mcp_context7` 호출 테스트 |
-| Sequential-thinking | 구조화된 추론 | `mcp_sequential_thinking` 호출 테스트 |
-| TestSprite | 테스트 자동화 | `mcp_testsprite` 호출 테스트 |
-| Supabase | 프로젝트 연동 | 프로젝트 목록 조회 |
-| GitHub | Org/Repo 연동 | `semicolon-devteam` 접근 확인 |
+| Server | 용도 | 실제 검증 방법 |
+|--------|------|---------------|
+| Context7 | 문서 검색 | `mcp__context7__resolve-library-id` 호출 |
+| Sequential-thinking | 구조화된 추론 | `mcp__sequentialthinking__sequentialthinking` 호출 |
+| Playwright | 브라우저 자동화 | `mcp__playwright__playwright_navigate` 호출 |
+| Supabase | 프로젝트 연동 | `mcp__supabase__list_tables` 호출 |
+| GitHub | Org/Repo 연동 | `gh api` 또는 MCP GitHub 도구 호출 |
 
-### 검증 절차
+### 검증 워크플로우
+
+#### Step 1: 사용 가능한 MCP 도구 목록 확인
+
+먼저 현재 세션에서 사용 가능한 MCP 도구를 확인합니다.
+도구 목록에 `mcp__context7`, `mcp__sequentialthinking` 등이 있는지 확인하세요.
+
+#### Step 2: 실제 호출 테스트
+
+**🔴 반드시 아래 도구를 직접 호출하여 검증합니다:**
+
+1. **Context7 검증**
+   ```
+   mcp__context7__resolve-library-id: "react"
+   ```
+   - ✅ 성공: 라이브러리 정보 반환
+   - ❌ 실패: 에러 또는 도구 없음
+
+2. **Sequential-thinking 검증**
+   ```
+   mcp__sequentialthinking__sequentialthinking: "1+1은 무엇인가요?"
+   ```
+   - ✅ 성공: 추론 결과 반환
+   - ❌ 실패: 에러 또는 도구 없음
+
+3. **Playwright 검증**
+   ```
+   mcp__playwright__playwright_navigate: url="https://example.com"
+   ```
+   - ✅ 성공: 페이지 로드 완료
+   - ❌ 실패: 에러 또는 도구 없음
+
+4. **GitHub 검증** (CLI 또는 MCP)
+   ```bash
+   gh api repos/semicolon-devteam/docs --jq '.name'
+   ```
+   - ✅ 성공: "docs" 반환
+   - ❌ 실패: 인증 오류
+
+### 검증 실패 시 자동 가이드
+
+MCP 서버가 연결되지 않은 경우, 아래 단계를 안내합니다:
+
+#### Claude Desktop 사용자
+
+```json
+// ~/.config/claude/claude_desktop_config.json (macOS)
+// %APPDATA%\Claude\claude_desktop_config.json (Windows)
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@anthropics/mcp-context7"]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@anthropics/mcp-sequential-thinking"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@anthropics/mcp-playwright"]
+    }
+  }
+}
+```
+
+#### VSCode Claude 확장 사용자
+
+```json
+// .vscode/settings.json 또는 claude_desktop_config.json
+{
+  "mcpServers": {
+    // ... 동일
+  }
+}
+```
+
+### 검증 결과 형식
 
 ```markdown
 ## Phase 1: MCP 서버 검증 결과
 
-### Context7
-- 상태: {connected | not_connected}
-- 테스트: 문서 검색 쿼리 실행
+### 검증 방법: 실제 도구 호출 테스트
 
-### Sequential-thinking
-- 상태: {connected | not_connected}
-- 테스트: 구조화된 추론 요청
+| Server | 상태 | 테스트 결과 |
+|--------|------|------------|
+| Context7 | ✅ | `resolve-library-id("react")` 성공 |
+| Sequential-thinking | ✅ | 추론 응답 정상 |
+| Playwright | ❌ | 도구 없음 - 설치 필요 |
+| GitHub | ✅ | `semicolon-devteam` 접근 가능 |
 
-### TestSprite
-- 상태: {connected | not_connected}
-- 테스트: 테스트 생성 요청
+### 조치 필요 항목
 
-### Supabase
-- 상태: {connected | not_connected}
-- 프로젝트: {project_name}
-- 테스트: 테이블 목록 조회
+❌ **Playwright** 연결 안 됨
 
-### GitHub
-- 상태: {connected | not_connected}
-- Organization: semicolon-devteam
-- 테스트: 리포지토리 접근 확인
+**설치 방법**:
+1. Claude Desktop 종료
+2. 설정 파일 수정 (위 가이드 참조)
+3. Claude Desktop 재시작
 
-### MCP 설정 가이드
+**또는 수동 설치**:
+\`\`\`bash
+npm install -g @anthropics/mcp-playwright
+\`\`\`
 
-MCP 서버가 연결되지 않은 경우:
-1. Claude Desktop 설정 확인 (`~/.config/claude/claude_desktop_config.json`)
-2. MCP 서버 설치 및 설정
-3. Claude 재시작
+---
 
-참조: [MCP 설정 가이드](sax-core/_shared/mcp-config.md)
+모든 MCP 서버가 연결될 때까지 Phase 2로 진행하지 않습니다.
 ```
 
 ---
