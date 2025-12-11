@@ -1,0 +1,111 @@
+# Promptfoo Configuration for SAX/SEMO Agentic Evaluation
+#
+# Usage:
+#   npx promptfoo eval --config evaluation/promptfoo.yaml
+#   npx promptfoo eval --config evaluation/promptfoo.yaml --output results.json
+#
+# Prerequisites:
+#   - ANTHROPIC_API_KEY 환경 변수 설정
+#   - Node.js 18+ 설치
+
+description: "SAX Agent/Skill 품질 평가 - sax-next 파일럿"
+
+prompts:
+  - file://prompts/code-generation.txt
+  - file://prompts/bug-fix.txt
+  - file://prompts/component-creation.txt
+
+providers:
+  - id: anthropic:claude-sonnet-4-20250514
+    config:
+      temperature: 0
+      max_tokens: 4096
+
+# 테스트 케이스
+tests:
+  # 1. React 컴포넌트 생성
+  - description: "React 컴포넌트 - loading 상태 추가"
+    vars:
+      task: "React 컴포넌트에 loading 상태를 추가해줘"
+      context: "Next.js 14 App Router, TypeScript"
+    assert:
+      - type: contains
+        value: "useState"
+      - type: contains
+        value: "loading"
+      - type: llm-rubric
+        value: "코드가 TypeScript 타입 안전성을 준수하는가? useState에 boolean 타입이 명시되어 있는가?"
+      - type: latency
+        threshold: 15000  # 15초 이하
+
+  # 2. API 에러 핸들링
+  - description: "API 에러 핸들링 추가"
+    vars:
+      task: "API 호출에 에러 핸들링을 추가해줘"
+      context: "fetch API 사용, try-catch 패턴"
+    assert:
+      - type: contains
+        value: "try"
+      - type: contains
+        value: "catch"
+      - type: llm-rubric
+        value: "에러 상태를 사용자에게 적절히 표시하는 UI가 포함되어 있는가?"
+
+  # 3. 폼 유효성 검사
+  - description: "폼 유효성 검사 구현"
+    vars:
+      task: "이메일과 비밀번호 폼에 유효성 검사를 추가해줘"
+      context: "React Hook Form 또는 네이티브 validation"
+    assert:
+      - type: javascript
+        value: |
+          output.includes('email') &&
+          (output.includes('pattern') || output.includes('regex') || output.includes('validate'))
+      - type: llm-rubric
+        value: "이메일 형식 검증과 비밀번호 최소 길이 검증이 모두 구현되어 있는가?"
+
+  # 4. 버그 수정
+  - description: "무한 루프 버그 수정"
+    vars:
+      task: |
+        다음 코드의 무한 루프 버그를 수정해줘:
+        useEffect(() => {
+          setData(fetchData());
+        }, [data]);
+      context: "React useEffect 의존성 배열 문제"
+    assert:
+      - type: not-contains
+        value: "[data]"
+      - type: llm-rubric
+        value: "useEffect 의존성 배열이 올바르게 수정되었는가? 빈 배열 또는 올바른 의존성이 사용되었는가?"
+
+  # 5. 타입 정의
+  - description: "TypeScript 인터페이스 정의"
+    vars:
+      task: "사용자 프로필 데이터의 TypeScript 인터페이스를 정의해줘"
+      context: "필드: id, name, email, createdAt, role(admin/user)"
+    assert:
+      - type: contains
+        value: "interface"
+      - type: contains
+        value: "id"
+      - type: contains
+        value: "email"
+      - type: llm-rubric
+        value: "role 필드가 union type('admin' | 'user')으로 정의되어 있는가?"
+
+# 기본 테스트 설정
+defaultTest:
+  assert:
+    - type: latency
+      threshold: 20000  # 20초 이하
+    - type: cost
+      threshold: 0.05  # $0.05 이하
+
+# 출력 설정
+outputPath: ./evaluation/results/
+
+# 동시 실행 설정
+evaluateOptions:
+  maxConcurrency: 2
+  showProgressBar: true
