@@ -1,0 +1,180 @@
+---
+name: version-manager
+description: SAX 패키지 시맨틱 버저닝 자동화. Use when (1) Agent/Skill/Command 변경 후 릴리스, (2) VERSION 및 CHANGELOG 업데이트, (3) Keep a Changelog 형식 버전 관리.
+tools: [Bash, Read, Write, Edit]
+---
+
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: version-manager 호출 - {버전 타입}` 시스템 메시지를 첫 줄에 출력하세요.
+
+# version-manager Skill
+
+> SAX 패키지 버저닝 자동화 Skill
+
+## Purpose
+
+SAX 패키지의 Semantic Versioning 관리를 자동화합니다.
+
+- VERSION 파일 업데이트
+- CHANGELOG/{version}.md 파일 생성
+- CHANGELOG/INDEX.md 업데이트
+- Keep a Changelog 형식 준수
+
+## Quick Start
+
+```bash
+# 1. 현재 버전 확인
+cat sax/VERSION
+
+# 2. 변경사항 분석 후 버전 타입 결정 (MAJOR/MINOR/PATCH)
+
+# 3. VERSION 업데이트
+echo "3.15.0" > sax/VERSION
+
+# 4. CHANGELOG 생성
+# sax/CHANGELOG/{version}.md 파일 작성
+
+# 5. 커밋 & 푸시
+git add -A && git commit -m "🔖 [SAX] 3.15.0: {변경 요약}"
+git push origin main
+
+# 6. 🔴 Slack 알림 (필수) - 아래 섹션 참조
+```
+
+## Semantic Versioning 요약
+
+| 버전 | 트리거 | 예시 |
+|------|--------|------|
+| **MAJOR** | 호환성 깨지는 변경 | 워크플로우 근본 변경 |
+| **MINOR** | 기능 추가/삭제 | Agent/Skill 추가, CLAUDE.md 변경 |
+| **PATCH** | 버그/오타 수정 | 문서 보완, 성능 개선 |
+
+## 📣 피드백 이슈 연동 (선택)
+
+> **사용자 피드백 기반 버저닝 시, 피드백 작성자에게 알림**
+
+### 자동 감지
+
+커밋 메시지에 피드백 이슈 참조가 있는 경우 자동으로 처리합니다:
+
+| 패턴 | 예시 |
+|------|------|
+| `#이슈번호` | `#123` |
+| `Fixes #이슈번호` | `Fixes #45` |
+| `Closes #이슈번호` | `Closes #78` |
+
+### 피드백 이슈 판별 조건
+
+다음 조건을 **모두** 만족해야 피드백 이슈로 판별합니다:
+
+1. 이슈에 `bug` 또는 `enhancement` 라벨 존재
+2. 이슈가 `sax-core/skills/feedback`에 의해 생성됨 (본문에 SAX Feedback Skill 표시)
+
+### 처리 흐름
+
+```text
+1. 커밋 메시지에서 이슈 번호 추출
+   ↓
+2. 이슈 정보 조회 (gh issue view)
+   ↓
+3. 피드백 이슈 여부 판별
+   ├─ 아님 → 일반 버저닝 완료
+   └─ 맞음 → 아래 단계 진행
+   ↓
+4. 이슈 작성자 조회
+   ↓
+5. GitHub 이슈에 완료 코멘트 추가 (@작성자 멘션)
+   ↓
+6. Slack 알림에 피드백 작성자 멘션 추가
+```
+
+### 명시적 지정
+
+피드백 이슈를 명시적으로 지정할 수도 있습니다:
+
+```yaml
+feedback_issues:
+  - repo: "sax-po"
+    number: 123
+```
+
+> 상세 워크플로우는 [Workflow - Phase 10](references/workflow.md#phase-10-피드백-이슈-완료-처리-조건부) 참조
+
+## 🔴 필수: Slack 릴리스 알림
+
+> **버저닝은 Slack 알림까지 완료해야 완료로 간주됩니다.**
+
+커밋 & 푸시 완료 후 **반드시** `notify-slack` Skill 호출:
+
+```markdown
+[SAX] Skill: notify-slack 호출 - 릴리스 알림
+```
+
+### 알림 내용
+
+| 항목 | 값 |
+|------|-----|
+| **채널** | #_협업 |
+| **타입** | release |
+| **패키지** | sax-{package} |
+| **버전** | v{new_version} |
+| **변경 내역** | CHANGELOG 요약 |
+
+### 완료 확인
+
+```markdown
+[SAX] Versioning: Slack 알림 전송 완료 (#_협업)
+```
+
+> **⚠️ 이 단계를 누락하면 버저닝 미완료 상태입니다.**
+
+## 🔴 필수: sax-meta 로컬 동기화
+
+> **sax-meta 버저닝 시, 현재 환경의 `.claude/sax-meta/`도 동기화해야 합니다.**
+
+sax-meta를 수정하는 환경 = sax-meta가 설치된 환경이므로,
+원본 push 후 로컬 서브모듈도 반드시 동기화:
+
+```bash
+cd .claude/sax-meta && git pull origin main
+```
+
+### 동기화 완료 확인
+
+```markdown
+[SAX] Versioning: 로컬 동기화 완료 (.claude/sax-meta/)
+```
+
+> **⚠️ sax-meta 버저닝 시 이 단계를 누락하면 버저닝 미완료 상태입니다.**
+
+## SAX Message
+
+```markdown
+[SAX] Skill: version-manager 사용
+
+[SAX] Versioning: {old_version} → {new_version} ({version_type})
+
+[SAX] Versioning: 커밋 완료 → 푸시 진행
+
+[SAX] Versioning: 완료 (푸시 성공)
+
+[SAX] Skill: notify-slack 호출 - 릴리스 알림
+
+[SAX] Versioning: Slack 알림 전송 완료 (#_협업)
+
+[SAX] Versioning: 로컬 동기화 완료 (.claude/sax-meta/)  # sax-meta 버저닝 시만
+```
+
+## Related
+
+- [sax-architect Agent](../../agents/sax-architect/sax-architect.md)
+- [package-validator Skill](../package-validator/SKILL.md)
+- [SAX Core - Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
+
+## References
+
+For detailed documentation, see:
+
+- [Semantic Versioning Rules](references/semantic-versioning.md) - MAJOR/MINOR/PATCH 상세 규칙
+- [Workflow](references/workflow.md) - 10단계 버저닝 프로세스 (커밋 & 푸시 & Slack 알림 & 피드백 이슈 처리)
+- [Changelog Format](references/changelog-format.md) - Keep a Changelog 템플릿
+- [Output Format](references/output-format.md) - 성공/실패 출력, Edge Cases
