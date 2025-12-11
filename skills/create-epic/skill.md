@@ -14,6 +14,21 @@ tools: [Bash, Read, GitHub CLI]
 
 PO/기획자가 정의한 요구사항을 GitHub Issue로 생성합니다.
 
+## 🔴 개발자 관점 체크리스트 (필수)
+
+> **Epic 생성 전 반드시 [dev-checklist.md](references/dev-checklist.md)를 검토합니다.**
+
+Epic 작성 시 개발자가 구현 단계에서 할 질문들을 사전에 점검:
+
+| 카테고리 | 핵심 질문 |
+|----------|----------|
+| 데이터 흐름 | 충돌 해결? 멀티플랫폼 동기화? |
+| 시간/계산 | 집계 기준? 일할 계산? |
+| 플랫폼 제약 | PWA/웹/네이티브 제약사항? |
+| 도메인 지식 | 업계 표준? 엣지 케이스? |
+
+**체크리스트 미검토 시 Epic 생성 금지**
+
 ## 트리거
 
 - `epic-master` 에이전트에서 호출
@@ -125,3 +140,4 @@ For detailed documentation, see:
 
 - [Workflow](references/workflow.md) - 입력 스키마, 상세 동작 프로세스
 - [Output Format](references/output-format.md) - 성공 출력, 에러 처리
+- [Dev Checklist](references/dev-checklist.md) - 개발자 관점 질문 체크리스트
