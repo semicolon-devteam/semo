@@ -76,9 +76,14 @@ EOF
 4. **API 호출**: Slack chat.postMessage 호출
 5. **완료 보고**: 결과 메시지 출력
 
-### 동적 사용자 조회 (Step 2)
+### 🔴 동적 사용자 조회 (Step 2) - 필수
 
 > **하드코딩된 매핑 테이블 대신 Slack API를 통해 실시간으로 사용자 ID를 조회합니다.**
+>
+> **⚠️ 중요**: 모든 사용자 멘션은 반드시 `<@SLACK_ID>` 형식이어야 합니다.
+> - ❌ `@gtod8010` → 텍스트로만 표시됨
+> - ❌ `@dwight.k` → 텍스트로만 표시됨
+> - ✅ `<@U06Q5KECB5J>` → 실제 멘션으로 표시됨
 
 #### 조회 API 호출
 
@@ -121,16 +126,54 @@ SLACK_ID=$(curl -s "https://slack.com/api/users.list" \
 # 결과: URSQYUNQJ
 ```
 
-#### 멘션 형식 생성
+#### 🔴 멘션 형식 생성 (필수)
+
+> **⚠️ GitHub username → Slack ID 변환은 필수입니다.**
 
 ```bash
-# Slack ID가 조회되면 멘션 형식으로 변환
+# 1. GitHub username으로 검색할 이름 결정
+# GitHub ID → Display Name 매핑 (team-members.md 참조)
+get_search_name() {
+  local github_id="$1"
+  case "$github_id" in
+    "reus-jeon") echo "Reus" ;;
+    "garden92") echo "Garden" ;;
+    "kokkh") echo "Goni" ;;
+    "kyago") echo "kyago" ;;
+    "Roki-Noh") echo "Roki" ;;
+    "Brightbong92") echo "bon" ;;
+    "gtod8010") echo "dwight.k" ;;
+    "Yeomsoyam") echo "Yeomso" ;;
+    *) echo "$github_id" ;;
+  esac
+}
+
+SEARCH_NAME=$(get_search_name "$GITHUB_USERNAME")
+
+# 2. Slack API로 ID 조회
+SLACK_ID=$(curl -s "https://slack.com/api/users.list" \
+  -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
+  | jq -r --arg name "$SEARCH_NAME" '
+    .members[]
+    | select(.deleted == false and .is_bot == false)
+    | select(
+        (.profile.display_name | ascii_downcase) == ($name | ascii_downcase) or
+        (.name | ascii_downcase) == ($name | ascii_downcase)
+      )
+    | .id
+  ' | head -1)
+
+# 3. 멘션 형식으로 변환
 if [ -n "$SLACK_ID" ]; then
-  MENTION="<@$SLACK_ID>"  # <@URSQYUNQJ>
+  MENTION="<@$SLACK_ID>"  # ✅ <@U06Q5KECB5J> → 실제 멘션
 else
-  MENTION="$SEARCH_NAME"   # 조회 실패 시 이름 그대로 표시
+  MENTION="$SEARCH_NAME"   # ⚠️ 조회 실패 시 이름만 표시 (멘션 안 됨)
 fi
 ```
+
+**🔴 메시지 본문에서 담당자/멘션 대상 사용 시**:
+- 반드시 위 과정을 거쳐 `<@SLACK_ID>` 형식 사용
+- section 블록의 mrkdwn에서도 동일하게 적용
 
 #### 팀원 참조 (Semicolon)
 
