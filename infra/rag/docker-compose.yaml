@@ -1,0 +1,48 @@
+# Self-Learning RAG Docker Compose
+# SEMO PR 피드백 기반 Few-shot 학습
+
+version: "3.9"
+
+services:
+  # ========================================
+  # Qdrant Vector Database
+  # ========================================
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: semo-qdrant
+    ports:
+      - "6333:6333"   # REST API
+      - "6334:6334"   # gRPC
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:6333/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ========================================
+  # RAG Indexer (피드백 수집 및 인덱싱)
+  # ========================================
+  rag-indexer:
+    build:
+      context: ./indexer
+      dockerfile: Dockerfile
+    container_name: semo-rag-indexer
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - COLLECTION_NAME=semo-feedback
+    volumes:
+      - ./indexer:/app
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  qdrant_data:
