@@ -51,8 +51,48 @@ curl -X POST -H 'Content-type: application/json' \
 
 | 변수 | 용도 | 필수 |
 |------|------|------|
-| `SLACK_WEBHOOK_URL` | Webhook URL | ✅ |
+| `SLACK_BOT_TOKEN` | Bot Token (API 방식) | ✅ |
+| `SLACK_WEBHOOK_URL` | Webhook URL (대안) | ❌ |
 | `SLACK_CHANNEL` | 기본 채널 | ❌ |
+
+## Configuration
+
+### Slack Bot Token
+
+> 📖 **Semicolon Notifier** 앱 사용
+
+```
+SLACK_BOT_TOKEN=xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7
+```
+
+### 기본 채널 ID
+
+| 채널 | ID | 용도 |
+|------|-----|------|
+| `#_협업` | `C09KNL91QBZ` | 기본 알림 |
+
+### 필수 Bot Token Scopes
+
+| Scope | 용도 |
+|-------|------|
+| `chat:write` | 메시지 전송 |
+| `chat:write.public` | 공개 채널 메시지 |
+| `users:read` | 사용자 ID 조회 |
+
+### Quick Start
+
+```bash
+# heredoc 방식 (권장)
+curl -s -X POST 'https://slack.com/api/chat.postMessage' \
+  -H 'Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7' \
+  -H 'Content-Type: application/json; charset=utf-8' \
+  -d @- << 'EOF'
+{
+  "channel": "C09KNL91QBZ",
+  "text": "메시지 내용"
+}
+EOF
+```
 
 ---
 
