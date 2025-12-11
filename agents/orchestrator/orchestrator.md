@@ -43,6 +43,7 @@ MVP 프로젝트 개발을 위한 모든 요청의 진입점입니다.
 | 통합 검증 | skill:verify-integration | 검증, verify, 통합, 머지 |
 | 온보딩 | onboarding-master | 온보딩, 시작, setup, 환경 설정 |
 | 환경 검증 | skill:health-check | 환경, health, MCP, 검증 |
+| **에픽/이슈 분석** | **🔴 GitHub API 필수** | 에픽, epic, 이슈, issue, 분석, 확인 |
 
 ---
 
@@ -98,7 +99,53 @@ MVP 범위 외 요청은 해당 패키지로 라우팅:
 → `[{prefix}] {request}` 형식으로 요청해주세요.
 ```
 
-### 3. Antigravity 위임
+### 3. 🔴 에픽/이슈 분석 시 GitHub API 필수 (NON-NEGOTIABLE)
+
+> **⚠️ 중요**: 에픽, 이슈, Task 관련 분석 요청 시 **반드시 실제 GitHub 데이터를 조회**해야 합니다.
+> 추측으로 응답하는 것은 절대 금지입니다.
+
+**키워드 감지**: 에픽, epic, 이슈, issue, 분석, 확인, 읽어, 보여줘, 내용
+
+**필수 조회 단계**:
+
+```bash
+# 1. 프로젝트의 연결된 레포 파악 (docs 레포가 기본 Epic 저장소)
+gh api repos/semicolon-devteam/docs/issues --jq '.[] | select(.labels[].name == "epic") | {number, title, url: .html_url}'
+
+# 2. 특정 에픽 내용 조회
+gh api repos/semicolon-devteam/docs/issues/{epic_number} --jq '{title, body, labels: [.labels[].name]}'
+
+# 3. Draft Task 목록 조회 (에픽과 연결된 하위 이슈)
+gh api repos/semicolon-devteam/docs/issues/{epic_number}/timeline --jq '.[] | select(.event == "cross-referenced") | .source.issue'
+```
+
+**응답 형식**:
+
+```markdown
+[SAX] Orchestrator: 에픽 분석 요청 → GitHub API 조회
+
+## 에픽 정보 (실제 데이터)
+
+**에픽**: #{number} - {title}
+**URL**: {epic_url}
+
+### 본문 내용
+{actual_epic_body}
+
+### 연결된 Draft Tasks
+- #{task_number} - {task_title}
+- ...
+
+## 분석
+{analysis_based_on_actual_data}
+```
+
+**🔴 금지 사항**:
+- 에픽 내용을 추측하여 작성 ❌
+- 링크 없이 "아마도~", "보통~" 식의 응답 ❌
+- GitHub API 조회 없이 응답 ❌
+
+### 4. Antigravity 위임
 
 시각적 작업 (목업, 브라우저 테스트)은 Antigravity로 위임:
 
@@ -146,6 +193,12 @@ Antigravity IDE에서 다음 워크플로우를 실행하세요:
 - 통합 검증
 - 스키마 호환성
 - 인터페이스 준수
+
+### 7. ANALYSIS (🔴 GitHub API 필수)
+- 에픽/이슈 분석 요청
+- Task 현황 확인
+- 진행 상황 파악
+- **⚠️ 반드시 실제 GitHub 데이터 조회 후 응답**
 
 ---
 
