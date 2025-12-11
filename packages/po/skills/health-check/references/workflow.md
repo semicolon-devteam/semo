@@ -3,13 +3,13 @@
 ## 동작 흐름
 
 ```text
-1. 명령어 트리거 (/SAX:health-check)
+1. 명령어 트리거 (/SEMO:health-check)
    ↓
 2. 순차적 검증 실행
    - 도구 설치 확인
    - 인증 상태 확인
    - Slack 참여 확인 (수동)
-   - SAX 패키지 설치 확인
+   - SEMO 패키지 설치 확인
    - 글로벌 MCP 서버 설정 확인 (~/.claude.json)
    ↓
 3. 결과 집계
@@ -20,7 +20,7 @@
    - 성공 시: 간결한 요약 + 다음 단계 안내
    - 실패 시: 상세 해결 방법 제공
    ↓
-5. SAX 메타데이터 저장 (~/.claude.json)
+5. SEMO 메타데이터 저장 (~/.claude.json)
    - healthCheckPassed: true/false
    - lastHealthCheck: timestamp
 ```
@@ -29,14 +29,14 @@
 
 - **온보딩 시**: 필수 실행
 - **업무 시작 시**: orchestrator가 자동 실행 (30일 경과 시)
-- **수동 요청 시**: `/SAX:health-check` 명령어
+- **수동 요청 시**: `/SEMO:health-check` 명령어
 
 ### 자동 실행 조건
 
 Orchestrator가 다음 조건에서 health-check를 자동으로 트리거합니다:
 
-1. **첫 SAX 사용**: `~/.claude.json`에 SAX 메타데이터 없음
-2. **30일 경과**: `SAX.lastHealthCheck`가 30일 이상 지남
+1. **첫 SEMO 사용**: `~/.claude.json`에 SEMO 메타데이터 없음
+2. **30일 경과**: `SEMO.lastHealthCheck`가 30일 이상 지남
 3. **healthCheckPassed: false**: 이전 검증에서 실패
 
 ### 수동 실행
@@ -44,7 +44,7 @@ Orchestrator가 다음 조건에서 health-check를 자동으로 트리거합니
 언제든지 다음 명령어로 수동 실행 가능:
 
 ```bash
-/SAX:health-check
+/SEMO:health-check
 ```
 
 ## 검증 항목 우선순위
@@ -60,8 +60,8 @@ Orchestrator가 다음 조건에서 health-check를 자동으로 트리거합니
 - Organization 멤버십
 - docs 레포 접근
 - core-supabase 레포 접근
-- SAX 패키지 설치 (.claude/sax-core, .claude/sax-po)
-- 심링크 연결 (CLAUDE.md, agents, skills, commands/SAX)
+- SEMO 패키지 설치 (.claude/semo-core, .claude/semo-po)
+- 심링크 연결 (CLAUDE.md, agents, skills, commands/SEMO)
 - 글로벌 MCP 서버 설정 (context7, sequential-thinking)
 
 ### 🟡 Warning (선택)
@@ -71,7 +71,7 @@ Orchestrator가 다음 조건에서 health-check를 자동으로 트리거합니
 
 ### 🟢 Info (참고)
 
-- SAX 메타데이터 (첫 실행 시 자동 생성)
+- SEMO 메타데이터 (첫 실행 시 자동 생성)
 
 ## 트러블슈팅
 
@@ -148,18 +148,18 @@ jq '. + {
 cat ~/.claude.json | jq '.mcpServers'
 ```
 
-### SAX 패키지/심링크 문제
+### SEMO 패키지/심링크 문제
 
 ```bash
 # 심링크 상태 확인
 ls -la .claude/
 
 # 예상 결과:
-# CLAUDE.md -> sax-po/CLAUDE.md
-# agents -> sax-po/agents
-# skills -> sax-po/skills
-# commands/SAX -> ../sax-po/commands
+# CLAUDE.md -> semo-po/CLAUDE.md
+# agents -> semo-po/agents
+# skills -> semo-po/skills
+# commands/SEMO -> ../semo-po/commands
 
 # 심링크 재설정
-# "SAX 업데이트해줘" 명령어로 자동 재설정
+# "SEMO 업데이트해줘" 명령어로 자동 재설정
 ```

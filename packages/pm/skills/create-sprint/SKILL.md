@@ -2,12 +2,12 @@
 name: create-sprint
 description: |
   Sprint(Iteration) 목표 설정 및 시작. Use when (1) 새 Sprint 시작,
-  (2) Sprint 계획 수립, (3) /SAX:sprint create 커맨드.
+  (2) Sprint 계획 수립, (3) /SEMO:sprint create 커맨드.
 tools: [Bash, Read, Write]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: create-sprint 호출` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: create-sprint 호출` 메시지를 첫 줄에 출력하세요.
 
 # create-sprint Skill
 
@@ -45,7 +45,7 @@ notify_slack: true                    # 선택
 ## Output
 
 ```markdown
-[SAX] Skill: create-sprint 완료
+[SEMO] Skill: create-sprint 완료
 
 ✅ Sprint "12월 1/4" 시작
 
@@ -154,7 +154,7 @@ gh issue list \
 ## 완료 메시지
 
 ```markdown
-[SAX] Skill: create-sprint 완료
+[SEMO] Skill: create-sprint 완료
 
 ✅ **Sprint "{iteration_title}"** 시작
 
@@ -164,5 +164,5 @@ gh issue list \
 | 기간 | {start_date} ~ {end_date} |
 | Sprint Issue | [#{issue_number}]({issue_url}) |
 
-다음 단계: `/SAX:sprint add` 명령어로 Task를 Sprint에 할당하세요.
+다음 단계: `/SEMO:sprint add` 명령어로 Task를 Sprint에 할당하세요.
 ```

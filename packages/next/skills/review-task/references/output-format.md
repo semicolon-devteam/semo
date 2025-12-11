@@ -5,7 +5,7 @@
 ## 기본 출력 구조
 
 ```markdown
-[SAX] Skill: review-task 호출 - {repo}#{issue_number}
+[SEMO] Skill: review-task 호출 - {repo}#{issue_number}
 
 === 태스크 리뷰: {repo}#{issue_number} ===
 
@@ -153,7 +153,7 @@ Critical 이슈 없이 리뷰를 통과했습니다.
 간략한 결과만 표시:
 
 ```markdown
-[SAX] Skill: review-task 호출 - cm-land#565
+[SEMO] Skill: review-task 호출 - cm-land#565
 
 === 태스크 리뷰 요약 ===
 

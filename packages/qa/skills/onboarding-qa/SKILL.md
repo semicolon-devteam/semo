@@ -1,27 +1,27 @@
 ---
 name: onboarding-qa
 description: |
-  QA 엔지니어 온보딩 실습 (SAX-QA 패키지 전용). Use when (1) sax-core/skill:onboarding에서 호출,
+  QA 엔지니어 온보딩 실습 (SEMO-QA 패키지 전용). Use when (1) semo-core/skill:onboarding에서 호출,
   (2) QA 엔지니어 온보딩 실습 필요 시. 테스트 케이스 작성 및 QA 워크플로우 체험.
 tools: [Read, Bash, Glob, Grep]
 model: inherit
 ---
 
-> **시스템 메시지**: `[SAX] Skill: onboarding-qa 호출`
+> **시스템 메시지**: `[SEMO] Skill: onboarding-qa 호출`
 
 # onboarding-qa Skill
 
-> QA 엔지니어를 위한 온보딩 실습 (SAX-QA 패키지 전용)
+> QA 엔지니어를 위한 온보딩 실습 (SEMO-QA 패키지 전용)
 
 ## Purpose
 
-SAX Core의 `skill:onboarding` Phase 3에서 호출됩니다.
+SEMO Core의 `skill:onboarding` Phase 3에서 호출됩니다.
 QA 엔지니어를 위한 실습 과정을 제공합니다.
 
 ## Prerequisites
 
-- Phase 0-2 완료 (환경 진단, 조직 참여, SAX 개념 학습)
-- sax-core/skill:onboarding에서 호출됨
+- Phase 0-2 완료 (환경 진단, 조직 참여, SEMO 개념 학습)
+- semo-core/skill:onboarding에서 호출됨
 
 ## Workflow
 
@@ -61,8 +61,8 @@ QA 워크플로우:
 > "로그인 기능 테스트 케이스 작성해줘"
 
 **확인 사항**:
-- [SAX] Orchestrator 메시지 확인
-- [SAX] Agent/Skill 호출 메시지 확인
+- [SEMO] Orchestrator 메시지 확인
+- [SEMO] Agent/Skill 호출 메시지 확인
 - 테스트 케이스 템플릿 확인
 ```
 
@@ -93,7 +93,7 @@ QA 워크플로우:
 ## Expected Output
 
 ```markdown
-[SAX] Skill: onboarding-qa 호출
+[SEMO] Skill: onboarding-qa 호출
 
 === QA 엔지니어 온보딩 실습 ===
 
@@ -123,13 +123,13 @@ QA 워크플로우:
 
 ✅ 실습 완료
 
-[SAX] Skill: onboarding-qa 완료
+[SEMO] Skill: onboarding-qa 완료
 ```
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: onboarding-qa 호출
+[SEMO] Skill: onboarding-qa 호출
 
-[SAX] Skill: onboarding-qa 완료
+[SEMO] Skill: onboarding-qa 완료
 ```

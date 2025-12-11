@@ -1,10 +1,10 @@
-# SAX-PM
+# SEMO-PM
 
-> SAX Package for Project Management - Sprint 관리, 진행도 추적, 인원별 업무 관리
+> SEMO Package for Project Management - Sprint 관리, 진행도 추적, 인원별 업무 관리
 
 ## Overview
 
-SAX-PM은 PM/프로젝트 매니저를 위한 SAX 패키지입니다. SAX-PO가 "무엇을 만들까?"(기획)에 집중한다면, SAX-PM은 "언제, 누가, 얼마나?"(관리)에 집중합니다.
+SEMO-PM은 PM/프로젝트 매니저를 위한 SEMO 패키지입니다. SEMO-PO가 "무엇을 만들까?"(기획)에 집중한다면, SEMO-PM은 "언제, 누가, 얼마나?"(관리)에 집중합니다.
 
 ## Features
 
@@ -33,27 +33,27 @@ SAX-PM은 PM/프로젝트 매니저를 위한 SAX 패키지입니다. SAX-PO가 
 ## Installation
 
 ```bash
-# SAX 설치 스크립트 사용 (권장)
+# SEMO 설치 스크립트 사용 (권장)
 ./install-sax.sh pm
 
 # 또는 수동 설치
-git submodule add https://github.com/semicolon-devteam/sax-pm.git .claude/sax-pm
+git submodule add https://github.com/semicolon-devteam/semo-pm.git .claude/semo-pm
 ```
 
 ## Quick Start
 
 ```bash
 # Sprint 생성
-/SAX:sprint create "Sprint 23" --start 2024-12-02 --end 2024-12-13
+/SEMO:sprint create "Sprint 23" --start 2024-12-02 --end 2024-12-13
 
 # 진행도 확인
-/SAX:progress
+/SEMO:progress
 
 # 주간 리포트
-/SAX:report weekly
+/SEMO:report weekly
 
 # Roadmap 생성
-/SAX:roadmap generate
+/SEMO:roadmap generate
 ```
 
 ## Components
@@ -74,18 +74,18 @@ git submodule add https://github.com/semicolon-devteam/sax-pm.git .claude/sax-pm
 - `detect-blockers` - 블로커 감지
 - `generate-roadmap` - Roadmap 생성
 - `sync-project-status` - Projects 동기화
-- `sax-help` - 도움말
+- `semo-help` - 도움말
 
 ### Commands (4)
-- `/SAX:sprint` - Sprint 관리
-- `/SAX:progress` - 진행도 조회
-- `/SAX:report` - 리포트 생성
-- `/SAX:roadmap` - Roadmap 관리
+- `/SEMO:sprint` - Sprint 관리
+- `/SEMO:progress` - 진행도 조회
+- `/SEMO:report` - 리포트 생성
+- `/SEMO:roadmap` - Roadmap 관리
 
 ## Dependencies
 
-- **sax-core** (필수): 공통 규칙, notify-slack
-- **sax-po** (권장): Epic/Task 구조 호환
+- **semo-core** (필수): 공통 규칙, notify-slack
+- **semo-po** (권장): Epic/Task 구조 호환
 
 ## License
 

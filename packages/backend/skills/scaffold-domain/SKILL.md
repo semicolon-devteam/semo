@@ -7,7 +7,7 @@ description: |
 tools: [Bash, Write]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: scaffold-domain 호출 - {도메인명}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: scaffold-domain 호출 - {도메인명}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Scaffold Domain Skill
 
@@ -64,7 +64,7 @@ skill: scaffold-domain("posts");
 ## Output Format
 
 ```markdown
-[SAX] Skill: scaffold-domain 호출 - {domain}
+[SEMO] Skill: scaffold-domain 호출 - {domain}
 
 ## ✅ 도메인 구조 생성 완료
 

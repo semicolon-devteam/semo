@@ -174,12 +174,12 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 
 ## 자동 생성 가이드
 
-SAX가 이슈를 자동 생성할 때 사용하는 형식:
+SEMO가 이슈를 자동 생성할 때 사용하는 형식:
 
-### SAX 이슈 생성 출력
+### SEMO 이슈 생성 출력
 
 ```
-[SAX] fast-track 완료 → 이슈 생성
+[SEMO] fast-track 완료 → 이슈 생성
 
 📋 생성할 이슈:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -269,9 +269,9 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 4. 이슈 생성 시 커밋 해시 언급
 5. 이슈에서 커밋 참조
 
-### SAX 기본 동작
+### SEMO 기본 동작
 
-SAX는 **옵션 1**을 기본으로 사용합니다:
+SEMO는 **옵션 1**을 기본으로 사용합니다:
 1. 작업 완료 확인
 2. 이슈 생성 제안
 3. 사용자 확인 후 이슈 생성

@@ -53,5 +53,5 @@ The Button component has been created. Here's how to use it.
 
 ## 참고
 
-- 이 규칙은 sax-design 패키지에 기본 포함됩니다.
+- 이 규칙은 semo-design 패키지에 기본 포함됩니다.
 - 한국어 사용자의 UX 개선을 위한 규칙입니다.

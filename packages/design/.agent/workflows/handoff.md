@@ -125,7 +125,7 @@
 
 ### 출력
 ```
-[SAX] Skill: handoff - 핸드오프 문서 생성
+[SEMO] Skill: handoff - 핸드오프 문서 생성
 
 ## Design Handoff: 로그인 폼
 

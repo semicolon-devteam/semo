@@ -2,12 +2,12 @@
 name: generate-progress-report
 description: |
   Sprint(Iteration) 진행도 리포트 생성. Use when (1) 진행 현황 조회,
-  (2) /SAX:progress 커맨드, (3) 상태 리포트 요청.
+  (2) /SEMO:progress 커맨드, (3) 상태 리포트 요청.
 tools: [Bash, Read, Write]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: generate-progress-report 호출` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: generate-progress-report 호출` 메시지를 첫 줄에 출력하세요.
 
 # generate-progress-report Skill
 
@@ -200,7 +200,7 @@ function generateProgressBar(percent) {
 ## 완료 메시지
 
 ```markdown
-[SAX] Skill: generate-progress-report 완료
+[SEMO] Skill: generate-progress-report 완료
 
 # 📊 Sprint "{iteration_title}" 진행 현황
 

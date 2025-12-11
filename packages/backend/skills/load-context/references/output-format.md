@@ -5,7 +5,7 @@
 ## 기본 출력 템플릿
 
 ```markdown
-[SAX] Skill: load-context 호출 - {domain}
+[SEMO] Skill: load-context 호출 - {domain}
 
 ## 📋 컨텍스트 요약: {Domain}
 
@@ -101,7 +101,7 @@ domain/posts/
 ### --deep 모드
 
 ```markdown
-[SAX] Skill: load-context 호출 - {domain} (상세 모드)
+[SEMO] Skill: load-context 호출 - {domain} (상세 모드)
 
 ## 📋 상세 컨텍스트: {Domain}
 
@@ -158,7 +158,7 @@ suspend fun search(query: String): List<Post>
 ### --spec-only 모드
 
 ```markdown
-[SAX] Skill: load-context 호출 - {domain} (Spec 전용)
+[SEMO] Skill: load-context 호출 - {domain} (Spec 전용)
 
 ## 📄 Spec Documents: {Domain}
 
@@ -175,7 +175,7 @@ suspend fun search(query: String): List<Post>
 ### --code-only 모드
 
 ```markdown
-[SAX] Skill: load-context 호출 - {domain} (코드 전용)
+[SEMO] Skill: load-context 호출 - {domain} (코드 전용)
 
 ## 📁 코드 구조: {Domain}
 
@@ -199,7 +199,7 @@ suspend fun search(query: String): List<Post>
 ### 도메인을 찾을 수 없는 경우
 
 ```markdown
-[SAX] Skill: load-context 호출 - {domain}
+[SEMO] Skill: load-context 호출 - {domain}
 
 ❌ **도메인을 찾을 수 없습니다**: `{domain}`
 
@@ -218,7 +218,7 @@ suspend fun search(query: String): List<Post>
 ### 부분적으로만 존재하는 경우
 
 ```markdown
-[SAX] Skill: load-context 호출 - {domain}
+[SEMO] Skill: load-context 호출 - {domain}
 
 ⚠️ **부분 컨텍스트**: `{domain}`
 

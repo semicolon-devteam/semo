@@ -209,7 +209,7 @@ C) tRPC - 타입 안전성 최대화"
 ### Brainstorming 세션 시작
 
 ```
-[SAX] Skill: spec 호출 - Brainstorming 모드
+[SEMO] Skill: spec 호출 - Brainstorming 모드
 
 🧠 Phase 0: Brainstorming
 
@@ -280,7 +280,7 @@ B) 현재 정보로 계속 → 리스크 인지 후 진행
 ```
 사용자: "커뮤니티 기능 같은 거 추가하면 좋을 것 같은데..."
 
-[SAX] Skill: spec 호출 - Brainstorming 모드
+[SEMO] Skill: spec 호출 - Brainstorming 모드
 
 🧠 Phase 0: Brainstorming
 

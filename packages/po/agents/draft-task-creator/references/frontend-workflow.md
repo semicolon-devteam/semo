@@ -20,7 +20,7 @@ gh api repos/semicolon-devteam/{service_repo}/issues \
 
 ## ✅ Acceptance Criteria
 
-[SAX] Skill: generate-acceptance-criteria 사용
+[SEMO] Skill: generate-acceptance-criteria 사용
 
 - [ ] {criterion_1}
 - [ ] UI 컴포넌트 구현 완료
@@ -30,7 +30,7 @@ gh api repos/semicolon-devteam/{service_repo}/issues \
 
 ## 📊 Estimation
 
-[SAX] Skill: assign-estimation-point 사용
+[SEMO] Skill: assign-estimation-point 사용
 
 - [x] organisms UI 컴포넌트 (3점)
 - [x] 기본 Form 작업 (5점)

@@ -14,7 +14,7 @@ tools:
 model: sonnet
 ---
 
-> **시스템 메시지**: `[SAX] Agent: domain-architect 호출 - {도메인명}`
+> **시스템 메시지**: `[SEMO] Agent: domain-architect 호출 - {도메인명}`
 
 # Domain Architect Agent
 
@@ -156,7 +156,7 @@ sealed class PostException(
 ### 설계 완료 보고
 
 ```markdown
-[SAX] Agent: domain-architect 완료 - {domain}
+[SEMO] Agent: domain-architect 완료 - {domain}
 
 ## Domain Structure
 

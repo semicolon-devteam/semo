@@ -4,7 +4,7 @@ description: Interactive project creation from cm-template. Use when (1) user re
 tools: [Bash, Read, Write, Edit]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: project-kickoff 호출 - {프로젝트명}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: project-kickoff 호출 - {프로젝트명}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Project Kickoff Skill
 

@@ -8,7 +8,7 @@ description: |
 tools: [Bash, Read, Write]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: docx 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: docx 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # DOCX Skill
 
@@ -68,10 +68,10 @@ python scripts/ooxml/unpack.py document.docx unpacked/
 python scripts/ooxml/pack.py unpacked/ edited.docx
 ```
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: docx 호출 - {spec 변환 | 릴리스 노트 | 문서 생성 | 문서 편집}
+[SEMO] Skill: docx 호출 - {spec 변환 | 릴리스 노트 | 문서 생성 | 문서 편집}
 
 ## 작업 유형: {type}
 **입력**: {input_file}
@@ -94,7 +94,7 @@ python scripts/ooxml/pack.py unpacked/ edited.docx
 
 - [docx-js Guide](references/docx-js.md) - JavaScript 문서 생성 상세
 - [OOXML Guide](references/ooxml.md) - Python 문서 편집 상세
-- [Workflow Examples](references/workflow-examples.md) - SAX 워크플로우 연동
+- [Workflow Examples](references/workflow-examples.md) - SEMO 워크플로우 연동
 
 ## Related
 

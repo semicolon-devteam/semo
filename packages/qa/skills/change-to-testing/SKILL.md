@@ -7,7 +7,7 @@ description: |
 tools: [Bash, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: change-to-testing 호출 - {repo}#{number}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: change-to-testing 호출 - {repo}#{number}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Change to Testing Skill
 
@@ -126,7 +126,7 @@ gh issue comment {number} --repo semicolon-devteam/{repo} --body "🧪 **테스�
 QA 담당자: @kokkh
 
 ---
-*SAX에서 자동 처리됨*"
+*SEMO에서 자동 처리됨*"
 ```
 
 ### 6. Slack 알림
@@ -146,7 +146,7 @@ QA 담당자: @kokkh
 ## 출력 형식
 
 ```markdown
-[SAX] Skill: change-to-testing 호출 - {repo}#{number}
+[SEMO] Skill: change-to-testing 호출 - {repo}#{number}
 
 ## 🧪 테스트중 상태 변경 완료
 
@@ -187,7 +187,7 @@ qa_assignees:
 ### 이슈를 찾을 수 없음
 
 ```markdown
-[SAX] Skill: change-to-testing 호출 - {repo}#{number}
+[SEMO] Skill: change-to-testing 호출 - {repo}#{number}
 
 ❌ **오류**: 이슈를 찾을 수 없습니다.
 
@@ -200,7 +200,7 @@ qa_assignees:
 ### 이미 테스트중 상태
 
 ```markdown
-[SAX] Skill: change-to-testing 호출 - {repo}#{number}
+[SEMO] Skill: change-to-testing 호출 - {repo}#{number}
 
 ℹ️ **알림**: 이미 "테스트중" 상태입니다.
 

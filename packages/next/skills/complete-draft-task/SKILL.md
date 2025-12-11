@@ -8,11 +8,11 @@ tools: [Bash, Read, Edit, GitHub CLI]
 location: project
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: complete-draft-task 호출 - {Epic/Feature}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: complete-draft-task 호출 - {Epic/Feature}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Complete Draft Task
 
-> SAX-PO Draft Task를 SAX-Next 완성된 Task로 변환하는 Skill
+> SEMO-PO Draft Task를 SEMO-Next 완성된 Task로 변환하는 Skill
 
 ## Quick Start
 
@@ -170,10 +170,10 @@ gh api graphql -f query='
 2. Implementation 시작: `skill:implement`
 ```
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: complete-draft-task 실행 - Epic #{epic}
+[SEMO] Skill: complete-draft-task 실행 - Epic #{epic}
 ```
 
 ## References
@@ -185,4 +185,4 @@ gh api graphql -f query='
 
 - [create-issues Skill](../create-issues/SKILL.md) - 이 Skill을 호출
 - [spec Skill](../spec/SKILL.md) - spec.md 생성
-- [draft-task-creator (SAX-PO)](../../sax-po/skills/draft-task-creator/SKILL.md) - Draft Task 생성
+- [draft-task-creator (SEMO-PO)](../../semo-po/skills/draft-task-creator/SKILL.md) - Draft Task 생성

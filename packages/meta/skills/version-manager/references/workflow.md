@@ -12,13 +12,13 @@
       "component": "Agent|Skill|Command|Config",
       "name": "component-name",
       "description": "변경 사항 설명",
-      "package": "sax-po|sax-next|sax-meta|sax-core"
+      "package": "semo-po|semo-next|semo-meta|semo-core"
     }
   ],
   "version_hint": "major|minor|patch|auto",
   "feedback_issues": [
     {
-      "repo": "sax-po|sax-next|sax-meta|sax-core",
+      "repo": "semo-po|semo-next|semo-meta|semo-core",
       "number": 123
     }
   ]
@@ -69,7 +69,7 @@ cat sax/VERSION
    ```markdown
    ### v3.x (2025-11-26)
 
-   - [3.8.0](3.8.0.md) - SAX-Meta 패키지 분리
+   - [3.8.0](3.8.0.md) - SEMO-Meta 패키지 분리
    - [3.7.0](3.7.0.md) - CHANGELOG 구조 개선
    ```
 
@@ -94,7 +94,7 @@ echo "{new_version}" > sax/VERSION
 git add sax/VERSION sax/CHANGELOG/
 
 # 버전 커밋 (CLAUDE.md 버저닝 커밋 형식 준수)
-git commit -m "🔖 [SAX] {new_version}: {변경 요약}
+git commit -m "🔖 [SEMO] {new_version}: {변경 요약}
 
 - 상세 변경 내용 1
 - 상세 변경 내용 2
@@ -107,7 +107,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 **커밋 메시지 형식** (CLAUDE.md 규칙):
 
 ```text
-🔖 [SAX] {version}: {변경 요약}
+🔖 [SEMO] {version}: {변경 요약}
 
 - 상세 변경 내용 1
 - 상세 변경 내용 2
@@ -132,12 +132,12 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 git push origin main
 ```
 
-**서브모듈 환경**: 각 패키지(sax-meta, sax-po, sax-next)가 별도 레포인 경우 개별 푸시 필요
+**서브모듈 환경**: 각 패키지(semo-meta, semo-po, semo-next)가 별도 레포인 경우 개별 푸시 필요
 
 ```bash
-cd sax-meta && git push origin main
-cd sax-po && git push origin main
-cd sax-next && git push origin main
+cd semo-meta && git push origin main
+cd semo-po && git push origin main
+cd semo-next && git push origin main
 ```
 
 ## Phase 9: Slack 릴리스 알림 (필수)
@@ -150,7 +150,7 @@ cd sax-next && git push origin main
 
 ```yaml
 type: "release"
-package: "{package_name}"  # sax-po, sax-next, sax-meta, sax-core
+package: "{package_name}"  # semo-po, semo-next, semo-meta, semo-core
 version: "{new_version}"
 changelog: |
   {CHANGELOG 내용 요약}
@@ -159,9 +159,9 @@ changelog: |
 ### Slack 메시지 예시
 
 ```
-🚀 SAX 패키지 업데이트
+🚀 SEMO 패키지 업데이트
 
-📦 sax-po v0.16.0
+📦 semo-po v0.16.0
 
 변경 내역:
 • report-bug: 버그 리포트 Skill 추가
@@ -171,7 +171,7 @@ changelog: |
 
 ### notify-slack 호출
 
-> 📖 **Slack 설정**: [sax-core/_shared/slack-config.md](../../../sax-core/_shared/slack-config.md) 참조
+> 📖 **Slack 설정**: [semo-core/_shared/slack-config.md](../../../semo-core/_shared/slack-config.md) 참조
 
 ```bash
 # notify-slack Skill이 다음을 수행:
@@ -179,7 +179,7 @@ changelog: |
 # 2. 메시지 블록 구성
 # 3. Slack API 호출
 
-# 토큰은 sax-core/_shared/slack-config.md 참조
+# 토큰은 semo-core/_shared/slack-config.md 참조
 # SLACK_BOT_TOKEN은 환경변수로 설정
 
 curl -X POST https://slack.com/api/chat.postMessage \
@@ -187,7 +187,7 @@ curl -X POST https://slack.com/api/chat.postMessage \
   -H "Content-Type: application/json" \
   -d '{
     "channel": "#_협업",
-    "text": "🚀 SAX 패키지 업데이트",
+    "text": "🚀 SEMO 패키지 업데이트",
     "blocks": [...]
   }'
 ```
@@ -195,7 +195,7 @@ curl -X POST https://slack.com/api/chat.postMessage \
 ### 완료 메시지
 
 ```markdown
-[SAX] Skill: notify-slack 완료
+[SEMO] Skill: notify-slack 완료
 
 ✅ Slack 릴리스 알림 전송 완료
 
@@ -221,7 +221,7 @@ git log -1 --format="%B" | grep -oE "(#[0-9]+|Fixes #[0-9]+|Closes #[0-9]+)" | g
 
 ```yaml
 feedback_issues:
-  - repo: "sax-po"
+  - repo: "semo-po"
     number: 123
 ```
 
@@ -234,8 +234,8 @@ gh issue view {이슈번호} --repo semicolon-devteam/{repo} --json author,label
 # 예시 출력:
 # {
 #   "author": {"login": "kyago"},
-#   "labels": [{"name": "bug"}, {"name": "sax-po"}],
-#   "body": "...\n🤖 SAX Feedback Skill (sax-core)로 자동 생성됨"
+#   "labels": [{"name": "bug"}, {"name": "semo-po"}],
+#   "body": "...\n🤖 SEMO Feedback Skill (semo-core)로 자동 생성됨"
 # }
 ```
 
@@ -244,7 +244,7 @@ gh issue view {이슈번호} --repo semicolon-devteam/{repo} --json author,label
 다음 조건을 **모두** 만족해야 피드백 이슈로 판별:
 
 1. **라벨 조건**: `bug` 또는 `enhancement` 라벨 존재
-2. **출처 조건**: 본문에 `SAX Feedback Skill` 문구 포함
+2. **출처 조건**: 본문에 `SEMO Feedback Skill` 문구 포함
 
 ```bash
 # 판별 스크립트
@@ -254,7 +254,7 @@ ISSUE_DATA=$(gh issue view {이슈번호} --repo semicolon-devteam/{repo} --json
 HAS_FEEDBACK_LABEL=$(echo "$ISSUE_DATA" | jq '.labels[] | select(.name == "bug" or .name == "enhancement")' | head -1)
 
 # 출처 확인
-HAS_SAX_ORIGIN=$(echo "$ISSUE_DATA" | jq -r '.body' | grep -c "SAX Feedback Skill")
+HAS_SAX_ORIGIN=$(echo "$ISSUE_DATA" | jq -r '.body' | grep -c "SEMO Feedback Skill")
 
 if [ -n "$HAS_FEEDBACK_LABEL" ] && [ "$HAS_SAX_ORIGIN" -gt 0 ]; then
   echo "피드백 이슈 확인됨"
@@ -276,10 +276,10 @@ gh issue comment {이슈번호} --repo semicolon-devteam/{repo} --body "$(cat <<
 **변경 내역**:
 {CHANGELOG 요약 - 불릿 포인트}
 
-SAX를 사용해주셔서 감사합니다! 🙏
+SEMO를 사용해주셔서 감사합니다! 🙏
 
 ---
-🤖 SAX version-manager로 자동 생성됨
+🤖 SEMO version-manager로 자동 생성됨
 EOF
 )"
 ```
@@ -316,7 +316,7 @@ EOF
 ### 완료 메시지
 
 ```markdown
-[SAX] Versioning: 피드백 이슈 처리 완료
+[SEMO] Versioning: 피드백 이슈 처리 완료
 
 ✅ GitHub 이슈 #{이슈번호} 완료 코멘트 추가
 ✅ Slack 알림에 @{작성자} 멘션 포함
@@ -330,7 +330,7 @@ EOF
 피드백 이슈가 감지되지 않으면 Phase 10은 스킵됩니다:
 
 ```markdown
-[SAX] Versioning: 피드백 이슈 없음 - Phase 10 스킵
+[SEMO] Versioning: 피드백 이슈 없음 - Phase 10 스킵
 ```
 
 ## Validation

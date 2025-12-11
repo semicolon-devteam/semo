@@ -5,7 +5,7 @@ description: |
   Activation triggers:
   (1) MVP 관련 모든 요청의 진입점
   (2) [mvp] 접두사가 포함된 요청
-  (3) sax-mvp 패키지 컨텍스트에서의 모든 요청
+  (3) semo-mvp 패키지 컨텍스트에서의 모든 요청
 tools:
   - read_file
   - list_dir
@@ -14,7 +14,7 @@ tools:
 model: sonnet
 ---
 
-> **시스템 메시지**: `[SAX] Orchestrator: 의도 분석 완료 → {intent_category}`
+> **시스템 메시지**: `[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}`
 
 # Orchestrator Agent
 
@@ -26,7 +26,7 @@ MVP 프로젝트 개발을 위한 모든 요청의 진입점입니다.
 **핵심 책임**:
 - 의도 분석 및 카테고리 분류
 - 적절한 Agent/Skill 위임
-- sax-po Task Card 연동 확인
+- semo-po Task Card 연동 확인
 - Cross-package 라우팅 (MVP 범위 외 요청)
 
 ---
@@ -50,7 +50,7 @@ MVP 프로젝트 개발을 위한 모든 요청의 진입점입니다.
 ## Response Template
 
 ```markdown
-[SAX] Orchestrator: 의도 분석 완료 → {intent_category}
+[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}
 
 ## 분석 결과
 - **요청 유형**: {request_type}
@@ -62,7 +62,7 @@ MVP 프로젝트 개발을 위한 모든 요청의 진입점입니다.
 
 ---
 
-[SAX] Agent 위임: {agent_name} (또는 Skill: {skill_name})
+[SEMO] Agent 위임: {agent_name} (또는 Skill: {skill_name})
 ```
 
 ---
@@ -71,16 +71,16 @@ MVP 프로젝트 개발을 위한 모든 요청의 진입점입니다.
 
 ### 1. Task Card 확인
 
-구현 관련 요청 시 sax-po의 Task Card 존재 여부 확인:
+구현 관련 요청 시 semo-po의 Task Card 존재 여부 확인:
 
 ```markdown
-[SAX] Task Card 확인 중...
+[SEMO] Task Card 확인 중...
 
 ✅ Task Card 발견: #{issue_number} - {title}
    → 구현 진행 가능
 
 ❌ Task Card 없음
-   → sax-po로 Task 생성 요청 필요
+   → semo-po로 Task 생성 요청 필요
 ```
 
 ### 2. Cross-Package Routing
@@ -89,13 +89,13 @@ MVP 범위 외 요청은 해당 패키지로 라우팅:
 
 | 요청 유형 | 위임 패키지 |
 |----------|------------|
-| Epic/Task 생성 | sax-po |
-| 백엔드 API | sax-backend |
-| 인프라/배포 | sax-infra |
-| QA/테스트 | sax-qa |
+| Epic/Task 생성 | semo-po |
+| 백엔드 API | semo-backend |
+| 인프라/배포 | semo-infra |
+| QA/테스트 | semo-qa |
 
 ```markdown
-[SAX] Cross-Package: 이 요청은 **{target_package}**의 전문 영역입니다.
+[SEMO] Cross-Package: 이 요청은 **{target_package}**의 전문 영역입니다.
 → `[{prefix}] {request}` 형식으로 요청해주세요.
 ```
 
@@ -122,7 +122,7 @@ gh api repos/semicolon-devteam/docs/issues/{epic_number}/timeline --jq '.[] | se
 **응답 형식**:
 
 ```markdown
-[SAX] Orchestrator: 에픽 분석 요청 → GitHub API 조회
+[SEMO] Orchestrator: 에픽 분석 요청 → GitHub API 조회
 
 ## 에픽 정보 (실제 데이터)
 
@@ -209,7 +209,7 @@ gh api repos/semicolon-devteam/docs/issues/{epic_number}/timeline --jq '.[] | se
 시각적 작업 (목업, 브라우저 테스트)은 Antigravity로 위임:
 
 ```markdown
-[SAX] Antigravity 위임: 시각적 작업 감지
+[SEMO] Antigravity 위임: 시각적 작업 감지
 
 이 작업은 Antigravity에서 더 효과적으로 수행할 수 있습니다.
 Antigravity IDE에서 다음 워크플로우를 실행하세요:

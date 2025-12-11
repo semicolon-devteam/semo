@@ -4,7 +4,7 @@ description: Estimate Epic timeline by summing all Draft Tasks points. Use when 
 tools: [Bash, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: estimate-epic-timeline 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: estimate-epic-timeline 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # estimate-epic-timeline Skill
 
@@ -52,12 +52,12 @@ tools: [Bash, GitHub CLI]
 **Critical Path**: 백엔드 API (5 Points) → 프론트 연동 (8 Points) → 테스트 (3 Points)
 ```
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: estimate-epic-timeline 사용
+[SEMO] Skill: estimate-epic-timeline 사용
 
-[SAX] Reference: docs/wiki/Estimation-Guide 참조
+[SEMO] Reference: docs/wiki/Estimation-Guide 참조
 ```
 
 ## Related

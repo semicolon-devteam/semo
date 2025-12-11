@@ -1,7 +1,7 @@
 # SEMO 프레임워크 구조 리포트
 
 > 작성일: 2025-12-11
-> 버전: Phase 2.1 (SAX → SEMO 리브랜딩 완료)
+> 버전: Phase 2.1 (SEMO → SEMO 리브랜딩 완료)
 
 ---
 
@@ -9,7 +9,7 @@
 
 ### 1.1 SEMO란?
 
-**SEMO (Semicolon Orchestrate)**는 Claude Code 기반의 AI 에이전트 오케스트레이션 프레임워크입니다. 이전 명칭은 SAX (Semicolon AI Transformation)였으며, 2025년 12월 리브랜딩되었습니다.
+**SEMO (Semicolon Orchestrate)**는 Claude Code 기반의 AI 에이전트 오케스트레이션 프레임워크입니다. 이전 명칭은 SEMO (Semicolon AI Transformation)였으며, 2025년 12월 리브랜딩되었습니다.
 
 ### 1.2 핵심 철학
 
@@ -62,18 +62,18 @@ project/
 ├── docs/                       # 문서
 ├── infra/                      # 인프라 도구 (LangFuse, LiteLLM 등)
 │
-├── packages/                   # [구조 A] SAX 전체 이식본
-│   ├── core/                   # = sax-core
-│   ├── next/                   # = sax-next
-│   ├── backend/                # = sax-backend
-│   ├── po/                     # = sax-po
-│   ├── qa/                     # = sax-qa
-│   ├── pm/                     # = sax-pm
-│   ├── infra/                  # = sax-infra
-│   ├── design/                 # = sax-design
-│   ├── ms/                     # = sax-ms
-│   ├── mvp/                    # = sax-mvp
-│   ├── meta/                   # = sax-meta
+├── packages/                   # [구조 A] SEMO 전체 이식본
+│   ├── core/                   # = semo-core
+│   ├── next/                   # = semo-next
+│   ├── backend/                # = semo-backend
+│   ├── po/                     # = semo-po
+│   ├── qa/                     # = semo-qa
+│   ├── pm/                     # = semo-pm
+│   ├── infra/                  # = semo-infra
+│   ├── design/                 # = semo-design
+│   ├── ms/                     # = semo-ms
+│   ├── mvp/                    # = semo-mvp
+│   ├── meta/                   # = semo-meta
 │   ├── cli/                    # SEMO CLI (npm 패키지)
 │   └── mcp-server/             # SEMO MCP Server (npm 패키지)
 │
@@ -86,9 +86,9 @@ project/
 
 ## 4. 디렉토리별 상세 설명
 
-### 4.1 packages/ (구조 A: SAX 전체 이식)
+### 4.1 packages/ (구조 A: SEMO 전체 이식)
 
-**철학**: 기존 SAX의 역할별 패키지 구조를 그대로 유지
+**철학**: 기존 SEMO의 역할별 패키지 구조를 그대로 유지
 
 **목적**: 대규모 팀에서 역할별(PO, QA, PM, Dev) 분리된 AI 지원 제공
 
@@ -123,8 +123,8 @@ packages/core/
 │   ├── feedback/              # 피드백 수집
 │   ├── memory/                # 세션 메모리
 │   ├── version-updater/       # 버전 관리
-│   ├── sax-help/              # 도움말
-│   ├── sax-architecture-checker/  # 구조 검증
+│   ├── semo-help/              # 도움말
+│   ├── semo-architecture-checker/  # 구조 검증
 │   └── ...
 ├── evaluation/                # 에이전트 평가 도구
 ├── observability/             # 모니터링
@@ -288,7 +288,7 @@ npx @team-semicolon/semo-cli update    # 업데이트
 
 | 구조 | 위치 | 출처 | CLI 설치 여부 |
 |------|------|------|--------------|
-| 구조 A | `packages/` | SAX 전체 이식 | ❌ 미설치 |
+| 구조 A | `packages/` | SEMO 전체 이식 | ❌ 미설치 |
 | 구조 B | `semo-core/`, `semo-skills/` | Gemini 전략 신규 생성 | ✅ 설치됨 |
 
 ### 문제점
@@ -301,7 +301,7 @@ npx @team-semicolon/semo-cli update    # 업데이트
 
 | 방안 | 설명 | 장점 | 단점 |
 |------|------|------|------|
-| **A** | packages/ 구조 사용 | SAX 기능 100% 보존 | 복잡도 높음 |
+| **A** | packages/ 구조 사용 | SEMO 기능 100% 보존 | 복잡도 높음 |
 | **B** | semo-* 구조로 통합 | Gemini 전략 준수, 단순함 | 통합 작업 필요 |
 | **C** | 하이브리드 (기본 B + 선택 A) | 유연성 | 두 구조 모두 유지 필요 |
 

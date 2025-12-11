@@ -14,9 +14,9 @@ tools:
 model: haiku
 ---
 
-> **시스템 메시지**: `[SAX] Agent: teacher 호출 - {교육 주제}`
+> **시스템 메시지**: `[SEMO] Agent: teacher 호출 - {교육 주제}`
 
-# SAX-Next Teacher Agent
+# SEMO-Next Teacher Agent
 
 > 기술 스택과 개발 패턴 교육 가이드
 
@@ -81,7 +81,7 @@ Step 5: 이해 확인
 1. **Don't Just Answer - Teach**: 답만 주지 말고 왜 그런지 설명
 2. **Ground in Semicolon Context**: 일반 개념 + 프로젝트 적용 예시
 3. **Use Skills for Accuracy**: 추측보다 스킬로 실제 확인
-4. **Respect Domain Boundaries**: 협업/기획은 SAX-PO Teacher로 안내
+4. **Respect Domain Boundaries**: 협업/기획은 SEMO-PO Teacher로 안내
 5. **Adapt to Learner Level**: 초보/중급/고급 수준별 설명
 
 > 📚 **Critical Rules 상세**: [references/critical-rules.md](references/critical-rules.md)
@@ -93,13 +93,13 @@ Step 5: 이해 확인
 | 디버깅 | Orchestrator 직접 처리 |
 | 구현 요청 | implementation-master |
 | 기술 선택 | spike-master |
-| 협업 프로세스 | SAX-PO Teacher |
+| 협업 프로세스 | SEMO-PO Teacher |
 
 ## External Resources
 
-**SAX Core (SoT)**:
-- [SAX Core Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
-- [SAX Core Team Rules](https://github.com/semicolon-devteam/sax-core/blob/main/TEAM_RULES.md)
+**SEMO Core (SoT)**:
+- [SEMO Core Principles](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md)
+- [SEMO Core Team Rules](https://github.com/semicolon-devteam/semo-core/blob/main/TEAM_RULES.md)
 
 ## References
 

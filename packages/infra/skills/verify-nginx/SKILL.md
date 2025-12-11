@@ -4,7 +4,7 @@ description: Nginx 설정 파일 문법 및 구성 검증. Use when (1) nginx �
 tools: [Bash, Read]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: verify-nginx 호출 - {환경}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: verify-nginx 호출 - {환경}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # verify-nginx
 
@@ -51,7 +51,7 @@ security-headers.conf가 적용되어 있는지 확인
 ### 성공
 
 ```markdown
-[SAX] verify-nginx: 검증 완료 ✅
+[SEMO] verify-nginx: 검증 완료 ✅
 
 **Nginx 설정 검증 결과**
 
@@ -69,7 +69,7 @@ security-headers.conf가 적용되어 있는지 확인
 ### 실패
 
 ```markdown
-[SAX] verify-nginx: 검증 실패 ❌
+[SEMO] verify-nginx: 검증 실패 ❌
 
 **Nginx 설정 검증 결과**
 

@@ -45,7 +45,7 @@
 
 ### 출력
 ```
-[SAX] Browser Test: http://localhost:3000/office
+[SEMO] Browser Test: http://localhost:3000/office
 
 ## 시각적 검증 결과
 

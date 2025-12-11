@@ -57,7 +57,7 @@ Nano Banana Pro를 활용하여 UI 목업 이미지를 생성합니다:
 
 ### 출력
 ```
-[SAX] Skill: mockup - UI 목업 생성
+[SEMO] Skill: mockup - UI 목업 생성
 
 ## 오피스 예약 폼 목업
 

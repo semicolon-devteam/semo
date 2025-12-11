@@ -4,7 +4,7 @@ description: Nginx upstream/vhost 설정 생성. Use when (1) nginx 설정 추�
 tools: [Bash, Read, Write, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: scaffold-nginx 호출 - {서비스명}/{환경}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: scaffold-nginx 호출 - {서비스명}/{환경}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # scaffold-nginx
 
@@ -54,7 +54,7 @@ docker-compose run --rm webserver nginx -t
 ## 출력
 
 ```markdown
-[SAX] scaffold-nginx: 완료
+[SEMO] scaffold-nginx: 완료
 
 ✅ **Nginx 설정 생성 완료**
 

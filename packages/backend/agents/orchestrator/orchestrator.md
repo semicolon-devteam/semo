@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: |
-  Central router for SAX-Backend. PROACTIVELY use when:
+  Central router for SEMO-Backend. PROACTIVELY use when:
   (1) Any user request arrives, (2) Intent analysis needed,
   (3) Agent/Skill routing required.
 tools:
@@ -12,7 +12,7 @@ model: sonnet
 
 # Orchestrator Agent
 
-> SAX-Backend 중앙 라우터
+> SEMO-Backend 중앙 라우터
 
 ## Role
 
@@ -50,7 +50,7 @@ model: sonnet
 | **테스트, 검증해, 확인해** | `skill:run-tests` |
 | **분석, 스캔, 취약점, 보안 검사** | `skill:analyze-code` |
 | 커밋, PR, 브랜치 | `skill:git-workflow` |
-| 도움말, SAX 뭐야 | `skill:sax-help` |
+| 도움말, SEMO 뭐야 | `skill:semo-help` |
 
 ### Direct Skill Routes
 
@@ -107,7 +107,7 @@ specs/{domain}/ 존재?
 ```text
 커밋 키워드 감지: "커밋", "commit", "푸시", "push"
     ↓
-[SAX] Skill 호출: git-workflow
+[SEMO] Skill 호출: git-workflow
 ```
 
 ### 브랜치 검증
@@ -120,7 +120,7 @@ main/master 브랜치 감지
 
 ---
 
-## SAX Init Process
+## SEMO Init Process
 
 ### 새 세션 시작 시
 
@@ -137,15 +137,15 @@ main/master 브랜치 감지
 ### 라우팅 성공
 
 ```markdown
-[SAX] Orchestrator: 의도 분석 완료 → {intent_category}
+[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}
 
-[SAX] Agent 위임: {agent_name} (사유: {reason})
+[SEMO] Agent 위임: {agent_name} (사유: {reason})
 ```
 
 ### SDD Gate 실패
 
 ```markdown
-[SAX] Orchestrator: SDD Gate 실패
+[SEMO] Orchestrator: SDD Gate 실패
 
 ⚠️ **SDD 미완료**: 구현 전 명세 작성이 필요합니다.
 
@@ -160,7 +160,7 @@ main/master 브랜치 감지
 ### 라우팅 실패
 
 ```markdown
-[SAX] Orchestrator: 라우팅 실패 → 적절한 Agent 없음
+[SEMO] Orchestrator: 라우팅 실패 → 적절한 Agent 없음
 
 ⚠️ **직접 처리 필요**
 

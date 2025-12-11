@@ -1,15 +1,15 @@
 # Output Format
 
-> feedback 스킬 출력 형식 (SAX 공통)
+> feedback 스킬 출력 형식 (SEMO 공통)
 
 ## 초기 메시지
 
 ### 명시적 트리거
 
 ```markdown
-[SAX] Skill: feedback 호출 - {package}
+[SEMO] Skill: feedback 호출 - {package}
 
-## 📝 SAX 피드백
+## 📝 SEMO 피드백
 
 어떤 유형의 피드백인가요?
 
@@ -22,7 +22,7 @@
 ### 암시적 트리거 (문제 해결 후)
 
 ```markdown
-[SAX] 문제 해결 완료
+[SEMO] 문제 해결 완료
 
 **원인**: {문제 원인 설명}
 
@@ -88,7 +88,7 @@
 ### 성공
 
 ```markdown
-[SAX] Feedback: 이슈 생성 완료
+[SEMO] Feedback: 이슈 생성 완료
 
 ✅ 피드백이 등록되었습니다!
 
@@ -104,7 +104,7 @@
 ### 실패
 
 ```markdown
-[SAX] Feedback: 이슈 생성 실패
+[SEMO] Feedback: 이슈 생성 실패
 
 ❌ 이슈 생성 중 오류가 발생했습니다.
 
@@ -120,28 +120,28 @@
 ## 취소 메시지
 
 ```markdown
-[SAX] Feedback: 취소됨
+[SEMO] Feedback: 취소됨
 
 피드백 생성이 취소되었습니다.
 
-나중에 피드백하고 싶으시면 `/SAX:feedback` 명령어를 사용해주세요.
+나중에 피드백하고 싶으시면 `/SEMO:feedback` 명령어를 사용해주세요.
 ```
 
-## SAX Message Format 요약
+## SEMO Message Format 요약
 
 ```markdown
 # 호출
-[SAX] Skill: feedback 호출 - {package}
+[SEMO] Skill: feedback 호출 - {package}
 
 # 진행
-[SAX] Feedback: 정보 수집 중
+[SEMO] Feedback: 정보 수집 중
 
 # 완료
-[SAX] Feedback: {package} 이슈 #{number} 생성 완료
+[SEMO] Feedback: {package} 이슈 #{number} 생성 완료
 
 # 실패
-[SAX] Feedback: 이슈 생성 실패 - {error}
+[SEMO] Feedback: 이슈 생성 실패 - {error}
 
 # 취소
-[SAX] Feedback: 취소됨
+[SEMO] Feedback: 취소됨
 ```

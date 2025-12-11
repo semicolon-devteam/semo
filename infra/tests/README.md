@@ -80,7 +80,7 @@ infra/tests/
 | 타입 | 설명 | 예시 |
 |------|------|------|
 | `contains` | 모든 문자열이 포함되어야 함 | `["API", "성공"]` |
-| `contains_any` | 하나라도 포함되면 통과 | `["sax-next", "semo-next"]` |
+| `contains_any` | 하나라도 포함되면 통과 | `["semo-next", "semo-next"]` |
 | `not_contains` | 포함되면 실패 | `["에러", "Error"]` |
 | `pattern` | 정규식 매칭 | `"\\[SAX\\].*Orchestrator"` |
 
@@ -98,14 +98,14 @@ LLM 응답은 매번 다를 수 있으므로:
 // 좋은 예: 유연한 검증
 {
   "expect": {
-    "contains_any": ["sax-next", "semo-next", "next 패키지"]
+    "contains_any": ["semo-next", "semo-next", "next 패키지"]
   }
 }
 
 // 나쁜 예: 너무 엄격
 {
   "expect": {
-    "contains": ["[SAX] Orchestrator: 의도 분석 완료 → 코드 수정"]
+    "contains": ["[SEMO] Orchestrator: 의도 분석 완료 → 코드 수정"]
   }
 }
 ```

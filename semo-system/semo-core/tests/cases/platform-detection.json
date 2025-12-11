@@ -1,0 +1,20 @@
+{
+  "description": "플랫폼 자동 감지 테스트",
+  "tests": [
+    {
+      "name": "Next.js 프로젝트 감지",
+      "input": "이 프로젝트 플랫폼이 뭐야?",
+      "expect": {
+        "contains_any": ["nextjs", "Next.js", "next.config"]
+      }
+    },
+    {
+      "name": "플랫폼 명시 없이 구현 요청",
+      "input": "새 컴포넌트 만들어줘",
+      "expect": {
+        "contains_any": ["platform:", "플랫폼", "감지"],
+        "not_contains": ["[next]", "[backend]"]
+      }
+    }
+  ]
+}

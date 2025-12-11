@@ -4,7 +4,7 @@ description: 커뮤니티 솔루션 통합 호환성 검증
 tools: [Read, Glob, Grep, Bash]
 ---
 
-> **시스템 메시지**: `[SAX] Skill: verify-integration 호출 - 통합 검증`
+> **시스템 메시지**: `[SEMO] Skill: verify-integration 호출 - 통합 검증`
 
 # Verify Integration Skill
 
@@ -16,7 +16,7 @@ MVP 코드가 세미콜론 커뮤니티 솔루션과 호환되는지 검증합�
 ## Quick Start
 
 ```bash
-/SAX:verify
+/SEMO:verify
 
 # 트리거 키워드
 "통합 검증", "verify", "호환성 확인"
@@ -178,7 +178,7 @@ grep -r "ApiResponse<" --include="*.ts" . 2>/dev/null
 
 검증 실패 시:
 1. 위반 항목 수정
-2. `/SAX:verify` 재실행
+2. `/SEMO:verify` 재실행
 ```
 
 ---

@@ -8,7 +8,7 @@ tools: [Bash, Read, Write, Task]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Agent가 호출되면 `[SAX] Agent: sprint-master 시작` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Agent가 호출되면 `[SEMO] Agent: sprint-master 시작` 메시지를 첫 줄에 출력하세요.
 
 # Sprint Master Agent
 
@@ -34,14 +34,14 @@ Sprint 기반 애자일 프로젝트 관리를 지원합니다.
 ```
 Sprint 생성 요청
     ↓
-[SAX] Skill: create-sprint 호출
+[SEMO] Skill: create-sprint 호출
     ↓
 1. Sprint 정보 수집 (이름, 기간, 목표)
 2. GitHub Milestone 생성
 3. Sprint Issue 생성 (docs 레포)
 4. Projects #1 연결
     ↓
-[SAX] Skill: notify-slack 호출
+[SEMO] Skill: notify-slack 호출
     ↓
 완료
 ```
@@ -51,7 +51,7 @@ Sprint 생성 요청
 ```text
 작업량 설정 요청
     ↓
-[SAX] Skill: set-estimate 호출
+[SEMO] Skill: set-estimate 호출
     ↓
 1. 대상 Task 확인
 2. 작업량(Point) 설정
@@ -65,7 +65,7 @@ Sprint 생성 요청
 ```text
 작업 시작 요청
     ↓
-[SAX] Skill: start-task 호출
+[SEMO] Skill: start-task 호출
     ↓
 1. 대상 Task 확인
 2. 상태 → 작업중 변경
@@ -80,7 +80,7 @@ Sprint 생성 요청
 ```text
 Task 할당 요청
     ↓
-[SAX] Skill: assign-to-sprint 호출
+[SEMO] Skill: assign-to-sprint 호출
     ↓
 1. 현재 Backlog 조회
 2. 선택된 Task에 sprint-N 라벨 추가
@@ -95,7 +95,7 @@ Task 할당 요청
 ```
 Sprint 종료 요청
     ↓
-[SAX] Skill: close-sprint 호출
+[SEMO] Skill: close-sprint 호출
     ↓
 1. 완료/미완료 Task 집계
 2. Velocity 계산
@@ -103,7 +103,7 @@ Sprint 종료 요청
 4. Milestone 종료
 5. 미완료 Task → 다음 Sprint 이관
     ↓
-[SAX] Skill: notify-slack 호출
+[SEMO] Skill: notify-slack 호출
     ↓
 완료
 ```

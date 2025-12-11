@@ -7,7 +7,7 @@ description: |
 tools: [Bash, Grep, Read]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: verify-implementation 호출 - {검증 대상}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: verify-implementation 호출 - {검증 대상}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Verify Implementation Skill
 
@@ -76,7 +76,7 @@ skill: verify-reactive();
 ### 검증 통과
 
 ```markdown
-[SAX] Skill: verify-implementation 완료
+[SEMO] Skill: verify-implementation 완료
 
 ## 종합 검증 결과: ✅ PASS
 
@@ -98,7 +98,7 @@ skill: verify-reactive();
 ### 검증 실패
 
 ```markdown
-[SAX] Skill: verify-implementation 완료
+[SEMO] Skill: verify-implementation 완료
 
 ## 종합 검증 결과: ❌ FAIL
 

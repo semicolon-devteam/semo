@@ -7,7 +7,7 @@ Check Epic's design field checkbox.
 ## Create Design Task
 
 ```markdown
-[SAX] Skill: create-design-task 사용
+[SEMO] Skill: create-design-task 사용
 ```
 
 Process:

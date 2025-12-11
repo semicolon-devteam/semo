@@ -48,7 +48,7 @@ tools: [Read, Write, Edit]
 
 | 문서 | 용도 |
 |------|------|
-| `sax-core/_shared/microservice-conventions.md` 섹션 4 | 이벤트 봉투 표준 |
+| `semo-core/_shared/microservice-conventions.md` 섹션 4 | 이벤트 봉투 표준 |
 | ms-notifier README | 알림 서비스 패턴 |
 
 ## Event Envelope Standard

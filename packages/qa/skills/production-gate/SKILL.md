@@ -7,7 +7,7 @@ description: |
 tools: [Bash, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: production-gate 호출` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: production-gate 호출` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Production Gate Skill
 
@@ -59,7 +59,7 @@ query {
 ### 배포 가능
 
 ```markdown
-[SAX] Skill: production-gate 호출
+[SEMO] Skill: production-gate 호출
 
 ## ✅ 프로덕션 배포 가능
 
@@ -84,7 +84,7 @@ query {
 ### 배포 불가
 
 ```markdown
-[SAX] Skill: production-gate 호출
+[SEMO] Skill: production-gate 호출
 
 ## ❌ 프로덕션 배포 불가
 

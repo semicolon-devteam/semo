@@ -8,7 +8,7 @@ tools: [Bash, Read, Write, Task]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Agent가 호출되면 `[SAX] Agent: progress-tracker 시작` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Agent가 호출되면 `[SEMO] Agent: progress-tracker 시작` 메시지를 첫 줄에 출력하세요.
 
 # Progress Tracker Agent
 
@@ -34,7 +34,7 @@ model: inherit
 ```
 진행도 요청
     ↓
-[SAX] Skill: generate-progress-report 호출
+[SEMO] Skill: generate-progress-report 호출
     ↓
 1. GitHub Projects 상태 조회
 2. 완료/진행중/대기 집계
@@ -49,7 +49,7 @@ model: inherit
 ```
 인원별 현황 요청
     ↓
-[SAX] Skill: generate-member-report 호출
+[SEMO] Skill: generate-member-report 호출
     ↓
 1. Assignee별 Task 그룹화
 2. 개인별 완료율 계산
@@ -64,14 +64,14 @@ model: inherit
 ```
 블로커 확인 요청 (또는 자동)
     ↓
-[SAX] Skill: detect-blockers 호출
+[SEMO] Skill: detect-blockers 호출
     ↓
 1. 장기 In Progress Task 감지 (3일+)
 2. blocked 라벨 Task 조회
 3. 의존성 미해결 Task 확인
 4. 알림 생성
     ↓
-[SAX] Skill: notify-slack 호출 (심각도 높은 경우)
+[SEMO] Skill: notify-slack 호출 (심각도 높은 경우)
     ↓
 완료
 ```

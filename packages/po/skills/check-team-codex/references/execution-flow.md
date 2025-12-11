@@ -1,6 +1,6 @@
 # Execution Flow
 
-> **SoT 참조**: Quality Gates는 `sax-core/TEAM_RULES.md` 섹션 6에서 관리됩니다.
+> **SoT 참조**: Quality Gates는 `semo-core/TEAM_RULES.md` 섹션 6에서 관리됩니다.
 
 ## 1. Quick Check (Pre-commit)
 

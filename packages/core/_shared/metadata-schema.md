@@ -1,10 +1,10 @@
-# SAX 메타데이터 스키마
+# SEMO 메타데이터 스키마
 
-> SAX 패키지 간 일관된 사용자 메타데이터 구조 정의
+> SEMO 패키지 간 일관된 사용자 메타데이터 구조 정의
 
 ## 목적
 
-- 모든 SAX 패키지에서 동일한 메타데이터 구조 사용
+- 모든 SEMO 패키지에서 동일한 메타데이터 구조 사용
 - 온보딩 완료 상태 추적 자동화
 - health-check Skill에서 표준 구조 검증
 - 패키지별 특수 필드 확장 가능
@@ -16,7 +16,7 @@
 **저장 방법**:
 ```bash
 # 메타데이터 추가/업데이트
-jq '.SAX = {
+jq '.SEMO = {
   "role": "fulltime",
   "position": "developer",
   "boarded": true,
@@ -26,7 +26,7 @@ jq '.SAX = {
 }' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
 
 # 메타데이터 조회
-cat ~/.claude.json | jq '.SAX'
+cat ~/.claude.json | jq '.SEMO'
 ```
 
 ---
@@ -37,7 +37,7 @@ cat ~/.claude.json | jq '.SAX'
 
 ```json
 {
-  "SAX": {
+  "SEMO": {
     "role": "fulltime" | "parttime" | "contractor",
     "position": "developer" | "po" | "designer" | "qa" | "pm" | "backend" | "infra" | "msa",
     "boarded": true | false,
@@ -63,7 +63,7 @@ cat ~/.claude.json | jq '.SAX'
 
 ```json
 {
-  "SAX": {
+  "SEMO": {
     ...필수 필드,
     "packageSpecific": {
       // 패키지별 추가 필드
@@ -78,24 +78,24 @@ cat ~/.claude.json | jq '.SAX'
 
 | 역할 | `position` 값 | 사용 패키지 |
 |------|--------------|------------|
-| 프론트엔드/풀스택 개발자 | `"developer"` | sax-next |
-| PO/기획자 | `"po"` | sax-po |
-| 디자이너 | `"designer"` | sax-design |
-| QA/테스터 | `"qa"` | sax-qa |
-| 백엔드 개발자 | `"backend"` | sax-backend |
-| PM (Project Manager) | `"pm"` | sax-pm |
-| 인프라 엔지니어 | `"infra"` | sax-infra |
-| MSA 개발자 | `"msa"` | sax-ms |
+| 프론트엔드/풀스택 개발자 | `"developer"` | semo-next |
+| PO/기획자 | `"po"` | semo-po |
+| 디자이너 | `"designer"` | semo-design |
+| QA/테스터 | `"qa"` | semo-qa |
+| 백엔드 개발자 | `"backend"` | semo-backend |
+| PM (Project Manager) | `"pm"` | semo-pm |
+| 인프라 엔지니어 | `"infra"` | semo-infra |
+| MSA 개발자 | `"msa"` | semo-ms |
 
 ---
 
 ## 패키지별 특수 필드 (packageSpecific)
 
-### sax-pm (PM)
+### semo-pm (PM)
 
 ```json
 {
-  "SAX": {
+  "SEMO": {
     ...필수 필드,
     "packageSpecific": {
       "githubProjectsAuth": true
@@ -107,11 +107,11 @@ cat ~/.claude.json | jq '.SAX'
 **필드 설명**:
 - `githubProjectsAuth`: GitHub Projects 접근 권한 (project scope) 보유 여부
 
-### sax-design (디자이너)
+### semo-design (디자이너)
 
 ```json
 {
-  "SAX": {
+  "SEMO": {
     ...필수 필드,
     "packageSpecific": {
       "antigravitySetup": false,
@@ -138,11 +138,11 @@ cat ~/.claude.json | jq '.SAX'
 
 각 패키지의 `onboarding-master` Agent는 온보딩 완료 시 메타데이터를 업데이트해야 합니다.
 
-### 예시: sax-next (개발자)
+### 예시: semo-next (개발자)
 
 ```bash
 # Phase 5: 온보딩 완료 시
-jq '.SAX = {
+jq '.SEMO = {
   "role": "fulltime",
   "position": "developer",
   "boarded": true,
@@ -152,11 +152,11 @@ jq '.SAX = {
 }' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
 ```
 
-### 예시: sax-pm (PM)
+### 예시: semo-pm (PM)
 
 ```bash
 # Phase 5: 온보딩 완료 시
-jq '.SAX = {
+jq '.SEMO = {
   "role": "fulltime",
   "position": "pm",
   "boarded": true,
@@ -178,18 +178,18 @@ jq '.SAX = {
 ### 검증 항목
 
 ```bash
-# 1. SAX 필드 존재 확인
-cat ~/.claude.json | jq -e '.SAX' >/dev/null 2>&1 || echo "❌ SAX 메타데이터 없음"
+# 1. SEMO 필드 존재 확인
+cat ~/.claude.json | jq -e '.SEMO' >/dev/null 2>&1 || echo "❌ SEMO 메타데이터 없음"
 
 # 2. 필수 필드 검증
 REQUIRED_FIELDS=("role" "position" "boarded" "boardedAt" "healthCheckPassed" "lastHealthCheck")
 
 for field in "${REQUIRED_FIELDS[@]}"; do
-  cat ~/.claude.json | jq -e ".SAX.$field" >/dev/null 2>&1 || echo "❌ 필수 필드 누락: $field"
+  cat ~/.claude.json | jq -e ".SEMO.$field" >/dev/null 2>&1 || echo "❌ 필수 필드 누락: $field"
 done
 
 # 3. position 값 검증
-POSITION=$(cat ~/.claude.json | jq -r '.SAX.position')
+POSITION=$(cat ~/.claude.json | jq -r '.SEMO.position')
 VALID_POSITIONS=("developer" "po" "designer" "qa" "pm" "backend" "infra" "msa")
 
 if [[ ! " ${VALID_POSITIONS[@]} " =~ " ${POSITION} " ]]; then
@@ -197,10 +197,10 @@ if [[ ! " ${VALID_POSITIONS[@]} " =~ " ${POSITION} " ]]; then
 fi
 
 # 4. ISO 8601 타임스탬프 검증
-BOARDED_AT=$(cat ~/.claude.json | jq -r '.SAX.boardedAt')
+BOARDED_AT=$(cat ~/.claude.json | jq -r '.SEMO.boardedAt')
 date -d "$BOARDED_AT" >/dev/null 2>&1 || echo "❌ 잘못된 boardedAt 형식"
 
-LAST_HEALTH_CHECK=$(cat ~/.claude.json | jq -r '.SAX.lastHealthCheck')
+LAST_HEALTH_CHECK=$(cat ~/.claude.json | jq -r '.SEMO.lastHealthCheck')
 date -d "$LAST_HEALTH_CHECK" >/dev/null 2>&1 || echo "❌ 잘못된 lastHealthCheck 형식"
 ```
 
@@ -208,7 +208,7 @@ date -d "$LAST_HEALTH_CHECK" >/dev/null 2>&1 || echo "❌ 잘못된 lastHealthCh
 
 **성공 시**:
 ```markdown
-✅ SAX 메타데이터: 정상
+✅ SEMO 메타데이터: 정상
   - role: fulltime
   - position: developer
   - boarded: true
@@ -219,14 +219,14 @@ date -d "$LAST_HEALTH_CHECK" >/dev/null 2>&1 || echo "❌ 잘못된 lastHealthCh
 
 **실패 시**:
 ```markdown
-❌ SAX 메타데이터: 오류 발견
+❌ SEMO 메타데이터: 오류 발견
 
 **문제**:
 - ❌ 필수 필드 누락: boardedAt
 - ❌ 잘못된 position 값: dev (올바른 값: developer)
 
 **해결**:
-온보딩 프로세스를 완료하거나 `/SAX:onboarding`을 실행하세요.
+온보딩 프로세스를 완료하거나 `/SEMO:onboarding`을 실행하세요.
 ```
 
 ---
@@ -237,7 +237,7 @@ date -d "$LAST_HEALTH_CHECK" >/dev/null 2>&1 || echo "❌ 잘못된 lastHealthCh
 
 ```bash
 # 마지막 health-check로부터 30일 경과 여부 확인
-LAST_CHECK=$(cat ~/.claude.json | jq -r '.SAX.lastHealthCheck')
+LAST_CHECK=$(cat ~/.claude.json | jq -r '.SEMO.lastHealthCheck')
 LAST_CHECK_EPOCH=$(date -d "$LAST_CHECK" +%s)
 NOW_EPOCH=$(date +%s)
 DIFF_DAYS=$(( ($NOW_EPOCH - $LAST_CHECK_EPOCH) / 86400 ))
@@ -252,7 +252,7 @@ fi
 
 ```bash
 # lastHealthCheck 업데이트
-jq '.SAX.healthCheckPassed = true | .SAX.lastHealthCheck = "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"' \
+jq '.SEMO.healthCheckPassed = true | .SEMO.lastHealthCheck = "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"' \
   ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
 ```
 
@@ -269,18 +269,18 @@ jq '.SAX.healthCheckPassed = true | .SAX.lastHealthCheck = "'$(date -u +"%Y-%m-%
 cp ~/.claude.json ~/.claude.json.backup
 
 # 2. 표준 구조로 마이그레이션
-jq '.SAX = {
-  "role": (.SAX.role // "fulltime"),
-  "position": (.SAX.position // "developer"),
-  "boarded": (.SAX.boarded // false),
-  "boardedAt": (.SAX.boardedAt // "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"),
-  "healthCheckPassed": (.SAX.healthCheckPassed // false),
-  "lastHealthCheck": (.SAX.lastHealthCheck // "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"),
-  "packageSpecific": (.SAX.packageSpecific // {})
+jq '.SEMO = {
+  "role": (.SEMO.role // "fulltime"),
+  "position": (.SEMO.position // "developer"),
+  "boarded": (.SEMO.boarded // false),
+  "boardedAt": (.SEMO.boardedAt // "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"),
+  "healthCheckPassed": (.SEMO.healthCheckPassed // false),
+  "lastHealthCheck": (.SEMO.lastHealthCheck // "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"),
+  "packageSpecific": (.SEMO.packageSpecific // {})
 }' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
 
 # 3. 검증
-cat ~/.claude.json | jq '.SAX'
+cat ~/.claude.json | jq '.SEMO'
 ```
 
 ---
@@ -299,10 +299,10 @@ interface SAXMetadata {
 }
 
 interface PackageSpecificMetadata {
-  // sax-pm
+  // semo-pm
   githubProjectsAuth?: boolean;
 
-  // sax-design
+  // semo-design
   antigravitySetup?: boolean;
   mcpServers?: {
     magic?: boolean;
@@ -326,7 +326,7 @@ interface ClaudeConfig {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "properties": {
-    "SAX": {
+    "SEMO": {
       "type": "object",
       "required": ["role", "position", "boarded", "boardedAt", "healthCheckPassed", "lastHealthCheck"],
       "properties": {
@@ -365,7 +365,7 @@ interface ClaudeConfig {
 
 ## 관련 문서
 
-- [SAX Core PRINCIPLES.md](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
-- [SAX Core MESSAGE_RULES.md](https://github.com/semicolon-devteam/sax-core/blob/main/MESSAGE_RULES.md)
+- [SEMO Core PRINCIPLES.md](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md)
+- [SEMO Core MESSAGE_RULES.md](https://github.com/semicolon-devteam/semo-core/blob/main/MESSAGE_RULES.md)
 - 각 패키지 `onboarding-master` Agent
 - 각 패키지 `health-check` Skill

@@ -1,6 +1,6 @@
-# SAX → SEMO Deprecation Notice
+# SEMO → SEMO Deprecation Notice
 
-> 기존 SAX 패키지 및 접두사 Deprecation 안내
+> 기존 SEMO 패키지 및 접두사 Deprecation 안내
 
 **적용일**: 2025-12-11
 **제거 예정**: 6개월 후 (2026-06-11)
@@ -13,22 +13,22 @@
 
 | 기존 패키지 | 상태 | 새 위치 |
 |-------------|------|---------|
-| `sax-po` | ⚠️ Deprecated | `semo-skills/planner/` |
-| `sax-pm` | ⚠️ Deprecated | `semo-skills/planner/` |
-| `sax-next` | ⚠️ Deprecated | `semo-skills/coder/` (platform: nextjs) |
-| `sax-backend` | ⚠️ Deprecated | `semo-skills/coder/` (platform: spring) |
-| `sax-qa` | ⚠️ Deprecated | `semo-skills/tester/` |
-| `sax-design` | ⚠️ Deprecated | `semo-skills/writer/` |
-| `sax-infra` | ⚠️ Deprecated | `semo-skills/deployer/` |
-| `sax-ms` | ⚠️ Deprecated | `semo-skills/coder/` (platform: microservice) |
-| `sax-mvp` | ⚠️ Deprecated | `semo-skills/coder/` (platform: mvp) |
+| `semo-po` | ⚠️ Deprecated | `semo-skills/planner/` |
+| `semo-pm` | ⚠️ Deprecated | `semo-skills/planner/` |
+| `semo-next` | ⚠️ Deprecated | `semo-skills/coder/` (platform: nextjs) |
+| `semo-backend` | ⚠️ Deprecated | `semo-skills/coder/` (platform: spring) |
+| `semo-qa` | ⚠️ Deprecated | `semo-skills/tester/` |
+| `semo-design` | ⚠️ Deprecated | `semo-skills/writer/` |
+| `semo-infra` | ⚠️ Deprecated | `semo-skills/deployer/` |
+| `semo-ms` | ⚠️ Deprecated | `semo-skills/coder/` (platform: microservice) |
+| `semo-mvp` | ⚠️ Deprecated | `semo-skills/coder/` (platform: mvp) |
 
 ### 유지되는 패키지
 
 | 패키지 | 상태 | 비고 |
 |--------|------|------|
-| `sax-core` | 🔄 마이그레이션 | `semo-core/`로 이관 |
-| `sax-meta` | 🔄 마이그레이션 | `semo-core/`로 통합 |
+| `semo-core` | 🔄 마이그레이션 | `semo-core/`로 이관 |
+| `semo-meta` | 🔄 마이그레이션 | `semo-core/`로 통합 |
 
 ---
 
@@ -63,11 +63,11 @@
 
 | Deprecated | 새 커맨드 | 비고 |
 |------------|----------|------|
-| `/SAX:help` | `/SEMO:help` | 병행 지원 |
-| `/SAX:slack` | `/SEMO:notify` | 병행 지원 |
-| `/SAX:feedback` | `/SEMO:feedback` | 병행 지원 |
-| `/SAX:health` | `/SEMO:health` | 병행 지원 |
-| `/SAX:audit` | `/SEMO:audit` | 병행 지원 |
+| `/SEMO:help` | `/SEMO:help` | 병행 지원 |
+| `/SEMO:slack` | `/SEMO:notify` | 병행 지원 |
+| `/SEMO:feedback` | `/SEMO:feedback` | 병행 지원 |
+| `/SEMO:health` | `/SEMO:health` | 병행 지원 |
+| `/SEMO:audit` | `/SEMO:audit` | 병행 지원 |
 
 ---
 
@@ -96,8 +96,8 @@
 
 ```markdown
 ❌ "[next] 댓글 기능 구현해줘" (Deprecated 접두사)
-❌ /SAX:help (Deprecated 커맨드)
-❌ sax-next/skills/implement 참조
+❌ /SEMO:help (Deprecated 커맨드)
+❌ semo-next/skills/implement 참조
 ```
 
 ---

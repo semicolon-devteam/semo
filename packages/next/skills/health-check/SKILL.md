@@ -1,10 +1,10 @@
 ---
 name: health-check
-description: Automatically verify development environment and authentication status for SAX-Next. Use when (1) onboarding new team members, (2) checking tool installation status, (3) validating GitHub/Supabase authentication, (4) orchestrator starts workflow.
+description: Automatically verify development environment and authentication status for SEMO-Next. Use when (1) onboarding new team members, (2) checking tool installation status, (3) validating GitHub/Supabase authentication, (4) orchestrator starts workflow.
 tools: [Bash, Read, Grep]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: health-check 실행` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: health-check 실행` 시스템 메시지를 첫 줄에 출력하세요.
 
 # health-check Skill
 
@@ -12,7 +12,7 @@ tools: [Bash, Read, Grep]
 
 ## 트리거
 
-- `/SAX:health-check` 명령어
+- `/SEMO:health-check` 명령어
 - "환경 확인", "도구 확인", "설치 확인" 키워드
 - onboarding-master Agent에서 자동 호출
 - orchestrator가 업무 시작 시 자동 실행
@@ -44,24 +44,24 @@ tools: [Bash, Read, Grep]
 |------|----------|
 | API 문서 사이트 | `curl` HTTP 200 체크 (`https://core-interface-ashen.vercel.app`) |
 
-### SAX 메타데이터
+### SEMO 메타데이터
 
 - 파일: `~/.claude.json`
-- 필수 필드: `SAX.role`, `SAX.position`, `SAX.boarded`, `SAX.boardedAt`, `SAX.healthCheckPassed`, `SAX.lastHealthCheck`
+- 필수 필드: `SEMO.role`, `SEMO.position`, `SEMO.boarded`, `SEMO.boardedAt`, `SEMO.healthCheckPassed`, `SEMO.lastHealthCheck`
 - 검증 스크립트:
 
 ```bash
-# SAX 필드 존재 확인
-cat ~/.claude.json | jq -e '.SAX' >/dev/null 2>&1 || echo "❌ SAX 메타데이터 없음"
+# SEMO 필드 존재 확인
+cat ~/.claude.json | jq -e '.SEMO' >/dev/null 2>&1 || echo "❌ SEMO 메타데이터 없음"
 
 # 필수 필드 검증
 REQUIRED_FIELDS=("role" "position" "boarded" "boardedAt" "healthCheckPassed" "lastHealthCheck")
 for field in "${REQUIRED_FIELDS[@]}"; do
-  cat ~/.claude.json | jq -e ".SAX.$field" >/dev/null 2>&1 || echo "❌ 필수 필드 누락: $field"
+  cat ~/.claude.json | jq -e ".SEMO.$field" >/dev/null 2>&1 || echo "❌ 필수 필드 누락: $field"
 done
 
 # position 값 검증 (developer)
-POSITION=$(cat ~/.claude.json | jq -r '.SAX.position')
+POSITION=$(cat ~/.claude.json | jq -r '.SEMO.position')
 VALID_POSITIONS=("developer" "po" "designer" "qa" "pm" "backend" "infra" "msa")
 if [[ ! " ${VALID_POSITIONS[@]} " =~ " ${POSITION} " ]]; then
   echo "❌ 잘못된 position 값: $POSITION"
@@ -70,7 +70,7 @@ fi
 
 **검증 성공 시**:
 ```markdown
-✅ SAX 메타데이터: 정상
+✅ SEMO 메타데이터: 정상
   - role: fulltime
   - position: developer
   - boarded: true
@@ -81,27 +81,27 @@ fi
 
 **검증 실패 시**:
 ```markdown
-❌ SAX 메타데이터: 오류 발견
+❌ SEMO 메타데이터: 오류 발견
 
 **문제**:
 - ❌ 필수 필드 누락: lastHealthCheck
 - ❌ 잘못된 position 값: dev (올바른 값: developer)
 
 **해결**:
-온보딩 프로세스를 완료하거나 `/SAX:onboarding`을 실행하세요.
+온보딩 프로세스를 완료하거나 `/SEMO:onboarding`을 실행하세요.
 ```
 
-> **참조**: [SAX Core Metadata Schema](https://github.com/semicolon-devteam/sax-core/blob/main/_shared/metadata-schema.md)
+> **참조**: [SEMO Core Metadata Schema](https://github.com/semicolon-devteam/semo-core/blob/main/_shared/metadata-schema.md)
 
-### SAX 패키지 설치 상태
+### SEMO 패키지 설치 상태
 
 | 항목 | 검증 방법 |
 |------|----------|
-| 패키지 디렉토리 | `.claude/sax-core/`, `.claude/sax-next/` 존재 확인 |
-| CLAUDE.md 심링크 | `.claude/CLAUDE.md` → `sax-next/CLAUDE.md` |
-| agents 심링크 | `.claude/agents` → `sax-next/agents` |
-| skills 심링크 | `.claude/skills` → `sax-next/skills` |
-| commands 심링크 | `.claude/commands/SAX` → `../sax-next/commands` |
+| 패키지 디렉토리 | `.claude/semo-core/`, `.claude/semo-next/` 존재 확인 |
+| CLAUDE.md 심링크 | `.claude/CLAUDE.md` → `semo-next/CLAUDE.md` |
+| agents 심링크 | `.claude/agents` → `semo-next/agents` |
+| skills 심링크 | `.claude/skills` → `semo-next/skills` |
+| commands 심링크 | `.claude/commands/SEMO` → `../semo-next/commands` |
 
 ### 글로벌 MCP 서버 설정 상태 (~/.claude.json)
 
@@ -115,7 +115,7 @@ fi
 
 - **온보딩 시**: 필수 실행
 - **업무 시작 시**: 30일 경과 시 자동 실행
-- **수동 요청 시**: `/SAX:health-check` 명령어
+- **수동 요청 시**: `/SEMO:health-check` 명령어
 
 ## Related Skills
 

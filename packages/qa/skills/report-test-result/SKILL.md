@@ -7,7 +7,7 @@ description: |
 tools: [Bash, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: report-test-result 호출 - {repo}#{number} {result}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: report-test-result 호출 - {repo}#{number} {result}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Report Test Result Skill
 
@@ -15,8 +15,8 @@ tools: [Bash, GitHub CLI]
 
 ## 트리거
 
-- `/SAX:test-pass {repo}#{number}` - 테스트 통과
-- `/SAX:test-fail {repo}#{number} 사유: {reason}` - 테스트 실패
+- `/SEMO:test-pass {repo}#{number}` - 테스트 통과
+- `/SEMO:test-fail {repo}#{number} 사유: {reason}` - 테스트 실패
 - "통과", "Pass", "성공" + 이슈 참조
 - "실패", "Fail", "버그" + 이슈 참조
 
@@ -60,7 +60,7 @@ gh issue comment {number} --repo semicolon-devteam/{repo} --body "✅ **QA 테�
 ### Pass 출력
 
 ```markdown
-[SAX] Skill: report-test-result 호출 - {repo}#{number} PASS
+[SEMO] Skill: report-test-result 호출 - {repo}#{number} PASS
 
 ## ✅ 테스트 통과 처리 완료
 
@@ -114,7 +114,7 @@ Iteration: #{iteration_count}
 ### Fail 출력
 
 ```markdown
-[SAX] Skill: report-test-result 호출 - {repo}#{number} FAIL
+[SEMO] Skill: report-test-result 호출 - {repo}#{number} FAIL
 
 ## ❌ 테스트 실패 처리 완료
 
@@ -180,4 +180,4 @@ gh api graphql -f query='query { organization(login: "semicolon-devteam") { proj
 
 - [qa-master Agent](../../agents/qa-master/qa-master.md)
 - [iteration-tracker Skill](../iteration-tracker/SKILL.md)
-- [notify-slack Skill](../../../sax-core/skills/notify-slack/SKILL.md)
+- [notify-slack Skill](../../../semo-core/skills/notify-slack/SKILL.md)

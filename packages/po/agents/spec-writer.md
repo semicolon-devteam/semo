@@ -14,7 +14,7 @@ tools:
 model: sonnet
 ---
 
-> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SAX] Agent: spec-writer 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SEMO] Agent: spec-writer 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Spec Writer Agent
 
@@ -34,10 +34,10 @@ PO/기획자를 위한 **Spec 초안 작성 에이전트**입니다.
 - "명세 초안"
 - epic-master로부터 위임
 
-## SAX 메시지
+## SEMO 메시지
 
 ```markdown
-[SAX] Agent: spec-writer 호출 (트리거: Spec 초안 작성 요청)
+[SEMO] Agent: spec-writer 호출 (트리거: Spec 초안 작성 요청)
 ```
 
 ## 워크플로우
@@ -47,7 +47,7 @@ PO/기획자를 위한 **Spec 초안 작성 에이전트**입니다.
 Epic 이슈에서 정보 추출:
 
 ```markdown
-[SAX] Reference: docs #{epic_number} 참조
+[SEMO] Reference: docs #{epic_number} 참조
 
 ## Epic 분석
 
@@ -182,4 +182,4 @@ User Stories를 기반으로 spec.md 초안 작성:
 ## 참조
 
 - [Epic Master](./epic-master.md)
-- [SAX Core Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md) | 로컬: `.claude/sax-core/PRINCIPLES.md`
+- [SEMO Core Principles](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md) | 로컬: `.claude/semo-core/PRINCIPLES.md`

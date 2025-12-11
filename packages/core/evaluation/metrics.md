@@ -1,4 +1,4 @@
-# SAX/SEMO Agentic Evaluation Metrics
+# SEMO Agentic Evaluation Metrics
 
 > Agent/Skill 품질 측정을 위한 메트릭 정의
 
@@ -89,7 +89,7 @@ npx promptfoo eval --config evaluation/promptfoo.yaml --repeat 5 --output result
 
 ## 테스트 카테고리
 
-### 1. sax-next (Frontend)
+### 1. semo-next (Frontend)
 
 | 카테고리 | 테스트 수 | 설명 |
 |----------|----------|------|
@@ -99,7 +99,7 @@ npx promptfoo eval --config evaluation/promptfoo.yaml --repeat 5 --output result
 | API 연동 | 3 | Data fetching |
 | 버그 수정 | 5 | Bug fixes |
 
-### 2. sax-backend (Backend) - 예정
+### 2. semo-backend (Backend) - 예정
 
 | 카테고리 | 테스트 수 | 설명 |
 |----------|----------|------|
@@ -131,7 +131,7 @@ evaluation/
 ```json
 {
   "timestamp": "2025-12-11T10:00:00Z",
-  "config": "sax-next-pilot",
+  "config": "semo-next-pilot",
   "summary": {
     "total": 10,
     "pass": 8,
@@ -159,8 +159,8 @@ name: Agentic Evaluation
 on:
   pull_request:
     paths:
-      - 'sax-core/skills/**'
-      - 'sax-next/**'
+      - 'semo-core/skills/**'
+      - 'semo-next/**'
   schedule:
     - cron: '0 9 * * 1'  # 매주 월요일 09:00
 
@@ -173,7 +173,7 @@ jobs:
         with:
           node-version: '20'
       - name: Run Promptfoo
-        run: npx promptfoo eval --config sax-core/evaluation/promptfoo.yaml
+        run: npx promptfoo eval --config semo-core/evaluation/promptfoo.yaml
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
@@ -183,5 +183,5 @@ jobs:
 ## References
 
 - [Promptfoo Documentation](https://promptfoo.dev/)
-- [SAX → SEMO 전환 계획](../../.claude/plans/prancy-scribbling-falcon.md)
-- [SAX Core Principles](../PRINCIPLES.md)
+- [SEMO → SEMO 전환 계획](../../.claude/plans/prancy-scribbling-falcon.md)
+- [SEMO Core Principles](../PRINCIPLES.md)

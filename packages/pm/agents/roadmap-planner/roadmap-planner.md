@@ -8,7 +8,7 @@ tools: [Bash, Read, Write, Task]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Agent가 호출되면 `[SAX] Agent: roadmap-planner 시작` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Agent가 호출되면 `[SEMO] Agent: roadmap-planner 시작` 메시지를 첫 줄에 출력하세요.
 
 # Roadmap Planner Agent
 
@@ -34,7 +34,7 @@ Epic 기반 장기 프로젝트 일정을 관리하고 시각화합니다.
 ```
 Roadmap 요청
     ↓
-[SAX] Skill: generate-roadmap 호출
+[SEMO] Skill: generate-roadmap 호출
     ↓
 1. Epic 목록 조회 (docs 레포)
 2. Epic별 예상 기간 계산
@@ -49,7 +49,7 @@ Roadmap 요청
 ```
 마일스톤 요청
     ↓
-[SAX] Skill: sync-project-status 호출
+[SEMO] Skill: sync-project-status 호출
     ↓
 1. GitHub Milestones 조회
 2. 진행 상황 동기화

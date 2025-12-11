@@ -115,7 +115,7 @@ spec 없음         spec 있음
 **라우팅 실패 시 응답**:
 
 ```markdown
-[SAX] Orchestrator: 라우팅 실패 → 적절한 Agent 없음 (워크플로우 안내)
+[SEMO] Orchestrator: 라우팅 실패 → 적절한 Agent 없음 (워크플로우 안내)
 
 ⚠️ **직접 처리 필요**
 

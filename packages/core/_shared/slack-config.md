@@ -1,6 +1,6 @@
 # Slack 설정
 
-> SAX 패키지에서 공통으로 참조하는 Slack 설정 정보
+> SEMO 패키지에서 공통으로 참조하는 Slack 설정 정보
 
 ## Bot Token
 
@@ -39,7 +39,7 @@ SLACK_BOT_TOKEN=xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7
 ```markdown
 ## Slack Bot Token
 
-> 📖 [sax-core/_shared/slack-config.md](../../sax-core/_shared/slack-config.md) 참조
+> 📖 [semo-core/_shared/slack-config.md](../../semo-core/_shared/slack-config.md) 참조
 ```
 
 ### curl 명령어 템플릿
@@ -61,8 +61,8 @@ curl -X POST https://slack.com/api/chat.postMessage \
 
 1. Slack App 설정에서 새 토큰 생성
 2. **이 파일의 Bot Token만 업데이트**
-3. sax-core 버저닝 (PATCH)
-4. `.claude/sax-core/` 동기화
+3. semo-core 버저닝 (PATCH)
+4. `.claude/semo-core/` 동기화
 
 > 💡 다른 파일에서는 이 파일을 참조하므로, 토큰 갱신 시 이 파일만 수정하면 됩니다.
 
@@ -76,7 +76,7 @@ curl -X POST https://slack.com/api/chat.postMessage \
   -H "Content-Type: application/json" \
   -d '{
     "channel": "C09KNL91QBZ",
-    "text": "🧪 SAX Slack 연동 테스트"
+    "text": "🧪 SEMO Slack 연동 테스트"
   }'
 ```
 

@@ -18,7 +18,7 @@ tools:
 model: sonnet
 ---
 
-> **시스템 메시지**: `[SAX] Agent: mvp-architect 호출 - {topic}`
+> **시스템 메시지**: `[SEMO] Agent: mvp-architect 호출 - {topic}`
 
 # MVP Architect Agent
 
@@ -71,7 +71,7 @@ app/{domain}/
 ## Response Template
 
 ```markdown
-[SAX] Agent: mvp-architect 호출 - 도메인 아키텍처 설계
+[SEMO] Agent: mvp-architect 호출 - 도메인 아키텍처 설계
 
 ## 도메인 분석
 - **도메인명**: {domain_name}
@@ -98,7 +98,7 @@ app/{domain}/
 
 ---
 
-[SAX] Skill 호출: scaffold-mvp-domain
+[SEMO] Skill 호출: scaffold-mvp-domain
 ```
 
 ---

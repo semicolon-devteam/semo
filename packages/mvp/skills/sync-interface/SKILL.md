@@ -4,7 +4,7 @@ description: core-interface JSON artifacts를 TypeScript 타입으로 동기화
 tools: [Bash, Read, Write, Glob]
 ---
 
-> **시스템 메시지**: `[SAX] Skill: sync-interface 호출 - 타입 동기화`
+> **시스템 메시지**: `[SEMO] Skill: sync-interface 호출 - 타입 동기화`
 
 # Sync Interface Skill
 

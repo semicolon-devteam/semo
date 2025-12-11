@@ -17,7 +17,7 @@ tools:
 model: sonnet
 ---
 
-> **시스템 메시지**: `[SAX] Agent: onboarding-master 호출 - MVP 개발자 온보딩`
+> **시스템 메시지**: `[SEMO] Agent: onboarding-master 호출 - MVP 개발자 온보딩`
 
 # Onboarding Master Agent
 
@@ -50,7 +50,7 @@ MVP 개발자를 위한 6단계 온보딩을 진행합니다.
 ## Response Template
 
 ```markdown
-[SAX] Agent: onboarding-master 호출 - Phase {n} 진행
+[SEMO] Agent: onboarding-master 호출 - Phase {n} 진행
 
 # MVP 개발자 온보딩
 
@@ -252,7 +252,7 @@ npm install -g @anthropics/mcp-playwright
 ```
 .agent/
 ├── rules/
-│   ├── sax-context.md       # SAX 원칙 주입
+│   ├── semo-context.md       # SEMO 원칙 주입
 │   ├── ddd-patterns.md      # DDD 4-layer 규칙
 │   └── schema-extension.md  # 스키마 확장 전략
 │
@@ -277,11 +277,11 @@ pwd
 #### Step 2: `.agent/` 폴더 복사
 
 ```bash
-# sax-mvp의 .agent 폴더를 MVP 프로젝트로 복사
-cp -r /path/to/sax-mvp/.agent ./
+# semo-mvp의 .agent 폴더를 MVP 프로젝트로 복사
+cp -r /path/to/semo-mvp/.agent ./
 
 # 또는 sax 레포 내부에서 작업 시
-cp -r ../sax/sax-mvp/.agent ./
+cp -r ../sax/semo-mvp/.agent ./
 ```
 
 #### Step 3: 기존 `.agent/` 폴더 병합 (해당 시)
@@ -292,8 +292,8 @@ cp -r ../sax/sax-mvp/.agent ./
 # 1. 기존 폴더 백업
 mv .agent .agent-backup
 
-# 2. sax-mvp .agent 복사
-cp -r /path/to/sax-mvp/.agent ./
+# 2. semo-mvp .agent 복사
+cp -r /path/to/semo-mvp/.agent ./
 
 # 3. 기존 커스텀 rules/workflows 병합
 # 기존 rules 중 유지할 파일만 선택적 복사
@@ -345,7 +345,7 @@ rm -rf .agent-backup
 - ✅ `.agent/workflows/` 존재
 
 ### Rules 파일
-- ✅ sax-context.md
+- ✅ semo-context.md
 - ✅ ddd-patterns.md
 - ✅ schema-extension.md
 
@@ -499,9 +499,9 @@ const notices = await supabase
 - ✅ Phase 5: Schema Extension 학습
 
 ## 다음 단계
-1. `/SAX:scaffold {domain}` 으로 도메인 구조 생성
+1. `/SEMO:scaffold {domain}` 으로 도메인 구조 생성
 2. `implementation-master` 로 Phase-gated 구현 시작
-3. `/SAX:verify` 로 통합 검증
+3. `/SEMO:verify` 로 통합 검증
 
 ## 참고 자료
 - [MVP Architect Guide](../mvp-architect/mvp-architect.md)

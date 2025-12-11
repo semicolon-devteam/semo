@@ -1,7 +1,7 @@
-# SAX 보안 감사 보고서
+# SEMO 보안 감사 보고서
 
 > 생성일: 2025-12-11
-> 감사 범위: SAX 패키지 전체 (sax-core, sax-meta, sax-*)
+> 감사 범위: SEMO 패키지 전체 (semo-core, semo-meta, sax-*)
 
 ---
 
@@ -28,8 +28,8 @@
 ### 1. Slack Bot Token 하드코딩 (HIGH)
 
 **위치**:
-- `.claude/sax-core/skills/notify-slack/SKILL.md`
-- `.claude/sax-core/_shared/slack-config.md`
+- `.claude/semo-core/skills/notify-slack/SKILL.md`
+- `.claude/semo-core/_shared/slack-config.md`
 
 **현재 상태**:
 ```markdown

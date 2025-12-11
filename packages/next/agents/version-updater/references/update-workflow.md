@@ -5,17 +5,17 @@
 ## Step 1: 시스템 메시지 출력
 
 ```markdown
-[SAX] Agent: version-updater 실행
+[SEMO] Agent: version-updater 실행
 
-SAX 패키지 업데이트를 시작합니다...
+SEMO 패키지 업데이트를 시작합니다...
 ```
 
-## Step 2: skill:sax-update 호출
+## Step 2: skill:semo-update 호출
 
-sax-update Skill을 호출하여 실제 업데이트를 수행합니다.
+semo-update Skill을 호출하여 실제 업데이트를 수행합니다.
 
 ```markdown
-[SAX] Skill 호출: sax-update
+[SEMO] Skill 호출: semo-update
 ```
 
 ## Step 3: 업데이트 검증
@@ -28,14 +28,14 @@ sax-update Skill을 호출하여 실제 업데이트를 수행합니다.
 
 ```bash
 # 버전 확인
-cat .claude/sax-core/VERSION
-cat .claude/sax-next/VERSION
+cat .claude/semo-core/VERSION
+cat .claude/semo-next/VERSION
 
 # 심링크/복사 상태 확인
 ls -la .claude/CLAUDE.md
 ls -la .claude/agents
 ls -la .claude/skills
-ls -la .claude/SAX/commands
+ls -la .claude/SEMO/commands
 
 # 서브모듈 상태
 git submodule status
@@ -53,27 +53,27 @@ Windows에서는 심링크 대신 복사본이 사용됩니다. 업데이트 후
 ## Step 4: 결과 보고
 
 ```markdown
-[SAX] version-updater: 업데이트 완료
+[SEMO] version-updater: 업데이트 완료
 
-## 📦 SAX 패키지 업데이트 결과
+## 📦 SEMO 패키지 업데이트 결과
 
 | 패키지 | 이전 버전 | 현재 버전 | 상태 |
 |--------|----------|----------|------|
-| sax-core | {old} | {new} | ✅ |
-| sax-next | {old} | {new} | ✅ |
+| semo-core | {old} | {new} | ✅ |
+| semo-next | {old} | {new} | ✅ |
 
 ### 심링크 상태
 
 | 심링크 | 대상 | 상태 |
 |--------|------|------|
-| CLAUDE.md | sax-next/CLAUDE.md | ✅ |
-| agents/ | sax-next/agents/ | ✅ |
-| skills/ | sax-next/skills/ | ✅ |
-| SAX/commands/ | sax-next/commands/ | ✅ |
+| CLAUDE.md | semo-next/CLAUDE.md | ✅ |
+| agents/ | semo-next/agents/ | ✅ |
+| skills/ | semo-next/skills/ | ✅ |
+| SAX/commands/ | semo-next/commands/ | ✅ |
 
 **다음 단계** (선택):
-- 서브모듈 변경사항 커밋: "SAX 커밋해줘"
-- 환경 검증: `/SAX:health-check`
+- 서브모듈 변경사항 커밋: "SEMO 커밋해줘"
+- 환경 검증: `/SEMO:health-check`
 ```
 
 ## Step 5: 커밋 안내 (선택)
@@ -81,11 +81,11 @@ Windows에서는 심링크 대신 복사본이 사용됩니다. 업데이트 후
 사용자가 커밋을 요청하면:
 
 ```bash
-git add .claude/sax-core .claude/sax-next
-git commit -m ":bookmark: [SAX] Sync to v{version}
+git add .claude/semo-core .claude/semo-next
+git commit -m ":bookmark: [SEMO] Sync to v{version}
 
-- sax-core: {old_version} → {new_version}
-- sax-next: {old_version} → {new_version}
+- semo-core: {old_version} → {new_version}
+- semo-next: {old_version} → {new_version}
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
@@ -99,18 +99,18 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
 ### Session Check Step 1: 환경 감지
 
 ```bash
-# SAX 설치 여부 확인
-ls -la .claude/sax-next/ 2>/dev/null || echo "NOT_INSTALLED"
+# SEMO 설치 여부 확인
+ls -la .claude/semo-next/ 2>/dev/null || echo "NOT_INSTALLED"
 ```
 
 ### Session Check Step 2: 버전 비교 (설치된 경우만)
 
 ```bash
 # 로컬 버전
-LOCAL_VERSION=$(cat .claude/sax-next/VERSION 2>/dev/null)
+LOCAL_VERSION=$(cat .claude/semo-next/VERSION 2>/dev/null)
 
 # 원격 버전
-REMOTE_VERSION=$(gh api repos/semicolon-devteam/sax-next/contents/VERSION --jq '.content' | base64 -d 2>/dev/null)
+REMOTE_VERSION=$(gh api repos/semicolon-devteam/semo-next/contents/VERSION --jq '.content' | base64 -d 2>/dev/null)
 
 # 비교
 if [ "$LOCAL_VERSION" != "$REMOTE_VERSION" ]; then
@@ -123,20 +123,20 @@ fi
 **업데이트 필요 시**:
 
 ```markdown
-[SAX] version-updater: 업데이트 가능
+[SEMO] version-updater: 업데이트 가능
 
-📦 **SAX 업데이트 알림**
+📦 **SEMO 업데이트 알림**
 
 현재 버전: {local_version}
 최신 버전: {remote_version}
 
-업데이트하려면: "SAX 업데이트해줘"
+업데이트하려면: "SEMO 업데이트해줘"
 ```
 
 **최신 상태 시**:
 
 ```markdown
-[SAX] version-updater: 최신 버전 확인 ✅
+[SEMO] version-updater: 최신 버전 확인 ✅
 
-SAX {version}이 설치되어 있습니다.
+SEMO {version}이 설치되어 있습니다.
 ```

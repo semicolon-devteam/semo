@@ -28,7 +28,7 @@
 ### 권한 오류
 
 ```markdown
-[SAX] Error: create-epic 실패 → GitHub API 권한 없음
+[SEMO] Error: create-epic 실패 → GitHub API 권한 없음
 
 ⚠️ docs 레포지토리에 Issue 생성 권한이 필요합니다.
 ```
@@ -36,7 +36,7 @@
 ### 중복 Epic
 
 ```markdown
-[SAX] Warning: 유사한 Epic이 존재합니다
+[SEMO] Warning: 유사한 Epic이 존재합니다
 
 기존 Epic: #{existing_number} - {existing_title}
 

@@ -4,7 +4,7 @@ description: Detect project labels from source Epic during migration. Use when (
 tools: [Bash, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: detect-project-from-epic 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: detect-project-from-epic 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # detect-project-from-epic Skill
 
@@ -31,11 +31,11 @@ PROJECT_LABEL=$(gh api repos/{source_org}/{source_repo}/issues/{epic_number} \
   --jq '.labels[] | select(.name == "오피스" or .name == "랜드" or .name == "정치판" or .name == "코인톡") | .name')
 ```
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: detect-project-from-epic 사용
-[SAX] Reference: {source_repo}#{epic_number} 참조
+[SEMO] Skill: detect-project-from-epic 사용
+[SEMO] Reference: {source_repo}#{epic_number} 참조
 ```
 
 ## Related

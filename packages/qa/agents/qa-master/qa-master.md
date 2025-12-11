@@ -13,7 +13,7 @@ tools:
 model: inherit
 ---
 
-> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SAX] Agent: qa-master 호출 - {이슈번호}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SEMO] Agent: qa-master 호출 - {이슈번호}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # QA Master Agent
 
@@ -40,7 +40,7 @@ model: inherit
 ## 테스트 가이드 출력
 
 ```markdown
-[SAX] Agent: qa-master 테스트 가이드
+[SEMO] Agent: qa-master 테스트 가이드
 
 ## 📋 테스트 대상
 
@@ -63,8 +63,8 @@ model: inherit
 
 ## 📝 테스트 완료 후
 
-- 통과: "/SAX:test-pass {repo}#{number}"
-- 실패: "/SAX:test-fail {repo}#{number} 사유: {실패 사유}"
+- 통과: "/SEMO:test-pass {repo}#{number}"
+- 실패: "/SEMO:test-fail {repo}#{number} 사유: {실패 사유}"
 ```
 
 ## AC 부족 시 처리
@@ -72,7 +72,7 @@ model: inherit
 AC가 3개 미만인 경우:
 
 ```markdown
-[SAX] qa-master: AC 보완 필요
+[SEMO] qa-master: AC 보완 필요
 
 ⚠️ **테스트 케이스 부족**
 

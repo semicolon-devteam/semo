@@ -37,7 +37,7 @@ find . -name "*{feature}*" -type f
 ## Phase 4: 결과 출력
 
 ```markdown
-[SAX] Skill: verify-implementation 호출 - {repo}#{issue_number}
+[SEMO] Skill: verify-implementation 호출 - {repo}#{issue_number}
 
 === 구현 검토: {repo}#{issue_number} ===
 

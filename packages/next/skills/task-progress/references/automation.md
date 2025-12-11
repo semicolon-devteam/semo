@@ -54,13 +54,13 @@ mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $date: Date!) {
 
 > **📖 상세 API**: [project-board/references/api-commands.md](../../project-board/references/api-commands.md)
 
-## SAX 메타데이터 업데이트
+## SEMO 메타데이터 업데이트
 
 작업 시작 시 `~/.claude.json` 업데이트:
 
 ```json
 {
-  "SAX": {
+  "SEMO": {
     "role": "parttimer",
     "position": "developer",
     "boarded": true,

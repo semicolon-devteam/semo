@@ -6,7 +6,7 @@ description: |
 tools: [Bash]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: list-bugs 호출` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: list-bugs 호출` 시스템 메시지를 첫 줄에 출력하세요.
 
 # list-bugs Skill
 
@@ -243,12 +243,12 @@ GraphQL API 호출이 실패했습니다.
 GitHub 인증 상태를 확인해주세요: `gh auth status`
 ```
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: list-bugs 호출
+[SEMO] Skill: list-bugs 호출
 
-[SAX] Skill: list-bugs 완료 - {N}개 버그 이슈 발견
+[SEMO] Skill: list-bugs 완료 - {N}개 버그 이슈 발견
 ```
 
 ## 라벨 기반 조회 (Fallback)
@@ -264,5 +264,5 @@ done
 
 ## Related
 
-- [이슈 #6](https://github.com/semicolon-devteam/sax-core/issues/6) - 버그 이슈 조회 시 Projects 타입 필드 기준 조회 지원
+- [이슈 #6](https://github.com/semicolon-devteam/semo-core/issues/6) - 버그 이슈 조회 시 Projects 타입 필드 기준 조회 지원
 - [check-feedback Skill](../check-feedback/SKILL.md) - 피드백 이슈 수집

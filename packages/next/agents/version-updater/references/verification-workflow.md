@@ -9,7 +9,7 @@
 ## Verification Step 1: 시스템 메시지 출력
 
 ```markdown
-[SAX] Agent: version-updater 실행 (검증 모드)
+[SEMO] Agent: version-updater 실행 (검증 모드)
 
 업데이트 상태를 확인합니다...
 ```
@@ -18,12 +18,12 @@
 
 ```bash
 # 로컬 버전 확인
-cat .claude/sax-core/VERSION
-cat .claude/sax-next/VERSION
+cat .claude/semo-core/VERSION
+cat .claude/semo-next/VERSION
 
 # 원격 버전 확인 (GitHub)
-gh api repos/semicolon-devteam/sax-core/contents/VERSION --jq '.content' | base64 -d
-gh api repos/semicolon-devteam/sax-next/contents/VERSION --jq '.content' | base64 -d
+gh api repos/semicolon-devteam/semo-core/contents/VERSION --jq '.content' | base64 -d
+gh api repos/semicolon-devteam/semo-next/contents/VERSION --jq '.content' | base64 -d
 ```
 
 ## Verification Step 3: 심링크 상태 확인
@@ -33,37 +33,37 @@ gh api repos/semicolon-devteam/sax-next/contents/VERSION --jq '.content' | base6
 ls -la .claude/CLAUDE.md
 ls -la .claude/agents
 ls -la .claude/skills
-ls -la .claude/SAX/commands
+ls -la .claude/SEMO/commands
 ```
 
 ## Verification Step 4: 검증 결과 보고
 
 ```markdown
-[SAX] version-updater: 검증 완료
+[SEMO] version-updater: 검증 완료
 
-## 📋 SAX 업데이트 상태 검증
+## 📋 SEMO 업데이트 상태 검증
 
 ### 버전 상태
 
 | 패키지 | 로컬 버전 | 원격 버전 | 상태 |
 |--------|----------|----------|------|
-| sax-core | {local} | {remote} | ✅/⚠️ |
-| sax-next | {local} | {remote} | ✅/⚠️ |
+| semo-core | {local} | {remote} | ✅/⚠️ |
+| semo-next | {local} | {remote} | ✅/⚠️ |
 
 ### 심링크 상태
 
 | 심링크 | 대상 | 상태 |
 |--------|------|------|
-| CLAUDE.md | sax-next/CLAUDE.md | ✅/❌ |
-| agents/ | sax-next/agents/ | ✅/❌ |
-| skills/ | sax-next/skills/ | ✅/❌ |
-| SAX/commands/ | sax-next/commands/ | ✅/❌ |
+| CLAUDE.md | semo-next/CLAUDE.md | ✅/❌ |
+| agents/ | semo-next/agents/ | ✅/❌ |
+| skills/ | semo-next/skills/ | ✅/❌ |
+| SAX/commands/ | semo-next/commands/ | ✅/❌ |
 
 ### 결론
 
 {상태에 따른 메시지}
-- ✅ 모든 항목 정상: "SAX가 최신 상태이며 정상적으로 설정되어 있습니다."
-- ⚠️ 버전 불일치: "업데이트가 필요합니다. `SAX 업데이트해줘`를 실행하세요."
+- ✅ 모든 항목 정상: "SEMO가 최신 상태이며 정상적으로 설정되어 있습니다."
+- ⚠️ 버전 불일치: "업데이트가 필요합니다. `SEMO 업데이트해줘`를 실행하세요."
 - ❌ 심링크 오류: "심링크 재설정이 필요합니다."
 ```
 
@@ -72,7 +72,7 @@ ls -la .claude/SAX/commands
 ### 모든 항목 정상
 
 ```markdown
-✅ SAX가 최신 상태이며 정상적으로 설정되어 있습니다.
+✅ SEMO가 최신 상태이며 정상적으로 설정되어 있습니다.
 ```
 
 ### 버전 불일치
@@ -81,10 +81,10 @@ ls -la .claude/SAX/commands
 ⚠️ 업데이트가 필요합니다.
 
 **현재 상태**:
-- sax-core: {local} (최신: {remote})
-- sax-next: {local} (최신: {remote})
+- semo-core: {local} (최신: {remote})
+- semo-next: {local} (최신: {remote})
 
-**업데이트하려면**: "SAX 업데이트해줘"
+**업데이트하려면**: "SEMO 업데이트해줘"
 ```
 
 ### 심링크 오류
@@ -98,9 +98,9 @@ ls -la .claude/SAX/commands
 **수동 재설정**:
 ```bash
 cd .claude
-ln -sf sax-next/CLAUDE.md CLAUDE.md
-ln -sf sax-next/agents agents
-ln -sf sax-next/skills skills
-mkdir -p SAX && ln -sf ../sax-next/commands SAX/commands
+ln -sf semo-next/CLAUDE.md CLAUDE.md
+ln -sf semo-next/agents agents
+ln -sf semo-next/skills skills
+mkdir -p SEMO && ln -sf ../semo-next/commands SAX/commands
 ```
 ```

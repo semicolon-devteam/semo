@@ -8,7 +8,7 @@ tools: [Read, Glob, Grep, Edit, Bash]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: improve-code 호출 - {개선 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: improve-code 호출 - {개선 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # improve-code Skill
 
@@ -135,7 +135,7 @@ val results = items
 ### 개선 제안
 
 ```markdown
-[SAX] Skill: improve-code 분석 완료
+[SEMO] Skill: improve-code 분석 완료
 
 ## 개선 기회 ({n}건)
 
@@ -156,7 +156,7 @@ val results = items
 ### 개선 완료
 
 ```markdown
-[SAX] Skill: improve-code 완료
+[SEMO] Skill: improve-code 완료
 
 ## 적용된 개선
 
@@ -173,16 +173,16 @@ val results = items
 - tests: ✅ 12/12 통과
 ```
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: improve-code 호출 - {개선 유형}
+[SEMO] Skill: improve-code 호출 - {개선 유형}
 
-[SAX] Skill: improve-code 분석 완료 - {n}건 발견
+[SEMO] Skill: improve-code 분석 완료 - {n}건 발견
 
-[SAX] Skill: improve-code 적용 중 - {current}/{total}
+[SEMO] Skill: improve-code 적용 중 - {current}/{total}
 
-[SAX] Skill: improve-code 완료 - {적용 건수}건 개선
+[SEMO] Skill: improve-code 완료 - {적용 건수}건 개선
 ```
 
 ## Error Handling

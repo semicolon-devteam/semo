@@ -62,7 +62,7 @@ Teacher:
 - **개발자가 Spec을 보완**합니다 (How)
 
 **더 자세히 알고 싶다면**:
-SAX-PO 패키지의 Teacher에게 물어보시거나,
+SEMO-PO 패키지의 Teacher에게 물어보시거나,
 팀 Wiki의 Collaboration Process를 참조해주세요!
 
 📖 https://github.com/semicolon-devteam/docs/wiki/Collaboration-Process

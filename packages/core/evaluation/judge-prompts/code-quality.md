@@ -188,4 +188,4 @@ tests:
 ## References
 
 - [Promptfoo LLM-as-Judge](https://promptfoo.dev/docs/configuration/expected-outputs/llm-rubric)
-- [SAX Evaluation Metrics](../metrics.md)
+- [SEMO Evaluation Metrics](../metrics.md)

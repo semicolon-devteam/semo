@@ -11,7 +11,7 @@ triggers:
   - 상태로 만들어줘
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: project-board 호출 - {action}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: project-board 호출 - {action}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Project Board Skill
 
@@ -163,7 +163,7 @@ gh api graphql -f query='mutation {...}' ...
 ### Step 3: 결과 출력
 
 ```markdown
-[SAX] Skill: project-board 완료
+[SEMO] Skill: project-board 완료
 
 📋 **이슈**: {repo}#{issue_number}
 📊 **프로젝트**: 이슈관리 (#1)
@@ -179,7 +179,7 @@ gh api graphql -f query='mutation {...}' ...
 Fast-track 또는 정석 프로세스 완료 시 사용:
 
 ```markdown
-[SAX] Skill: project-board 호출 - 이슈 연동 및 상태 설정
+[SEMO] Skill: project-board 호출 - 이슈 연동 및 상태 설정
 
 📋 **대상 이슈**: {repo}#{issue_number}
 
@@ -247,7 +247,7 @@ skill: project-board({
 ### 성공
 
 ```markdown
-[SAX] Skill: project-board 완료
+[SEMO] Skill: project-board 완료
 
 📋 **이슈**: {repo}#{issue_number}
 📊 **프로젝트**: 이슈관리 (#1)
@@ -260,7 +260,7 @@ skill: project-board({
 ### 실패 - 프로젝트 미연결
 
 ```markdown
-[SAX] Skill: project-board 경고
+[SEMO] Skill: project-board 경고
 
 ⚠️ 이슈가 프로젝트에 연결되어 있지 않습니다.
 
@@ -275,7 +275,7 @@ skill: project-board({
 ### 실패 - 권한 오류
 
 ```markdown
-[SAX] Skill: project-board 실패
+[SEMO] Skill: project-board 실패
 
 ❌ Project 상태 변경 권한이 없습니다.
 

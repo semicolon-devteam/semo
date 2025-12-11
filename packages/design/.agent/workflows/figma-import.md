@@ -54,7 +54,7 @@ Figma API를 통해 디자인 데이터를 가져옵니다:
 
 ### 출력
 ```
-[SAX] Skill: figma-import - Figma 데이터 조회
+[SEMO] Skill: figma-import - Figma 데이터 조회
 
 ## Figma 디자인: Login Screen
 

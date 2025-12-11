@@ -12,7 +12,7 @@ PO가 생성한 Draft Task 상태:
 [간단한 Task 설명]
 
 ---
-_Draft task created by SAX-PO_
+_Draft task created by SEMO-PO_
 ```
 
 **특징**:
@@ -81,7 +81,7 @@ complete-draft-task 변환 후:
 [plan.md에서 추출한 기술적 가이드]
 
 ---
-_Completed by SAX-Next complete-draft-task Skill_
+_Completed by SEMO-Next complete-draft-task Skill_
 ```
 
 **특징**:

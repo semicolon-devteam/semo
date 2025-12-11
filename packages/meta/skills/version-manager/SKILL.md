@@ -1,18 +1,18 @@
 ---
 name: version-manager
-description: SAX 패키지 시맨틱 버저닝 자동화. Use when (1) Agent/Skill/Command 변경 후 릴리스, (2) VERSION 및 CHANGELOG 업데이트, (3) Keep a Changelog 형식 버전 관리.
+description: SEMO 패키지 시맨틱 버저닝 자동화. Use when (1) Agent/Skill/Command 변경 후 릴리스, (2) VERSION 및 CHANGELOG 업데이트, (3) Keep a Changelog 형식 버전 관리.
 tools: [Bash, Read, Write, Edit]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: version-manager 호출 - {버전 타입}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: version-manager 호출 - {버전 타입}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # version-manager Skill
 
-> SAX 패키지 버저닝 자동화 Skill
+> SEMO 패키지 버저닝 자동화 Skill
 
 ## Purpose
 
-SAX 패키지의 Semantic Versioning 관리를 자동화합니다.
+SEMO 패키지의 Semantic Versioning 관리를 자동화합니다.
 
 - VERSION 파일 업데이트
 - CHANGELOG/{version}.md 파일 생성
@@ -34,7 +34,7 @@ echo "3.15.0" > sax/VERSION
 # sax/CHANGELOG/{version}.md 파일 작성
 
 # 5. 커밋 & 푸시
-git add -A && git commit -m "🔖 [SAX] 3.15.0: {변경 요약}"
+git add -A && git commit -m "🔖 [SEMO] 3.15.0: {변경 요약}"
 git push origin main
 
 # 6. 🔴 Slack 알림 (필수) - 아래 섹션 참조
@@ -67,7 +67,7 @@ git push origin main
 다음 조건을 **모두** 만족해야 피드백 이슈로 판별합니다:
 
 1. 이슈에 `bug` 또는 `enhancement` 라벨 존재
-2. 이슈가 `sax-core/skills/feedback`에 의해 생성됨 (본문에 SAX Feedback Skill 표시)
+2. 이슈가 `semo-core/skills/feedback`에 의해 생성됨 (본문에 SEMO Feedback Skill 표시)
 
 ### 처리 흐름
 
@@ -93,7 +93,7 @@ git push origin main
 
 ```yaml
 feedback_issues:
-  - repo: "sax-po"
+  - repo: "semo-po"
     number: 123
 ```
 
@@ -106,7 +106,7 @@ feedback_issues:
 커밋 & 푸시 완료 후 **반드시** `notify-slack` Skill 호출:
 
 ```markdown
-[SAX] Skill: notify-slack 호출 - 릴리스 알림
+[SEMO] Skill: notify-slack 호출 - 릴리스 알림
 ```
 
 ### 알림 내용
@@ -122,53 +122,53 @@ feedback_issues:
 ### 완료 확인
 
 ```markdown
-[SAX] Versioning: Slack 알림 전송 완료 (#_협업)
+[SEMO] Versioning: Slack 알림 전송 완료 (#_협업)
 ```
 
 > **⚠️ 이 단계를 누락하면 버저닝 미완료 상태입니다.**
 
-## 🔴 필수: sax-meta 로컬 동기화
+## 🔴 필수: semo-meta 로컬 동기화
 
-> **sax-meta 버저닝 시, 현재 환경의 `.claude/sax-meta/`도 동기화해야 합니다.**
+> **semo-meta 버저닝 시, 현재 환경의 `.claude/semo-meta/`도 동기화해야 합니다.**
 
-sax-meta를 수정하는 환경 = sax-meta가 설치된 환경이므로,
+semo-meta를 수정하는 환경 = semo-meta가 설치된 환경이므로,
 원본 push 후 로컬 서브모듈도 반드시 동기화:
 
 ```bash
-cd .claude/sax-meta && git pull origin main
+cd .claude/semo-meta && git pull origin main
 ```
 
 ### 동기화 완료 확인
 
 ```markdown
-[SAX] Versioning: 로컬 동기화 완료 (.claude/sax-meta/)
+[SEMO] Versioning: 로컬 동기화 완료 (.claude/semo-meta/)
 ```
 
-> **⚠️ sax-meta 버저닝 시 이 단계를 누락하면 버저닝 미완료 상태입니다.**
+> **⚠️ semo-meta 버저닝 시 이 단계를 누락하면 버저닝 미완료 상태입니다.**
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: version-manager 사용
+[SEMO] Skill: version-manager 사용
 
-[SAX] Versioning: {old_version} → {new_version} ({version_type})
+[SEMO] Versioning: {old_version} → {new_version} ({version_type})
 
-[SAX] Versioning: 커밋 완료 → 푸시 진행
+[SEMO] Versioning: 커밋 완료 → 푸시 진행
 
-[SAX] Versioning: 완료 (푸시 성공)
+[SEMO] Versioning: 완료 (푸시 성공)
 
-[SAX] Skill: notify-slack 호출 - 릴리스 알림
+[SEMO] Skill: notify-slack 호출 - 릴리스 알림
 
-[SAX] Versioning: Slack 알림 전송 완료 (#_협업)
+[SEMO] Versioning: Slack 알림 전송 완료 (#_협업)
 
-[SAX] Versioning: 로컬 동기화 완료 (.claude/sax-meta/)  # sax-meta 버저닝 시만
+[SEMO] Versioning: 로컬 동기화 완료 (.claude/semo-meta/)  # semo-meta 버저닝 시만
 ```
 
 ## Related
 
-- [sax-architect Agent](../../agents/sax-architect/sax-architect.md)
+- [semo-architect Agent](../../agents/semo-architect/semo-architect.md)
 - [package-validator Skill](../package-validator/SKILL.md)
-- [SAX Core - Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
+- [SEMO Core - Principles](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md)
 
 ## References
 

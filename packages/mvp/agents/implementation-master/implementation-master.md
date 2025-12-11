@@ -18,7 +18,7 @@ tools:
 model: sonnet
 ---
 
-> **시스템 메시지**: `[SAX] Agent: implementation-master 호출 - {topic}`
+> **시스템 메시지**: `[SEMO] Agent: implementation-master 호출 - {topic}`
 
 # Implementation Master Agent
 
@@ -50,7 +50,7 @@ MVP 프로젝트의 Phase-gated 구현을 담당합니다.
 ## Response Template
 
 ```markdown
-[SAX] Agent: implementation-master 호출 - {feature_name} 구현
+[SEMO] Agent: implementation-master 호출 - {feature_name} 구현
 
 ## 현재 Phase
 - **Phase**: {current_phase}
@@ -181,7 +181,7 @@ feat({domain}): [TEST] Add {domain} tests and verification
 시각적 작업은 Antigravity로 위임:
 
 ```markdown
-[SAX] Antigravity 위임 필요
+[SEMO] Antigravity 위임 필요
 
 ### 권장 워크플로우
 1. Antigravity IDE에서 프로젝트 열기
@@ -201,7 +201,7 @@ feat({domain}): [TEST] Add {domain} tests and verification
 ### Build 실패 시
 
 ```markdown
-[SAX] Build 실패 감지
+[SEMO] Build 실패 감지
 
 ## 오류 분석
 {error_analysis}
@@ -216,7 +216,7 @@ feat({domain}): [TEST] Add {domain} tests and verification
 ### Phase 실패 시
 
 ```markdown
-[SAX] Phase 실패
+[SEMO] Phase 실패
 
 현재 Phase를 완료하지 못했습니다.
 이전 Phase로 돌아가서 누락된 항목을 확인하세요.

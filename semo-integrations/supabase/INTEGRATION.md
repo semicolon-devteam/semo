@@ -82,12 +82,12 @@ const supabase = createClient()
 
 ---
 
-## 매핑 정보 (SAX → SEMO)
+## 매핑 정보 (SEMO → SEMO)
 
 | 기존 패키지 | 기존 스킬 | 새 위치 |
 |-------------|----------|---------|
-| sax-mvp | sync-interface | supabase/sync |
-| sax-next | fetch-supabase-example | supabase/query |
+| semo-mvp | sync-interface | supabase/sync |
+| semo-next | fetch-supabase-example | supabase/query |
 
 ---
 

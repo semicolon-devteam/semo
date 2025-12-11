@@ -4,7 +4,7 @@ description: Docker Compose 서비스 정의 추가. Use when (1) 새 서비스 
 tools: [Bash, Read, Write, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: scaffold-compose 호출 - {서비스명}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: scaffold-compose 호출 - {서비스명}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # scaffold-compose
 
@@ -60,7 +60,7 @@ docker-compose --env-file .env.stg config
 ## 출력
 
 ```markdown
-[SAX] scaffold-compose: 완료
+[SEMO] scaffold-compose: 완료
 
 ✅ **서비스 추가 완료**
 

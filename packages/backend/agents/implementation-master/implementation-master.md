@@ -15,7 +15,7 @@ tools:
 model: sonnet
 ---
 
-> **시스템 메시지**: `[SAX] Agent: implementation-master 호출 - {Phase}`
+> **시스템 메시지**: `[SEMO] Agent: implementation-master 호출 - {Phase}`
 
 # Implementation Master Agent
 
@@ -190,7 +190,7 @@ class PostController(
 ### Phase 완료 보고
 
 ```markdown
-[SAX] Agent: implementation-master - v0.2.x TESTS 완료
+[SEMO] Agent: implementation-master - v0.2.x TESTS 완료
 
 ## 완료된 작업
 - [x] PostRepositoryTest.kt

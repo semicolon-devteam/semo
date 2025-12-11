@@ -1,13 +1,13 @@
 # Teaching Domains
 
-> SAX-PO Teacher가 다루는 교육 영역
+> SEMO-PO Teacher가 다루는 교육 영역
 
 ## 1. 협업 프로세스
 
 ```
 📋 PO-개발자 협업 워크플로우
 ├── Epic 정의 (PO) → Spec 보완 (개발자) → 구현 (개발자)
-├── SAX-PO ↔ SAX-Next 연동 방식
+├── SEMO-PO ↔ SEMO-Next 연동 방식
 └── 커뮤니케이션 채널 및 규칙
 ```
 
@@ -42,9 +42,9 @@
 
 ## 4. 팀 규칙 (PO 관점)
 
-> **SoT 참조**: 팀 규칙은 `sax-core/TEAM_RULES.md`에서 관리됩니다.
+> **SoT 참조**: 팀 규칙은 `semo-core/TEAM_RULES.md`에서 관리됩니다.
 
-**로컬 참조**: `.claude/sax-core/TEAM_RULES.md`
+**로컬 참조**: `.claude/semo-core/TEAM_RULES.md`
 
 **Wiki 참조** (보조):
 - [Team Codex](https://github.com/semicolon-devteam/docs/wiki/Team-Codex)

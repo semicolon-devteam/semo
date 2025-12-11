@@ -10,7 +10,7 @@ gh api repos/{source_org}/{source_repo}/issues/{epic_number}
 ## Phase 2: 프로젝트 감지
 
 ```markdown
-[SAX] Skill: detect-project-from-epic 사용
+[SEMO] Skill: detect-project-from-epic 사용
 ```
 
 ## Phase 3: Epic 내용 복사 및 이식
@@ -30,7 +30,7 @@ gh api repos/{source_org}/{source_repo}/issues/{epic_number}
 ```
 
 ```markdown
-[SAX] Skill: create-epic 사용 (이식 모드)
+[SEMO] Skill: create-epic 사용 (이식 모드)
 ```
 
 ## Phase 4: 프로젝트 라벨 적용
@@ -38,7 +38,7 @@ gh api repos/{source_org}/{source_repo}/issues/{epic_number}
 감지된 프로젝트 또는 수동 선택:
 
 ```markdown
-[SAX] Skill: assign-project-label 사용
+[SEMO] Skill: assign-project-label 사용
 ```
 
 ## Phase 5: 원본 Epic 표시
@@ -63,11 +63,11 @@ gh api repos/{source_org}/{source_repo}/issues/{epic_number}/labels \
 ## 출력 형식
 
 ```markdown
-[SAX] Skill: detect-project-from-epic 사용
+[SEMO] Skill: detect-project-from-epic 사용
 
-[SAX] Skill: create-epic 사용 (이식 모드)
+[SEMO] Skill: create-epic 사용 (이식 모드)
 
-[SAX] Skill: assign-project-label 사용
+[SEMO] Skill: assign-project-label 사용
 
 ## ✅ Epic 이식 완료
 

@@ -3,7 +3,7 @@
 ## 성공 시
 
 ```markdown
-=== SAX 환경 검증 결과 ===
+=== SEMO 환경 검증 결과 ===
 
 ## 필수 도구
 
@@ -25,24 +25,24 @@
 
 ✅ Slack 워크스페이스 참여: 확인
 
-## SAX 메타데이터 (~/.claude.json)
+## SEMO 메타데이터 (~/.claude.json)
 
 ✅ 파일 존재
-✅ SAX 메타데이터 존재
+✅ SEMO 메타데이터 존재
   - role: parttimer
   - position: developer
   - boarded: true
   - healthCheckPassed: true
   - lastHealthCheck: 2025-11-25T10:30:00Z
 
-## SAX 패키지 설치
+## SEMO 패키지 설치
 
-✅ sax-core: 설치됨
-✅ sax-next: 설치됨
-✅ CLAUDE.md → sax-next/CLAUDE.md
-✅ agents → sax-next/agents
-✅ skills → sax-next/skills
-✅ commands/SAX → ../sax-next/commands
+✅ semo-core: 설치됨
+✅ semo-next: 설치됨
+✅ CLAUDE.md → semo-next/CLAUDE.md
+✅ agents → semo-next/agents
+✅ skills → semo-next/skills
+✅ commands/SEMO → ../semo-next/commands
 
 ## 글로벌 MCP 서버 설정 (~/.claude.json)
 
@@ -54,13 +54,13 @@
 ✅ 모든 필수 항목 통과
 ⚠️  1개 선택 항목 미설치 (PostgreSQL)
 
-**다음 단계**: 온보딩 완료. 업무 할당을 대기하거나 `/SAX:onboarding`으로 SAX 학습을 진행하세요.
+**다음 단계**: 온보딩 완료. 업무 할당을 대기하거나 `/SEMO:onboarding`으로 SEMO 학습을 진행하세요.
 ```
 
 ## 실패 시
 
 ```markdown
-=== SAX 환경 검증 결과 ===
+=== SEMO 환경 검증 결과 ===
 
 ✅ GitHub CLI: v2.40.0
 ❌ Git: 미설치
@@ -119,16 +119,16 @@ jq '. + {
 }' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
 ```
 
-**재검증**: `/SAX:health-check` 명령어로 다시 확인하세요.
+**재검증**: `/SEMO:health-check` 명령어로 다시 확인하세요.
 ```
 
-## SAX 메타데이터 저장
+## SEMO 메타데이터 저장
 
-검증 완료 시 `~/.claude.json`에 SAX 메타데이터 저장:
+검증 완료 시 `~/.claude.json`에 SEMO 메타데이터 저장:
 
 ```json
 {
-  "SAX": {
+  "SEMO": {
     "role": "parttimer",
     "position": "developer",
     "boarded": true,
@@ -143,4 +143,4 @@ jq '. + {
 
 - **온보딩 시**: 필수 실행
 - **업무 시작 시**: orchestrator가 자동 실행 (30일 경과 시)
-- **수동 요청 시**: `/SAX:health-check` 명령어
+- **수동 요청 시**: `/SEMO:health-check` 명령어

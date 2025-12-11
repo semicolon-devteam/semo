@@ -1,8 +1,8 @@
 # Knowledge Base
 
-> SAX-PO Teacher의 지식 베이스
+> SEMO-PO Teacher의 지식 베이스
 
-## SAX-PO 워크플로우
+## SEMO-PO 워크플로우
 
 ```
 PO 요청

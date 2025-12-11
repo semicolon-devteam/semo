@@ -2,7 +2,7 @@
 
 > notify-slack Skill에서 사용하는 Slack Block Kit 메시지 템플릿
 
-> 📖 **Slack 설정**: [sax-core/_shared/slack-config.md](../../../_shared/slack-config.md) 참조
+> 📖 **Slack 설정**: [semo-core/_shared/slack-config.md](../../../_shared/slack-config.md) 참조
 
 ## 릴리스 알림 템플릿 (표준)
 
@@ -11,10 +11,10 @@
 ### 메시지 미리보기
 
 ```text
-🚀 SAX 패키지 업데이트
+🚀 SEMO 패키지 업데이트
 
 패키지             버전
-sax-meta          v0.30.0
+semo-meta          v0.30.0
 
 변경 내역
 • version-manager SKILL.md에 Slack 알림 필수화 명시
@@ -29,13 +29,13 @@ sax-meta          v0.30.0
 ```json
 {
   "channel": "C09KNL91QBZ",
-  "text": "🚀 SAX 패키지 업데이트 - {package_name} v{version}",
+  "text": "🚀 SEMO 패키지 업데이트 - {package_name} v{version}",
   "blocks": [
     {
       "type": "header",
       "text": {
         "type": "plain_text",
-        "text": "🚀 SAX 패키지 업데이트",
+        "text": "🚀 SEMO 패키지 업데이트",
         "emoji": true
       }
     },
@@ -76,7 +76,7 @@ sax-meta          v0.30.0
 
 | 변수 | 설명 | 예시 |
 |------|------|------|
-| `{package_name}` | 패키지 이름 | `sax-meta` |
+| `{package_name}` | 패키지 이름 | `semo-meta` |
 | `{version}` | 새 버전 (v 접두사 없이) | `0.30.0` |
 | `{changelog_bullets}` | 변경 내역 (• bullet 형식) | `• feature A 추가\n• bug B 수정` |
 
@@ -92,19 +92,19 @@ curl -s -X POST 'https://slack.com/api/chat.postMessage' \
   -d @- << 'EOF'
 {
   "channel": "C09KNL91QBZ",
-  "text": "SAX 패키지 업데이트: sax-meta v0.30.0",
+  "text": "SEMO 패키지 업데이트: semo-meta v0.30.0",
   "blocks": [
     {
       "type": "header",
       "text": {
         "type": "plain_text",
-        "text": "SAX 패키지 업데이트"
+        "text": "SEMO 패키지 업데이트"
       }
     },
     {
       "type": "section",
       "fields": [
-        {"type": "mrkdwn", "text": "*패키지*\nsax-meta"},
+        {"type": "mrkdwn", "text": "*패키지*\nsemo-meta"},
         {"type": "mrkdwn", "text": "*버전*\nv0.30.0"}
       ]
     },
@@ -117,7 +117,7 @@ curl -s -X POST 'https://slack.com/api/chat.postMessage' \
     },
     {
       "type": "context",
-      "elements": [{"type": "mrkdwn", "text": "<https://github.com/semicolon-devteam/sax-meta|GitHub>"}]
+      "elements": [{"type": "mrkdwn", "text": "<https://github.com/semicolon-devteam/semo-meta|GitHub>"}]
     }
   ]
 }
@@ -141,17 +141,17 @@ EOF
 
 ```json
 {
-  "text": "🚀 SAX 릴리즈 - SAX-Next 0.35.0 / SAX-Backend 1.2.0",
+  "text": "🚀 SEMO 릴리즈 - SEMO-Next 0.35.0 / SEMO-Backend 1.2.0",
   "blocks": [
     {
       "type": "header",
-      "text": { "type": "plain_text", "text": "🚀 SAX 릴리즈" }
+      "text": { "type": "plain_text", "text": "🚀 SEMO 릴리즈" }
     },
     {
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "*SAX-Next 0.35.0 / SAX-Backend 1.2.0*"
+        "text": "*SEMO-Next 0.35.0 / SEMO-Backend 1.2.0*"
       }
     },
     {
@@ -166,7 +166,7 @@ EOF
       "elements": [
         {
           "type": "mrkdwn",
-          "text": "<https://...|SAX-Next CHANGELOG> | <https://...|SAX-Backend CHANGELOG>"
+          "text": "<https://...|SEMO-Next CHANGELOG> | <https://...|SEMO-Backend CHANGELOG>"
         }
       ]
     }

@@ -67,7 +67,7 @@ Epic 생성 시 사용자에게 우선순위를 물어봅니다:
 
 ```bash
 # 템플릿 경로
-.claude/sax-po/templates/epic-template.md
+.claude/semo-po/templates/epic-template.md
 ```
 
 ### 2. 템플릿 렌더링

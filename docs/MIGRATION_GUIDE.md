@@ -1,6 +1,6 @@
-# SAX → SEMO 마이그레이션 가이드
+# SEMO → SEMO 마이그레이션 가이드
 
-> 기존 SAX 사용자를 위한 SEMO 전환 가이드
+> 기존 SEMO 사용자를 위한 SEMO 전환 가이드
 
 **버전**: 2.0.0
 **작성일**: 2025-12-11
@@ -11,7 +11,7 @@
 
 ### 왜 SEMO인가?
 
-| 항목 | SAX (기존) | SEMO (신규) |
+| 항목 | SEMO (기존) | SEMO (신규) |
 |------|-----------|-------------|
 | **구조** | 역할 기반 (11개 패키지) | 기능 기반 (3개 레이어) |
 | **Orchestrator** | 11개 (중복) | 1개 (통합) |
@@ -82,11 +82,11 @@ semo-workspace/
 
 | 기존 | 신규 | 상태 |
 |------|------|------|
-| `/SAX:help` | `/SEMO:help` | 병행 지원 |
-| `/SAX:slack` | `/SEMO:notify` | 병행 지원 |
-| `/SAX:feedback` | `/SEMO:feedback` | 병행 지원 |
-| `/SAX:health` | `/SEMO:health` | 병행 지원 |
-| `/SAX:audit` | `/SEMO:audit` | 병행 지원 |
+| `/SEMO:help` | `/SEMO:help` | 병행 지원 |
+| `/SEMO:slack` | `/SEMO:notify` | 병행 지원 |
+| `/SEMO:feedback` | `/SEMO:feedback` | 병행 지원 |
+| `/SEMO:health` | `/SEMO:health` | 병행 지원 |
+| `/SEMO:audit` | `/SEMO:audit` | 병행 지원 |
 
 ---
 
@@ -95,7 +95,7 @@ semo-workspace/
 ### 기존 (SAX)
 
 ```markdown
-[SAX] Skill: sax-next/skills/implement 사용
+[SEMO] Skill: semo-next/skills/implement 사용
 ```
 
 ### 신규 (SEMO)
@@ -108,11 +108,11 @@ semo-workspace/
 
 | 기존 경로 | 신규 경로 |
 |----------|----------|
-| `sax-next/skills/implement` | `semo-skills/coder/implement` |
-| `sax-backend/skills/implement` | `semo-skills/coder/implement` |
-| `sax-qa/skills/run-tests` | `semo-skills/tester/execute` |
-| `sax-po/skills/create-epic` | `semo-skills/planner/epic` |
-| `sax-core/skills/notify-slack` | `semo-integrations/slack/notify` |
+| `semo-next/skills/implement` | `semo-skills/coder/implement` |
+| `semo-backend/skills/implement` | `semo-skills/coder/implement` |
+| `semo-qa/skills/run-tests` | `semo-skills/tester/execute` |
+| `semo-po/skills/create-epic` | `semo-skills/planner/epic` |
+| `semo-core/skills/notify-slack` | `semo-integrations/slack/notify` |
 
 ---
 
@@ -121,8 +121,8 @@ semo-workspace/
 ### 기존 (SAX)
 
 ```markdown
-[SAX] Orchestrator: 의도 분석 완료 → 코드 구현
-[SAX] Agent 위임: implementation-master
+[SEMO] Orchestrator: 의도 분석 완료 → 코드 구현
+[SEMO] Agent 위임: implementation-master
 ```
 
 ### 신규 (SEMO)
@@ -185,7 +185,7 @@ fi
 
 ### 마이그레이션 전
 
-- [ ] 현재 사용 중인 SAX 패키지 확인
+- [ ] 현재 사용 중인 SEMO 패키지 확인
 - [ ] 사용 중인 접두사 목록 정리
 - [ ] 커스텀 스킬/에이전트 확인
 

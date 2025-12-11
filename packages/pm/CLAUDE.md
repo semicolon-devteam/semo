@@ -1,14 +1,14 @@
 <!-- SEMO Framework -->
 > **SEMO** = "Semicolon Orchestrate" - AI 에이전트 오케스트레이션 프레임워크
-> (이전 명칭: SAX - Semicolon AI Transformation)
+> (이전 명칭: SEMO - Semicolon AI Transformation)
 
-# SAX-PM Package Configuration
+# SEMO-PM Package Configuration
 
-> PM/프로젝트 매니저를 위한 SAX 패키지
+> PM/프로젝트 매니저를 위한 SEMO 패키지
 
 ## Package Info
 
-- **Package**: SAX-PM
+- **Package**: SEMO-PM
 - **Version**: 📌 [VERSION](./VERSION) 참조
 - **Target**: docs repository (Epic/Sprint 중심)
 - **Audience**: PM, 프로젝트 관리자, 팀 리드
@@ -21,9 +21,9 @@
 
 > 📖 상세: [_shared/INIT_SETUP.md](../_shared/INIT_SETUP.md)
 
-### 2. SAX Core 참조
+### 2. SEMO Core 참조
 
-> 📖 상세: [_shared/SAX_CORE_REFERENCE.md](../_shared/SAX_CORE_REFERENCE.md)
+> 📖 상세: [_shared/SEMO_CORE_REFERENCE.md](../_shared/SEMO_CORE_REFERENCE.md)
 
 ### 3. Orchestrator 위임
 
@@ -42,10 +42,10 @@
 
 ## PM 워크플로우
 
-### SAX-PO vs SAX-PM
+### SEMO-PO vs SEMO-PM
 
 ```text
-SAX-PO (기획)              SAX-PM (관리)
+SEMO-PO (기획)              SEMO-PM (관리)
 ─────────────              ─────────────
 Epic 생성          ───→    Sprint Backlog 추가
 Draft Task 생성    ───→    Sprint 할당
@@ -91,14 +91,14 @@ Ready Task         ───→    Progress 추적
 
 | Command | 기능 |
 |---------|------|
-| `/SAX:sprint` | Sprint 생성, 할당, 종료 |
-| `/SAX:progress` | 진행도 조회 |
-| `/SAX:report` | 주간/인원별 리포트 생성 |
-| `/SAX:roadmap` | Roadmap 생성 |
+| `/SEMO:sprint` | Sprint 생성, 할당, 종료 |
+| `/SEMO:progress` | 진행도 조회 |
+| `/SEMO:report` | 주간/인원별 리포트 생성 |
+| `/SEMO:roadmap` | Roadmap 생성 |
 
 ---
 
 ## References
 
-- [SAX Core - Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
-- [SAX Core - Message Rules](https://github.com/semicolon-devteam/sax-core/blob/main/MESSAGE_RULES.md)
+- [SEMO Core - Principles](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md)
+- [SEMO Core - Message Rules](https://github.com/semicolon-devteam/semo-core/blob/main/MESSAGE_RULES.md)

@@ -7,7 +7,7 @@ tools: [Bash, Read]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: detect-blockers 호출` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: detect-blockers 호출` 메시지를 첫 줄에 출력하세요.
 
 # detect-blockers Skill
 
@@ -219,7 +219,7 @@ Critical 블로커 발견 시 자동 알림:
 
 ```bash
 # notify-slack 호출
-/SAX:slack #_협업 채널에 블로커 알림
+/SEMO:slack #_협업 채널에 블로커 알림
 ```
 
 **메시지 형식**:
@@ -236,7 +236,7 @@ Sprint 12월 1/4에서 Critical 블로커가 발견되었습니다.
 ## 완료 메시지
 
 ```markdown
-[SAX] Skill: detect-blockers 완료
+[SEMO] Skill: detect-blockers 완료
 
 # 🚨 블로커 현황
 

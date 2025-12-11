@@ -1,6 +1,6 @@
 # Check Items
 
-> **SoT 참조**: 모든 검증 규칙은 `sax-core/TEAM_RULES.md`에서 관리됩니다.
+> **SoT 참조**: 모든 검증 규칙은 `semo-core/TEAM_RULES.md`에서 관리됩니다.
 
 ## 검증 명령어 요약
 
@@ -14,7 +14,7 @@
 
 ## 상세 규칙
 
-**sax-core/TEAM_RULES.md 참조**:
+**semo-core/TEAM_RULES.md 참조**:
 - 섹션 2.1: 필수 검증 항목
 - 섹션 2.2: 금지 사항
 - 섹션 2.5: Severity Levels

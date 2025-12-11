@@ -7,7 +7,7 @@ tools: [Read]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 트리거되면 `[SAX] Skill: circuit-breaker 발동 - {조건}` 시스템 메시지를 출력하세요.
+> **시스템 메시지**: 이 Skill이 트리거되면 `[SEMO] Skill: circuit-breaker 발동 - {조건}` 시스템 메시지를 출력하세요.
 
 # Circuit Breaker Skill
 
@@ -86,7 +86,7 @@ Claude Code 환경에서 에이전트의 비효율적 동작을 감지하고 중
 - Skill 호출이 계속 실패하며 재시도
 
 **액션**:
-[SAX] Skill: circuit-breaker 발동 - 재귀 깊이 초과 (15회)
+[SEMO] Skill: circuit-breaker 발동 - 재귀 깊이 초과 (15회)
 
 ⚠️ **작업 중단**: 무한 루프가 감지되었습니다.
 현재 호출 스택: {stack}
@@ -103,7 +103,7 @@ Claude Code 환경에서 에이전트의 비효율적 동작을 감지하고 중
 - 권한 에러 (3회 연속)
 
 **액션**:
-[SAX] Skill: circuit-breaker 발동 - 동일 에러 반복 (3회)
+[SEMO] Skill: circuit-breaker 발동 - 동일 에러 반복 (3회)
 
 ⚠️ **에러 패턴 감지**: "{에러 메시지}"
 동일 에러가 3회 반복되었습니다.
@@ -120,7 +120,7 @@ Claude Code 환경에서 에이전트의 비효율적 동작을 감지하고 중
 - 수정 → 테스트 실패 → 수정 → 테스트 실패 반복
 
 **액션**:
-[SAX] Skill: circuit-breaker 발동 - 동일 파일 반복 수정 (5회)
+[SEMO] Skill: circuit-breaker 발동 - 동일 파일 반복 수정 (5회)
 
 ⚠️ **반복 수정 감지**: {파일명}
 동일 파일을 5회 수정했습니다.
@@ -133,7 +133,7 @@ Claude Code 환경에서 에이전트의 비효율적 동작을 감지하고 중
 **감지 조건**: 단일 세션이 30분 이상 지속
 
 **액션**:
-[SAX] Skill: circuit-breaker 경고 - 세션 시간 30분 초과
+[SEMO] Skill: circuit-breaker 경고 - 세션 시간 30분 초과
 
 ⚠️ **긴 세션 경고**: 현재 세션이 30분을 초과했습니다.
 진행 상황:
@@ -159,7 +159,7 @@ Claude Code 환경에서 에이전트의 비효율적 동작을 감지하고 중
 ### 에스컬레이션 메시지 형식
 
 ```markdown
-[SAX] Skill: circuit-breaker 에스컬레이션
+[SEMO] Skill: circuit-breaker 에스컬레이션
 
 ## 상황
 - **조건**: {trigger_condition}
@@ -212,19 +212,19 @@ CLOSED (정상) → OPEN (발동) → HALF_OPEN (테스트) → CLOSED
 
 ---
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: circuit-breaker 발동 - {조건}
+[SEMO] Skill: circuit-breaker 발동 - {조건}
 
-[SAX] Skill: circuit-breaker 경고 - {조건}
+[SEMO] Skill: circuit-breaker 경고 - {조건}
 
-[SAX] Skill: circuit-breaker 해제 - 사용자 승인
+[SEMO] Skill: circuit-breaker 해제 - 사용자 승인
 ```
 
 ---
 
 ## References
 
-- [SAX Core Principles](../../PRINCIPLES.md)
+- [SEMO Core Principles](../../PRINCIPLES.md)
 - [SEMO 네이밍 규칙](../../../../docs/SEMO_NAMING_CONVENTION.md)

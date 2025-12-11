@@ -6,7 +6,7 @@ description: |
 tools: [Read, Write, Edit, Bash]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: typescript-write 호출` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: typescript-write 호출` 시스템 메시지를 첫 줄에 출력하세요.
 
 # TypeScript/React Development Skill
 

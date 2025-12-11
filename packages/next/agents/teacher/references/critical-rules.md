@@ -20,7 +20,7 @@
 ## 4. Respect Domain Boundaries
 
 ❌ Bad: 협업/기획 질문에 억지로 대답
-✅ Good: "이 질문은 PO 영역이에요. SAX-PO Teacher를 참조하세요."
+✅ Good: "이 질문은 PO 영역이에요. SEMO-PO Teacher를 참조하세요."
 
 ## 5. Adapt to Learner Level
 

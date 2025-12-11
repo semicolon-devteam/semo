@@ -124,13 +124,13 @@ SEMO는 **Claude Code CLI 기반**으로 동작합니다. 이로 인해:
 ### 5.1 현재 구조: 인간 역할 기반
 
 ```
-sax-po/     → PO (Product Owner)
-sax-pm/     → PM (Project Manager)
-sax-next/   → Frontend Developer
-sax-backend/→ Backend Developer
-sax-qa/     → QA Engineer
-sax-design/ → Designer
-sax-infra/  → DevOps/Infra
+semo-po/     → PO (Product Owner)
+semo-pm/     → PM (Project Manager)
+semo-next/   → Frontend Developer
+semo-backend/→ Backend Developer
+semo-qa/     → QA Engineer
+semo-design/ → Designer
+semo-infra/  → DevOps/Infra
 ```
 
 **이 구조의 가정**:
@@ -287,7 +287,7 @@ $ ./run-tests.sh --dry-run
 | 피드백 유형 | 예상 액션 |
 |-------------|----------|
 | 구현 개선 제안 | 테스트 프레임워크 고도화 |
-| 구조 변경 제안 | SAX → SEMO 리브랜딩 시 반영 |
+| 구조 변경 제안 | SEMO → SEMO 리브랜딩 시 반영 |
 | 추가 분석 요청 | 심층 연구 진행 |
 
 ---

@@ -1,14 +1,14 @@
 <!-- SEMO Framework -->
 > **SEMO** = "Semicolon Orchestrate" - AI 에이전트 오케스트레이션 프레임워크
-> (이전 명칭: SAX - Semicolon AI Transformation)
+> (이전 명칭: SEMO - Semicolon AI Transformation)
 
-# SAX-Backend Package Configuration
+# SEMO-Backend Package Configuration
 
-> Spring Boot 백엔드 개발자를 위한 SAX 패키지
+> Spring Boot 백엔드 개발자를 위한 SEMO 패키지
 
 ## Package Info
 
-- **Package**: SAX-Backend
+- **Package**: SEMO-Backend
 - **Version**: 📌 [VERSION](./VERSION) 참조
 - **Target**: core-backend, core-interface
 - **Audience**: Backend 개발자
@@ -26,9 +26,9 @@
 버전 체크 → 구조 검증 → 동기화 검증 → 메모리 복원
 ```
 
-### 2. SAX Core 참조
+### 2. SEMO Core 참조
 
-> 📖 상세: [_shared/SAX_CORE_REFERENCE.md](../_shared/SAX_CORE_REFERENCE.md)
+> 📖 상세: [_shared/SEMO_CORE_REFERENCE.md](../_shared/SEMO_CORE_REFERENCE.md)
 
 ### 3. Orchestrator 위임
 
@@ -120,5 +120,5 @@ grep -r "\.block()" src/main/ --include="*.kt"
 
 ## References
 
-- [SAX Core - Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
-- [SAX Core - Message Rules](https://github.com/semicolon-devteam/sax-core/blob/main/MESSAGE_RULES.md)
+- [SEMO Core - Principles](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md)
+- [SEMO Core - Message Rules](https://github.com/semicolon-devteam/semo-core/blob/main/MESSAGE_RULES.md)

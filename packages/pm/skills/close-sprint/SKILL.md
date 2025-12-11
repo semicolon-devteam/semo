@@ -2,12 +2,12 @@
 name: close-sprint
 description: |
   Sprint(Iteration) 종료 및 회고 정리. Use when (1) Sprint 마감,
-  (2) 회고 작성, (3) /SAX:sprint close 커맨드.
+  (2) 회고 작성, (3) /SEMO:sprint close 커맨드.
 tools: [Bash, Read, Write]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: close-sprint 호출` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: close-sprint 호출` 메시지를 첫 줄에 출력하세요.
 
 # close-sprint Skill
 
@@ -49,7 +49,7 @@ retrospective:                        # 선택
 ## Output
 
 ```markdown
-[SAX] Skill: close-sprint 완료
+[SEMO] Skill: close-sprint 완료
 
 ✅ Sprint "11월 4/4" 종료 완료
 
@@ -284,7 +284,7 @@ gh api graphql -f query='
 ## 완료 메시지
 
 ```markdown
-[SAX] Skill: close-sprint 완료
+[SEMO] Skill: close-sprint 완료
 
 ✅ **Sprint "{iteration_title}"** 종료 완료
 

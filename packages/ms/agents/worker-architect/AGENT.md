@@ -48,7 +48,7 @@ tools: [Read, Write, Edit]
 
 | 문서 | 용도 |
 |------|------|
-| `sax-core/_shared/microservice-conventions.md` 섹션 6 | 워커 패턴 |
+| `semo-core/_shared/microservice-conventions.md` 섹션 6 | 워커 패턴 |
 | ms-scheduler README | 스케줄러 패턴 |
 | ms-notifier README | 알림 워커 패턴 |
 

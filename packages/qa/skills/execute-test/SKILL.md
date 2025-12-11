@@ -7,7 +7,7 @@ description: |
 tools: [Bash, GitHub CLI, Read]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: execute-test 호출 - {repo}#{number}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: execute-test 호출 - {repo}#{number}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Execute Test Skill
 
@@ -28,7 +28,7 @@ tools: [Bash, GitHub CLI, Read]
 ## 출력 형식
 
 ```markdown
-[SAX] Skill: execute-test 호출 - {repo}#{number}
+[SEMO] Skill: execute-test 호출 - {repo}#{number}
 
 ## 🧪 테스트 실행: {repo}#{number}
 
@@ -70,12 +70,12 @@ AC를 기반으로 다음 항목을 확인하세요:
 
 **통과 시**:
 ```
-/SAX:test-pass {repo}#{number}
+/SEMO:test-pass {repo}#{number}
 ```
 
 **실패 시**:
 ```
-/SAX:test-fail {repo}#{number} 사유: {실패한 AC 항목과 상세 사유}
+/SEMO:test-fail {repo}#{number} 사유: {실패한 AC 항목과 상세 사유}
 ```
 
 ---

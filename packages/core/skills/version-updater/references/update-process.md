@@ -1,6 +1,6 @@
-# SAX Update Process
+# SEMO Update Process
 
-> SAX 패키지 업데이트 상세 절차
+> SEMO 패키지 업데이트 상세 절차
 
 ## 1. 버전 체크 절차
 
@@ -8,18 +8,18 @@
 
 ```bash
 # 각 패키지의 VERSION 파일 읽기
-cat .claude/sax-core/VERSION
-cat .claude/sax-meta/VERSION
-cat .claude/sax-{package}/VERSION
+cat .claude/semo-core/VERSION
+cat .claude/semo-meta/VERSION
+cat .claude/semo-{package}/VERSION
 ```
 
 ### 1.2 원격 버전 확인
 
 ```bash
 # GitHub API로 최신 버전 조회
-gh api repos/semicolon-devteam/sax-core/contents/VERSION --jq '.content' | base64 -d
-gh api repos/semicolon-devteam/sax-meta/contents/VERSION --jq '.content' | base64 -d
-gh api repos/semicolon-devteam/sax-{package}/contents/VERSION --jq '.content' | base64 -d
+gh api repos/semicolon-devteam/semo-core/contents/VERSION --jq '.content' | base64 -d
+gh api repos/semicolon-devteam/semo-meta/contents/VERSION --jq '.content' | base64 -d
+gh api repos/semicolon-devteam/semo-{package}/contents/VERSION --jq '.content' | base64 -d
 ```
 
 ### 1.3 버전 비교
@@ -46,7 +46,7 @@ compare_versions() {
 
 ```bash
 # 1. 변경사항 확인
-cd .claude/sax-{package}
+cd .claude/semo-{package}
 git status
 
 # 2. 로컬 변경사항이 있으면 stash
@@ -67,13 +67,13 @@ cd -
 업데이트 완료 후 `claude-health` 스킬이 자동으로 호출됩니다:
 
 ```markdown
-[SAX] version-updater: 업데이트 완료 → claude-health 호출
+[SEMO] version-updater: 업데이트 완료 → claude-health 호출
 ```
 
 **claude-health 동작**:
 
 1. 패키지 감지 (po, next, qa, meta, pm, backend, infra)
-2. `.claude` 구조 검증 (CLAUDE.md, agents/, skills/, commands/SAX/)
+2. `.claude` 구조 검증 (CLAUDE.md, agents/, skills/, commands/SEMO/)
 3. 문제 발견 시 자동 수정 (install-sax.sh와 동일 로직)
 4. 결과 보고
 
@@ -85,18 +85,18 @@ cd -
 #!/bin/bash
 # update-sax.sh
 
-# 모든 SAX 서브모듈 업데이트
+# 모든 SEMO 서브모듈 업데이트
 git submodule update --remote --merge
 
 # 심링크 재구성
-for pkg in .claude/sax-*/; do
+for pkg in .claude/semo-*/; do
   if [ -d "$pkg" ]; then
-    name=$(basename "$pkg" | sed 's/sax-//')
+    name=$(basename "$pkg" | sed 's/semo-//')
     ./install-sax.sh "$name" --refresh-links 2>/dev/null || true
   fi
 done
 
-echo "SAX 업데이트 완료"
+echo "SEMO 업데이트 완료"
 ```
 
 ## 3. 업데이트 시 주의사항
@@ -126,7 +126,7 @@ MAJOR 버전 변경 시:
 
 ```bash
 # 1. 이전 커밋 해시 확인
-cd .claude/sax-{package}
+cd .claude/semo-{package}
 git log --oneline -5
 
 # 2. 특정 버전으로 롤백
@@ -144,7 +144,7 @@ cd -
 
 ```markdown
 <!-- .claude/CLAUDE.md 에 추가 -->
-## SAX Settings
+## SEMO Settings
 
 - **auto_version_check**: false
 ```

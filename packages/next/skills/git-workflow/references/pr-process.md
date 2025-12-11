@@ -1,6 +1,6 @@
 # PR Process
 
-> **SoT 참조**: Quality Gates는 `sax-core/TEAM_RULES.md` 섹션 6에서 관리됩니다.
+> **SoT 참조**: Quality Gates는 `semo-core/TEAM_RULES.md` 섹션 6에서 관리됩니다.
 
 ## Pull Request Creation
 
@@ -172,7 +172,7 @@ Skill Response:
 ### Example 5: PR 머지 후
 
 ```markdown
-[SAX] skill:git-workflow: PR 머지 완료
+[SEMO] skill:git-workflow: PR 머지 완료
 
 ✅ **PR #42**: `✨ #35 댓글 UI 구현` → dev 병합 완료
 

@@ -1,6 +1,6 @@
 # Semicolon 팀원 정보
 
-> SAX 패키지에서 공통으로 참조하는 팀원 정보 (GitHub ↔ Slack 매핑)
+> SEMO 패키지에서 공통으로 참조하는 팀원 정보 (GitHub ↔ Slack 매핑)
 
 ## 팀원 매핑 테이블
 
@@ -85,7 +85,7 @@ SLACK_NAME=$(get_slack_name "reus-jeon")  # "Reus"
 
 1. 이 파일의 매핑 테이블 업데이트
 2. `skills/notify-slack/references/slack-id-mapping.md` 참조 테이블도 동기화
-3. sax-core 버저닝 (PATCH)
+3. semo-core 버저닝 (PATCH)
 
 ## Related
 

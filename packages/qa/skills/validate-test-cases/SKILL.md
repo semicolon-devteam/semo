@@ -7,7 +7,7 @@ description: |
 tools: [Bash, GitHub CLI, Read]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: validate-test-cases 호출 - {repo}#{number}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: validate-test-cases 호출 - {repo}#{number}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Validate Test Cases Skill
 
@@ -46,7 +46,7 @@ gh issue view {number} --repo semicolon-devteam/{repo} --json body --jq '.body'
 ### AC 충분
 
 ```markdown
-[SAX] Skill: validate-test-cases 호출 - {repo}#{number}
+[SEMO] Skill: validate-test-cases 호출 - {repo}#{number}
 
 ## ✅ AC 검증 결과: 테스트 가능
 
@@ -67,7 +67,7 @@ gh issue view {number} --repo semicolon-devteam/{repo} --json body --jq '.body'
 ### AC 부족
 
 ```markdown
-[SAX] Skill: validate-test-cases 호출 - {repo}#{number}
+[SEMO] Skill: validate-test-cases 호출 - {repo}#{number}
 
 ## ❌ AC 검증 결과: 보완 필요
 

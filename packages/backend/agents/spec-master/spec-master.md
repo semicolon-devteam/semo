@@ -15,7 +15,7 @@ tools:
 model: sonnet
 ---
 
-> **시스템 메시지**: `[SAX] Agent: spec-master 호출 - {Phase 번호}`
+> **시스템 메시지**: `[SEMO] Agent: spec-master 호출 - {Phase 번호}`
 
 # Spec Master Agent
 

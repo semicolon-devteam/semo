@@ -18,7 +18,7 @@
 ### 사용 예시
 
 ```markdown
-[SAX] MCP: magic 사용
+[SEMO] MCP: magic 사용
 
 21st_magic_component_builder({
   "type": "button",
@@ -43,7 +43,7 @@
 ### 사용 예시
 
 ```markdown
-[SAX] MCP: Framelink 사용
+[SEMO] MCP: Framelink 사용
 
 get_figma_data({
   "fileKey": "abc123def456",
@@ -81,7 +81,7 @@ https://www.figma.com/file/{fileKey}/{fileName}?node-id={nodeId}
 ### 사용 예시
 
 ```markdown
-[SAX] MCP: playwright 사용
+[SEMO] MCP: playwright 사용
 
 # 페이지 이동
 browser_navigate("https://example.com")

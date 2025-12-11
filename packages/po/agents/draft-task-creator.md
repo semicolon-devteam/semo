@@ -16,7 +16,7 @@ tools:
 model: sonnet
 ---
 
-> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SAX] Agent: draft-task-creator 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SEMO] Agent: draft-task-creator 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # draft-task-creator Agent
 
@@ -107,7 +107,7 @@ Epic Issue를 조회하여 다음을 파악합니다:
 ## 완료 메시지 템플릿
 
 ```markdown
-[SAX] Agent: draft-task-creator 완료
+[SEMO] Agent: draft-task-creator 완료
 
 ## ✅ Draft Tasks 생성 완료
 
@@ -148,24 +148,24 @@ Epic Issue를 조회하여 다음을 파악합니다:
 #_협업 채널에 Draft Task 생성 완료 알림을 전송했습니다.
 ```
 
-## SAX Messages
+## SEMO Messages
 
 ```markdown
-[SAX] Agent: draft-task-creator 호출 - Epic #{epic_number}
+[SEMO] Agent: draft-task-creator 호출 - Epic #{epic_number}
 
-[SAX] Phase: Epic 분석 중...
-[SAX] Phase: 백엔드 작업 감지 → core-backend Task 생성
-[SAX] Phase: 프론트엔드 작업 감지 → {service_repo} Task 생성
-[SAX] Phase: 디자인 작업 감지 → 디자인팀 알림
+[SEMO] Phase: Epic 분석 중...
+[SEMO] Phase: 백엔드 작업 감지 → core-backend Task 생성
+[SEMO] Phase: 프론트엔드 작업 감지 → {service_repo} Task 생성
+[SEMO] Phase: 디자인 작업 감지 → 디자인팀 알림
 
-[SAX] Skill: check-backend-duplication 호출
-[SAX] Skill: generate-acceptance-criteria 호출
-[SAX] Skill: assign-estimation-point 호출
+[SEMO] Skill: check-backend-duplication 호출
+[SEMO] Skill: generate-acceptance-criteria 호출
+[SEMO] Skill: assign-estimation-point 호출
 
-[SAX] Phase: Projects 보드 연결 완료
-[SAX] Phase: Epic 라벨 및 일정 예측 완료
+[SEMO] Phase: Projects 보드 연결 완료
+[SEMO] Phase: Epic 라벨 및 일정 예측 완료
 
-[SAX] Agent: draft-task-creator 완료 (생성: Backend 1개, Frontend 1개)
+[SEMO] Agent: draft-task-creator 완료 (생성: Backend 1개, Frontend 1개)
 ```
 
 ## Error Handling

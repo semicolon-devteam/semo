@@ -1,10 +1,10 @@
 ---
 name: health-check
-description: Validate design environment and tool status. Use when (1) new designer onboarding (triggered by /SAX:health-check), (2) orchestrator auto-runs at work start, (3) checking design tools (Figma, Chrome, Antigravity), (4) verifying MCP servers and external service access.
+description: Validate design environment and tool status. Use when (1) new designer onboarding (triggered by /SEMO:health-check), (2) orchestrator auto-runs at work start, (3) checking design tools (Figma, Chrome, Antigravity), (4) verifying MCP servers and external service access.
 tools: [Bash, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: health-check 호출 - 디자인 환경 검증` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: health-check 호출 - 디자인 환경 검증` 시스템 메시지를 첫 줄에 출력하세요.
 
 # health-check Skill
 
@@ -12,11 +12,11 @@ tools: [Bash, GitHub CLI]
 
 ## 역할
 
-신규/기존 디자이너의 작업 환경을 자동으로 검증하여 SAX-Design 사용 준비 상태를 확인합니다.
+신규/기존 디자이너의 작업 환경을 자동으로 검증하여 SEMO-Design 사용 준비 상태를 확인합니다.
 
 ## 트리거
 
-- `/SAX:health-check` 명령어
+- `/SEMO:health-check` 명령어
 - "환경 확인", "도구 확인", "설정 확인" 키워드
 - onboarding-master Agent에서 자동 호출
 - orchestrator가 업무 시작 시 자동 실행 (30일 경과 시)
@@ -37,9 +37,9 @@ ls /Applications/Google\ Chrome.app 2>/dev/null && echo "✅ Chrome 설치됨"
 gh auth status
 gh api user/orgs --jq '.[].login' | grep semicolon-devteam
 
-# 4. SAX 패키지 확인
-ls -la .claude/sax-design/ 2>/dev/null && echo "✅ sax-design 설치됨"
-ls -la .claude/sax-core/ 2>/dev/null && echo "✅ sax-core 설치됨"
+# 4. SEMO 패키지 확인
+ls -la .claude/semo-design/ 2>/dev/null && echo "✅ semo-design 설치됨"
+ls -la .claude/semo-core/ 2>/dev/null && echo "✅ semo-core 설치됨"
 
 # 5. MCP 서버 확인
 cat ~/.claude.json | jq '.mcpServers | keys'
@@ -55,7 +55,7 @@ ls -la .agent/workflows/ 2>/dev/null && echo "✅ Antigravity workflows 존재"
 - ✅ Chrome 브라우저 설치됨
 - ✅ GitHub 인증 완료
 - ✅ semicolon-devteam 멤버십 확인
-- ✅ SAX 패키지 설치됨 (sax-design, sax-core)
+- ✅ SEMO 패키지 설치됨 (semo-design, semo-core)
 - ✅ MCP 서버 설정됨 (playwright, magic)
 - ⚠️ Antigravity 설정 (선택)
 
@@ -80,12 +80,12 @@ ls -la .agent/workflows/ 2>/dev/null && echo "✅ Antigravity workflows 존재"
 | Figma Desktop | ⚠️ 권장 | 앱 설치 확인 |
 | Figma 계정 | ⚠️ 권장 | 수동 확인 |
 
-### Category 3: SAX 패키지
+### Category 3: SEMO 패키지
 
 | 패키지 | 필수 | 확인 경로 |
 |--------|------|----------|
-| sax-core | ✅ | `.claude/sax-core/` |
-| sax-design | ✅ | `.claude/sax-design/` |
+| semo-core | ✅ | `.claude/semo-core/` |
+| semo-design | ✅ | `.claude/semo-design/` |
 | CLAUDE.md 심링크 | ✅ | `.claude/CLAUDE.md` |
 
 ### Category 4: Antigravity (선택)
@@ -94,7 +94,7 @@ ls -la .agent/workflows/ 2>/dev/null && echo "✅ Antigravity workflows 존재"
 |------|------|----------|
 | .agent/rules/ | ⚠️ 선택 | `.agent/rules/` |
 | .agent/workflows/ | ⚠️ 선택 | `.agent/workflows/` |
-| sax-context.md | ⚠️ 선택 | `.agent/rules/sax-context.md` |
+| semo-context.md | ⚠️ 선택 | `.agent/rules/semo-context.md` |
 
 ### Category 5: MCP 서버
 
@@ -113,31 +113,31 @@ ls -la .agent/workflows/ 2>/dev/null && echo "✅ Antigravity workflows 존재"
 | Slack 워크스페이스 | ✅ | 수동 확인 |
 | Figma 팀 접근권한 | ⚠️ 권장 | 수동 확인 |
 
-### Category 7: SAX 메타데이터
+### Category 7: SEMO 메타데이터
 
 - 파일: `~/.claude.json`
-- 필수 필드: `SAX.role`, `SAX.position`, `SAX.boarded`, `SAX.boardedAt`, `SAX.healthCheckPassed`, `SAX.lastHealthCheck`
-- 디자이너 전용 필드: `SAX.packageSpecific.antigravitySetup`, `SAX.packageSpecific.mcpServers`
+- 필수 필드: `SEMO.role`, `SEMO.position`, `SEMO.boarded`, `SEMO.boardedAt`, `SEMO.healthCheckPassed`, `SEMO.lastHealthCheck`
+- 디자이너 전용 필드: `SEMO.packageSpecific.antigravitySetup`, `SEMO.packageSpecific.mcpServers`
 
 **검증 스크립트**:
 ```bash
-# SAX 필드 존재 확인
-cat ~/.claude.json | jq -e '.SAX' >/dev/null 2>&1 || echo "❌ SAX 메타데이터 없음"
+# SEMO 필드 존재 확인
+cat ~/.claude.json | jq -e '.SEMO' >/dev/null 2>&1 || echo "❌ SEMO 메타데이터 없음"
 
 # 필수 필드 검증
 REQUIRED_FIELDS=("role" "position" "boarded" "boardedAt" "healthCheckPassed" "lastHealthCheck")
 for field in "${REQUIRED_FIELDS[@]}"; do
-  cat ~/.claude.json | jq -e ".SAX.$field" >/dev/null 2>&1 || echo "❌ 필수 필드 누락: $field"
+  cat ~/.claude.json | jq -e ".SEMO.$field" >/dev/null 2>&1 || echo "❌ 필수 필드 누락: $field"
 done
 
 # position 값 검증 (designer)
-POSITION=$(cat ~/.claude.json | jq -r '.SAX.position')
+POSITION=$(cat ~/.claude.json | jq -r '.SEMO.position')
 if [ "$POSITION" != "designer" ]; then
   echo "❌ position 값이 'designer'가 아님: $POSITION"
 fi
 
 # 디자이너 전용 필드 검증 (선택)
-ANTIGRAVITY_SETUP=$(cat ~/.claude.json | jq -r '.SAX.packageSpecific.antigravitySetup')
+ANTIGRAVITY_SETUP=$(cat ~/.claude.json | jq -r '.SEMO.packageSpecific.antigravitySetup')
 if [ "$ANTIGRAVITY_SETUP" == "null" ]; then
   echo "ℹ️ Antigravity 설정 상태 미기록 (선택 사항)"
 fi
@@ -145,7 +145,7 @@ fi
 
 **검증 성공 시**:
 ```markdown
-✅ SAX 메타데이터: 정상
+✅ SEMO 메타데이터: 정상
   - role: fulltime
   - position: designer
   - boarded: true
@@ -159,17 +159,17 @@ fi
 
 **검증 실패 시**:
 ```markdown
-❌ SAX 메타데이터: 오류 발견
+❌ SEMO 메타데이터: 오류 발견
 
 **문제**:
 - ❌ 필수 필드 누락: lastHealthCheck
 - ❌ 잘못된 position 값: design (올바른 값: designer)
 
 **해결**:
-온보딩 프로세스를 완료하거나 `/SAX:onboarding`을 실행하세요.
+온보딩 프로세스를 완료하거나 `/SEMO:onboarding`을 실행하세요.
 ```
 
-> **참조**: [SAX Core Metadata Schema](https://github.com/semicolon-devteam/sax-core/blob/main/_shared/metadata-schema.md)
+> **참조**: [SEMO Core Metadata Schema](https://github.com/semicolon-devteam/semo-core/blob/main/_shared/metadata-schema.md)
 
 ---
 
@@ -178,9 +178,9 @@ fi
 ### 성공 시
 
 ```markdown
-[SAX] Skill: health-check 호출 - 디자인 환경 검증
+[SEMO] Skill: health-check 호출 - 디자인 환경 검증
 
-=== SAX-Design 환경 검증 결과 ===
+=== SEMO-Design 환경 검증 결과 ===
 
 ## 공통 도구
 ✅ GitHub CLI: v2.40.0
@@ -192,9 +192,9 @@ fi
 ✅ Chrome: 설치됨
 ⚠️ Figma Desktop: 미설치 (권장)
 
-## SAX 패키지
-✅ sax-core: 설치됨
-✅ sax-design: 설치됨
+## SEMO 패키지
+✅ semo-core: 설치됨
+✅ semo-design: 설치됨
 ✅ CLAUDE.md 심링크: 정상
 
 ## MCP 서버
@@ -216,15 +216,15 @@ fi
 === 결과 ===
 ✅ 모든 필수 항목 통과 (권장 항목 3개 미설정)
 
-**다음 단계**: SAX-Design 사용 준비 완료!
+**다음 단계**: SEMO-Design 사용 준비 완료!
 ```
 
 ### 실패 시
 
 ```markdown
-[SAX] Skill: health-check 호출 - 디자인 환경 검증
+[SEMO] Skill: health-check 호출 - 디자인 환경 검증
 
-=== SAX-Design 환경 검증 결과 ===
+=== SEMO-Design 환경 검증 결과 ===
 
 ❌ 3개 필수 항목 미통과
 
@@ -253,7 +253,7 @@ jq '.mcpServers += {
 }' ~/.claude.json > ~/.claude.json.tmp && mv ~/.claude.json.tmp ~/.claude.json
 ```
 
-**재검증**: `/SAX:health-check` 명령어로 다시 확인하세요.
+**재검증**: `/SEMO:health-check` 명령어로 다시 확인하세요.
 ```
 
 ---
@@ -261,24 +261,24 @@ jq '.mcpServers += {
 ## 패키지/심링크 이상 발견 시
 
 ```markdown
-[SAX] health-check: ⚠️ 패키지 설치 이상 감지
+[SEMO] health-check: ⚠️ 패키지 설치 이상 감지
 
 **문제**:
 - ❌ 심링크 연결 오류: .claude/CLAUDE.md
-- ❌ sax-design 패키지 미설치
+- ❌ semo-design 패키지 미설치
 
 **해결**:
-`SAX 업데이트해줘`를 실행하여 패키지를 설치/심링크를 재설정하세요.
+`SEMO 업데이트해줘`를 실행하여 패키지를 설치/심링크를 재설정하세요.
 ```
 
 ---
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: health-check 사용
+[SEMO] Skill: health-check 사용
 
-[SAX] Reference: 디자인 환경 검증 (도구/패키지/MCP/서비스) 완료
+[SEMO] Reference: 디자인 환경 검증 (도구/패키지/MCP/서비스) 완료
 ```
 
 ---
@@ -286,5 +286,5 @@ jq '.mcpServers += {
 ## References
 
 - [onboarding-master Agent](../../agents/onboarding-master/onboarding-master.md)
-- [SAX Core - Message Rules](https://github.com/semicolon-devteam/sax-core/blob/main/MESSAGE_RULES.md)
+- [SEMO Core - Message Rules](https://github.com/semicolon-devteam/semo-core/blob/main/MESSAGE_RULES.md)
 - [Antigravity Setup Guide](references/antigravity-setup.md)

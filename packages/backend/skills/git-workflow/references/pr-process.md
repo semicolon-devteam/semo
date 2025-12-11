@@ -62,7 +62,7 @@ ISSUE_NUM=$(gh pr view --json body --jq '.body' | grep -oE 'Related #[0-9]+' | g
 **출력**:
 
 ```markdown
-[SAX] skill:git-workflow: PR 머지 완료
+[SEMO] skill:git-workflow: PR 머지 완료
 
 ✅ **PR #42**: `✨ #35 Add post API` → main 병합 완료
 
@@ -74,4 +74,4 @@ ISSUE_NUM=$(gh pr view --json body --jq '.body' | grep -oE 'Related #[0-9]+' | g
 다음 단계: 담당 엔지니어가 테스트 코드로 검증 진행
 ```
 
-> **ℹ️ 프론트엔드와의 차이**: 프론트엔드(sax-next)는 테스트중 상태 시 QA(@kokkh)가 자동 할당되지만, 백엔드는 담당 엔지니어가 테스트 코드로 직접 검증합니다.
+> **ℹ️ 프론트엔드와의 차이**: 프론트엔드(semo-next)는 테스트중 상태 시 QA(@kokkh)가 자동 할당되지만, 백엔드는 담당 엔지니어가 테스트 코드로 직접 검증합니다.

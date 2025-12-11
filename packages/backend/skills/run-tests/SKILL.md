@@ -8,7 +8,7 @@ tools: [Bash, Read, Glob, Grep]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: run-tests 호출 - {테스트 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: run-tests 호출 - {테스트 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # run-tests Skill
 
@@ -171,7 +171,7 @@ class UserRepositoryTest {
 ### 테스트 성공
 
 ```markdown
-[SAX] Skill: run-tests 완료
+[SEMO] Skill: run-tests 완료
 
 ## 테스트 결과: ✅ 성공
 
@@ -193,7 +193,7 @@ class UserRepositoryTest {
 ### 테스트 실패
 
 ```markdown
-[SAX] Skill: run-tests 완료
+[SEMO] Skill: run-tests 완료
 
 ## 테스트 결과: ❌ 실패
 
@@ -223,14 +223,14 @@ class UserRepositoryTest {
 디버깅 필요시 `debug-master` Agent 호출을 권장합니다.
 ```
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: run-tests 호출 - {unit|integration|all|specific}
+[SEMO] Skill: run-tests 호출 - {unit|integration|all|specific}
 
-[SAX] Skill: run-tests 실행 중 - {진행률}%
+[SEMO] Skill: run-tests 실행 중 - {진행률}%
 
-[SAX] Skill: run-tests 완료 - {passed}/{total} 통과
+[SEMO] Skill: run-tests 완료 - {passed}/{total} 통과
 ```
 
 ## Error Handling

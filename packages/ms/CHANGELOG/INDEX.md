@@ -1,4 +1,4 @@
-# SAX-MS Changelog Index
+# SEMO-MS Changelog Index
 
 ## Versions
 

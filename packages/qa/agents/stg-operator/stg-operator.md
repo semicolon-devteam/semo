@@ -12,7 +12,7 @@ tools:
 model: inherit
 ---
 
-> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SAX] Agent: stg-operator 호출 - {작업}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SEMO] Agent: stg-operator 호출 - {작업}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # STG Operator Agent
 
@@ -37,7 +37,7 @@ model: inherit
 ## 환경 상태 출력
 
 ```markdown
-[SAX] Agent: stg-operator 환경 확인
+[SEMO] Agent: stg-operator 환경 확인
 
 ## 🌐 STG 환경 상태
 
@@ -58,7 +58,7 @@ model: inherit
 ## 환경 문제 감지 시
 
 ```markdown
-[SAX] Agent: stg-operator 환경 문제 감지
+[SEMO] Agent: stg-operator 환경 문제 감지
 
 ## ⚠️ 환경 문제 발견
 
@@ -81,7 +81,7 @@ model: inherit
 > **참조**: 환경 정보는 프로젝트별 설정에서 조회
 
 ```yaml
-# .claude/sax-qa/environments.yaml (예시)
+# .claude/semo-qa/environments.yaml (예시)
 cm-office:
   stg:
     url: "https://stg-office.semicolon.com"

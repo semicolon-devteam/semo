@@ -63,13 +63,13 @@ gh pr create --title "..." --body "..."
 
 ---
 
-## 매핑 정보 (SAX → SEMO)
+## 매핑 정보 (SEMO → SEMO)
 
 | 기존 패키지 | 기존 스킬 | 새 위치 |
 |-------------|----------|---------|
-| sax-next | create-issues | github/issues |
-| sax-next | git-workflow | github/pr |
-| sax-core | feedback (GitHub 부분) | github/issues |
+| semo-next | create-issues | github/issues |
+| semo-next | git-workflow | github/pr |
+| semo-core | feedback (GitHub 부분) | github/issues |
 
 ---
 

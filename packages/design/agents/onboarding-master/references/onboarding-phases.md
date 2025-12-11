@@ -5,7 +5,7 @@
 ## Phase 0: 환경 진단
 
 ```markdown
-[SAX] Skill: health-check 사용
+[SEMO] Skill: health-check 사용
 
 환경 검증을 시작합니다...
 ```
@@ -13,7 +13,7 @@
 **검증 항목**:
 - 공통 도구 (gh, git, node, pnpm)
 - 디자인 도구 (Chrome, Figma)
-- SAX 패키지 (sax-core, sax-design)
+- SEMO 패키지 (semo-core, semo-design)
 - MCP 서버 (playwright, magic)
 - Antigravity 설정 (선택)
 
@@ -63,14 +63,14 @@ Figma 팀 접근권한이 있으신가요? (y/n)
 
 ---
 
-## Phase 2: SAX 개념 학습
+## Phase 2: SEMO 개념 학습
 
-### 2.1 SAX 4대 원칙
+### 2.1 SEMO 4대 원칙
 
-1. **Transparency (투명성)**: 모든 AI 작업이 `[SAX] ...` 메시지로 명시적 표시
+1. **Transparency (투명성)**: 모든 AI 작업이 `[SEMO] ...` 메시지로 명시적 표시
 2. **Orchestrator-First (오케스트레이터 우선)**: 모든 요청은 Orchestrator가 먼저 분석
 3. **Modularity (모듈성)**: 역할별 패키지 독립 동작
-4. **Hierarchy (계층구조)**: SAX Core → Package 상속
+4. **Hierarchy (계층구조)**: SEMO Core → Package 상속
 
 ### 2.2 디자이너 워크플로우
 
@@ -90,14 +90,14 @@ Figma 팀 접근권한이 있으신가요? (y/n)
 ```markdown
 ## Antigravity 연동 설정
 
-SAX-Design은 Claude Code와 Antigravity 듀얼 설정을 지원합니다.
+SEMO-Design은 Claude Code와 Antigravity 듀얼 설정을 지원합니다.
 Antigravity를 사용하시겠습니까? (y/n)
 ```
 
 **y 선택 시**:
 - `.agent/rules/` 폴더 생성 안내
 - `.agent/workflows/` 폴더 생성 안내
-- SAX 컨텍스트 파일 복사 가이드
+- SEMO 컨텍스트 파일 복사 가이드
 
 **n 선택 시**:
 - Phase 4로 바로 진행
@@ -115,9 +115,9 @@ Antigravity를 사용하시겠습니까? (y/n)
 > "간단한 로그인 폼 목업 만들어줘"
 
 **확인사항**:
-- [SAX] Orchestrator 메시지 확인
-- [SAX] Agent: design-master 메시지 확인
-- [SAX] Skill: generate-mockup 메시지 확인
+- [SEMO] Orchestrator 메시지 확인
+- [SEMO] Agent: design-master 메시지 확인
+- [SEMO] Skill: generate-mockup 메시지 확인
 ```
 
 ### 옵션 B: 핸드오프 문서 실습
@@ -138,7 +138,7 @@ Antigravity를 사용하시겠습니까? (y/n)
 ```markdown
 ## 참조 문서
 
-### SAX Core 문서
+### SEMO Core 문서
 - PRINCIPLES.md
 - MESSAGE_RULES.md
 
@@ -159,7 +159,7 @@ Antigravity를 사용하시겠습니까? (y/n)
 === 온보딩 완료 ===
 
 ✅ 모든 필수 항목 통과
-✅ SAX 개념 학습 완료
+✅ SEMO 개념 학습 완료
 ✅ 실습 완료
 
 **다음 단계**:
@@ -168,15 +168,15 @@ Antigravity를 사용하시겠습니까? (y/n)
 3. 핸드오프 문서 생성
 
 **도움말**:
-- /SAX:health-check: 환경 재검증
-- /SAX:mockup: 목업 생성
-- /SAX:handoff: 핸드오프 문서 생성
+- /SEMO:health-check: 환경 재검증
+- /SEMO:mockup: 목업 생성
+- /SEMO:handoff: 핸드오프 문서 생성
 ```
 
-**SAX 메타데이터 업데이트**:
+**SEMO 메타데이터 업데이트**:
 ```json
 {
-  "SAX": {
+  "SEMO": {
     "role": "fulltime",
     "position": "designer",
     "boarded": true,
@@ -200,5 +200,5 @@ Phase X 완료. Phase X+1을 진행하시겠습니까? (y/n)
 사용자가 `n` 응답 시:
 ```markdown
 온보딩을 일시 중단합니다.
-재시작하려면 `/SAX:onboarding` 명령어를 사용하세요.
+재시작하려면 `/SEMO:onboarding` 명령어를 사용하세요.
 ```

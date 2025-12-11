@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to sax-core will be documented in this file.
+All notable changes to semo-core will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - `evaluation/` - Promptfoo 기반 Agentic Evaluation 시스템
-  - `promptfoo.yaml` - 평가 설정 (sax-next 파일럿)
+  - `promptfoo.yaml` - 평가 설정 (semo-next 파일럿)
   - `prompts/` - 프롬프트 템플릿 (code-generation, bug-fix, component-creation)
   - `metrics.md` - Pass@k 메트릭 정의
 - `security/SECURITY_AUDIT.md` - 보안 감사 보고서
@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `_shared/package-index.md` - SEMO 패키지 인덱스 및 라우팅 가이드
 
 ### Changed
-- SAX 정의 수정: "Semicolon Agent eXperience" → "Semicolon AI Transformation"
+- SEMO 정의 수정: "Semicolon Agent eXperience" → "Semicolon AI Transformation"
 - SEMO 명확화 블록 추가 (모든 CLAUDE.md)
 
 ## [0.23.0] - 2025-12-10

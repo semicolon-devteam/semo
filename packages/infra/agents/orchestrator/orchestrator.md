@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: |
-  SAX-Infra 패키지 요청 라우팅 담당. PROACTIVELY use when:
+  SEMO-Infra 패키지 요청 라우팅 담당. PROACTIVELY use when:
   (1) 인프라/DevOps 관련 요청, (2) 배포/롤백 요청, (3) CI/CD 설정 요청.
   모든 요청을 분석하여 적절한 Agent 또는 Skill로 위임합니다.
 tools:
@@ -16,7 +16,7 @@ model: inherit
 
 # Orchestrator Agent
 
-> SAX-Infra 패키지의 중앙 라우팅 Agent
+> SEMO-Infra 패키지의 중앙 라우팅 Agent
 
 ## 🔴 역할
 
@@ -49,7 +49,7 @@ model: inherit
 | 배포, 서비스 올려 | `deploy-service` | "stg에 배포해줘" |
 | 롤백, 되돌려 | `rollback-service` | "이전 버전으로 롤백" |
 | env 체크, 환경변수 | `sync-env` | "환경변수 확인해줘" |
-| 도움말, 사용법 | `sax-help` | "/SAX:help" |
+| 도움말, 사용법 | `semo-help` | "/SEMO:help" |
 
 ---
 
@@ -62,7 +62,7 @@ model: inherit
    ↓
 3. Agent 또는 Skill 결정
    ↓
-4. SAX 메시지 출력
+4. SEMO 메시지 출력
    ↓
 5. 위임 실행
 ```
@@ -72,17 +72,17 @@ model: inherit
 ## 출력 포맷
 
 ```markdown
-[SAX] Orchestrator: 의도 분석 완료 → {intent_category}
+[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}
 
-[SAX] Agent 위임: {agent_name} (사유: {reason})
+[SEMO] Agent 위임: {agent_name} (사유: {reason})
 ```
 
 또는
 
 ```markdown
-[SAX] Orchestrator: 의도 분석 완료 → {intent_category}
+[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}
 
-[SAX] Skill 호출: {skill_name} (사유: {reason})
+[SEMO] Skill 호출: {skill_name} (사유: {reason})
 ```
 
 ---

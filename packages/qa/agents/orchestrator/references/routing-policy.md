@@ -50,10 +50,10 @@ test_fail:
 
 | 명령어 | 라우팅 |
 |--------|--------|
-| `/SAX:test-queue` | `skill:test-queue` |
-| `/SAX:run-test` | `qa-master` |
-| `/SAX:test-pass` | `skill:report-test-result` |
-| `/SAX:test-fail` | `skill:report-test-result` |
+| `/SEMO:test-queue` | `skill:test-queue` |
+| `/SEMO:run-test` | `qa-master` |
+| `/SEMO:test-pass` | `skill:report-test-result` |
+| `/SEMO:test-fail` | `skill:report-test-result` |
 
 ### 3. 컨텍스트 기반
 

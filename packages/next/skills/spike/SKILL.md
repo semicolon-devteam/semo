@@ -4,7 +4,7 @@ description: Prototype and explore technical approaches. Use when (1) multiple v
 tools: [Bash, Read, Write, Edit]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: spike 호출 - {주제}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: spike 호출 - {주제}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Spike Skill
 

@@ -1,33 +1,33 @@
 ---
 name: feedback
 description: |
-  SAX 패키지 피드백 수집 및 GitHub 이슈 생성 (공통 Skill).
-  Use when (1) /SAX:feedback 명령어 호출, (2) 사용자가 SAX 동작 오류 지적, (3) 개선 제안 요청.
+  SEMO 패키지 피드백 수집 및 GitHub 이슈 생성 (공통 Skill).
+  Use when (1) /SEMO:feedback 명령어 호출, (2) 사용자가 SEMO 동작 오류 지적, (3) 개선 제안 요청.
 tools: [Bash, Read]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: feedback 호출 - {피드백 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: feedback 호출 - {피드백 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # feedback Skill
 
-> SAX 패키지에 대한 사용자 피드백을 GitHub 이슈로 생성 (SAX 공통 Skill)
+> SEMO 패키지에 대한 사용자 피드백을 GitHub 이슈로 생성 (SEMO 공통 Skill)
 
 ## Purpose
 
-모든 SAX 패키지에서 공통으로 사용하는 피드백 수집 Skill입니다. 패키지명을 파라미터로 받아 해당 레포지토리에 이슈를 생성합니다.
+모든 SEMO 패키지에서 공통으로 사용하는 피드백 수집 Skill입니다. 패키지명을 파라미터로 받아 해당 레포지토리에 이슈를 생성합니다.
 
 ### 지원 패키지
 
 | 패키지 | Repository | 라벨 접미사 |
 |--------|------------|-------------|
-| sax-po | `semicolon-devteam/sax-po` | `sax-po` |
-| sax-next | `semicolon-devteam/sax-next` | `sax-next` |
-| sax-pm | `semicolon-devteam/sax-pm` | `sax-pm` |
-| sax-qa | `semicolon-devteam/sax-qa` | `sax-qa` |
-| sax-infra | `semicolon-devteam/sax-infra` | `sax-infra` |
-| sax-meta | `semicolon-devteam/sax-meta` | `sax-meta` |
-| sax-core | `semicolon-devteam/sax-core` | `sax-core` |
+| semo-po | `semicolon-devteam/semo-po` | `semo-po` |
+| semo-next | `semicolon-devteam/semo-next` | `semo-next` |
+| semo-pm | `semicolon-devteam/semo-pm` | `semo-pm` |
+| semo-qa | `semicolon-devteam/semo-qa` | `semo-qa` |
+| semo-infra | `semicolon-devteam/semo-infra` | `semo-infra` |
+| semo-meta | `semicolon-devteam/semo-meta` | `semo-meta` |
+| semo-core | `semicolon-devteam/semo-core` | `semo-core` |
 
 ## When to Use (Orchestrator → Skill 호출 조건)
 
@@ -35,29 +35,29 @@ model: inherit
 
 | 감지 키워드 | 호출 조건 |
 |-------------|-----------|
-| `/SAX:feedback` | 명시적 피드백 명령 |
+| `/SEMO:feedback` | 명시적 피드백 명령 |
 | `피드백`, `피드백해줘`, `버그 신고`, `제안할게` | 피드백 의도 표현 |
-| `SAX가 왜`, `SAX 동작이`, `[SAX] 메시지가`, `SAX 결과가` | SAX 동작 오류 지적 |
+| `SEMO가 왜`, `SEMO 동작이`, `[SEMO] 메시지가`, `SEMO 결과가` | SEMO 동작 오류 지적 |
 
 **호출 흐름**:
 
 ```text
-User → Orchestrator (의도 분석) → sax-core/skill:feedback 라우팅 → feedback Skill 실행
+User → Orchestrator (의도 분석) → semo-core/skill:feedback 라우팅 → feedback Skill 실행
 ```
 
 **애매한 경우 확인 질문**:
 
-SAX와 무관한 오류 지적일 수 있는 경우, Orchestrator가 먼저 확인합니다:
+SEMO와 무관한 오류 지적일 수 있는 경우, Orchestrator가 먼저 확인합니다:
 
 ```markdown
-[SAX] Orchestrator: 의도 확인 필요
+[SEMO] Orchestrator: 의도 확인 필요
 
-⚠️ SAX 관련 피드백인가요?
+⚠️ SEMO 관련 피드백인가요?
 
-- **예**: SAX Agent/Skill/Command의 동작 문제
+- **예**: SEMO Agent/Skill/Command의 동작 문제
 - **아니오**: 일반 코드나 프로젝트 문제
 
-"SAX 피드백이야" 또는 "아니야"로 응답해주세요.
+"SEMO 피드백이야" 또는 "아니야"로 응답해주세요.
 ```
 
 ## Input
@@ -65,7 +65,7 @@ SAX와 무관한 오류 지적일 수 있는 경우, Orchestrator가 먼저 확�
 ### 필수 파라미터
 
 ```yaml
-package: "sax-po"           # 필수: 대상 패키지명
+package: "semo-po"           # 필수: 대상 패키지명
 ```
 
 ### 선택 파라미터
@@ -87,7 +87,7 @@ description: "설명"         # 선택: 상세 설명
 
 ```bash
 # GitHub 이슈 생성 (패키지명 변수 사용)
-PACKAGE="sax-po"
+PACKAGE="semo-po"
 
 gh issue create \
   --repo "semicolon-devteam/${PACKAGE}" \
@@ -101,9 +101,9 @@ gh issue create \
 ### Step 1: 피드백 유형 확인
 
 ```markdown
-[SAX] Skill: feedback 호출 - {package}
+[SEMO] Skill: feedback 호출 - {package}
 
-## 📝 SAX 피드백
+## 📝 SEMO 피드백
 
 어떤 유형의 피드백인가요?
 
@@ -140,7 +140,7 @@ gh issue create \
 ### Step 3: 이슈 생성
 
 ```bash
-PACKAGE="sax-po"  # 호출 시 전달받은 패키지명
+PACKAGE="semo-po"  # 호출 시 전달받은 패키지명
 
 # 버그 이슈 생성
 gh issue create \
@@ -164,7 +164,7 @@ gh issue create \
 - 관련 Agent/Skill: {이름}
 
 ---
-🤖 SAX Feedback Skill (sax-core)로 자동 생성됨
+🤖 SEMO Feedback Skill (semo-core)로 자동 생성됨
 EOF
 )" \
   --label "bug,${PACKAGE}"
@@ -173,7 +173,7 @@ EOF
 ### Step 4: 완료 메시지
 
 ```markdown
-[SAX] Feedback: 이슈 생성 완료
+[SEMO] Feedback: 이슈 생성 완료
 
 ✅ 피드백이 등록되었습니다!
 
@@ -212,7 +212,7 @@ EOF
 - 관련 Agent/Skill: {이름}
 
 ---
-🤖 SAX Feedback Skill (sax-core)로 자동 생성됨
+🤖 SEMO Feedback Skill (semo-core)로 자동 생성됨
 ```
 
 ### 개선 제안
@@ -233,12 +233,12 @@ EOF
 {추가 설명}
 
 ---
-🤖 SAX Feedback Skill (sax-core)로 자동 생성됨
+🤖 SEMO Feedback Skill (semo-core)로 자동 생성됨
 ```
 
 ## 암시적 트리거
 
-사용자가 SAX 기반 에이전트 동작에 대해 의문을 제기하거나 지적할 때:
+사용자가 SEMO 기반 에이전트 동작에 대해 의문을 제기하거나 지적할 때:
 
 - "이건 이렇게 돼야 하는데 왜 이렇게 만들었어?"
 - "이거 왜 이렇게 동작해?"
@@ -250,7 +250,7 @@ EOF
 2. 해결 후 피드백 제안:
 
 ```markdown
-[SAX] 문제 해결 완료
+[SEMO] 문제 해결 완료
 
 **원인**: {문제 원인 설명}
 
@@ -265,17 +265,17 @@ EOF
 각 패키지의 Orchestrator에서 다음과 같이 호출합니다:
 
 ```markdown
-[SAX] Orchestrator: 의도 분석 완료 → 피드백 요청
+[SEMO] Orchestrator: 의도 분석 완료 → 피드백 요청
 
-[SAX] Skill: sax-core/feedback 호출 (package: {현재 패키지명})
+[SEMO] Skill: semo-core/feedback 호출 (package: {현재 패키지명})
 ```
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: feedback 호출 - {package}
+[SEMO] Skill: feedback 호출 - {package}
 
-[SAX] Feedback: {package} 이슈 #{number} 생성 완료
+[SEMO] Feedback: {package} 이슈 #{number} 생성 완료
 ```
 
 ## Error Handling
@@ -298,15 +298,15 @@ GitHub 인증 상태를 확인해주세요.
 
 `{package}`는 지원되지 않는 패키지입니다.
 
-**지원 패키지**: sax-po, sax-next, sax-pm, sax-qa, sax-infra, sax-meta, sax-core
+**지원 패키지**: semo-po, semo-next, semo-pm, semo-qa, semo-infra, semo-meta, semo-core
 ```
 
 ## Related
 
 - [notify-slack](../notify-slack/SKILL.md) - Slack 알림 공통 Skill
 - [version-updater](../version-updater/SKILL.md) - 버전 업데이트 공통 Skill
-- [SAX Core - Principles](../../PRINCIPLES.md)
-- [SAX Core - Message Rules](../../MESSAGE_RULES.md)
+- [SEMO Core - Principles](../../PRINCIPLES.md)
+- [SEMO Core - Message Rules](../../MESSAGE_RULES.md)
 
 ## References
 

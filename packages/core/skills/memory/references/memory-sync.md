@@ -72,7 +72,7 @@ Memory MCP가 활성화된 경우:
 ## 출력 예시
 
 ```markdown
-[SAX] Skill: memory 호출 - sync
+[SEMO] Skill: memory 호출 - sync
 
 === 세션 메모리 복원 ===
 

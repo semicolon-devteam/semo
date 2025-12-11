@@ -1,6 +1,6 @@
 # Semicolon Team Rules
 
-> SAX Core - Semicolon 팀 공통 규칙 (Single Source of Truth)
+> SEMO Core - Semicolon 팀 공통 규칙 (Single Source of Truth)
 
 ## 기본 설정
 
@@ -239,7 +239,7 @@ npm run lint && npx tsc --noEmit && npm test
 요청이 규칙과 충돌 시:
 
 ```text
-[SAX] 문서 갱신 제안
+[SEMO] 문서 갱신 제안
 
 현재 요청: [요청 내용]
 기존 규칙: [기존 규칙]
@@ -255,9 +255,9 @@ npm run lint && npx tsc --noEmit && npm test
 ## 참조 방법
 
 ```bash
-# 로컬 (SAX 설치된 환경)
-.claude/sax-core/TEAM_RULES.md
+# 로컬 (SEMO 설치된 환경)
+.claude/semo-core/TEAM_RULES.md
 
 # GitHub API
-gh api repos/semicolon-devteam/sax-core/contents/TEAM_RULES.md --jq '.content' | base64 -d
+gh api repos/semicolon-devteam/semo-core/contents/TEAM_RULES.md --jq '.content' | base64 -d
 ```

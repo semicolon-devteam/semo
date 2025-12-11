@@ -383,4 +383,4 @@ outputs:
 
 - [LangFuse 관측성 설정](../observability/langfuse-config.md)
 - [Self-Learning RAG](../rag/feedback-index.md)
-- [SAX → SEMO 전환 계획](../../.claude/plans/prancy-scribbling-falcon.md)
+- [SEMO → SEMO 전환 계획](../../.claude/plans/prancy-scribbling-falcon.md)

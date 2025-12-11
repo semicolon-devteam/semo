@@ -9,7 +9,7 @@ description: |
 tools: [Bash, Read, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: check-backend-duplication 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: check-backend-duplication 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # check-backend-duplication Skill
 
@@ -75,12 +75,12 @@ gh api repos/semicolon-devteam/core-backend/contents/src/main/kotlin/com/semicol
 3. **새로 구현 필요** → 신규 Backend Task 생성
 ```
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: check-backend-duplication 호출 - Epic #{number}
-[SAX] 키워드 감지: {keywords} → 도메인: {domains}
-[SAX] Reference: core-backend/domain/{domain}/service 참조
+[SEMO] Skill: check-backend-duplication 호출 - Epic #{number}
+[SEMO] 키워드 감지: {keywords} → 도메인: {domains}
+[SEMO] Reference: core-backend/domain/{domain}/service 참조
 ```
 
 ## Related

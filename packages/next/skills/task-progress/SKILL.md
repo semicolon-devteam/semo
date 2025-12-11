@@ -4,7 +4,7 @@ description: Track developer task progress with automated checklist and workflow
 tools: [Bash, Read, Grep, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: task-progress 호출 - {이슈번호}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: task-progress 호출 - {이슈번호}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # task-progress Skill
 
@@ -12,7 +12,7 @@ tools: [Bash, Read, Grep, GitHub CLI]
 
 ## 트리거
 
-- `/SAX:task-progress` 명령어
+- `/SEMO:task-progress` 명령어
 - "어디까지 했어", "현황", "체크리스트", "진행도" 키워드
 - 이슈 URL 제공 시 orchestrator가 자동 호출
 - "cm-office#32 할당받았어요" 패턴 감지 시
@@ -64,13 +64,13 @@ tools: [Bash, Read, Grep, GitHub CLI]
 - GitHub Project 상태 자동 변경
 - 작업완료일 자동 설정
 
-## SAX 메타데이터
+## SEMO 메타데이터
 
 작업 시작 시 `~/.claude.json` 업데이트:
 
 ```json
 {
-  "SAX": {
+  "SEMO": {
     "currentTask": {
       "issueNumber": 32,
       "repo": "cm-office",
@@ -87,7 +87,7 @@ tools: [Bash, Read, Grep, GitHub CLI]
 이슈 작업 시작 시 자동으로 상태를 "작업중"으로 변경하고 **시작일** 설정:
 
 ```markdown
-[SAX] Skill: task-progress → 프로젝트 보드 상태 변경
+[SEMO] Skill: task-progress → 프로젝트 보드 상태 변경
 
 📋 **이슈**: {repo}#{issue_number}
 🔄 **상태 변경**: 검수완료 → **작업중**
@@ -101,7 +101,7 @@ tools: [Bash, Read, Grep, GitHub CLI]
 PR Ready 상태가 되면 자동으로 상태를 "리뷰요청"으로 변경하고 **종료일** 설정:
 
 ```markdown
-[SAX] Skill: task-progress → 프로젝트 보드 상태 변경
+[SEMO] Skill: task-progress → 프로젝트 보드 상태 변경
 
 📋 **이슈**: {repo}#{issue_number}
 🔀 **PR**: #{pr_number} Ready for Review

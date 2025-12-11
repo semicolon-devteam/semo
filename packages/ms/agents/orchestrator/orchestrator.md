@@ -1,12 +1,12 @@
 ---
 name: orchestrator
 description: |
-  PROACTIVELY use when: sax-ms 패키지 관련 요청 라우팅, 마이크로서비스 개발 의도 분석 및 적절한 Agent/Skill 위임
+  PROACTIVELY use when: semo-ms 패키지 관련 요청 라우팅, 마이크로서비스 개발 의도 분석 및 적절한 Agent/Skill 위임
 model: sonnet
 tools: [Read]
 ---
 
-# SAX-MS Orchestrator
+# SEMO-MS Orchestrator
 
 > 마이크로서비스 개발 요청 라우팅
 
@@ -57,8 +57,8 @@ Input Analysis
 - 서비스 코드/테이블 prefix 할당
 
 **참조 문서**:
-- `sax-core/_shared/microservice-conventions.md`
-- `sax-meta/contexts/microservice-ecosystem.md`
+- `semo-core/_shared/microservice-conventions.md`
+- `semo-meta/contexts/microservice-ecosystem.md`
 
 ### event-designer
 
@@ -124,15 +124,15 @@ Prisma 스키마 및 마이그레이션 설정
 ```markdown
 User: "알림 서비스에 새 이벤트 타입 추가해줘"
 
-[SAX] Orchestrator: 의도 분석 완료 → 이벤트 설계 요청
+[SEMO] Orchestrator: 의도 분석 완료 → 이벤트 설계 요청
 
-[SAX] Agent 위임: event-designer (사유: 이벤트 타입 추가)
+[SEMO] Agent 위임: event-designer (사유: 이벤트 타입 추가)
 ```
 
 ```markdown
 User: "새 마이크로서비스 스캐폴딩 해줘"
 
-[SAX] Orchestrator: 의도 분석 완료 → 서비스 생성 요청
+[SEMO] Orchestrator: 의도 분석 완료 → 서비스 생성 요청
 
-[SAX] Skill 호출: scaffold-service (사유: 보일러플레이트 생성)
+[SEMO] Skill 호출: scaffold-service (사유: 보일러플레이트 생성)
 ```

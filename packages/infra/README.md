@@ -1,10 +1,10 @@
-# SAX-Infra
+# SEMO-Infra
 
-> 인프라, CI/CD, DevOps 작업을 위한 SAX 패키지
+> 인프라, CI/CD, DevOps 작업을 위한 SEMO 패키지
 
 ## Overview
 
-SAX-Infra는 Semicolon 팀의 인프라 자동화를 지원하는 패키지입니다.
+SEMO-Infra는 Semicolon 팀의 인프라 자동화를 지원하는 패키지입니다.
 
 ### Target Repositories
 
@@ -16,7 +16,7 @@ SAX-Infra는 Semicolon 팀의 인프라 자동화를 지원하는 패키지입�
 ## Installation
 
 ```bash
-# SAX 설치 스크립트 사용
+# SEMO 설치 스크립트 사용
 ./install-sax.sh --package infra
 ```
 
@@ -45,9 +45,9 @@ SAX-Infra는 Semicolon 팀의 인프라 자동화를 지원하는 패키지입�
 
 ## Commands
 
-- `/SAX:deploy` - 서비스 배포
-- `/SAX:rollback` - 서비스 롤백
-- `/SAX:env-check` - 환경변수 검증
+- `/SEMO:deploy` - 서비스 배포
+- `/SEMO:rollback` - 서비스 롤백
+- `/SEMO:env-check` - 환경변수 검증
 
 ## License
 

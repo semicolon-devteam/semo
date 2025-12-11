@@ -7,11 +7,11 @@ tools: [Bash, Read]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: set-project-field 호출 - {필드명}` 시스템 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: set-project-field 호출 - {필드명}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # set-project-field Skill
 
-> GitHub Projects 필드 값을 자동으로 설정하는 SAX 공통 Skill
+> GitHub Projects 필드 값을 자동으로 설정하는 SEMO 공통 Skill
 
 ## Purpose
 
@@ -247,7 +247,7 @@ Issue #{issue_number}가 '이슈관리' Project에 추가되어 있는지 확인
 ## 완료 메시지
 
 ```markdown
-[SAX] Skill: set-project-field 완료
+[SEMO] Skill: set-project-field 완료
 
 ✅ GitHub Projects 필드 설정 완료
 
@@ -256,12 +256,12 @@ Issue #{issue_number}가 '이슈관리' Project에 추가되어 있는지 확인
 **값**: {value}
 ```
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: set-project-field 호출 - {필드명}
+[SEMO] Skill: set-project-field 호출 - {필드명}
 
-[SAX] Skill: set-project-field 완료 - Issue #{issue_number}
+[SEMO] Skill: set-project-field 완료 - Issue #{issue_number}
 ```
 
 ## References

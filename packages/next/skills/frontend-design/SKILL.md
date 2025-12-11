@@ -12,7 +12,7 @@ triggers:
   - 화면 구현
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: frontend-design 실행 - {Phase}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: frontend-design 실행 - {Phase}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # frontend-design Skill
 
@@ -40,7 +40,7 @@ triggers:
 코드 작성 전 **반드시** 다음을 정의합니다:
 
 ```
-[SAX] Skill: frontend-design 실행 - Design Thinking
+[SEMO] Skill: frontend-design 실행 - Design Thinking
 
 📋 디자인 사고 단계
 
@@ -73,7 +73,7 @@ triggers:
 Design Thinking 완료 후 구현 단계:
 
 ```
-[SAX] frontend-design: Production Code 시작
+[SEMO] frontend-design: Production Code 시작
 
 🔨 구현 영역
 
@@ -100,7 +100,7 @@ Design Thinking 완료 후 구현 단계:
 ### Phase 3: Quality Check
 
 ```
-[SAX] frontend-design: Quality Check
+[SEMO] frontend-design: Quality Check
 
 ✅ 디자인 품질 체크리스트
 
@@ -168,7 +168,7 @@ const colors = {
 UI 컴포넌트 생성 시 Magic MCP 활용:
 
 ```
-[SAX] frontend-design: Magic MCP 활용
+[SEMO] frontend-design: Magic MCP 활용
 
 💡 21st.dev 컴포넌트 탐색
 
@@ -183,7 +183,7 @@ UI 컴포넌트 생성 시 Magic MCP 활용:
 시각적 검증 시 Playwright 활용:
 
 ```
-[SAX] frontend-design: 시각적 검증
+[SEMO] frontend-design: 시각적 검증
 
 📸 스크린샷 비교
 - 데스크톱 뷰포트
@@ -271,7 +271,7 @@ skill: frontend-design({ component: "UserProfileCard" });
 ```
 User: "서비스 랜딩 페이지 디자인해줘"
 
-[SAX] Skill: frontend-design 실행 - Design Thinking
+[SEMO] Skill: frontend-design 실행 - Design Thinking
 
 📋 디자인 사고 단계
 
@@ -292,7 +292,7 @@ User: "서비스 랜딩 페이지 디자인해줘"
 
 ---
 
-[SAX] frontend-design: Production Code 시작
+[SEMO] frontend-design: Production Code 시작
 ...
 ```
 
@@ -301,7 +301,7 @@ User: "서비스 랜딩 페이지 디자인해줘"
 ```
 User: "관리자 대시보드 카드 컴포넌트 만들어줘"
 
-[SAX] Skill: frontend-design 실행 - Design Thinking
+[SEMO] Skill: frontend-design 실행 - Design Thinking
 
 📋 디자인 사고 단계
 

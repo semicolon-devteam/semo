@@ -3,12 +3,12 @@ name: assign-task
 description: |
   작업자에게 Task 할당 + 작업 포인트 설정 + Slack 알림의 통합 워크플로우.
   Use when (1) Task 할당 시, (2) 담당자 지정 + 포인트 설정 + 알림 한 번에 처리,
-  (3) /SAX:pm assign 커맨드.
+  (3) /SEMO:pm assign 커맨드.
 tools: [Bash, Read, AskUserQuestion]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: assign-task 호출` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: assign-task 호출` 메시지를 첫 줄에 출력하세요.
 
 # assign-task Skill
 
@@ -109,7 +109,7 @@ tasks:
 ### 성공 (전체 프로세스)
 
 ```markdown
-[SAX] Skill: assign-task 완료
+[SEMO] Skill: assign-task 완료
 
 ✅ Task 할당 완료
 
@@ -126,7 +126,7 @@ tasks:
 ### 작업 포인트 기존재 시
 
 ```markdown
-[SAX] Skill: assign-task 완료
+[SEMO] Skill: assign-task 완료
 
 ✅ Task 할당 완료
 
@@ -225,7 +225,7 @@ mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $value: Float!) {
 ### 4. Slack 알림 전송
 
 ```bash
-# SLACK_BOT_TOKEN은 sax-core/skills/notify-slack/SKILL.md 참조
+# SLACK_BOT_TOKEN은 semo-core/skills/notify-slack/SKILL.md 참조
 
 # 담당자 Slack ID 조회
 ASSIGNEE_SLACK_ID=$(curl -s "https://slack.com/api/users.list" \
@@ -376,14 +376,14 @@ Task                              작업량
 2. start-task (작업 시작)
 ```
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: assign-task 호출
+[SEMO] Skill: assign-task 호출
 
-[SAX] Skill: assign-task - 작업 포인트 확인 요청
+[SEMO] Skill: assign-task - 작업 포인트 확인 요청
 
-[SAX] Skill: assign-task 완료
+[SEMO] Skill: assign-task 완료
 ```
 
 ## Related
@@ -391,4 +391,4 @@ Task                              작업량
 - [set-estimate](../set-estimate/SKILL.md) - 작업 포인트 설정 로직
 - [start-task](../start-task/SKILL.md) - 작업 시작 (이터레이션 자동 할당)
 - [assign-to-sprint](../assign-to-sprint/SKILL.md) - Sprint 할당
-- [notify-slack](../../../sax-core/skills/notify-slack/SKILL.md) - Slack 알림 공통 스킬
+- [notify-slack](../../../semo-core/skills/notify-slack/SKILL.md) - Slack 알림 공통 스킬

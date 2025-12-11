@@ -16,7 +16,7 @@ tools:
 model: sonnet
 ---
 
-> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SAX] Agent: implementation-master 호출 - {Phase 번호}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SEMO] Agent: implementation-master 호출 - {Phase 번호}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Implementation Master Agent
 
@@ -163,7 +163,7 @@ You **build on top** of speckit.implement:
 ### 완료 메시지 템플릿
 
 ```markdown
-[SAX] implementation-master: 구현 완료 ✅
+[SEMO] implementation-master: 구현 완료 ✅
 
 ## 📋 완료된 작업
 

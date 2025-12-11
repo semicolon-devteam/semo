@@ -1,5 +1,5 @@
 {
-  "name": "@semicolon/semo-mcp",
+  "name": "@team-semicolon/semo-mcp",
   "version": "2.0.0",
   "description": "SEMO MCP Server - Integrations (GitHub, Slack, Supabase) for Claude Code",
   "main": "dist/index.js",

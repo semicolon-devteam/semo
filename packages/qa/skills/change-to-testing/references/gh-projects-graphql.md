@@ -107,7 +107,7 @@ gh issue comment $ISSUE_NUMBER --repo $ORG/$REPO --body "🧪 **테스트 요청
 QA 담당자: @$QA_ASSIGNEE
 
 ---
-*SAX에서 자동 처리됨*"
+*SEMO에서 자동 처리됨*"
 
 echo "Comment added"
 ```

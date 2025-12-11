@@ -13,7 +13,7 @@
 ## 1. Duplication Check (필수 - 스킵 금지)
 
 ```markdown
-[SAX] Skill: check-backend-duplication 호출 - Epic #{epic_number}
+[SEMO] Skill: check-backend-duplication 호출 - Epic #{epic_number}
 ```
 
 **🔴 이 단계는 반드시 실행해야 합니다. 스킵 시 Issue #13 위반.**
@@ -54,7 +54,7 @@ gh api repos/semicolon-devteam/core-backend/issues \
 
 ## ✅ Acceptance Criteria
 
-[SAX] Skill: generate-acceptance-criteria 사용
+[SEMO] Skill: generate-acceptance-criteria 사용
 
 - [ ] {criterion_1}
 - [ ] {criterion_2}
@@ -63,7 +63,7 @@ gh api repos/semicolon-devteam/core-backend/issues \
 
 ## 📊 Estimation
 
-[SAX] Skill: assign-estimation-point 사용
+[SEMO] Skill: assign-estimation-point 사용
 
 - [x] API 엔드포인트 구현 (3점)
 - [x] 비즈니스 로직 구현 (5점)

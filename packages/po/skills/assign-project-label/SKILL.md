@@ -4,7 +4,7 @@ description: Assign project labels to Epics and connect to GitHub Projects #1 ('
 tools: [Bash, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: assign-project-label 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: assign-project-label 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Assign Project Label
 
@@ -34,11 +34,11 @@ gh api repos/semicolon-devteam/docs/issues/{epic_number}/labels \
   -f labels[]="{project_label}"
 ```
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: assign-project-label 사용
-[SAX] Reference: GitHub Projects API 참조
+[SEMO] Skill: assign-project-label 사용
+[SEMO] Reference: GitHub Projects API 참조
 ```
 
 ## Related

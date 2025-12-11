@@ -2,7 +2,7 @@
 
 > Slack 알림 대상 채널 설정 및 권한 관리
 
-> 📖 **중앙 설정**: [sax-core/_shared/slack-config.md](../../../_shared/slack-config.md) 참조
+> 📖 **중앙 설정**: [semo-core/_shared/slack-config.md](../../../_shared/slack-config.md) 참조
 
 ## 대상 채널
 
@@ -51,9 +51,9 @@ curl -X GET "https://slack.com/api/conversations.list" \
 
 | 알림 유형 | 채널 | 비고 |
 |----------|------|------|
-| 릴리스 알림 | `#_협업` | SAX 패키지 업데이트 |
+| 릴리스 알림 | `#_협업` | SEMO 패키지 업데이트 |
 | 이슈 알림 | `#_협업` | Draft Task, Issue 생성 |
-| 커스텀 메시지 | 지정된 채널 | /SAX:slack 커맨드 |
+| 커스텀 메시지 | 지정된 채널 | /SEMO:slack 커맨드 |
 
 ## 권한 오류 대응
 
@@ -90,7 +90,7 @@ curl -s -X POST 'https://slack.com/api/chat.postMessage' \
   -d @- << 'EOF'
 {
   "channel": "C09KNL91QBZ",
-  "text": "SAX notify-slack 테스트 메시지"
+  "text": "SEMO notify-slack 테스트 메시지"
 }
 EOF
 ```

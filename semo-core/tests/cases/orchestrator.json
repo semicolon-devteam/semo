@@ -5,14 +5,14 @@
       "name": "[next] 접두사 라우팅",
       "input": "[next] API 엔드포인트 버그 수정해줘",
       "expect": {
-        "contains_any": ["sax-next", "semo-next", "next 패키지", "[next]"]
+        "contains_any": ["semo-next", "semo-next", "next 패키지", "[next]"]
       }
     },
     {
       "name": "[backend] 접두사 라우팅",
       "input": "[backend] 데이터베이스 쿼리 최적화해줘",
       "expect": {
-        "contains_any": ["sax-backend", "semo-backend", "backend 패키지", "[backend]"]
+        "contains_any": ["semo-backend", "semo-backend", "backend 패키지", "[backend]"]
       }
     },
     {

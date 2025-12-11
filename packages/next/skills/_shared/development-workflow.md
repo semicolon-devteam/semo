@@ -1,6 +1,6 @@
 # Development Workflow
 
-> **SoT**: 핵심 원칙은 sax-core/PRINCIPLES.md 참조
+> **SoT**: 핵심 원칙은 semo-core/PRINCIPLES.md 참조
 
 ## Core Principles
 

@@ -7,7 +7,7 @@ tools: [Bash, Read]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: report-bug 호출` 시스템 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: report-bug 호출` 시스템 메시지를 첫 줄에 출력하세요.
 
 # report-bug Skill
 
@@ -44,7 +44,7 @@ EOF
 ### Step 1: 정보 수집
 
 ```markdown
-[SAX] Skill: report-bug 호출
+[SEMO] Skill: report-bug 호출
 
 ## 🐛 버그 리포트 생성
 
@@ -103,7 +103,7 @@ gh issue create \
 `fix/{issue-number}-{slug}`
 
 ---
-🤖 SAX report-bug Skill로 자동 생성됨
+🤖 SEMO report-bug Skill로 자동 생성됨
 EOF
 )" \
   --label "bug"
@@ -175,7 +175,7 @@ gh api graphql -f query='
 ### Step 4: 완료 메시지
 
 ```markdown
-[SAX] Bug Report: 이슈 생성 완료
+[SEMO] Bug Report: 이슈 생성 완료
 
 ✅ 버그 리포트가 등록되었습니다!
 
@@ -242,20 +242,20 @@ git checkout -b fix/{이슈번호}-{slug}
 `fix/{issue-number}-{slug}`
 
 ---
-🤖 SAX report-bug Skill로 자동 생성됨
+🤖 SEMO report-bug Skill로 자동 생성됨
 ```
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: report-bug 사용
+[SEMO] Skill: report-bug 사용
 
-[SAX] Bug Report: {repo}#{number} 생성 완료 → fix/{number}-{slug}
+[SEMO] Bug Report: {repo}#{number} 생성 완료 → fix/{number}-{slug}
 ```
 
 ## Related
 
-- [feedback Skill](../feedback/SKILL.md) - SAX 패키지 피드백
+- [feedback Skill](../feedback/SKILL.md) - SEMO 패키지 피드백
 - [create-design-task Skill](../create-design-task/SKILL.md) - 태스크카드 생성 참고
 
 ## References

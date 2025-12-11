@@ -2,12 +2,12 @@
 name: generate-member-report
 description: |
   인원별 업무 현황 리포트 생성. Use when (1) 담당자별 현황 조회,
-  (2) /SAX:report member 커맨드, (3) 업무량 분석.
+  (2) /SEMO:report member 커맨드, (3) 업무량 분석.
 tools: [Bash, Read, Write]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: generate-member-report 호출` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: generate-member-report 호출` 메시지를 첫 줄에 출력하세요.
 
 # generate-member-report Skill
 
@@ -209,7 +209,7 @@ function calculateCompletionRate(done, total) {
 ## 완료 메시지
 
 ```markdown
-[SAX] Skill: generate-member-report 완료
+[SEMO] Skill: generate-member-report 완료
 
 # 👥 팀원별 업무 현황
 

@@ -1,14 +1,14 @@
 <!-- SEMO Framework -->
 > **SEMO** = "Semicolon Orchestrate" - AI 에이전트 오케스트레이션 프레임워크
-> (이전 명칭: SAX - Semicolon AI Transformation)
+> (이전 명칭: SEMO - Semicolon AI Transformation)
 
-# SAX-MVP Package Configuration
+# SEMO-MVP Package Configuration
 
-> MVP Developer를 위한 SAX 패키지 - Next.js + Antigravity 통합
+> MVP Developer를 위한 SEMO 패키지 - Next.js + Antigravity 통합
 
 ## Package Info
 
-- **Package**: SAX-MVP
+- **Package**: SEMO-MVP
 - **Version**: [VERSION](./VERSION) 참조
 - **Target**: Greenfield MVP projects using Antigravity
 - **Audience**: MVP Developers in Semicolon ecosystem
@@ -22,8 +22,8 @@
 모든 요청은 의도 분석 후 적절한 Agent/Skill로 위임:
 
 ```markdown
-[SAX] Orchestrator: 의도 분석 완료 → {intent_category}
-[SAX] Agent 위임: {agent_name} (사유: {reason})
+[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}
+[SEMO] Agent 위임: {agent_name} (사유: {reason})
 ```
 
 ### 2. Schema Extension Strategy (우선순위 순)
@@ -62,11 +62,11 @@ core-interface JSON artifacts → TypeScript types → domain/_types/
 ### 4. Workflow Integration
 
 ```text
-[sax-po] Epic/Task 생성
+[semo-po] Epic/Task 생성
      ↓
-[sax-mvp] Task Card 확인 → 구현 시작
+[semo-mvp] Task Card 확인 → 구현 시작
      ↓
-[sax-mvp] skill:verify-integration
+[semo-mvp] skill:verify-integration
      ↓
 Community Solution Merge
 ```
@@ -103,12 +103,12 @@ Community Solution Merge
 
 | Skill | 역할 | 트리거 |
 |-------|------|--------|
-| [health-check](skills/health-check/SKILL.md) | 환경 및 MCP 검증 | `/SAX:health` |
+| [health-check](skills/health-check/SKILL.md) | 환경 및 MCP 검증 | `/SEMO:health` |
 | [sync-interface](skills/sync-interface/SKILL.md) | core-interface 타입 동기화 | "타입 동기화" |
-| [scaffold-mvp-domain](skills/scaffold-mvp-domain/SKILL.md) | 도메인 구조 생성 | `/SAX:scaffold` |
+| [scaffold-mvp-domain](skills/scaffold-mvp-domain/SKILL.md) | 도메인 구조 생성 | `/SEMO:scaffold` |
 | [supabase-fallback](skills/supabase-fallback/SKILL.md) | Supabase GraphQL 쿼리 | "supabase 직접" |
-| [implement-mvp](skills/implement-mvp/SKILL.md) | MVP 구현 | `/SAX:implement` |
-| [verify-integration](skills/verify-integration/SKILL.md) | 통합 검증 | `/SAX:verify` |
+| [implement-mvp](skills/implement-mvp/SKILL.md) | MVP 구현 | `/SEMO:implement` |
+| [verify-integration](skills/verify-integration/SKILL.md) | 통합 검증 | `/SEMO:verify` |
 
 ---
 
@@ -116,12 +116,12 @@ Community Solution Merge
 
 | Command | 설명 |
 |---------|------|
-| `/SAX:onboarding` | MVP 개발자 온보딩 |
-| `/SAX:health` | 환경 및 MCP 검증 |
-| `/SAX:scaffold` | 도메인 구조 생성 |
-| `/SAX:implement` | 구현 시작 |
-| `/SAX:mockup` | Antigravity 목업 위임 |
-| `/SAX:verify` | 통합 검증 |
+| `/SEMO:onboarding` | MVP 개발자 온보딩 |
+| `/SEMO:health` | 환경 및 MCP 검증 |
+| `/SEMO:scaffold` | 도메인 구조 생성 |
+| `/SEMO:implement` | 구현 시작 |
+| `/SEMO:mockup` | Antigravity 목업 위임 |
+| `/SEMO:verify` | 통합 검증 |
 
 ---
 
@@ -156,7 +156,7 @@ Community Solution Merge
 
 ### Antigravity Context Injection
 
-- `.agent/rules/`: SAX 원칙, DDD 패턴, 스키마 확장 전략
+- `.agent/rules/`: SEMO 원칙, DDD 패턴, 스키마 확장 전략
 - `.agent/workflows/`: mockup, component, browser-test
 
 ---
@@ -177,7 +177,7 @@ app/{domain}/
 
 ## References
 
-- [SAX Core Principles](../sax-core/PRINCIPLES.md)
+- [SEMO Core Principles](../semo-core/PRINCIPLES.md)
 - [core-interface](https://github.com/semicolon-devteam/core-interface)
 - [core-supabase](https://github.com/semicolon-devteam/core-supabase)
 - [Supabase GraphQL](https://supabase.com/docs/guides/graphql)

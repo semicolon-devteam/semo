@@ -1,18 +1,18 @@
 ---
 name: memory
 description: |
-  SAX 세션 간 컨텍스트 영속화 (공통 Skill). Use when (1) 아키텍처 결정 사항 저장,
+  SEMO 세션 간 컨텍스트 영속화 (공통 Skill). Use when (1) 아키텍처 결정 사항 저장,
   (2) 팀 선호도 기록, (3) 자주 참조하는 파일 캐싱, (4) 세션 간 맥락 유지.
   "기억 상실" 문제 해결을 위한 장기 메모리 시스템.
 tools: [Read, Write, Bash, Glob]
 model: inherit
 ---
 
-> **시스템 메시지**: `[SAX] Skill: memory 호출 - {action}`
+> **시스템 메시지**: `[SEMO] Skill: memory 호출 - {action}`
 
-# SAX Memory Skill
+# SEMO Memory Skill
 
-> 세션 간 컨텍스트 영속화를 위한 장기 메모리 시스템 (SAX Core 공통 Skill)
+> 세션 간 컨텍스트 영속화를 위한 장기 메모리 시스템 (SEMO Core 공통 Skill)
 
 ## Purpose
 
@@ -195,7 +195,7 @@ Claude: 선호도 적용
 ### save 예시
 
 ```markdown
-[SAX] Skill: memory 호출 - save
+[SEMO] Skill: memory 호출 - save
 
 ✅ 메모리 저장 완료
 
@@ -210,7 +210,7 @@ Claude: 선호도 적용
 ### load 예시
 
 ```markdown
-[SAX] Skill: memory 호출 - load
+[SEMO] Skill: memory 호출 - load
 
 ## 저장된 결정 사항
 
@@ -223,7 +223,7 @@ Claude: 선호도 적용
 ### sync 예시
 
 ```markdown
-[SAX] Skill: memory 호출 - sync
+[SEMO] Skill: memory 호출 - sync
 
 === 세션 메모리 복원 ===
 
@@ -305,12 +305,12 @@ skill:memory save decision "api-pattern" "JSON Envelope"
 3. MCP 비활성화 → .claude/memory/decisions.json에 저장
 ```
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: memory 호출 - {action}
+[SEMO] Skill: memory 호출 - {action}
 
-[SAX] Skill: memory 완료 - {결과 요약}
+[SEMO] Skill: memory 완료 - {결과 요약}
 ```
 
 ## References

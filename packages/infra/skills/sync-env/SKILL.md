@@ -4,7 +4,7 @@ description: 환경변수 파일 동기화 및 검증. Use when (1) 환경변수
 tools: [Bash, Read, Write]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: sync-env 호출 - {환경}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: sync-env 호출 - {환경}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # sync-env
 
@@ -54,7 +54,7 @@ dev와 stg 간 변수 누락 확인
 ### 성공
 
 ```markdown
-[SAX] sync-env: 검증 완료 ✅
+[SEMO] sync-env: 검증 완료 ✅
 
 **환경변수 검증 결과**
 
@@ -77,7 +77,7 @@ dev와 stg 간 변수 누락 확인
 ### 경고
 
 ```markdown
-[SAX] sync-env: 검증 완료 (경고 있음) ⚠️
+[SEMO] sync-env: 검증 완료 (경고 있음) ⚠️
 
 **환경변수 검증 결과**
 

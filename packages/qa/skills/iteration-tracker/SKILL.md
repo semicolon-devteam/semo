@@ -7,7 +7,7 @@ description: |
 tools: [Bash, GitHub CLI, Read]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: iteration-tracker 호출 - {repo}#{number}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: iteration-tracker 호출 - {repo}#{number}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Iteration Tracker Skill
 
@@ -37,7 +37,7 @@ gh issue view {number} --repo semicolon-devteam/{repo} --json comments --jq '.co
 ### 이터레이션 이력
 
 ```markdown
-[SAX] Skill: iteration-tracker 호출 - {repo}#{number}
+[SEMO] Skill: iteration-tracker 호출 - {repo}#{number}
 
 ## 📊 이터레이션 현황
 

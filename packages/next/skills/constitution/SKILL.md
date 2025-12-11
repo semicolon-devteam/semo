@@ -5,7 +5,7 @@ tools: [Read, Write, Edit]
 location: project
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: constitution 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: constitution 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Constitution Skill
 

@@ -2,12 +2,12 @@
 name: generate-roadmap
 description: |
   Epic 기반 Roadmap 생성. Use when (1) 장기 일정 시각화,
-  (2) /SAX:roadmap 커맨드, (3) 마일스톤 계획.
+  (2) /SEMO:roadmap 커맨드, (3) 마일스톤 계획.
 tools: [Bash, Read, Write]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: generate-roadmap 호출` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: generate-roadmap 호출` 메시지를 첫 줄에 출력하세요.
 
 # generate-roadmap Skill
 
@@ -175,7 +175,7 @@ graph LR
 ## 완료 메시지
 
 ```markdown
-[SAX] Skill: generate-roadmap 완료
+[SEMO] Skill: generate-roadmap 완료
 
 # 🗺️ {period} Roadmap
 

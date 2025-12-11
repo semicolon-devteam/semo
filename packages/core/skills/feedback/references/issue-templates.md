@@ -1,6 +1,6 @@
 # Issue Templates
 
-> feedback 스킬 이슈 템플릿 (SAX 공통)
+> feedback 스킬 이슈 템플릿 (SEMO 공통)
 
 ## 버그 리포트 템플릿
 
@@ -27,7 +27,7 @@
 - 관련 Agent/Skill: {이름}
 
 ---
-🤖 SAX Feedback Skill (sax-core)로 자동 생성됨
+🤖 SEMO Feedback Skill (semo-core)로 자동 생성됨
 ```
 
 ## 개선 제안 템플릿
@@ -48,7 +48,7 @@
 {추가 설명}
 
 ---
-🤖 SAX Feedback Skill (sax-core)로 자동 생성됨
+🤖 SEMO Feedback Skill (semo-core)로 자동 생성됨
 ```
 
 ## 이슈 제목 형식
@@ -91,20 +91,20 @@
 
 | 패키지 | 라벨 |
 |--------|------|
-| sax-po | `sax-po` |
-| sax-next | `sax-next` |
-| sax-pm | `sax-pm` |
-| sax-qa | `sax-qa` |
-| sax-infra | `sax-infra` |
-| sax-meta | `sax-meta` |
-| sax-core | `sax-core` |
+| semo-po | `semo-po` |
+| semo-next | `semo-next` |
+| semo-pm | `semo-pm` |
+| semo-qa | `semo-qa` |
+| semo-infra | `semo-infra` |
+| semo-meta | `semo-meta` |
+| semo-core | `semo-core` |
 
 ## gh issue create 명령어
 
 ### 버그 이슈
 
 ```bash
-PACKAGE="sax-po"
+PACKAGE="semo-po"
 VERSION="0.5.0"
 
 gh issue create \
@@ -128,7 +128,7 @@ gh issue create \
 - 관련 Agent/Skill: {이름}
 
 ---
-🤖 SAX Feedback Skill (sax-core)로 자동 생성됨
+🤖 SEMO Feedback Skill (semo-core)로 자동 생성됨
 EOF
 )" \
   --label "bug,${PACKAGE}"
@@ -137,7 +137,7 @@ EOF
 ### 제안 이슈
 
 ```bash
-PACKAGE="sax-po"
+PACKAGE="semo-po"
 
 gh issue create \
   --repo "semicolon-devteam/${PACKAGE}" \
@@ -155,7 +155,7 @@ gh issue create \
 {제안 동작}
 
 ---
-🤖 SAX Feedback Skill (sax-core)로 자동 생성됨
+🤖 SEMO Feedback Skill (semo-core)로 자동 생성됨
 EOF
 )" \
   --label "enhancement,${PACKAGE}"

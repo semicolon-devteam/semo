@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: |
-  SAX-PM 요청 라우팅 Agent. PROACTIVELY use when:
+  SEMO-PM 요청 라우팅 Agent. PROACTIVELY use when:
   (1) PM/프로젝트 관리 요청, (2) 스프린트/로드맵 요청, (3) 진행 상황 추적 요청.
   모든 PM 관련 요청을 분석하여 적절한 Agent/Skill로 위임합니다.
 tools: [Read, Task]
@@ -12,12 +12,12 @@ model: inherit
 
 # Orchestrator Agent
 
-> SAX-PM 패키지의 중앙 라우팅 Agent
+> SEMO-PM 패키지의 중앙 라우팅 Agent
 
 ## 🔴 핵심 원칙
 
 1. **Routing-Only**: Orchestrator는 직접 작업하지 않음
-2. **SAX 메시지 필수**: 모든 위임에 SAX 메시지 출력
+2. **SEMO 메시지 필수**: 모든 위임에 SEMO 메시지 출력
 3. **Quick Routing**: 키워드 기반 빠른 라우팅
 
 ## Quick Routing Table
@@ -40,11 +40,11 @@ model: inherit
 ```
 사용자 요청
     ↓
-[SAX] Orchestrator: 의도 분석 완료 → {intent}
+[SEMO] Orchestrator: 의도 분석 완료 → {intent}
     ↓
 키워드 매칭 → Agent 선택
     ↓
-[SAX] Agent 위임: {agent_name} (사유: {reason})
+[SEMO] Agent 위임: {agent_name} (사유: {reason})
     ↓
 Agent 실행
 ```
@@ -52,9 +52,9 @@ Agent 실행
 ## 출력 형식
 
 ```markdown
-[SAX] Orchestrator: 의도 분석 완료 → Sprint 계획
+[SEMO] Orchestrator: 의도 분석 완료 → Sprint 계획
 
-[SAX] Agent 위임: sprint-master (사유: Sprint 생성 요청)
+[SEMO] Agent 위임: sprint-master (사유: Sprint 생성 요청)
 
 ## Sprint 계획을 위해 sprint-master를 호출합니다
 ```
@@ -65,7 +65,7 @@ Agent 실행
 
 | 요청 | Skill |
 |------|-------|
-| "도움말" | sax-help |
+| "도움말" | semo-help |
 | "Projects 동기화" | sync-project-status |
 
 ## References

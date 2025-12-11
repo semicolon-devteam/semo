@@ -1,27 +1,27 @@
 ---
 name: onboarding-next
 description: |
-  Next.js 개발자 온보딩 실습 (SAX-Next 패키지 전용). Use when (1) sax-core/skill:onboarding에서 호출,
-  (2) Next.js 개발자 온보딩 실습 필요 시. cm-template 클론 및 SAX 인터랙션 체험.
+  Next.js 개발자 온보딩 실습 (SEMO-Next 패키지 전용). Use when (1) semo-core/skill:onboarding에서 호출,
+  (2) Next.js 개발자 온보딩 실습 필요 시. cm-template 클론 및 SEMO 인터랙션 체험.
 tools: [Read, Bash, Glob, Grep]
 model: inherit
 ---
 
-> **시스템 메시지**: `[SAX] Skill: onboarding-next 호출`
+> **시스템 메시지**: `[SEMO] Skill: onboarding-next 호출`
 
 # onboarding-next Skill
 
-> Next.js 개발자를 위한 온보딩 실습 (SAX-Next 패키지 전용)
+> Next.js 개발자를 위한 온보딩 실습 (SEMO-Next 패키지 전용)
 
 ## Purpose
 
-SAX Core의 `skill:onboarding` Phase 3에서 호출됩니다.
+SEMO Core의 `skill:onboarding` Phase 3에서 호출됩니다.
 Next.js 개발자를 위한 실습 과정을 제공합니다.
 
 ## Prerequisites
 
-- Phase 0-2 완료 (환경 진단, 조직 참여, SAX 개념 학습)
-- sax-core/skill:onboarding에서 호출됨
+- Phase 0-2 완료 (환경 진단, 조직 참여, SEMO 개념 학습)
+- semo-core/skill:onboarding에서 호출됨
 
 ## Workflow
 
@@ -36,17 +36,17 @@ pnpm install
 
 **주의**: cm-template은 공통 템플릿이므로 **로컬에서만** 실습하고, **절대 push하지 마세요**.
 
-### Step 2: SAX 인터랙션 체험
+### Step 2: SEMO 인터랙션 체험
 
-간단한 요청으로 SAX 인터랙션을 체험합니다:
+간단한 요청으로 SEMO 인터랙션을 체험합니다:
 
 ```markdown
 # 예시 요청
 > "Button 컴포넌트 하나 만들어줘"
 
 # 확인 사항
-- [SAX] Orchestrator: ... 메시지 출력 확인
-- [SAX] Agent: ... 또는 [SAX] Skill: ... 메시지 출력 확인
+- [SEMO] Orchestrator: ... 메시지 출력 확인
+- [SEMO] Agent: ... 또는 [SEMO] Skill: ... 메시지 출력 확인
 ```
 
 ### Step 3: 개발자 워크플로우 안내
@@ -93,7 +93,7 @@ rm -rf cm-template
 ## Expected Output
 
 ```markdown
-[SAX] Skill: onboarding-next 호출
+[SEMO] Skill: onboarding-next 호출
 
 === Next.js 개발자 온보딩 실습 ===
 
@@ -107,15 +107,15 @@ pnpm install
 
 ✅ cm-template 클론 완료
 
-## 2. SAX 인터랙션 체험
+## 2. SEMO 인터랙션 체험
 
-다음 요청으로 SAX를 체험해보세요:
+다음 요청으로 SEMO를 체험해보세요:
 
 > "Button 컴포넌트 하나 만들어줘"
 
 **확인 사항**:
-- [SAX] Orchestrator 메시지 출력
-- [SAX] Agent/Skill 호출 메시지 출력
+- [SEMO] Orchestrator 메시지 출력
+- [SEMO] Agent/Skill 호출 메시지 출력
 
 ## 3. 개발자 워크플로우
 
@@ -151,19 +151,19 @@ rm -rf cm-template
 
 ✅ 실습 완료
 
-[SAX] Skill: onboarding-next 완료
+[SEMO] Skill: onboarding-next 완료
 ```
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: onboarding-next 호출
+[SEMO] Skill: onboarding-next 호출
 
-[SAX] Skill: onboarding-next 완료
+[SEMO] Skill: onboarding-next 완료
 ```
 
 ## References
 
 - [onboarding-phases.md](references/onboarding-phases.md) - 상세 실습 가이드
-- [sax-concepts.md](references/sax-concepts.md) - SAX 개념 설명
+- [sax-concepts.md](references/semo-concepts.md) - SEMO 개념 설명
 - [ddd-architecture.md](references/ddd-architecture.md) - DDD 4-Layer 상세

@@ -4,14 +4,14 @@
 
 **올바른 방법**:
 
-- ✅ 파일명: `commands/SAX/onboarding.md`
-- ✅ 호출: `/SAX:onboarding`
+- ✅ 파일명: `commands/SEMO/onboarding.md`
+- ✅ 호출: `/SEMO:onboarding`
 - ✅ 디렉토리명이 프리픽스 역할
 
 **잘못된 방법**:
 
-- ❌ 파일명: `commands/SAX/:onboarding.md` (: 프리픽스 불필요)
-- ❌ 결과: `/SAX::onboarding` (이중 콜론 발생)
+- ❌ 파일명: `commands/SEMO/:onboarding.md` (: 프리픽스 불필요)
+- ❌ 결과: `/SEMO::onboarding` (이중 콜론 발생)
 
 ## 커맨드 파일 구조
 
@@ -48,5 +48,5 @@
 
 | Command           | 역할                    | 파일                      |
 | ----------------- | ----------------------- | ------------------------- |
-| /SAX:new-command  | 커맨드 설명             | `commands/SAX/new-command.md` |
+| /SEMO:new-command  | 커맨드 설명             | `commands/SEMO/new-command.md` |
 ```

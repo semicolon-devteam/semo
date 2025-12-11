@@ -9,7 +9,7 @@ triggers:
   - 브랜치 만들어줘
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: git-workflow 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: git-workflow 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Git Workflow Skill
 
@@ -20,10 +20,10 @@ triggers:
 
 ## 규칙 참조 (SoT)
 
-> **모든 Git 규칙은 sax-core/TEAM_RULES.md에서 관리됩니다.**
+> **모든 Git 규칙은 semo-core/TEAM_RULES.md에서 관리됩니다.**
 
 ```bash
-.claude/sax-core/TEAM_RULES.md
+.claude/semo-core/TEAM_RULES.md
 ```
 
 **참조 섹션**:
@@ -58,7 +58,7 @@ ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+|/[0-9]+' | grep -oE '[
 감지 시 즉시 중단:
 
 ```markdown
-[SAX] skill:git-workflow: ⛔ --no-verify 차단
+[SEMO] skill:git-workflow: ⛔ --no-verify 차단
 
 🚫 **커밋 중단**: `--no-verify` 플래그는 사용할 수 없습니다.
 
@@ -90,7 +90,7 @@ ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+|/[0-9]+' | grep -oE '[
 ### 커밋 성공
 
 ```markdown
-[SAX] Skill: git-workflow 실행
+[SEMO] Skill: git-workflow 실행
 
 ## ✅ 커밋 완료
 
@@ -106,7 +106,7 @@ ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+|/[0-9]+' | grep -oE '[
 ### PR 생성
 
 ```markdown
-[SAX] Skill: git-workflow 실행
+[SEMO] Skill: git-workflow 실행
 
 ## ✅ PR 생성 완료
 
@@ -119,7 +119,7 @@ ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+|/[0-9]+' | grep -oE '[
 
 ## 프로젝트 보드 상태 관리
 
-> **📖 상세 API**: sax-next/skills/project-board 참조
+> **📖 상세 API**: semo-next/skills/project-board 참조
 
 | 상태 변경 | 설정 속성 | 시점 |
 |----------|----------|------|

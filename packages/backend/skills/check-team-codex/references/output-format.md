@@ -3,7 +3,7 @@
 ## Success
 
 ```markdown
-[SAX] Skill: check-team-codex 실행
+[SEMO] Skill: check-team-codex 실행
 
 ## ✅ 모든 검사 통과
 
@@ -21,7 +21,7 @@
 ## Failure
 
 ```markdown
-[SAX] Skill: check-team-codex 실행
+[SEMO] Skill: check-team-codex 실행
 
 ## ❌ 검사 실패
 

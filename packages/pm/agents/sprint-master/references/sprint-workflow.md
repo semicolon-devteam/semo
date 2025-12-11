@@ -146,7 +146,7 @@ Projects #1에서 Task 상태 관리:
 블로커 발견 시:
 1. `blocked` 라벨 추가
 2. 블로킹 사유 코멘트
-3. Slack 알림 (`/SAX:slack`)
+3. Slack 알림 (`/SEMO:slack`)
 
 ---
 

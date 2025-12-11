@@ -7,7 +7,7 @@ tools: [Bash, Read]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: calculate-velocity 호출` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: calculate-velocity 호출` 메시지를 첫 줄에 출력하세요.
 
 # calculate-velocity Skill
 
@@ -40,7 +40,7 @@ include_current: false            # 선택 (진행중 Iteration 포함 여부)
 ## Output
 
 ```markdown
-[SAX] Skill: calculate-velocity 완료
+[SEMO] Skill: calculate-velocity 완료
 
 📊 팀 Velocity 분석
 
@@ -179,7 +179,7 @@ function predictCompletion(remainingPoints, weeklyVelocity) {
 ## 완료 메시지
 
 ```markdown
-[SAX] Skill: calculate-velocity 완료
+[SEMO] Skill: calculate-velocity 완료
 
 ## 📊 팀 Velocity 분석
 

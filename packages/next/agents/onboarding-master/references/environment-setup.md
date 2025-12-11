@@ -93,9 +93,9 @@ cp .env.example .env.local
 # .claude/ 디렉토리 확인
 ls -la .claude/
 
-# SAX 패키지 확인
-ls -la .claude/sax-core/
-ls -la .claude/sax-next/
+# SEMO 패키지 확인
+ls -la .claude/semo-core/
+ls -la .claude/semo-next/
 ```
 
 ## 환경 문제 해결

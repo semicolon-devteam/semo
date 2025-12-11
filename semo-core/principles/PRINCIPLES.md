@@ -228,8 +228,8 @@ semo-skills/coder/implement/
 
 | 레거시 | 새 포맷 |
 |--------|---------|
-| `[SAX] Agent:` | `[SEMO] Agent:` |
-| `[SAX] Skill:` | `[SEMO] Skill:` |
+| `[SEMO] Agent:` | `[SEMO] Agent:` |
+| `[SEMO] Skill:` | `[SEMO] Skill:` |
 
 ---
 
@@ -280,5 +280,5 @@ semo-skills/coder/implement/
 
 ---
 
-*이 문서는 SAX Core Principles를 SEMO 구조에 맞게 업데이트했습니다.*
-*원본: SAX Core v1.0 → SEMO Core v2.0*
+*이 문서는 SEMO Core Principles를 SEMO 구조에 맞게 업데이트했습니다.*
+*원본: SEMO Core v1.0 → SEMO Core v2.0*

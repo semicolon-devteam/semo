@@ -4,7 +4,7 @@ description: DDD 4-layer MVP 도메인 구조 생성
 tools: [Bash, Write, Glob]
 ---
 
-> **시스템 메시지**: `[SAX] Skill: scaffold-mvp-domain 호출 - 도메인 구조 생성`
+> **시스템 메시지**: `[SEMO] Skill: scaffold-mvp-domain 호출 - 도메인 구조 생성`
 
 # Scaffold MVP Domain Skill
 
@@ -15,11 +15,11 @@ DDD 4-layer 아키텍처 기반의 MVP 도메인 구조를 자동 생성합니�
 ## Quick Start
 
 ```bash
-/SAX:scaffold {domain-name}
+/SEMO:scaffold {domain-name}
 
 # 예시
-/SAX:scaffold office
-/SAX:scaffold reservation
+/SEMO:scaffold office
+/SEMO:scaffold reservation
 ```
 
 ---

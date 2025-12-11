@@ -191,7 +191,7 @@ export function {Name}Form({ onSuccess, onCancel }: {Name}FormProps) {
 
 ### 출력
 ```
-[SAX] Component: OfficeList 생성
+[SEMO] Component: OfficeList 생성
 
 ## 생성된 파일
 - app/office/_components/OfficeList.tsx

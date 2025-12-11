@@ -4,7 +4,7 @@ description: Docker Compose 설정 문법 및 구성 검증. Use when (1) compos
 tools: [Bash, Read]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: verify-compose 호출 - {환경}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: verify-compose 호출 - {환경}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # verify-compose
 
@@ -57,7 +57,7 @@ docker-compose --env-file .env.{env} config --services
 ### 성공
 
 ```markdown
-[SAX] verify-compose: 검증 완료 ✅
+[SEMO] verify-compose: 검증 완료 ✅
 
 **Docker Compose 검증 결과**
 
@@ -76,7 +76,7 @@ docker-compose --env-file .env.{env} config --services
 ### 실패
 
 ```markdown
-[SAX] verify-compose: 검증 실패 ❌
+[SEMO] verify-compose: 검증 실패 ❌
 
 **Docker Compose 검증 결과**
 

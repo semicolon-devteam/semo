@@ -4,7 +4,7 @@ description: Spring Boot 미가동 시 Supabase GraphQL 직접 쿼리 지원
 tools: [Read, Write, Bash]
 ---
 
-> **시스템 메시지**: `[SAX] Skill: supabase-fallback 호출 - Supabase 직접 쿼리`
+> **시스템 메시지**: `[SEMO] Skill: supabase-fallback 호출 - Supabase 직접 쿼리`
 
 # Supabase Fallback Skill
 

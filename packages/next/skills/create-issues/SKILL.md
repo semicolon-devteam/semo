@@ -5,7 +5,7 @@ tools: [Bash, Read, Write, GitHub CLI]
 location: project
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: create-issues 호출 - {Epic 번호/Feature 명}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: create-issues 호출 - {Epic 번호/Feature 명}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Create Issues Skill
 

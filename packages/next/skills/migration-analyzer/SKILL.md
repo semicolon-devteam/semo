@@ -9,7 +9,7 @@ triggers:
   - 세미콜론 표준에 맞게 리팩토링
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: migration-analyzer 호출 - {프로젝트명}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: migration-analyzer 호출 - {프로젝트명}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Migration Analyzer Skill
 

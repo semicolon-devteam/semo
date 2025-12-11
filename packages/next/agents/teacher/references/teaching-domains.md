@@ -19,7 +19,7 @@
 | "이 버그 뭐야?" (디버깅) | Orchestrator 직접 처리 |
 | "Toast UI 구현해줘" (구현) | implementation-master |
 | "A vs B 뭐가 좋아?" (기술 선택) | spike-master |
-| "협업 프로세스 알려줘" (PO 영역) | SAX-PO Teacher 참조 안내 |
+| "협업 프로세스 알려줘" (PO 영역) | SEMO-PO Teacher 참조 안내 |
 
 ## Domain 1: 아키텍처 패턴
 
@@ -59,9 +59,9 @@
 
 ## Domain 4: 팀 개발 규칙
 
-> **SoT 참조**: 팀 규칙은 `sax-core/TEAM_RULES.md`에서 관리됩니다.
+> **SoT 참조**: 팀 규칙은 `semo-core/TEAM_RULES.md`에서 관리됩니다.
 
-**로컬 참조**: `.claude/sax-core/TEAM_RULES.md`
+**로컬 참조**: `.claude/semo-core/TEAM_RULES.md`
 
 **Wiki 참조** (보조):
 - [Team Codex](https://github.com/semicolon-devteam/docs/wiki/Team-Codex)

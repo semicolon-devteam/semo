@@ -4,7 +4,7 @@ description: Create Epic issue in docs repository. Use when (1) epic-master need
 tools: [Bash, Read, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: create-epic 호출 - {Epic 제목}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: create-epic 호출 - {Epic 제목}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # create-epic Skill
 
@@ -38,7 +38,7 @@ Epic 작성 시 개발자가 구현 단계에서 할 질문들을 사전에 점�
 
 ```bash
 # 1. 템플릿 로드
-.claude/sax-po/templates/epic-template.md
+.claude/semo-po/templates/epic-template.md
 
 # 2. GitHub Issue 생성
 gh issue create \
@@ -123,10 +123,10 @@ gh api graphql -f query='
 - 기술 상세는 포함하지 않음
 - **Projects 연동은 필수** (실패 시 재시도 필요)
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: create-epic 사용
+[SEMO] Skill: create-epic 사용
 ```
 
 ## Related

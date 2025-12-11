@@ -5,7 +5,7 @@
 ## CHANGELOG 템플릿
 
 ```markdown
-# SAX v{new_version} - {YYYY-MM-DD}
+# SEMO v{new_version} - {YYYY-MM-DD}
 
 {changes를 Keep a Changelog 형식으로 변환}
 

@@ -56,7 +56,7 @@ Nano Banana Pro를 활용하여 UI 목업 이미지를 생성합니다:
 
 ### 출력
 ```
-[SAX] Skill: mockup - UI 목업 생성
+[SEMO] Skill: mockup - UI 목업 생성
 
 ## 로그인 폼 목업
 
@@ -132,5 +132,5 @@ Nano Banana Pro를 활용하여 UI 목업 이미지를 생성합니다:
 생성된 목업을 Claude Code에서 활용하려면:
 
 1. 목업 이미지를 `assets/mockups/` 폴더에 저장
-2. Claude Code에서 `/SAX:handoff` 명령어 실행
+2. Claude Code에서 `/SEMO:handoff` 명령어 실행
 3. 핸드오프 문서에 목업 참조 추가

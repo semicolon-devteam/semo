@@ -1,12 +1,12 @@
 # LangFuse 관측성 설정 가이드
 
-> SAX/SEMO AI 에이전트 동작 가시성 확보를 위한 LangFuse 통합
+> SEMO AI 에이전트 동작 가시성 확보를 위한 LangFuse 통합
 
 ---
 
 ## Overview
 
-LangFuse는 LLM 애플리케이션을 위한 오픈소스 관측성 플랫폼입니다. SAX/SEMO 에이전트의 동작을 추적하고 분석할 수 있습니다.
+LangFuse는 LLM 애플리케이션을 위한 오픈소스 관측성 플랫폼입니다. SEMO 에이전트의 동작을 추적하고 분석할 수 있습니다.
 
 ### 핵심 기능
 
@@ -77,7 +77,7 @@ export LANGFUSE_HOST="https://cloud.langfuse.com"
 
 ## 트레이싱 포인트
 
-### SAX/SEMO 트레이싱 구조
+### SEMO 트레이싱 구조
 
 ```
 [SEMO] Orchestrator 요청
@@ -135,7 +135,7 @@ export LANGFUSE_HOST="https://cloud.langfuse.com"
 │  ████████░░ 847     │  p50: 5.2s  p95: 18.3s  p99: 45.1s  │
 ├─────────────────────┼───────────────────────────────────────┤
 │  Error Rate         │  Top Agents by Usage                  │
-│  ██░░░░░░░░ 2.3%    │  1. sax-architect (45%)               │
+│  ██░░░░░░░░ 2.3%    │  1. semo-architect (45%)               │
 │                     │  2. code-generator (30%)               │
 │                     │  3. bug-fixer (15%)                    │
 ├─────────────────────┼───────────────────────────────────────┤
@@ -236,12 +236,12 @@ trace = langfuse.trace(
     name="semo-orchestrator",
     user_id=github_id,
     session_id=session_id,
-    metadata={"package": "sax-next", "intent": "code_generation"}
+    metadata={"package": "semo-next", "intent": "code_generation"}
 )
 
 # 스팬 추가
 span = trace.span(
-    name="agent/sax-architect",
+    name="agent/semo-architect",
     input={"task": "컴포넌트 설계"},
     metadata={"model": "claude-sonnet-4-20250514"}
 )
@@ -319,5 +319,5 @@ langfuse traces get --id "semo-{uuid}"
 
 - [LangFuse Documentation](https://langfuse.com/docs)
 - [LangFuse Python SDK](https://github.com/langfuse/langfuse-python)
-- [SAX/SEMO 전환 계획](../../.claude/plans/prancy-scribbling-falcon.md)
+- [SEMO 전환 계획](../../.claude/plans/prancy-scribbling-falcon.md)
 - [Doppler 보안 설정](../_shared/mcp-config.md)

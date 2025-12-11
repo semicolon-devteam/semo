@@ -5,7 +5,7 @@
 ## Phase 0: 환경 진단
 
 ```markdown
-[SAX] Skill: health-check 사용
+[SEMO] Skill: health-check 사용
 
 환경 검증을 시작합니다...
 ```
@@ -49,14 +49,14 @@ gh api user/orgs --jq '.[].login' | grep semicolon-devteam
 - semicolon-devteam Organization 멤버십
 - developers 팀 배정 여부
 
-## Phase 2: SAX 개념 학습
+## Phase 2: SEMO 개념 학습
 
-### 2.1 SAX 4대 원칙
+### 2.1 SEMO 4대 원칙
 
-1. **Transparency (투명성)**: 모든 AI 작업이 `[SAX] ...` 메시지로 명시적 표시
+1. **Transparency (투명성)**: 모든 AI 작업이 `[SEMO] ...` 메시지로 명시적 표시
 2. **Orchestrator-First (오케스트레이터 우선)**: 모든 요청은 Orchestrator가 먼저 분석
 3. **Modularity (모듈성)**: 역할별 패키지 독립 동작
-4. **Hierarchy (계층구조)**: SAX Core → Package 상속
+4. **Hierarchy (계층구조)**: SEMO Core → Package 상속
 
 ### 2.2 개발자 워크플로우
 
@@ -90,7 +90,7 @@ src/app/{domain}/
 ## Phase 3: 실습
 
 ```markdown
-## 실습: SAX 인터랙션 체험
+## 실습: SEMO 인터랙션 체험
 
 **주의**: cm-template은 공통 템플릿이므로 **로컬에서만** 실습하고, **절대 push하지 마세요**.
 
@@ -100,13 +100,13 @@ gh repo clone semicolon-devteam/cm-template
 cd cm-template
 ```
 
-### 2. SAX 인터랙션 테스트
+### 2. SEMO 인터랙션 테스트
 간단한 요청을 해보세요:
 > "Button 컴포넌트 하나 만들어줘"
 
 **확인사항**:
-- `[SAX] Orchestrator: ...` 메시지 출력 확인
-- `[SAX] Agent: ...` 또는 `[SAX] Skill: ...` 메시지 출력 확인
+- `[SEMO] Orchestrator: ...` 메시지 출력 확인
+- `[SEMO] Agent: ...` 또는 `[SEMO] Skill: ...` 메시지 출력 확인
 
 ### 3. 실습 완료 후 삭제
 ```bash
@@ -120,13 +120,13 @@ rm -rf cm-template
 ```markdown
 ## 참조 문서
 
-### SAX Core 문서
+### SEMO Core 문서
 ```bash
-# SAX Core 원칙
+# SEMO Core 원칙
 gh api repos/semicolon-devteam/docs/contents/sax/core/PRINCIPLES.md \
   --jq '.content' | base64 -d
 
-# SAX 메시지 규칙
+# SEMO 메시지 규칙
 gh api repos/semicolon-devteam/docs/contents/sax/core/MESSAGE_RULES.md \
   --jq '.content' | base64 -d
 ```
@@ -139,29 +139,29 @@ gh api repos/semicolon-devteam/docs/contents/sax/core/MESSAGE_RULES.md \
 ## Phase 5: 온보딩 완료
 
 ```markdown
-[SAX] Skill: health-check 사용 (최종 검증)
+[SEMO] Skill: health-check 사용 (최종 검증)
 
 === 온보딩 완료 ===
 
 ✅ 모든 필수 항목 통과
-✅ SAX 개념 학습 완료
+✅ SEMO 개념 학습 완료
 ✅ 실습 완료
 
 **다음 단계**:
 1. 팀 리더에게 업무 할당 요청
 2. 이슈 할당 받으면: "cm-{project}#{issue_number} 할당받았어요"
-3. SAX가 자동으로 다음 단계를 안내합니다
+3. SEMO가 자동으로 다음 단계를 안내합니다
 
 **도움말**:
-- `/SAX:health-check`: 환경 재검증
-- `/SAX:task-progress`: 작업 진행도 확인
+- `/SEMO:health-check`: 환경 재검증
+- `/SEMO:task-progress`: 작업 진행도 확인
 - `cm-office#32 할당받았어요`: 업무 시작 가이드
 ```
 
-**SAX 메타데이터 업데이트**:
+**SEMO 메타데이터 업데이트**:
 ```json
 {
-  "SAX": {
+  "SEMO": {
     "role": "parttimer",
     "position": "developer",
     "boarded": true,
@@ -183,5 +183,5 @@ Phase 0 완료. Phase 1 (조직 참여 확인)을 진행하시겠습니까? (y/n
 사용자가 `n` 응답 시:
 ```markdown
 온보딩을 일시 중단합니다.
-재시작하려면 `/SAX:onboarding` 명령어를 사용하세요.
+재시작하려면 `/SEMO:onboarding` 명령어를 사용하세요.
 ```

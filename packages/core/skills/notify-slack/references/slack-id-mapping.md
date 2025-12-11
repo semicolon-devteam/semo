@@ -2,7 +2,7 @@
 
 > Slack API를 통한 실시간 사용자 ID 조회 방법
 
-> 📖 **Slack 설정**: [sax-core/_shared/slack-config.md](../../../_shared/slack-config.md) 참조
+> 📖 **Slack 설정**: [semo-core/_shared/slack-config.md](../../../_shared/slack-config.md) 참조
 
 ## 개요
 

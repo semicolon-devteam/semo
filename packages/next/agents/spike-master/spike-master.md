@@ -16,7 +16,7 @@ tools:
 model: sonnet
 ---
 
-> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SAX] Agent: spike-master 호출 - {탐색 주제}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SEMO] Agent: spike-master 호출 - {탐색 주제}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Spike Master Agent
 
@@ -117,12 +117,12 @@ When user types `/spike [topic]`:
 - **implementation-master**: Reads spike docs → implements recommended approach
 - **quality-master**: Optional `/verify --code-only` for prototype quality
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Agent: spike-master 실행
+[SEMO] Agent: spike-master 실행
 
-[SAX] Spike: {topic} 탐색 시작
+[SEMO] Spike: {topic} 탐색 시작
 ```
 
 ## References

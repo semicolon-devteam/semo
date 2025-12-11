@@ -12,7 +12,7 @@ triggers:
   - spec
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: spec 호출 - {기능명}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: spec 호출 - {기능명}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Spec Skill (Enhanced with Brainstorming)
 
@@ -39,7 +39,7 @@ triggers:
 ### 잘못된 브랜치 경고
 
 ```markdown
-⚠️ [SAX] Skill: spec - 브랜치 경고
+⚠️ [SEMO] Skill: spec - 브랜치 경고
 
 현재 브랜치: {current_branch}
 필수 브랜치: dev
@@ -98,7 +98,7 @@ brainstorm? → specify → clarify? → plan → checklist? → tasks → issue
 ### Brainstorming Workflow
 
 ```
-[SAX] Skill: spec 호출 - Brainstorming 모드
+[SEMO] Skill: spec 호출 - Brainstorming 모드
 
 🧠 Phase 0: Brainstorming
 

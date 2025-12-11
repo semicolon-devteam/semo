@@ -1,6 +1,6 @@
 # Principles Guide
 
-> **SoT 참조**: Constitution 원칙의 정의는 `sax-core/PRINCIPLES.md`에서 관리됩니다.
+> **SoT 참조**: Constitution 원칙의 정의는 `semo-core/PRINCIPLES.md`에서 관리됩니다.
 
 ## Constitution Structure
 

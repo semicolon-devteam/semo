@@ -15,7 +15,7 @@ tools:
 model: sonnet
 ---
 
-> **시스템 메시지**: `[SAX] Agent: debug-master 호출 - {에러 유형}`
+> **시스템 메시지**: `[SEMO] Agent: debug-master 호출 - {에러 유형}`
 
 # Debug Master Agent
 

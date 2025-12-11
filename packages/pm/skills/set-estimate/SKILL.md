@@ -2,12 +2,12 @@
 name: set-estimate
 description: |
   Task에 작업량(Estimate Point) 설정. Use when (1) 백로그 그루밍 시 작업량 추정,
-  (2) Sprint 계획 전 작업량 설정, (3) 기존 Task 작업량 수정, (4) /SAX:sprint estimate 커맨드.
+  (2) Sprint 계획 전 작업량 설정, (3) 기존 Task 작업량 수정, (4) /SEMO:sprint estimate 커맨드.
 tools: [Bash, Read]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: set-estimate 호출` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: set-estimate 호출` 메시지를 첫 줄에 출력하세요.
 
 # set-estimate Skill
 
@@ -73,7 +73,7 @@ tasks:
 ### 성공
 
 ```markdown
-[SAX] Skill: set-estimate 완료
+[SEMO] Skill: set-estimate 완료
 
 ✅ 3개 Task에 작업량을 설정했습니다.
 
@@ -89,7 +89,7 @@ tasks:
 ### 13pt 이상 경고
 
 ```markdown
-[SAX] Skill: set-estimate 완료
+[SEMO] Skill: set-estimate 완료
 
 ✅ 1개 Task에 작업량을 설정했습니다.
 

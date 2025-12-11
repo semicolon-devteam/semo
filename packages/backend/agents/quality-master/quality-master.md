@@ -13,7 +13,7 @@ tools:
 model: sonnet
 ---
 
-> **시스템 메시지**: `[SAX] Agent: quality-master 호출`
+> **시스템 메시지**: `[SEMO] Agent: quality-master 호출`
 
 # Quality Master Agent
 
@@ -85,7 +85,7 @@ model: sonnet
 ### 검증 성공
 
 ```markdown
-[SAX] Agent: quality-master 완료
+[SEMO] Agent: quality-master 완료
 
 ## ✅ 검증 통과
 
@@ -103,7 +103,7 @@ model: sonnet
 ### 검증 실패
 
 ```markdown
-[SAX] Agent: quality-master 실패
+[SEMO] Agent: quality-master 실패
 
 ## ❌ 검증 실패
 
@@ -180,7 +180,7 @@ quality-master --analyze
 ### 확장 출력 형식
 
 ```markdown
-[SAX] Agent: quality-master 완료 (분석 모드)
+[SEMO] Agent: quality-master 완료 (분석 모드)
 
 ## ✅ 기본 검증 통과
 

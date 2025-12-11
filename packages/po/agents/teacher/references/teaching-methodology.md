@@ -1,6 +1,6 @@
 # Teaching Methodology
 
-> SAX-PO Teacher의 교육 방법론
+> SEMO-PO Teacher의 교육 방법론
 
 ## Step 1: 질문 도메인 파악
 

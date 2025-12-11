@@ -1,14 +1,14 @@
 <!-- SEMO Framework -->
 > **SEMO** = "Semicolon Orchestrate" - AI 에이전트 오케스트레이션 프레임워크
-> (이전 명칭: SAX - Semicolon AI Transformation)
+> (이전 명칭: SEMO - Semicolon AI Transformation)
 
-# SAX-MS Package Configuration
+# SEMO-MS Package Configuration
 
-> 마이크로서비스 개발을 위한 SAX 패키지
+> 마이크로서비스 개발을 위한 SEMO 패키지
 
 ## Package Info
 
-- **Package**: SAX-MS
+- **Package**: SEMO-MS
 - **Version**: 📌 [VERSION](./VERSION) 참조
 - **Audience**: 마이크로서비스 개발자 (ms-* 레포지토리)
 
@@ -20,9 +20,9 @@
 
 > 📖 상세: [_shared/INIT_SETUP.md](../_shared/INIT_SETUP.md)
 
-### 2. SAX Core 참조
+### 2. SEMO Core 참조
 
-> 📖 상세: [_shared/SAX_CORE_REFERENCE.md](../_shared/SAX_CORE_REFERENCE.md)
+> 📖 상세: [_shared/SEMO_CORE_REFERENCE.md](../_shared/SEMO_CORE_REFERENCE.md)
 
 | 파일 | 용도 |
 |------|------|
@@ -103,4 +103,4 @@ src/
 ## References
 
 - [Orchestrator](agents/orchestrator/orchestrator.md)
-- [SAX Core - Microservice Conventions](https://github.com/semicolon-devteam/sax-core/blob/main/_shared/microservice-conventions.md)
+- [SEMO Core - Microservice Conventions](https://github.com/semicolon-devteam/semo-core/blob/main/_shared/microservice-conventions.md)

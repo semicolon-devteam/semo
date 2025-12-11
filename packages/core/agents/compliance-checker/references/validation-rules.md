@@ -1,12 +1,12 @@
 # Core Validation Rules
 
-> 모든 SAX 패키지에 적용되는 공통 검증 규칙
+> 모든 SEMO 패키지에 적용되는 공통 검증 규칙
 
-## 1. SAX 메시지 포맷 검증
+## 1. SEMO 메시지 포맷 검증
 
 ### 1.1 기본 포맷
 
-**규칙**: `[SAX] {Type}: {name} {action}`
+**규칙**: `[SEMO] {Type}: {name} {action}`
 
 **검증 방법**:
 ```regex
@@ -15,16 +15,16 @@
 
 **위반 예시**:
 - `[sax] Agent: ...` - 대소문자 오류
-- `[SAX] agent-manager 호출` - Type 누락
-- `SAX Agent: ...` - 대괄호 누락
+- `[SEMO] agent-manager 호출` - Type 누락
+- `SEMO Agent: ...` - 대괄호 누락
 
 ### 1.2 Orchestrator 메시지
 
 **필수 포맷**:
 ```markdown
-[SAX] Orchestrator: 의도 분석 완료 → {intent_category}
+[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}
 
-[SAX] Agent 위임: {agent_name} (사유: {reason})
+[SEMO] Agent 위임: {agent_name} (사유: {reason})
 ```
 
 ## 2. Orchestrator-First Policy 검증
@@ -33,7 +33,7 @@
 
 | 항목 | 기준 | 위반 조건 |
 |------|------|----------|
-| 첫 SAX 메시지 | `[SAX] Orchestrator:` | 다른 Type이 먼저 출력 |
+| 첫 SEMO 메시지 | `[SEMO] Orchestrator:` | 다른 Type이 먼저 출력 |
 | 의도 분석 | 의도 분석 완료 메시지 존재 | 메시지 없이 Agent 위임 |
 | 라우팅 결정 | Agent 위임 또는 Skill 호출 | 직접 작업 수행 |
 
@@ -66,9 +66,9 @@
 
 | 정보 유형 | SoT 위치 | 참조 방식 |
 |----------|---------|----------|
-| SAX 핵심 원칙 | `sax-core/PRINCIPLES.md` | 링크 참조 |
-| 메시지 규칙 | `sax-core/MESSAGE_RULES.md` | 링크 참조 |
-| 팀 규칙 | `sax-core/TEAM_RULES.md` | 링크 참조 |
+| SEMO 핵심 원칙 | `semo-core/PRINCIPLES.md` | 링크 참조 |
+| 메시지 규칙 | `semo-core/MESSAGE_RULES.md` | 링크 참조 |
+| 팀 규칙 | `semo-core/TEAM_RULES.md` | 링크 참조 |
 | 패키지 버전 | 각 패키지 `VERSION` 파일 | 직접 읽기 |
 
 ### 4.2 위반 예시
@@ -102,7 +102,7 @@ Agent/Skill/Command 파일 변경이 감지되면 다음을 확인:
 ### 5.3 위반 시 경고
 
 ```markdown
-[SAX] Compliance Warning: 버저닝 미완료
+[SEMO] Compliance Warning: 버저닝 미완료
 
 ⚠️ Agent/Skill/Command 변경이 감지되었으나 버저닝이 완료되지 않았습니다.
 
@@ -138,13 +138,13 @@ Agent/Skill/Command 파일 변경이 감지되면 다음을 확인:
 
 | 조건 | 필수 동작 |
 |------|----------|
-| 새 세션 + SAX 설치됨 | version-updater 호출 필수 |
+| 새 세션 + SEMO 설치됨 | version-updater 호출 필수 |
 | 기존 세션 계속 | 검증 불필요 |
 
 ### 6.2 위반 시 경고
 
 ```markdown
-[SAX] Compliance Warning: 세션 시작 시 버전 체크 누락
+[SEMO] Compliance Warning: 세션 시작 시 버전 체크 누락
 
 ⚠️ 새 세션에서 version-updater가 호출되지 않았습니다.
 
@@ -155,7 +155,7 @@ Agent/Skill/Command 파일 변경이 감지되면 다음을 확인:
 
 ### ❌ CRITICAL (작업 중단 권장)
 
-- SAX 메시지 포맷 오류
+- SEMO 메시지 포맷 오류
 - Orchestrator-First Policy 위반
 - SoT 원칙 위반 (명백한 중복)
 - 세션 시작 시 version-updater 미호출

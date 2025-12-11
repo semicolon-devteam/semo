@@ -1,14 +1,14 @@
 <!-- SEMO Framework -->
 > **SEMO** = "Semicolon Orchestrate" - AI 에이전트 오케스트레이션 프레임워크
-> (이전 명칭: SAX - Semicolon AI Transformation)
+> (이전 명칭: SEMO - Semicolon AI Transformation)
 
-# SAX-Design Package Configuration
+# SEMO-Design Package Configuration
 
 > 디자이너를 위한 AI 어시스턴트 패키지 - Claude Code + Antigravity 통합
 
 ## Package Info
 
-- **Package**: SAX-Design
+- **Package**: SEMO-Design
 - **Version**: 📌 [VERSION](./VERSION) 참조
 - **Audience**: UI/UX 디자이너, 프로덕트 디자이너
 
@@ -20,9 +20,9 @@
 
 > 📖 상세: [_shared/INIT_SETUP.md](../_shared/INIT_SETUP.md)
 
-### 2. SAX Core 참조
+### 2. SEMO Core 참조
 
-> 📖 상세: [_shared/SAX_CORE_REFERENCE.md](../_shared/SAX_CORE_REFERENCE.md)
+> 📖 상세: [_shared/SEMO_CORE_REFERENCE.md](../_shared/SEMO_CORE_REFERENCE.md)
 
 ### 3. Orchestrator 위임
 
@@ -90,14 +90,14 @@
 
 | Command | 설명 |
 |---------|------|
-| `/SAX:onboarding` | 디자이너 온보딩 시작 |
-| `/SAX:health-check` | 환경 검증 |
-| `/SAX:mockup` | 목업 생성 |
-| `/SAX:handoff` | 핸드오프 문서 생성 |
+| `/SEMO:onboarding` | 디자이너 온보딩 시작 |
+| `/SEMO:health-check` | 환경 검증 |
+| `/SEMO:mockup` | 목업 생성 |
+| `/SEMO:handoff` | 핸드오프 문서 생성 |
 
 ---
 
 ## References
 
-- [SAX Core - Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
-- [SAX Core - Message Rules](https://github.com/semicolon-devteam/sax-core/blob/main/MESSAGE_RULES.md)
+- [SEMO Core - Principles](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md)
+- [SEMO Core - Message Rules](https://github.com/semicolon-devteam/semo-core/blob/main/MESSAGE_RULES.md)

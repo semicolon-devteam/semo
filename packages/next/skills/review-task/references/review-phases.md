@@ -313,7 +313,7 @@ const determineReviewType = (criticalCount, warningCount) => {
 **코멘트 템플릿**:
 
 ```markdown
-## 🔍 SAX Review: #{issue_number}
+## 🔍 SEMO Review: #{issue_number}
 
 ### 리뷰 결과
 
@@ -331,7 +331,7 @@ const determineReviewType = (criticalCount, warningCount) => {
 
 ---
 
-🤖 *SAX review-task Skill에 의해 자동 생성됨*
+🤖 *SEMO review-task Skill에 의해 자동 생성됨*
 ```
 
 ### 6.4 리뷰 제출
@@ -339,7 +339,7 @@ const determineReviewType = (criticalCount, warningCount) => {
 ```bash
 # APPROVE
 gh pr review {pr_number} --approve --body "$(cat <<'EOF'
-## 🔍 SAX Review: #{issue_number}
+## 🔍 SEMO Review: #{issue_number}
 
 ### ✅ 리뷰 통과
 
@@ -354,13 +354,13 @@ gh pr review {pr_number} --approve --body "$(cat <<'EOF'
 | 품질 게이트 | ✅ |
 
 ---
-🤖 *SAX review-task Skill*
+🤖 *SEMO review-task Skill*
 EOF
 )"
 
 # COMMENT (경고 있음)
 gh pr review {pr_number} --comment --body "$(cat <<'EOF'
-## 🔍 SAX Review: #{issue_number}
+## 🔍 SEMO Review: #{issue_number}
 
 ### 🟡 경고 사항
 
@@ -369,13 +369,13 @@ PR 진행 가능하나, 다음 사항 검토 권장:
 {warning_details}
 
 ---
-🤖 *SAX review-task Skill*
+🤖 *SEMO review-task Skill*
 EOF
 )"
 
 # REQUEST_CHANGES (Critical 있음)
 gh pr review {pr_number} --request-changes --body "$(cat <<'EOF'
-## 🔍 SAX Review: #{issue_number}
+## 🔍 SEMO Review: #{issue_number}
 
 ### 🔴 수정 필요
 
@@ -384,7 +384,7 @@ gh pr review {pr_number} --request-changes --body "$(cat <<'EOF'
 {critical_details}
 
 ---
-🤖 *SAX review-task Skill*
+🤖 *SEMO review-task Skill*
 EOF
 )"
 ```

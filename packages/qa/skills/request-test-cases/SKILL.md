@@ -7,7 +7,7 @@ description: |
 tools: [Bash, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: request-test-cases 호출 - {repo}#{number}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: request-test-cases 호출 - {repo}#{number}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Request Test Cases Skill
 
@@ -77,7 +77,7 @@ mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
 AC 보완 후 상태를 "테스트중"으로 변경해주세요.
 
 ---
-> 🤖 SAX-QA 자동 생성 코멘트
+> 🤖 SEMO-QA 자동 생성 코멘트
 ```
 
 ## Slack 알림
@@ -95,7 +95,7 @@ AC 보완 후 "테스트중" 상태로 변경해주세요.
 ## 출력 형식
 
 ```markdown
-[SAX] Skill: request-test-cases 호출 - {repo}#{number}
+[SEMO] Skill: request-test-cases 호출 - {repo}#{number}
 
 ## ⚠️ AC 보완 요청 완료
 

@@ -1,7 +1,7 @@
 ---
 name: orchestrator
 description: |
-  SAX-Design package orchestrator. PROACTIVELY use when:
+  SEMO-Design package orchestrator. PROACTIVELY use when:
   (1) Design intent analysis needed, (2) Agent/Skill routing decisions,
   (3) Mockup/handoff/Figma work delegation. Routes all design tasks to appropriate handlers.
 tools:
@@ -12,9 +12,9 @@ tools:
 model: sonnet
 ---
 
-> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SAX] Orchestrator: 의도 분석 완료 → {intent}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SEMO] Orchestrator: 의도 분석 완료 → {intent}` 시스템 메시지를 첫 줄에 출력하세요.
 
-# SAX-Design Orchestrator
+# SEMO-Design Orchestrator
 
 디자이너의 요청을 분석하여 적절한 Agent 또는 Skill로 위임하는 **중앙 라우터**입니다.
 
@@ -33,10 +33,10 @@ model: sonnet
 | 목업 생성 | 목업, mockup, UI 만들어, 화면 만들어 | design-master → generate-mockup | Agent → Skill |
 | 핸드오프 | 핸드오프, handoff, 개발 전달, 스펙 문서 | design-master → design-handoff | Agent → Skill |
 | Figma 작업 | Figma, 피그마, 디자인 가져와, 디자인 불러와 | design-master | Agent |
-| 환경 검증 | 환경 확인, 설정 확인, 도구 확인, health | `/SAX:health` | Command (sax-core) |
+| 환경 검증 | 환경 확인, 설정 확인, 도구 확인, health | `/SEMO:health` | Command (semo-core) |
 | 온보딩 | 처음이에요, 신규, 온보딩, 시작 | onboarding-master | Agent |
-| 도움말 | 도움, help, 뭐 할 수 있어 | sax-help | Skill (sax-core) |
-| 피드백 | 피드백, 건의, 오류 신고 | feedback | Skill (sax-core) |
+| 도움말 | 도움, help, 뭐 할 수 있어 | semo-help | Skill (semo-core) |
+| 피드백 | 피드백, 건의, 오류 신고 | feedback | Skill (semo-core) |
 
 ---
 
@@ -45,7 +45,7 @@ model: sonnet
 ### 1. 명령어 우선
 
 ```text
-/SAX:{command} 감지 시:
+/SEMO:{command} 감지 시:
   → 해당 Command 파일 참조
   → 지정된 Agent/Skill 즉시 호출
 ```
@@ -70,24 +70,24 @@ model: sonnet
 
 ---
 
-## SAX Message Format
+## SEMO Message Format
 
 ### 의도 분석 완료
 
 ```markdown
-[SAX] Orchestrator: 의도 분석 완료 → {intent_category}
+[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}
 ```
 
 ### Agent 위임
 
 ```markdown
-[SAX] Agent 위임: {agent_name} (사유: {reason})
+[SEMO] Agent 위임: {agent_name} (사유: {reason})
 ```
 
 ### Skill 호출
 
 ```markdown
-[SAX] Skill 호출: {skill_name} (트리거: {trigger})
+[SEMO] Skill 호출: {skill_name} (트리거: {trigger})
 ```
 
 ---
@@ -128,10 +128,10 @@ model: sonnet
 
 | Command | 호출 대상 | 파일 |
 |---------|----------|------|
-| `/SAX:onboarding` | onboarding-master Agent | [onboarding.md](../../commands/SAX/onboarding.md) |
-| `/SAX:health` | 환경 + 구조 통합 검증 | sax-core (commands/SAX/health.md) |
-| `/SAX:mockup` | generate-mockup Skill | [mockup.md](../../commands/SAX/mockup.md) |
-| `/SAX:handoff` | design-handoff Skill | [handoff.md](../../commands/SAX/handoff.md) |
+| `/SEMO:onboarding` | onboarding-master Agent | [onboarding.md](../../commands/SEMO/onboarding.md) |
+| `/SEMO:health` | 환경 + 구조 통합 검증 | semo-core (commands/SEMO/health.md) |
+| `/SEMO:mockup` | generate-mockup Skill | [mockup.md](../../commands/SEMO/mockup.md) |
+| `/SEMO:handoff` | design-handoff Skill | [handoff.md](../../commands/SEMO/handoff.md) |
 
 ---
 
@@ -140,28 +140,28 @@ model: sonnet
 ### 의도 불명확 시
 
 ```markdown
-[SAX] Orchestrator: 의도 분석 실패
+[SEMO] Orchestrator: 의도 분석 실패
 
 요청을 이해하지 못했습니다. 다음 중 하나를 시도해보세요:
 
 - "UI 목업 만들어줘" - 목업 생성
 - "개발팀에 전달할 문서 만들어줘" - 핸드오프
 - "Figma에서 디자인 가져와" - Figma 연동
-- "/SAX:help" - 전체 도움말
+- "/SEMO:help" - 전체 도움말
 ```
 
 ### Agent/Skill 미존재 시
 
 ```markdown
-[SAX] Orchestrator: 위임 실패
+[SEMO] Orchestrator: 위임 실패
 
 요청하신 기능({feature})은 아직 구현되지 않았습니다.
-피드백을 남기시면 우선 개발을 검토하겠습니다: /SAX:feedback
+피드백을 남기시면 우선 개발을 검토하겠습니다: /SEMO:feedback
 ```
 
 ---
 
 ## References
 
-- [SAX Core - Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
-- [SAX Core - Message Rules](https://github.com/semicolon-devteam/sax-core/blob/main/MESSAGE_RULES.md)
+- [SEMO Core - Principles](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md)
+- [SEMO Core - Message Rules](https://github.com/semicolon-devteam/semo-core/blob/main/MESSAGE_RULES.md)

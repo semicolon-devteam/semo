@@ -30,19 +30,19 @@ Ask user:
 Use collected information to create Epic:
 
 ```markdown
-[SAX] Skill: create-epic 사용
+[SEMO] Skill: create-epic 사용
 ```
 
 ## Phase 3: 프로젝트 라벨 및 Projects 연결
 
 ```markdown
-[SAX] Skill: assign-project-label 사용
+[SEMO] Skill: assign-project-label 사용
 ```
 
 ## Phase 4: Spec 초안 생성 (선택)
 
 ```markdown
-[SAX] Agent: spec-writer 위임 (사유: Spec 초안 생성)
+[SEMO] Agent: spec-writer 위임 (사유: Spec 초안 생성)
 ```
 
 ## Epic 구조
@@ -88,9 +88,9 @@ Use collected information to create Epic:
 ## 출력 형식
 
 ```markdown
-[SAX] Skill: create-epic 사용
+[SEMO] Skill: create-epic 사용
 
-[SAX] Skill: assign-project-label 사용
+[SEMO] Skill: assign-project-label 사용
 
 ## ✅ Epic 생성 완료
 

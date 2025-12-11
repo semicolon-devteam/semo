@@ -1,4 +1,4 @@
-# SAX/SEMO Agentic Evaluation
+# SEMO Agentic Evaluation
 
 > Promptfoo 기반 Agent/Skill 품질 자동 평가 시스템
 
@@ -26,7 +26,7 @@ export ANTHROPIC_API_KEY="your-api-key"
 ### 3. 평가 실행
 
 ```bash
-cd sax-core
+cd semo-core
 
 # 기본 실행
 npx promptfoo eval --config evaluation/promptfoo.yaml
@@ -59,7 +59,7 @@ evaluation/
 
 ## 테스트 케이스
 
-### 현재 포함된 테스트 (sax-next 파일럿)
+### 현재 포함된 테스트 (semo-next 파일럿)
 
 | # | 테스트 | 검증 항목 |
 |---|--------|----------|
@@ -140,13 +140,13 @@ name: Agentic Evaluation
 on:
   pull_request:
     paths:
-      - 'sax-core/skills/**'
+      - 'semo-core/skills/**'
 jobs:
   evaluate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npx promptfoo eval --config sax-core/evaluation/promptfoo.yaml
+      - run: npx promptfoo eval --config semo-core/evaluation/promptfoo.yaml
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 ```
@@ -203,5 +203,5 @@ providers:
 ## References
 
 - [Promptfoo Documentation](https://promptfoo.dev/)
-- [SAX Metrics 정의](./metrics.md)
-- [SAX → SEMO 전환 계획](../../.claude/plans/prancy-scribbling-falcon.md)
+- [SEMO Metrics 정의](./metrics.md)
+- [SEMO → SEMO 전환 계획](../../.claude/plans/prancy-scribbling-falcon.md)

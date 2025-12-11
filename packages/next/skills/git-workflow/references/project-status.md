@@ -140,7 +140,7 @@ mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
 
 **출력**:
 ```markdown
-[SAX] skill:git-workflow: 이슈 상태 변경
+[SEMO] skill:git-workflow: 이슈 상태 변경
 
 📋 **이슈**: {repo}#{number}
 🔄 **상태 변경**: {이전 상태} → **작업중**
@@ -168,7 +168,7 @@ gh issue edit ${ISSUE_NUM} --repo semicolon-devteam/${REPO} --add-assignee kokkh
 
 **출력**:
 ```markdown
-[SAX] skill:git-workflow: 이슈 상태 변경
+[SEMO] skill:git-workflow: 이슈 상태 변경
 
 📋 **이슈**: {repo}#{number}
 🔄 **상태 변경**: 작업중 → **테스트중**
@@ -182,7 +182,7 @@ gh issue edit ${ISSUE_NUM} --repo semicolon-devteam/${REPO} --add-assignee kokkh
 **트리거**:
 
 - QA 담당자가 STG 환경에서 테스트 통과 확인
-- SAX-QA에서 `test-pass` 처리
+- SEMO-QA에서 `test-pass` 처리
 
 **조건**:
 - PR 본문에 `Related #{number}` 형식으로 이슈 연결
@@ -191,7 +191,7 @@ gh issue edit ${ISSUE_NUM} --repo semicolon-devteam/${REPO} --add-assignee kokkh
 
 **출력**:
 ```markdown
-[SAX] skill:git-workflow: 이슈 상태 변경
+[SEMO] skill:git-workflow: 이슈 상태 변경
 
 📋 **이슈**: {repo}#{number}
 🔄 **상태 변경**: 테스트중 → **병합됨**

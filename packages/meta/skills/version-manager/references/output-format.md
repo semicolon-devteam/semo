@@ -24,8 +24,8 @@
     "fixed": 0
   },
   "next_steps": [
-    ".claude/ 동기화 (SAX-PO만)",
-    "git commit -m '📝 [SAX] v3.8.0'"
+    ".claude/ 동기화 (SEMO-PO만)",
+    "git commit -m '📝 [SEMO] v3.8.0'"
   ]
 }
 ```

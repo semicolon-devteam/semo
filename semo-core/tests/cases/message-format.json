@@ -1,11 +1,11 @@
 {
-  "description": "SAX/SEMO 메시지 포맷 준수 테스트",
+  "description": "SEMO 메시지 포맷 준수 테스트",
   "tests": [
     {
       "name": "Orchestrator 메시지 포맷",
       "input": "[meta] CLAUDE.md 업데이트해줘",
       "expect": {
-        "contains_any": ["[SAX] Orchestrator:", "[SEMO] Orchestrator:", "Orchestrator:"]
+        "contains_any": ["[SEMO] Orchestrator:", "[SEMO] Orchestrator:", "Orchestrator:"]
       }
     },
     {

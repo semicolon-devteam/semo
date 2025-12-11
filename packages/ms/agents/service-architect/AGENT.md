@@ -46,8 +46,8 @@ tools: [Read, Write, Edit]
 
 | 문서 | 용도 |
 |------|------|
-| `sax-core/_shared/microservice-conventions.md` | 공통 규약 |
-| `sax-meta/contexts/microservice-ecosystem.md` | 생태계 컨텍스트 |
+| `semo-core/_shared/microservice-conventions.md` | 공통 규약 |
+| `semo-meta/contexts/microservice-ecosystem.md` | 생태계 컨텍스트 |
 
 ## Output Template
 

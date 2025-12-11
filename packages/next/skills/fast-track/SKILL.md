@@ -13,7 +13,7 @@ triggers:
   - typo
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: fast-track 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: fast-track 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # fast-track Skill
 
@@ -42,7 +42,7 @@ PO의 Epic→Task 생성 프로세스를 거치지 않고, 개발자가 발견�
 ### Step 1: 적격성 확인
 
 ```
-[SAX] Skill 호출: fast-track (적격성 확인)
+[SEMO] Skill 호출: fast-track (적격성 확인)
 
 작업 내용: {사용자가 설명한 작업}
 
@@ -61,7 +61,7 @@ PO의 Epic→Task 생성 프로세스를 거치지 않고, 개발자가 발견�
 ### Step 2: 즉시 수정 실행
 
 ```
-[SAX] fast-track 실행: {작업 설명}
+[SEMO] fast-track 실행: {작업 설명}
 
 📝 변경 사항:
 - {파일1}: {변경 내용}
@@ -77,7 +77,7 @@ PO의 Epic→Task 생성 프로세스를 거치지 않고, 개발자가 발견�
 작업 완료 후 **반드시** GitHub Issue 생성:
 
 ```
-[SAX] fast-track 완료 → 이슈 생성
+[SEMO] fast-track 완료 → 이슈 생성
 
 📋 생성할 이슈:
 - 제목: [Fast-Track] {작업 요약}
@@ -94,7 +94,7 @@ PO의 Epic→Task 생성 프로세스를 거치지 않고, 개발자가 발견�
 이슈 생성 후 **반드시** 프로젝트 보드에 연동하고 상태 설정:
 
 ```
-[SAX] fast-track → 프로젝트 보드 연동
+[SEMO] fast-track → 프로젝트 보드 연동
 
 📋 생성된 이슈: {repo}#{issue_number}
 📊 프로젝트: 이슈관리 (#1)
@@ -202,7 +202,7 @@ triggers:
 **사용자**: "버튼에 오타가 있어서 수정하고 싶어"
 
 ```
-[SAX] Skill 호출: fast-track (적격성 확인)
+[SEMO] Skill 호출: fast-track (적격성 확인)
 
 작업 내용: 버튼 텍스트 오타 수정
 
@@ -216,7 +216,7 @@ triggers:
 
 ---
 
-[SAX] fast-track 실행: 버튼 오타 수정
+[SEMO] fast-track 실행: 버튼 오타 수정
 
 📝 변경 사항:
 - components/Button.tsx: "제출하기" → "제출하기" (오타 없음 확인)
@@ -230,7 +230,7 @@ triggers:
 **사용자**: "새 페이지 추가 빠르게 해줘"
 
 ```
-[SAX] Skill 호출: fast-track (적격성 확인)
+[SEMO] Skill 호출: fast-track (적격성 확인)
 
 작업 내용: 새 페이지 추가
 
@@ -251,4 +251,4 @@ triggers:
 - [적격성 체크 가이드](references/eligibility-check.md)
 - [이슈 템플릿](references/issue-template.md)
 - [카테고리 가이드](references/category-guide.md)
-- [SAX Core - Message Rules](../../.claude/sax-core/MESSAGE_RULES.md)
+- [SEMO Core - Message Rules](../../.claude/semo-core/MESSAGE_RULES.md)

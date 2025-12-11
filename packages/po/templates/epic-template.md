@@ -1,6 +1,6 @@
 # Epic Template (Simplified)
 
-> SAX-PO용 간소화된 Epic 템플릿
+> SEMO-PO용 간소화된 Epic 템플릿
 > 기술 상세는 제외하고, What(무엇을)에 집중합니다.
 
 ---

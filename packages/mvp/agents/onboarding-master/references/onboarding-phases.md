@@ -88,7 +88,7 @@ echo "Supabase CLI: $(supabase --version | cut -d' ' -f2)"
 
 | 파일 | 역할 |
 |------|------|
-| sax-context.md | SAX 원칙 (Orchestrator-First, Transparency) 주입 |
+| semo-context.md | SEMO 원칙 (Orchestrator-First, Transparency) 주입 |
 | ddd-patterns.md | DDD 4-layer 아키텍처 규칙 |
 | schema-extension.md | 스키마 확장 전략 (metadata 우선) |
 
@@ -109,7 +109,7 @@ echo "Supabase CLI: $(supabase --version | cut -d' ' -f2)"
 
 set -e
 
-SAX_MVP_PATH="${SAX_MVP_PATH:-../sax/sax-mvp}"
+SAX_MVP_PATH="${SAX_MVP_PATH:-../sax/semo-mvp}"
 TARGET_PATH="${1:-.}"
 
 echo "=== .agent/ 폴더 마이그레이션 ==="

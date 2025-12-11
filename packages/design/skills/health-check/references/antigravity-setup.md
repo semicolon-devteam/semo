@@ -1,11 +1,11 @@
 # Antigravity Setup Guide
 
-> Google Antigravity 설정 가이드 for SAX-Design
+> Google Antigravity 설정 가이드 for SEMO-Design
 
 ## 개요
 
 Antigravity는 Google의 Agent-First IDE로, Gemini 3 모델과 Nano Banana Pro (이미지 생성)를 활용합니다.
-SAX-Design과 함께 사용하면 텍스트 기반 Claude Code와 시각적 Antigravity의 장점을 모두 활용할 수 있습니다.
+SEMO-Design과 함께 사용하면 텍스트 기반 Claude Code와 시각적 Antigravity의 장점을 모두 활용할 수 있습니다.
 
 ---
 
@@ -28,7 +28,7 @@ https://firebase.studio/
 프로젝트/
 └── .agent/
     ├── rules/           # 항상 활성화되는 규칙
-    │   └── sax-context.md
+    │   └── semo-context.md
     └── workflows/       # /command로 호출되는 워크플로우
         └── mockup.md
 ```
@@ -37,15 +37,15 @@ https://firebase.studio/
 
 ## Rules 설정
 
-### sax-context.md
+### semo-context.md
 
-`.agent/rules/sax-context.md` 파일로 SAX 컨텍스트를 주입합니다:
+`.agent/rules/semo-context.md` 파일로 SEMO 컨텍스트를 주입합니다:
 
 ```markdown
-# SAX Design Context
+# SEMO Design Context
 
-## SAX 메시지 규칙
-- 모든 응답 시작: `[SAX] {Type}: {name} - {action}`
+## SEMO 메시지 규칙
+- 모든 응답 시작: `[SEMO] {Type}: {name} - {action}`
 - Type: Agent, Skill, Reference
 
 ## 디자인 원칙

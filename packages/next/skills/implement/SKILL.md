@@ -4,7 +4,7 @@ description: Execute ADD Phase 4 with phased development (v0.0.x → v0.4.x). Us
 tools: [Read, Write, Edit, Bash]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: implement 실행` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: implement 실행` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Implement Skill
 

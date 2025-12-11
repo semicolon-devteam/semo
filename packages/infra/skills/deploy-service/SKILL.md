@@ -1,10 +1,10 @@
 ---
 name: deploy-service
-description: Docker Compose 기반 서비스 배포 실행. Use when (1) 배포 요청, (2) 서비스 업데이트, (3) /SAX:deploy 커맨드.
+description: Docker Compose 기반 서비스 배포 실행. Use when (1) 배포 요청, (2) 서비스 업데이트, (3) /SEMO:deploy 커맨드.
 tools: [Bash, Read]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: deploy-service 호출 - {환경}/{서비스}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: deploy-service 호출 - {환경}/{서비스}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # deploy-service
 
@@ -18,7 +18,7 @@ Docker Compose 기반 서비스를 배포합니다.
 
 - "배포해줘"
 - "서비스 올려줘"
-- `/SAX:deploy`
+- `/SEMO:deploy`
 
 ## 입력 파라미터
 
@@ -81,7 +81,7 @@ curl -f http://localhost:{port}/health
 ### 성공
 
 ```markdown
-[SAX] deploy-service: 배포 완료 ✅
+[SEMO] deploy-service: 배포 완료 ✅
 
 **배포 결과**
 
@@ -100,7 +100,7 @@ curl -f http://localhost:{port}/health
 ### 실패
 
 ```markdown
-[SAX] deploy-service: 배포 실패 ❌
+[SEMO] deploy-service: 배포 실패 ❌
 
 **배포 결과**
 

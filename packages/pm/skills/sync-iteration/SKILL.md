@@ -2,12 +2,12 @@
 name: sync-iteration
 description: |
   미완료 이슈들의 Iteration을 현재(Current)로 일괄 동기화. Use when (1) iteration 업데이트/갱신 요청,
-  (2) 이터레이션 동기화, (3) /SAX:sprint sync 커맨드.
+  (2) 이터레이션 동기화, (3) /SEMO:sprint sync 커맨드.
 tools: [Bash, Read]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: sync-iteration 호출` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: sync-iteration 호출` 메시지를 첫 줄에 출력하세요.
 
 # sync-iteration Skill
 
@@ -43,7 +43,7 @@ dry_run: false  # true면 미리보기만, false면 실행
 ### 실행 모드
 
 ```markdown
-[SAX] Skill: sync-iteration 완료
+[SEMO] Skill: sync-iteration 완료
 
 ✅ {count}개 이슈의 Iteration을 "{current_iteration}"로 업데이트했습니다.
 
@@ -57,7 +57,7 @@ dry_run: false  # true면 미리보기만, false면 실행
 ### dry-run 모드
 
 ```markdown
-[SAX] Skill: sync-iteration 호출 (dry-run 모드)
+[SEMO] Skill: sync-iteration 호출 (dry-run 모드)
 
 📋 변경 예정 목록 - 현재 Iteration: "{current_iteration}"
 
@@ -67,7 +67,7 @@ dry_run: false  # true면 미리보기만, false면 실행
 
 **요약**: {count}개 이슈가 업데이트될 예정입니다.
 
-> 실행하려면 `/SAX:sprint sync` (--dry-run 없이) 를 사용하세요.
+> 실행하려면 `/SEMO:sprint sync` (--dry-run 없이) 를 사용하세요.
 ```
 
 ## API 호출
@@ -174,7 +174,7 @@ mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $iterationId: String!) {
 ### 업데이트할 이슈가 없는 경우
 
 ```markdown
-[SAX] Skill: sync-iteration 완료
+[SEMO] Skill: sync-iteration 완료
 
 ✅ 모든 OPEN 이슈가 이미 현재 Iteration("{current_iteration}")에 있습니다.
 
@@ -184,7 +184,7 @@ mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $iterationId: String!) {
 ### Current Iteration을 찾을 수 없는 경우
 
 ```markdown
-[SAX] Skill: sync-iteration 실패
+[SEMO] Skill: sync-iteration 실패
 
 ❌ 현재 날짜에 해당하는 Iteration을 찾을 수 없습니다.
 
@@ -196,7 +196,7 @@ mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $iterationId: String!) {
 ### 일부 업데이트 실패
 
 ```markdown
-[SAX] Skill: sync-iteration 완료 (일부 실패)
+[SEMO] Skill: sync-iteration 완료 (일부 실패)
 
 ✅ {success_count}개 이슈 업데이트 완료
 ❌ {fail_count}개 이슈 업데이트 실패

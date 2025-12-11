@@ -1,10 +1,10 @@
-# SAX-Next
+# SEMO-Next
 
-> Next.js 개발자를 위한 SAX 패키지
+> Next.js 개발자를 위한 SEMO 패키지
 
 ## Overview
 
-SAX-Next는 Next.js 프로젝트 개발을 지원하는 AI 에이전트 패키지입니다. DDD 아키텍처, Supabase 연동, 코드 구현 등을 지원합니다.
+SEMO-Next는 Next.js 프로젝트 개발을 지원하는 AI 에이전트 패키지입니다. DDD 아키텍처, Supabase 연동, 코드 구현 등을 지원합니다.
 
 **대상 사용자**:
 - Next.js 개발자
@@ -16,23 +16,23 @@ SAX-Next는 Next.js 프로젝트 개발을 지원하는 AI 에이전트 패키�
 ### As Git Submodule (권장)
 
 ```bash
-# sax-core 먼저 설치 (필수)
-git submodule add https://github.com/semicolon-devteam/sax-core.git .claude/sax-core
+# semo-core 먼저 설치 (필수)
+git submodule add https://github.com/semicolon-devteam/semo-core.git .claude/semo-core
 
-# sax-next 설치
-git submodule add https://github.com/semicolon-devteam/sax-next.git .claude/sax-next
+# semo-next 설치
+git submodule add https://github.com/semicolon-devteam/semo-next.git .claude/semo-next
 ```
 
 ### Update
 
 ```bash
-git submodule update --remote .claude/sax-next
+git submodule update --remote .claude/semo-next
 ```
 
 ## Structure
 
 ```text
-sax-next/
+semo-next/
 ├── CLAUDE.md              # 패키지 설정
 ├── agents/                # 개발 전용 Agents
 │   ├── orchestrator/
@@ -117,15 +117,15 @@ Skills에서 공용 리소스 참조:
 
 ## Commands
 
-- `/SAX:help` - SAX 도움말
-- `/SAX:health-check` - 상태 점검
-- `/SAX:task-progress` - 작업 진행 현황
+- `/SEMO:help` - SEMO 도움말
+- `/SEMO:health-check` - 상태 점검
+- `/SEMO:task-progress` - 작업 진행 현황
 
 ## Dependencies
 
-- **sax-core**: 필수 (../sax-core 참조)
+- **semo-core**: 필수 (../semo-core 참조)
 
 ## References
 
-- [SAX Documentation](https://github.com/semicolon-devteam/docs/tree/main/sax)
-- [SAX Core](https://github.com/semicolon-devteam/sax-core)
+- [SEMO Documentation](https://github.com/semicolon-devteam/docs/tree/main/sax)
+- [SEMO Core](https://github.com/semicolon-devteam/semo-core)

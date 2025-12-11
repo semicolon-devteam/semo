@@ -4,7 +4,7 @@ description: Generate Acceptance Criteria from Epic User Stories. Use when (1) c
 tools: [Read]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: generate-acceptance-criteria 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: generate-acceptance-criteria 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # generate-acceptance-criteria Skill
 
@@ -33,10 +33,10 @@ Epic의 User Stories를 분석하여 Draft Task의 Acceptance Criteria를 생성
 - [ ] 린트 및 타입 체크 통과
 ```
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: generate-acceptance-criteria 사용
+[SEMO] Skill: generate-acceptance-criteria 사용
 ```
 
 ## Related

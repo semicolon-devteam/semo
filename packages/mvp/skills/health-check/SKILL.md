@@ -4,7 +4,7 @@ description: MVP 개발 환경 및 MCP 서버 검증
 tools: [Bash, Read, Glob]
 ---
 
-> **시스템 메시지**: `[SAX] Skill: health-check 호출 - 환경 검증`
+> **시스템 메시지**: `[SEMO] Skill: health-check 호출 - 환경 검증`
 
 # Health Check Skill
 
@@ -15,7 +15,7 @@ MVP 개발을 위한 환경과 MCP 서버 연동 상태를 검증합니다.
 ## Quick Start
 
 ```bash
-/SAX:health
+/SEMO:health
 ```
 
 또는 "환경 검증", "health check", "MCP 확인" 키워드로 트리거
@@ -55,7 +55,7 @@ MVP 개발을 위한 환경과 MCP 서버 연동 상태를 검증합니다.
 
 ```bash
 #!/bin/bash
-echo "=== SAX-MVP Health Check ==="
+echo "=== SEMO-MVP Health Check ==="
 
 echo ""
 echo "📦 도구 버전 확인"
@@ -87,7 +87,7 @@ echo "─────────────────"
 ## 출력 형식
 
 ```markdown
-# 🏥 SAX-MVP Health Check 결과
+# 🏥 SEMO-MVP Health Check 결과
 
 ## 📦 도구 버전
 
@@ -290,7 +290,7 @@ echo "💡 Claude Code/Desktop에서 위 명령을 실행하여 MCP 연결 상�
 }
 ```
 
-> **참조**: [MCP 설정 가이드](../../sax-core/_shared/mcp-config.md)
+> **참조**: [MCP 설정 가이드](../../semo-core/_shared/mcp-config.md)
 
 ---
 
@@ -322,7 +322,7 @@ supabase login
 
 2. MCP 서버 설정 추가 후 Claude 재시작
 
-참조: [MCP 설정 가이드](../../sax-core/_shared/mcp-config.md)
+참조: [MCP 설정 가이드](../../semo-core/_shared/mcp-config.md)
 
 ---
 

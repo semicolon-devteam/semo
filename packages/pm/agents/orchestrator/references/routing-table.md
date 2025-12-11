@@ -61,7 +61,7 @@
 
 | 키워드 | Skill | 조건 |
 |--------|-------|------|
-| 도움말, help, 사용법 | sax-help | - |
+| 도움말, help, 사용법 | semo-help | - |
 | 동기화, sync | sync-project-status | Projects 관련 |
 | 작업량 설정, estimate 설정 | set-estimate | Sprint 할당 없이 작업량만 설정 |
 | 작업 시작, start task | start-task | 상태+시작일+이터레이션 일괄 설정 |
@@ -91,7 +91,7 @@
 키워드 매칭 실패 시:
 
 ```markdown
-[SAX] Orchestrator: 의도 분석 필요
+[SEMO] Orchestrator: 의도 분석 필요
 
 죄송합니다. 요청을 정확히 파악하지 못했습니다.
 

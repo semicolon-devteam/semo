@@ -133,7 +133,7 @@ detect_keywords() {
 ### 중복/활용 가능 발견 시
 
 ```markdown
-[SAX] Skill: check-backend-duplication 호출 - Epic #63
+[SEMO] Skill: check-backend-duplication 호출 - Epic #63
 
 ## 🔍 core-backend 중복/활용 가능성 검사
 
@@ -161,7 +161,7 @@ detect_keywords() {
 ### 중복 없음 (신규 구현 필요)
 
 ```markdown
-[SAX] Skill: check-backend-duplication 호출 - Epic #65
+[SEMO] Skill: check-backend-duplication 호출 - Epic #65
 
 ## 🔍 core-backend 중복/활용 가능성 검사
 

@@ -16,34 +16,34 @@
 | Intent | Skill | Trigger |
 |--------|-------|---------|
 | 테스트중 변경 | `change-to-testing` | "테스트중으로 변경", "QA에 넘겨", "테스트 요청" |
-| 테스트 대기열 | `test-queue` | "/SAX:test-queue", "테스트 대기", "뭐 테스트해" |
+| 테스트 대기열 | `test-queue` | "/SEMO:test-queue", "테스트 대기", "뭐 테스트해" |
 | AC 검증 | `validate-test-cases` | "테스트 케이스 확인", "AC 검증" |
 | 환경 확인 | `verify-stg-environment` | "STG 상태", "환경 확인", "접속 확인" |
 | 테스트 실행 | `execute-test` | qa-master 내부 호출 |
-| 결과 보고 | `report-test-result` | "/SAX:test-pass", "/SAX:test-fail" |
+| 결과 보고 | `report-test-result` | "/SEMO:test-pass", "/SEMO:test-fail" |
 | AC 요청 | `request-test-cases` | "테스트 케이스 없어", "AC 부족" |
 | 이터레이션 | `iteration-tracker` | "몇 번째", "이터레이션", "재테스트 횟수" |
 | 배포 게이트 | `production-gate` | "프로덕션 가능", "배포해도 돼" |
 
-### 공통 Skills (SAX-Core)
+### 공통 Skills (SEMO-Core)
 
 | Intent | Skill | Trigger |
 |--------|-------|---------|
-| 도움말 | `sax-help` | "/SAX:help", "도움말", "뭐 할 수 있어" |
-| 피드백 | `feedback` | "/SAX:feedback", "버그 신고", "개선 요청" |
+| 도움말 | `semo-help` | "/SEMO:help", "도움말", "뭐 할 수 있어" |
+| 피드백 | `feedback` | "/SEMO:feedback", "버그 신고", "개선 요청" |
 | 환경 검증 | `health-check` | "환경 확인", "도구 확인" |
 
 ## 명령어 매핑
 
 | Command | Route | Description |
 |---------|-------|-------------|
-| `/SAX:help` | `skill:sax-help` | SAX-QA 도움말 |
-| `/SAX:test-queue` | `skill:test-queue` | 테스트 대기 이슈 목록 |
-| `/SAX:run-test` | `qa-master` | 테스트 실행 |
-| `/SAX:test-pass` | `skill:report-test-result` | 테스트 통과 처리 |
-| `/SAX:test-fail` | `skill:report-test-result` | 테스트 실패 처리 |
-| `/SAX:feedback` | `skill:feedback` | 피드백/버그 신고 |
-| `/SAX:to-testing` | `skill:change-to-testing` | 테스트중 상태 변경 + QA 할당 |
+| `/SEMO:help` | `skill:semo-help` | SEMO-QA 도움말 |
+| `/SEMO:test-queue` | `skill:test-queue` | 테스트 대기 이슈 목록 |
+| `/SEMO:run-test` | `qa-master` | 테스트 실행 |
+| `/SEMO:test-pass` | `skill:report-test-result` | 테스트 통과 처리 |
+| `/SEMO:test-fail` | `skill:report-test-result` | 테스트 실패 처리 |
+| `/SEMO:feedback` | `skill:feedback` | 피드백/버그 신고 |
+| `/SEMO:to-testing` | `skill:change-to-testing` | 테스트중 상태 변경 + QA 할당 |
 
 ## 우선순위 규칙
 
@@ -59,19 +59,19 @@
 ```
 User: "테스트할 이슈 뭐야?"
 
-[SAX] Orchestrator: 의도 분석 완료 → 테스트 대기열 조회
+[SEMO] Orchestrator: 의도 분석 완료 → 테스트 대기열 조회
 
-[SAX] Skill 호출: test-queue
+[SEMO] Skill 호출: test-queue
 ```
 
 ### Example 2: 테스트 통과 처리
 
 ```
-User: "/SAX:test-pass cm-office#45"
+User: "/SEMO:test-pass cm-office#45"
 
-[SAX] Orchestrator: 의도 분석 완료 → 테스트 결과 보고
+[SEMO] Orchestrator: 의도 분석 완료 → 테스트 결과 보고
 
-[SAX] Skill 호출: report-test-result (cm-office#45, result: pass)
+[SEMO] Skill 호출: report-test-result (cm-office#45, result: pass)
 ```
 
 ### Example 3: 테스트 실패 처리
@@ -79,9 +79,9 @@ User: "/SAX:test-pass cm-office#45"
 ```
 User: "cm-office#45 실패야. 버튼 클릭이 안돼"
 
-[SAX] Orchestrator: 의도 분석 완료 → 테스트 결과 보고
+[SEMO] Orchestrator: 의도 분석 완료 → 테스트 결과 보고
 
-[SAX] Skill 호출: report-test-result (cm-office#45, result: fail, reason: 버튼 클릭 불가)
+[SEMO] Skill 호출: report-test-result (cm-office#45, result: fail, reason: 버튼 클릭 불가)
 ```
 
 ### Example 4: 테스트중 상태 변경 + QA 자동 할당
@@ -89,17 +89,17 @@ User: "cm-office#45 실패야. 버튼 클릭이 안돼"
 ```
 User: "cm-office#50 테스트중으로 변경해줘"
 
-[SAX] Orchestrator: 의도 분석 완료 → 테스트중 상태 변경
+[SEMO] Orchestrator: 의도 분석 완료 → 테스트중 상태 변경
 
-[SAX] Skill 호출: change-to-testing (cm-office#50)
+[SEMO] Skill 호출: change-to-testing (cm-office#50)
 ```
 
 ```
-User: "/SAX:to-testing core-backend#22"
+User: "/SEMO:to-testing core-backend#22"
 
-[SAX] Orchestrator: 의도 분석 완료 → 테스트중 상태 변경
+[SEMO] Orchestrator: 의도 분석 완료 → 테스트중 상태 변경
 
-[SAX] Skill 호출: change-to-testing (core-backend#22)
+[SEMO] Skill 호출: change-to-testing (core-backend#22)
 → 상태 변경: 테스트중
 → QA 할당: @kokkh (자동)
 ```

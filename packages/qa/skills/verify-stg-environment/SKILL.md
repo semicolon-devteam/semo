@@ -7,7 +7,7 @@ description: |
 tools: [Bash, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: verify-stg-environment 호출` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: verify-stg-environment 호출` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Verify STG Environment Skill
 
@@ -43,7 +43,7 @@ gh run list --repo semicolon-devteam/{repo} --workflow deploy-stg --limit 1 --js
 ### 정상 상태
 
 ```markdown
-[SAX] Skill: verify-stg-environment 호출
+[SEMO] Skill: verify-stg-environment 호출
 
 ## 🌐 STG 환경 상태: ✅ 정상
 
@@ -60,7 +60,7 @@ gh run list --repo semicolon-devteam/{repo} --workflow deploy-stg --limit 1 --js
 ### 문제 감지
 
 ```markdown
-[SAX] Skill: verify-stg-environment 호출
+[SEMO] Skill: verify-stg-environment 호출
 
 ## 🌐 STG 환경 상태: ⚠️ 문제 감지
 

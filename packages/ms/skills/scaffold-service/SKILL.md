@@ -140,4 +140,4 @@ WORKER_CONCURRENCY=5
 
 ## Reference
 
-- [마이크로서비스 규약](../../sax-core/_shared/microservice-conventions.md)
+- [마이크로서비스 규약](../../semo-core/_shared/microservice-conventions.md)

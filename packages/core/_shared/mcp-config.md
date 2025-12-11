@@ -69,7 +69,7 @@
 - 이전 단계 결과를 다음 단계에 반영
 - 사고 과정 수정 및 분기 지원
 
-**SAX에서 활용 시나리오**:
+**SEMO에서 활용 시나리오**:
 
 | 시나리오 | 설명 | 트리거 |
 |----------|------|--------|
@@ -110,7 +110,7 @@ Step 4: 구현 계획
 
 **자동 활성화 조건**:
 
-SAX는 다음 조건에서 Sequential Thinking을 자동으로 활용합니다:
+SEMO는 다음 조건에서 Sequential Thinking을 자동으로 활용합니다:
 - 요청이 3단계 이상의 분석 필요 시
 - "설계", "분석", "계획" 키워드 포함 시
 - 복잡한 아키텍처 관련 요청 시
@@ -139,7 +139,7 @@ SAX는 다음 조건에서 Sequential Thinking을 자동으로 활용합니다:
 - 접근 로그 및 감사
 - 자동 로테이션 지원
 
-**SAX 비밀 관리**:
+**SEMO 비밀 관리**:
 
 | 비밀 | 용도 | Doppler 경로 |
 |------|------|--------------|
@@ -177,7 +177,7 @@ SLACK_TOKEN=$SLACK_BOT_TOKEN curl -s -X POST ...
 }
 ```
 
-## 전체 설정 예시 (SAX 권장)
+## 전체 설정 예시 (SEMO 권장)
 
 ```json
 {
@@ -201,9 +201,9 @@ SLACK_TOKEN=$SLACK_BOT_TOKEN curl -s -X POST ...
 }
 ```
 
-> **💡 권장**: Memory + Sequential Thinking + Doppler 조합으로 SAX의 핵심 기능을 최대한 활용할 수 있습니다.
+> **💡 권장**: Memory + Sequential Thinking + Doppler 조합으로 SEMO의 핵심 기능을 최대한 활용할 수 있습니다.
 
-## SAX Memory Skill 연동
+## SEMO Memory Skill 연동
 
 Memory MCP가 설치되면 `skill:memory`가 자동으로 MCP를 우선 사용합니다:
 

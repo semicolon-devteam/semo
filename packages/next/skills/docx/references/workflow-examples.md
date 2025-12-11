@@ -1,6 +1,6 @@
 # Workflow Examples
 
-SAX 워크플로우와 docx Skill 연동 예시입니다.
+SEMO 워크플로우와 docx Skill 연동 예시입니다.
 
 ## 1. Spec 문서 내보내기
 
@@ -30,7 +30,7 @@ pandoc specs/comments/spec.md -o specs/comments/spec.docx \
 ### Output
 
 ```markdown
-[SAX] Skill: docx 호출 - spec 변환
+[SEMO] Skill: docx 호출 - spec 변환
 
 ## 작업 유형: Spec Export
 **입력**: specs/comments/spec.md
@@ -85,7 +85,7 @@ Packer.toBuffer(doc).then(buffer => {
 ### Output
 
 ```markdown
-[SAX] Skill: docx 호출 - 릴리스 노트
+[SEMO] Skill: docx 호출 - 릴리스 노트
 
 ## 작업 유형: Release Notes
 **입력**: CHANGELOG.md
@@ -210,7 +210,7 @@ pandoc --track-changes=all reviewed.docx -o verification.md
 ### Output
 
 ```markdown
-[SAX] Skill: docx 호출 - 문서 편집
+[SEMO] Skill: docx 호출 - 문서 편집
 
 ## 작업 유형: Edit with Tracked Changes
 **입력**: document.docx
@@ -227,9 +227,9 @@ pandoc --track-changes=all reviewed.docx -o verification.md
 - 원본 서식 유지됨
 ```
 
-## Integration with SAX Skills
+## Integration with SEMO Skills
 
-| SAX Skill | docx 연동 | 용도 |
+| SEMO Skill | docx 연동 | 용도 |
 |-----------|----------|------|
 | `spec` | spec.md → spec.docx | 외부 공유 |
 | `spike` | spike-report.md → spike.docx | 기술 검토 문서 |

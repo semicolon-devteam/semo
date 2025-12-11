@@ -160,4 +160,4 @@ await fetch('http://ms-notifier/api/events', {
 
 ## Reference
 
-- [이벤트 봉투 표준](../../sax-core/_shared/microservice-conventions.md)
+- [이벤트 봉투 표준](../../semo-core/_shared/microservice-conventions.md)

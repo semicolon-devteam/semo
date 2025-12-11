@@ -1,14 +1,14 @@
 <!-- SEMO Framework -->
 > **SEMO** = "Semicolon Orchestrate" - AI 에이전트 오케스트레이션 프레임워크
-> (이전 명칭: SAX - Semicolon AI Transformation)
+> (이전 명칭: SEMO - Semicolon AI Transformation)
 
-# SAX-Infra Package Configuration
+# SEMO-Infra Package Configuration
 
-> 인프라, CI/CD, DevOps 작업을 위한 SAX 패키지
+> 인프라, CI/CD, DevOps 작업을 위한 SEMO 패키지
 
 ## Package Info
 
-- **Package**: SAX-Infra
+- **Package**: SEMO-Infra
 - **Version**: 📌 [VERSION](./VERSION) 참조
 - **Target**: core-compose, actions-template
 - **Audience**: DevOps, 인프라 담당자
@@ -21,9 +21,9 @@
 
 > 📖 상세: [_shared/INIT_SETUP.md](../_shared/INIT_SETUP.md)
 
-### 2. SAX Core 참조
+### 2. SEMO Core 참조
 
-> 📖 상세: [_shared/SAX_CORE_REFERENCE.md](../_shared/SAX_CORE_REFERENCE.md)
+> 📖 상세: [_shared/SEMO_CORE_REFERENCE.md](../_shared/SEMO_CORE_REFERENCE.md)
 
 ### 3. Orchestrator 위임
 
@@ -101,7 +101,7 @@ act -n -W .github/workflows/{workflow}.yml
 
 ## References
 
-- [SAX Core - Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
-- [SAX Core - Message Rules](https://github.com/semicolon-devteam/sax-core/blob/main/MESSAGE_RULES.md)
+- [SEMO Core - Principles](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md)
+- [SEMO Core - Message Rules](https://github.com/semicolon-devteam/semo-core/blob/main/MESSAGE_RULES.md)
 - [core-compose Repository](https://github.com/semicolon-devteam/core-compose)
 - [actions-template Repository](https://github.com/semicolon-devteam/actions-template)

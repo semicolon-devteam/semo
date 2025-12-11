@@ -4,7 +4,7 @@ description: Generate UI mockups using Magic MCP (21st.dev). Use when (1) creati
 tools: [mcp_magic, Write]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: generate-mockup 호출 - UI 목업 생성` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: generate-mockup 호출 - UI 목업 생성` 시스템 메시지를 첫 줄에 출력하세요.
 
 # generate-mockup Skill
 
@@ -16,7 +16,7 @@ tools: [mcp_magic, Write]
 
 ## 트리거
 
-- `/SAX:mockup` 명령어
+- `/SEMO:mockup` 명령어
 - "목업", "mockup", "UI 만들어" 키워드
 - design-master Agent에서 호출
 
@@ -27,13 +27,13 @@ tools: [mcp_magic, Write]
 ```markdown
 사용자: "로그인 폼 목업 만들어줘"
 
-[SAX] Skill: generate-mockup 호출 - UI 목업 생성
+[SEMO] Skill: generate-mockup 호출 - UI 목업 생성
 
 ## 요구사항 분석
 - 컴포넌트: 로그인 폼
 - 필요 요소: 이메일 입력, 비밀번호 입력, 제출 버튼
 
-[SAX] MCP: magic (21st.dev) 사용
+[SEMO] MCP: magic (21st.dev) 사용
 
 ## 생성된 목업
 [Magic MCP 결과 - 컴포넌트 코드]
@@ -207,7 +207,7 @@ import { ComponentName } from './components/ComponentName'
 ### 성공 시
 
 ```markdown
-[SAX] Skill: generate-mockup 호출 - UI 목업 생성
+[SEMO] Skill: generate-mockup 호출 - UI 목업 생성
 
 ## 목업: {컴포넌트명}
 
@@ -231,14 +231,14 @@ import { ComponentName } from './components/ComponentName'
 - 타이포그래피: {typography}
 
 ### 다음 단계
-- `/SAX:handoff`로 핸드오프 문서 생성
+- `/SEMO:handoff`로 핸드오프 문서 생성
 - 또는 컴포넌트 수정 요청
 ```
 
 ### Magic MCP 미설정 시
 
 ```markdown
-[SAX] Skill: generate-mockup - MCP 서버 미설정
+[SEMO] Skill: generate-mockup - MCP 서버 미설정
 
 magic (21st.dev) MCP 서버가 설정되지 않았습니다.
 
@@ -297,14 +297,14 @@ WCAG 2.1 AA 기준 준수:
 
 ---
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: generate-mockup 사용
+[SEMO] Skill: generate-mockup 사용
 
-[SAX] MCP: magic (21st.dev) - {component_type} 생성
+[SEMO] MCP: magic (21st.dev) - {component_type} 생성
 
-[SAX] Reference: 21st.dev 컴포넌트 패턴 적용
+[SEMO] Reference: 21st.dev 컴포넌트 패턴 적용
 ```
 
 ---

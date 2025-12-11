@@ -33,9 +33,9 @@ ADD Phase 4 (Implementation):
 
 ## Constitution 9 Principles
 
-> **SoT 참조**: Constitution 원칙은 `sax-core/PRINCIPLES.md`에서 관리됩니다.
+> **SoT 참조**: Constitution 원칙은 `semo-core/PRINCIPLES.md`에서 관리됩니다.
 >
-> 참조: [SAX Core Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md) | 로컬: `.claude/sax-core/PRINCIPLES.md`
+> 참조: [SEMO Core Principles](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md) | 로컬: `.claude/semo-core/PRINCIPLES.md`
 
 **주요 원칙 (요약)**:
 1. DDD Architecture (NON-NEGOTIABLE)
@@ -66,9 +66,9 @@ gh api repos/semicolon-devteam/core-supabase/...
 
 ## External Resources
 
-**SAX Core (SoT)**:
-- [SAX Core Principles](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
-- [SAX Core Team Rules](https://github.com/semicolon-devteam/sax-core/blob/main/TEAM_RULES.md)
+**SEMO Core (SoT)**:
+- [SEMO Core Principles](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md)
+- [SEMO Core Team Rules](https://github.com/semicolon-devteam/semo-core/blob/main/TEAM_RULES.md)
 
 **Wiki (보조)**:
 - [Team Codex](https://github.com/semicolon-devteam/docs/wiki/Team-Codex)

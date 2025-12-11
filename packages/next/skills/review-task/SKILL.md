@@ -13,7 +13,7 @@ triggers:
   - 이슈카드 리뷰
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: review-task 호출 - {repo}#{issue_number}` 시스템 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: review-task 호출 - {repo}#{issue_number}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Review Task Skill
 
@@ -98,7 +98,7 @@ ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+' | head -1)
 > 📚 **상세**: [references/output-format.md](references/output-format.md)
 
 ```markdown
-[SAX] Skill: review-task 호출 - {repo}#{issue_number}
+[SEMO] Skill: review-task 호출 - {repo}#{issue_number}
 
 === 태스크 리뷰: {repo}#{issue_number} ===
 
@@ -160,7 +160,7 @@ PR 머지 완료 후 이슈 상태를 자동으로 "테스트중"으로 변경�
 ### 프로세스
 
 ```markdown
-[SAX] Skill: review-task → 프로젝트 보드 상태 변경
+[SEMO] Skill: review-task → 프로젝트 보드 상태 변경
 
 📋 **이슈**: {repo}#{issue_number}
 🔀 **PR**: #{pr_number} 머지 완료
@@ -199,7 +199,7 @@ skill: project-board({
 ### 승인 시 출력 템플릿
 
 ```markdown
-[SAX] Skill: review-task 완료 - {repo}#{issue_number}
+[SEMO] Skill: review-task 완료 - {repo}#{issue_number}
 
 ## 🎯 최종 판정: ✅ 승인
 
@@ -245,7 +245,7 @@ gh pr list --head $(git branch --show-current) --json number,url,state
 사용자가 "머지해줘" 요청 시:
 
 ```markdown
-[SAX] Skill: review-task → PR 머지 진행
+[SEMO] Skill: review-task → PR 머지 진행
 
 📋 **이슈**: {repo}#{issue_number}
 🔀 **PR**: #{pr_number}

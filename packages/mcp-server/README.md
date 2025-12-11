@@ -14,7 +14,7 @@ Gemini의 하이브리드 전략에 따라 **Black Box 영역**(외부 연동)�
 ## 설치
 
 ```bash
-npx @semicolon/semo-mcp
+npx @team-semicolon/semo-mcp
 ```
 
 ## Claude Code 설정
@@ -26,7 +26,7 @@ npx @semicolon/semo-mcp
   "mcpServers": {
     "semo-integrations": {
       "command": "npx",
-      "args": ["-y", "@semicolon/semo-mcp"],
+      "args": ["-y", "@team-semicolon/semo-mcp"],
       "env": {
         "GITHUB_TOKEN": "${GITHUB_TOKEN}",
         "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",

@@ -48,7 +48,7 @@ Implementation Request Detected
 ### Fast Track Output
 
 ```markdown
-[SAX] Orchestrator: Fast Track 적용
+[SEMO] Orchestrator: Fast Track 적용
 
 ⚡ **SDD 생략**: {reason}
 

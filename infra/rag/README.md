@@ -97,11 +97,11 @@ curl "http://localhost:6333/collections/semo-feedback/points/scroll" \
 
 현재 다음 레포에서 PR 코멘트를 수집합니다:
 
-- semicolon-devteam/sax-core
-- semicolon-devteam/sax-next
-- semicolon-devteam/sax-backend
-- semicolon-devteam/sax-po
-- semicolon-devteam/sax-qa
+- semicolon-devteam/semo-core
+- semicolon-devteam/semo-next
+- semicolon-devteam/semo-backend
+- semicolon-devteam/semo-po
+- semicolon-devteam/semo-qa
 
 ## 인덱싱 주기
 

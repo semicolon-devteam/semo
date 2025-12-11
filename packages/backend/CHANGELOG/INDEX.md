@@ -1,8 +1,8 @@
-# SAX-Backend Changelog Index
+# SEMO-Backend Changelog Index
 
 ## Versions
 
-- [1.9.0](./1.9.0.md) - SAX 커맨드 추가 (SuperClaude 대응)
+- [1.9.0](./1.9.0.md) - SEMO 커맨드 추가 (SuperClaude 대응)
 - [1.8.0](./1.8.0.md) - analyze-code Skill 추가, quality-master 확장
 - [1.7.0](./1.7.0.md) - improve-code Skill, run-tests Skill 추가
 - [1.6.0](./1.6.0.md) - debug-master Agent, load-context Skill 추가

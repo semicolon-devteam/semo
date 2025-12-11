@@ -160,4 +160,4 @@ const UserList = () => {
 ## References
 
 - [Code Quality Judge](./code-quality.md)
-- [SAX Evaluation Metrics](../metrics.md)
+- [SEMO Evaluation Metrics](../metrics.md)

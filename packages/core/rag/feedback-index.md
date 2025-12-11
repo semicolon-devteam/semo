@@ -57,7 +57,7 @@ Prompting
 {
   "id": "feedback-{uuid}",
   "source": {
-    "repo": "semicolon-devteam/sax-next",
+    "repo": "semicolon-devteam/semo-next",
     "pr_number": 123,
     "file": "src/components/Button.tsx",
     "line": 42
@@ -233,7 +233,7 @@ steps:
 [SEMO] Skill: feedback-collector 완료
 
 ## 수집 결과
-- PR: #123 (sax-next)
+- PR: #123 (semo-next)
 - 피드백: 3건
 - 새 패턴: 1건 (`missing-empty-state`)
 
@@ -272,4 +272,4 @@ steps:
 
 - [LangFuse 관측성 설정](../observability/langfuse-config.md)
 - [Promptfoo Evaluation](../evaluation/promptfoo.yaml)
-- [SAX → SEMO 전환 계획](../../.claude/plans/prancy-scribbling-falcon.md)
+- [SEMO → SEMO 전환 계획](../../.claude/plans/prancy-scribbling-falcon.md)

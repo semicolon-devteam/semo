@@ -15,7 +15,7 @@ tools:
 model: sonnet
 ---
 
-> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SAX] Agent: migration-master 호출 - {프로젝트명}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SEMO] Agent: migration-master 호출 - {프로젝트명}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Migration Master Agent
 
@@ -88,7 +88,7 @@ Phase별 실행 및 체크포인트 확인
 | 구분 | 소스 | 설명 |
 |------|------|------|
 | 🔴 불변 원칙 | 템플릿 | Team Codex, Dev Philosophy 등 |
-| 🔴 SAX 규칙 | 템플릿 | Agent & Skill 활용 가이드 |
+| 🔴 SEMO 규칙 | 템플릿 | Agent & Skill 활용 가이드 |
 | 🟢 프로젝트 정보 | 기존 문서 | 서비스명, 설명, 환경 설정 |
 | 🟢 특화 규칙 | 기존 문서 | 도메인별 비즈니스 규칙 |
 
@@ -100,7 +100,7 @@ Phase별 실행 및 체크포인트 확인
 4. **cm-template 기준**: 모든 변환은 cm-template 규격 기준
 5. **점진적 마이그레이션**: 한 번에 모든 것을 바꾸지 않음
 6. **테스트 유지**: 기존 테스트가 있다면 마이그레이션 후에도 통과해야 함
-7. **SAX 규칙 필수 이식**: SAX 시스템 메시지 출력 규칙 반드시 적용
+7. **SEMO 규칙 필수 이식**: SEMO 시스템 메시지 출력 규칙 반드시 적용
 8. **Docs 검증 규칙 필수 이식**: docs 참조 시 404 알림 규칙 반드시 적용
 
 ## Integration Points

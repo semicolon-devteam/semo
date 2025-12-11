@@ -54,7 +54,7 @@
 `fix/{issue-number}-{slug}`
 
 ---
-🤖 SAX report-bug Skill로 자동 생성됨 (QA)
+🤖 SEMO report-bug Skill로 자동 생성됨 (QA)
 ```
 
 ## QA 특화 필드

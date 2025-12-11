@@ -53,7 +53,7 @@ github_project_scope:
   command: "gh auth status 2>&1 | grep -q 'project'"
   required: true
   error: "GitHub Projects 권한 없음. `gh auth refresh -s project` 실행 필요"
-  note: "SAX-PO에서 Projects Status 변경에 필요 (Epic/Bug 상태 관리)"
+  note: "SEMO-PO에서 Projects Status 변경에 필요 (Epic/Bug 상태 관리)"
 
 docs_access:
   command: "gh api repos/semicolon-devteam/docs/contents/README.md"
@@ -90,16 +90,16 @@ claude_json_check:
     Windows: "~/.claude.json (WSL2 Linux filesystem)"
   checks:
     - file_exists: "~/.claude.json 파일 존재 여부"
-    - sax_metadata: "SAX 메타데이터 존재 여부"
+    - sax_metadata: "SEMO 메타데이터 존재 여부"
     - required_fields:
-        - "SAX.role" (fulltime, parttimer, contractor)
-        - "SAX.position" (developer, po, designer)
-        - "SAX.boarded" (true/false)
-        - "SAX.healthCheckPassed" (true/false)
+        - "SEMO.role" (fulltime, parttimer, contractor)
+        - "SEMO.position" (developer, po, designer)
+        - "SEMO.boarded" (true/false)
+        - "SEMO.healthCheckPassed" (true/false)
     - optional_fields:
-        - "SAX.lastHealthCheck" (ISO 8601 timestamp)
-        - "SAX.participantProjects" (array)
-        - "SAX.currentTask" (object: repo, issue, branch)
+        - "SEMO.lastHealthCheck" (ISO 8601 timestamp)
+        - "SEMO.participantProjects" (array)
+        - "SEMO.currentTask" (object: repo, issue, branch)
 ```
 
 ### 검증 로직
@@ -112,30 +112,30 @@ else
   echo "⚠️  ~/.claude.json 파일 없음 (첫 실행 시 자동 생성됨)"
 fi
 
-# 2. SAX 메타데이터 확인 (jq 사용)
-if jq -e '.SAX' ~/.claude.json > /dev/null 2>&1; then
-  echo "✅ SAX 메타데이터 존재"
+# 2. SEMO 메타데이터 확인 (jq 사용)
+if jq -e '.SEMO' ~/.claude.json > /dev/null 2>&1; then
+  echo "✅ SEMO 메타데이터 존재"
 
   # 필수 필드 확인
-  ROLE=$(jq -r '.SAX.role // "missing"' ~/.claude.json)
-  POSITION=$(jq -r '.SAX.position // "missing"' ~/.claude.json)
-  BOARDED=$(jq -r '.SAX.boarded // "missing"' ~/.claude.json)
+  ROLE=$(jq -r '.SEMO.role // "missing"' ~/.claude.json)
+  POSITION=$(jq -r '.SEMO.position // "missing"' ~/.claude.json)
+  BOARDED=$(jq -r '.SEMO.boarded // "missing"' ~/.claude.json)
 
   echo "  - role: $ROLE"
   echo "  - position: $POSITION"
   echo "  - boarded: $BOARDED"
 else
-  echo "⚠️  SAX 메타데이터 없음 (온보딩 필요)"
+  echo "⚠️  SEMO 메타데이터 없음 (온보딩 필요)"
 fi
 ```
 
-## SAX 메타데이터 저장
+## SEMO 메타데이터 저장
 
-검증 완료 시 `~/.claude.json`에 SAX 메타데이터 저장:
+검증 완료 시 `~/.claude.json`에 SEMO 메타데이터 저장:
 
 ```json
 {
-  "SAX": {
+  "SEMO": {
     "role": "parttimer",
     "position": "developer",
     "boarded": true,
@@ -152,47 +152,47 @@ fi
 - Linux/WSL2: `~/.claude.json` (Linux 파일시스템 내)
 - Windows: `~/.claude.json` (WSL2 사용 시 Linux 경로 우선)
 
-## 5. SAX 패키지 설치 상태
+## 5. SEMO 패키지 설치 상태
 
 ```yaml
 sax_package_installed:
   check_type: "directory_exists"
   paths:
-    - ".claude/sax-core/"
-    - ".claude/sax-po/"
+    - ".claude/semo-core/"
+    - ".claude/semo-po/"
   required: true
-  error: "SAX 패키지 미설치. `SAX 업데이트해줘` 실행 필요"
+  error: "SEMO 패키지 미설치. `SEMO 업데이트해줘` 실행 필요"
 
 symlinks_valid:
   check_type: "symlink_target"
   items:
     - path: ".claude/CLAUDE.md"
-      expected_target: "sax-po/CLAUDE.md"
+      expected_target: "semo-po/CLAUDE.md"
       critical: true
     - path: ".claude/agents"
-      expected_target: "sax-po/agents"
+      expected_target: "semo-po/agents"
       critical: true
     - path: ".claude/skills"
-      expected_target: "sax-po/skills"
+      expected_target: "semo-po/skills"
       critical: true
-    - path: ".claude/commands/SAX"
-      expected_target: "../sax-po/commands"
-      critical: true  # 🔴 누락 시 /SAX:* 명령어 인식 불가
+    - path: ".claude/commands/SEMO"
+      expected_target: "../semo-po/commands"
+      critical: true  # 🔴 누락 시 /SEMO:* 명령어 인식 불가
   required: true
-  error: "심링크 연결 오류. `SAX 업데이트해줘` 실행하여 심링크 재설정 필요"
+  error: "심링크 연결 오류. `SEMO 업데이트해줘` 실행하여 심링크 재설정 필요"
 ```
 
-> **🔴 중요**: `SAX/commands` 심링크가 누락되면 `/SAX:help`, `/SAX:health-check` 등 모든 SAX 명령어가 인식되지 않습니다.
+> **🔴 중요**: `SAX/commands` 심링크가 누락되면 `/SEMO:help`, `/SEMO:health-check` 등 모든 SEMO 명령어가 인식되지 않습니다.
 
 ### 검증 로직
 
 ```bash
 # 1. 패키지 디렉토리 존재 확인
-if [ -d ".claude/sax-core" ] && [ -d ".claude/sax-po" ]; then
-  echo "✅ SAX 패키지 설치됨"
+if [ -d ".claude/semo-core" ] && [ -d ".claude/semo-po" ]; then
+  echo "✅ SEMO 패키지 설치됨"
 else
-  echo "❌ SAX 패키지 미설치"
-  echo "  → `SAX 업데이트해줘` 실행 필요"
+  echo "❌ SEMO 패키지 미설치"
+  echo "  → `SEMO 업데이트해줘` 실행 필요"
 fi
 
 # 2. 심링크 상태 확인
@@ -211,10 +211,10 @@ check_symlink() {
   fi
 }
 
-check_symlink ".claude/CLAUDE.md" "sax-po/CLAUDE.md"
-check_symlink ".claude/agents" "sax-po/agents"
-check_symlink ".claude/skills" "sax-po/skills"
-check_symlink ".claude/commands/SAX" "../sax-po/commands"
+check_symlink ".claude/CLAUDE.md" "semo-po/CLAUDE.md"
+check_symlink ".claude/agents" "semo-po/agents"
+check_symlink ".claude/skills" "semo-po/skills"
+check_symlink ".claude/commands/SEMO" "../semo-po/commands"
 ```
 
 ## 6. 글로벌 MCP 서버 설정 상태

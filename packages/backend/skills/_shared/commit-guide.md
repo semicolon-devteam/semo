@@ -17,8 +17,8 @@
 ### 이슈 번호 추출 (dev 브랜치)
 
 ```bash
-# 방법 1: SAX 메타데이터 활용
-ISSUE_NUM=$(jq -r '.SAX.currentTask.issueNumber' ~/.claude.json 2>/dev/null)
+# 방법 1: SEMO 메타데이터 활용
+ISSUE_NUM=$(jq -r '.SEMO.currentTask.issueNumber' ~/.claude.json 2>/dev/null)
 
 # 방법 2: 최근 작업 이슈 확인
 gh issue list --assignee @me --state open --json number,title

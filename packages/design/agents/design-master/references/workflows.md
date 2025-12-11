@@ -16,8 +16,8 @@
 ```markdown
 사용자: "로그인 폼 목업 만들어줘"
 
-[SAX] Agent: design-master 호출 - 목업 생성
-[SAX] Skill 호출: generate-mockup
+[SEMO] Agent: design-master 호출 - 목업 생성
+[SEMO] Skill 호출: generate-mockup
 
 ## 로그인 폼 목업
 
@@ -80,8 +80,8 @@
 ```markdown
 사용자: "이 Figma 디자인 가져와: https://www.figma.com/file/abc123/..."
 
-[SAX] Agent: design-master 호출 - Figma 연동
-[SAX] MCP: Framelink 사용
+[SEMO] Agent: design-master 호출 - Figma 연동
+[SEMO] MCP: Framelink 사용
 
 ## Figma 디자인 데이터
 
@@ -130,7 +130,7 @@
 ### MCP 서버 미설정 시
 
 ```markdown
-[SAX] Agent: design-master - MCP 서버 미설정
+[SEMO] Agent: design-master - MCP 서버 미설정
 
 {mcp_name} MCP 서버가 설정되지 않았습니다.
 
@@ -140,13 +140,13 @@
 jq '.mcpServers += {"magic": {"command": "npx", "args": ["@anthropic/claude-mcp-magic"]}}' ~/.claude.json > tmp && mv tmp ~/.claude.json
 \`\`\`
 
-또는 `/SAX:health-check`로 전체 환경을 점검하세요.
+또는 `/SEMO:health-check`로 전체 환경을 점검하세요.
 ```
 
 ### Figma 권한 없음 시
 
 ```markdown
-[SAX] Agent: design-master - Figma 접근 실패
+[SEMO] Agent: design-master - Figma 접근 실패
 
 Figma 파일에 접근할 수 없습니다.
 

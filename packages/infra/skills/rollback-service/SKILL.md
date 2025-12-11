@@ -1,10 +1,10 @@
 ---
 name: rollback-service
-description: 서비스를 이전 버전으로 롤백. Use when (1) 롤백 요청, (2) 이전 버전 복원, (3) /SAX:rollback 커맨드.
+description: 서비스를 이전 버전으로 롤백. Use when (1) 롤백 요청, (2) 이전 버전 복원, (3) /SEMO:rollback 커맨드.
 tools: [Bash, Read, Write]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: rollback-service 호출 - {환경}/{서비스}/{태그}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: rollback-service 호출 - {환경}/{서비스}/{태그}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # rollback-service
 
@@ -18,7 +18,7 @@ tools: [Bash, Read, Write]
 
 - "롤백해줘"
 - "이전 버전으로 되돌려"
-- `/SAX:rollback`
+- `/SEMO:rollback`
 
 ## 입력 파라미터
 
@@ -70,7 +70,7 @@ curl -f http://localhost:{port}/health
 ### 성공
 
 ```markdown
-[SAX] rollback-service: 롤백 완료 ✅
+[SEMO] rollback-service: 롤백 완료 ✅
 
 **롤백 결과**
 
@@ -90,7 +90,7 @@ curl -f http://localhost:{port}/health
 ### 실패
 
 ```markdown
-[SAX] rollback-service: 롤백 실패 ❌
+[SEMO] rollback-service: 롤백 실패 ❌
 
 **롤백 결과**
 

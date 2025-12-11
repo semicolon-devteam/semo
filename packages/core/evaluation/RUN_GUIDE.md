@@ -1,6 +1,6 @@
 # Promptfoo 실행 가이드
 
-> sax-next 파일럿 평가 실행 방법
+> semo-next 파일럿 평가 실행 방법
 
 ---
 
@@ -33,7 +33,7 @@ npx promptfoo --version
 ### 기본 실행
 
 ```bash
-cd sax-core
+cd semo-core
 
 # 평가 실행
 npx promptfoo eval --config evaluation/promptfoo.yaml

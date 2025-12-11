@@ -1,6 +1,6 @@
-# SAX Core Principles
+# SEMO Core Principles
 
-> **SAX (Semicolon AI Transformation)**: Semicolon 팀의 AI 에이전트 협업 표준
+> **SEMO (Semicolon AI Transformation)**: Semicolon 팀의 AI 에이전트 협업 표준
 
 ## 1. 핵심 원칙
 
@@ -8,61 +8,61 @@
 
 모든 AI 에이전트 동작은 사용자에게 **명시적으로 노출**되어야 합니다.
 
-- Agent 활성화 시 SAX 메시지 출력
-- Skill 사용 시 SAX 메시지 출력
-- 외부 참조 시 SAX 메시지 출력
+- Agent 활성화 시 SEMO 메시지 출력
+- Skill 사용 시 SEMO 메시지 출력
+- 외부 참조 시 SEMO 메시지 출력
 
 ### 1.2 일관성 (Consistency)
 
-모든 SAX 패키지는 **동일한 메시지 포맷**을 사용합니다.
+모든 SEMO 패키지는 **동일한 메시지 포맷**을 사용합니다.
 
 ```markdown
-[SAX] {Type}: {name} {action}
+[SEMO] {Type}: {name} {action}
 ```
 
 ### 1.3 모듈성 (Modularity)
 
-SAX는 **패키지 단위로 분리**되어 각 레포지토리에 맞게 구성됩니다.
+SEMO는 **패키지 단위로 분리**되어 각 레포지토리에 맞게 구성됩니다.
 
-- SAX-Core: 공통 원칙 및 규칙
-- SAX-PO: PO/기획자용 에이전트
-- SAX-Next: Next.js 개발용 에이전트
-- SAX-Spring: Spring Boot 개발용 에이전트
+- SEMO-Core: 공통 원칙 및 규칙
+- SEMO-PO: PO/기획자용 에이전트
+- SEMO-Next: Next.js 개발용 에이전트
+- SEMO-Spring: Spring Boot 개발용 에이전트
 
 ### 1.4 계층성 (Hierarchy)
 
 ```text
-SAX-Core (docs/sax/core/)
+SEMO-Core (docs/sax/core/)
     │
-    ├── SAX-Meta (docs) - SAX 패키지 관리
-    ├── SAX-PO (docs) - PO/기획자용
-    ├── SAX-Next (cm-template, cm-*) - Next.js 개발용
-    └── SAX-Spring (core-backend) - Spring Boot 개발용 [Planned]
+    ├── SEMO-Meta (docs) - SEMO 패키지 관리
+    ├── SEMO-PO (docs) - PO/기획자용
+    ├── SEMO-Next (cm-template, cm-*) - Next.js 개발용
+    └── SEMO-Spring (core-backend) - Spring Boot 개발용 [Planned]
 ```
 
 각 패키지는 Core를 **상속**하고 **확장**합니다.
 
 ---
 
-## 2. SAX 메시지 규칙
+## 2. SEMO 메시지 규칙
 
 ### 2.1 필수 메시지 타입
 
 | Type | 설명 | 예시 |
 |------|------|------|
-| `Agent` | 에이전트 활성화 | `[SAX] Agent: epic-master 호출` |
-| `Skill` | 스킬 사용 | `[SAX] Skill: create-epic 사용` |
-| `Reference` | 외부 참조 | `[SAX] Reference: core-supabase 참조` |
-| `Orchestrator` | 라우팅 결정 | `[SAX] Orchestrator: 의도 분석 완료` |
+| `Agent` | 에이전트 활성화 | `[SEMO] Agent: epic-master 호출` |
+| `Skill` | 스킬 사용 | `[SEMO] Skill: create-epic 사용` |
+| `Reference` | 외부 참조 | `[SEMO] Reference: core-supabase 참조` |
+| `Orchestrator` | 라우팅 결정 | `[SEMO] Orchestrator: 의도 분석 완료` |
 
 ### 2.2 메시지 포맷
 
 ```markdown
-[SAX] {Type}: {name} {action} (사유: {reason})
+[SEMO] {Type}: {name} {action} (사유: {reason})
 ```
 
 **필수 요소**:
-- `[SAX]` 접두사
+- `[SEMO]` 접두사
 - `Type`: Agent, Skill, Reference, Orchestrator 중 하나
 - `name`: 에이전트/스킬/참조 대상 이름
 - `action`: 동작 (호출, 사용, 참조, 위임 등)
@@ -72,15 +72,15 @@ SAX-Core (docs/sax/core/)
 
 ### 2.3 메시지 출력 규칙
 
-1. **각 SAX 메시지는 별도의 줄에 출력**
-2. **SAX 메시지들 사이에 빈 줄 삽입**
-3. **SAX 메시지 출력 후 일반 텍스트 시작 전에도 빈 줄 필수**
+1. **각 SEMO 메시지는 별도의 줄에 출력**
+2. **SEMO 메시지들 사이에 빈 줄 삽입**
+3. **SEMO 메시지 출력 후 일반 텍스트 시작 전에도 빈 줄 필수**
 
 **예시**:
 ```markdown
-[SAX] Orchestrator: 의도 분석 완료 → Epic 생성 요청
+[SEMO] Orchestrator: 의도 분석 완료 → Epic 생성 요청
 
-[SAX] Agent: epic-master 호출 (사유: Epic 생성)
+[SEMO] Agent: epic-master 호출 (사유: Epic 생성)
 
 ## Epic 생성을 시작합니다
 
@@ -93,14 +93,14 @@ SAX-Core (docs/sax/core/)
 
 ### 3.0 Orchestrator-First Policy (필수)
 
-> ⚠️ **핵심 규칙**: SAX 패키지가 설치된 환경에서는 **모든 요청이 Orchestrator를 먼저 거쳐야 합니다.**
+> ⚠️ **핵심 규칙**: SEMO 패키지가 설치된 환경에서는 **모든 요청이 Orchestrator를 먼저 거쳐야 합니다.**
 
-**적용 대상**: SAX-PO, SAX-Next, SAX-Spring 등 모든 SAX 패키지가 설치된 레포지토리
+**적용 대상**: SEMO-PO, SEMO-Next, SEMO-Spring 등 모든 SEMO 패키지가 설치된 레포지토리
 
 **동작 방식**:
 
 1. **모든 사용자 요청** → Orchestrator가 먼저 의도 분석
-2. **SAX 메시지 출력**: `[SAX] Orchestrator: 의도 분석 완료 → {category}`
+2. **SEMO 메시지 출력**: `[SEMO] Orchestrator: 의도 분석 완료 → {category}`
 3. **라우팅 결정**: 적절한 Agent 위임 또는 직접 응답
 
 **예외 사항** (Orchestrator 생략 가능):
@@ -114,31 +114,31 @@ SAX-Core (docs/sax/core/)
 ```markdown
 User: 댓글 기능 구현해줘
 
-[SAX] Orchestrator: 의도 분석 완료 → 기능 구현 요청
+[SEMO] Orchestrator: 의도 분석 완료 → 기능 구현 요청
 
-[SAX] Agent 위임: implementation-master (사유: 코드 구현)
+[SEMO] Agent 위임: implementation-master (사유: 코드 구현)
 ```
 
 ```markdown
-User: sax-po에서 불필요한 에이전트 삭제해줘
+User: semo-po에서 불필요한 에이전트 삭제해줘
 
-[SAX] Orchestrator: 의도 분석 완료 → SAX 메타 작업 (구조 변경)
+[SEMO] Orchestrator: 의도 분석 완료 → SEMO 메타 작업 (구조 변경)
 
-[SAX] Agent: sax-architect 역할 수행 (사유: SAX 패키지 정리)
+[SEMO] Agent: semo-architect 역할 수행 (사유: SEMO 패키지 정리)
 ```
 
-### 3.0.1 SAX 메타 작업 필수 절차
+### 3.0.1 SEMO 메타 작업 필수 절차
 
-**트리거**: "Semicolon AX" 키워드 또는 SAX 패키지 구조 변경 요청
+**트리거**: "Semicolon AX" 키워드 또는 SEMO 패키지 구조 변경 요청
 
 **필수 절차**:
 
-1. `[SAX] Orchestrator: 의도 분석 완료 → SAX 메타 작업 ({세부 카테고리})`
-2. `[SAX] Agent: sax-architect 역할 수행 (트리거: "Semicolon AX" 키워드)`
+1. `[SEMO] Orchestrator: 의도 분석 완료 → SEMO 메타 작업 ({세부 카테고리})`
+2. `[SEMO] Agent: semo-architect 역할 수행 (트리거: "Semicolon AX" 키워드)`
 3. 작업 수행
 4. `sax/VERSION` 업데이트
 5. `sax/CHANGELOG/{version}.md` 작성 및 `sax/CHANGELOG/INDEX.md` 업데이트
-6. `git commit -m "📝 [SAX] vX.Y.Z"`
+6. `git commit -m "📝 [SEMO] vX.Y.Z"`
 7. 완료 보고
 
 **버저닝 기준**:
@@ -152,16 +152,16 @@ User: sax-po에서 불필요한 에이전트 삭제해줘
 ```markdown
 User: Semicolon AX - Orchestrator 규칙 개선
 
-[SAX] Orchestrator: 의도 분석 완료 → SAX 메타 작업 (규칙 개선)
+[SEMO] Orchestrator: 의도 분석 완료 → SEMO 메타 작업 (규칙 개선)
 
-[SAX] Agent: sax-architect 역할 수행 (트리거: "Semicolon AX" 키워드)
+[SEMO] Agent: semo-architect 역할 수행 (트리거: "Semicolon AX" 키워드)
 
 [작업 수행...]
 
 [버저닝]
 - sax/VERSION: 2.6.0
 - sax/CHANGELOG.md: 변경 내역 기록
-- git commit -m "📝 [SAX] v2.6.0"
+- git commit -m "📝 [SEMO] v2.6.0"
 
 완료
 ```
@@ -185,7 +185,7 @@ Orchestrator는 **라우팅만 담당**합니다.
 적절한 Agent가 없는 경우, **반드시 사용자에게 알림**:
 
 ```markdown
-[SAX] Orchestrator: 라우팅 실패 → 적절한 Agent 없음
+[SEMO] Orchestrator: 라우팅 실패 → 적절한 Agent 없음
 
 ⚠️ **직접 처리 필요**
 
@@ -207,12 +207,12 @@ Orchestrator는 **라우팅만 담당**합니다.
 | implementation-master | 코드 구현 |
 | quality-master | 품질 검증 |
 
-### 4.2 SAX 규칙 준수
+### 4.2 SEMO 규칙 준수
 
 모든 Agent는 다음을 준수합니다:
 
-1. Skill 사용 시 SAX 메시지 출력
-2. Reference 참조 시 SAX 메시지 출력
+1. Skill 사용 시 SEMO 메시지 출력
+2. Reference 참조 시 SEMO 메시지 출력
 3. 다른 Agent 호출 시 Orchestrator를 통해 위임
 
 ### 4.3 컨텍스트 보존
@@ -235,12 +235,12 @@ Skill은 다음 방식으로만 실행됩니다:
 - Agent에 의한 호출
 - 자동 트리거 조건 충족
 
-### 5.2 SAX 메시지 출력
+### 5.2 SEMO 메시지 출력
 
-Skill 실행 시 반드시 SAX 메시지 출력:
+Skill 실행 시 반드시 SEMO 메시지 출력:
 
 ```markdown
-[SAX] Skill: {skill-name} 사용
+[SEMO] Skill: {skill-name} 사용
 ```
 
 ### 5.3 부작용 최소화
@@ -257,16 +257,16 @@ Skill은 **선언된 동작만** 수행합니다.
 
 ### 6.1 Core 상속
 
-모든 SAX 패키지는 Core 원칙을 상속합니다.
+모든 SEMO 패키지는 Core 원칙을 상속합니다.
 
 ```markdown
 # 각 패키지의 CLAUDE.md에서
 
-## SAX 패키지
+## SEMO 패키지
 
-이 레포지토리는 **SAX-{PackageName}** 패키지를 사용합니다.
+이 레포지토리는 **SEMO-{PackageName}** 패키지를 사용합니다.
 
-SAX Core 원칙: https://github.com/semicolon-devteam/command-center/.claude/sax-core/PRINCIPLES.md
+SEMO Core 원칙: https://github.com/semicolon-devteam/command-center/.claude/semo-core/PRINCIPLES.md
 ```
 
 ### 6.2 확장 허용 범위
@@ -279,7 +279,7 @@ SAX Core 원칙: https://github.com/semicolon-devteam/command-center/.claude/sax
 
 패키지는 다음을 **변경할 수 없습니다**:
 
-- SAX 메시지 포맷
+- SEMO 메시지 포맷
 - Orchestrator 원칙
 - Core 메시지 규칙
 
@@ -288,11 +288,11 @@ SAX Core 원칙: https://github.com/semicolon-devteam/command-center/.claude/sax
 각 레포지토리의 CLAUDE.md에서 패키지 선언:
 
 ```markdown
-## SAX Configuration
+## SEMO Configuration
 
-**Package**: SAX-Next
+**Package**: SEMO-Next
 **Version**: 1.0.0
-**Core Reference**: command-center/.claude/sax-core/
+**Core Reference**: command-center/.claude/semo-core/
 ```
 
 ---
@@ -301,7 +301,7 @@ SAX Core 원칙: https://github.com/semicolon-devteam/command-center/.claude/sax
 
 ### 7.1 Core 버전
 
-SAX Core는 시맨틱 버저닝을 따릅니다:
+SEMO Core는 시맨틱 버저닝을 따릅니다:
 
 - **Major**: 호환되지 않는 변경
 - **Minor**: 하위 호환되는 기능 추가
@@ -336,7 +336,7 @@ echo "X.Y.Z" > sax/VERSION
 # Keep a Changelog 형식으로 변경사항 기록
 
 # 3. 커밋
-git commit -m "📝 [SAX] vX.Y.Z"
+git commit -m "📝 [SEMO] vX.Y.Z"
 ```
 
 ### 7.3 패키지 호환성
@@ -345,7 +345,7 @@ git commit -m "📝 [SAX] vX.Y.Z"
 
 ```yaml
 sax:
-  package: SAX-Next
+  package: SEMO-Next
   core_version: ">=1.0.0 <2.0.0"
 ```
 
@@ -353,6 +353,6 @@ sax:
 
 ## 8. 참조
 
-- **SAX Message Rules**: [MESSAGE_RULES.md](./MESSAGE_RULES.md)
+- **SEMO Message Rules**: [MESSAGE_RULES.md](./MESSAGE_RULES.md)
 - **Packaging Guide**: [PACKAGING.md](./PACKAGING.md)
 - **Team Codex**: [Team Codex](https://github.com/semicolon-devteam/docs/wiki/Team-Codex)

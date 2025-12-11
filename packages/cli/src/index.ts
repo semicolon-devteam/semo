@@ -139,14 +139,14 @@ program
     // 4. Standard 설치 (semo-core + semo-skills)
     await setupStandard(cwd, options.force);
 
-    // 5. Extensions 설치
+    // 5. Extensions 다운로드 (심볼릭 링크는 아직)
     if (extensionsToInstall.length > 0) {
-      await setupExtensions(cwd, extensionsToInstall, options.force);
+      await downloadExtensions(cwd, extensionsToInstall, options.force);
     }
 
-    // 6. MCP 설정
+    // 6. MCP 설정 (Extension 설정 병합 포함)
     if (!options.skipMcp) {
-      await setupMCP(cwd, options.force);
+      await setupMCP(cwd, extensionsToInstall, options.force);
     }
 
     // 7. Context Mesh 초기화
@@ -154,6 +154,11 @@ program
 
     // 8. CLAUDE.md 생성
     await setupClaudeMd(cwd, extensionsToInstall, options.force);
+
+    // 9. Extensions 심볼릭 링크 (agents/skills 병합)
+    if (extensionsToInstall.length > 0) {
+      await setupExtensionSymlinks(cwd, extensionsToInstall);
+    }
 
     // 완료 메시지
     console.log(chalk.green.bold("\n✅ SEMO 설치 완료!\n"));
@@ -237,24 +242,50 @@ async function createStandardSymlinks(cwd: string) {
   const claudeDir = path.join(cwd, ".claude");
   const semoSystemDir = path.join(cwd, "semo-system");
 
-  // agents 링크
-  const agentsLink = path.join(claudeDir, "agents");
-  if (!fs.existsSync(agentsLink)) {
-    const agentsTarget = path.join(semoSystemDir, "semo-core", "agents");
-    if (fs.existsSync(agentsTarget)) {
-      fs.symlinkSync("../semo-system/semo-core/agents", agentsLink);
-      console.log(chalk.green("  ✓ .claude/agents → semo-system/semo-core/agents"));
+  // agents 디렉토리 생성 및 개별 링크 (Extension 병합 지원)
+  const claudeAgentsDir = path.join(claudeDir, "agents");
+  const coreAgentsDir = path.join(semoSystemDir, "semo-core", "agents");
+
+  if (fs.existsSync(coreAgentsDir)) {
+    // 기존 심볼릭 링크면 삭제 (디렉토리로 변경)
+    if (fs.existsSync(claudeAgentsDir) && fs.lstatSync(claudeAgentsDir).isSymbolicLink()) {
+      fs.unlinkSync(claudeAgentsDir);
     }
+    fs.mkdirSync(claudeAgentsDir, { recursive: true });
+
+    const agents = fs.readdirSync(coreAgentsDir).filter(f =>
+      fs.statSync(path.join(coreAgentsDir, f)).isDirectory()
+    );
+    for (const agent of agents) {
+      const agentLink = path.join(claudeAgentsDir, agent);
+      if (!fs.existsSync(agentLink)) {
+        fs.symlinkSync(`../../semo-system/semo-core/agents/${agent}`, agentLink);
+      }
+    }
+    console.log(chalk.green(`  ✓ .claude/agents/ (${agents.length}개 agent 링크됨)`));
   }
 
-  // skills 링크
-  const skillsLink = path.join(claudeDir, "skills");
-  if (!fs.existsSync(skillsLink)) {
-    const skillsTarget = path.join(semoSystemDir, "semo-skills");
-    if (fs.existsSync(skillsTarget)) {
-      fs.symlinkSync("../semo-system/semo-skills", skillsLink);
-      console.log(chalk.green("  ✓ .claude/skills → semo-system/semo-skills"));
+  // skills 디렉토리 생성 및 개별 링크 (Extension 병합 지원)
+  const claudeSkillsDir = path.join(claudeDir, "skills");
+  const coreSkillsDir = path.join(semoSystemDir, "semo-skills");
+
+  if (fs.existsSync(coreSkillsDir)) {
+    // 기존 심볼릭 링크면 삭제 (디렉토리로 변경)
+    if (fs.existsSync(claudeSkillsDir) && fs.lstatSync(claudeSkillsDir).isSymbolicLink()) {
+      fs.unlinkSync(claudeSkillsDir);
     }
+    fs.mkdirSync(claudeSkillsDir, { recursive: true });
+
+    const skills = fs.readdirSync(coreSkillsDir).filter(f =>
+      fs.statSync(path.join(coreSkillsDir, f)).isDirectory()
+    );
+    for (const skill of skills) {
+      const skillLink = path.join(claudeSkillsDir, skill);
+      if (!fs.existsSync(skillLink)) {
+        fs.symlinkSync(`../../semo-system/semo-skills/${skill}`, skillLink);
+      }
+    }
+    console.log(chalk.green(`  ✓ .claude/skills/ (${skills.length}개 skill 링크됨)`));
   }
 
   // commands 링크
@@ -271,9 +302,9 @@ async function createStandardSymlinks(cwd: string) {
   }
 }
 
-// === Extensions 설치 ===
-async function setupExtensions(cwd: string, packages: string[], force: boolean) {
-  console.log(chalk.cyan("\n📦 Extensions 설치"));
+// === Extensions 다운로드 (심볼릭 링크 제외) ===
+async function downloadExtensions(cwd: string, packages: string[], force: boolean) {
+  console.log(chalk.cyan("\n📦 Extensions 다운로드"));
   packages.forEach(pkg => {
     console.log(chalk.gray(`   - ${EXTENSION_PACKAGES[pkg].name}`));
   });
@@ -307,36 +338,68 @@ async function setupExtensions(cwd: string, packages: string[], force: boolean) 
 
     execSync(`rm -rf "${tempDir}"`, { stdio: "pipe" });
 
-    spinner.succeed(`Extensions 설치 완료 (${packages.length}개)`);
-
-    // Extensions 심볼릭 링크 생성
-    await createExtensionSymlinks(cwd, packages);
+    spinner.succeed(`Extensions 다운로드 완료 (${packages.length}개)`);
 
   } catch (error) {
-    spinner.fail("Extensions 설치 실패");
+    spinner.fail("Extensions 다운로드 실패");
     console.error(chalk.red(`   ${error}`));
   }
 }
 
-// === Extensions 심볼릭 링크 ===
-async function createExtensionSymlinks(cwd: string, packages: string[]) {
+// === Extensions 심볼릭 링크 설정 (agents/skills 병합) ===
+async function setupExtensionSymlinks(cwd: string, packages: string[]) {
+  console.log(chalk.cyan("\n🔗 Extensions 연결"));
+
   const claudeDir = path.join(cwd, ".claude");
   const semoSystemDir = path.join(cwd, "semo-system");
 
   for (const pkg of packages) {
-    // sax-{pkg} 호환 링크 (기존 SAX 사용자용)
-    const saxPkgLink = path.join(claudeDir, `sax-${pkg}`);
     const pkgPath = path.join(semoSystemDir, pkg);
+    if (!fs.existsSync(pkgPath)) continue;
 
-    if (fs.existsSync(pkgPath) && !fs.existsSync(saxPkgLink)) {
-      fs.symlinkSync(`../semo-system/${pkg}`, saxPkgLink);
-      console.log(chalk.green(`  ✓ .claude/sax-${pkg} → semo-system/${pkg}`));
+    // 1. semo-{pkg} 링크
+    const semoPkgLink = path.join(claudeDir, `semo-${pkg}`);
+    if (!fs.existsSync(semoPkgLink)) {
+      fs.symlinkSync(`../semo-system/${pkg}`, semoPkgLink);
+      console.log(chalk.green(`  ✓ .claude/semo-${pkg} → semo-system/${pkg}`));
+    }
+
+    // 2. Extension의 agents를 .claude/agents/에 개별 링크
+    const extAgentsDir = path.join(pkgPath, "agents");
+    const claudeAgentsDir = path.join(claudeDir, "agents");
+    if (fs.existsSync(extAgentsDir)) {
+      const agents = fs.readdirSync(extAgentsDir).filter(f =>
+        fs.statSync(path.join(extAgentsDir, f)).isDirectory()
+      );
+      for (const agent of agents) {
+        const agentLink = path.join(claudeAgentsDir, agent);
+        if (!fs.existsSync(agentLink)) {
+          fs.symlinkSync(`../../semo-system/${pkg}/agents/${agent}`, agentLink);
+          console.log(chalk.green(`  ✓ .claude/agents/${agent} → semo-system/${pkg}/agents/${agent}`));
+        }
+      }
+    }
+
+    // 3. Extension의 skills를 .claude/skills/에 개별 링크
+    const extSkillsDir = path.join(pkgPath, "skills");
+    const claudeSkillsDir = path.join(claudeDir, "skills");
+    if (fs.existsSync(extSkillsDir)) {
+      const skills = fs.readdirSync(extSkillsDir).filter(f =>
+        fs.statSync(path.join(extSkillsDir, f)).isDirectory()
+      );
+      for (const skill of skills) {
+        const skillLink = path.join(claudeSkillsDir, skill);
+        if (!fs.existsSync(skillLink)) {
+          fs.symlinkSync(`../../semo-system/${pkg}/skills/${skill}`, skillLink);
+          console.log(chalk.green(`  ✓ .claude/skills/${skill} → semo-system/${pkg}/skills/${skill}`));
+        }
+      }
     }
   }
 }
 
 // === MCP 설정 ===
-async function setupMCP(cwd: string, force: boolean) {
+async function setupMCP(cwd: string, extensions: string[], force: boolean) {
   console.log(chalk.cyan("\n🔧 Black Box 설정 (MCP Server)"));
   console.log(chalk.gray("   토큰이 격리된 외부 연동 도구\n"));
 
@@ -350,7 +413,11 @@ async function setupMCP(cwd: string, force: boolean) {
     }
   }
 
-  const settings = {
+  // Base settings (Standard)
+  const settings: {
+    permissions?: { allow?: string[]; deny?: string[] };
+    mcpServers: Record<string, unknown>;
+  } = {
     mcpServers: {
       "semo-integrations": {
         command: "npx",
@@ -365,8 +432,98 @@ async function setupMCP(cwd: string, force: boolean) {
     },
   };
 
+  // Extension settings 병합
+  const semoSystemDir = path.join(cwd, "semo-system");
+  for (const pkg of extensions) {
+    const extSettingsPath = path.join(semoSystemDir, pkg, "settings.local.json");
+    if (fs.existsSync(extSettingsPath)) {
+      try {
+        const extSettings = JSON.parse(fs.readFileSync(extSettingsPath, "utf-8"));
+
+        // mcpServers 병합
+        if (extSettings.mcpServers) {
+          Object.assign(settings.mcpServers, extSettings.mcpServers);
+          console.log(chalk.gray(`  + ${pkg} MCP 설정 병합됨`));
+        }
+
+        // permissions 병합
+        if (extSettings.permissions) {
+          if (!settings.permissions) {
+            settings.permissions = { allow: [], deny: [] };
+          }
+          if (extSettings.permissions.allow) {
+            settings.permissions.allow = [
+              ...(settings.permissions.allow || []),
+              ...extSettings.permissions.allow,
+            ];
+          }
+          if (extSettings.permissions.deny) {
+            settings.permissions.deny = [
+              ...(settings.permissions.deny || []),
+              ...extSettings.permissions.deny,
+            ];
+          }
+          console.log(chalk.gray(`  + ${pkg} permissions 병합됨`));
+        }
+      } catch (error) {
+        console.log(chalk.yellow(`  ⚠ ${pkg} settings.local.json 파싱 실패`));
+      }
+    }
+  }
+
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
   console.log(chalk.green("✓ .claude/settings.json 생성됨 (MCP 설정)"));
+}
+
+// === Extension settings 병합 (add 명령어용) ===
+async function mergeExtensionSettings(cwd: string, packages: string[]) {
+  const settingsPath = path.join(cwd, ".claude", "settings.json");
+  const semoSystemDir = path.join(cwd, "semo-system");
+
+  if (!fs.existsSync(settingsPath)) {
+    console.log(chalk.yellow("  ⚠ settings.json이 없습니다. 'semo init'을 먼저 실행하세요."));
+    return;
+  }
+
+  const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+
+  for (const pkg of packages) {
+    const extSettingsPath = path.join(semoSystemDir, pkg, "settings.local.json");
+    if (fs.existsSync(extSettingsPath)) {
+      try {
+        const extSettings = JSON.parse(fs.readFileSync(extSettingsPath, "utf-8"));
+
+        // mcpServers 병합
+        if (extSettings.mcpServers) {
+          settings.mcpServers = settings.mcpServers || {};
+          Object.assign(settings.mcpServers, extSettings.mcpServers);
+          console.log(chalk.gray(`  + ${pkg} MCP 설정 병합됨`));
+        }
+
+        // permissions 병합
+        if (extSettings.permissions) {
+          settings.permissions = settings.permissions || { allow: [], deny: [] };
+          if (extSettings.permissions.allow) {
+            settings.permissions.allow = [
+              ...(settings.permissions.allow || []),
+              ...extSettings.permissions.allow,
+            ];
+          }
+          if (extSettings.permissions.deny) {
+            settings.permissions.deny = [
+              ...(settings.permissions.deny || []),
+              ...extSettings.permissions.deny,
+            ];
+          }
+          console.log(chalk.gray(`  + ${pkg} permissions 병합됨`));
+        }
+      } catch (error) {
+        console.log(chalk.yellow(`  ⚠ ${pkg} settings.local.json 파싱 실패`));
+      }
+    }
+  }
+
+  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
 }
 
 // === Context Mesh 초기화 ===
@@ -508,7 +665,7 @@ async function setupClaudeMd(cwd: string, extensions: string[], force: boolean) 
 - **semo-core**: 원칙, 오케스트레이터, 공통 커맨드
 - **semo-skills**: 13개 통합 스킬
   - 행동: coder, tester, planner, deployer, writer
-  - 운영: memory, notify-slack, feedback, version-updater, sax-help, sax-architecture-checker, circuit-breaker, list-bugs
+  - 운영: memory, notify-slack, feedback, version-updater, semo-help, semo-architecture-checker, circuit-breaker, list-bugs
 
 ${extensions.length > 0 ? `### Extensions (선택)
 ${extensions.map(pkg => `- **${pkg}**: ${EXTENSION_PACKAGES[pkg].desc}`).join("\n")}` : ""}
@@ -593,7 +750,14 @@ program
     console.log(chalk.cyan(`\n📦 ${EXTENSION_PACKAGES[packageName].name} 패키지 설치\n`));
     console.log(chalk.gray(`   ${EXTENSION_PACKAGES[packageName].desc}\n`));
 
-    await setupExtensions(cwd, [packageName], options.force);
+    // 1. 다운로드
+    await downloadExtensions(cwd, [packageName], options.force);
+
+    // 2. settings.json 병합
+    await mergeExtensionSettings(cwd, [packageName]);
+
+    // 3. 심볼릭 링크 설정
+    await setupExtensionSymlinks(cwd, [packageName]);
 
     console.log(chalk.green.bold(`\n✅ ${EXTENSION_PACKAGES[packageName].name} 패키지 설치 완료!\n`));
   });

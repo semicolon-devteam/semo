@@ -9,7 +9,7 @@ triggers:
   - 브랜치 만들어줘
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: git-workflow 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: git-workflow 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Git Workflow Skill
 
@@ -20,14 +20,14 @@ triggers:
 
 ## 규칙 참조 (SoT)
 
-> **모든 Git 규칙은 sax-core/TEAM_RULES.md에서 관리됩니다.**
+> **모든 Git 규칙은 semo-core/TEAM_RULES.md에서 관리됩니다.**
 
 ```bash
 # 로컬 참조
-.claude/sax-core/TEAM_RULES.md
+.claude/semo-core/TEAM_RULES.md
 
 # 원격 참조
-gh api repos/semicolon-devteam/sax-core/contents/TEAM_RULES.md --jq '.content' | base64 -d
+gh api repos/semicolon-devteam/semo-core/contents/TEAM_RULES.md --jq '.content' | base64 -d
 ```
 
 **참조 섹션**:
@@ -57,7 +57,7 @@ gh api repos/semicolon-devteam/sax-core/contents/TEAM_RULES.md --jq '.content' |
 3. 프로젝트 미연결 시 자동 추가 후 상태 변경
 
 ```markdown
-[SAX] skill:git-workflow: 상태 변경 요청 감지
+[SEMO] skill:git-workflow: 상태 변경 요청 감지
 
 📋 **이슈**: {repo}#{number}
 🔄 **요청 상태**: {target_status}
@@ -87,7 +87,7 @@ ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+|/[0-9]+' | grep -oE '[
 감지 시 즉시 중단:
 
 ```markdown
-[SAX] skill:git-workflow: ⛔ --no-verify 차단
+[SEMO] skill:git-workflow: ⛔ --no-verify 차단
 
 🚫 **커밋 중단**: `--no-verify` 플래그는 사용할 수 없습니다.
 

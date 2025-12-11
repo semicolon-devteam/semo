@@ -1,12 +1,12 @@
 # Trigger Detection
 
-> 피드백 스킬 트리거 감지 패턴 (SAX 공통)
+> 피드백 스킬 트리거 감지 패턴 (SEMO 공통)
 
 ## 명시적 트리거
 
 ### 명령어
 
-- `/SAX:feedback`
+- `/SEMO:feedback`
 - `피드백`
 - `피드백해줘`
 - `이슈 만들어줘`
@@ -17,7 +17,7 @@
 
 ### 불만/의문 표현 패턴
 
-사용자가 SAX 동작에 대해 의문을 제기하는 패턴:
+사용자가 SEMO 동작에 대해 의문을 제기하는 패턴:
 
 ```
 - "이건 이렇게 돼야 하는데 왜 이렇게 만들었어?"
@@ -53,7 +53,7 @@
 ### 피드백 제안 메시지
 
 ```markdown
-[SAX] 문제 해결 완료
+[SEMO] 문제 해결 완료
 
 **원인**: {문제 원인에 대한 설명}
 
@@ -66,17 +66,17 @@
 > "피드백해줘" 또는 "괜찮아"로 응답해주세요.
 ```
 
-## SAX와 무관한 경우 확인
+## SEMO와 무관한 경우 확인
 
 ```markdown
-[SAX] Orchestrator: 의도 확인 필요
+[SEMO] Orchestrator: 의도 확인 필요
 
-⚠️ SAX 관련 피드백인가요?
+⚠️ SEMO 관련 피드백인가요?
 
-- **예**: SAX Agent/Skill/Command의 동작 문제
+- **예**: SEMO Agent/Skill/Command의 동작 문제
 - **아니오**: 일반 코드나 프로젝트 문제
 
-"SAX 피드백이야" 또는 "아니야"로 응답해주세요.
+"SEMO 피드백이야" 또는 "아니야"로 응답해주세요.
 ```
 
 ## 트리거 우선순위
@@ -91,11 +91,11 @@
 
 | 컨텍스트 | 대상 레포 |
 |----------|-----------|
-| sax-po 작업 중 | `semicolon-devteam/sax-po` |
-| sax-next 작업 중 | `semicolon-devteam/sax-next` |
-| sax-pm 작업 중 | `semicolon-devteam/sax-pm` |
-| sax-qa 작업 중 | `semicolon-devteam/sax-qa` |
-| sax-infra 작업 중 | `semicolon-devteam/sax-infra` |
-| sax-meta 작업 중 | `semicolon-devteam/sax-meta` |
-| sax-core 관련 | `semicolon-devteam/sax-core` |
+| semo-po 작업 중 | `semicolon-devteam/semo-po` |
+| semo-next 작업 중 | `semicolon-devteam/semo-next` |
+| semo-pm 작업 중 | `semicolon-devteam/semo-pm` |
+| semo-qa 작업 중 | `semicolon-devteam/semo-qa` |
+| semo-infra 작업 중 | `semicolon-devteam/semo-infra` |
+| semo-meta 작업 중 | `semicolon-devteam/semo-meta` |
+| semo-core 관련 | `semicolon-devteam/semo-core` |
 | 불명확 | 사용자에게 확인 |

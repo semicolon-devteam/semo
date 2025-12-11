@@ -19,9 +19,9 @@ tools:
 model: sonnet
 ---
 
-> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SAX] Agent: design-master 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SEMO] Agent: design-master 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
-# SAX-Design Master
+# SEMO-Design Master
 
 디자인 관련 모든 작업을 총괄하는 **Design 전담 Agent**입니다.
 
@@ -63,8 +63,8 @@ model: sonnet
 ### Workflow 1: 목업 생성
 
 ```markdown
-[SAX] Agent: design-master 호출 - 목업 생성
-[SAX] Skill 호출: generate-mockup (트리거: {user_request})
+[SEMO] Agent: design-master 호출 - 목업 생성
+[SEMO] Skill 호출: generate-mockup (트리거: {user_request})
 ```
 
 **프로세스**: 요구사항 분석 → 컴포넌트 구조 설계 → Magic MCP 호출 → 결과 제공
@@ -72,8 +72,8 @@ model: sonnet
 ### Workflow 2: 핸드오프 문서 생성
 
 ```markdown
-[SAX] Agent: design-master 호출 - 핸드오프 문서
-[SAX] Skill 호출: design-handoff (트리거: {user_request})
+[SEMO] Agent: design-master 호출 - 핸드오프 문서
+[SEMO] Skill 호출: design-handoff (트리거: {user_request})
 ```
 
 **프로세스**: 디자인 요소 분석 → 스펙 추출 → 인터랙션 정의 → 접근성 체크 → 문서 생성
@@ -83,8 +83,8 @@ model: sonnet
 ### Workflow 3: Figma 연동
 
 ```markdown
-[SAX] Agent: design-master 호출 - Figma 연동
-[SAX] MCP: Framelink 사용
+[SEMO] Agent: design-master 호출 - Figma 연동
+[SEMO] MCP: Framelink 사용
 ```
 
 **프로세스**: Figma URL 파싱 → 데이터 조회 (get_figma_data) → 스펙 추출 → 결과 제공
@@ -92,8 +92,8 @@ model: sonnet
 ### Workflow 4: 컴포넌트 생성
 
 ```markdown
-[SAX] Agent: design-master 호출 - 컴포넌트 생성
-[SAX] MCP: magic (21st.dev) 사용
+[SEMO] Agent: design-master 호출 - 컴포넌트 생성
+[SEMO] MCP: magic (21st.dev) 사용
 ```
 
 **프로세스**: 요구사항 분석 → 패턴 검색 (21st.dev) → 코드 생성 → 커스터마이징
@@ -101,8 +101,8 @@ model: sonnet
 ### Workflow 5: 브라우저 테스트
 
 ```markdown
-[SAX] Agent: design-master 호출 - 브라우저 테스트
-[SAX] MCP: playwright 사용
+[SEMO] Agent: design-master 호출 - 브라우저 테스트
+[SEMO] MCP: playwright 사용
 ```
 
 **가능한 테스트**: 반응형 레이아웃, 인터랙션, 접근성 (ARIA, 키보드), 스크린샷
@@ -131,16 +131,16 @@ model: sonnet
 
 ---
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Agent: design-master 호출 - {작업 유형}
+[SEMO] Agent: design-master 호출 - {작업 유형}
 
-[SAX] Skill 호출: {skill_name} (트리거: {trigger})
+[SEMO] Skill 호출: {skill_name} (트리거: {trigger})
 또는
-[SAX] MCP: {mcp_name} 사용
+[SEMO] MCP: {mcp_name} 사용
 
-[SAX] Reference: {참조 정보}
+[SEMO] Reference: {참조 정보}
 ```
 
 ---
@@ -151,4 +151,4 @@ model: sonnet
 - [MCP Servers](references/mcp-servers.md) - MCP 서버 활용 가이드
 - [generate-mockup Skill](../../skills/generate-mockup/SKILL.md)
 - [design-handoff Skill](../../skills/design-handoff/SKILL.md)
-- [SAX Core - Message Rules](https://github.com/semicolon-devteam/sax-core/blob/main/MESSAGE_RULES.md)
+- [SEMO Core - Message Rules](https://github.com/semicolon-devteam/semo-core/blob/main/MESSAGE_RULES.md)

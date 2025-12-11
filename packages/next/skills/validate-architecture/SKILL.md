@@ -4,7 +4,7 @@ description: Validate DDD 4-layer architecture compliance. Use when (1) after im
 tools: [Bash, Read, Grep]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: validate-architecture 호출 - {도메인/범위}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: validate-architecture 호출 - {도메인/범위}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Validate Architecture Skill
 
@@ -66,7 +66,7 @@ skill: validateArchitecture({ quick: true });
 
 ## Constitution Compliance
 
-> **SoT 참조**: Constitution 원칙은 `sax-core/PRINCIPLES.md`에서 관리됩니다.
+> **SoT 참조**: Constitution 원칙은 `semo-core/PRINCIPLES.md`에서 관리됩니다.
 
 - **Principle I**: DDD Architecture (NON-NEGOTIABLE)
 - **Principle II**: SSR-First Development

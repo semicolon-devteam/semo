@@ -7,7 +7,7 @@ description: |
 tools: [Bash, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: test-queue 호출` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: test-queue 호출` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Test Queue Skill
 
@@ -15,7 +15,7 @@ tools: [Bash, GitHub CLI]
 
 ## 트리거
 
-- `/SAX:test-queue` 명령어
+- `/SEMO:test-queue` 명령어
 - "테스트할 이슈 뭐야", "테스트 대기", "뭐 테스트해" 키워드
 
 ## 기능
@@ -62,7 +62,7 @@ query {
 ## 출력 형식
 
 ```markdown
-[SAX] Skill: test-queue 호출
+[SEMO] Skill: test-queue 호출
 
 ## 📋 테스트 대기열
 

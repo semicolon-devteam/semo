@@ -1,24 +1,56 @@
 {
-  "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/main/schemas/settings.json",
   "mcpServers": {
     "semo-integrations": {
       "command": "npx",
-      "args": ["-y", "@semicolon/semo-mcp"],
+      "args": [
+        "-y",
+        "@team-semicolon/semo-mcp"
+      ],
       "env": {
         "GITHUB_TOKEN": "${GITHUB_TOKEN}",
-        "SLACK_WEBHOOK_URL": "${SLACK_WEBHOOK_URL}",
+        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
         "SUPABASE_URL": "${SUPABASE_URL}",
         "SUPABASE_KEY": "${SUPABASE_KEY}"
       }
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "<YOUR_GITHUB_TOKEN>"
+      }
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
     }
   },
-  "semo": {
-    "version": "2.0.0",
-    "structure": "hybrid",
-    "layers": {
-      "core": "filesystem",
-      "skills": "filesystem",
-      "integrations": "mcp"
-    }
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git diff:*)",
+      "Bash(git branch:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(gh auth status:*)",
+      "Bash(gh api:*)"
+    ],
+    "deny": []
   }
 }

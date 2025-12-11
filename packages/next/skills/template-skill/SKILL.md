@@ -1,10 +1,10 @@
 ---
 name: template-skill
-description: Template for creating new SAX skills. Use when creating a new skill that extends SAX capabilities with specialized workflows or domain knowledge.
+description: Template for creating new SEMO skills. Use when creating a new skill that extends SEMO capabilities with specialized workflows or domain knowledge.
 tools: [Read, Write]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: {skill-name} 호출 - {context}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: {skill-name} 호출 - {context}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Template Skill
 

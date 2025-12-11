@@ -5,7 +5,7 @@ tools: [Bash, Read, Grep, Glob]
 location: project
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: verify-implementation 호출 - {이슈 번호}` 시스템 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: verify-implementation 호출 - {이슈 번호}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Verify Implementation Skill
 
@@ -52,7 +52,7 @@ location: project
 ## Output Format
 
 ```markdown
-[SAX] Skill: verify-implementation 호출 - {repo}#{issue_number}
+[SEMO] Skill: verify-implementation 호출 - {repo}#{issue_number}
 
 === 구현 검토: {repo}#{issue_number} ===
 

@@ -7,7 +7,7 @@ description: |
 tools: [Bash, Read, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: sync-openapi 호출 - {API 경로}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: sync-openapi 호출 - {API 경로}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Sync OpenAPI Skill
 
@@ -85,7 +85,7 @@ sealed class ApiResponse<T> {
 ## Output Format
 
 ```markdown
-[SAX] Skill: sync-openapi 호출 - {endpoint}
+[SEMO] Skill: sync-openapi 호출 - {endpoint}
 
 ## API Spec: POST /api/v1/posts
 

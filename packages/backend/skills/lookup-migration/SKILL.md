@@ -6,7 +6,7 @@ description: |
 tools: [Bash, Read, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: lookup-migration 호출 - {테이블명}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: lookup-migration 호출 - {테이블명}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Lookup Migration Skill
 
@@ -75,7 +75,7 @@ object PostStatus {
 ## Output Format
 
 ```markdown
-[SAX] Skill: lookup-migration 호출 - {table_name}
+[SEMO] Skill: lookup-migration 호출 - {table_name}
 
 ## Table: posts
 

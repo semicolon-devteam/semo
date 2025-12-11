@@ -4,7 +4,7 @@ description: 이슈관리 보드의 전체 이슈 품질 감사. Use when (1) �
 tools: [Bash, Read, Write]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: audit-issues 호출` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: audit-issues 호출` 시스템 메시지를 첫 줄에 출력하세요.
 
 # audit-issues Skill
 
@@ -143,7 +143,7 @@ gh issue list --repo semicolon-devteam/{repo} --state open --json number,title,b
 ### 정상 결과
 
 ```markdown
-[SAX] Skill: audit-issues 완료
+[SEMO] Skill: audit-issues 완료
 
 ## 📊 이슈 감사 결과
 
@@ -162,7 +162,7 @@ gh issue list --repo semicolon-devteam/{repo} --state open --json number,title,b
 ### 문제 발견 시
 
 ```markdown
-[SAX] Skill: audit-issues 완료
+[SEMO] Skill: audit-issues 완료
 
 ## 📊 이슈 감사 결과
 
@@ -200,22 +200,22 @@ gh issue list --repo semicolon-devteam/{repo} --state open --json number,title,b
 4. 태스크 이슈에 작업량 할당 → **`set-estimate` Skill 사용**
 ```
 
-> 💡 **Tip**: 작업량 미할당 Task는 `/SAX:sprint estimate #이슈번호 --point 3` 또는 `set-estimate` Skill로 설정하세요.
+> 💡 **Tip**: 작업량 미할당 Task는 `/SEMO:sprint estimate #이슈번호 --point 3` 또는 `set-estimate` Skill로 설정하세요.
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: audit-issues 호출
+[SEMO] Skill: audit-issues 호출
 
-[SAX] Audit: 이슈관리 보드 조회 중... (42개 이슈)
+[SEMO] Audit: 이슈관리 보드 조회 중... (42개 이슈)
 
-[SAX] Audit: 4가지 감사 항목 검토 중...
+[SEMO] Audit: 4가지 감사 항목 검토 중...
 - 중복 이슈 검토 ✅
 - 필수 필드 검토 ✅
 - Projects 연결 검토 ✅
 - 작업량 할당 검토 ✅
 
-[SAX] Skill: audit-issues 완료 (문제 {n}건 발견)
+[SEMO] Skill: audit-issues 완료 (문제 {n}건 발견)
 ```
 
 ## Related
@@ -223,7 +223,7 @@ gh issue list --repo semicolon-devteam/{repo} --state open --json number,title,b
 - [set-estimate Skill](../set-estimate/SKILL.md) - 작업량 설정
 - [detect-blockers Skill](../detect-blockers/SKILL.md) - 블로커 탐지
 - [sync-project-status Skill](../sync-project-status/SKILL.md) - 프로젝트 상태 동기화
-- [project-board Skill (sax-next)](../../sax-next/skills/project-board/SKILL.md) - Projects 보드 관리
+- [project-board Skill (semo-next)](../../semo-next/skills/project-board/SKILL.md) - Projects 보드 관리
 
 ## References
 

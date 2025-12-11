@@ -7,7 +7,7 @@ description: |
 tools: [Bash, Read]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: complete-draft-task 호출 - {이슈 번호}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: complete-draft-task 호출 - {이슈 번호}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Complete Draft Task Skill
 
@@ -100,7 +100,7 @@ EOF
 ### 완료
 
 ```markdown
-[SAX] Skill: complete-draft-task 완료
+[SEMO] Skill: complete-draft-task 완료
 
 ## Draft Task 완료 처리
 

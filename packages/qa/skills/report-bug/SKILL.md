@@ -7,7 +7,7 @@ tools: [Bash, Read]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: report-bug 호출` 시스템 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: report-bug 호출` 시스템 메시지를 첫 줄에 출력하세요.
 
 # report-bug Skill (QA)
 
@@ -44,7 +44,7 @@ EOF
 ### Step 1: 정보 수집
 
 ```markdown
-[SAX] Skill: report-bug 호출
+[SEMO] Skill: report-bug 호출
 
 ## 🐛 QA 버그 리포트 생성
 
@@ -103,7 +103,7 @@ gh issue create \
 `fix/{issue-number}-{slug}`
 
 ---
-🤖 SAX report-bug Skill로 자동 생성됨 (QA)
+🤖 SEMO report-bug Skill로 자동 생성됨 (QA)
 EOF
 )" \
   --label "bug,qa-found"
@@ -112,7 +112,7 @@ EOF
 ### Step 3: 완료 메시지
 
 ```markdown
-[SAX] Bug Report: 이슈 생성 완료
+[SEMO] Bug Report: 이슈 생성 완료
 
 ✅ QA 버그 리포트가 등록되었습니다!
 
@@ -177,7 +177,7 @@ git checkout -b fix/{이슈번호}-{slug}
 `fix/{issue-number}-{slug}`
 
 ---
-🤖 SAX report-bug Skill로 자동 생성됨 (QA)
+🤖 SEMO report-bug Skill로 자동 생성됨 (QA)
 ```
 
 ## QA 특화 기능
@@ -197,18 +197,18 @@ git checkout -b fix/{이슈번호}-{slug}
 `report-test-result` Skill과 연동하여 실패한 테스트에서 바로 버그 리포트 생성 가능:
 
 ```markdown
-[SAX] 테스트 결과: 3/10 실패
+[SEMO] 테스트 결과: 3/10 실패
 
 실패한 테스트에서 버그 리포트를 생성하시겠어요?
 > "TC-042 버그 등록해줘"
 ```
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: report-bug 사용
+[SEMO] Skill: report-bug 사용
 
-[SAX] Bug Report: {repo}#{number} 생성 완료 → fix/{number}-{slug}
+[SEMO] Bug Report: {repo}#{number} 생성 완료 → fix/{number}-{slug}
 ```
 
 ## Related

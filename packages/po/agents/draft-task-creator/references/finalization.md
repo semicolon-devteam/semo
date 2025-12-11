@@ -31,7 +31,7 @@ gh api graphql -f query='
 For each Draft Task:
 
 ```markdown
-[SAX] Skill: assign-estimation-point 사용
+[SEMO] Skill: assign-estimation-point 사용
 ```
 
 ```bash
@@ -42,7 +42,7 @@ gh api graphql -f query='...'
 ## 3. Auto-label Epic
 
 ```markdown
-[SAX] Skill: auto-label-by-scope 사용
+[SEMO] Skill: auto-label-by-scope 사용
 ```
 
 ```bash
@@ -56,7 +56,7 @@ gh api repos/semicolon-devteam/docs/issues/{epic_number}/labels \
 ## 4. Epic Timeline Estimation
 
 ```markdown
-[SAX] Skill: estimate-epic-timeline 사용
+[SEMO] Skill: estimate-epic-timeline 사용
 ```
 
 Sum all Draft Tasks Points and add timeline comment to Epic.
@@ -66,7 +66,7 @@ Sum all Draft Tasks Points and add timeline comment to Epic.
 For each Draft Task:
 
 ```markdown
-[SAX] Skill: validate-task-completeness 사용
+[SEMO] Skill: validate-task-completeness 사용
 ```
 
 Check required items:

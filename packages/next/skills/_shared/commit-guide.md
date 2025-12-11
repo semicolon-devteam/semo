@@ -1,6 +1,6 @@
 # Commit Guide
 
-> **SoT 참조**: 커밋 규칙은 `sax-core/TEAM_RULES.md` 참조
+> **SoT 참조**: 커밋 규칙은 `semo-core/TEAM_RULES.md` 참조
 
 ## 🔴 Spec 커밋 규칙 (dev 브랜치)
 
@@ -25,8 +25,8 @@
 dev 브랜치에서는 브랜치명에 이슈 번호가 없으므로 다음 방법 사용:
 
 ```bash
-# 방법 1: SAX 메타데이터 활용
-ISSUE_NUM=$(jq -r '.SAX.currentTask.issueNumber' ~/.claude.json 2>/dev/null)
+# 방법 1: SEMO 메타데이터 활용
+ISSUE_NUM=$(jq -r '.SEMO.currentTask.issueNumber' ~/.claude.json 2>/dev/null)
 
 # 방법 2: 직접 입력
 read -p "이슈 번호: " ISSUE_NUM

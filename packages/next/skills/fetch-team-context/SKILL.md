@@ -4,7 +4,7 @@ description: Fetch Semicolon team standards from docs wiki. Use when (1) providi
 tools: [Bash, Read, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: fetch-team-context 호출 - {토픽}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: fetch-team-context 호출 - {토픽}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Fetch Team Context Skill
 

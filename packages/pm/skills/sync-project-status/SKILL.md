@@ -7,7 +7,7 @@ tools: [Bash, Read]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: sync-project-status 호출` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: sync-project-status 호출` 메시지를 첫 줄에 출력하세요.
 
 # sync-project-status Skill
 
@@ -41,7 +41,7 @@ dry_run: false                    # 선택 (실제 변경 없이 확인만)
 ## Output
 
 ```markdown
-[SAX] Skill: sync-project-status 완료
+[SEMO] Skill: sync-project-status 완료
 
 ✅ Projects 동기화 완료
 
@@ -155,7 +155,7 @@ function detectExpectedStatus(issue) {
 
 ```bash
 # dry_run: true 시 출력
-[SAX] Skill: sync-project-status (Dry Run)
+[SEMO] Skill: sync-project-status (Dry Run)
 
 📋 불일치 감지됨 (변경 없음)
 
@@ -170,7 +170,7 @@ function detectExpectedStatus(issue) {
 ## 완료 메시지
 
 ```markdown
-[SAX] Skill: sync-project-status 완료
+[SEMO] Skill: sync-project-status 완료
 
 ✅ Projects 동기화 완료
 

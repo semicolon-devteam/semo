@@ -4,7 +4,7 @@ description: Measure and assign estimation points based on Wiki Estimation Guide
 tools: [Bash, Read, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: assign-estimation-point 호출 - {Task 번호}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: assign-estimation-point 호출 - {Task 번호}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # assign-estimation-point Skill
 
@@ -41,11 +41,11 @@ gh api repos/semicolon-devteam/docs/contents/wiki/Estimation-Guide.md \
 **총합**: 10점
 ```
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: assign-estimation-point 사용
-[SAX] Reference: docs/wiki/Estimation-Guide 참조
+[SEMO] Skill: assign-estimation-point 사용
+[SEMO] Reference: docs/wiki/Estimation-Guide 참조
 ```
 
 ## Related

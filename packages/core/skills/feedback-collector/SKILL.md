@@ -18,13 +18,13 @@ PR 리뷰 피드백을 자동으로 수집하고 패턴을 분석하여, 에이�
 
 ```bash
 # 1. 특정 PR 피드백 수집
-/SEMO:collect-feedback --repo sax-next --pr 123
+/SEMO:collect-feedback --repo semo-next --pr 123
 
 # 2. 최근 PR 일괄 수집 (최근 7일)
-/SEMO:collect-feedback --repo sax-next --days 7
+/SEMO:collect-feedback --repo semo-next --days 7
 
 # 3. 전체 레포 스캔
-/SEMO:collect-feedback --repo sax-next --all
+/SEMO:collect-feedback --repo semo-next --all
 ```
 
 ## Workflow
@@ -104,7 +104,7 @@ LLM을 사용하여 피드백을 다음 카테고리로 분류:
 
 ```yaml
 inputs:
-  repo: string        # 레포지토리 이름 (예: sax-next)
+  repo: string        # 레포지토리 이름 (예: semo-next)
   pr_number: number   # PR 번호 (선택)
   days: number        # 최근 N일 (선택, 기본: 7)
   all: boolean        # 전체 스캔 (선택)
@@ -120,13 +120,13 @@ outputs:
   alerts: array           # 임계값 초과 알림
 ```
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
 [SEMO] Skill: feedback-collector 호출
 
 ## 수집 대상
-- Repo: sax-next
+- Repo: semo-next
 - PR: #123 (또는 최근 7일)
 
 ---
@@ -189,10 +189,10 @@ GitHub API 호출 중 오류가 발생했습니다.
 
 ```yaml
 # 프로젝트별 설정
-sax-next:
+semo-next:
   index_path: ".claude/rag/feedback-index.json"
 
-sax-backend:
+semo-backend:
   index_path: ".claude/rag/feedback-index.json"
 ```
 

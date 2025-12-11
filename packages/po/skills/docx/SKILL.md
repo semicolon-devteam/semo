@@ -4,11 +4,11 @@ description: |
   PO용 Word 문서 생성 Skill. Use when:
   (1) Epic 제안서 Word 생성, (2) 요구사항 문서 내보내기,
   (3) 스프린트 리포트 문서화, (4) 이해관계자 공유용 문서 생성.
-  sax-next의 docx Skill 경량 버전.
+  semo-next의 docx Skill 경량 버전.
 tools: [Bash, Read, Write]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: docx 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: docx 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # DOCX Skill (PO Edition)
 
@@ -53,10 +53,10 @@ node scripts/create-sprint-report.js \
   --output "reports/sprint-5-report.docx"
 ```
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: docx 호출 - {Epic 제안서 | 요구사항 문서 | 스프린트 리포트}
+[SEMO] Skill: docx 호출 - {Epic 제안서 | 요구사항 문서 | 스프린트 리포트}
 
 ## 작업 유형: {type}
 **입력**: {source_data}
@@ -129,4 +129,4 @@ node scripts/create-sprint-report.js \
 
 - `create-epic` - Epic 생성 (docx 입력 데이터)
 - `estimate-epic-timeline` - 타임라인 추정
-- sax-next의 `docx` - Full 버전 (문서 편집 포함)
+- semo-next의 `docx` - Full 버전 (문서 편집 포함)

@@ -1,27 +1,27 @@
 ---
 name: onboarding-backend
 description: |
-  백엔드 개발자 온보딩 실습 (SAX-Backend 패키지 전용). Use when (1) sax-core/skill:onboarding에서 호출,
+  백엔드 개발자 온보딩 실습 (SEMO-Backend 패키지 전용). Use when (1) semo-core/skill:onboarding에서 호출,
   (2) 백엔드 개발자 온보딩 실습 필요 시. API 설계 및 백엔드 워크플로우 체험.
 tools: [Read, Bash, Glob, Grep]
 model: inherit
 ---
 
-> **시스템 메시지**: `[SAX] Skill: onboarding-backend 호출`
+> **시스템 메시지**: `[SEMO] Skill: onboarding-backend 호출`
 
 # onboarding-backend Skill
 
-> 백엔드 개발자를 위한 온보딩 실습 (SAX-Backend 패키지 전용)
+> 백엔드 개발자를 위한 온보딩 실습 (SEMO-Backend 패키지 전용)
 
 ## Purpose
 
-SAX Core의 `skill:onboarding` Phase 3에서 호출됩니다.
+SEMO Core의 `skill:onboarding` Phase 3에서 호출됩니다.
 백엔드 개발자를 위한 실습 과정을 제공합니다.
 
 ## Prerequisites
 
-- Phase 0-2 완료 (환경 진단, 조직 참여, SAX 개념 학습)
-- sax-core/skill:onboarding에서 호출됨
+- Phase 0-2 완료 (환경 진단, 조직 참여, SEMO 개념 학습)
+- semo-core/skill:onboarding에서 호출됨
 
 ## Workflow
 
@@ -61,7 +61,7 @@ SAX Core의 `skill:onboarding` Phase 3에서 호출됩니다.
 > "사용자 CRUD API 설계해줘"
 
 **확인 사항**:
-- [SAX] Orchestrator 메시지 확인
+- [SEMO] Orchestrator 메시지 확인
 - API 명세 (endpoint, method, request/response)
 - 에러 처리 방안
 ```
@@ -82,7 +82,7 @@ supabase start
 ## Expected Output
 
 ```markdown
-[SAX] Skill: onboarding-backend 호출
+[SEMO] Skill: onboarding-backend 호출
 
 === 백엔드 개발자 온보딩 실습 ===
 
@@ -111,13 +111,13 @@ supabase start
 
 ✅ 실습 완료
 
-[SAX] Skill: onboarding-backend 완료
+[SEMO] Skill: onboarding-backend 완료
 ```
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: onboarding-backend 호출
+[SEMO] Skill: onboarding-backend 호출
 
-[SAX] Skill: onboarding-backend 완료
+[SEMO] Skill: onboarding-backend 완료
 ```

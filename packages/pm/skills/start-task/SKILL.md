@@ -2,12 +2,12 @@
 name: start-task
 description: |
   Task 작업 시작 처리. Use when (1) Task 상태를 '작업중'으로 변경,
-  (2) 시작일 자동 설정, (3) 현재 이터레이션 자동 할당, (4) /SAX:sprint start 커맨드.
+  (2) 시작일 자동 설정, (3) 현재 이터레이션 자동 할당, (4) /SEMO:sprint start 커맨드.
 tools: [Bash, Read]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: start-task 호출` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: start-task 호출` 메시지를 첫 줄에 출력하세요.
 
 # start-task Skill
 
@@ -70,7 +70,7 @@ skip_iteration: false    # 선택: 이터레이션 설정 생략
 ### 성공
 
 ```markdown
-[SAX] Skill: start-task 완료
+[SEMO] Skill: start-task 완료
 
 ✅ 2개 Task 작업 시작 처리 완료
 
@@ -326,7 +326,7 @@ GitHub Projects 설정에서 'Date' 타입의 '시작일' 필드를 추가하세
 ## 완료 메시지
 
 ```markdown
-[SAX] Skill: start-task 완료
+[SEMO] Skill: start-task 완료
 
 ✅ {count}개 Task 작업 시작 처리 완료
 

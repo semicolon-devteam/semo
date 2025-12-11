@@ -7,7 +7,7 @@ description: |
 tools: [Read, Write, Edit, Bash]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: implement 호출 - {구현 대상}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: implement 호출 - {구현 대상}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Implement Skill
 
@@ -96,7 +96,7 @@ Service, Controller 구현
 ### Phase 완료
 
 ```markdown
-[SAX] Skill: implement - v0.2.x TESTS 완료
+[SEMO] Skill: implement - v0.2.x TESTS 완료
 
 ## 완료된 작업
 - [x] PostRepositoryTest.kt
@@ -118,7 +118,7 @@ v0.3.x DATA → Entity, DTO, Repository 작성
 ### 구현 완료
 
 ```markdown
-[SAX] Skill: implement 완료 - {feature}
+[SEMO] Skill: implement 완료 - {feature}
 
 ## 구현 완료
 

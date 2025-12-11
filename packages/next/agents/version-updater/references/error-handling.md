@@ -5,7 +5,7 @@
 ## 네트워크 오류
 
 ```markdown
-[SAX] version-updater: ❌ 업데이트 실패
+[SEMO] version-updater: ❌ 업데이트 실패
 
 GitHub 연결에 실패했습니다.
 
@@ -18,26 +18,26 @@ GitHub 연결에 실패했습니다.
 ## 심링크 오류
 
 ```markdown
-[SAX] version-updater: ⚠️ 심링크 재설정 필요
+[SEMO] version-updater: ⚠️ 심링크 재설정 필요
 
 일부 심링크가 올바르지 않습니다.
 
 **수동 재설정**:
 ```bash
 cd .claude
-ln -sf sax-next/CLAUDE.md CLAUDE.md
-ln -sf sax-next/agents agents
-ln -sf sax-next/skills skills
-mkdir -p SAX && ln -sf ../sax-next/commands SAX/commands
+ln -sf semo-next/CLAUDE.md CLAUDE.md
+ln -sf semo-next/agents agents
+ln -sf semo-next/skills skills
+mkdir -p SEMO && ln -sf ../semo-next/commands SAX/commands
 ```
 ```
 
 ## 복사 방식 설치
 
 ```markdown
-[SAX] version-updater: ⚠️ 복사 방식 감지
+[SEMO] version-updater: ⚠️ 복사 방식 감지
 
-이 프로젝트는 복사 방식으로 SAX가 설치되어 있습니다.
+이 프로젝트는 복사 방식으로 SEMO가 설치되어 있습니다.
 자동 업데이트가 불가능합니다.
 
 **권장 조치**:
@@ -48,7 +48,7 @@ mkdir -p SAX && ln -sf ../sax-next/commands SAX/commands
 ## 권한 오류
 
 ```markdown
-[SAX] version-updater: ❌ 권한 오류
+[SEMO] version-updater: ❌ 권한 오류
 
 서브모듈 업데이트 권한이 없습니다.
 
@@ -61,14 +61,14 @@ mkdir -p SAX && ln -sf ../sax-next/commands SAX/commands
 ## 서브모듈 충돌
 
 ```markdown
-[SAX] version-updater: ⚠️ 서브모듈 충돌
+[SEMO] version-updater: ⚠️ 서브모듈 충돌
 
 로컬 변경사항과 원격 변경사항이 충돌합니다.
 
 **해결 방법**:
-1. 로컬 변경사항 확인: `git -C .claude/sax-next status`
-2. 변경사항 커밋 또는 스태시: `git -C .claude/sax-next stash`
-3. 업데이트 재시도: "SAX 업데이트해줘"
+1. 로컬 변경사항 확인: `git -C .claude/semo-next status`
+2. 변경사항 커밋 또는 스태시: `git -C .claude/semo-next stash`
+3. 업데이트 재시도: "SEMO 업데이트해줘"
 ```
 
 ## 일반 오류 처리 가이드라인
@@ -93,5 +93,5 @@ ls -la .claude/
 gh auth status
 
 # 네트워크 테스트
-gh api repos/semicolon-devteam/sax-core --jq '.name'
+gh api repos/semicolon-devteam/semo-core --jq '.name'
 ```

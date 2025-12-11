@@ -16,7 +16,7 @@ tools:
 model: sonnet
 ---
 
-> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SAX] Agent: database-master 호출 - {DB 작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Agent가 호출되면 `[SEMO] Agent: database-master 호출 - {DB 작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Database Master Agent
 
@@ -163,14 +163,14 @@ import { createBrowserClient } from '@/lib/supabase/client';
 - [x] core-supabase 패턴 준수
 ```
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Agent: database-master 역할 수행
+[SEMO] Agent: database-master 역할 수행
 
-[SAX] Operation: {schema|migration|repository|rpc}
+[SEMO] Operation: {schema|migration|repository|rpc}
 
-[SAX] Reference: core-supabase 패턴 준수
+[SEMO] Reference: core-supabase 패턴 준수
 ```
 
 ## Related

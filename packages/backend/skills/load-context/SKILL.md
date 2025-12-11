@@ -7,7 +7,7 @@ description: |
 tools: [Read, Glob, Grep, Bash]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: load-context 호출 - {대상}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: load-context 호출 - {대상}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Load Context Skill
 
@@ -130,7 +130,7 @@ ls src/test/**/*{Domain}*.kt
 ## Output Format
 
 ```markdown
-[SAX] Skill: load-context 호출 - {domain}
+[SEMO] Skill: load-context 호출 - {domain}
 
 ## 📋 컨텍스트 요약: {Domain}
 

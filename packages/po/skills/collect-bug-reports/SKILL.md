@@ -7,7 +7,7 @@ tools: [Bash, Read]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: collect-bug-reports 호출` 시스템 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: collect-bug-reports 호출` 시스템 메시지를 첫 줄에 출력하세요.
 
 # collect-bug-reports Skill
 
@@ -42,7 +42,7 @@ gh issue list --repo semicolon-devteam/{repo} --label bug --state open --search 
 사용자가 레포지토리나 기간을 명시하지 않은 경우 확인:
 
 ```markdown
-[SAX] Skill: collect-bug-reports 호출
+[SEMO] Skill: collect-bug-reports 호출
 
 ## 🐛 버그 리포트 취합
 
@@ -126,7 +126,7 @@ gh issue list \
 ### Step 4: 완료 메시지
 
 ```markdown
-[SAX] Bug Collection: 완료
+[SEMO] Bug Collection: 완료
 
 ✅ 버그 리포트 취합이 완료되었습니다.
 
@@ -156,12 +156,12 @@ gh issue list \
 | `최근 3개월` | 3개월 내 생성 | `--search "created:>=$(date -d '3 months ago' +%Y-%m-%d)"` |
 | 직접 입력 | 특정 날짜 이후 | `--search "created:>={date}"` |
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: collect-bug-reports 호출
+[SEMO] Skill: collect-bug-reports 호출
 
-[SAX] Bug Collection: {repo} 버그 {n}건 취합 완료
+[SEMO] Bug Collection: {repo} 버그 {n}건 취합 완료
 ```
 
 ## Related

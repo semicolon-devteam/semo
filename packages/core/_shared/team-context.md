@@ -1,6 +1,6 @@
 # 세미콜론 팀 컨텍스트 가이드
 
-> SAX 패키지 전반에 걸친 세미콜론 팀 조직 구조, 협업 프로세스, 커뮤니케이션 채널 안내
+> SEMO 패키지 전반에 걸친 세미콜론 팀 조직 구조, 협업 프로세스, 커뮤니케이션 채널 안내
 
 ## 목적
 
@@ -46,9 +46,9 @@ gh api user/orgs --jq '.[].login' | grep semicolon-devteam
 | **#개발사업팀** | 개발팀 전용 채널 | 개발자 |
 | **#디자인팀** | 디자인팀 전용 채널 | 디자이너 |
 
-### SAX 시스템 연동
+### SEMO 시스템 연동
 
-SAX 패키지는 Slack과 자동 연동됩니다:
+SEMO 패키지는 Slack과 자동 연동됩니다:
 
 - **버저닝 알림**: `#_협업` 채널에 버전 업데이트 자동 공유
 - **커밋 알림**: PR 생성/머지 시 자동 알림
@@ -57,7 +57,7 @@ SAX 패키지는 Slack과 자동 연동됩니다:
 **Skill 사용**:
 ```bash
 # Slack 메시지 전송 (notify-slack Skill)
-/SAX:slack
+/SEMO:slack
 ```
 
 ---
@@ -69,16 +69,16 @@ SAX 패키지는 Slack과 자동 연동됩니다:
 | 레포 | 용도 | 접근 권한 |
 |------|------|----------|
 | **docs** | 문서, 기획, Epic 관리 | 전체 읽기, Managers 쓰기 |
-| **sax-core** | SAX 공통 컴포넌트 | 전체 읽기, Owners 쓰기 |
-| **sax-meta** | SAX 메타 패키지 | 전체 읽기, Owners 쓰기 |
-| **sax-next** | 프론트엔드 개발용 SAX | Developers |
-| **sax-po** | PO/기획자용 SAX | Managers |
-| **sax-design** | 디자이너용 SAX | Designers |
-| **sax-qa** | QA/테스터용 SAX | QA |
-| **sax-backend** | 백엔드 개발용 SAX | Developers |
-| **sax-pm** | PM용 SAX | Managers |
-| **sax-infra** | 인프라 엔지니어용 SAX | Developers |
-| **sax-ms** | MSA 개발용 SAX | Developers |
+| **semo-core** | SEMO 공통 컴포넌트 | 전체 읽기, Owners 쓰기 |
+| **semo-meta** | SEMO 메타 패키지 | 전체 읽기, Owners 쓰기 |
+| **semo-next** | 프론트엔드 개발용 SEMO | Developers |
+| **semo-po** | PO/기획자용 SEMO | Managers |
+| **semo-design** | 디자이너용 SEMO | Designers |
+| **semo-qa** | QA/테스터용 SEMO | QA |
+| **semo-backend** | 백엔드 개발용 SEMO | Developers |
+| **semo-pm** | PM용 SEMO | Managers |
+| **semo-infra** | 인프라 엔지니어용 SEMO | Developers |
+| **semo-ms** | MSA 개발용 SEMO | Developers |
 
 ### 프로젝트 레포지토리
 
@@ -171,7 +171,7 @@ docs(readme): Update installation guide
 
 ## 역할별 워크플로우
 
-### PO/기획자 (sax-po)
+### PO/기획자 (semo-po)
 
 1. **Epic 생성**: "댓글 기능 Epic 만들어줘"
 2. **Spec 초안 작성** (선택): "Spec 초안 작성해줘"
@@ -179,47 +179,47 @@ docs(readme): Update installation guide
 4. **Task 동기화**: `sync-tasks` Skill
 5. **진행도 추적**: GitHub Projects
 
-### 개발자 (sax-next, sax-backend, sax-ms)
+### 개발자 (semo-next, semo-backend, semo-ms)
 
 1. **이슈 할당 확인**: "현재 업무 확인"
 2. **브랜치 생성**: `feature/#123-{description}`
 3. **Draft PR 생성**: 작업 시작 시점
-4. **코드 작성 및 커밋**: SAX Agent 활용
+4. **코드 작성 및 커밋**: SEMO Agent 활용
 5. **PR 완성 및 리뷰 요청**: 작업 완료 시
 6. **머지 및 배포**: 리뷰 승인 후
 
-### 디자이너 (sax-design)
+### 디자이너 (semo-design)
 
 1. **목업 생성**: "로그인 화면 목업 만들어줘"
 2. **핸드오프 문서 작성**: "개발팀에 전달할 문서 만들어줘"
 3. **Figma 연동** (선택): Framelink MCP
 4. **개발팀 피드백**: Slack `#_협업` 채널
 
-### QA/테스터 (sax-qa)
+### QA/테스터 (semo-qa)
 
 1. **테스트 대기 목록 확인**: "현재 업무 확인"
 2. **테스트 케이스 검증**: `validate-test-cases` Skill
-3. **테스트 실행**: `/SAX:run-test`
-4. **테스트 결과 보고**: `/SAX:test-pass` or `/SAX:test-fail`
+3. **테스트 실행**: `/SEMO:run-test`
+4. **테스트 결과 보고**: `/SEMO:test-pass` or `/SEMO:test-fail`
 5. **버그 리포트 작성**: `report-bug` Skill
 
-### PM (sax-pm)
+### PM (semo-pm)
 
 1. **Sprint 계획**: `create-sprint` Skill
 2. **Epic/Task 할당**: `assign-task` Skill
-3. **진행도 추적**: `/SAX:progress`
+3. **진행도 추적**: `/SEMO:progress`
 4. **장애물 감지**: `detect-blockers` Skill
-5. **보고서 생성**: `/SAX:report`
+5. **보고서 생성**: `/SEMO:report`
 6. **Sprint 종료**: `close-sprint` Skill
 
-### 인프라 엔지니어 (sax-infra)
+### 인프라 엔지니어 (semo-infra)
 
 1. **Docker Compose 설정**: `scaffold-compose` Skill
 2. **Nginx 설정**: `scaffold-nginx` Skill
 3. **환경 변수 동기화**: `sync-env` Skill
-4. **서비스 배포**: `/SAX:deploy`
+4. **서비스 배포**: `/SEMO:deploy`
 5. **모니터링**: 서비스 상태 확인
-6. **롤백** (필요 시): `/SAX:rollback`
+6. **롤백** (필요 시): `/SEMO:rollback`
 
 ---
 
@@ -303,38 +303,38 @@ gh auth status 2>&1 | grep -q 'project' && echo "✅ project 스코프 있음"
 
 ---
 
-## SAX 패키지 설치
+## SEMO 패키지 설치
 
 ### 신규 팀원 온보딩
 
-1. **SAX 패키지 설치**:
+1. **SEMO 패키지 설치**:
    ```bash
    # 역할에 맞는 패키지 선택
-   bash <(curl -fsSL https://raw.githubusercontent.com/semicolon-devteam/sax-meta/main/scripts/install-sax.sh)
+   bash <(curl -fsSL https://raw.githubusercontent.com/semicolon-devteam/semo-meta/main/scripts/install-sax.sh)
    ```
 
 2. **온보딩 프로세스 시작**:
    ```bash
-   /SAX:onboarding
+   /SEMO:onboarding
    ```
 
 3. **환경 검증**:
    ```bash
-   /SAX:health-check
+   /SEMO:health-check
    ```
 
 ### 패키지별 대상
 
 | 패키지 | 대상 |
 |--------|------|
-| sax-next | 프론트엔드/풀스택 개발자 |
-| sax-po | PO/기획자 |
-| sax-design | 디자이너 |
-| sax-qa | QA/테스터 |
-| sax-backend | 백엔드 개발자 |
-| sax-pm | PM (Project Manager) |
-| sax-infra | 인프라 엔지니어 |
-| sax-ms | MSA 개발자 |
+| semo-next | 프론트엔드/풀스택 개발자 |
+| semo-po | PO/기획자 |
+| semo-design | 디자이너 |
+| semo-qa | QA/테스터 |
+| semo-backend | 백엔드 개발자 |
+| semo-pm | PM (Project Manager) |
+| semo-infra | 인프라 엔지니어 |
+| semo-ms | MSA 개발자 |
 
 ---
 
@@ -404,19 +404,19 @@ gh auth status 2>&1 | grep -q 'project' && echo "✅ project 스코프 있음"
 gh auth refresh -s project
 ```
 
-#### 3. SAX 패키지 설치 실패
+#### 3. SEMO 패키지 설치 실패
 
-**증상**: `.claude/sax-*` 디렉토리 없음
+**증상**: `.claude/semo-*` 디렉토리 없음
 
 **해결**:
 ```bash
 # 재설치
-bash <(curl -fsSL https://raw.githubusercontent.com/semicolon-devteam/sax-meta/main/scripts/install-sax.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/semicolon-devteam/semo-meta/main/scripts/install-sax.sh)
 
 # 또는 수동 설치
 cd .claude
-git clone https://github.com/semicolon-devteam/sax-core
-git clone https://github.com/semicolon-devteam/sax-{package}
+git clone https://github.com/semicolon-devteam/semo-core
+git clone https://github.com/semicolon-devteam/semo-{package}
 ```
 
 #### 4. Slack 워크스페이스 초대 안받음
@@ -434,9 +434,9 @@ git clone https://github.com/semicolon-devteam/sax-{package}
 
 ### 공식 문서
 
-- [SAX Core PRINCIPLES.md](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md) - SAX 핵심 원칙
-- [SAX Core MESSAGE_RULES.md](https://github.com/semicolon-devteam/sax-core/blob/main/MESSAGE_RULES.md) - 메시지 규칙
-- [SAX Metadata Schema](https://github.com/semicolon-devteam/sax-core/blob/main/_shared/metadata-schema.md) - 메타데이터 표준
+- [SEMO Core PRINCIPLES.md](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md) - SEMO 핵심 원칙
+- [SEMO Core MESSAGE_RULES.md](https://github.com/semicolon-devteam/semo-core/blob/main/MESSAGE_RULES.md) - 메시지 규칙
+- [SEMO Metadata Schema](https://github.com/semicolon-devteam/semo-core/blob/main/_shared/metadata-schema.md) - 메타데이터 표준
 
 ### 외부 링크
 
@@ -459,6 +459,6 @@ git clone https://github.com/semicolon-devteam/sax-{package}
 
 이 문서에 대한 피드백은 다음 방법으로 제출할 수 있습니다:
 
-1. **GitHub 이슈**: [sax-core Issues](https://github.com/semicolon-devteam/sax-core/issues)
+1. **GitHub 이슈**: [semo-core Issues](https://github.com/semicolon-devteam/semo-core/issues)
 2. **Slack**: `#_협업` 채널
-3. **SAX Skill**: `/SAX:feedback`
+3. **SEMO Skill**: `/SEMO:feedback`

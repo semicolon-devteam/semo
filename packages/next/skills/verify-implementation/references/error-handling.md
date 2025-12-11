@@ -5,7 +5,7 @@
 ## 이슈를 찾을 수 없음
 
 ```markdown
-[SAX] Skill: verify-implementation 오류
+[SEMO] Skill: verify-implementation 오류
 
 ❌ 이슈를 찾을 수 없습니다.
 
@@ -20,7 +20,7 @@
 ## 요구사항 추출 실패
 
 ```markdown
-[SAX] Skill: verify-implementation 경고
+[SEMO] Skill: verify-implementation 경고
 
 ⚠️ 이슈에서 명확한 요구사항을 추출하지 못했습니다.
 
@@ -33,7 +33,7 @@
 ## 코드 검색 실패
 
 ```markdown
-[SAX] Skill: verify-implementation 경고
+[SEMO] Skill: verify-implementation 경고
 
 ⚠️ 관련 코드를 찾지 못했습니다.
 
@@ -53,7 +53,7 @@
 ## 권한 오류
 
 ```markdown
-[SAX] Skill: verify-implementation 오류
+[SEMO] Skill: verify-implementation 오류
 
 ❌ GitHub 접근 권한이 없습니다.
 

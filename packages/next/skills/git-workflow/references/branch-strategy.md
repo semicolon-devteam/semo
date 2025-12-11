@@ -1,6 +1,6 @@
 # Branch Strategy
 
-> **SoT 참조**: 브랜치 전략은 `sax-core/TEAM_RULES.md` 섹션 1.1에서 관리됩니다.
+> **SoT 참조**: 브랜치 전략은 `semo-core/TEAM_RULES.md` 섹션 1.1에서 관리됩니다.
 
 ## 🔴 Spec-First Branching Rule (필수)
 

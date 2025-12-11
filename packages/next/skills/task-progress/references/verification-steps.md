@@ -208,7 +208,7 @@ workflow:
 
   # QA 테스트 통과 시
   qa_pass:
-    check: SAX-QA에서 test-pass 처리되었는지
+    check: SEMO-QA에서 test-pass 처리되었는지
     auto_action:
       - status "테스트중" → "병합됨" 자동 변경
 ```

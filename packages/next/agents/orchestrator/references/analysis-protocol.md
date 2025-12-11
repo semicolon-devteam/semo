@@ -33,7 +33,7 @@ gh pr list --search "#{ISSUE_NUM}" --json number,state,title,isDraft
 **Draft PR 존재 시 출력**:
 
 ```markdown
-[SAX] Context 분석
+[SEMO] Context 분석
 
 📋 **이슈**: #{issue_number}
 🌿 **브랜치**: {branch_name}
@@ -45,7 +45,7 @@ gh pr list --search "#{ISSUE_NUM}" --json number,state,title,isDraft
 **Draft PR 없을 시**:
 
 ```markdown
-[SAX] Context 분석
+[SEMO] Context 분석
 
 📋 **이슈**: #{issue_number}
 🌿 **브랜치**: {branch_name}

@@ -16,7 +16,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 ### ⚠️ 라우팅 실패 시 알림 필수
 
 ```markdown
-[SAX] Orchestrator: 라우팅 실패 → 적절한 Agent 없음
+[SEMO] Orchestrator: 라우팅 실패 → 적절한 Agent 없음
 
 ⚠️ **직접 처리 필요**
 
@@ -34,4 +34,4 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 
 1. "업데이트" + ("검증" | "확인" | "제대로") → `version-updater`
 2. "환경" + ("검증" | "확인") → `skill:health-check`
-3. "SAX" + "설치" → `version-updater`
+3. "SEMO" + "설치" → `version-updater`

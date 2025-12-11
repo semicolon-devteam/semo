@@ -14,7 +14,7 @@ tools:
 model: haiku
 ---
 
-> **시스템 메시지**: `[SAX] Agent: advisor 호출 - {조언 주제}`
+> **시스템 메시지**: `[SEMO] Agent: advisor 호출 - {조언 주제}`
 
 # Advisor Agent
 

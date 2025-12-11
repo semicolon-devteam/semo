@@ -4,7 +4,7 @@ description: Generate design-to-development handoff documents. Use when (1) prep
 tools: [Write, Read, mcp_Framelink]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: design-handoff 호출 - 핸드오프 문서 생성` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: design-handoff 호출 - 핸드오프 문서 생성` 시스템 메시지를 첫 줄에 출력하세요.
 
 # design-handoff Skill
 
@@ -17,7 +17,7 @@ Claude Code와 Antigravity 간의 정보 전달 브릿지 역할도 수행합니
 
 ## 트리거
 
-- `/SAX:handoff` 명령어
+- `/SEMO:handoff` 명령어
 - "핸드오프", "개발 전달", "스펙 문서" 키워드
 - design-master Agent에서 호출
 
@@ -28,7 +28,7 @@ Claude Code와 Antigravity 간의 정보 전달 브릿지 역할도 수행합니
 ```markdown
 사용자: "로그인 폼의 핸드오프 문서 만들어줘"
 
-[SAX] Skill: design-handoff 호출 - 핸드오프 문서 생성
+[SEMO] Skill: design-handoff 호출 - 핸드오프 문서 생성
 
 ## 디자인 분석
 - 대상: 로그인 폼
@@ -248,7 +248,7 @@ Figma 소스인 경우 Framelink MCP 활용:
 템플릿에 맞춰 핸드오프 문서 작성:
 
 ```markdown
-[SAX] Skill: design-handoff - 문서 생성 중
+[SEMO] Skill: design-handoff - 문서 생성 중
 
 섹션 작성:
 ✅ 1. 개요
@@ -276,7 +276,7 @@ docs/handoff/{component-name}-handoff.md
 ### 성공 시
 
 ```markdown
-[SAX] Skill: design-handoff 호출 - 핸드오프 문서 생성
+[SEMO] Skill: design-handoff 호출 - 핸드오프 문서 생성
 
 ## 핸드오프 문서: {컴포넌트명}
 
@@ -300,7 +300,7 @@ docs/handoff/{component-name}-handoff.md
 ### 소스 부족 시
 
 ```markdown
-[SAX] Skill: design-handoff - 추가 정보 필요
+[SEMO] Skill: design-handoff - 추가 정보 필요
 
 핸드오프 문서 생성을 위해 다음 정보가 필요합니다:
 
@@ -313,7 +313,7 @@ docs/handoff/{component-name}-handoff.md
 - [ ] 인터랙션 요구사항
 - [ ] 접근성 요구사항
 
-`/SAX:mockup`으로 먼저 목업을 생성하거나,
+`/SEMO:mockup`으로 먼저 목업을 생성하거나,
 Figma 링크를 제공해주세요.
 ```
 
@@ -338,14 +338,14 @@ Figma 링크를 제공해주세요.
 
 ---
 
-## SAX Message
+## SEMO Message
 
 ```markdown
-[SAX] Skill: design-handoff 사용
+[SEMO] Skill: design-handoff 사용
 
-[SAX] Reference: 핸드오프 문서 생성 - {컴포넌트명}
+[SEMO] Reference: 핸드오프 문서 생성 - {컴포넌트명}
 
-[SAX] Output: {파일경로}
+[SEMO] Output: {파일경로}
 ```
 
 ---

@@ -3,13 +3,13 @@ name: current-tasks
 description: |
   현재 테스트 대기 중인 업무 리스트 확인 및 진행 상황 보고. Use when:
   (1) "현재 업무 확인", (2) "지금 뭐 테스트해야 돼?", (3) "테스트 대기 목록",
-  (4) "내 할 일", (5) `/SAX:current-tasks` 명령어 입력
+  (4) "내 할 일", (5) `/SEMO:current-tasks` 명령어 입력
 tools:
   - run_command
   - read_file
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: current-tasks 실행` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: current-tasks 실행` 시스템 메시지를 첫 줄에 출력하세요.
 
 # current-tasks Skill
 
@@ -25,7 +25,7 @@ GitHub Projects '이슈관리' 프로젝트(ID: 1)에서 '테스트중' 상태�
 - "지금 뭐 테스트해야 돼?"
 - "테스트 대기 목록"
 - "내 할 일"
-- `/SAX:current-tasks` 명령어
+- `/SEMO:current-tasks` 명령어
 
 ## Workflow
 
@@ -61,7 +61,7 @@ gh issue view {issue_number} --json body --jq '.body'
 ### 4. 결과 보고
 
 ```markdown
-[SAX] Skill: current-tasks 실행
+[SEMO] Skill: current-tasks 실행
 
 # 📋 현재 테스트 업무
 
@@ -97,7 +97,7 @@ gh issue view {issue_number} --json body --jq '.body'
 
 테스트를 시작하려면:
 ```
-/SAX:run-test
+/SEMO:run-test
 ```
 
 특정 이슈 선택:
@@ -151,7 +151,7 @@ gh issue view 123 --json body --jq '.body'
 ### 프로젝트 접근 오류
 
 ```markdown
-[SAX] Skill: current-tasks 실행
+[SEMO] Skill: current-tasks 실행
 
 ❌ **프로젝트 접근 실패**
 
@@ -176,7 +176,7 @@ gh issue view 123 --json body --jq '.body'
 ### 테스트중 이슈 없음
 
 ```markdown
-[SAX] Skill: current-tasks 실행
+[SEMO] Skill: current-tasks 실행
 
 # 📋 현재 테스트 업무
 
@@ -190,7 +190,7 @@ gh issue view 123 --json body --jq '.body'
 
 ## Output Format
 
-- SAX 메시지 규칙 준수
+- SEMO 메시지 규칙 준수
 - 이슈 번호는 `#{number}` 형식
 - URL은 마크다운 링크
 - 체크 상태는 ✅/⬜ 이모지
@@ -202,7 +202,7 @@ gh issue view 123 --json body --jq '.body'
 
 ```markdown
 User: "지금 뭐 테스트해야 돼?"
-→ [SAX] Agent 위임: qa-master
+→ [SEMO] Agent 위임: qa-master
 → qa-master가 current-tasks skill 호출
 ```
 
@@ -212,10 +212,10 @@ current-tasks와 유사하지만:
 - current-tasks: 전체 테스트중 이슈 개요
 - test-queue: 특정 이슈의 상세 테스트 큐
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: current-tasks 실행
+[SEMO] Skill: current-tasks 실행
 
 # 📋 현재 테스트 업무
 ...

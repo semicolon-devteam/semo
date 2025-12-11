@@ -1,10 +1,10 @@
-# SAX-MVP
+# SEMO-MVP
 
 > 세미콜론 생태계 기반 그린필드 MVP 개발 패키지
 
 ## Overview
 
-SAX-MVP는 Next.js + Antigravity를 활용한 MVP 프로젝트 개발을 위한 SAX 패키지입니다.
+SEMO-MVP는 Next.js + Antigravity를 활용한 MVP 프로젝트 개발을 위한 SEMO 패키지입니다.
 세미콜론 커뮤니티 솔루션의 컨텍스트를 기반으로 빠른 MVP 개발과 추후 원활한 통합을 지원합니다.
 
 ## Key Features
@@ -17,11 +17,11 @@ SAX-MVP는 Next.js + Antigravity를 활용한 MVP 프로젝트 개발을 위한 
 ## Workflow
 
 ```
-[sax-po] Epic/Task 생성
+[semo-po] Epic/Task 생성
      ↓
-[sax-mvp] Task Card 확인 → 구현 시작
+[semo-mvp] Task Card 확인 → 구현 시작
      ↓
-[sax-mvp] skill:verify-integration
+[semo-mvp] skill:verify-integration
      ↓
 Community Solution Merge
 ```
@@ -38,16 +38,16 @@ Community Solution Merge
 
 ```bash
 # 온보딩 시작
-/SAX:onboarding
+/SEMO:onboarding
 
 # 환경 검증
-/SAX:health
+/SEMO:health
 
 # 도메인 구조 생성
-/SAX:scaffold {domain-name}
+/SEMO:scaffold {domain-name}
 
 # 구현 시작
-/SAX:implement
+/SEMO:implement
 ```
 
 ## MCP Servers Required
@@ -60,6 +60,6 @@ Community Solution Merge
 
 ## References
 
-- [SAX Core Principles](../sax-core/PRINCIPLES.md)
+- [SEMO Core Principles](../semo-core/PRINCIPLES.md)
 - [core-interface](https://github.com/semicolon-devteam/core-interface)
 - [core-supabase](https://github.com/semicolon-devteam/core-supabase)

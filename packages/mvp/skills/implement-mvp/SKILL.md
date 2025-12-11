@@ -4,7 +4,7 @@ description: Phase-gated MVP 구현 워크플로우 실행
 tools: [Read, Write, Edit, Bash, Glob, Grep]
 ---
 
-> **시스템 메시지**: `[SAX] Skill: implement-mvp 호출 - MVP 구현`
+> **시스템 메시지**: `[SEMO] Skill: implement-mvp 호출 - MVP 구현`
 
 # Implement MVP Skill
 
@@ -15,10 +15,10 @@ tools: [Read, Write, Edit, Bash, Glob, Grep]
 ## Quick Start
 
 ```bash
-/SAX:implement
+/SEMO:implement
 
 # 또는 특정 Phase부터 시작
-/SAX:implement --phase=DATA
+/SEMO:implement --phase=DATA
 ```
 
 ---
@@ -73,7 +73,7 @@ git commit -m "feat({domain}): [SETUP] Initialize {feature} dependencies"
 
 ```bash
 # skill:scaffold-mvp-domain 사용
-/SAX:scaffold {domain}
+/SEMO:scaffold {domain}
 ```
 
 ### 커밋
@@ -181,7 +181,7 @@ git commit -m "feat({domain}): [CODE] Implement {domain} hooks and components"
 
 ## 통합 검증
 
-/SAX:verify
+/SEMO:verify
 ```
 
 ### 커밋
@@ -195,7 +195,7 @@ git commit -m "feat({domain}): [TEST] Add {domain} tests and verification"
 ## 전체 워크플로우 실행
 
 ```markdown
-[SAX] Skill: implement-mvp 시작
+[SEMO] Skill: implement-mvp 시작
 
 ## 현재 상태
 - 도메인: {domain}
@@ -238,7 +238,7 @@ git commit -m "feat({domain}): [TEST] Add {domain} tests and verification"
 ### Build 실패
 
 ```markdown
-[SAX] Build 실패 감지
+[SEMO] Build 실패 감지
 
 ## 오류 로그
 {error_log}
@@ -255,7 +255,7 @@ git commit -m "feat({domain}): [TEST] Add {domain} tests and verification"
 ### Phase 실패
 
 ```markdown
-[SAX] Phase {n} 실패
+[SEMO] Phase {n} 실패
 
 ## 누락 항목
 {missing_items}
@@ -265,7 +265,7 @@ git commit -m "feat({domain}): [TEST] Add {domain} tests and verification"
 - 누락된 파일 확인
 
 ## 다시 시도
-/SAX:implement --phase={n}
+/SEMO:implement --phase={n}
 ```
 
 ---

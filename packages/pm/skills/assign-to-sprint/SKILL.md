@@ -2,12 +2,12 @@
 name: assign-to-sprint
 description: |
   Task를 Sprint(Iteration)에 할당. Use when (1) Sprint 계획 시 Task 선정,
-  (2) Task 추가 할당, (3) /SAX:sprint add 커맨드.
+  (2) Task 추가 할당, (3) /SEMO:sprint add 커맨드.
 tools: [Bash, Read]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: assign-to-sprint 호출` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: assign-to-sprint 호출` 메시지를 첫 줄에 출력하세요.
 
 # assign-to-sprint Skill
 
@@ -47,7 +47,7 @@ tasks:                                # 필수
 ## Output
 
 ```markdown
-[SAX] Skill: assign-to-sprint 완료
+[SEMO] Skill: assign-to-sprint 완료
 
 ✅ 2개 Task를 "12월 1/4"에 할당했습니다.
 
@@ -252,7 +252,7 @@ Sprint 용량이 많습니다. 추가 할당 시 주의하세요.
 ## 완료 메시지
 
 ```markdown
-[SAX] Skill: assign-to-sprint 완료
+[SEMO] Skill: assign-to-sprint 완료
 
 ✅ {count}개 Task를 "{iteration_title}"에 할당했습니다.
 

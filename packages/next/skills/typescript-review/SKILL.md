@@ -6,7 +6,7 @@ description: |
 tools: [Read, Grep, Bash, Glob]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: typescript-review 호출` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: typescript-review 호출` 시스템 메시지를 첫 줄에 출력하세요.
 
 # TypeScript/React Code Review Skill
 

@@ -1,6 +1,6 @@
 # Onboarding Phases 상세 가이드
 
-> SAX 온보딩 각 Phase별 상세 진행 방법
+> SEMO 온보딩 각 Phase별 상세 진행 방법
 
 ## Phase 0: 환경 진단
 
@@ -55,18 +55,18 @@ gh auth login
 - **선택 채널**: #_개발, #_디자인, #_qa (역할별)
 - **확인 방법**: 사용자에게 직접 확인 요청
 
-## Phase 2: SAX 개념 학습
+## Phase 2: SEMO 개념 학습
 
-### SAX 4대 원칙
+### SEMO 4대 원칙
 
 #### 1. Transparency (투명성)
 
-모든 AI 작업은 `[SAX] ...` 메시지로 시작합니다.
+모든 AI 작업은 `[SEMO] ...` 메시지로 시작합니다.
 
 ```markdown
-[SAX] Orchestrator: 의도 분석 완료 → 개발 요청
-[SAX] Agent: next-developer 호출
-[SAX] Skill: health-check 호출
+[SEMO] Orchestrator: 의도 분석 완료 → 개발 요청
+[SEMO] Agent: next-developer 호출
+[SEMO] Skill: health-check 호출
 ```
 
 #### 2. Orchestrator-First (오케스트레이터 우선)
@@ -83,22 +83,22 @@ gh auth login
 
 | 역할 | 패키지 | 주요 기능 |
 |------|--------|----------|
-| PO/기획 | sax-po | Epic 생성, 이슈 관리 |
-| 개발자 | sax-next | Next.js 개발 지원 |
-| QA | sax-qa | 테스트 케이스 작성 |
-| 디자이너 | sax-design | Figma 연동 |
-| 백엔드 | sax-backend | API 설계 |
-| PM | sax-pm | Task 관리 |
+| PO/기획 | semo-po | Epic 생성, 이슈 관리 |
+| 개발자 | semo-next | Next.js 개발 지원 |
+| QA | semo-qa | 테스트 케이스 작성 |
+| 디자이너 | semo-design | Figma 연동 |
+| 백엔드 | semo-backend | API 설계 |
+| PM | semo-pm | Task 관리 |
 
 #### 4. Hierarchy (계층성)
 
-SAX Core의 원칙을 각 패키지가 상속합니다.
+SEMO Core의 원칙을 각 패키지가 상속합니다.
 
 ```text
-sax-core (공통 원칙)
-├── sax-po (PO 특화)
-├── sax-next (개발자 특화)
-├── sax-qa (QA 특화)
+semo-core (공통 원칙)
+├── semo-po (PO 특화)
+├── semo-next (개발자 특화)
+├── semo-qa (QA 특화)
 └── ...
 ```
 
@@ -108,16 +108,16 @@ sax-core (공통 원칙)
 1. 이슈 할당
    → "cm-{project}#{issue_number} 할당받았어요"
 
-2. SAX 분석
+2. SEMO 분석
    → 이슈 복잡도 분석
    → 작업 계획 제안
 
 3. 개발 진행
    → "버튼 컴포넌트 만들어줘"
-   → SAX가 코드 작성 지원
+   → SEMO가 코드 작성 지원
 
 4. PR 생성
-   → SAX가 PR 템플릿 자동 생성
+   → SEMO가 PR 템플릿 자동 생성
    → 커밋 메시지 규칙 준수
 
 5. 완료 보고
@@ -130,7 +130,7 @@ sax-core (공통 원칙)
 
 ```bash
 # 설치된 패키지 목록
-ls -d .claude/sax-*/ 2>/dev/null | xargs -I {} basename {} | sed 's/sax-//'
+ls -d .claude/semo-*/ 2>/dev/null | xargs -I {} basename {} | sed 's/semo-//'
 ```
 
 ### 패키지별 스킬 호출
@@ -138,11 +138,11 @@ ls -d .claude/sax-*/ 2>/dev/null | xargs -I {} basename {} | sed 's/sax-//'
 각 패키지의 `skill:onboarding-{package}` 호출:
 
 ```markdown
-[SAX] Skill: onboarding-next 호출
+[SEMO] Skill: onboarding-next 호출
 
 ... 패키지별 실습 진행 ...
 
-[SAX] Skill: onboarding-next 완료
+[SEMO] Skill: onboarding-next 완료
 ```
 
 ### 스킬 없을 경우
@@ -150,7 +150,7 @@ ls -d .claude/sax-*/ 2>/dev/null | xargs -I {} basename {} | sed 's/sax-//'
 패키지에 온보딩 스킬이 없으면 건너뜁니다:
 
 ```markdown
-⏭️ sax-infra: onboarding-infra 스킬 없음 - 건너뜀
+⏭️ semo-infra: onboarding-infra 스킬 없음 - 건너뜀
 ```
 
 ## Phase 4: 온보딩 완료
@@ -159,7 +159,7 @@ ls -d .claude/sax-*/ 2>/dev/null | xargs -I {} basename {} | sed 's/sax-//'
 
 ```json
 {
-  "SAX": {
+  "SEMO": {
     "role": "fulltime",
     "position": "developer",
     "boarded": true,
@@ -175,8 +175,8 @@ ls -d .claude/sax-*/ 2>/dev/null | xargs -I {} basename {} | sed 's/sax-//'
 
 ```bash
 # skill:notify-slack 호출
-{사용자명}님이 SAX 온보딩을 완료했습니다!
-- 패키지: sax-next, sax-qa
+{사용자명}님이 SEMO 온보딩을 완료했습니다!
+- 패키지: semo-next, semo-qa
 - 완료 시간: 2025-12-10 10:00:00
 ```
 
@@ -186,17 +186,17 @@ ls -d .claude/sax-*/ 2>/dev/null | xargs -I {} basename {} | sed 's/sax-//'
 === 온보딩 완료 ===
 
 ✅ 모든 필수 항목 통과
-✅ SAX 개념 학습 완료
+✅ SEMO 개념 학습 완료
 ✅ 패키지별 실습 완료
 
 **다음 단계**:
 1. 팀 리더에게 업무 할당 요청
 2. 이슈 할당 받으면: "cm-{project}#{issue_number} 할당받았어요"
-3. SAX가 자동으로 다음 단계를 안내합니다
+3. SEMO가 자동으로 다음 단계를 안내합니다
 ```
 
 ## 참조 문서
 
-- [SAX Core PRINCIPLES.md](https://github.com/semicolon-devteam/sax-core/blob/main/PRINCIPLES.md)
-- [SAX Core MESSAGE_RULES.md](https://github.com/semicolon-devteam/sax-core/blob/main/MESSAGE_RULES.md)
-- [Team Context Guide](https://github.com/semicolon-devteam/sax-core/blob/main/_shared/team-context.md)
+- [SEMO Core PRINCIPLES.md](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md)
+- [SEMO Core MESSAGE_RULES.md](https://github.com/semicolon-devteam/semo-core/blob/main/MESSAGE_RULES.md)
+- [Team Context Guide](https://github.com/semicolon-devteam/semo-core/blob/main/_shared/team-context.md)

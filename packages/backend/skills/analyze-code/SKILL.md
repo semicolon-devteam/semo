@@ -8,7 +8,7 @@ tools: [Read, Glob, Grep, Bash]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SAX] Skill: analyze-code 호출 - {분석 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: analyze-code 호출 - {분석 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
 # analyze-code Skill
 
@@ -170,7 +170,7 @@ grep -rn "import.*repository" src/main/**/controller/**/*.kt
 ### 분석 완료 (요약)
 
 ```markdown
-[SAX] Skill: analyze-code 완료
+[SEMO] Skill: analyze-code 완료
 
 ## 📊 분석 요약
 
@@ -228,14 +228,14 @@ grep -rn "import.*repository" src/main/**/controller/**/*.kt
 - **수정**: 파라미터 바인딩 사용
 ```
 
-## SAX Message Format
+## SEMO Message Format
 
 ```markdown
-[SAX] Skill: analyze-code 호출 - {focus}
+[SEMO] Skill: analyze-code 호출 - {focus}
 
-[SAX] Skill: analyze-code 스캔 중 - {current}/{total} 파일
+[SEMO] Skill: analyze-code 스캔 중 - {current}/{total} 파일
 
-[SAX] Skill: analyze-code 완료 - {issues}건 발견 (Critical: {n})
+[SEMO] Skill: analyze-code 완료 - {issues}건 발견 (Critical: {n})
 ```
 
 ## Integration with Other Components

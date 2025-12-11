@@ -1,6 +1,6 @@
 # Examples
 
-> SAX-PO Teacher 응답 예시
+> SEMO-PO Teacher 응답 예시
 
 ## 예시 1: 협업 프로세스 질문
 
@@ -19,12 +19,12 @@ Semicolon 팀에서 PO와 개발자의 역할은 명확히 분리됩니다:
 - **개발자**: 기술 명세, 구현, 테스트
 
 ### Semicolon에서는?
-SAX 시스템을 통해 협업합니다:
+SEMO 시스템을 통해 협업합니다:
 
-1. **Epic 생성** (PO - SAX-PO)
+1. **Epic 생성** (PO - SEMO-PO)
    > "댓글 기능 Epic 만들어줘"
 
-2. **Spec 보완** (개발자 - SAX-Next)
+2. **Spec 보완** (개발자 - SEMO-Next)
    > /speckit.specify로 기술 명세 작성
 
 3. **구현 및 검증** (개발자 → PO)
@@ -61,7 +61,7 @@ PO/기획자로서 React hooks의 세부 동작을 알 필요는 없지만,
 **간단히 말하면**: React에서 상태 관리를 위한 기능이에요.
 
 **더 자세히 알고 싶다면**:
-개발자용 SAX-Next 패키지의 Teacher에게 물어보시거나,
+개발자용 SEMO-Next 패키지의 Teacher에게 물어보시거나,
 팀 개발자에게 직접 질문해보세요!
 
 ---

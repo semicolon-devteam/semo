@@ -1,6 +1,6 @@
 # Validation Checks
 
-> **SoT 참조**: 모든 검증 규칙은 `sax-core/TEAM_RULES.md`에서 관리됩니다.
+> **SoT 참조**: 모든 검증 규칙은 `semo-core/TEAM_RULES.md`에서 관리됩니다.
 
 ## Check 1: Commit Messages (섹션 1.2 참조)
 
