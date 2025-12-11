@@ -1,0 +1,57 @@
+# LangFuse Docker Compose
+# SEMO LLM 옵저버빌리티 플랫폼
+
+version: "3.9"
+
+services:
+  langfuse:
+    image: langfuse/langfuse:latest
+    container_name: semo-langfuse
+    ports:
+      - "3000:3000"
+    environment:
+      # 데이터베이스
+      - DATABASE_URL=postgresql://langfuse:langfuse@postgres:5432/langfuse
+
+      # NextAuth 설정
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET:-semo-langfuse-secret-change-me}
+
+      # Salt (암호화)
+      - SALT=${SALT:-semo-langfuse-salt-change-me}
+
+      # Telemetry (선택)
+      - TELEMETRY_ENABLED=false
+
+      # SMTP (이메일 알림, 선택)
+      # - SMTP_CONNECTION_URL=smtp://user:password@smtp.example.com:587
+      # - EMAIL_FROM_ADDRESS=langfuse@example.com
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/public/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: semo-langfuse-db
+    environment:
+      - POSTGRES_USER=langfuse
+      - POSTGRES_PASSWORD=langfuse
+      - POSTGRES_DB=langfuse
+    volumes:
+      - langfuse_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U langfuse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  langfuse_postgres_data:
