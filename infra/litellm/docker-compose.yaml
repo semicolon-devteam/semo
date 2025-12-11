@@ -1,0 +1,78 @@
+# LiteLLM Docker Compose
+# SEMO AI Gateway 로컬/개발 환경용
+
+version: "3.9"
+
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: semo-litellm
+    ports:
+      - "4000:4000"
+    environment:
+      # API Keys (환경변수로 주입)
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+
+      # LiteLLM 설정
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-semo-master}
+      - LITELLM_DATABASE_URL=postgresql://litellm:litellm@postgres:5432/litellm
+
+      # Redis 캐시
+      - REDIS_HOST=redis
+
+      # Slack 알림
+      - SLACK_WEBHOOK_URL=${SLACK_WEBHOOK_URL}
+
+      # LangFuse (Phase 3.1에서 활성화)
+      # - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      # - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      # - LANGFUSE_HOST=${LANGFUSE_HOST:-https://cloud.langfuse.com}
+
+    volumes:
+      - ./config.yaml:/app/config.yaml
+    command: ["--config", "/app/config.yaml", "--detailed_debug"]
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: semo-litellm-db
+    environment:
+      - POSTGRES_USER=litellm
+      - POSTGRES_PASSWORD=litellm
+      - POSTGRES_DB=litellm
+    volumes:
+      - litellm_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: semo-litellm-cache
+    volumes:
+      - litellm_redis_data:/data
+    restart: unless-stopped
+
+  # Admin UI (옵션)
+  litellm-ui:
+    image: ghcr.io/berriai/litellm-ui:main-latest
+    container_name: semo-litellm-ui
+    ports:
+      - "4001:3000"
+    environment:
+      - LITELLM_API_URL=http://litellm:4000
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-semo-master}
+    depends_on:
+      - litellm
+    restart: unless-stopped
+
+volumes:
+  litellm_postgres_data:
+  litellm_redis_data:

@@ -1,0 +1,98 @@
+# LiteLLM Proxy Configuration
+# SEMO AI Gateway - 중앙 집중식 LLM 라우팅
+
+model_list:
+  # Claude 모델 (기본)
+  - model_name: "claude-default"
+    litellm_params:
+      model: "claude-sonnet-4-20250514"
+      api_key: "os.environ/ANTHROPIC_API_KEY"
+    model_info:
+      description: "기본 Claude 모델 - 일반 작업용"
+
+  - model_name: "claude-fast"
+    litellm_params:
+      model: "claude-3-5-haiku-20241022"
+      api_key: "os.environ/ANTHROPIC_API_KEY"
+    model_info:
+      description: "빠른 응답용 - 간단한 작업, 코드 포맷팅"
+
+  - model_name: "claude-advanced"
+    litellm_params:
+      model: "claude-opus-4-20250514"
+      api_key: "os.environ/ANTHROPIC_API_KEY"
+    model_info:
+      description: "고급 추론용 - 복잡한 아키텍처 설계"
+
+  # OpenAI 폴백 (Claude 다운 시)
+  - model_name: "gpt-fallback"
+    litellm_params:
+      model: "gpt-4o"
+      api_key: "os.environ/OPENAI_API_KEY"
+    model_info:
+      description: "Claude 장애 시 폴백"
+
+# 라우터 설정
+router_settings:
+  routing_strategy: "simple-shuffle"  # 로드 밸런싱
+  num_retries: 3
+  retry_after: 5  # 초
+  timeout: 120
+
+  # 모델 그룹 폴백 체인
+  fallbacks:
+    - "claude-default": ["claude-fast", "gpt-fallback"]
+    - "claude-advanced": ["claude-default", "gpt-fallback"]
+
+# 예산 및 속도 제한
+litellm_settings:
+  # 전역 설정
+  drop_params: true
+  set_verbose: false
+
+  # 예산 관리
+  max_budget: 500  # 월 $500 한도
+  budget_duration: "monthly"
+
+  # 속도 제한 (분당)
+  global_max_parallel_requests: 100
+
+# 팀별 예산 할당
+general_settings:
+  master_key: "os.environ/LITELLM_MASTER_KEY"
+  database_url: "os.environ/LITELLM_DATABASE_URL"  # PostgreSQL
+
+  # 알림 설정
+  alerting:
+    - webhook_type: "slack"
+      webhook_url: "os.environ/SLACK_WEBHOOK_URL"
+      alert_types:
+        - "budget_crossed"      # 예산 초과
+        - "llm_exceptions"      # API 오류
+        - "daily_reports"       # 일일 리포트
+
+# 팀별 API 키 설정 (예시)
+# 실제 키는 LiteLLM Admin UI에서 생성
+team_settings:
+  - team_alias: "semo-next"
+    max_budget: 100
+    budget_duration: "monthly"
+
+  - team_alias: "semo-backend"
+    max_budget: 150
+    budget_duration: "monthly"
+
+  - team_alias: "semo-infra"
+    max_budget: 50
+    budget_duration: "monthly"
+
+# 캐싱 설정
+cache:
+  type: "redis"
+  host: "os.environ/REDIS_HOST"
+  port: 6379
+  ttl: 3600  # 1시간
+
+# 로깅 (LangFuse 연동 준비)
+callbacks:
+  - "langfuse"  # Phase 3.1에서 활성화
