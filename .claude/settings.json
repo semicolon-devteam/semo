@@ -1,0 +1,24 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/claude-code/main/schemas/settings.json",
+  "mcpServers": {
+    "semo-integrations": {
+      "command": "npx",
+      "args": ["-y", "@semicolon/semo-mcp"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}",
+        "SLACK_WEBHOOK_URL": "${SLACK_WEBHOOK_URL}",
+        "SUPABASE_URL": "${SUPABASE_URL}",
+        "SUPABASE_KEY": "${SUPABASE_KEY}"
+      }
+    }
+  },
+  "semo": {
+    "version": "2.0.0",
+    "structure": "hybrid",
+    "layers": {
+      "core": "filesystem",
+      "skills": "filesystem",
+      "integrations": "mcp"
+    }
+  }
+}
