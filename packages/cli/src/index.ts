@@ -21,8 +21,69 @@ import inquirer from "inquirer";
 import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 
-const VERSION = "2.0.1";
+const VERSION = "2.0.2";
+
+// === Windows 지원 유틸리티 ===
+const isWindows = os.platform() === "win32";
+
+/**
+ * Windows에서 Junction 링크를 생성하거나, Unix에서 심볼릭 링크를 생성
+ * Junction은 관리자 권한 없이 디렉토리 링크를 생성할 수 있음
+ */
+function createSymlinkOrJunction(targetPath: string, linkPath: string): void {
+  if (isWindows) {
+    // Windows: Junction 사용 (절대 경로 필요)
+    const absoluteTarget = path.resolve(targetPath);
+    try {
+      execSync(`cmd /c "mklink /J "${linkPath}" "${absoluteTarget}""`, { stdio: "pipe" });
+    } catch {
+      // fallback: 디렉토리 복사
+      console.log(chalk.yellow(`  ⚠ Junction 생성 실패, 복사로 대체: ${path.basename(linkPath)}`));
+      execSync(`xcopy /E /I /Q "${absoluteTarget}" "${linkPath}"`, { stdio: "pipe" });
+    }
+  } else {
+    // Unix: 상대 경로 심볼릭 링크
+    const relativeTarget = path.relative(path.dirname(linkPath), targetPath);
+    fs.symlinkSync(relativeTarget, linkPath);
+  }
+}
+
+/**
+ * 플랫폼에 맞는 rm -rf 실행
+ */
+function removeRecursive(targetPath: string): void {
+  if (!fs.existsSync(targetPath)) return;
+
+  if (isWindows) {
+    try {
+      const stats = fs.lstatSync(targetPath);
+      if (stats.isSymbolicLink()) {
+        // Junction/Symlink는 rmdir로 제거 (내용물 보존)
+        execSync(`cmd /c "rmdir "${targetPath}""`, { stdio: "pipe" });
+      } else {
+        execSync(`cmd /c "rd /s /q "${targetPath}""`, { stdio: "pipe" });
+      }
+    } catch {
+      fs.rmSync(targetPath, { recursive: true, force: true });
+    }
+  } else {
+    execSync(`rm -rf "${targetPath}"`, { stdio: "pipe" });
+  }
+}
+
+/**
+ * 플랫폼에 맞는 cp -r 실행
+ */
+function copyRecursive(src: string, dest: string): void {
+  if (isWindows) {
+    execSync(`xcopy /E /I /Q "${src}" "${dest}"`, { stdio: "pipe" });
+  } else {
+    execSync(`cp -r "${src}" "${dest}"`, { stdio: "pipe" });
+  }
+}
+
 const SEMO_REPO = "https://github.com/semicolon-devteam/semo.git";
 
 // 확장 패키지 정의
@@ -201,7 +262,7 @@ async function setupStandard(cwd: string, force: boolean) {
       console.log(chalk.gray("  → semo-system/ 건너뜀"));
       return;
     }
-    execSync(`rm -rf "${semoSystemDir}"`, { stdio: "pipe" });
+    removeRecursive(semoSystemDir);
     console.log(chalk.green("  ✓ 기존 semo-system/ 삭제됨"));
   }
 
@@ -209,22 +270,22 @@ async function setupStandard(cwd: string, force: boolean) {
 
   try {
     const tempDir = path.join(cwd, ".semo-temp");
-    execSync(`rm -rf "${tempDir}"`, { stdio: "pipe" });
+    removeRecursive(tempDir);
     execSync(`git clone --depth 1 ${SEMO_REPO} "${tempDir}"`, { stdio: "pipe" });
 
     fs.mkdirSync(semoSystemDir, { recursive: true });
 
     // semo-core 복사
     if (fs.existsSync(path.join(tempDir, "semo-core"))) {
-      execSync(`cp -r "${tempDir}/semo-core" "${semoSystemDir}/"`, { stdio: "pipe" });
+      copyRecursive(path.join(tempDir, "semo-core"), path.join(semoSystemDir, "semo-core"));
     }
 
     // semo-skills 복사
     if (fs.existsSync(path.join(tempDir, "semo-skills"))) {
-      execSync(`cp -r "${tempDir}/semo-skills" "${semoSystemDir}/"`, { stdio: "pipe" });
+      copyRecursive(path.join(tempDir, "semo-skills"), path.join(semoSystemDir, "semo-skills"));
     }
 
-    execSync(`rm -rf "${tempDir}"`, { stdio: "pipe" });
+    removeRecursive(tempDir);
 
     spinner.succeed("Standard 설치 완료");
 
@@ -258,8 +319,9 @@ async function createStandardSymlinks(cwd: string) {
     );
     for (const agent of agents) {
       const agentLink = path.join(claudeAgentsDir, agent);
+      const agentTarget = path.join(coreAgentsDir, agent);
       if (!fs.existsSync(agentLink)) {
-        fs.symlinkSync(`../../semo-system/semo-core/agents/${agent}`, agentLink);
+        createSymlinkOrJunction(agentTarget, agentLink);
       }
     }
     console.log(chalk.green(`  ✓ .claude/agents/ (${agents.length}개 agent 링크됨)`));
@@ -272,7 +334,7 @@ async function createStandardSymlinks(cwd: string) {
   if (fs.existsSync(coreSkillsDir)) {
     // 기존 심볼릭 링크면 삭제 (디렉토리로 변경)
     if (fs.existsSync(claudeSkillsDir) && fs.lstatSync(claudeSkillsDir).isSymbolicLink()) {
-      fs.unlinkSync(claudeSkillsDir);
+      removeRecursive(claudeSkillsDir);
     }
     fs.mkdirSync(claudeSkillsDir, { recursive: true });
 
@@ -281,8 +343,9 @@ async function createStandardSymlinks(cwd: string) {
     );
     for (const skill of skills) {
       const skillLink = path.join(claudeSkillsDir, skill);
+      const skillTarget = path.join(coreSkillsDir, skill);
       if (!fs.existsSync(skillLink)) {
-        fs.symlinkSync(`../../semo-system/semo-skills/${skill}`, skillLink);
+        createSymlinkOrJunction(skillTarget, skillLink);
       }
     }
     console.log(chalk.green(`  ✓ .claude/skills/ (${skills.length}개 skill 링크됨)`));
@@ -296,7 +359,7 @@ async function createStandardSymlinks(cwd: string) {
   if (!fs.existsSync(semoCommandsLink)) {
     const commandsTarget = path.join(semoSystemDir, "semo-core", "commands", "SEMO");
     if (fs.existsSync(commandsTarget)) {
-      fs.symlinkSync("../../semo-system/semo-core/commands/SEMO", semoCommandsLink);
+      createSymlinkOrJunction(commandsTarget, semoCommandsLink);
       console.log(chalk.green("  ✓ .claude/commands/SEMO → semo-system/semo-core/commands/SEMO"));
     }
   }
@@ -331,12 +394,12 @@ async function downloadExtensions(cwd: string, packages: string[], force: boolea
           console.log(chalk.yellow(`  ⚠ ${pkg}/ 이미 존재 (건너뜀)`));
           continue;
         }
-        execSync(`rm -rf "${destPath}"`, { stdio: "pipe" });
-        execSync(`cp -r "${srcPath}" "${destPath}"`, { stdio: "pipe" });
+        removeRecursive(destPath);
+        copyRecursive(srcPath, destPath);
       }
     }
 
-    execSync(`rm -rf "${tempDir}"`, { stdio: "pipe" });
+    removeRecursive(tempDir);
 
     spinner.succeed(`Extensions 다운로드 완료 (${packages.length}개)`);
 
@@ -360,7 +423,7 @@ async function setupExtensionSymlinks(cwd: string, packages: string[]) {
     // 1. semo-{pkg} 링크
     const semoPkgLink = path.join(claudeDir, `semo-${pkg}`);
     if (!fs.existsSync(semoPkgLink)) {
-      fs.symlinkSync(`../semo-system/${pkg}`, semoPkgLink);
+      createSymlinkOrJunction(pkgPath, semoPkgLink);
       console.log(chalk.green(`  ✓ .claude/semo-${pkg} → semo-system/${pkg}`));
     }
 
@@ -373,8 +436,9 @@ async function setupExtensionSymlinks(cwd: string, packages: string[]) {
       );
       for (const agent of agents) {
         const agentLink = path.join(claudeAgentsDir, agent);
+        const agentTarget = path.join(extAgentsDir, agent);
         if (!fs.existsSync(agentLink)) {
-          fs.symlinkSync(`../../semo-system/${pkg}/agents/${agent}`, agentLink);
+          createSymlinkOrJunction(agentTarget, agentLink);
           console.log(chalk.green(`  ✓ .claude/agents/${agent} → semo-system/${pkg}/agents/${agent}`));
         }
       }
@@ -389,8 +453,9 @@ async function setupExtensionSymlinks(cwd: string, packages: string[]) {
       );
       for (const skill of skills) {
         const skillLink = path.join(claudeSkillsDir, skill);
+        const skillTarget = path.join(extSkillsDir, skill);
         if (!fs.existsSync(skillLink)) {
-          fs.symlinkSync(`../../semo-system/${pkg}/skills/${skill}`, skillLink);
+          createSymlinkOrJunction(skillTarget, skillLink);
           console.log(chalk.green(`  ✓ .claude/skills/${skill} → semo-system/${pkg}/skills/${skill}`));
         }
       }
@@ -892,25 +957,26 @@ program
 
     try {
       const tempDir = path.join(cwd, ".semo-temp");
-      execSync(`rm -rf "${tempDir}"`, { stdio: "pipe" });
+      removeRecursive(tempDir);
       execSync(`git clone --depth 1 ${SEMO_REPO} "${tempDir}"`, { stdio: "pipe" });
 
       // Standard 업데이트
-      execSync(`rm -rf "${semoSystemDir}/semo-core" "${semoSystemDir}/semo-skills"`, { stdio: "pipe" });
-      execSync(`cp -r "${tempDir}/semo-core" "${semoSystemDir}/"`, { stdio: "pipe" });
-      execSync(`cp -r "${tempDir}/semo-skills" "${semoSystemDir}/"`, { stdio: "pipe" });
+      removeRecursive(path.join(semoSystemDir, "semo-core"));
+      removeRecursive(path.join(semoSystemDir, "semo-skills"));
+      copyRecursive(path.join(tempDir, "semo-core"), path.join(semoSystemDir, "semo-core"));
+      copyRecursive(path.join(tempDir, "semo-skills"), path.join(semoSystemDir, "semo-skills"));
 
       // Extensions 업데이트
       for (const pkg of installedExtensions) {
         const srcPath = path.join(tempDir, "packages", pkg);
         const destPath = path.join(semoSystemDir, pkg);
         if (fs.existsSync(srcPath)) {
-          execSync(`rm -rf "${destPath}"`, { stdio: "pipe" });
-          execSync(`cp -r "${srcPath}" "${destPath}"`, { stdio: "pipe" });
+          removeRecursive(destPath);
+          copyRecursive(srcPath, destPath);
         }
       }
 
-      execSync(`rm -rf "${tempDir}"`, { stdio: "pipe" });
+      removeRecursive(tempDir);
 
       spinner.succeed("SEMO 업데이트 완료");
     } catch (error) {
