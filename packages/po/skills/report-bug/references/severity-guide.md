@@ -1,0 +1,103 @@
+# Severity Guide
+
+> 버그 심각도 기준 가이드
+
+## 심각도 레벨
+
+| 레벨 | 라벨 | 설명 | 대응 시간 |
+|------|------|------|----------|
+| **Critical** | `critical` | 서비스 전체 불가, 데이터 손실 위험 | 즉시 |
+| **High** | `high` | 주요 기능 장애, 대안 없음 | 24시간 내 |
+| **Medium** | `medium` | 기능 일부 문제, 대안 있음 | 1주일 내 |
+| **Low** | `low` | 사소한 이슈, UX 개선 수준 | 스프린트 내 |
+
+## 상세 기준
+
+### Critical (치명적)
+
+- 서비스 전체가 작동하지 않음
+- 데이터 손실 또는 보안 취약점
+- 결제/금전 관련 심각한 오류
+- 모든 사용자에게 영향
+
+**예시**:
+- 서버 다운으로 앱 접속 불가
+- 결제 금액 오류 발생
+- 개인정보 노출 취약점
+
+### High (높음)
+
+- 핵심 기능이 작동하지 않음
+- 우회 방법이 없음
+- 다수의 사용자에게 영향
+
+**예시**:
+- 로그인 기능 전체 실패
+- 게시글 작성 불가
+- 알림 전송 실패
+
+### Medium (중간)
+
+- 일부 기능에 문제 있음
+- 우회 방법이 존재함
+- 일부 사용자에게 영향
+
+**예시**:
+- 특정 브라우저에서만 UI 깨짐
+- 검색 결과 정렬 오류
+- 이미지 업로드 간헐적 실패
+
+### Low (낮음)
+
+- 사소한 UI/UX 이슈
+- 기능에는 영향 없음
+- 개선 사항에 가까움
+
+**예시**:
+- 오타 수정
+- 버튼 색상 불일치
+- 로딩 시간 약간 느림
+
+## 자동 라벨링
+
+심각도 선택 시 자동으로 라벨이 추가됩니다:
+
+```bash
+# Critical
+--label "bug,critical,priority:urgent"
+
+# High
+--label "bug,high,priority:high"
+
+# Medium
+--label "bug,medium"
+
+# Low
+--label "bug,low"
+```
+
+## 심각도 → 우선순위 자동 매핑
+
+버그 이슈는 심각도에 따라 Projects #1 (이슈관리)의 우선순위가 자동으로 설정됩니다:
+
+| 심각도 | 우선순위 | Option ID | 설명 |
+|--------|----------|-----------|------|
+| **Critical** | P0(긴급) | `a20917be` | 즉시 처리 |
+| **High** | P1(높음) | `851dbd77` | 24시간 내 |
+| **Medium** | P2(보통) | `e3b68a2a` | 1주일 내 |
+| **Low** | P3(낮음) | `2ba68eff` | 스프린트 내 |
+
+### 우선순위 설정 코드
+
+```bash
+# 심각도별 Option ID 매핑
+case "$SEVERITY" in
+  "critical") PRIORITY_OPTION_ID="a20917be" ;;  # P0(긴급)
+  "high")     PRIORITY_OPTION_ID="851dbd77" ;;  # P1(높음)
+  "medium")   PRIORITY_OPTION_ID="e3b68a2a" ;;  # P2(보통)
+  "low")      PRIORITY_OPTION_ID="2ba68eff" ;;  # P3(낮음)
+  *)          PRIORITY_OPTION_ID="e3b68a2a" ;;  # 기본값: P2(보통)
+esac
+```
+
+> 상세 설정 방법: [priority-config.md](../../common/priority-config.md) 참조
