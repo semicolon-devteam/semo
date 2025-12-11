@@ -1,0 +1,50 @@
+# Promptfoo 최소 테스트
+# 동작 방식 이해를 위한 가장 단순한 설정
+
+description: "Promptfoo 동작 확인 - 최소 테스트"
+
+# 테스트할 프롬프트 (직접 문자열로 정의)
+prompts:
+  - "당신은 도움이 되는 AI 어시스턴트입니다. 사용자 질문: {{input}}"
+
+# 테스트할 모델 (가장 저렴한 Haiku만)
+providers:
+  - id: anthropic:claude-3-5-haiku-20241022
+    config:
+      max_tokens: 256
+
+# 테스트 케이스 (3개만)
+tests:
+  # 테스트 1: 단순 응답 확인
+  - description: "기본 인사 응답"
+    vars:
+      input: "안녕하세요"
+    assert:
+      - type: contains-any
+        value: ["안녕", "반갑", "hello", "Hello"]
+
+  # 테스트 2: 특정 키워드 포함 확인
+  - description: "Python 질문 응답"
+    vars:
+      input: "Python에서 리스트를 만드는 방법은?"
+    assert:
+      - type: contains
+        value: "["
+      - type: contains-any
+        value: ["list", "리스트", "[]"]
+
+  # 테스트 3: LLM-as-Judge (llm-rubric)
+  - description: "코드 설명 품질"
+    vars:
+      input: "for 루프란 무엇인가요?"
+    assert:
+      - type: llm-rubric
+        value: "반복(iteration) 또는 루프(loop) 개념을 설명했는가?"
+
+# 반복 실행 없음 (빠른 테스트)
+defaultTest:
+  options:
+    repeat: 1
+
+# 출력
+outputPath: ./results/minimal-test.json
