@@ -38,7 +38,7 @@ MVP 프로젝트 개발을 위한 모든 요청의 진입점입니다.
 | 도메인 생성 | mvp-architect | 도메인, scaffold, 구조, 아키텍처 |
 | 구현 시작 | implementation-master | 구현, implement, 개발, 코드 |
 | 타입 동기화 | skill:sync-interface | 타입, interface, 동기화, core-interface |
-| Supabase 직접 | skill:supabase-fallback | supabase, graphql, fallback, 쿼리 |
+| **Supabase 연결** | **🔴 자동 설정 필수** | supabase, 연결, 설정, graphql, 데이터베이스 |
 | UI 목업 | Antigravity 위임 | 목업, mockup, UI, 디자인 |
 | 통합 검증 | skill:verify-integration | 검증, verify, 통합, 머지 |
 | 온보딩 | onboarding-master | 온보딩, 시작, setup, 환경 설정 |
@@ -145,7 +145,66 @@ gh api repos/semicolon-devteam/docs/issues/{epic_number}/timeline --jq '.[] | se
 - 링크 없이 "아마도~", "보통~" 식의 응답 ❌
 - GitHub API 조회 없이 응답 ❌
 
-### 4. Antigravity 위임
+### 4. 🔴 Supabase 연결 시 자동 설정 (NON-NEGOTIABLE)
+
+> **⚠️ 중요**: Supabase 관련 요청 시 **설명만 하고 끝내지 마세요**.
+> 비개발자도 바로 사용할 수 있도록 자동 설정을 실행해야 합니다.
+
+**키워드 감지**: supabase, 연결, 설정, 데이터베이스, DB
+
+**자동 실행 단계**:
+
+1. **프로젝트 루트 확인**
+   ```bash
+   pwd
+   ls -la .env* 2>/dev/null || echo "환경변수 파일 없음"
+   ```
+
+2. **.env.local 파일 생성/업데이트**
+   ```bash
+   # .env.local 파일이 없으면 생성
+   if [ ! -f .env.local ]; then
+     cat > .env.local << 'EOF'
+   # Supabase 설정
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key-here
+   EOF
+     echo "✅ .env.local 파일 생성됨"
+   fi
+   ```
+
+3. **사용자에게 안내**
+   ```markdown
+   ## Supabase 연결 설정
+
+   ✅ `.env.local` 파일이 생성되었습니다.
+
+   ### 다음 단계
+
+   1. **Supabase Dashboard 열기**
+      👉 [dashboard.supabase.com](https://dashboard.supabase.com)
+
+   2. **프로젝트 선택** → **Settings** → **API**
+
+   3. **아래 값을 복사해서 `.env.local`에 붙여넣기**:
+      - `Project URL` → `NEXT_PUBLIC_SUPABASE_URL`
+      - `anon public` (Project API keys) → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+   ### 예시
+   \`\`\`env
+   NEXT_PUBLIC_SUPABASE_URL=https://abcdefgh.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   \`\`\`
+
+   복사가 완료되면 알려주세요!
+   ```
+
+**🔴 금지 사항**:
+- Supabase 설명만 하고 끝내기 ❌
+- "환경변수를 설정하세요"라고만 말하기 ❌
+- .env.local 파일을 직접 생성하지 않기 ❌
+
+### 5. Antigravity 위임
 
 시각적 작업 (목업, 브라우저 테스트)은 Antigravity로 위임:
 
