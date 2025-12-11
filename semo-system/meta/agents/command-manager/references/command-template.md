@@ -91,7 +91,7 @@ sax/packages/semo-meta/commands/SEMO/{command-name}.md
 | 파일명 | 결과 | 이유 |
 |--------|------|------|
 | `:onboarding.md` | `/SEMO::onboarding` | 이중 콜론 발생 |
-| `SAX:onboarding.md` | `/SEMO:SAX:onboarding` | 중복 프리픽스 |
+| `SEMO:onboarding.md` | `/SEMO:SEMO:onboarding` | 중복 프리픽스 |
 | `OnBoarding.md` | `/SEMO:OnBoarding` | PascalCase 지양 |
 
 ## 섹션별 가이드

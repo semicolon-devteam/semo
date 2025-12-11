@@ -79,15 +79,15 @@ Command가 호출할 수 있는 공통 컴포넌트:
 
 | 파일명 | 호출 형식 | 설명 |
 |--------|-----------|------|
-| `SAX/onboarding.md` | `/SEMO:onboarding` ✅ | 디렉토리명이 프리픽스 |
-| `SAX/health-check.md` | `/SEMO:health-check` ✅ | kebab-case 권장 |
+| `SEMO/onboarding.md` | `/SEMO:onboarding` ✅ | 디렉토리명이 프리픽스 |
+| `SEMO/health-check.md` | `/SEMO:health-check` ✅ | kebab-case 권장 |
 
 ### 잘못된 네이밍 (피해야 함)
 
 | 파일명 | 결과 | 이유 |
 |--------|------|------|
-| `SAX/:onboarding.md` | `/SEMO::onboarding` ❌ | `:` 프리픽스로 이중 콜론 발생 |
-| `SEMO:onboarding.md` | `/SEMO:SAX:onboarding` ❌ | 중복 프리픽스 |
+| `SEMO/:onboarding.md` | `/SEMO::onboarding` ❌ | `:` 프리픽스로 이중 콜론 발생 |
+| `SEMO:onboarding.md` | `/SEMO:SEMO:onboarding` ❌ | 중복 프리픽스 |
 
 ## Output Format
 
@@ -97,7 +97,7 @@ Command가 호출할 수 있는 공통 컴포넌트:
 ## ✅ SEMO 커맨드 {작업} 완료
 
 **Command**: /SEMO:{command-name}
-**Location**: `sax/packages/{package}/commands/SEMO/{command-name}.md`
+**Location**: `semo-system/{package}/commands/SEMO/{command-name}.md`
 
 ### 처리된 항목
 

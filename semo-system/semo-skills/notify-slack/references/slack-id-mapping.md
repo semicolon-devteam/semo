@@ -21,7 +21,8 @@ notify-slack Skill은 **하드코딩된 매핑 테이블 대신 Slack API를 통
 전체 워크스페이스 사용자 목록 조회:
 
 ```bash
-SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7"
+# SLACK_BOT_TOKEN은 환경 변수 또는 .claude/settings.json의 MCP env에서 설정
+# 예: export SLACK_BOT_TOKEN="xoxb-your-token-here"
 
 curl -s "https://slack.com/api/users.list" \
   -H "Authorization: Bearer $SLACK_BOT_TOKEN"

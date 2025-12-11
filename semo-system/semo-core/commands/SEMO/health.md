@@ -76,7 +76,29 @@ your-project/
 }
 ```
 
-### Phase 4: 토큰 사용량 리포트
+### Phase 4: Supabase 연결 검증 (Next.js 패키지 설치 시)
+
+> 이 Phase는 `semo-system/next/` 또는 Next.js 프로젝트에서만 실행됩니다.
+
+**검증 항목:**
+
+| 항목 | 환경 변수 | 필수 |
+|------|----------|------|
+| Supabase URL | `NEXT_PUBLIC_SUPABASE_URL` | 필수 |
+| Supabase Anon Key | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | 필수 |
+| Service Role Key | `SUPABASE_SERVICE_ROLE_KEY` | 선택 |
+
+**Supabase CLI 확인:**
+
+```bash
+# CLI 설치 확인
+supabase --version
+
+# 로그인 상태 확인
+supabase projects list
+```
+
+### Phase 5: 토큰 사용량 리포트
 
 SEMO 구조의 토큰 사용량을 분석:
 
@@ -124,7 +146,17 @@ SEMO 구조의 토큰 사용량을 분석:
 |----------|------|
 | semo-integrations | OK |
 
-=== Phase 4: 토큰 사용량 리포트 ===
+=== Phase 4: Supabase 연결 검증 (Next.js 감지) ===
+
+| 항목 | 상태 |
+|------|------|
+| NEXT_PUBLIC_SUPABASE_URL | OK |
+| NEXT_PUBLIC_SUPABASE_ANON_KEY | OK |
+| SUPABASE_SERVICE_ROLE_KEY | ⚠️ 미설정 (선택) |
+| Supabase CLI | OK (v1.x.x) |
+| 연결된 프로젝트 | my-project (ap-northeast-1) |
+
+=== Phase 5: 토큰 사용량 리포트 ===
 
 | 항목 | 파일 수 | 예상 토큰 |
 |------|---------|----------|
