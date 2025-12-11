@@ -2,6 +2,29 @@
 
 > 중앙 집중식 LLM 프록시 - 비용 추적, 속도 제한, 모델 폴백
 
+---
+
+## ⚠️ 현재 상태: 보류 (Reserved)
+
+**이 컴포넌트는 현재 SEMO에서 활성화되지 않습니다.**
+
+### 이유
+
+SEMO는 **Claude Code 기반**으로 동작하며, Claude Code는:
+- 내부적으로 Anthropic API를 직접 호출
+- 커스텀 프록시 엔드포인트 설정을 지원하지 않음
+
+따라서 LiteLLM 프록시를 경유할 수 없습니다.
+
+### 활성화 시점
+
+다음 시나리오에서 활성화합니다:
+1. **MCP 서버**가 자체적으로 LLM API를 호출하는 기능 추가 시
+2. **백엔드 서비스**에서 AI 기능을 직접 구현할 때
+3. **Claude Code 외부**의 커스텀 도구 개발 시
+
+---
+
 ## 빠른 시작
 
 ```bash
@@ -25,15 +48,18 @@ curl http://localhost:4000/health
 
 ## 사용법
 
-### Claude Code에서 사용
+### ~~Claude Code에서 사용~~ (미지원)
+
+> ⚠️ Claude Code는 커스텀 API 엔드포인트를 지원하지 않습니다.
+> 아래 설정은 동작하지 않습니다.
 
 ```bash
-# 환경변수 설정
-export ANTHROPIC_API_BASE=http://localhost:4000
-export ANTHROPIC_API_KEY=sk-semo-team-key  # LiteLLM에서 발급한 팀 키
+# ❌ 동작하지 않음
+# export ANTHROPIC_API_BASE=http://localhost:4000
+# export ANTHROPIC_API_KEY=sk-semo-team-key
 ```
 
-### 직접 API 호출
+### 직접 API 호출 (MCP 서버, 백엔드 등)
 
 ```bash
 curl http://localhost:4000/v1/chat/completions \
