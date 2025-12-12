@@ -9,9 +9,12 @@
 import crypto from "crypto";
 
 // 암호화 키 (32바이트 = 256비트)
-// 빌드 시 환경변수로 주입, 런타임에는 내장된 키 사용
-const ENCRYPTION_KEY =
-  process.env.SEMO_ENCRYPTION_KEY || "semo-default-key-for-development!!";
+// 팀 공용 토큰용 고정 키 (패키지에 내장 - 난독화 목적)
+// 주의: 이 키는 소스코드에 노출되어 있으므로 고급 보안이 아닌 기본 난독화 수준임
+const TEAM_TOKEN_KEY = "semo-team-token-key-2024-secure";
+
+// 사용자 커스텀 키 (환경변수로 주입, 개인 토큰용)
+const ENCRYPTION_KEY = process.env.SEMO_ENCRYPTION_KEY || TEAM_TOKEN_KEY;
 
 const ALGORITHM = "aes-256-cbc";
 const IV_LENGTH = 16;

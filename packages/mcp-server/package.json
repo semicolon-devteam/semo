@@ -1,6 +1,6 @@
 {
   "name": "@team-semicolon/semo-mcp",
-  "version": "2.1.1",
+  "version": "2.1.2",
   "description": "SEMO MCP Server - Integrations (GitHub, Slack, Supabase) for Claude Code",
   "main": "dist/index.js",
   "bin": {
@@ -28,14 +28,16 @@
     "directory": "packages/mcp-server"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.0"
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@types/pg": "^8.16.0",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
+    "@types/jest": "^29.0.0",
     "@types/node": "^20.0.0",
-    "typescript": "^5.0.0",
-    "ts-node": "^10.0.0",
     "jest": "^29.0.0",
-    "@types/jest": "^29.0.0"
+    "ts-node": "^10.0.0",
+    "typescript": "^5.0.0"
   },
   "engines": {
     "node": ">=18.0.0"
