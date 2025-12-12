@@ -45,9 +45,57 @@ jobs:
         run: npm version ${{ github.event.inputs.version }} --no-git-tag-version --allow-same-version
 
       - name: Publish to npm
+        id: publish
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Job Summary (Success)
+        if: success()
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "## ✅ semo-mcp v${VERSION} 배포 성공" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 패키지 정보" >> $GITHUB_STEP_SUMMARY
+          echo "| 항목 | 값 |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| 패키지 | \`@team-semicolon/semo-mcp\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 버전 | \`${VERSION}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 트리거 | \`${{ github.event_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 커밋 | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔐 토큰 상태" >> $GITHUB_STEP_SUMMARY
+          echo "| 토큰 | 상태 |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|------|" >> $GITHUB_STEP_SUMMARY
+          echo "| SEMO_SLACK_BOT_TOKEN | ✅ 암호화됨 |" >> $GITHUB_STEP_SUMMARY
+          echo "| SEMO_ENCRYPTION_KEY | ✅ 설정됨 |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📥 설치 방법" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "npx @team-semicolon/semo-mcp@${VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 링크" >> $GITHUB_STEP_SUMMARY
+          echo "- [npm 패키지](https://www.npmjs.com/package/@team-semicolon/semo-mcp)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Job Summary (Failure)
+        if: failure()
+        run: |
+          VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "unknown")
+          echo "## ❌ semo-mcp 배포 실패" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📋 실패 정보" >> $GITHUB_STEP_SUMMARY
+          echo "| 항목 | 값 |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| 버전 | \`${VERSION}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 트리거 | \`${{ github.event_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 커밋 | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔍 체크리스트" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] \`SEMO_ENCRYPTION_KEY\` 시크릿 설정 확인 (32자)" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] \`SEMO_SLACK_BOT_TOKEN\` 시크릿 설정 확인" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] \`NPM_TOKEN\` 시크릿 설정 확인" >> $GITHUB_STEP_SUMMARY
+          echo "- [ ] npm 패키지 버전 중복 확인" >> $GITHUB_STEP_SUMMARY
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
