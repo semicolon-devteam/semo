@@ -32,11 +32,45 @@ import {
   ListResourcesRequestSchema,
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import { decrypt } from "./crypto.js";
+import { ENCRYPTED_TOKENS, hasEncryptedToken } from "./tokens.js";
+
+// === 토큰 관리 ===
+// 우선순위: 환경변수 > 암호화된 팀 토큰
+
+// Slack 토큰 (팀 공용 토큰 자동 사용)
+function getSlackToken(): string {
+  // 1. 환경변수 우선
+  if (process.env.SLACK_BOT_TOKEN) {
+    return process.env.SLACK_BOT_TOKEN;
+  }
+  // 2. 암호화된 팀 토큰 사용
+  if (hasEncryptedToken("SLACK_BOT_TOKEN")) {
+    const decrypted = decrypt(ENCRYPTED_TOKENS.SLACK_BOT_TOKEN);
+    if (decrypted) return decrypted;
+  }
+  // 3. 폴백 (개발용)
+  return "";
+}
+
+// GitHub 토큰 (개인 토큰 필요)
+function getGithubToken(): string {
+  // 1. 환경변수 우선 (개인 토큰)
+  if (process.env.GITHUB_TOKEN) {
+    return process.env.GITHUB_TOKEN;
+  }
+  // 2. 암호화된 팀 토큰 (있는 경우)
+  if (hasEncryptedToken("GITHUB_APP_TOKEN")) {
+    const decrypted = decrypt(ENCRYPTED_TOKENS.GITHUB_APP_TOKEN);
+    if (decrypted) return decrypted;
+  }
+  return "";
+}
 
 // 환경 변수
-const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || "xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7";
+const SLACK_BOT_TOKEN = getSlackToken();
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID || "C09KNL91QBZ";
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+const GITHUB_TOKEN = getGithubToken();
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 

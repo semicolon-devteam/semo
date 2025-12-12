@@ -25,13 +25,123 @@
 **실패 시**: 각 항목별 설치 가이드 제공 후 재검증
 **성공 시**: Phase 1 진행
 
-### Phase 1: 조직 참여 확인
+### Phase 1: 프로젝트 설정 동기화
 
 ```markdown
-[SEMO] Onboarding: Phase 1 - 조직 참여 확인
+[SEMO] Onboarding: Phase 1 - 프로젝트 설정 동기화
 ```
 
-#### 1.1 GitHub Organization 확인 (자동)
+#### 1.1 .gitignore SEMO 설정 확인
+
+```bash
+# SEMO 섹션 존재 확인
+if grep -q "SEMO: Claude Code Configuration Management" .gitignore 2>/dev/null; then
+  echo "✅ .gitignore SEMO 설정 존재"
+else
+  echo "⚠️ .gitignore SEMO 설정 누락 - 동기화 필요"
+fi
+```
+
+**누락 시 자동 추가**:
+```bash
+# SEMO gitignore 템플릿 추가
+cat semo-system/semo-core/templates/gitignore-semo.txt >> .gitignore
+```
+
+#### 1.2 로컬 설정 파일 생성 안내
+
+```markdown
+SEMO는 다음과 같은 계층적 설정 구조를 사용합니다:
+
+| 파일 | 용도 | Git |
+|------|------|-----|
+| `settings.json` | 팀 공통 설정 | ✅ 커밋 |
+| `settings.local.json` | 개인 오버라이드 | ❌ 제외 |
+| `CLAUDE.md` | 프로젝트 규칙 | ✅ 커밋 |
+| `CLAUDE.local.md` | 개인 메모 | ❌ 제외 |
+
+개인 설정이 필요하면 `*.local.*` 파일을 생성하세요.
+```
+
+### Phase 1.5: 토큰 설정
+
+```markdown
+[SEMO] Onboarding: Phase 1.5 - 토큰 설정
+```
+
+> **참조**: [TOKEN_MANAGEMENT.md](../../integrations/TOKEN_MANAGEMENT.md)
+
+#### 1.5.1 팀 공용 토큰 확인 (자동)
+
+팀 공용 토큰은 SEMO 설치 시 **자동으로 설정**됩니다.
+
+```markdown
+### 팀 공용 토큰 (자동 설정)
+
+| 토큰 | 용도 | 상태 |
+|------|------|------|
+| Semicolon Notifier | Slack 알림 | ✅ 자동 설정됨 |
+| Team GitHub Bot | 팀 저장소 접근 | ✅ 자동 설정됨 |
+
+> 팀 공용 토큰은 `semo-mcp` 패키지에 내장되어 있어 별도 설정이 필요 없습니다.
+```
+
+#### 1.5.2 개인 토큰 설정 안내
+
+```markdown
+### 개인 토큰 설정 (필수)
+
+GitHub Personal Access Token이 필요합니다.
+
+**생성 방법**:
+1. https://github.com/settings/tokens 접속
+2. "Generate new token (classic)" 클릭
+3. 권한 선택:
+   - `repo` (전체)
+   - `read:org`
+4. 토큰 생성 후 복사
+
+**설정 방법** (택 1):
+```
+
+```bash
+# 방법 1: 환경변수 설정 (권장)
+# ~/.zshrc 또는 ~/.bashrc에 추가
+export GITHUB_PERSONAL_ACCESS_TOKEN="ghp_xxxxxxxxxxxx"
+
+# 방법 2: .claude/settings.local.json 생성
+cat > .claude/settings.local.json << 'EOF'
+{
+  "env": {
+    "GITHUB_PERSONAL_ACCESS_TOKEN": "ghp_xxxxxxxxxxxx"
+  }
+}
+EOF
+```
+
+#### 1.5.3 토큰 검증
+
+```bash
+# GitHub 토큰 검증
+gh auth status
+# 또는
+curl -H "Authorization: token $GITHUB_PERSONAL_ACCESS_TOKEN" \
+  https://api.github.com/user --silent | jq '.login'
+```
+
+**검증 결과**:
+| 결과 | 상태 | 안내 |
+|------|------|------|
+| 로그인 ID 출력 | ✅ 정상 | 다음 단계 진행 |
+| `null` 또는 에러 | ❌ 실패 | 토큰 재생성 안내 |
+
+### Phase 2: 조직 참여 확인
+
+```markdown
+[SEMO] Onboarding: Phase 2 - 조직 참여 확인
+```
+
+#### 2.1 GitHub Organization 확인 (자동)
 
 ```bash
 # GitHub Organization 멤버십 확인
@@ -44,7 +154,7 @@ gh api user/memberships/orgs/semicolon-devteam --jq '.state' 2>/dev/null
 | `pending` | ⏳ 초대 대기 | 이메일 확인 요청 |
 | 에러 | ❌ 미참여 | 팀 리더에게 초대 요청 안내 |
 
-#### 1.2 Slack 워크스페이스 확인 (자동)
+#### 2.2 Slack 워크스페이스 확인 (자동)
 
 ```bash
 # Slack CLI 인증 상태 확인
@@ -64,13 +174,13 @@ Slack 워크스페이스(Semicolon)에 참여하셨나요? (y/n)
 - `#_협업`: 협업 관련 논의
 - `#개발사업팀`: 개발팀 전체 채널
 
-### Phase 2: SEMO 개념 학습
+### Phase 3: SEMO 개념 학습
 
 ```markdown
-[SEMO] Onboarding: Phase 2 - SEMO 개념 학습
+[SEMO] Onboarding: Phase 3 - SEMO 개념 학습
 ```
 
-#### 2.1 SEMO 4대 원칙
+#### 3.1 SEMO 4대 원칙
 
 | 원칙 | 설명 |
 |------|------|
@@ -79,7 +189,7 @@ Slack 워크스페이스(Semicolon)에 참여하셨나요? (y/n)
 | **Modularity** | 기능별 패키지 독립 동작 |
 | **Hierarchy** | semo-core → semo-skills → Extensions 상속 |
 
-#### 2.2 SEMO 구조
+#### 3.2 SEMO 구조
 
 ```
 .claude/
@@ -94,7 +204,7 @@ semo-system/      # White Box (읽기 전용)
 └── {extensions}/ # Layer 2: 프로젝트별 확장
 ```
 
-#### 2.3 주요 커맨드
+#### 3.3 주요 커맨드
 
 | 커맨드 | 설명 |
 |--------|------|
@@ -104,13 +214,13 @@ semo-system/      # White Box (읽기 전용)
 | `/SEMO:slack` | Slack 메시지 전송 |
 | `/SEMO:feedback` | 피드백 제출 |
 
-### Phase 3: 실습
+### Phase 4: 실습
 
 ```markdown
-[SEMO] Onboarding: Phase 3 - 실습
+[SEMO] Onboarding: Phase 4 - 실습
 ```
 
-#### 3.1 SEMO 인터랙션 테스트
+#### 4.1 SEMO 인터랙션 테스트
 
 현재 프로젝트에서 간단한 요청을 해보세요:
 
@@ -122,10 +232,10 @@ semo-system/      # White Box (읽기 전용)
 - `[SEMO] Orchestrator: ...` 메시지 출력 확인
 - `[SEMO] Skill: ...` 메시지 출력 확인
 
-### Phase 4: 참조 문서 안내
+### Phase 5: 참조 문서 안내
 
 ```markdown
-[SEMO] Onboarding: Phase 4 - 참조 문서 안내
+[SEMO] Onboarding: Phase 5 - 참조 문서 안내
 ```
 
 #### 핵심 문서
@@ -141,7 +251,7 @@ semo-system/      # White Box (읽기 전용)
 - [Team Codex](https://github.com/semicolon-devteam/docs/wiki/Team-Codex)
 - [Development Philosophy](https://github.com/semicolon-devteam/docs/wiki/Development-Philosophy)
 
-### Phase 5: 온보딩 완료
+### Phase 6: 온보딩 완료
 
 ```markdown
 [SEMO] Onboarding: 완료
@@ -149,6 +259,8 @@ semo-system/      # White Box (읽기 전용)
 === 온보딩 완료 ===
 
 ✅ 환경 검증 통과
+✅ 프로젝트 설정 동기화 (.gitignore)
+✅ 토큰 설정 완료 (팀 공용 + 개인)
 ✅ 조직 참여 확인
 ✅ SEMO 개념 학습 완료
 ✅ 실습 완료

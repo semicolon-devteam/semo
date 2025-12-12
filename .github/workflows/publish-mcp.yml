@@ -1,0 +1,71 @@
+name: Publish semo-mcp
+
+on:
+  push:
+    tags:
+      - 'mcp-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 2.1.0)'
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/mcp-server
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate encrypted tokens
+        env:
+          SEMO_ENCRYPTION_KEY: ${{ secrets.SEMO_ENCRYPTION_KEY }}
+          SEMO_SLACK_BOT_TOKEN: ${{ secrets.SEMO_SLACK_BOT_TOKEN }}
+          SEMO_GITHUB_APP_TOKEN: ${{ secrets.SEMO_GITHUB_APP_TOKEN }}
+        run: node scripts/generate-tokens.js
+
+      - name: Build
+        run: npm run build
+
+      - name: Update version (if manual dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        run: npm version ${{ github.event.inputs.version }} --no-git-tag-version
+
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          name: semo-mcp ${{ github.ref_name }}
+          body: |
+            ## semo-mcp ${{ github.ref_name }}
+
+            SEMO MCP Server 업데이트
+
+            ### 설치/업데이트
+            ```bash
+            npx @team-semicolon/semo-mcp@latest
+            ```
+
+            ### Changes
+            - 팀 공용 토큰 암호화 내장
+            - 보안 강화
+          draft: false
+          prerelease: false

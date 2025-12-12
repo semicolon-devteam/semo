@@ -1,6 +1,6 @@
 {
   "name": "@team-semicolon/semo-mcp",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "SEMO MCP Server - Integrations (GitHub, Slack, Supabase) for Claude Code",
   "main": "dist/index.js",
   "bin": {
@@ -10,7 +10,8 @@
     "build": "tsc",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
-    "test": "jest"
+    "test": "jest",
+    "generate-tokens": "node scripts/generate-tokens.js"
   },
   "keywords": [
     "mcp",
