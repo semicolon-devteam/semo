@@ -1,10 +1,10 @@
 # SEMO Project Configuration
 
-> SEMO (Semicolon Orchestrate) - AI Agent Orchestration Framework v2.0.2
+> SEMO (Semicolon Orchestrate) - AI Agent Orchestration Framework v{{VERSION}}
 
 ---
 
-## ⚠️ Orchestrator-First Policy (필수)
+## Orchestrator-First Policy (필수)
 
 > **이 섹션은 SEMO의 핵심 규칙입니다. 모든 요청 처리 전 반드시 준수하세요.**
 
@@ -80,12 +80,14 @@
 
 ### Standard (필수)
 - **semo-core**: 원칙, 오케스트레이터, 공통 커맨드
-- **semo-skills**: 13개 통합 스킬
+- **semo-skills**: 통합 스킬
   - 행동: coder, tester, planner, deployer, writer
   - 운영: memory, notify-slack, feedback, version-updater, semo-help, semo-architecture-checker, circuit-breaker, list-bugs
 
+{{#EXTENSIONS}}
 ### Extensions (선택)
-- **meta**: SEMO 프레임워크 자체 개발/관리 (6 agents, 7 skills)
+{{EXTENSIONS_LIST}}
+{{/EXTENSIONS}}
 
 ## 구조
 
@@ -103,7 +105,9 @@
 semo-system/           # White Box (읽기 전용)
 ├── semo-core/         # Layer 0: 원칙, 오케스트레이션
 ├── semo-skills/       # Layer 1: 통합 스킬
-├── meta/              # Meta
+{{#EXTENSIONS}}
+├── {{EXTENSION_NAME}}/  # Extension
+{{/EXTENSIONS}}
 ```
 
 ## 사용 가능한 커맨드
@@ -115,6 +119,7 @@ semo-system/           # White Box (읽기 전용)
 | `/SEMO:feedback` | 피드백 제출 |
 | `/SEMO:health` | 환경 검증 |
 | `/SEMO:update` | SEMO 업데이트 |
+| `/SEMO:onboarding` | 신규 개발자 온보딩 |
 
 ## Context Mesh 사용
 
@@ -129,5 +134,5 @@ memory 스킬이 자동으로 이 파일들을 관리합니다.
 ## References
 
 - [SEMO Principles](semo-system/semo-core/principles/PRINCIPLES.md)
+- [SEMO Message Rules](semo-system/semo-core/principles/MESSAGE_RULES.md)
 - [SEMO Skills](semo-system/semo-skills/)
-- [Meta Package](semo-system/meta/)

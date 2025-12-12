@@ -229,7 +229,7 @@ SEMO 메시지 포맷은 **변경 불가**:
 ✅ [SEMO] Skill: implement 호출
 ```
 
-### 6.3 SEMO 접두사 사용 (Deprecated)
+### 6.3 SAX 접두사 사용 (Deprecated)
 
 ```markdown
 ❌ [SEMO] Agent: implementation-master 호출
@@ -260,5 +260,5 @@ SEMO 메시지 출력 시 확인:
 
 ---
 
-*이 문서는 SEMO Message Rules를 SEMO 구조에 맞게 업데이트했습니다.*
+*이 문서는 SAX Message Rules를 SEMO 구조에 맞게 업데이트했습니다.*
 *원본: SEMO Core → SEMO Core v2.0*

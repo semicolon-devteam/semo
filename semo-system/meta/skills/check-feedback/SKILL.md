@@ -1,6 +1,6 @@
 ---
 name: check-feedback
-description: SEMO 피드백 이슈 수집 및 리스트업. Use when (1) "피드백 확인", "피드백 있는지", (2) "유저 피드백 체크", (3) SEMO 관련 open 이슈 조회.
+description: SEMO 패키지 피드백 이슈 수집 및 리스트업. Use when (1) "피드백 확인", "피드백 있는지", (2) "유저 피드백 체크", (3) SEMO 관련 open 이슈 조회.
 tools: [Bash]
 ---
 
@@ -8,11 +8,11 @@ tools: [Bash]
 
 # check-feedback Skill
 
-> SEMO 레포지토리 피드백 이슈 수집 및 리포트
+> SEMO 패키지 관련 피드백 이슈 수집 및 리포트
 
 ## Purpose
 
-`semicolon-devteam/semo` 레포지토리에서 open 상태인 이슈를 수집하여 리스트업합니다.
+`semo-*` 패턴의 모든 레포지토리에서 open 상태인 이슈를 수집하여 리스트업합니다.
 
 ## Trigger Keywords
 
@@ -22,10 +22,25 @@ tools: [Bash]
 
 ## Workflow
 
-### 1. SEMO 레포지토리 Open 이슈 수집
+### 1. SEMO 레포지토리 목록 조회
 
 ```bash
-gh api repos/semicolon-devteam/semo/issues --jq '.[] | select(.state == "open") | "- #\(.number) | \(.title) | [\(.labels | map(.name) | join(", "))] | \(.created_at | split("T")[0])"'
+gh repo list semicolon-devteam --json name --jq '.[] | select(.name | startswith("sax-")) | .name'
+```
+
+### 2. 각 레포별 Open 이슈 수집
+
+```bash
+for repo in $(gh repo list semicolon-devteam --json name --jq '.[] | select(.name | startswith("sax-")) | .name'); do
+  echo "=== $repo ==="
+  gh api repos/semicolon-devteam/$repo/issues --jq '.[] | select(.state == "open") | "- #\(.number) \(.title) [\(.labels | map(.name) | join(", "))]"'
+done
+```
+
+### 3. docs 레포 SEMO 관련 이슈 수집
+
+```bash
+gh api repos/semicolon-devteam/docs/issues --jq '.[] | select(.state == "open" and (.labels[].name == "sax" or .labels[].name == "feedback-requested")) | "- #\(.number) \(.title)"'
 ```
 
 ## Output Format
@@ -33,10 +48,18 @@ gh api repos/semicolon-devteam/semo/issues --jq '.[] | select(.state == "open") 
 ```markdown
 ## 📋 SEMO 피드백 현황
 
-### 📦 semo
+### 📦 semo-backend
 | # | 제목 | 라벨 | 생성일 |
 |---|------|------|--------|
 | #1 | 이슈 제목 | bug, feedback | 2024-12-01 |
+
+### 📦 semo-next
+(이슈 없음)
+
+### 📄 docs (SEMO 관련)
+| # | 제목 | 라벨 | 생성일 |
+|---|------|------|--------|
+| #10 | semo-backend 피드백 요청 | release, sax | 2024-11-30 |
 
 ---
 **총 {N}개의 Open 이슈**
@@ -47,7 +70,7 @@ gh api repos/semicolon-devteam/semo/issues --jq '.[] | select(.state == "open") 
 ```markdown
 ## 📋 SEMO 피드백 현황
 
-✅ semo 레포지토리에 open 이슈가 없습니다.
+✅ 모든 SEMO 패키지에 open 이슈가 없습니다.
 ```
 
 ---
@@ -66,7 +89,7 @@ gh api repos/semicolon-devteam/semo/issues --jq '.[] | select(.state == "open") 
 1. **이슈 작성자 확인**
    ```bash
    # 이슈 작성자 GitHub ID 조회
-   AUTHOR=$(gh api repos/semicolon-devteam/semo/issues/{number} --jq '.user.login')
+   AUTHOR=$(gh api repos/semicolon-devteam/{repo}/issues/{number} --jq '.user.login')
    ```
 
 2. **GitHub → Slack 사용자 매칭**
@@ -138,7 +161,7 @@ gh api repos/semicolon-devteam/semo/issues --jq '.[] | select(.state == "open") 
            "fields": [
              {
                "type": "mrkdwn",
-               "text": "*패키지*\nsemo"
+               "text": "*패키지*\n{repo}"
              },
              {
                "type": "mrkdwn",
@@ -186,7 +209,7 @@ gh api repos/semicolon-devteam/semo/issues --jq '.[] | select(.state == "open") 
 ✅ SEMO 피드백 수정 완료
 
 패키지          이슈
-semo            #12
+semo-po         #12
 
 제목
 [Bug] Epic 생성 시 Projects 타입 필드 미설정
@@ -209,7 +232,7 @@ semo            #12
 ✅ 슬랙 알림 전송 완료
 - **채널**: #_협업
 - **문의자**: @{slack_name}
-- **이슈**: semo#{number}
+- **이슈**: {repo}#{number}
 ```
 
 ### 알림 생략 조건

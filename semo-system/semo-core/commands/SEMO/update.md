@@ -51,22 +51,7 @@ GitHub에서 최신 버전 정보 조회:
 gh api repos/semicolon-devteam/semo/releases/latest --jq '.tag_name'
 ```
 
-### Step 3: 클린 설치 여부 확인
-
-업데이트 전 사용자에게 클린 설치 여부를 확인합니다:
-
-```markdown
-## 업데이트 방식 선택
-
-1. **일반 업데이트**: 기존 설정 유지하며 업데이트
-2. **클린 설치**: .claude/ 폴더를 완전히 삭제 후 재설치
-
-클린 설치를 진행할까요? (권장: 설정 충돌 또는 문제 발생 시)
-```
-
-### Step 4: 업데이트 실행
-
-**일반 업데이트:**
+### Step 3: 업데이트 실행
 
 ```bash
 npx @team-semicolon/semo-cli update
@@ -80,23 +65,24 @@ git fetch origin main
 git reset --hard origin/main
 ```
 
-**클린 설치 (사용자가 선택한 경우):**
+### Step 4: CLAUDE.md 동기화 (필수)
+
+> **중요**: 업데이트 시 CLAUDE.md도 최신 템플릿으로 갱신합니다.
 
 ```bash
-# 1. 기존 .claude 폴더 백업 (memory만 보존)
-mkdir -p .claude-backup
-cp -r .claude/memory .claude-backup/memory 2>/dev/null || true
+# 템플릿에서 CLAUDE.md 갱신
+cp semo-system/semo-core/templates/CLAUDE.md .claude/CLAUDE.md
 
-# 2. .claude 폴더 완전 삭제
-rm -rf .claude
-
-# 3. SEMO 재설치
-npx @team-semicolon/semo-cli init
-
-# 4. memory 복원
-cp -r .claude-backup/memory .claude/memory 2>/dev/null || true
-rm -rf .claude-backup
+# 버전 치환
+VERSION=$(cat semo-system/semo-core/VERSION 2>/dev/null || echo "unknown")
+sed -i '' "s/{{VERSION}}/$VERSION/g" .claude/CLAUDE.md
 ```
+
+**동기화 대상**:
+- Orchestrator-First Policy (모든 요청 처리 흐름)
+- 카테고리별 라우팅 테이블
+- SEMO 메시지 출력 규칙
+- 표준 커맨드 목록
 
 ### Step 5: 완료 안내
 
@@ -109,6 +95,7 @@ SEMO 업데이트 완료
 |------|------|------|
 | semo-core | v1.0.0 | v1.1.0 |
 | semo-skills | v1.0.0 | v1.1.0 |
+| CLAUDE.md | ✅ 동기화됨 |
 ```
 
 ## Expected Output
@@ -153,11 +140,8 @@ SEMO 업데이트 완료
 # 상태 확인
 npx @team-semicolon/semo-cli status
 
-# 일반 업데이트
+# 업데이트
 npx @team-semicolon/semo-cli update
-
-# 클린 설치 (--clean 옵션)
-npx @team-semicolon/semo-cli update --clean
 
 # 강제 재설치
 npx @team-semicolon/semo-cli init --force

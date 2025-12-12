@@ -1,0 +1,201 @@
+{
+  "description": "Agent 호출 라우팅 테스트 - 복잡한 작업이 적절한 에이전트로 위임되는지 검증",
+  "version": "2.0.0",
+  "tests": [
+    {
+      "name": "SEMO 구조 변경 요청 → semo-architect Agent 호출",
+      "category": "agent_routing",
+      "input": "Semicolon AX - 새 스킬 추가해줘",
+      "expect": {
+        "contains": [
+          "[SEMO] Orchestrator:",
+          "[SEMO] Agent:"
+        ],
+        "contains_any": [
+          "semo-architect",
+          "SEMO 메타 작업"
+        ],
+        "sequence": [
+          "Orchestrator",
+          "Agent"
+        ]
+      },
+      "simulation": {
+        "expected_flow": [
+          "1. [SEMO] Orchestrator: 의도 분석 완료 → SEMO 메타 작업",
+          "2. [SEMO] Agent: semo-architect 호출 - 스킬 추가",
+          "3. semo-architect Agent가 작업 수행"
+        ],
+        "verification_points": [
+          "Semicolon AX 키워드가 트리거로 인식되는가?",
+          "semo-architect Agent로 위임되는가?",
+          "Agent 메시지가 Orchestrator 이후에 출력되는가?"
+        ]
+      }
+    },
+    {
+      "name": "스킬 관리 요청 → skill-manager Agent 호출",
+      "category": "agent_routing",
+      "input": "semo-skills에 새 스킬 생성해줘",
+      "expect": {
+        "contains": [
+          "[SEMO] Orchestrator:"
+        ],
+        "contains_any": [
+          "skill-manager",
+          "Agent:"
+        ]
+      },
+      "simulation": {
+        "expected_flow": [
+          "1. [SEMO] Orchestrator: 의도 분석 완료 → 스킬 관리 작업",
+          "2. [SEMO] Agent: skill-manager 호출",
+          "3. skill-manager Agent가 스킬 생성 수행"
+        ]
+      }
+    },
+    {
+      "name": "에이전트 관리 요청 → agent-manager Agent 호출",
+      "category": "agent_routing",
+      "input": "새 에이전트 추가해줘",
+      "expect": {
+        "contains": [
+          "[SEMO] Orchestrator:"
+        ],
+        "contains_any": [
+          "agent-manager",
+          "Agent:"
+        ]
+      },
+      "simulation": {
+        "expected_flow": [
+          "1. [SEMO] Orchestrator: 의도 분석 완료 → 에이전트 관리 작업",
+          "2. [SEMO] Agent: agent-manager 호출",
+          "3. agent-manager Agent가 에이전트 생성 수행"
+        ]
+      }
+    },
+    {
+      "name": "SEMO 규칙 준수 검사 → compliance-checker Agent 호출",
+      "category": "agent_routing",
+      "input": "SEMO 규칙 준수 상태 검사해줘",
+      "expect": {
+        "contains": [
+          "[SEMO] Orchestrator:"
+        ],
+        "contains_any": [
+          "compliance-checker",
+          "검증",
+          "Agent:"
+        ]
+      },
+      "simulation": {
+        "expected_flow": [
+          "1. [SEMO] Orchestrator: 의도 분석 완료 → 규칙 준수 검사",
+          "2. [SEMO] Agent: compliance-checker 호출",
+          "3. compliance-checker Agent가 검사 수행"
+        ]
+      }
+    },
+    {
+      "name": "커맨드 관리 요청 → command-manager Agent 호출",
+      "category": "agent_routing",
+      "input": "새 슬래시 커맨드 추가해줘",
+      "expect": {
+        "contains": [
+          "[SEMO] Orchestrator:"
+        ],
+        "contains_any": [
+          "command-manager",
+          "커맨드",
+          "Agent:"
+        ]
+      },
+      "simulation": {
+        "expected_flow": [
+          "1. [SEMO] Orchestrator: 의도 분석 완료 → 커맨드 관리 작업",
+          "2. [SEMO] Agent: command-manager 호출",
+          "3. command-manager Agent가 커맨드 생성 수행"
+        ]
+      }
+    },
+    {
+      "name": "Agent 호출 후 Skill 체이닝",
+      "category": "chaining",
+      "input": "Semicolon AX - 새 스킬 추가하고 버전 업데이트해줘",
+      "expect": {
+        "contains": [
+          "[SEMO] Orchestrator:",
+          "[SEMO] Agent:"
+        ],
+        "contains_any": [
+          "Skill:",
+          "version"
+        ]
+      },
+      "simulation": {
+        "expected_flow": [
+          "1. [SEMO] Orchestrator: 의도 분석 완료 → SEMO 메타 작업 (복합)",
+          "2. [SEMO] Agent: semo-architect 호출",
+          "3. [SEMO] Skill: version-manager 호출 (체이닝)",
+          "4. 버전 업데이트 완료"
+        ],
+        "verification_points": [
+          "Agent가 작업 완료 후 필요한 Skill을 호출하는가?",
+          "체이닝 시에도 SEMO 메시지가 출력되는가?"
+        ]
+      }
+    },
+    {
+      "name": "Agent 없이 Skill만으로 처리 가능한 경우",
+      "category": "skill_only",
+      "input": "로그인 버튼 CSS 수정해줘",
+      "expect": {
+        "contains": [
+          "[SEMO] Orchestrator:"
+        ],
+        "contains_any": [
+          "Skill 위임:",
+          "coder"
+        ],
+        "not_contains": [
+          "[SEMO] Agent:"
+        ]
+      },
+      "simulation": {
+        "expected_flow": [
+          "1. [SEMO] Orchestrator: 의도 분석 완료 → 코드 수정 요청",
+          "2. [SEMO] Skill 위임: semo-skills/coder/ (단순 수정)",
+          "3. Agent 호출 없이 Skill만으로 처리"
+        ],
+        "note": "단순한 코드 수정은 Agent 없이 Skill만으로 처리"
+      }
+    },
+    {
+      "name": "복잡한 아키텍처 변경 → Agent 호출 필요",
+      "category": "complex_task",
+      "input": "전체 폴더 구조를 리팩토링해줘",
+      "expect": {
+        "contains": [
+          "[SEMO] Orchestrator:"
+        ],
+        "contains_any": [
+          "Agent:",
+          "architect",
+          "복잡한 작업"
+        ]
+      },
+      "simulation": {
+        "expected_flow": [
+          "1. [SEMO] Orchestrator: 의도 분석 완료 → 아키텍처 변경 (복잡)",
+          "2. [SEMO] Agent: semo-architect 호출 (또는 해당 Agent)",
+          "3. Agent가 구조 분석 및 리팩토링 계획 수립"
+        ],
+        "verification_points": [
+          "복잡한 작업은 Agent로 위임되는가?",
+          "Orchestrator가 작업 복잡도를 판단하는가?"
+        ]
+      }
+    }
+  ]
+}

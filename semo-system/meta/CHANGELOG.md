@@ -5,6 +5,23 @@ All notable changes to semo-meta will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.52.0] - 2025-12-12
+
+### Added
+- **CLAUDE.md 템플릿** (`semo-core/templates/CLAUDE.md`)
+  - Orchestrator-First Policy 포함 표준 템플릿
+  - 카테고리별 라우팅 테이블 내장
+  - 배포 및 업데이트 시 자동 적용
+- **Orchestrator-First 테스트 케이스** (`semo-core/tests/cases/`)
+  - `orchestrator-first.json` - Skill 라우팅 검증
+  - `agent-routing.json` - Agent 호출 검증
+- `/SEMO:onboarding` 커맨드 - 신규 개발자 온보딩 자동화
+
+### Changed
+- `package-deploy` Skill - CLAUDE.md 자동 설정 프로세스 추가
+- `/SEMO:update` 커맨드 - CLAUDE.md 동기화 단계 추가
+- `version-updater` Skill - Phase 1.5 CLAUDE.md 동기화 추가
+
 ## [0.51.0] - 2025-12-11
 
 ### Added

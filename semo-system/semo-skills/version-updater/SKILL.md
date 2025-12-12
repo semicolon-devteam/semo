@@ -22,7 +22,7 @@ tools: [Bash, Read]
 3. **업데이트 실행** 지원
 4. **무결성 검증** 구조 및 동기화 상태 확인
 
-## 무결성 검증 흐름 (4-Phase)
+## 무결성 검증 흐름 (5-Phase)
 
 ```text
 [세션 시작] → version-updater 호출
@@ -30,6 +30,10 @@ tools: [Bash, Read]
               ┌─────┴─────┐
               │ Phase 1   │ 버전 체크
               └─────┬─────┘
+                    ↓
+              ┌─────┴─────┐
+              │ Phase 1.5 │ CLAUDE.md 동기화 (업데이트 시)
+              └─────┬─────┘      ※ 버전 변경 시에만
                     ↓
               ┌─────┴─────┐
               │ Phase 2   │ 구조 검증 (semo-architecture-checker --check-only)
@@ -62,6 +66,7 @@ fi
 | Phase | 스킬 | 모드 | 문제 시 동작 |
 |-------|------|------|-------------|
 | 1 | (내장) | - | 업데이트 안내 |
+| 1.5 | (내장) | - | CLAUDE.md 템플릿 동기화 |
 | 2 | semo-architecture-checker | --check-only | 기본 모드로 재호출 (자동 수정) |
 | 3 | package-sync | --check-only | 기본 모드로 재호출 (동기화 실행) |
 | 4 | skill:memory | sync | 저장된 결정/선호도 복원 |
@@ -132,7 +137,28 @@ git reset --hard origin/main
 cd -
 ```
 
-### 3. 무결성 검증 (Phase 2-3)
+### 3. CLAUDE.md 동기화 (Phase 1.5)
+
+> **필수**: 업데이트 시 CLAUDE.md도 최신 템플릿으로 갱신합니다.
+
+```bash
+# 템플릿에서 CLAUDE.md 갱신
+cp semo-system/semo-core/templates/CLAUDE.md .claude/CLAUDE.md
+
+# 버전 치환
+VERSION=$(cat semo-system/semo-core/VERSION 2>/dev/null || echo "unknown")
+sed -i '' "s/{{VERSION}}/$VERSION/g" .claude/CLAUDE.md
+```
+
+**CLAUDE.md에 포함된 필수 요소**:
+- Orchestrator-First Policy (모든 요청 처리 흐름)
+- 카테고리별 라우팅 테이블
+- SEMO 메시지 출력 규칙
+- 표준 커맨드 목록
+
+> **템플릿 위치**: `semo-system/semo-core/templates/CLAUDE.md`
+
+### 4. 무결성 검증 (Phase 2-3)
 
 업데이트 완료 후 또는 세션 시작 시 무결성 검증:
 
@@ -274,6 +300,13 @@ Phase 3: package-sync --check-only (semo-core 환경만)
 |--------|----------|----------|
 | semo-core | 1.2.0 | 1.3.0 |
 | semo-next | 0.25.0 | 0.26.0 |
+
+### Phase 1.5: CLAUDE.md 동기화
+| 항목 | 상태 |
+|------|------|
+| Orchestrator-First Policy | ✅ 동기화됨 |
+| 라우팅 테이블 | ✅ 동기화됨 |
+| 메시지 규칙 | ✅ 동기화됨 |
 
 업데이트가 완료되었습니다.
 
