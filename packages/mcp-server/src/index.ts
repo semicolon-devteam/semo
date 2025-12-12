@@ -33,7 +33,31 @@ import {
   ReadResourceRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { decrypt } from "./crypto.js";
-import { ENCRYPTED_TOKENS, hasEncryptedToken } from "./tokens.js";
+
+// 토큰 로드 (CI/CD 생성 파일 우선, 없으면 기본 파일)
+function loadTokens(): { SLACK_BOT_TOKEN: string; GITHUB_APP_TOKEN: string } {
+  try {
+    // CI/CD에서 생성된 암호화 토큰 (배포 패키지용)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const generated = require("./tokens.generated.js");
+    if (generated.ENCRYPTED_TOKENS?.SLACK_BOT_TOKEN) {
+      return generated.ENCRYPTED_TOKENS;
+    }
+  } catch {
+    // tokens.generated.js 없음 - 로컬 개발 환경
+  }
+
+  // 로컬 개발용 (환경변수 기반)
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fallback = require("./tokens.js");
+  return fallback.ENCRYPTED_TOKENS;
+}
+
+const ENCRYPTED_TOKENS = loadTokens();
+
+function hasEncryptedToken(name: "SLACK_BOT_TOKEN" | "GITHUB_APP_TOKEN"): boolean {
+  return !!ENCRYPTED_TOKENS[name];
+}
 
 // === 토큰 관리 ===
 // 우선순위: 환경변수 > 암호화된 팀 토큰
