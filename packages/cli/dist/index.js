@@ -394,13 +394,9 @@ async function setupExtensionSymlinks(cwd, packages) {
         const pkgPath = path.join(semoSystemDir, pkg);
         if (!fs.existsSync(pkgPath))
             continue;
-        // 1. semo-{pkg} 링크
-        const semoPkgLink = path.join(claudeDir, `semo-${pkg}`);
-        if (!fs.existsSync(semoPkgLink)) {
-            createSymlinkOrJunction(pkgPath, semoPkgLink);
-            console.log(chalk_1.default.green(`  ✓ .claude/semo-${pkg} → semo-system/${pkg}`));
-        }
-        // 2. Extension의 agents를 .claude/agents/에 개별 링크
+        // Note: .claude/semo-{pkg} 링크는 생성하지 않음 (불필요)
+        // Extension의 agents/skills만 개별 링크하여 병합
+        // 1. Extension의 agents를 .claude/agents/에 개별 링크
         const extAgentsDir = path.join(pkgPath, "agents");
         const claudeAgentsDir = path.join(claudeDir, "agents");
         if (fs.existsSync(extAgentsDir)) {
@@ -806,23 +802,47 @@ async function setupClaudeMd(cwd, extensions, force) {
 
 ---
 
+## 🔴 MANDATORY: Orchestrator-First Execution
+
+> **⚠️ 이 규칙은 모든 사용자 요청에 적용됩니다. 예외 없음.**
+
+### 실행 흐름 (필수)
+
+\`\`\`
+1. 사용자 요청 수신
+2. [SEMO] Orchestrator 메시지 출력 (의도 분석)
+3. Orchestrator가 적절한 Agent/Skill 라우팅
+4. [SEMO] Agent/Skill 메시지 출력
+5. 실행 결과 반환
+\`\`\`
+
+### 모든 응답은 다음으로 시작
+
+\`\`\`
+[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}
+[SEMO] {Agent/Skill} 호출: {target} (사유: {reason})
+\`\`\`
+
+### Orchestrator 참조
+
+**반드시 읽어야 할 파일**: \`semo-system/semo-core/agents/orchestrator/orchestrator.md\`
+
+이 파일에서 라우팅 테이블, 의도 분류, 메시지 포맷을 확인하세요.
+
+---
+
 ## 🔴 NON-NEGOTIABLE RULES
 
 ### 1. Orchestrator-First Policy
 
-> **모든 요청은 반드시 Orchestrator를 통해 라우팅됩니다.**
-
-\`\`\`
-사용자 요청 → Orchestrator → 적절한 Agent/Skill → 실행
-\`\`\`
-
-**Orchestrator 위치**: \`semo-system/semo-core/agents/orchestrator/\`
+> **모든 요청은 반드시 Orchestrator를 통해 라우팅됩니다. 직접 처리 금지.**
 
 **직접 처리 금지 항목**:
 - 코드 작성/수정 → \`implementation-master\` 또는 \`coder\` 스킬
 - Git 커밋/푸시 → \`git-workflow\` 스킬
 - 품질 검증 → \`quality-master\` 또는 \`verify\` 스킬
 - 명세 작성 → \`spec-master\`
+- 일반 작업 → Orchestrator 분석 후 라우팅
 
 ### 2. Pre-Commit Quality Gate
 
