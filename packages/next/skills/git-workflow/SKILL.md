@@ -80,6 +80,65 @@ gh api repos/semicolon-devteam/semo-core/contents/TEAM_RULES.md --jq '.content' 
 ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+|/[0-9]+' | grep -oE '[0-9]+' | head -1)
 ```
 
+## 🔴 Pre-Commit Quality Gate (NON-NEGOTIABLE)
+
+> **CRITICAL**: 모든 커밋 전 반드시 Quality Gate를 통과해야 합니다.
+
+### 커밋 전 필수 검증 순서
+
+```bash
+# 1. ESLint 검사
+npm run lint
+
+# 2. TypeScript 타입 체크
+npx tsc --noEmit
+
+# 3. (Next.js 프로젝트) 빌드 검증
+npm run build
+```
+
+### 검증 실패 시 커밋 차단
+
+```markdown
+[SEMO] skill:git-workflow: ⛔ Quality Gate 실패
+
+🚫 **커밋 차단**: 품질 검증을 통과하지 못했습니다.
+
+**실패 항목**:
+- [ ] ESLint: {pass/fail} ({error_count} errors)
+- [ ] TypeScript: {pass/fail} ({error_count} errors)
+- [ ] Build: {pass/fail}
+
+**다음 단계**:
+1. 위 에러들을 먼저 수정하세요
+2. 수정 후 다시 커밋을 요청하세요
+
+에러 수정을 도와드릴까요?
+```
+
+### 검증 성공 시 진행
+
+```markdown
+[SEMO] skill:git-workflow: ✅ Quality Gate 통과
+
+**검증 결과**:
+- [x] ESLint: pass
+- [x] TypeScript: pass
+- [x] Build: pass
+
+커밋을 진행합니다...
+```
+
+### 예외 케이스 (Quality Gate 생략 가능)
+
+| 케이스 | 조건 | 검증 범위 |
+|--------|------|----------|
+| 문서만 변경 | `*.md` 파일만 변경 | 생략 가능 |
+| 설정 파일만 | `.json`, `.yaml` 등 | lint만 실행 |
+| SEMO 파일만 | `.claude/` 내부만 변경 | 생략 가능 |
+
+> **🔴 중요**: src/ 또는 app/ 내 코드 변경이 있으면 **반드시** 전체 검증 실행
+
 ## --no-verify 차단 (NON-NEGOTIABLE)
 
 > **🔴 CRITICAL**: `--no-verify` 또는 `-n` 플래그는 **어떤 상황에서도** 사용하지 않습니다.
@@ -91,9 +150,13 @@ ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+|/[0-9]+' | grep -oE '[
 
 🚫 **커밋 중단**: `--no-verify` 플래그는 사용할 수 없습니다.
 
-**현재 상태 확인**:
-1. `npm run lint` - ESLint 검사
-2. `npx tsc --noEmit` - TypeScript 타입 체크
+**사유**: Pre-commit Quality Gate는 코드 품질을 보장합니다.
+
+**해결 방법**:
+1. `npm run lint` 실행 후 에러 수정
+2. `npx tsc --noEmit` 실행 후 타입 에러 수정
+3. `npm run build` 실행 후 빌드 에러 수정
+4. 에러 수정 후 다시 커밋 요청
 
 에러 수정을 도와드릴까요?
 ```
@@ -102,6 +165,7 @@ ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+|/[0-9]+' | grep -oE '[
 
 - 사용자가 명시적으로 요청해도 **거부**
 - 긴급 상황이라도 **거부**
+- "빨리 해야 해", "나중에 고칠게" 등 **모두 거부**
 
 ## Related Skills
 

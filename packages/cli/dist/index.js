@@ -804,6 +804,52 @@ async function setupClaudeMd(cwd, extensions, force) {
 
 > SEMO (Semicolon Orchestrate) - AI Agent Orchestration Framework v${VERSION}
 
+---
+
+## 🔴 NON-NEGOTIABLE RULES
+
+### 1. Orchestrator-First Policy
+
+> **모든 요청은 반드시 Orchestrator를 통해 라우팅됩니다.**
+
+\`\`\`
+사용자 요청 → Orchestrator → 적절한 Agent/Skill → 실행
+\`\`\`
+
+**Orchestrator 위치**: \`semo-system/semo-core/agents/orchestrator/\`
+
+**직접 처리 금지 항목**:
+- 코드 작성/수정 → \`implementation-master\` 또는 \`coder\` 스킬
+- Git 커밋/푸시 → \`git-workflow\` 스킬
+- 품질 검증 → \`quality-master\` 또는 \`verify\` 스킬
+- 명세 작성 → \`spec-master\`
+
+### 2. Pre-Commit Quality Gate
+
+> **코드 변경이 포함된 커밋 전 반드시 Quality Gate를 통과해야 합니다.**
+
+\`\`\`bash
+# 필수 검증 순서
+npm run lint           # 1. ESLint 검사
+npx tsc --noEmit       # 2. TypeScript 타입 체크
+npm run build          # 3. 빌드 검증 (Next.js/TypeScript 프로젝트)
+\`\`\`
+
+**차단 항목**:
+- \`--no-verify\` 플래그 사용 금지
+- Quality Gate 우회 시도 거부
+- "그냥 커밋해줘", "빌드 생략해줘" 등 거부
+
+### 3. SEMO Message Format
+
+모든 SEMO 동작은 시스템 메시지로 시작:
+
+\`\`\`
+[SEMO] {Component}: {Action} → {Result}
+\`\`\`
+
+---
+
 ## 설치된 구성
 
 ### Standard (필수)

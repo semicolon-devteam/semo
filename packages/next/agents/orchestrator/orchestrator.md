@@ -147,7 +147,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 /
 ```
 
-## Git 명령 인터셉트
+## Git 명령 인터셉트 및 Quality Gate
 
 > **🔴 CRITICAL**: 모든 Git commit/push 명령은 반드시 `skill:git-workflow`를 통해 처리합니다.
 
@@ -159,6 +159,58 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 | `git push` | `git push origin`, `git push -u origin` |
 | 한글 커밋 요청 | "커밋해줘", "푸시해줘" |
 | PR 요청 | "PR 만들어줘", "풀리퀘스트 생성해줘" |
+
+### 🔴 Pre-Commit Quality Gate (NON-NEGOTIABLE)
+
+> **CRITICAL**: 코드 변경이 포함된 커밋 요청 시 반드시 Quality Gate를 실행합니다.
+
+**커밋 요청 감지 시 Orchestrator 동작:**
+
+1. **변경 파일 확인**: `git status`로 변경된 파일 목록 확인
+2. **코드 변경 여부 판단**: `src/`, `app/`, `*.ts`, `*.tsx` 파일 변경 시 Quality Gate 필수
+3. **`skill:git-workflow` 라우팅**: Quality Gate 실행 후 커밋 진행
+
+```markdown
+[SEMO] Orchestrator: 커밋 요청 감지 → Quality Gate 필수
+
+📋 **변경 파일 분석**:
+- 코드 파일: {count}개 (src/, app/)
+- 문서 파일: {count}개 (*.md)
+- 설정 파일: {count}개 (*.json, *.yaml)
+
+🔍 **Quality Gate 실행 중...**
+
+→ skill:git-workflow 라우팅 (Quality Gate 포함)
+```
+
+### Quality Gate 우회 시도 차단
+
+사용자가 Quality Gate를 우회하려는 시도 감지 시:
+
+| 우회 시도 | 대응 |
+|-----------|------|
+| "그냥 커밋해줘" | **거부** → Quality Gate 필요성 안내 |
+| "빌드 검증 생략해줘" | **거부** → 배포 시 문제 발생 경고 |
+| "lint만 통과하면 돼" | **거부** → 전체 검증 필요 안내 |
+| "--no-verify 써줘" | **거부** → NON-NEGOTIABLE 규칙 안내 |
+
+```markdown
+[SEMO] Orchestrator: ⛔ Quality Gate 우회 시도 감지
+
+🚫 **거부됨**: Quality Gate는 필수입니다.
+
+**이유**:
+- 배포 단계에서 발견되는 오류 → 수정 비용 10배 증가
+- CI/CD 파이프라인 실패 → 팀 전체 작업 차단
+- 코드 품질 저하 → 기술 부채 누적
+
+**해결 방법**:
+1. `npm run lint` - ESLint 에러 수정
+2. `npx tsc --noEmit` - TypeScript 에러 수정
+3. `npm run build` - 빌드 에러 수정
+
+에러 수정을 도와드릴까요?
+```
 
 ### --no-verify 차단
 
@@ -174,7 +226,8 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 **해결 방법**:
 1. `npm run lint` 실행 후 에러 수정
 2. `npx tsc --noEmit` 실행 후 타입 에러 수정
-3. 에러 수정 후 다시 커밋 요청
+3. `npm run build` 실행 후 빌드 에러 수정
+4. 에러 수정 후 다시 커밋 요청
 ```
 
 ## SEMO init 프로세스
