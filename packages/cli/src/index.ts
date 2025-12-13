@@ -463,6 +463,70 @@ async function setupExtensionSymlinks(cwd: string, packages: string[]) {
   }
 }
 
+// === MCP 서버 정의 ===
+interface MCPServerConfig {
+  name: string;
+  command: string;
+  args: string[];
+  env?: Record<string, string>;
+}
+
+const BASE_MCP_SERVERS: MCPServerConfig[] = [
+  {
+    name: "semo-integrations",
+    command: "npx",
+    args: ["-y", "@team-semicolon/semo-mcp"],
+    env: {
+      GITHUB_TOKEN: "${GITHUB_TOKEN}",
+      SLACK_BOT_TOKEN: "${SLACK_BOT_TOKEN}",
+      SUPABASE_URL: "${SUPABASE_URL}",
+      SUPABASE_KEY: "${SUPABASE_KEY}",
+    },
+  },
+  {
+    name: "context7",
+    command: "npx",
+    args: ["-y", "@upstash/context7-mcp"],
+  },
+  {
+    name: "sequential-thinking",
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+  },
+];
+
+// === Claude MCP 등록 함수 ===
+function registerMCPServer(server: MCPServerConfig): { success: boolean; error?: string } {
+  try {
+    // 환경변수가 있는 경우 --env 옵션 추가
+    const envArgs: string[] = [];
+    if (server.env) {
+      for (const [key, value] of Object.entries(server.env)) {
+        envArgs.push("-e", `${key}=${value}`);
+      }
+    }
+
+    // claude mcp add 명령어 실행
+    const args = [
+      "mcp", "add",
+      server.name,
+      "--",
+      server.command,
+      ...server.args,
+    ];
+
+    // 환경변수가 있으면 명령어 앞에 추가
+    if (envArgs.length > 0) {
+      args.splice(2, 0, ...envArgs);
+    }
+
+    execSync(`claude ${args.join(" ")}`, { stdio: "pipe" });
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: String(error) };
+  }
+}
+
 // === MCP 설정 ===
 async function setupMCP(cwd: string, extensions: string[], force: boolean) {
   console.log(chalk.cyan("\n🔧 Black Box 설정 (MCP Server)"));
@@ -483,19 +547,11 @@ async function setupMCP(cwd: string, extensions: string[], force: boolean) {
     permissions?: { allow?: string[]; deny?: string[] };
     mcpServers: Record<string, unknown>;
   } = {
-    mcpServers: {
-      "semo-integrations": {
-        command: "npx",
-        args: ["-y", "@team-semicolon/semo-mcp"],
-        env: {
-          GITHUB_TOKEN: "${GITHUB_TOKEN}",
-          SLACK_BOT_TOKEN: "${SLACK_BOT_TOKEN}",
-          SUPABASE_URL: "${SUPABASE_URL}",
-          SUPABASE_KEY: "${SUPABASE_KEY}",
-        },
-      },
-    },
+    mcpServers: {},
   };
+
+  // MCP 서버 목록 수집
+  const allServers: MCPServerConfig[] = [...BASE_MCP_SERVERS];
 
   // Extension settings 병합
   const semoSystemDir = path.join(cwd, "semo-system");
@@ -507,8 +563,16 @@ async function setupMCP(cwd: string, extensions: string[], force: boolean) {
 
         // mcpServers 병합
         if (extSettings.mcpServers) {
-          Object.assign(settings.mcpServers, extSettings.mcpServers);
-          console.log(chalk.gray(`  + ${pkg} MCP 설정 병합됨`));
+          for (const [name, config] of Object.entries(extSettings.mcpServers)) {
+            const serverConfig = config as { command: string; args: string[]; env?: Record<string, string> };
+            allServers.push({
+              name,
+              command: serverConfig.command,
+              args: serverConfig.args,
+              env: serverConfig.env,
+            });
+          }
+          console.log(chalk.gray(`  + ${pkg} MCP 설정 수집됨`));
         }
 
         // permissions 병합
@@ -536,8 +600,60 @@ async function setupMCP(cwd: string, extensions: string[], force: boolean) {
     }
   }
 
+  // settings.json에 mcpServers 저장 (백업용)
+  for (const server of allServers) {
+    const serverConfig: Record<string, unknown> = {
+      command: server.command,
+      args: server.args,
+    };
+    if (server.env) {
+      serverConfig.env = server.env;
+    }
+    settings.mcpServers[server.name] = serverConfig;
+  }
+
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-  console.log(chalk.green("✓ .claude/settings.json 생성됨 (MCP 설정)"));
+  console.log(chalk.green("✓ .claude/settings.json 생성됨 (MCP 설정 백업)"));
+
+  // Claude Code에 MCP 서버 등록 시도
+  console.log(chalk.cyan("\n🔌 Claude Code에 MCP 서버 등록 중..."));
+
+  const successServers: string[] = [];
+  const failedServers: MCPServerConfig[] = [];
+
+  for (const server of allServers) {
+    const spinner = ora(`  ${server.name} 등록 중...`).start();
+    const result = registerMCPServer(server);
+
+    if (result.success) {
+      spinner.succeed(`  ${server.name} 등록 완료`);
+      successServers.push(server.name);
+    } else {
+      spinner.fail(`  ${server.name} 등록 실패`);
+      failedServers.push(server);
+    }
+  }
+
+  // 결과 요약
+  if (successServers.length > 0) {
+    console.log(chalk.green(`\n✓ ${successServers.length}개 MCP 서버 자동 등록 완료`));
+  }
+
+  // 실패한 서버가 있으면 수동 등록 안내
+  if (failedServers.length > 0) {
+    console.log(chalk.yellow(`\n⚠ ${failedServers.length}개 MCP 서버 자동 등록 실패`));
+    console.log(chalk.cyan("\n📋 수동 등록 명령어:"));
+    console.log(chalk.gray("   다음 명령어를 터미널에서 실행하세요:\n"));
+
+    for (const server of failedServers) {
+      const envArgs = server.env
+        ? Object.entries(server.env).map(([k, v]) => `-e ${k}="${v}"`).join(" ")
+        : "";
+      const cmd = `claude mcp add ${server.name} ${envArgs} -- ${server.command} ${server.args.join(" ")}`.trim();
+      console.log(chalk.white(`   ${cmd}`));
+    }
+    console.log();
+  }
 }
 
 // === Extension settings 병합 (add 명령어용) ===
@@ -551,6 +667,7 @@ async function mergeExtensionSettings(cwd: string, packages: string[]) {
   }
 
   const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+  const newServers: MCPServerConfig[] = [];
 
   for (const pkg of packages) {
     const extSettingsPath = path.join(semoSystemDir, pkg, "settings.local.json");
@@ -561,7 +678,16 @@ async function mergeExtensionSettings(cwd: string, packages: string[]) {
         // mcpServers 병합
         if (extSettings.mcpServers) {
           settings.mcpServers = settings.mcpServers || {};
-          Object.assign(settings.mcpServers, extSettings.mcpServers);
+          for (const [name, config] of Object.entries(extSettings.mcpServers)) {
+            const serverConfig = config as { command: string; args: string[]; env?: Record<string, string> };
+            settings.mcpServers[name] = serverConfig;
+            newServers.push({
+              name,
+              command: serverConfig.command,
+              args: serverConfig.args,
+              env: serverConfig.env,
+            });
+          }
           console.log(chalk.gray(`  + ${pkg} MCP 설정 병합됨`));
         }
 
@@ -589,6 +715,44 @@ async function mergeExtensionSettings(cwd: string, packages: string[]) {
   }
 
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+
+  // 새 MCP 서버 Claude Code에 등록
+  if (newServers.length > 0) {
+    console.log(chalk.cyan("\n🔌 Claude Code에 MCP 서버 등록 중..."));
+
+    const successServers: string[] = [];
+    const failedServers: MCPServerConfig[] = [];
+
+    for (const server of newServers) {
+      const spinner = ora(`  ${server.name} 등록 중...`).start();
+      const result = registerMCPServer(server);
+
+      if (result.success) {
+        spinner.succeed(`  ${server.name} 등록 완료`);
+        successServers.push(server.name);
+      } else {
+        spinner.fail(`  ${server.name} 등록 실패`);
+        failedServers.push(server);
+      }
+    }
+
+    if (successServers.length > 0) {
+      console.log(chalk.green(`\n✓ ${successServers.length}개 MCP 서버 자동 등록 완료`));
+    }
+
+    if (failedServers.length > 0) {
+      console.log(chalk.yellow(`\n⚠ ${failedServers.length}개 MCP 서버 자동 등록 실패`));
+      console.log(chalk.cyan("\n📋 수동 등록 명령어:"));
+      for (const server of failedServers) {
+        const envArgs = server.env
+          ? Object.entries(server.env).map(([k, v]) => `-e ${k}="${v}"`).join(" ")
+          : "";
+        const cmd = `claude mcp add ${server.name} ${envArgs} -- ${server.command} ${server.args.join(" ")}`.trim();
+        console.log(chalk.white(`   ${cmd}`));
+      }
+      console.log();
+    }
+  }
 }
 
 // === Context Mesh 초기화 ===
