@@ -33,6 +33,7 @@ MVP 개발을 위한 환경과 MCP 서버 연동 상태를 검증합니다.
 | Git | - | ✅ |
 | GitHub CLI | - | ✅ |
 | Supabase CLI | - | ✅ |
+| **Vercel CLI** | - | ✅ |
 
 ### 2. MCP 서버
 
@@ -65,6 +66,7 @@ echo "pnpm: $(pnpm --version 2>/dev/null || echo '❌ 미설치')"
 echo "Git: $(git --version 2>/dev/null | cut -d' ' -f3 || echo '❌ 미설치')"
 echo "GitHub CLI: $(gh --version 2>/dev/null | head -1 | cut -d' ' -f3 || echo '❌ 미설치')"
 echo "Supabase CLI: $(supabase --version 2>/dev/null | cut -d' ' -f2 || echo '❌ 미설치')"
+echo "Vercel CLI: $(vercel --version 2>/dev/null || echo '❌ 미설치')"
 
 echo ""
 echo "🔌 MCP 서버 상태"
@@ -98,6 +100,7 @@ echo "─────────────────"
 | Git | - | {version} | {status} |
 | GitHub CLI | - | {version} | {status} |
 | Supabase CLI | - | {version} | {status} |
+| Vercel CLI | - | {version} | {status} |
 
 ## 🔌 MCP 서버
 
@@ -312,6 +315,10 @@ gh auth login
 # Supabase CLI
 brew install supabase/tap/supabase
 supabase login
+
+# Vercel CLI
+npm install -g vercel
+vercel login
 ```
 
 ### MCP 서버 미연결
