@@ -1,0 +1,23 @@
+{
+  "name": "semo-tests",
+  "version": "1.0.0",
+  "description": "SEMO Test Framework",
+  "scripts": {
+    "test": "ts-node runner.ts",
+    "test:mock": "ts-node runner.ts --mock",
+    "test:e2e": "ts-node runner.ts --e2e",
+    "test:biz": "ts-node runner.ts --layer=biz",
+    "test:eng": "ts-node runner.ts --layer=eng",
+    "test:ops": "ts-node runner.ts --layer=ops",
+    "test:core": "ts-node runner.ts --tags=core"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
