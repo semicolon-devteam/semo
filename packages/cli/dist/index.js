@@ -403,6 +403,148 @@ async function downloadExtensions(cwd, packages, force) {
         console.error(chalk_1.default.red(`   ${error}`));
     }
 }
+// === Orchestrator 병합 파일 생성 ===
+function createMergedOrchestrator(claudeAgentsDir, orchestratorSources) {
+    const orchestratorDir = path.join(claudeAgentsDir, "orchestrator");
+    fs.mkdirSync(orchestratorDir, { recursive: true });
+    // _packages 디렉토리 생성 (원본 참조용)
+    const packagesDir = path.join(orchestratorDir, "_packages");
+    fs.mkdirSync(packagesDir, { recursive: true });
+    // 각 패키지의 orchestrator 내용 수집
+    const routingTables = [];
+    const availableAgents = [];
+    const availableSkills = [];
+    const crossPackageRouting = [];
+    for (const source of orchestratorSources) {
+        const orchestratorMdPath = path.join(source.path, "orchestrator.md");
+        if (!fs.existsSync(orchestratorMdPath))
+            continue;
+        const content = fs.readFileSync(orchestratorMdPath, "utf-8");
+        const pkgShortName = source.pkg.replace(/\//g, "-");
+        // 원본 파일 복사 (참조용)
+        fs.writeFileSync(path.join(packagesDir, `${pkgShortName}.md`), content);
+        // Quick Routing Table 추출
+        const routingMatch = content.match(/## 🔴 Quick Routing Table[\s\S]*?\n\n([\s\S]*?)(?=\n## |$)/);
+        if (routingMatch) {
+            routingTables.push(`### ${EXTENSION_PACKAGES[source.pkg]?.name || source.pkg}\n\n${routingMatch[1].trim()}`);
+        }
+        // Available Agents 추출
+        const agentsMatch = content.match(/## Available Agents[\s\S]*?\n\n([\s\S]*?)(?=\n## |$)/);
+        if (agentsMatch) {
+            availableAgents.push(`### ${EXTENSION_PACKAGES[source.pkg]?.name || source.pkg}\n\n${agentsMatch[1].trim()}`);
+        }
+        // Available Skills 추출
+        const skillsMatch = content.match(/## Available Skills[\s\S]*?\n\n([\s\S]*?)(?=\n## |$)/);
+        if (skillsMatch) {
+            availableSkills.push(`### ${EXTENSION_PACKAGES[source.pkg]?.name || source.pkg}\n\n${skillsMatch[1].trim()}`);
+        }
+        // Cross-Package Routing 추출
+        const crossMatch = content.match(/## 🔄 Cross-Package Routing[\s\S]*?\n\n([\s\S]*?)(?=\n## |$)/);
+        if (crossMatch) {
+            crossPackageRouting.push(crossMatch[1].trim());
+        }
+        // references 폴더가 있으면 복사
+        const refsDir = path.join(source.path, "references");
+        if (fs.existsSync(refsDir)) {
+            const mergedRefsDir = path.join(orchestratorDir, "references");
+            fs.mkdirSync(mergedRefsDir, { recursive: true });
+            const refs = fs.readdirSync(refsDir);
+            for (const ref of refs) {
+                const srcRef = path.join(refsDir, ref);
+                const destRef = path.join(mergedRefsDir, `${pkgShortName}-${ref}`);
+                if (fs.statSync(srcRef).isFile()) {
+                    fs.copyFileSync(srcRef, destRef);
+                }
+            }
+        }
+    }
+    // 병합된 orchestrator.md 생성
+    const mergedContent = `---
+name: orchestrator
+description: |
+  SEMO Merged Orchestrator - Routes all user requests to appropriate agents/skills.
+  This orchestrator combines routing tables from ${orchestratorSources.length} packages.
+  PROACTIVELY delegate on ALL requests. Never process directly.
+tools:
+  - read_file
+  - list_dir
+  - run_command
+  - glob
+  - grep
+  - task
+  - skill
+model: inherit
+---
+
+# SEMO Merged Orchestrator
+
+> 이 파일은 **자동 생성**되었습니다. 직접 수정하지 마세요.
+> 원본 파일: \`_packages/\` 디렉토리 참조
+
+모든 사용자 요청을 분석하고 적절한 Agent 또는 Skill로 라우팅하는 **Primary Router**입니다.
+
+## 🔴 설치된 패키지
+
+${orchestratorSources.map(s => `- **${EXTENSION_PACKAGES[s.pkg]?.name || s.pkg}**: \`semo-system/${s.pkg}\``).join("\n")}
+
+## �� Quick Routing Table (Merged)
+
+> 키워드 매칭 시 **첫 번째 매칭된 패키지**로 라우팅됩니다.
+
+${routingTables.join("\n\n---\n\n")}
+
+## SEMO 메시지 포맷
+
+### Agent 위임
+
+\`\`\`markdown
+[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}
+
+[SEMO] Agent 위임: {agent_name} (사유: {reason})
+\`\`\`
+
+### Skill 호출
+
+\`\`\`markdown
+[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}
+
+[SEMO] Skill 호출: {skill_name}
+\`\`\`
+
+### 라우팅 실패
+
+\`\`\`markdown
+[SEMO] Orchestrator: 라우팅 실패 → 적절한 Agent/Skill 없음
+
+⚠️ 직접 처리 필요
+\`\`\`
+
+## Critical Rules
+
+1. **Routing-Only**: 직접 작업 수행 금지
+2. **SEMO 메시지 필수**: 모든 위임에 SEMO 메시지 포함
+3. **Package Priority**: 라우팅 충돌 시 설치 순서대로 우선순위 적용
+4. **Cross-Package**: 다른 패키지 전문 영역 요청 시 인계 권유
+
+${crossPackageRouting.length > 0 ? `## 🔄 Cross-Package Routing
+
+${crossPackageRouting[0]}` : ""}
+
+${availableAgents.length > 0 ? `## Available Agents (All Packages)
+
+${availableAgents.join("\n\n")}` : ""}
+
+${availableSkills.length > 0 ? `## Available Skills (All Packages)
+
+${availableSkills.join("\n\n")}` : ""}
+
+## References
+
+- 원본 Orchestrator: \`_packages/\` 디렉토리
+- 병합된 References: \`references/\` 디렉토리
+`;
+    fs.writeFileSync(path.join(orchestratorDir, "orchestrator.md"), mergedContent);
+}
 // === Extensions 심볼릭 링크 설정 (agents/skills 병합) ===
 async function setupExtensionSymlinks(cwd, packages) {
     console.log(chalk_1.default.cyan("\n🔗 Extensions 연결"));
@@ -413,12 +555,12 @@ async function setupExtensionSymlinks(cwd, packages) {
     const claudeSkillsDir = path.join(claudeDir, "skills");
     fs.mkdirSync(claudeAgentsDir, { recursive: true });
     fs.mkdirSync(claudeSkillsDir, { recursive: true });
+    // Orchestrator 소스 수집 (병합용)
+    const orchestratorSources = [];
     for (const pkg of packages) {
         const pkgPath = path.join(semoSystemDir, pkg);
         if (!fs.existsSync(pkgPath))
             continue;
-        // Note: .claude/semo-{pkg} 링크는 생성하지 않음 (불필요)
-        // Extension의 agents/skills만 개별 링크하여 병합
         // 1. Extension의 agents를 .claude/agents/에 개별 링크
         const extAgentsDir = path.join(pkgPath, "agents");
         if (fs.existsSync(extAgentsDir)) {
@@ -426,6 +568,11 @@ async function setupExtensionSymlinks(cwd, packages) {
             for (const agent of agents) {
                 const agentLink = path.join(claudeAgentsDir, agent);
                 const agentTarget = path.join(extAgentsDir, agent);
+                // Orchestrator는 특별 처리 (병합 필요)
+                if (agent === "orchestrator") {
+                    orchestratorSources.push({ pkg, path: agentTarget });
+                    continue; // 심볼릭 링크 생성 안 함
+                }
                 if (!fs.existsSync(agentLink)) {
                     createSymlinkOrJunction(agentTarget, agentLink);
                     console.log(chalk_1.default.green(`  ✓ .claude/agents/${agent} → semo-system/${pkg}/agents/${agent}`));
@@ -443,6 +590,27 @@ async function setupExtensionSymlinks(cwd, packages) {
                     createSymlinkOrJunction(skillTarget, skillLink);
                     console.log(chalk_1.default.green(`  ✓ .claude/skills/${skill} → semo-system/${pkg}/skills/${skill}`));
                 }
+            }
+        }
+    }
+    // 3. Orchestrator 병합 처리
+    if (orchestratorSources.length > 0) {
+        // 기존 orchestrator 링크/디렉토리 제거
+        const orchestratorPath = path.join(claudeAgentsDir, "orchestrator");
+        if (fs.existsSync(orchestratorPath)) {
+            removeRecursive(orchestratorPath);
+        }
+        if (orchestratorSources.length === 1) {
+            // 단일 패키지: 심볼릭 링크
+            createSymlinkOrJunction(orchestratorSources[0].path, orchestratorPath);
+            console.log(chalk_1.default.green(`  ✓ .claude/agents/orchestrator → semo-system/${orchestratorSources[0].pkg}/agents/orchestrator`));
+        }
+        else {
+            // 다중 패키지: 병합 파일 생성
+            createMergedOrchestrator(claudeAgentsDir, orchestratorSources);
+            console.log(chalk_1.default.green(`  ✓ .claude/agents/orchestrator (${orchestratorSources.length}개 패키지 병합)`));
+            for (const source of orchestratorSources) {
+                console.log(chalk_1.default.gray(`    - semo-system/${source.pkg}/agents/orchestrator`));
             }
         }
     }
