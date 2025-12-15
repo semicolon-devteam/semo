@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="SEMO Tests" tests="1" failures="1" skipped="0" time="0">
-  <testcase name="list-my-tasks" time="0">
-    <failure message="One or more verifications failed">
-      output: Pattern not matched: \d+건
-    </failure>
-  </testcase>
-</testsuite>

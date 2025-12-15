@@ -1,0 +1,15 @@
+{
+    "sqltools.connections": [
+        {
+            "ssh": "Disabled",
+            "previewLimit": 50,
+            "server": "3.38.162.21",
+            "port": 5432,
+            "driver": "PostgreSQL",
+            "name": "Semicolon Core",
+            "database": "appdb",
+            "username": "app",
+            "password": "ProductionPassword2024!@#"
+        }
+    ]
+}

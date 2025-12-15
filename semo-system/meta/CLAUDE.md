@@ -218,17 +218,23 @@ cd semo-meta && git push origin main && cd ../.claude/semo-meta && git pull orig
 | 항목 | 파일 | 내용 |
 |------|------|------|
 | ✅ 접두사 라우팅 | `CLAUDE.md` | 접두사 테이블에 `[{name}]` 추가 |
-| ✅ 버저닝 대상 | `CLAUDE.md` | 버저닝 필수 대상에 `semo-{name}` 추가 |
-| ✅ CLI 패키지 | `packages/cli` | EXTENSION_PACKAGES에 추가 |
+| ✅ 버저닝 대상 | `CLAUDE.md` | 버저닝 필수 대상에 `sax-{name}` 추가 |
+| ✅ 설치 스크립트 | `scripts/install-sax.sh` | 3곳 수정 (show_usage, select_package, parse_args) |
 
-#### CLI 패키지 수정 위치 (packages/cli/src/index.ts)
+#### install-sax.sh 수정 위치
 
-```typescript
-// EXTENSION_PACKAGES에 새 패키지 추가
-const EXTENSION_PACKAGES: Record<string, { name: string; desc: string; detect: string[] }> = {
-  // ... 기존 패키지들
-  {name}: { name: "{Name}", desc: "{설명}", detect: [/* 자동 감지 파일들 */] },
-};
+```bash
+# 1. show_usage() - 패키지 설명 추가
+echo "  {name}    - SEMO-{Name} ({대상}용)"
+
+# 2. select_package() - 메뉴 옵션 추가
+echo "  N) sax-{name}  - {대상}용"
+echo "                   {설명}"
+# case 문에 추가
+N) PACKAGE="{name}" ;;
+
+# 3. parse_args() - CLI 인자 패턴에 추가
+po|next|qa|meta|pm|backend|infra|design|ms|{name})
 ```
 
 > **참조**: [semo-architect Agent](agents/semo-architect/semo-architect.md) - 신규 패키지 추가 상세 가이드

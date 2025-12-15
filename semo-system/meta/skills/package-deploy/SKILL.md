@@ -84,33 +84,6 @@ git submodule update --remote
 [SEMO] Deploy: {package} → {target_path} 배포 완료 (v{version})
 ```
 
-## CLAUDE.md 자동 설정 (필수)
-
-> **중요**: 배포 시 Orchestrator-First Policy가 포함된 표준 템플릿을 자동으로 설치합니다.
-
-### 배포 프로세스
-
-```text
-1. 패키지 파일 복사 (agents/, skills/, commands/)
-   ↓
-2. semo-core/templates/CLAUDE.md → .claude/CLAUDE.md 복사
-   ↓
-3. {{VERSION}} 치환
-   ↓
-4. 배포 완료
-```
-
-### 템플릿에 포함된 필수 요소
-
-| 요소 | 설명 |
-|------|------|
-| Orchestrator-First Policy | 모든 요청 처리 흐름 정의 |
-| 라우팅 테이블 | 카테고리별 스킬 매핑 |
-| SEMO 메시지 규칙 | 출력 포맷 및 규칙 |
-| 표준 커맨드 | /SEMO:* 커맨드 목록 |
-
-> **템플릿 위치**: `semo-system/semo-core/templates/CLAUDE.md`
-
 ## Related
 
 - [package-sync Skill](../package-sync/SKILL.md) - docs 내부 동기화

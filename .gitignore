@@ -1,0 +1,42 @@
+# SEMO Project .gitignore
+
+# === 의존성 ===
+node_modules/
+.pnpm-store/
+
+# === 빌드 산출물 ===
+dist/
+build/
+*.tsbuildinfo
+
+# === 환경 설정 ===
+.env
+.env.local
+.env.*.local
+*.pem
+credentials.json
+
+# === IDE ===
+.idea/
+*.swp
+*.swo
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === 로그 ===
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# === 테스트 ===
+coverage/
+.nyc_output/
+
+# === Claude Code ===
+.claude/settings.local.json
+
+# === 민감한 디렉토리 ===
+core-db/

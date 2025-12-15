@@ -105,28 +105,19 @@ target-project/.claude/
 
 ## Phase 3: 배포 후 설정
 
-### 3.1 루트 CLAUDE.md 설정 (필수)
+### 3.1 루트 CLAUDE.md 설정
 
-> **중요**: Orchestrator-First Policy가 포함된 표준 템플릿을 사용해야 합니다.
+대상 프로젝트의 `.claude/CLAUDE.md` 생성/수정:
 
-대상 프로젝트의 `.claude/CLAUDE.md` 생성:
+```markdown
+# Project CLAUDE.md
 
-```bash
-# 표준 템플릿 복사 (권장)
-cp semo-system/semo-core/templates/CLAUDE.md "$TARGET/.claude/CLAUDE.md"
+## SEMO-Next 활성화
 
-# 버전 치환
-VERSION=$(cat semo-system/semo-core/VERSION)
-sed -i '' "s/{{VERSION}}/$VERSION/g" "$TARGET/.claude/CLAUDE.md"
+이 프로젝트는 SEMO-Next 패키지를 사용합니다.
+
+@semo-next/CLAUDE.md
 ```
-
-**템플릿에 포함된 필수 요소**:
-- Orchestrator-First Policy (모든 요청 처리 흐름)
-- 카테고리별 라우팅 테이블
-- SEMO 메시지 출력 규칙
-- 표준 커맨드 목록
-
-> **참고**: 템플릿 위치: `semo-system/semo-core/templates/CLAUDE.md`
 
 ### 3.2 Health Check 실행
 
