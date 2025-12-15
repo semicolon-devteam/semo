@@ -59,7 +59,7 @@ const child_process_1 = require("child_process");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
-const VERSION = "2.0.2";
+const VERSION = "3.0.0-alpha";
 // === Windows 지원 유틸리티 ===
 const isWindows = os.platform() === "win32";
 /**
@@ -122,18 +122,36 @@ function copyRecursive(src, dest) {
     }
 }
 const SEMO_REPO = "https://github.com/semicolon-devteam/semo.git";
-// 확장 패키지 정의
+// 확장 패키지 정의 (v3.0 구조)
 const EXTENSION_PACKAGES = {
-    next: { name: "Next.js", desc: "Next.js 프론트엔드 개발 (13 agents, 33 skills)", detect: ["next.config.js", "next.config.mjs", "next.config.ts"] },
-    backend: { name: "Backend", desc: "Spring/Node.js 백엔드 개발 (8 agents, 15 skills)", detect: ["pom.xml", "build.gradle"] },
-    po: { name: "PO", desc: "Product Owner - 태스크/에픽 관리 (5 agents, 19 skills)", detect: [] },
-    qa: { name: "QA", desc: "QA 테스트 관리 (4 agents, 13 skills)", detect: [] },
-    pm: { name: "PM", desc: "프로젝트/스프린트 관리 (5 agents, 16 skills)", detect: [] },
-    infra: { name: "Infra", desc: "인프라/배포 관리 (6 agents, 10 skills)", detect: ["docker-compose.yml", "Dockerfile"] },
-    design: { name: "Design", desc: "디자인 핸드오프 (3 agents, 4 skills)", detect: [] },
-    ms: { name: "Microservice", desc: "마이크로서비스 아키텍처 (5 agents, 5 skills)", detect: [] },
-    mvp: { name: "MVP", desc: "MVP 빠른 개발 (4 agents, 6 skills)", detect: [] },
-    meta: { name: "Meta", desc: "SEMO 프레임워크 자체 개발/관리 (6 agents, 7 skills)", detect: ["semo-core", "semo-skills", "packages/meta"] },
+    // Business Layer
+    "biz/discovery": { name: "Discovery", desc: "아이템 발굴, 시장 조사, Epic/Task", layer: "biz", detect: [] },
+    "biz/design": { name: "Design", desc: "컨셉 설계, 목업, UX", layer: "biz", detect: [] },
+    "biz/management": { name: "Management", desc: "일정/인력/스프린트 관리", layer: "biz", detect: [] },
+    "biz/poc": { name: "PoC", desc: "빠른 PoC, 패스트트랙", layer: "biz", detect: [] },
+    // Engineering Layer
+    "eng/nextjs": { name: "Next.js", desc: "Next.js 프론트엔드 개발", layer: "eng", detect: ["next.config.js", "next.config.mjs", "next.config.ts"] },
+    "eng/spring": { name: "Spring", desc: "Spring Boot 백엔드 개발", layer: "eng", detect: ["pom.xml", "build.gradle"] },
+    "eng/ms": { name: "Microservice", desc: "마이크로서비스 아키텍처", layer: "eng", detect: [] },
+    "eng/infra": { name: "Infra", desc: "인프라/배포 관리", layer: "eng", detect: ["docker-compose.yml", "Dockerfile"] },
+    // Operations Layer
+    "ops/qa": { name: "QA", desc: "테스트/품질 관리", layer: "ops", detect: [] },
+    "ops/monitor": { name: "Monitor", desc: "서비스 현황 모니터링", layer: "ops", detect: [] },
+    "ops/improve": { name: "Improve", desc: "개선 제안", layer: "ops", detect: [] },
+    // Meta
+    meta: { name: "Meta", desc: "SEMO 프레임워크 자체 개발/관리", layer: "meta", detect: ["semo-core", "semo-skills"] },
+};
+// 레거시 패키지 → 새 패키지 매핑 (하위호환성)
+const LEGACY_MAPPING = {
+    next: "eng/nextjs",
+    backend: "eng/spring",
+    ms: "eng/ms",
+    infra: "eng/infra",
+    qa: "ops/qa",
+    po: "biz/discovery",
+    pm: "biz/management",
+    design: "biz/design",
+    mvp: "biz/poc",
 };
 const program = new commander_1.Command();
 program
@@ -390,6 +408,11 @@ async function setupExtensionSymlinks(cwd, packages) {
     console.log(chalk_1.default.cyan("\n🔗 Extensions 연결"));
     const claudeDir = path.join(cwd, ".claude");
     const semoSystemDir = path.join(cwd, "semo-system");
+    // .claude/agents, .claude/skills 디렉토리 생성 (없으면)
+    const claudeAgentsDir = path.join(claudeDir, "agents");
+    const claudeSkillsDir = path.join(claudeDir, "skills");
+    fs.mkdirSync(claudeAgentsDir, { recursive: true });
+    fs.mkdirSync(claudeSkillsDir, { recursive: true });
     for (const pkg of packages) {
         const pkgPath = path.join(semoSystemDir, pkg);
         if (!fs.existsSync(pkgPath))
@@ -398,7 +421,6 @@ async function setupExtensionSymlinks(cwd, packages) {
         // Extension의 agents/skills만 개별 링크하여 병합
         // 1. Extension의 agents를 .claude/agents/에 개별 링크
         const extAgentsDir = path.join(pkgPath, "agents");
-        const claudeAgentsDir = path.join(claudeDir, "agents");
         if (fs.existsSync(extAgentsDir)) {
             const agents = fs.readdirSync(extAgentsDir).filter(f => fs.statSync(path.join(extAgentsDir, f)).isDirectory());
             for (const agent of agents) {
@@ -410,9 +432,8 @@ async function setupExtensionSymlinks(cwd, packages) {
                 }
             }
         }
-        // 3. Extension의 skills를 .claude/skills/에 개별 링크
+        // 2. Extension의 skills를 .claude/skills/에 개별 링크
         const extSkillsDir = path.join(pkgPath, "skills");
-        const claudeSkillsDir = path.join(claudeDir, "skills");
         if (fs.existsSync(extSkillsDir)) {
             const skills = fs.readdirSync(extSkillsDir).filter(f => fs.statSync(path.join(extSkillsDir, f)).isDirectory());
             for (const skill of skills) {
@@ -449,28 +470,34 @@ const BASE_MCP_SERVERS = [
         args: ["-y", "@modelcontextprotocol/server-sequential-thinking"],
     },
 ];
+// === Claude MCP 서버 존재 여부 확인 ===
+function isMCPServerRegistered(serverName) {
+    try {
+        const result = (0, child_process_1.execSync)("claude mcp list", { stdio: "pipe", encoding: "utf-8" });
+        return result.includes(serverName);
+    }
+    catch {
+        return false;
+    }
+}
 // === Claude MCP 등록 함수 ===
 function registerMCPServer(server) {
     try {
-        // 환경변수가 있는 경우 --env 옵션 추가
-        const envArgs = [];
+        // 이미 등록된 서버인지 확인
+        if (isMCPServerRegistered(server.name)) {
+            return { success: true, skipped: true };
+        }
+        // claude mcp add 명령어 구성
+        // 형식: claude mcp add <name> [-e KEY=value...] -- <command> [args...]
+        const args = ["mcp", "add", server.name];
+        // 환경변수가 있는 경우 -e 옵션 추가
         if (server.env) {
             for (const [key, value] of Object.entries(server.env)) {
-                envArgs.push("-e", `${key}=${value}`);
+                args.push("-e", `${key}=${value}`);
             }
         }
-        // claude mcp add 명령어 실행
-        const args = [
-            "mcp", "add",
-            server.name,
-            "--",
-            server.command,
-            ...server.args,
-        ];
-        // 환경변수가 있으면 명령어 앞에 추가
-        if (envArgs.length > 0) {
-            args.splice(2, 0, ...envArgs);
-        }
+        // -- 구분자 후 명령어와 인자 추가
+        args.push("--", server.command, ...server.args);
         (0, child_process_1.execSync)(`claude ${args.join(" ")}`, { stdio: "pipe" });
         return { success: true };
     }
@@ -557,13 +584,20 @@ async function setupMCP(cwd, extensions, force) {
     // Claude Code에 MCP 서버 등록 시도
     console.log(chalk_1.default.cyan("\n🔌 Claude Code에 MCP 서버 등록 중..."));
     const successServers = [];
+    const skippedServers = [];
     const failedServers = [];
     for (const server of allServers) {
         const spinner = (0, ora_1.default)(`  ${server.name} 등록 중...`).start();
         const result = registerMCPServer(server);
         if (result.success) {
-            spinner.succeed(`  ${server.name} 등록 완료`);
-            successServers.push(server.name);
+            if (result.skipped) {
+                spinner.info(`  ${server.name} 이미 등록됨 (건너뜀)`);
+                skippedServers.push(server.name);
+            }
+            else {
+                spinner.succeed(`  ${server.name} 등록 완료`);
+                successServers.push(server.name);
+            }
         }
         else {
             spinner.fail(`  ${server.name} 등록 실패`);
@@ -572,7 +606,10 @@ async function setupMCP(cwd, extensions, force) {
     }
     // 결과 요약
     if (successServers.length > 0) {
-        console.log(chalk_1.default.green(`\n✓ ${successServers.length}개 MCP 서버 자동 등록 완료`));
+        console.log(chalk_1.default.green(`\n✓ ${successServers.length}개 MCP 서버 새로 등록 완료`));
+    }
+    if (skippedServers.length > 0) {
+        console.log(chalk_1.default.gray(`  (${skippedServers.length}개 이미 등록됨)`));
     }
     // 실패한 서버가 있으면 수동 등록 안내
     if (failedServers.length > 0) {
@@ -647,13 +684,20 @@ async function mergeExtensionSettings(cwd, packages) {
     if (newServers.length > 0) {
         console.log(chalk_1.default.cyan("\n🔌 Claude Code에 MCP 서버 등록 중..."));
         const successServers = [];
+        const skippedServers = [];
         const failedServers = [];
         for (const server of newServers) {
             const spinner = (0, ora_1.default)(`  ${server.name} 등록 중...`).start();
             const result = registerMCPServer(server);
             if (result.success) {
-                spinner.succeed(`  ${server.name} 등록 완료`);
-                successServers.push(server.name);
+                if (result.skipped) {
+                    spinner.info(`  ${server.name} 이미 등록됨 (건너뜀)`);
+                    skippedServers.push(server.name);
+                }
+                else {
+                    spinner.succeed(`  ${server.name} 등록 완료`);
+                    successServers.push(server.name);
+                }
             }
             else {
                 spinner.fail(`  ${server.name} 등록 실패`);
@@ -661,7 +705,10 @@ async function mergeExtensionSettings(cwd, packages) {
             }
         }
         if (successServers.length > 0) {
-            console.log(chalk_1.default.green(`\n✓ ${successServers.length}개 MCP 서버 자동 등록 완료`));
+            console.log(chalk_1.default.green(`\n✓ ${successServers.length}개 MCP 서버 새로 등록 완료`));
+        }
+        if (skippedServers.length > 0) {
+            console.log(chalk_1.default.gray(`  (${skippedServers.length}개 이미 등록됨)`));
         }
         if (failedServers.length > 0) {
             console.log(chalk_1.default.yellow(`\n⚠ ${failedServers.length}개 MCP 서버 자동 등록 실패`));
@@ -782,7 +829,7 @@ _SEMO 기본 규칙의 예외 사항을 여기에 추가하세요._
         console.log(chalk_1.default.green("✓ .claude/memory/rules/project-specific.md 생성됨"));
     }
 }
-// === CLAUDE.md 생성 ===
+// === CLAUDE.md 생성 (패키지 CLAUDE.md 병합 지원) ===
 async function setupClaudeMd(cwd, extensions, force) {
     console.log(chalk_1.default.cyan("\n📄 CLAUDE.md 설정"));
     const claudeMdPath = path.join(cwd, ".claude", "CLAUDE.md");
@@ -793,9 +840,24 @@ async function setupClaudeMd(cwd, extensions, force) {
             return;
         }
     }
+    const semoSystemDir = path.join(cwd, "semo-system");
     const extensionsList = extensions.length > 0
         ? extensions.map(pkg => `├── ${pkg}/              # ${EXTENSION_PACKAGES[pkg].name}`).join("\n")
         : "";
+    // 패키지별 CLAUDE.md 병합 섹션 생성
+    let packageClaudeMdSections = "";
+    for (const pkg of extensions) {
+        const pkgClaudeMdPath = path.join(semoSystemDir, pkg, "CLAUDE.md");
+        if (fs.existsSync(pkgClaudeMdPath)) {
+            const pkgContent = fs.readFileSync(pkgClaudeMdPath, "utf-8");
+            // 첫 헤더(#)를 ##로 변경하여 하위 섹션으로 만듦
+            const adjustedContent = pkgContent
+                .replace(/^# /gm, "### ")
+                .replace(/^## /gm, "#### ");
+            packageClaudeMdSections += `\n\n---\n\n## ${EXTENSION_PACKAGES[pkg].name} 패키지 컨텍스트\n\n${adjustedContent}`;
+            console.log(chalk_1.default.gray(`  + ${pkg}/CLAUDE.md 병합됨`));
+        }
+    }
     const claudeMdContent = `# SEMO Project Configuration
 
 > SEMO (Semicolon Orchestrate) - AI Agent Orchestration Framework v${VERSION}
@@ -925,9 +987,13 @@ memory 스킬이 자동으로 이 파일들을 관리합니다.
 - [SEMO Principles](semo-system/semo-core/principles/PRINCIPLES.md)
 - [SEMO Skills](semo-system/semo-skills/)
 ${extensions.length > 0 ? extensions.map(pkg => `- [${EXTENSION_PACKAGES[pkg].name} Package](semo-system/${pkg}/)`).join("\n") : ""}
+${packageClaudeMdSections}
 `;
     fs.writeFileSync(claudeMdPath, claudeMdContent);
     console.log(chalk_1.default.green("✓ .claude/CLAUDE.md 생성됨"));
+    if (packageClaudeMdSections) {
+        console.log(chalk_1.default.green(`  + ${extensions.length}개 패키지 CLAUDE.md 병합 완료`));
+    }
 }
 // === add 명령어 ===
 program
@@ -941,11 +1007,19 @@ program
         console.log(chalk_1.default.red("\nSEMO가 설치되어 있지 않습니다. 'semo init'을 먼저 실행하세요.\n"));
         process.exit(1);
     }
-    if (!(packageName in EXTENSION_PACKAGES)) {
+    // 레거시 패키지 이름 → 새 이름 변환
+    let resolvedPackage = packageName;
+    if (packageName in LEGACY_MAPPING) {
+        resolvedPackage = LEGACY_MAPPING[packageName];
+        console.log(chalk_1.default.yellow(`\n💡 '${packageName}' → '${resolvedPackage}' (v3.0 구조)`));
+    }
+    if (!(resolvedPackage in EXTENSION_PACKAGES)) {
         console.log(chalk_1.default.red(`\n알 수 없는 패키지: ${packageName}`));
-        console.log(chalk_1.default.gray(`사용 가능한 패키지: ${Object.keys(EXTENSION_PACKAGES).join(", ")}\n`));
+        console.log(chalk_1.default.gray(`사용 가능한 패키지: ${Object.keys(EXTENSION_PACKAGES).join(", ")}`));
+        console.log(chalk_1.default.gray(`레거시 별칭: ${Object.keys(LEGACY_MAPPING).join(", ")}\n`));
         process.exit(1);
     }
+    packageName = resolvedPackage;
     const pkgPath = path.join(semoSystemDir, packageName);
     if (fs.existsSync(pkgPath) && !options.force) {
         console.log(chalk_1.default.yellow(`\n${EXTENSION_PACKAGES[packageName].name} 패키지가 이미 설치되어 있습니다.`));
@@ -969,24 +1043,41 @@ program
     .action(() => {
     const cwd = process.cwd();
     const semoSystemDir = path.join(cwd, "semo-system");
-    console.log(chalk_1.default.cyan.bold("\n📦 SEMO 패키지 목록\n"));
+    console.log(chalk_1.default.cyan.bold("\n📦 SEMO 패키지 목록 (v3.0)\n"));
     // Standard
     console.log(chalk_1.default.white.bold("Standard (필수)"));
     const coreInstalled = fs.existsSync(path.join(semoSystemDir, "semo-core"));
     const skillsInstalled = fs.existsSync(path.join(semoSystemDir, "semo-skills"));
     console.log(`  ${coreInstalled ? chalk_1.default.green("✓") : chalk_1.default.gray("○")} semo-core - 원칙, 오케스트레이터`);
-    console.log(`  ${skillsInstalled ? chalk_1.default.green("✓") : chalk_1.default.gray("○")} semo-skills - 13개 통합 스킬`);
+    console.log(`  ${skillsInstalled ? chalk_1.default.green("✓") : chalk_1.default.gray("○")} semo-skills - 통합 스킬`);
     console.log();
-    // Extensions
-    console.log(chalk_1.default.white.bold("Extensions (선택)"));
-    for (const [key, pkg] of Object.entries(EXTENSION_PACKAGES)) {
-        const isInstalled = fs.existsSync(path.join(semoSystemDir, key));
-        const status = isInstalled ? chalk_1.default.green("✓") : chalk_1.default.gray("○");
-        console.log(`  ${status} ${key} - ${pkg.desc}`);
+    // Extensions - 레이어별 그룹화
+    const layers = {
+        biz: { title: "Business Layer", emoji: "💼" },
+        eng: { title: "Engineering Layer", emoji: "⚙️" },
+        ops: { title: "Operations Layer", emoji: "📊" },
+        meta: { title: "Meta", emoji: "🔧" },
+    };
+    for (const [layerKey, layerInfo] of Object.entries(layers)) {
+        const layerPackages = Object.entries(EXTENSION_PACKAGES).filter(([, pkg]) => pkg.layer === layerKey);
+        if (layerPackages.length === 0)
+            continue;
+        console.log(chalk_1.default.white.bold(`${layerInfo.emoji} ${layerInfo.title}`));
+        for (const [key, pkg] of layerPackages) {
+            const isInstalled = fs.existsSync(path.join(semoSystemDir, key));
+            const status = isInstalled ? chalk_1.default.green("✓") : chalk_1.default.gray("○");
+            const displayKey = key.includes("/") ? key.split("/")[1] : key;
+            console.log(`  ${status} ${chalk_1.default.cyan(displayKey)} - ${pkg.desc}`);
+            console.log(chalk_1.default.gray(`      semo add ${key}`));
+        }
+        console.log();
     }
-    console.log();
-    console.log(chalk_1.default.gray("설치: semo add <package>"));
-    console.log(chalk_1.default.gray("예시: semo add next\n"));
+    // 레거시 호환성 안내
+    console.log(chalk_1.default.gray("─".repeat(50)));
+    console.log(chalk_1.default.gray("레거시 명령어도 지원됩니다:"));
+    console.log(chalk_1.default.gray("  semo add next     → eng/nextjs"));
+    console.log(chalk_1.default.gray("  semo add backend  → eng/spring"));
+    console.log(chalk_1.default.gray("  semo add mvp      → biz/poc\n"));
 });
 // === status 명령어 ===
 program
