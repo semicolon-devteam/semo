@@ -153,6 +153,50 @@ const LEGACY_MAPPING = {
     design: "biz/design",
     mvp: "biz/poc",
 };
+// 그룹 이름 목록 (biz, eng, ops)
+const PACKAGE_GROUPS = ["biz", "eng", "ops", "meta"];
+// 그룹명 → 해당 그룹의 모든 패키지 반환
+function getPackagesByGroup(group) {
+    return Object.entries(EXTENSION_PACKAGES)
+        .filter(([, pkg]) => pkg.layer === group)
+        .map(([key]) => key);
+}
+// 패키지 입력을 해석 (그룹, 레거시, 쉼표 구분 모두 처리)
+function resolvePackageInput(input) {
+    // 쉼표로 구분된 여러 패키지 처리
+    const parts = input.split(",").map(p => p.trim()).filter(p => p);
+    const resolvedPackages = [];
+    let isGroup = false;
+    let groupName;
+    for (const part of parts) {
+        // 1. 그룹명인지 확인 (biz, eng, ops, meta)
+        if (PACKAGE_GROUPS.includes(part)) {
+            const groupPackages = getPackagesByGroup(part);
+            resolvedPackages.push(...groupPackages);
+            isGroup = true;
+            groupName = part;
+            continue;
+        }
+        // 2. 레거시 매핑 확인
+        if (part in LEGACY_MAPPING) {
+            resolvedPackages.push(LEGACY_MAPPING[part]);
+            continue;
+        }
+        // 3. 직접 패키지명 확인
+        if (part in EXTENSION_PACKAGES) {
+            resolvedPackages.push(part);
+            continue;
+        }
+        // 4. 유효하지 않은 패키지명
+        // (빈 배열 대신 null을 추가하여 나중에 에러 처리)
+    }
+    // 중복 제거
+    return {
+        packages: [...new Set(resolvedPackages)],
+        isGroup,
+        groupName
+    };
+}
 const program = new commander_1.Command();
 program
     .name("semo")
@@ -1165,44 +1209,90 @@ ${packageClaudeMdSections}
 }
 // === add 명령어 ===
 program
-    .command("add <package>")
-    .description("Extension 패키지를 추가로 설치합니다")
+    .command("add <packages>")
+    .description("Extension 패키지를 추가로 설치합니다 (그룹: biz, eng, ops / 개별: biz/discovery, eng/nextjs)")
     .option("-f, --force", "기존 설정 덮어쓰기")
-    .action(async (packageName, options) => {
+    .action(async (packagesInput, options) => {
     const cwd = process.cwd();
     const semoSystemDir = path.join(cwd, "semo-system");
     if (!fs.existsSync(semoSystemDir)) {
         console.log(chalk_1.default.red("\nSEMO가 설치되어 있지 않습니다. 'semo init'을 먼저 실행하세요.\n"));
         process.exit(1);
     }
-    // 레거시 패키지 이름 → 새 이름 변환
-    let resolvedPackage = packageName;
-    if (packageName in LEGACY_MAPPING) {
-        resolvedPackage = LEGACY_MAPPING[packageName];
-        console.log(chalk_1.default.yellow(`\n💡 '${packageName}' → '${resolvedPackage}' (v3.0 구조)`));
-    }
-    if (!(resolvedPackage in EXTENSION_PACKAGES)) {
-        console.log(chalk_1.default.red(`\n알 수 없는 패키지: ${packageName}`));
+    // 패키지 입력 해석 (그룹, 레거시, 쉼표 구분 모두 처리)
+    const { packages, isGroup, groupName } = resolvePackageInput(packagesInput);
+    if (packages.length === 0) {
+        console.log(chalk_1.default.red(`\n알 수 없는 패키지: ${packagesInput}`));
+        console.log(chalk_1.default.gray(`사용 가능한 그룹: ${PACKAGE_GROUPS.join(", ")}`));
         console.log(chalk_1.default.gray(`사용 가능한 패키지: ${Object.keys(EXTENSION_PACKAGES).join(", ")}`));
         console.log(chalk_1.default.gray(`레거시 별칭: ${Object.keys(LEGACY_MAPPING).join(", ")}\n`));
         process.exit(1);
     }
-    packageName = resolvedPackage;
-    const pkgPath = path.join(semoSystemDir, packageName);
-    if (fs.existsSync(pkgPath) && !options.force) {
-        console.log(chalk_1.default.yellow(`\n${EXTENSION_PACKAGES[packageName].name} 패키지가 이미 설치되어 있습니다.`));
-        console.log(chalk_1.default.gray("강제 재설치: semo add " + packageName + " --force\n"));
+    // 그룹 설치인 경우 안내
+    if (isGroup) {
+        console.log(chalk_1.default.cyan.bold(`\n📦 ${groupName?.toUpperCase()} 그룹 패키지 일괄 설치\n`));
+        console.log(chalk_1.default.gray("   포함된 패키지:"));
+        for (const pkg of packages) {
+            console.log(chalk_1.default.gray(`   - ${pkg} (${EXTENSION_PACKAGES[pkg].name})`));
+        }
+        console.log();
+    }
+    else if (packages.length === 1) {
+        // 단일 패키지
+        const pkg = packages[0];
+        console.log(chalk_1.default.cyan(`\n📦 ${EXTENSION_PACKAGES[pkg].name} 패키지 설치\n`));
+        console.log(chalk_1.default.gray(`   ${EXTENSION_PACKAGES[pkg].desc}\n`));
+    }
+    else {
+        // 여러 패키지 (쉼표 구분)
+        console.log(chalk_1.default.cyan.bold(`\n📦 ${packages.length}개 패키지 설치\n`));
+        for (const pkg of packages) {
+            console.log(chalk_1.default.gray(`   - ${pkg} (${EXTENSION_PACKAGES[pkg].name})`));
+        }
+        console.log();
+    }
+    // 이미 설치된 패키지 확인
+    const alreadyInstalled = [];
+    const toInstall = [];
+    for (const pkg of packages) {
+        const pkgPath = path.join(semoSystemDir, pkg);
+        if (fs.existsSync(pkgPath) && !options.force) {
+            alreadyInstalled.push(pkg);
+        }
+        else {
+            toInstall.push(pkg);
+        }
+    }
+    if (alreadyInstalled.length > 0) {
+        console.log(chalk_1.default.yellow("⚠ 이미 설치된 패키지 (건너뜀):"));
+        for (const pkg of alreadyInstalled) {
+            console.log(chalk_1.default.yellow(`   - ${pkg}`));
+        }
+        console.log(chalk_1.default.gray("   강제 재설치: semo add " + packagesInput + " --force\n"));
+    }
+    if (toInstall.length === 0) {
+        console.log(chalk_1.default.yellow("\n모든 패키지가 이미 설치되어 있습니다.\n"));
         return;
     }
-    console.log(chalk_1.default.cyan(`\n📦 ${EXTENSION_PACKAGES[packageName].name} 패키지 설치\n`));
-    console.log(chalk_1.default.gray(`   ${EXTENSION_PACKAGES[packageName].desc}\n`));
     // 1. 다운로드
-    await downloadExtensions(cwd, [packageName], options.force);
+    await downloadExtensions(cwd, toInstall, options.force);
     // 2. settings.json 병합
-    await mergeExtensionSettings(cwd, [packageName]);
-    // 3. 심볼릭 링크 설정
-    await setupExtensionSymlinks(cwd, [packageName]);
-    console.log(chalk_1.default.green.bold(`\n✅ ${EXTENSION_PACKAGES[packageName].name} 패키지 설치 완료!\n`));
+    await mergeExtensionSettings(cwd, toInstall);
+    // 3. 심볼릭 링크 설정 (모든 설치된 패키지 포함하여 orchestrator 병합)
+    const allInstalledPackages = [...new Set([...alreadyInstalled, ...toInstall])];
+    await setupExtensionSymlinks(cwd, allInstalledPackages);
+    // 4. CLAUDE.md 재생성 (모든 설치된 패키지 반영)
+    await setupClaudeMd(cwd, allInstalledPackages, options.force);
+    if (toInstall.length === 1) {
+        console.log(chalk_1.default.green.bold(`\n✅ ${EXTENSION_PACKAGES[toInstall[0]].name} 패키지 설치 완료!\n`));
+    }
+    else {
+        console.log(chalk_1.default.green.bold(`\n✅ ${toInstall.length}개 패키지 설치 완료!`));
+        for (const pkg of toInstall) {
+            console.log(chalk_1.default.green(`   ✓ ${EXTENSION_PACKAGES[pkg].name}`));
+        }
+        console.log();
+    }
 });
 // === list 명령어 ===
 program
@@ -1240,6 +1330,13 @@ program
         }
         console.log();
     }
+    // 그룹 설치 안내
+    console.log(chalk_1.default.gray("─".repeat(50)));
+    console.log(chalk_1.default.white.bold("📦 그룹 일괄 설치"));
+    console.log(chalk_1.default.gray("  semo add biz      → Business 전체 (discovery, design, management, poc)"));
+    console.log(chalk_1.default.gray("  semo add eng      → Engineering 전체 (nextjs, spring, ms, infra)"));
+    console.log(chalk_1.default.gray("  semo add ops      → Operations 전체 (qa, monitor, improve)"));
+    console.log();
     // 레거시 호환성 안내
     console.log(chalk_1.default.gray("─".repeat(50)));
     console.log(chalk_1.default.gray("레거시 명령어도 지원됩니다:"));
