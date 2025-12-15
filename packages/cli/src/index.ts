@@ -884,7 +884,7 @@ _SEMO 기본 규칙의 예외 사항을 여기에 추가하세요._
   }
 }
 
-// === CLAUDE.md 생성 ===
+// === CLAUDE.md 생성 (패키지 CLAUDE.md 병합 지원) ===
 async function setupClaudeMd(cwd: string, extensions: string[], force: boolean) {
   console.log(chalk.cyan("\n📄 CLAUDE.md 설정"));
 
@@ -898,9 +898,25 @@ async function setupClaudeMd(cwd: string, extensions: string[], force: boolean) 
     }
   }
 
+  const semoSystemDir = path.join(cwd, "semo-system");
   const extensionsList = extensions.length > 0
     ? extensions.map(pkg => `├── ${pkg}/              # ${EXTENSION_PACKAGES[pkg].name}`).join("\n")
     : "";
+
+  // 패키지별 CLAUDE.md 병합 섹션 생성
+  let packageClaudeMdSections = "";
+  for (const pkg of extensions) {
+    const pkgClaudeMdPath = path.join(semoSystemDir, pkg, "CLAUDE.md");
+    if (fs.existsSync(pkgClaudeMdPath)) {
+      const pkgContent = fs.readFileSync(pkgClaudeMdPath, "utf-8");
+      // 첫 헤더(#)를 ##로 변경하여 하위 섹션으로 만듦
+      const adjustedContent = pkgContent
+        .replace(/^# /gm, "### ")
+        .replace(/^## /gm, "#### ");
+      packageClaudeMdSections += `\n\n---\n\n## ${EXTENSION_PACKAGES[pkg].name} 패키지 컨텍스트\n\n${adjustedContent}`;
+      console.log(chalk.gray(`  + ${pkg}/CLAUDE.md 병합됨`));
+    }
+  }
 
   const claudeMdContent = `# SEMO Project Configuration
 
@@ -1031,10 +1047,15 @@ memory 스킬이 자동으로 이 파일들을 관리합니다.
 - [SEMO Principles](semo-system/semo-core/principles/PRINCIPLES.md)
 - [SEMO Skills](semo-system/semo-skills/)
 ${extensions.length > 0 ? extensions.map(pkg => `- [${EXTENSION_PACKAGES[pkg].name} Package](semo-system/${pkg}/)`).join("\n") : ""}
+${packageClaudeMdSections}
 `;
 
   fs.writeFileSync(claudeMdPath, claudeMdContent);
   console.log(chalk.green("✓ .claude/CLAUDE.md 생성됨"));
+
+  if (packageClaudeMdSections) {
+    console.log(chalk.green(`  + ${extensions.length}개 패키지 CLAUDE.md 병합 완료`));
+  }
 }
 
 // === add 명령어 ===

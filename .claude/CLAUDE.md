@@ -4,6 +4,60 @@
 
 ---
 
+## 🔴 META 환경 (NON-NEGOTIABLE)
+
+> **이 환경은 SEMO 프레임워크 자체를 개발/개선하는 Meta 작업 환경입니다.**
+
+### Meta 환경의 핵심 규칙
+
+1. **모든 변경사항은 배포까지 완료해야 함**
+   - 코드 수정 → 테스트 → 커밋/푸시 → npm 배포
+   - 로컬 수정만으로는 작업 완료가 아님
+
+2. **수정 대상 범위**
+   - `semo-system/`: 코어 시스템 (semo-core, semo-skills)
+   - `packages/`: 확장 패키지 (biz, eng, ops, meta, cli, mcp-server)
+
+3. **배포 후 로컬 동기화**
+   - 코어/메타 수정 시 설치된 환경에도 반영 필요
+   - `/SEMO:update` 또는 `semo update` 실행
+
+### Meta 작업 흐름
+
+```
+1. 코드 수정/추가
+    ↓
+2. 테스트 실행 (/SEMO:test)
+    ↓
+3. 커밋 및 푸시 (git push origin main)
+    ↓
+4. npm 배포 (cli 또는 mcp-server 변경 시)
+    ↓
+5. 로컬 환경 동기화 (필요 시)
+```
+
+### Meta 전용 Skills
+
+| Skill | 역할 | 트리거 |
+|-------|------|--------|
+| deploy-semo | npm 패키지 배포 | "배포해줘", "npm publish" |
+| sync-local | 로컬 환경 동기화 | "로컬 반영", "동기화" |
+| run-tests | SEMO 테스트 실행 | "/SEMO:test" |
+
+### 커밋 규칙
+
+```
+feat(scope): 새 기능
+fix(scope): 버그 수정
+refactor(scope): 리팩토링
+docs(scope): 문서 수정
+test(scope): 테스트 추가/수정
+
+scope: core, cli, mcp, biz, eng, ops, meta, tests
+```
+
+---
+
 ## ⚠️ Orchestrator-First Policy (필수)
 
 > **이 섹션은 SEMO의 핵심 규칙입니다. 모든 요청 처리 전 반드시 준수하세요.**
