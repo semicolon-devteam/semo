@@ -1141,10 +1141,40 @@ program
 program
     .command("update")
     .description("SEMO를 최신 버전으로 업데이트합니다")
-    .action(async () => {
+    .option("--self", "CLI만 업데이트")
+    .option("--system", "semo-system만 업데이트")
+    .option("--skip-cli", "CLI 업데이트 건너뛰기")
+    .action(async (options) => {
     console.log(chalk_1.default.cyan.bold("\n🔄 SEMO 업데이트\n"));
     const cwd = process.cwd();
     const semoSystemDir = path.join(cwd, "semo-system");
+    const claudeDir = path.join(cwd, ".claude");
+    // === 1. CLI 자체 업데이트 ===
+    if (options.self || (!options.system && !options.skipCli)) {
+        console.log(chalk_1.default.cyan("📦 CLI 업데이트"));
+        const cliSpinner = (0, ora_1.default)("  @team-semicolon/semo-cli 업데이트 중...").start();
+        try {
+            (0, child_process_1.execSync)("npm update -g @team-semicolon/semo-cli", { stdio: "pipe" });
+            cliSpinner.succeed("  CLI 업데이트 완료");
+        }
+        catch (error) {
+            cliSpinner.fail("  CLI 업데이트 실패");
+            const errorMsg = String(error);
+            if (errorMsg.includes("EACCES") || errorMsg.includes("permission")) {
+                console.log(chalk_1.default.yellow("\n  💡 권한 오류: 다음 명령어로 재시도하세요:"));
+                console.log(chalk_1.default.white("     sudo npm update -g @team-semicolon/semo-cli\n"));
+            }
+            else {
+                console.error(chalk_1.default.gray(`     ${errorMsg}`));
+            }
+        }
+        // --self 옵션만 있으면 여기서 종료
+        if (options.self) {
+            console.log(chalk_1.default.green.bold("\n✅ CLI 업데이트 완료!\n"));
+            return;
+        }
+    }
+    // === 2. semo-system 업데이트 ===
     if (!fs.existsSync(semoSystemDir)) {
         console.log(chalk_1.default.red("SEMO가 설치되어 있지 않습니다. 'semo init'을 먼저 실행하세요."));
         process.exit(1);
@@ -1156,13 +1186,14 @@ program
             installedExtensions.push(key);
         }
     }
-    console.log(chalk_1.default.cyan("업데이트 대상:"));
-    console.log(chalk_1.default.gray("  - semo-core"));
-    console.log(chalk_1.default.gray("  - semo-skills"));
+    console.log(chalk_1.default.cyan("\n📚 semo-system 업데이트"));
+    console.log(chalk_1.default.gray("  대상:"));
+    console.log(chalk_1.default.gray("    - semo-core"));
+    console.log(chalk_1.default.gray("    - semo-skills"));
     installedExtensions.forEach(pkg => {
-        console.log(chalk_1.default.gray(`  - ${pkg}`));
+        console.log(chalk_1.default.gray(`    - ${pkg}`));
     });
-    const spinner = (0, ora_1.default)("\n최신 버전 다운로드 중...").start();
+    const spinner = (0, ora_1.default)("\n  최신 버전 다운로드 중...").start();
     try {
         const tempDir = path.join(cwd, ".semo-temp");
         removeRecursive(tempDir);
@@ -1182,11 +1213,93 @@ program
             }
         }
         removeRecursive(tempDir);
-        spinner.succeed("SEMO 업데이트 완료");
+        spinner.succeed("  semo-system 업데이트 완료");
     }
     catch (error) {
-        spinner.fail("업데이트 실패");
-        console.error(chalk_1.default.red(`${error}`));
+        spinner.fail("  semo-system 업데이트 실패");
+        console.error(chalk_1.default.red(`     ${error}`));
+        return;
     }
+    // === 3. 심볼릭 링크 재생성 ===
+    console.log(chalk_1.default.cyan("\n🔗 심볼릭 링크 재생성"));
+    // 기존 링크 정리
+    const claudeAgentsDir = path.join(claudeDir, "agents");
+    const claudeSkillsDir = path.join(claudeDir, "skills");
+    if (fs.existsSync(claudeAgentsDir)) {
+        const existingLinks = fs.readdirSync(claudeAgentsDir);
+        for (const link of existingLinks) {
+            const linkPath = path.join(claudeAgentsDir, link);
+            if (fs.lstatSync(linkPath).isSymbolicLink()) {
+                fs.unlinkSync(linkPath);
+            }
+        }
+    }
+    if (fs.existsSync(claudeSkillsDir)) {
+        const existingLinks = fs.readdirSync(claudeSkillsDir);
+        for (const link of existingLinks) {
+            const linkPath = path.join(claudeSkillsDir, link);
+            if (fs.lstatSync(linkPath).isSymbolicLink()) {
+                fs.unlinkSync(linkPath);
+            }
+        }
+    }
+    // Standard 심볼릭 링크 재생성
+    await createStandardSymlinks(cwd);
+    // Extensions 심볼릭 링크 재생성
+    if (installedExtensions.length > 0) {
+        await setupExtensionSymlinks(cwd, installedExtensions);
+    }
+    // === 4. CLAUDE.md 재생성 ===
+    console.log(chalk_1.default.cyan("\n📄 CLAUDE.md 재생성"));
+    await setupClaudeMd(cwd, installedExtensions, true);
+    // === 5. MCP 서버 동기화 ===
+    console.log(chalk_1.default.cyan("\n🔧 MCP 서버 동기화"));
+    // Extension의 MCP 설정 확인 및 병합
+    const allServers = [...BASE_MCP_SERVERS];
+    for (const pkg of installedExtensions) {
+        const extSettingsPath = path.join(semoSystemDir, pkg, "settings.local.json");
+        if (fs.existsSync(extSettingsPath)) {
+            try {
+                const extSettings = JSON.parse(fs.readFileSync(extSettingsPath, "utf-8"));
+                if (extSettings.mcpServers) {
+                    for (const [name, config] of Object.entries(extSettings.mcpServers)) {
+                        const serverConfig = config;
+                        allServers.push({
+                            name,
+                            command: serverConfig.command,
+                            args: serverConfig.args,
+                            env: serverConfig.env,
+                        });
+                    }
+                }
+            }
+            catch {
+                // 파싱 실패 무시
+            }
+        }
+    }
+    // MCP 서버 등록 상태 확인
+    const missingServers = [];
+    for (const server of allServers) {
+        if (!isMCPServerRegistered(server.name)) {
+            missingServers.push(server);
+        }
+    }
+    if (missingServers.length === 0) {
+        console.log(chalk_1.default.green("  ✓ 모든 MCP 서버가 등록되어 있습니다"));
+    }
+    else {
+        console.log(chalk_1.default.yellow(`  ${missingServers.length}개 MCP 서버 미등록`));
+        for (const server of missingServers) {
+            const result = registerMCPServer(server);
+            if (result.success) {
+                console.log(chalk_1.default.green(`    ✓ ${server.name} 등록 완료`));
+            }
+            else {
+                console.log(chalk_1.default.red(`    ✗ ${server.name} 등록 실패`));
+            }
+        }
+    }
+    console.log(chalk_1.default.green.bold("\n✅ SEMO 업데이트 완료!\n"));
 });
 program.parse();

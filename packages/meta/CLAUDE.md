@@ -47,21 +47,53 @@
 
 ---
 
-## 🔴 작업 완료 후 버저닝 필수 (NON-NEGOTIABLE)
+## 🔴 작업 완료 후 자동 배포 (NON-NEGOTIABLE)
 
-> **⚠️ 어떤 패키지든 작업 완료 시 반드시 version-manager를 호출합니다.**
+> **⚠️ Meta 환경에서 작업 완료 시 반드시 전체 배포 플로우를 실행합니다.**
+> **사용자가 별도로 요청하지 않아도 자동으로 진행합니다.**
 
-### 버저닝 필수 대상
+### 🔴 배포 대상 감지
 
-| 대상 패키지 | VERSION 위치 | CHANGELOG 위치 |
-|-------------|--------------|----------------|
-| semo-meta | `semo-meta/VERSION` | `semo-meta/CHANGELOG/` |
-| semo-po | `semo-po/VERSION` | `semo-po/CHANGELOG/` |
-| semo-next | `semo-next/VERSION` | `semo-next/CHANGELOG/` |
-| semo-qa | `semo-qa/VERSION` | `semo-qa/CHANGELOG/` |
-| semo-core | `semo-core/VERSION` | `semo-core/CHANGELOG/` |
-| semo-ms | `semo-ms/VERSION` | `semo-ms/CHANGELOG/` |
-| semo-mvp | `semo-mvp/VERSION` | `semo-mvp/CHANGELOG/` |
+| 변경 파일 | 배포 대상 | 스킬 |
+|----------|----------|------|
+| `packages/cli/**` | @team-semicolon/semo-cli | `deploy-npm` |
+| `packages/mcp-server/**` | @team-semicolon/semo-mcp | `deploy-npm` |
+| `semo-core/**`, `semo-skills/**` | Git push only | - |
+| `packages/meta/**` | Git push only | - |
+
+### 🔴 필수 동작 순서 (CLI/MCP 변경 시)
+
+```text
+1. 작업 완료
+   ↓
+2. [SEMO] Skill 호출: deploy-npm
+   ↓
+3. (deploy-npm에 의해) 버전 범프 (package.json)
+   ↓
+4. (deploy-npm에 의해) 빌드 (npm run build)
+   ↓
+5. (deploy-npm에 의해) 커밋 + 푸시
+   ↓
+6. (deploy-npm에 의해) npm publish
+   ↓
+7. (deploy-npm에 의해) 슬랙 알림
+```
+
+### 🔴 필수 동작 순서 (Core/Skills/Meta 변경 시)
+
+```text
+1. 작업 완료
+   ↓
+2. 커밋 + 푸시 (직접 실행)
+   ↓
+3. 슬랙 알림 (선택)
+```
+
+> **예외 없음**: 커밋/푸시 없이는 작업 완료로 간주하지 않습니다.
+
+---
+
+## 🔴 버저닝 규칙
 
 ### 버전 타입
 
@@ -70,22 +102,6 @@
 | Agent/Skill/Command 추가/수정/삭제 | MINOR |
 | 버그/오타 수정 | PATCH |
 | Breaking Change | MAJOR |
-
-### 🔴 필수 동작 순서
-
-```text
-1. 작업 완료
-   ↓
-2. [SEMO] Skill 호출: version-manager
-   ↓
-3. (version-manager에 의해) VERSION 업데이트 + CHANGELOG 생성
-   ↓
-4. (version-manager에 의해) 커밋 + 푸시
-   ↓
-4. (version-manager에 의해) 슬랙 `#_협업` 채널에 버저닝 정보 공유
-```
-
-> **예외 없음**: 버저닝 없이는 작업 완료로 간주하지 않습니다.
 
 ### TodoWrite 자동 추가
 

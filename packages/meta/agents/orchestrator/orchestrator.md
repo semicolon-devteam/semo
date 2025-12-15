@@ -72,18 +72,37 @@ SEMO 패키지 관리 요청을 분석하고 적절한 에이전트로 위임하
 
 > 다른 패키지의 전문 영역 요청 감지 시 해당 패키지로 인계 권유
 
-### 전문 영역 매트릭스
+### 전문 영역 매트릭스 (v3.0)
 
-| 키워드 | 전문 패키지 | 담당 역할 |
-|--------|------------|----------|
-| Epic, 요구사항, 기획, AC | `semo-po` | PO |
-| 테스트, QA, STG 검증 | `semo-qa` | QA |
-| React, Next.js, 컴포넌트, UI | `semo-next` | Frontend |
-| Spring Boot, Kotlin, API | `semo-backend` | Backend |
-| 배포, Docker, CI/CD, Nginx | `semo-infra` | DevOps |
-| Sprint, 진행도, 할당, 로드맵 | `semo-pm` | PM |
-| 목업, Figma, 디자인, 핸드오프 | `semo-design` | Designer |
-| 마이크로서비스, 이벤트, 워커 | `semo-ms` | MS Dev |
+| 키워드 | v3.0 패키지 | 레거시 | 담당 역할 |
+|--------|------------|--------|----------|
+| Epic, 요구사항, 기획, AC | `biz/discovery` | semo-po | PO |
+| 테스트, QA, STG 검증 | `ops/qa` | semo-qa | QA |
+| React, Next.js, 컴포넌트, UI | `eng/nextjs` | semo-next | Frontend |
+| Spring Boot, Kotlin, API | `eng/spring` | semo-backend | Backend |
+| 배포, Docker, CI/CD, Nginx | `eng/infra` | semo-infra | DevOps |
+| Sprint, 진행도, 할당, 로드맵 | `biz/management` | semo-pm | PM |
+| 목업, Figma, 디자인, 핸드오프 | `biz/design` | semo-design | Designer |
+| 마이크로서비스, 이벤트, 워커 | `eng/ms` | semo-ms | MS Dev |
+| PoC, MVP, 빠른 검증 | `biz/poc` | semo-mvp | PM/Dev |
+| 모니터링, 서비스 상태 | `ops/monitor` | - | Ops |
+| 개선 제안, 리팩토링 | `ops/improve` | - | Tech Lead |
+
+### 레거시 호환성
+
+> 이전 패키지명도 계속 지원됩니다.
+
+```bash
+# 레거시 → v3.0 자동 변환
+semo-po → biz/discovery
+semo-next → eng/nextjs
+semo-backend → eng/spring
+semo-infra → eng/infra
+semo-qa → ops/qa
+semo-pm → biz/management
+semo-design → biz/design
+semo-ms → eng/ms
+```
 
 ### 인계 메시지 포맷
 
@@ -94,7 +113,7 @@ SEMO 패키지 관리 요청을 분석하고 적절한 에이전트로 위임하
 
 | 방법 | 설명 |
 |------|------|
-| **패키지 전환** | `[{prefix}] {요청}` 접두사로 다시 요청 |
+| **패키지 설치** | `semo add {package}` 명령어로 설치 |
 | **담당자 문의** | {담당역할} 담당자에게 문의 |
 
 > 💡 현재 패키지에서 계속 진행하시려면 명시적으로 요청해주세요.
