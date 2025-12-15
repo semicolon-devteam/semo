@@ -30,12 +30,18 @@ model: inherit
 
 ```text
 semo-help
-├── semo-core/PRINCIPLES.md (SEMO 핵심 원칙)
-├── semo-core/MESSAGE_RULES.md (메시지 포맷 규칙)
-├── semo-core/TEAM_RULES.md (Semicolon 팀 규칙)
+├── docs/README.md (SEMO 소개)
+├── docs/QUICKSTART.md (빠른 시작 가이드)
+├── docs/PACKAGES.md (패키지 카탈로그)
+├── docs/USER_GUIDE.md (사용자 가이드)
+├── docs/FAQ.md (자주 묻는 질문)
+├── docs/ARCHITECTURE.md (아키텍처 개요)
+├── semo-core/principles/PRINCIPLES.md (SEMO 핵심 원칙)
+├── semo-core/principles/MESSAGE_RULES.md (메시지 포맷 규칙)
+├── packages/core/TEAM_RULES.md (Semicolon 팀 규칙)
+├── packages/core/_shared/team-context.md (팀 컨텍스트)
 ├── .claude/semo-*/VERSION (설치된 패키지 버전)
-├── .claude/semo-*/CLAUDE.md (패키지별 설명)
-└── docs 레포 Wiki (팀 문서)
+└── .claude/semo-*/CLAUDE.md (패키지별 설명)
 ```
 
 ## Workflow
@@ -54,17 +60,22 @@ semo-help
 
 ### Step 2: 정보 수집
 
-**SEMO 문서 조회**:
+**SEMO 문서 조회 (우선순위)**:
 
 ```bash
-# SEMO 핵심 원칙
-cat semo-core/PRINCIPLES.md
+# 1순위: docs/ 디렉토리 (사용자 친화적 문서)
+cat docs/README.md           # SEMO 소개
+cat docs/QUICKSTART.md       # 빠른 시작
+cat docs/PACKAGES.md         # 패키지 카탈로그
+cat docs/USER_GUIDE.md       # 사용자 가이드
+cat docs/FAQ.md              # 자주 묻는 질문
+cat docs/ARCHITECTURE.md     # 아키텍처 (리더용)
 
-# 메시지 규칙
-cat semo-core/MESSAGE_RULES.md
-
-# 팀 규칙
-cat semo-core/TEAM_RULES.md
+# 2순위: 기술 문서
+cat semo-core/principles/PRINCIPLES.md  # 핵심 원칙
+cat semo-core/principles/MESSAGE_RULES.md  # 메시지 규칙
+cat packages/core/TEAM_RULES.md  # 팀 규칙
+cat packages/core/_shared/team-context.md  # 팀 컨텍스트
 ```
 
 **패키지 정보 조회**:
@@ -76,13 +87,16 @@ for dir in .claude/semo-*/; do
   version=$(cat "$dir/VERSION" 2>/dev/null || echo "unknown")
   echo "$name: $version"
 done
+
+# 또는 packages/ 디렉토리에서 버전 확인
+cat packages/*/VERSION 2>/dev/null
 ```
 
-**docs 레포 Wiki 조회**:
+**팀 컨텍스트 조회**:
 
 ```bash
-# docs 레포 위키 접근
-gh api repos/semicolon-devteam/docs/contents/wiki
+# 팀 컨텍스트 상세
+cat packages/core/_shared/team-context.md
 ```
 
 ### Step 3: 응답 제공
@@ -198,6 +212,19 @@ SEMO는 Semicolon 팀의 Claude Code 확장 프레임워크입니다.
 
 ## References
 
-- [docs-integration](references/docs-integration.md) - docs 레포 연동 가이드
-- [package-info](references/package-info.md) - 패키지 정보 조회
-- [team-context](references/team-context.md) - 팀 컨텍스트 설정
+### 사용자 문서 (docs/)
+
+| 문서 | 설명 | 대상 |
+|------|------|------|
+| [docs/README.md](../../../docs/README.md) | SEMO 소개/진입점 | 신규 사용자 |
+| [docs/QUICKSTART.md](../../../docs/QUICKSTART.md) | 5분 빠른 시작 | 신규 사용자 |
+| [docs/PACKAGES.md](../../../docs/PACKAGES.md) | 패키지 카탈로그 | 패키지 선택 시 |
+| [docs/USER_GUIDE.md](../../../docs/USER_GUIDE.md) | 상세 사용법 | 모든 사용자 |
+| [docs/FAQ.md](../../../docs/FAQ.md) | 자주 묻는 질문 | 문제 해결 시 |
+| [docs/ARCHITECTURE.md](../../../docs/ARCHITECTURE.md) | 아키텍처 개요 | 리더, 아키텍트 |
+
+### 기술 문서
+
+- [references/docs-integration.md](references/docs-integration.md) - docs 레포 연동 가이드
+- [references/package-info.md](references/package-info.md) - 패키지 정보 조회
+- [references/team-context.md](references/team-context.md) - 팀 컨텍스트 설정

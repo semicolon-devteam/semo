@@ -32,9 +32,9 @@ jobs:
 
       - name: Generate encrypted tokens
         env:
-          SEMO_ENCRYPTION_KEY: ${{ secrets.SEMO_ENCRYPTION_KEY }}
           SEMO_SLACK_BOT_TOKEN: ${{ secrets.SEMO_SLACK_BOT_TOKEN }}
           SEMO_GITHUB_APP_TOKEN: ${{ secrets.SEMO_GITHUB_APP_TOKEN }}
+          SEMO_DB_PASSWORD: ${{ secrets.SEMO_DB_PASSWORD }}
         run: node scripts/generate-tokens.js
 
       - name: Build

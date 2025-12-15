@@ -4,11 +4,11 @@
       "command": "npx",
       "args": [
         "-y",
-        "@team-semicolon/semo-mcp"
+        "@team-semicolon/semo-mcp@latest"
       ],
       "env": {
+        "SEMO_ENCRYPTION_KEY": "${SEMO_ENCRYPTION_KEY}",
         "GITHUB_TOKEN": "${GITHUB_TOKEN}",
-        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
         "SUPABASE_URL": "${SUPABASE_URL}",
         "SUPABASE_KEY": "${SUPABASE_KEY}"
       }
@@ -27,7 +27,7 @@
         "@modelcontextprotocol/server-github"
       ],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "<YOUR_GITHUB_TOKEN>"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       }
     },
     "sequential-thinking": {

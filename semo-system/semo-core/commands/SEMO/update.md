@@ -84,7 +84,59 @@ sed -i '' "s/{{VERSION}}/$VERSION/g" .claude/CLAUDE.md
 - SEMO 메시지 출력 규칙
 - 표준 커맨드 목록
 
-### Step 5: 완료 안내
+### Step 5: .gitignore 동기화 (필수)
+
+> **중요**: `.gitignore`에 SEMO 로컬 설정 제외 규칙을 추가합니다.
+
+```bash
+# SEMO gitignore 템플릿 경로
+GITIGNORE_TEMPLATE="semo-system/semo-core/templates/gitignore-semo.txt"
+
+# 프로젝트 루트의 .gitignore
+GITIGNORE_FILE=".gitignore"
+```
+
+**동기화 로직**:
+
+```bash
+# 1. .gitignore 파일이 없으면 생성
+if [ ! -f "$GITIGNORE_FILE" ]; then
+  touch "$GITIGNORE_FILE"
+fi
+
+# 2. SEMO 섹션 마커 확인
+SEMO_START="# ============================================"
+SEMO_MARKER="# SEMO: Claude Code Configuration Management"
+SEMO_END="# END SEMO"
+
+# 3. 기존 SEMO 섹션 존재 여부 확인
+if grep -q "$SEMO_MARKER" "$GITIGNORE_FILE"; then
+  # 기존 섹션 교체 (sed로 블록 교체)
+  # macOS sed 호환
+  sed -i '' "/$SEMO_START/,/$SEMO_END/d" "$GITIGNORE_FILE"
+fi
+
+# 4. 새 SEMO 섹션 추가 (파일 끝에)
+echo "" >> "$GITIGNORE_FILE"
+cat "$GITIGNORE_TEMPLATE" >> "$GITIGNORE_FILE"
+```
+
+**결과 확인**:
+```bash
+# SEMO 섹션이 정상적으로 추가되었는지 확인
+grep -A 5 "SEMO: Claude Code" "$GITIGNORE_FILE"
+```
+
+**동기화되는 내용**:
+| 패턴 | 설명 | 커밋 |
+|------|------|------|
+| `.claude/*.local.*` | 로컬 전용 설정 | ❌ 제외 |
+| `.claude/settings.local.json` | 개인 권한 오버라이드 | ❌ 제외 |
+| `.claude/CLAUDE.local.md` | 개인 메모리 | ❌ 제외 |
+| `.claude/memory/*.local.md` | 개인 메모리 파일 | ❌ 제외 |
+| `.claude/memory/personal/` | 개인 메모리 디렉토리 | ❌ 제외 |
+
+### Step 6: 완료 안내
 
 ```markdown
 [SEMO] Command: update 완료
@@ -96,6 +148,7 @@ SEMO 업데이트 완료
 | semo-core | v1.0.0 | v1.1.0 |
 | semo-skills | v1.0.0 | v1.1.0 |
 | CLAUDE.md | ✅ 동기화됨 |
+| .gitignore | ✅ 동기화됨 |
 ```
 
 ## Expected Output

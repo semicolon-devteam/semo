@@ -23,7 +23,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 
-const VERSION = "2.0.2";
+const VERSION = "3.0.0-alpha";
 
 // === Windows 지원 유틸리티 ===
 const isWindows = os.platform() === "win32";
@@ -86,18 +86,40 @@ function copyRecursive(src: string, dest: string): void {
 
 const SEMO_REPO = "https://github.com/semicolon-devteam/semo.git";
 
-// 확장 패키지 정의
-const EXTENSION_PACKAGES: Record<string, { name: string; desc: string; detect: string[] }> = {
-  next: { name: "Next.js", desc: "Next.js 프론트엔드 개발 (13 agents, 33 skills)", detect: ["next.config.js", "next.config.mjs", "next.config.ts"] },
-  backend: { name: "Backend", desc: "Spring/Node.js 백엔드 개발 (8 agents, 15 skills)", detect: ["pom.xml", "build.gradle"] },
-  po: { name: "PO", desc: "Product Owner - 태스크/에픽 관리 (5 agents, 19 skills)", detect: [] },
-  qa: { name: "QA", desc: "QA 테스트 관리 (4 agents, 13 skills)", detect: [] },
-  pm: { name: "PM", desc: "프로젝트/스프린트 관리 (5 agents, 16 skills)", detect: [] },
-  infra: { name: "Infra", desc: "인프라/배포 관리 (6 agents, 10 skills)", detect: ["docker-compose.yml", "Dockerfile"] },
-  design: { name: "Design", desc: "디자인 핸드오프 (3 agents, 4 skills)", detect: [] },
-  ms: { name: "Microservice", desc: "마이크로서비스 아키텍처 (5 agents, 5 skills)", detect: [] },
-  mvp: { name: "MVP", desc: "MVP 빠른 개발 (4 agents, 6 skills)", detect: [] },
-  meta: { name: "Meta", desc: "SEMO 프레임워크 자체 개발/관리 (6 agents, 7 skills)", detect: ["semo-core", "semo-skills", "packages/meta"] },
+// 확장 패키지 정의 (v3.0 구조)
+const EXTENSION_PACKAGES: Record<string, { name: string; desc: string; detect: string[]; layer: string }> = {
+  // Business Layer
+  "biz/discovery": { name: "Discovery", desc: "아이템 발굴, 시장 조사, Epic/Task", layer: "biz", detect: [] },
+  "biz/design": { name: "Design", desc: "컨셉 설계, 목업, UX", layer: "biz", detect: [] },
+  "biz/management": { name: "Management", desc: "일정/인력/스프린트 관리", layer: "biz", detect: [] },
+  "biz/poc": { name: "PoC", desc: "빠른 PoC, 패스트트랙", layer: "biz", detect: [] },
+
+  // Engineering Layer
+  "eng/nextjs": { name: "Next.js", desc: "Next.js 프론트엔드 개발", layer: "eng", detect: ["next.config.js", "next.config.mjs", "next.config.ts"] },
+  "eng/spring": { name: "Spring", desc: "Spring Boot 백엔드 개발", layer: "eng", detect: ["pom.xml", "build.gradle"] },
+  "eng/ms": { name: "Microservice", desc: "마이크로서비스 아키텍처", layer: "eng", detect: [] },
+  "eng/infra": { name: "Infra", desc: "인프라/배포 관리", layer: "eng", detect: ["docker-compose.yml", "Dockerfile"] },
+
+  // Operations Layer
+  "ops/qa": { name: "QA", desc: "테스트/품질 관리", layer: "ops", detect: [] },
+  "ops/monitor": { name: "Monitor", desc: "서비스 현황 모니터링", layer: "ops", detect: [] },
+  "ops/improve": { name: "Improve", desc: "개선 제안", layer: "ops", detect: [] },
+
+  // Meta
+  meta: { name: "Meta", desc: "SEMO 프레임워크 자체 개발/관리", layer: "meta", detect: ["semo-core", "semo-skills"] },
+};
+
+// 레거시 패키지 → 새 패키지 매핑 (하위호환성)
+const LEGACY_MAPPING: Record<string, string> = {
+  next: "eng/nextjs",
+  backend: "eng/spring",
+  ms: "eng/ms",
+  infra: "eng/infra",
+  qa: "ops/qa",
+  po: "biz/discovery",
+  pm: "biz/management",
+  design: "biz/design",
+  mvp: "biz/poc",
 };
 
 const program = new Command();
