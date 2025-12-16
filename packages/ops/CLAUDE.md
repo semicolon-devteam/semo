@@ -43,6 +43,45 @@ QA/테스트 결과 리포트 시 반드시 포함:
 
 ---
 
+## 📦 세미콜론 운영 컨텍스트
+
+### 테스트 환경
+
+| 환경 | URL 패턴 | 용도 |
+|------|----------|------|
+| **DEV** | `https://dev.{service}.com` | 개발 확인 |
+| **STG** | `https://stg.{service}.com` | QA 테스트 (기본) |
+| **PRD** | `https://{service}.com` | 운영 |
+
+> 서비스 목록: [GitHub cm-* 검색](https://github.com/semicolon-devteam?q=cm&type=all)
+
+### QA 프로세스
+
+```
+PR 병합 → STG 자동 배포 → QA 테스트 시작
+  ↓
+AC 기반 검증
+  ├─ PASS → Status: 병합됨 → PRD 배포 가능
+  └─ FAIL → 버그 이슈 생성 → Status: 수정요청
+```
+
+### 테스트 요청 시 포함 정보
+
+```
+@{tester} [{issue_title}] 테스트 요청드립니다
+
+📍 테스트 환경: STG
+🔗 URL: https://stg.{service}.com
+📋 이슈: {issue_url}
+```
+
+### API 스펙 확인
+
+- **최신 API 문서**: https://core-interface-ashen.vercel.app/
+- **릴리즈 노트**: https://github.com/semicolon-devteam/core-interface/releases
+
+---
+
 ## Overview
 
 Operations Layer는 **서비스 운영 및 품질 관리**를 담당합니다.

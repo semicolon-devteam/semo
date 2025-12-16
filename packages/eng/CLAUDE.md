@@ -41,6 +41,83 @@
 
 ---
 
+## 📦 세미콜론 개발 컨텍스트
+
+### 아키텍처 전환 현황
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    아키텍처 마이그레이션                          │
+├─────────────────────────────────────────────────────────────────┤
+│ [레거시] Supabase 중심                                          │
+│   - RLS (Row Level Security)                                   │
+│   - PostgreSQL Triggers                                        │
+│   - RPC 함수 호출                                               │
+│                        ↓ 전환 중                                │
+│ [현재] Spring Boot 중심                                         │
+│   - core-backend (비즈니스 로직)                                │
+│   - Flyway (스키마 마이그레이션)                                 │
+│   - Supabase는 Auth/Storage/Realtime만 유지                     │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 코어 레포지토리
+
+| 레포 | 역할 | 참조 |
+|------|------|------|
+| `core-backend` | Spring Boot 중앙 서버, Flyway 스키마 | [README](https://github.com/semicolon-devteam/core-backend) |
+| `core-interface` | 공통 API 스펙 (Swagger) | [API 문서](https://core-interface-ashen.vercel.app/) |
+| `core-supabase` | 레거시 스키마, 구현 가이드 | [가이드](https://github.com/semicolon-devteam/core-supabase/tree/dev/document/test) |
+| `cm-template` | 프론트엔드 공통 템플릿 | [README](https://github.com/semicolon-devteam/cm-template) |
+
+### 🔴 코어 스키마 규칙 (NON-NEGOTIABLE)
+
+| 규칙 | 설명 |
+|------|------|
+| **스키마 임의 수정 금지** | core-backend의 Flyway 스키마 직접 수정 불가 |
+| **API 추가는 core-interface** | 공통 API는 core-interface에서 정의 후 배포 |
+| **레거시 작업 시 가이드 참조** | Supabase 직접 작업 시 `core-supabase/document/test/{domain}/` 필수 |
+
+### Supabase 환경별 접근 방식
+
+| 환경 | 접근 방식 | 사용 시점 |
+|------|----------|----------|
+| **Cloud** | Supabase CLI, API, MCP | 대부분의 서비스 |
+| **On-Premise** | SSH 터널 + Docker Exec | 특수 환경 |
+
+**Cloud 환경 (기본)**:
+```bash
+npx supabase db push
+npx supabase migration new {name}
+```
+
+**On-Premise 환경**:
+```bash
+ssh -i ./key.pem ubuntu@{host} \
+  "docker exec -e PGPASSWORD='\${DB_PASSWORD}' \
+   {container} psql -U postgres -d postgres -c 'SQL'"
+```
+
+### 환경별 배포
+
+| 환경 | 트리거 | URL 패턴 |
+|------|--------|----------|
+| **DEV** | `dev` 브랜치 push | `https://dev.{service}.com` |
+| **STG** | Milestone close | `https://stg.{service}.com` |
+| **PRD** | Milestone + `source-tag` 라벨 | `https://{service}.com` |
+
+> 서비스 목록: [GitHub cm-* 검색](https://github.com/semicolon-devteam?q=cm&type=all)
+
+### 기술 스택
+
+- **Frontend**: Next.js 15, React 19, TypeScript, TailwindCSS
+- **State**: Redux Toolkit / Zustand, React Query
+- **Backend**: core-backend (Kotlin/Spring Boot, WebFlux, R2DBC)
+- **Database**: Supabase PostgreSQL (Cloud/On-Premise)
+- **Testing**: Vitest (FE), Testcontainers (BE)
+
+---
+
 ## Overview
 
 Engineering Layer는 **실제 구현 및 배포**를 담당합니다.

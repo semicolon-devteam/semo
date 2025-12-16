@@ -43,6 +43,34 @@ Epic/Task 작성 전 반드시 검토:
 
 ---
 
+## 📦 세미콜론 프로젝트 컨텍스트
+
+### 프로젝트 유형
+
+| 유형 | 설명 | 조회 링크 |
+|------|------|----------|
+| **정식 프로젝트 (cm-*)** | 프로덕션 서비스, Full Pipeline | [GitHub 조회](https://github.com/semicolon-devteam?q=cm&type=all) |
+| **MVP 프로젝트 (mvp-*)** | 빠른 검증용, Fast Track | [GitHub 조회](https://github.com/semicolon-devteam?q=mvp&type=all) |
+
+### 정식 vs MVP 결정 기준
+
+| 기준 | 정식 프로젝트 | MVP |
+|------|-------------|-----|
+| 검증 목표 | 장기 운영 | 빠른 가설 검증 |
+| 품질 수준 | 높음 (DDD 4계층) | 최소 (2계층) |
+| 배포 환경 | dev/stg/prd 3단계 | Vercel 단일 |
+| 코드 리뷰 | 필수 | 선택 |
+
+### 역할 체계 (SEMO 기준)
+
+| SEMO 그룹 | 담당 영역 | 레거시 역할 |
+|----------|----------|------------|
+| **biz** | 기획, Epic/Task, 프로젝트 관리 | PO, PM, PSM |
+| **eng** | 개발, 인프라, 배포 | Dev, DevOps |
+| **ops** | QA, 운영, 모니터링 | QA, 운영팀 |
+
+---
+
 ## Overview
 
 Business Layer는 제품/서비스의 **기획 및 검증** 단계를 담당합니다.
