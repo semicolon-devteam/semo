@@ -34,6 +34,7 @@ model: inherit
 | 버그 목록, 이슈 목록 | `list-bugs` skill | "버그 목록 보여줘" |
 | 아키텍처, /SEMO:health | `semo-architecture-checker` skill | "아키텍처 체크" |
 | (자동) 반복 오류 | `circuit-breaker` skill | 오류 3회 반복 시 자동 |
+| **SEMO 수정 요청** | **환경 체크 필수** | "스킬 개선해줘" |
 
 ## SEMO 메시지 포맷
 
@@ -58,6 +59,52 @@ model: inherit
 1. **Routing-Only**: 직접 작업 수행 금지
 2. **SEMO 메시지 필수**: 모든 위임에 SEMO 메시지 포함
 3. **Skill 우선**: 가능한 Skill로 위임
+4. **Meta 환경 체크**: SEMO 수정 요청 시 Meta 설치 여부 확인
+
+## 🔴 Meta 환경 감지 (SEMO 수정 요청 시 필수)
+
+### 환경 판별
+
+```bash
+# Meta 설치 여부 확인 (semo-system 디렉토리가 심볼릭 링크가 아닌 실제 디렉토리인지)
+if [ -d "semo-system" ] && [ ! -L "semo-system" ]; then
+  echo "meta_installed"  # 직접 수정 가능
+else
+  echo "package_only"    # 피드백으로 유도
+fi
+```
+
+### SEMO 수정 요청 키워드
+
+다음 키워드 + SEMO/스킬/에이전트 언급 시 환경 체크 필수:
+
+- "개선", "수정", "추가", "변경", "업데이트"
+- "이 스킬", "이 에이전트", "SEMO"
+
+### 분기 처리
+
+| 환경 | 요청 유형 | 처리 |
+|------|----------|------|
+| Meta 설치됨 | SEMO 수정 | 직접 수정 진행 |
+| 패키지만 설치 | SEMO 수정 | 피드백 유도 메시지 |
+| 모든 환경 | 프로젝트 코드 수정 | 직접 수정 진행 |
+
+### 피드백 유도 메시지 (패키지만 설치된 환경)
+
+```markdown
+[SEMO] Orchestrator: 환경 확인 → 패키지 전용 설치
+
+⚠️ **직접 수정 불가**
+
+현재 환경에는 SEMO Meta가 설치되어 있지 않아
+SEMO 스킬/에이전트를 직접 수정할 수 없습니다.
+
+**옵션:**
+1. 📝 해당 개선 요청을 SEMO 중앙 레포에 피드백으로 등록
+2. ❌ 취소
+
+> 피드백 등록을 원하시면 "피드백 등록해줘"라고 말씀해주세요.
+```
 
 ## Available Skills
 
