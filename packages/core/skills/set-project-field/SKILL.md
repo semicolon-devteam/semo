@@ -21,12 +21,15 @@ GitHub Issues를 '이슈관리' Project에 추가한 후, 작업량/우선순위
 
 | 필드명 | 필드 ID | 데이터 타입 | 설명 |
 |--------|---------|-------------|------|
+| **Status** | `PVTSSF_lADOC01-Rc4AtDz2zg0XXXX` | SINGLE_SELECT | 검수대기/작업중/완료 등 |
 | **작업량** | `PVTF_lADOC01-Rc4AtDz2zg0bhf0` | NUMBER | Estimation Point (1, 2, 3, 5, 8, 13) |
 | **우선순위** | `PVTSSF_lADOC01-Rc4AtDz2zg0YPyI` | SINGLE_SELECT | P0~P4 |
 | **타입** | `PVTSSF_lADOC01-Rc4AtDz2zg2XDtA` | SINGLE_SELECT | 에픽/버그/태스크 |
 | **기술영역** | `PVTSSF_lADOC01-Rc4AtDz2zg0X5BE` | SINGLE_SELECT | 프론트/백엔드/인프라 등 |
 | **시작일** | `PVTF_lADOC01-Rc4AtDz2zgs0OE4` | DATE | 작업 시작 예정일 |
 | **목표일** | `PVTF_lADOC01-Rc4AtDz2zg0X7kk` | DATE | 작업 완료 목표일 |
+
+> **Note**: Status 필드 ID는 동적으로 조회해야 합니다. 아래 "Status 필드 조회" 섹션 참조.
 
 ## Configuration
 
@@ -218,6 +221,86 @@ input:
 | 에픽 | `389a3389` |
 | 버그 | `acbe6dfc` |
 | 태스크 | `851de036` |
+
+## Status 필드 변경 (#16)
+
+> Epic/태스크의 Status를 변경하는 기능
+
+### Status 필드 ID 및 옵션 조회
+
+```bash
+# Status 필드 ID와 모든 옵션 조회
+gh api graphql -f query='
+query {
+  organization(login: "semicolon-devteam") {
+    projectV2(number: 1) {
+      field(name: "Status") {
+        ... on ProjectV2SingleSelectField {
+          id
+          options { id name }
+        }
+      }
+    }
+  }
+}' --jq '.data.organization.projectV2.field'
+```
+
+### 예상 Status 옵션
+
+| Status | Option ID | 설명 |
+|--------|-----------|------|
+| 백로그 | 동적조회 | 초기 상태 |
+| 검수대기 | 동적조회 | Epic 생성 시 기본값 |
+| 작업중 | 동적조회 | 개발 진행 중 |
+| 테스트중 | 동적조회 | QA 테스트 단계 |
+| 완료 | 동적조회 | 작업 완료 |
+
+> **Note**: Status Option ID는 프로젝트마다 다를 수 있으므로 동적으로 조회해야 합니다.
+
+### Status 변경 예시
+
+```bash
+# 1. Status 필드 ID 및 옵션 조회
+STATUS_RESULT=$(gh api graphql -f query='
+query {
+  organization(login: "semicolon-devteam") {
+    projectV2(number: 1) {
+      field(name: "Status") {
+        ... on ProjectV2SingleSelectField {
+          id
+          options { id name }
+        }
+      }
+    }
+  }
+}')
+
+STATUS_FIELD_ID=$(echo "$STATUS_RESULT" | jq -r '.data.organization.projectV2.field.id')
+STATUS_OPTION_ID=$(echo "$STATUS_RESULT" | jq -r '.data.organization.projectV2.field.options[] | select(.name == "작업중") | .id')
+
+# 2. Status 변경
+gh api graphql -f query='
+  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+    updateProjectV2ItemFieldValue(input: {
+      projectId: $projectId
+      itemId: $itemId
+      fieldId: $fieldId
+      value: { singleSelectOptionId: $optionId }
+    }) {
+      projectV2Item { id }
+    }
+  }
+' -f projectId="PVT_kwDOC01-Rc4AtDz2" \
+  -f itemId="$ITEM_ID" \
+  -f fieldId="$STATUS_FIELD_ID" \
+  -f optionId="$STATUS_OPTION_ID"
+```
+
+### 자연어 트리거
+
+- "Epic #78 상태를 작업중으로 변경해줘"
+- "차곡 Epic들 전부 작업중으로 변경해줘"
+- "#123 완료 처리해줘"
 
 ## Error Handling
 

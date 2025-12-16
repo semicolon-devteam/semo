@@ -99,6 +99,40 @@ gh api graphql -f query='
   -f itemId="$ITEM_ID" \
   -f fieldId="PVTSSF_lADOC01-Rc4AtDz2zg0YPyI" \
   -f optionId="{priority_option_id}"
+
+# 3-4. 🔴 Status 필드를 "검수대기"로 설정 (#15 필수)
+STATUS_RESULT=$(gh api graphql -f query='
+query {
+  organization(login: "semicolon-devteam") {
+    projectV2(number: 1) {
+      field(name: "Status") {
+        ... on ProjectV2SingleSelectField {
+          id
+          options { id name }
+        }
+      }
+    }
+  }
+}')
+
+STATUS_FIELD_ID=$(echo "$STATUS_RESULT" | jq -r '.data.organization.projectV2.field.id')
+STATUS_OPTION_ID=$(echo "$STATUS_RESULT" | jq -r '.data.organization.projectV2.field.options[] | select(.name == "검수대기") | .id')
+
+gh api graphql -f query='
+  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+    updateProjectV2ItemFieldValue(input: {
+      projectId: $projectId
+      itemId: $itemId
+      fieldId: $fieldId
+      value: { singleSelectOptionId: $optionId }
+    }) {
+      projectV2Item { id }
+    }
+  }
+' -f projectId="PVT_kwDOC01-Rc4AtDz2" \
+  -f itemId="$ITEM_ID" \
+  -f fieldId="$STATUS_FIELD_ID" \
+  -f optionId="$STATUS_OPTION_ID"
 ```
 
 > **Note**: `PVT_kwDOC01-Rc4AtDz2`는 `이슈관리` Projects (#1) ID입니다.
