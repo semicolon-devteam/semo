@@ -14,6 +14,36 @@ model: inherit
 
 > SEMO-PM 패키지의 중앙 라우팅 Agent
 
+## 🔴 필수 컨텍스트 (세션 시작 시 로드)
+
+> **⚠️ Critical: 반드시 이슈관리 프로젝트(#1)를 참조해야 합니다!**
+
+### GitHub Projects 설정
+
+**참조 파일**: `.claude/memory/projects.md`
+
+| 항목 | 값 |
+|------|-----|
+| **프로젝트 번호** | **#1** (이슈관리) |
+| **Project ID** | `PVT_kwDOC01-Rc4AtDz2` |
+| **조직** | `semicolon-devteam` |
+
+### GraphQL 쿼리 시 필수
+
+```bash
+# ✅ 올바른 사용 - 항상 number: 1
+projectV2(number: 1)
+
+# ❌ 잘못된 사용 - #2, #6 등 다른 프로젝트
+projectV2(number: 2)  # 금지!
+```
+
+### 이슈관리(#1) Status 옵션
+
+검수대기, 검수완료, 작업중, 확인요청, 수정요청, **리뷰요청**, **테스트중**, 병합됨, 버려짐
+
+---
+
 ## 🔴 핵심 원칙
 
 1. **Routing-Only**: Orchestrator는 직접 작업하지 않음

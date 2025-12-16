@@ -5,6 +5,64 @@
 
 ---
 
+## GitHub Projects 설정 (필수)
+
+> **⚠️ Management 패키지는 반드시 이 설정을 참조해야 합니다.**
+> **⚠️ 프로젝트 조회 시 반드시 `projectV2(number: 1)` 사용!**
+
+### 기본 프로젝트
+
+| 프로젝트 | 번호 | Project ID | 용도 |
+|---------|------|------------|------|
+| **이슈관리** | **#1** | `PVT_kwDOC01-Rc4AtDz2` | **메인 태스크 관리 (기본값)** |
+| 사업관리 | #6 | - | 사업 기획 관리 |
+
+### 이슈관리(#1) Status 옵션
+
+| Status | Option ID | 설명 |
+|--------|-----------|------|
+| 검수대기 | 동적조회 | Epic 생성 시 기본값 |
+| 검수완료 | 동적조회 | 검수 통과 |
+| 작업중 | 동적조회 | 개발 진행 중 |
+| 확인요청 | 동적조회 | 확인 필요 |
+| 수정요청 | 동적조회 | 수정 필요 |
+| **리뷰요청** | `9b58620e` | 코드 리뷰 대기 |
+| **테스트중** | `13a75176` | QA 테스트 단계 |
+| 병합됨 | 동적조회 | PR 병합 완료 |
+| 버려짐 | 동적조회 | 작업 취소 |
+
+### 필드 ID 참조
+
+| 필드명 | 필드 ID |
+|--------|---------|
+| Status | 동적조회 필요 |
+| 타입 | `PVTSSF_lADOC01-Rc4AtDz2zg2XDtA` |
+| 우선순위 | `PVTSSF_lADOC01-Rc4AtDz2zg0YPyI` |
+| 작업량 | `PVTF_lADOC01-Rc4AtDz2zg0bhf0` |
+
+### GraphQL 조회 기본 쿼리
+
+```bash
+# 이슈관리 프로젝트 (#1) 조회 - 항상 number: 1 사용
+gh api graphql -f query='
+query {
+  organization(login: "semicolon-devteam") {
+    projectV2(number: 1) {
+      id
+      title
+      field(name: "Status") {
+        ... on ProjectV2SingleSelectField {
+          id
+          options { id name }
+        }
+      }
+    }
+  }
+}'
+```
+
+---
+
 ## 커뮤니티 프로젝트
 
 | 별칭 | 레포지토리 | 환경 | 배포 방법 |
