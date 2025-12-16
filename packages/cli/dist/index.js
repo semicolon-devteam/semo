@@ -592,6 +592,27 @@ async function downloadExtensions(cwd, packages, force) {
             (0, child_process_1.execSync)(`git clone --depth 1 ${SEMO_REPO} "${tempDir}"`, { stdio: "pipe" });
         }
         const semoSystemDir = path.join(cwd, "semo-system");
+        // 그룹 추출 (중복 제거) - 그룹 레벨 CLAUDE.md 복사용
+        const groups = [...new Set(packages.map(pkg => pkg.split("/")[0]).filter(g => ["biz", "eng", "ops"].includes(g)))];
+        // 그룹 레벨 파일 복사 (CLAUDE.md, VERSION 등)
+        for (const group of groups) {
+            const groupSrcDir = path.join(tempDir, "packages", group);
+            const groupDestDir = path.join(semoSystemDir, group);
+            // 그룹 디렉토리의 루트 파일만 복사 (CLAUDE.md, VERSION)
+            if (fs.existsSync(groupSrcDir)) {
+                fs.mkdirSync(groupDestDir, { recursive: true });
+                const groupFiles = fs.readdirSync(groupSrcDir);
+                for (const file of groupFiles) {
+                    const srcFile = path.join(groupSrcDir, file);
+                    const destFile = path.join(groupDestDir, file);
+                    if (fs.statSync(srcFile).isFile()) {
+                        fs.copyFileSync(srcFile, destFile);
+                    }
+                }
+                console.log(chalk_1.default.green(`  ✓ ${group}/ 그룹 파일 복사 (CLAUDE.md 등)`));
+            }
+        }
+        // 개별 패키지 복사
         for (const pkg of packages) {
             const srcPath = path.join(tempDir, "packages", pkg);
             const destPath = path.join(semoSystemDir, pkg);
@@ -1223,8 +1244,25 @@ async function setupClaudeMd(cwd, extensions, force) {
     const extensionsList = extensions.length > 0
         ? extensions.map(pkg => `├── ${pkg}/              # ${EXTENSION_PACKAGES[pkg].name}`).join("\n")
         : "";
-    // 패키지별 CLAUDE.md 병합 섹션 생성
+    // 그룹 및 패키지별 CLAUDE.md 병합 섹션 생성
     let packageClaudeMdSections = "";
+    // 1. 설치된 패키지에서 그룹 추출 (중복 제거)
+    const installedGroups = [...new Set(extensions.map(pkg => pkg.split("/")[0]).filter(g => PACKAGE_GROUPS.includes(g)))];
+    // 2. 그룹 레벨 CLAUDE.md 먼저 병합 (biz, eng, ops)
+    for (const group of installedGroups) {
+        const groupClaudeMdPath = path.join(semoSystemDir, group, "CLAUDE.md");
+        if (fs.existsSync(groupClaudeMdPath)) {
+            const groupContent = fs.readFileSync(groupClaudeMdPath, "utf-8");
+            // 그룹 CLAUDE.md 헤더 레벨 조정 (# → ##, ## → ###)
+            const adjustedContent = groupContent
+                .replace(/^# /gm, "## ")
+                .replace(/^## /gm, "### ")
+                .replace(/^### /gm, "#### ");
+            packageClaudeMdSections += `\n\n---\n\n${adjustedContent}`;
+            console.log(chalk_1.default.green(`  + ${group}/ 그룹 CLAUDE.md 병합됨`));
+        }
+    }
+    // 3. 개별 패키지 CLAUDE.md 병합
     for (const pkg of extensions) {
         const pkgClaudeMdPath = path.join(semoSystemDir, pkg, "CLAUDE.md");
         if (fs.existsSync(pkgClaudeMdPath)) {
