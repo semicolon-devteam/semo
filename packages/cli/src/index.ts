@@ -23,7 +23,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 
-const VERSION = "3.0.0-alpha";
+const VERSION = "3.0.6";
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 
 // === 버전 비교 유틸리티 ===
