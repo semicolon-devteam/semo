@@ -22,14 +22,18 @@ model: inherit
 
 | 키워드 | Route To | 예시 |
 |--------|----------|------|
-| 코드 작성, 구현 | `coder` skill | "로그인 기능 만들어줘" |
-| 테스트 | `tester` skill | "테스트 작성해줘" |
+| 코드 작성, 구현, 만들어줘 | `coder` skill | "로그인 기능 만들어줘" |
+| 테스트, 커버리지 | `tester` skill | "테스트 작성해줘" |
 | 계획, 설계 | `planner` skill | "구현 계획 세워줘" |
 | 배포, deploy, {별칭} 배포 | `deployer` skill | "랜드 stg 배포해줘" |
-| 슬랙 알림 | `notify-slack` skill | "슬랙에 알려줘" |
-| 피드백, 버그 | `feedback` skill | "피드백 등록해줘" |
-| 버전, 릴리스 | `version-updater` skill | "버전 체크해줘" |
-| 도움말 | `semo-help` skill | "/SEMO:help" |
+| 슬랙, 알림, 공유 | `notify-slack` skill | "슬랙에 알려줘" |
+| 피드백, 이슈 등록 | `feedback` skill | "피드백 등록해줘" |
+| 버전, 업데이트 | `version-updater` skill | "버전 체크해줘" |
+| 도움말, 사용법, /SEMO:help | `semo-help` skill | "도움말", "/SEMO:help" |
+| 기억, 저장, 컨텍스트 | `memory` skill | "기억해줘", "저장해줘" |
+| 버그 목록, 이슈 목록 | `list-bugs` skill | "버그 목록 보여줘" |
+| 아키텍처, /SEMO:health | `semo-architecture-checker` skill | "아키텍처 체크" |
+| (자동) 반복 오류 | `circuit-breaker` skill | 오류 3회 반복 시 자동 |
 
 ## SEMO 메시지 포맷
 
