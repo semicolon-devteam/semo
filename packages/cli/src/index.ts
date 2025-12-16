@@ -23,7 +23,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 
-const VERSION = "3.0.6";
+const VERSION = "3.0.7";
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 
 // === 버전 비교 유틸리티 ===
@@ -565,6 +565,8 @@ async function downloadExtensions(cwd: string, packages: string[], force: boolea
           continue;
         }
         removeRecursive(destPath);
+        // 상위 디렉토리 생성 (biz/discovery -> biz/ 먼저 생성)
+        fs.mkdirSync(path.dirname(destPath), { recursive: true });
         copyRecursive(srcPath, destPath);
       }
     }
