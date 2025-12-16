@@ -111,7 +111,32 @@ src/app/{domain}/
 | typescript-review | TypeScript 코드 리뷰 |
 | git-workflow | Git 워크플로우 |
 | fetch-supabase-example | Supabase 패턴 참조 |
+| supabase-typegen | DB 타입 동기화 |
 | health-check | 환경 검증 |
+
+---
+
+## Supabase 타입 동기화 (Cloud 환경 필수)
+
+**DB 작업 시 반드시 타입 동기화 후 작업**:
+
+```bash
+# 1. 타입 생성 (Cloud 환경)
+npx supabase gen types typescript --linked > src/lib/supabase/database.types.ts
+
+# 2. 타입 활용
+import { Database } from '@/lib/supabase/database.types';
+type Post = Database['public']['Tables']['posts']['Row'];
+```
+
+| 순서 | 작업 | 비고 |
+|------|------|------|
+| 1 | DB 스키마 변경 | Migration 또는 Studio |
+| 2 | **타입 동기화** | `npx supabase gen types ...` |
+| 3 | Repository 구현 | 생성된 타입 사용 |
+| 4 | 타입 파일 커밋 | `database.types.ts` 포함 |
+
+> **On-Premise 환경**: CLI 연결 불가 → 수동 타입 정의 필요
 
 ---
 

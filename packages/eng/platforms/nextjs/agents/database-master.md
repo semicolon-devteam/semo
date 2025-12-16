@@ -108,6 +108,26 @@ export class {Domain}Repository {
 
 ## Critical Rules
 
+### 0. 타입 동기화 필수 (Cloud 환경)
+
+**DB 작업 전 반드시 타입 동기화**:
+
+```bash
+# Cloud 환경 (On-Premise 제외)
+npx supabase gen types typescript --linked > src/lib/supabase/database.types.ts
+```
+
+| 순서 | 작업 | 필수 |
+|------|------|------|
+| 1 | DB 스키마 변경 | - |
+| 2 | **타입 동기화** | **필수** |
+| 3 | Repository 코드 작성 | - |
+| 4 | 타입 파일 커밋 포함 | 필수 |
+
+**On-Premise 환경**: SSH로 스키마 조회 후 수동 타입 정의 필요
+
+> 상세: [supabase-typegen Skill](../skills/supabase-typegen/SKILL.md)
+
 ### 1. core-supabase 우선
 
 **절대 커스텀 RPC 생성 금지** - 먼저 core-supabase 확인:
