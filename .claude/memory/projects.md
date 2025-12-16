@@ -76,6 +76,46 @@ query {
 
 ---
 
+## 환경 정보 (테스트 요청 시 자동 첨부)
+
+> **⚠️ 테스트 요청 시 이 정보가 자동으로 메시지에 첨부됩니다.**
+
+### cm-land (커뮤니티 랜드)
+
+| 환경 | URL | 비고 |
+|------|-----|------|
+| dev | https://dev.cm-land.com | 개발 테스트 |
+| stg | https://stg.cm-land.com | QA 테스트 **(기본값)** |
+| prd | https://cm-land.com | 운영 |
+
+### cm-office (커뮤니티 오피스)
+
+| 환경 | URL | 비고 |
+|------|-----|------|
+| dev | https://dev.cm-office.com | 개발 테스트 |
+| stg | https://stg.cm-office.com | QA 테스트 **(기본값)** |
+| prd | https://cm-office.com | 운영 |
+
+### 환경 선택 규칙
+
+| Issue Status | 권장 환경 | 이유 |
+|--------------|----------|------|
+| 리뷰요청 | stg | 코드 리뷰 후 STG 배포 예정 |
+| 테스트중 | stg | QA 테스트 진행 |
+| 작업중 | dev | 개발 중 확인 |
+
+### 테스트 요청 메시지 템플릿
+
+```
+@{tester} [{issue_title}] 테스트 요청드립니다 🙏
+
+📍 테스트 환경: {env}
+🔗 URL: {env_url}
+📋 이슈: {issue_url}
+```
+
+---
+
 ## 배포 절차
 
 ### DEV 배포
