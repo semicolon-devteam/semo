@@ -59,7 +59,7 @@ const child_process_1 = require("child_process");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
-const VERSION = "3.0.7";
+const VERSION = "3.0.8";
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 // === 버전 비교 유틸리티 ===
 /**
@@ -313,6 +313,74 @@ function detectProjectType(cwd) {
     }
     return detected;
 }
+function checkRequiredTools() {
+    const tools = [
+        {
+            name: "GitHub CLI (gh)",
+            installed: false,
+            installCmd: isWindows ? "winget install GitHub.cli" : "brew install gh",
+            description: "GitHub API 연동 (이슈, PR, 배포)",
+        },
+        {
+            name: "Supabase CLI",
+            installed: false,
+            installCmd: isWindows ? "npm install -g supabase" : "brew install supabase/tap/supabase",
+            description: "Supabase 데이터베이스 연동",
+        },
+    ];
+    // GitHub CLI 확인
+    try {
+        const ghVersion = (0, child_process_1.execSync)("gh --version", { stdio: "pipe", encoding: "utf-8" });
+        tools[0].installed = true;
+        tools[0].version = ghVersion.split("\n")[0].replace("gh version ", "").trim();
+    }
+    catch {
+        // gh not installed
+    }
+    // Supabase CLI 확인
+    try {
+        const supabaseVersion = (0, child_process_1.execSync)("supabase --version", { stdio: "pipe", encoding: "utf-8" });
+        tools[1].installed = true;
+        tools[1].version = supabaseVersion.trim();
+    }
+    catch {
+        // supabase not installed
+    }
+    return tools;
+}
+async function showToolsStatus() {
+    console.log(chalk_1.default.cyan("\n🔍 필수 도구 확인"));
+    const tools = checkRequiredTools();
+    const missingTools = tools.filter(t => !t.installed);
+    for (const tool of tools) {
+        if (tool.installed) {
+            console.log(chalk_1.default.green(`  ✓ ${tool.name} ${tool.version ? `(${tool.version})` : ""}`));
+        }
+        else {
+            console.log(chalk_1.default.yellow(`  ✗ ${tool.name} - 미설치`));
+            console.log(chalk_1.default.gray(`      ${tool.description}`));
+        }
+    }
+    if (missingTools.length > 0) {
+        console.log(chalk_1.default.yellow("\n⚠ 일부 도구가 설치되어 있지 않습니다."));
+        console.log(chalk_1.default.gray("  SEMO의 일부 기능이 제한될 수 있습니다.\n"));
+        console.log(chalk_1.default.cyan("📋 설치 명령어:"));
+        for (const tool of missingTools) {
+            console.log(chalk_1.default.white(`   ${tool.installCmd}`));
+        }
+        console.log();
+        const { continueWithout } = await inquirer_1.default.prompt([
+            {
+                type: "confirm",
+                name: "continueWithout",
+                message: "도구 없이 계속 설치를 진행할까요?",
+                default: true,
+            },
+        ]);
+        return continueWithout;
+    }
+    return true;
+}
 // === init 명령어 ===
 program
     .command("init")
@@ -324,6 +392,12 @@ program
     console.log(chalk_1.default.cyan.bold("\n🚀 SEMO 설치 시작\n"));
     console.log(chalk_1.default.gray("Gemini 하이브리드 전략: White Box + Black Box\n"));
     const cwd = process.cwd();
+    // 0. 필수 도구 확인
+    const shouldContinue = await showToolsStatus();
+    if (!shouldContinue) {
+        console.log(chalk_1.default.yellow("\n설치가 취소되었습니다. 필수 도구 설치 후 다시 시도하세요.\n"));
+        process.exit(0);
+    }
     // 1. Git 레포지토리 확인
     const spinner = (0, ora_1.default)("Git 레포지토리 확인 중...").start();
     try {
@@ -488,12 +562,19 @@ async function createStandardSymlinks(cwd) {
     const commandsDir = path.join(claudeDir, "commands");
     fs.mkdirSync(commandsDir, { recursive: true });
     const semoCommandsLink = path.join(commandsDir, "SEMO");
-    if (!fs.existsSync(semoCommandsLink)) {
-        const commandsTarget = path.join(semoSystemDir, "semo-core", "commands", "SEMO");
-        if (fs.existsSync(commandsTarget)) {
-            createSymlinkOrJunction(commandsTarget, semoCommandsLink);
-            console.log(chalk_1.default.green("  ✓ .claude/commands/SEMO → semo-system/semo-core/commands/SEMO"));
+    const commandsTarget = path.join(semoSystemDir, "semo-core", "commands", "SEMO");
+    // 기존 링크가 있으면 삭제 후 재생성 (업데이트 시에도 최신 반영)
+    if (fs.existsSync(semoCommandsLink)) {
+        if (fs.lstatSync(semoCommandsLink).isSymbolicLink()) {
+            fs.unlinkSync(semoCommandsLink);
         }
+        else {
+            removeRecursive(semoCommandsLink);
+        }
+    }
+    if (fs.existsSync(commandsTarget)) {
+        createSymlinkOrJunction(commandsTarget, semoCommandsLink);
+        console.log(chalk_1.default.green("  ✓ .claude/commands/SEMO → semo-system/semo-core/commands/SEMO"));
     }
 }
 // === Extensions 다운로드 (심볼릭 링크 제외) ===
@@ -1594,7 +1675,18 @@ program
             }
         }
     }
-    // Standard 심볼릭 링크 재생성
+    // commands 링크도 정리 (신규 commands 반영 위해)
+    const claudeCommandsDir = path.join(claudeDir, "commands");
+    const semoCommandsLink = path.join(claudeCommandsDir, "SEMO");
+    if (fs.existsSync(semoCommandsLink)) {
+        if (fs.lstatSync(semoCommandsLink).isSymbolicLink()) {
+            fs.unlinkSync(semoCommandsLink);
+        }
+        else {
+            removeRecursive(semoCommandsLink);
+        }
+    }
+    // Standard 심볼릭 링크 재생성 (agents, skills, commands 포함)
     await createStandardSymlinks(cwd);
     // Extensions 심볼릭 링크 재생성
     if (installedExtensions.length > 0) {

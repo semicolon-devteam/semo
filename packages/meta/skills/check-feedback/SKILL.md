@@ -12,7 +12,7 @@ tools: [Bash]
 
 ## Purpose
 
-`semo-*` 패턴의 모든 레포지토리에서 open 상태인 이슈를 수집하여 리스트업합니다.
+`semicolon-devteam/semo` 레포지토리에서 open 상태인 이슈를 수집하여 리스트업합니다.
 
 ## Trigger Keywords
 
@@ -22,25 +22,10 @@ tools: [Bash]
 
 ## Workflow
 
-### 1. SEMO 레포지토리 목록 조회
+### 1. semo 레포지토리 Open 이슈 수집
 
 ```bash
-gh repo list semicolon-devteam --json name --jq '.[] | select(.name | startswith("sax-")) | .name'
-```
-
-### 2. 각 레포별 Open 이슈 수집
-
-```bash
-for repo in $(gh repo list semicolon-devteam --json name --jq '.[] | select(.name | startswith("sax-")) | .name'); do
-  echo "=== $repo ==="
-  gh api repos/semicolon-devteam/$repo/issues --jq '.[] | select(.state == "open") | "- #\(.number) \(.title) [\(.labels | map(.name) | join(", "))]"'
-done
-```
-
-### 3. docs 레포 SEMO 관련 이슈 수집
-
-```bash
-gh api repos/semicolon-devteam/docs/issues --jq '.[] | select(.state == "open" and (.labels[].name == "sax" or .labels[].name == "feedback-requested")) | "- #\(.number) \(.title)"'
+gh api repos/semicolon-devteam/semo/issues --jq '.[] | select(.state == "open") | "- #\(.number) | \(.title) | [\(.labels | map(.name) | join(\", \"))] | \(.created_at | split(\"T\")[0])"'
 ```
 
 ## Output Format
@@ -48,18 +33,10 @@ gh api repos/semicolon-devteam/docs/issues --jq '.[] | select(.state == "open" a
 ```markdown
 ## 📋 SEMO 피드백 현황
 
-### 📦 semo-backend
+### 📦 semo
 | # | 제목 | 라벨 | 생성일 |
 |---|------|------|--------|
 | #1 | 이슈 제목 | bug, feedback | 2024-12-01 |
-
-### 📦 semo-next
-(이슈 없음)
-
-### 📄 docs (SEMO 관련)
-| # | 제목 | 라벨 | 생성일 |
-|---|------|------|--------|
-| #10 | semo-backend 피드백 요청 | release, sax | 2024-11-30 |
 
 ---
 **총 {N}개의 Open 이슈**
@@ -70,7 +47,7 @@ gh api repos/semicolon-devteam/docs/issues --jq '.[] | select(.state == "open" a
 ```markdown
 ## 📋 SEMO 피드백 현황
 
-✅ 모든 SEMO 패키지에 open 이슈가 없습니다.
+✅ semo 레포에 open 이슈가 없습니다.
 ```
 
 ---
