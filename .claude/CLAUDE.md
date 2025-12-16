@@ -117,9 +117,21 @@ SEMO는 `.claude/memory/`를 통해 세션 간 컨텍스트를 유지합니다:
 
 - **context.md**: 프로젝트 상태, 진행 중인 작업
 - **decisions.md**: 아키텍처 결정 기록 (ADR)
+- **projects.md**: 외부 프로젝트 별칭 매핑 (배포용)
 - **rules/**: 프로젝트별 커스텀 규칙
 
 memory 스킬이 자동으로 이 파일들을 관리합니다.
+
+## 외부 프로젝트 배포
+
+`.claude/memory/projects.md`에 정의된 별칭으로 외부 프로젝트 배포가 가능합니다:
+
+```
+"랜드 stg 배포해줘"  → cm-land STG 배포 (Milestone close)
+"오피스 prd 배포"    → cm-office PRD 배포 (source-tag + Milestone close)
+```
+
+`deployer` 스킬이 프로젝트 별칭을 인식하고 GitHub API를 통해 배포를 트리거합니다.
 
 ## References
 
