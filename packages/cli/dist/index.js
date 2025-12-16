@@ -60,6 +60,49 @@ const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
 const VERSION = "3.0.0-alpha";
+const PACKAGE_NAME = "@team-semicolon/semo-cli";
+// === 버전 비교 유틸리티 ===
+/**
+ * npm registry에서 최신 버전을 가져옴
+ */
+async function getLatestVersion() {
+    try {
+        const result = (0, child_process_1.execSync)(`npm view ${PACKAGE_NAME} version`, {
+            stdio: "pipe",
+            encoding: "utf-8",
+            timeout: 10000, // 10초 타임아웃
+        });
+        return result.trim();
+    }
+    catch {
+        return null;
+    }
+}
+/**
+ * 시맨틱 버전 비교 (v1이 v2보다 낮으면 true)
+ * 예: isVersionLower("1.0.0", "1.0.1") => true
+ */
+function isVersionLower(current, latest) {
+    // alpha, beta 등 pre-release 태그 제거 후 비교
+    const cleanVersion = (v) => v.replace(/-.*$/, "");
+    const currentParts = cleanVersion(current).split(".").map(Number);
+    const latestParts = cleanVersion(latest).split(".").map(Number);
+    for (let i = 0; i < 3; i++) {
+        const c = currentParts[i] || 0;
+        const l = latestParts[i] || 0;
+        if (c < l)
+            return true;
+        if (c > l)
+            return false;
+    }
+    // 숫자가 같으면 pre-release 여부 확인
+    // current가 pre-release이고 latest가 정식이면 낮은 버전
+    const currentIsPrerelease = current.includes("-");
+    const latestIsPrerelease = latest.includes("-");
+    if (currentIsPrerelease && !latestIsPrerelease)
+        return true;
+    return false;
+}
 // === Windows 지원 유틸리티 ===
 const isWindows = os.platform() === "win32";
 /**
@@ -201,7 +244,48 @@ const program = new commander_1.Command();
 program
     .name("semo")
     .description("SEMO CLI - AI Agent Orchestration Framework")
-    .version(VERSION);
+    .version(VERSION, "-V, --version-simple", "버전 번호만 출력");
+// === version 명령어 (상세 버전 정보) ===
+program
+    .command("version")
+    .description("버전 정보 및 업데이트 확인")
+    .action(async () => {
+    await showVersionInfo();
+});
+/**
+ * 상세 버전 정보 표시 및 업데이트 확인
+ */
+async function showVersionInfo() {
+    console.log(chalk_1.default.cyan.bold("\n📦 SEMO CLI 버전 정보\n"));
+    // 현재 버전 표시
+    console.log(chalk_1.default.white(`  현재 버전: ${chalk_1.default.green.bold(VERSION)}`));
+    // 최신 버전 확인
+    const spinner = (0, ora_1.default)("  최신 버전 확인 중...").start();
+    const latestVersion = await getLatestVersion();
+    if (latestVersion === null) {
+        spinner.warn("  최신 버전 확인 실패 (네트워크 오류)");
+        console.log(chalk_1.default.gray("  npm registry에 접속할 수 없습니다.\n"));
+        return;
+    }
+    spinner.stop();
+    console.log(chalk_1.default.white(`  최신 버전: ${chalk_1.default.blue.bold(latestVersion)}`));
+    // 버전 비교 및 업데이트 권유
+    if (isVersionLower(VERSION, latestVersion)) {
+        console.log();
+        console.log(chalk_1.default.yellow.bold("  ⚠️  새로운 버전이 있습니다!"));
+        console.log();
+        console.log(chalk_1.default.white("  업데이트 방법:"));
+        console.log(chalk_1.default.cyan(`    npm update -g ${PACKAGE_NAME}`));
+        console.log();
+        console.log(chalk_1.default.gray("  또는 프로젝트 내 SEMO 업데이트:"));
+        console.log(chalk_1.default.gray("    semo update"));
+    }
+    else {
+        console.log();
+        console.log(chalk_1.default.green("  ✓ 최신 버전을 사용 중입니다."));
+    }
+    console.log();
+}
 // === 유틸리티 함수들 ===
 async function confirmOverwrite(itemName, itemPath) {
     if (!fs.existsSync(itemPath)) {
@@ -1567,4 +1651,14 @@ program
     }
     console.log(chalk_1.default.green.bold("\n✅ SEMO 업데이트 완료!\n"));
 });
-program.parse();
+// === -v 옵션 처리 (program.parse 전에 직접 처리) ===
+async function main() {
+    const args = process.argv.slice(2);
+    // semo -v 또는 semo --version-info 처리
+    if (args.length === 1 && (args[0] === "-v" || args[0] === "--version-info")) {
+        await showVersionInfo();
+        process.exit(0);
+    }
+    program.parse();
+}
+main();
