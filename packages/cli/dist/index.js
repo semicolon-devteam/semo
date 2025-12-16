@@ -59,7 +59,7 @@ const child_process_1 = require("child_process");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
-const VERSION = "3.0.0-alpha";
+const VERSION = "3.0.7";
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 // === 버전 비교 유틸리티 ===
 /**
@@ -520,6 +520,8 @@ async function downloadExtensions(cwd, packages, force) {
                     continue;
                 }
                 removeRecursive(destPath);
+                // 상위 디렉토리 생성 (biz/discovery -> biz/ 먼저 생성)
+                fs.mkdirSync(path.dirname(destPath), { recursive: true });
                 copyRecursive(srcPath, destPath);
             }
         }

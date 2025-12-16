@@ -1,6 +1,6 @@
 # Design Handoff Template
 
-> 복사하여 사용할 수 있는 핸드오프 문서 템플릿
+## Full Template Structure
 
 ```markdown
 # Design Handoff: {컴포넌트명}
@@ -20,8 +20,6 @@
 ### 사용 맥락
 {어디서, 언제 이 컴포넌트가 사용되는지}
 
----
-
 ## 2. 시각 스펙
 
 ### 레이아웃
@@ -34,164 +32,129 @@
 |------|------|------|
 | 배경 | #FFFFFF | --bg-primary |
 | 텍스트 | #1F2937 | --text-primary |
-| Primary | #3B82F6 | --color-primary |
-| Error | #EF4444 | --color-error |
+| Primary 버튼 | #3B82F6 | --color-primary |
+| 오류 | #EF4444 | --color-error |
 
 ### 타이포그래피
 | 요소 | 폰트 | 크기 | 굵기 |
 |------|------|------|------|
 | 제목 | Inter | 24px | 600 |
-| 본문 | Inter | 16px | 400 |
+| 레이블 | Inter | 14px | 500 |
+| 입력 텍스트 | Inter | 16px | 400 |
+| 에러 메시지 | Inter | 12px | 400 |
 
 ### 스페이싱
 | 요소 | 값 |
 |------|-----|
-| 패딩 | 24px |
-| 간격 | 16px |
+| 컨테이너 패딩 | 24px |
+| 필드 간격 | 16px |
+| 버튼 패딩 | 12px 24px |
 
----
+### 테두리/그림자
+| 요소 | 스타일 |
+|------|--------|
+| 입력 필드 | 1px solid #D1D5DB, radius 8px |
+| 버튼 | radius 8px, shadow-sm |
+| 컨테이너 | radius 12px, shadow-md |
 
 ## 3. 인터랙션
 
 ### 상태별 스타일
 | 상태 | 변화 |
 |------|------|
-| Default | 기본 |
-| Hover | {변화} |
-| Focus | {변화} |
-| Disabled | {변화} |
+| Default | 기본 스타일 |
+| Hover | 버튼 배경 어두워짐 (10%) |
+| Focus | 2px ring, primary 색상 |
+| Active | 버튼 배경 더 어두워짐 (15%) |
+| Disabled | opacity 50%, cursor not-allowed |
+| Error | 입력 border red, 에러 메시지 표시 |
 
 ### 애니메이션
 | 트랜지션 | 속성 | 시간 |
 |----------|------|------|
-| {이름} | {속성} | {시간} |
+| 버튼 hover | background-color | 150ms ease |
+| 포커스 링 | box-shadow | 150ms ease |
+| 에러 메시지 | opacity, transform | 200ms ease-out |
 
----
+### 사용자 흐름
+\`\`\`
+1. 이메일 입력 → 포커스 스타일
+2. 비밀번호 입력 → 포커스 스타일
+3. 제출 클릭 → 로딩 상태
+4a. 성공 → 대시보드 이동
+4b. 실패 → 에러 메시지 표시
+\`\`\`
 
 ## 4. 반응형
 
 ### Desktop (≥1024px)
-{스펙}
+- 폼 너비: 400px, 중앙 정렬
+- 큰 패딩, 여유로운 레이아웃
 
 ### Tablet (640px-1023px)
-{스펙}
+- 폼 너비: 90%, max 400px
+- 패딩 유지
 
 ### Mobile (<640px)
-{스펙}
-
----
+- 폼 너비: 100%, padding 16px
+- 세로 스택 레이아웃
+- 터치 타겟 최소 44px
 
 ## 5. 접근성
 
 ### ARIA 속성
-{필요한 ARIA 속성}
+\`\`\`html
+<form aria-labelledby="login-title">
+  <input aria-describedby="email-error" aria-invalid="true/false">
+  <button type="submit" aria-busy="true/false">
+</form>
+\`\`\`
 
 ### 키보드 탐색
-{키보드 동작}
+- Tab: 순차 포커스 이동
+- Enter: 폼 제출
+- Escape: 모달 닫기 (해당 시)
+
+### 스크린 리더
+- 레이블과 입력 연결 필수
+- 에러 메시지 aria-live="polite"
+- 로딩 상태 aria-busy 업데이트
 
 ### 색상 대비
-{대비 비율}
-
----
+- 텍스트/배경: 4.5:1 이상
+- 버튼 텍스트/배경: 4.5:1 이상
 
 ## 6. 에셋
 
 ### Figma
-- 링크: {URL}
+- 파일: {Figma 링크}
+- 프레임: {프레임 이름}
 
-### 이미지
-- {파일 경로}
+### 목업 이미지
+- Desktop: \`/assets/mockups/{component}-desktop.png\`
+- Mobile: \`/assets/mockups/{component}-mobile.png\`
 
----
+### 아이콘
+| 이름 | 용도 | 소스 |
+|------|------|------|
+| eye | 비밀번호 표시 | lucide-react |
+| eye-off | 비밀번호 숨김 | lucide-react |
+| loader | 로딩 | lucide-react |
 
 ## 7. 구현 노트
 
-### 기술 권장
-{기술 스택}
+### 기술 스택 권장
+- React + TypeScript
+- Tailwind CSS 또는 CSS Modules
+- React Hook Form (폼 관리)
+- Zod (유효성 검사)
 
 ### 주의사항
-{주의점}
+- {주의할 점 1}
+- {주의할 점 2}
+
+### 참조 컴포넌트
+- \`@/components/ui/Button\`
+- \`@/components/ui/Input\`
+- \`@/components/ui/Label\`
 ```
-
----
-
-## 섹션별 가이드
-
-### 1. 개요 섹션
-
-**목적**: 왜 이 컴포넌트가 필요한가?
-- 사용자 문제 중심으로 작성
-- 비즈니스 목표 언급
-
-**대상 사용자**: 누가 사용하는가?
-- 페르소나 이름 또는 역할
-- 사용 빈도, 숙련도
-
-**사용 맥락**: 어디서 사용되는가?
-- 페이지/화면 위치
-- 사용 시나리오
-
-### 2. 시각 스펙 섹션
-
-**레이아웃**: 구조적 배치
-- ASCII 다이어그램 권장
-- 중첩 관계 표현
-
-**색상**: 모든 색상 값
-- HEX 코드 필수
-- 디자인 토큰 매핑
-
-**타이포그래피**: 텍스트 스타일
-- 폰트 패밀리
-- 크기, 굵기, 줄 높이
-
-**스페이싱**: 여백과 간격
-- 픽셀 값 명시
-- 4px 그리드 시스템 권장
-
-### 3. 인터랙션 섹션
-
-**상태별 스타일**: 모든 상태 정의
-- Default, Hover, Focus, Active
-- Disabled, Error, Loading
-
-**애니메이션**: 동적 변화
-- 트랜지션 속성
-- 타이밍 함수
-- 지속 시간
-
-### 4. 반응형 섹션
-
-**Breakpoints**: 화면 크기별 변화
-- Desktop: ≥1024px
-- Tablet: 640-1023px
-- Mobile: <640px
-
-**변화 요소**:
-- 레이아웃 방향
-- 폰트 크기
-- 패딩/마진
-
-### 5. 접근성 섹션
-
-**ARIA**: 보조 기술 지원
-- role, aria-label
-- aria-describedby
-
-**키보드**: 키보드 네비게이션
-- Tab 순서
-- 단축키
-
-**색상 대비**: WCAG 준수
-- 4.5:1 (일반 텍스트)
-- 3:1 (큰 텍스트)
-
-### 6. 에셋 섹션
-
-**Figma**: 원본 디자인 링크
-**이미지**: 목업, 아이콘 경로
-
-### 7. 구현 노트 섹션
-
-**기술 권장**: 사용할 기술 스택
-**주의사항**: 개발 시 유의점
