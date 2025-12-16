@@ -2,7 +2,8 @@
 name: deployer
 description: |
   외부 프로젝트 배포 관리. Use when (1) "배포해줘", "deploy",
-  (2) 프로젝트 별칭 + 환경 (예: "랜드 stg 배포"), (3) Milestone 관리.
+  (2) 프로젝트 별칭 + 환경 (예: "랜드 stg 배포"), (3) Milestone 관리,
+  (4) "stg에 뭐 올라가있어?", "prd 최신 버전", (5) "stg 반영 대기".
 tools: [Read, Bash, mcp__github__*]
 model: inherit
 ---
@@ -11,13 +12,27 @@ model: inherit
 
 # deployer Skill
 
-> 프로젝트 별칭 기반 외부 프로젝트 배포
+> 프로젝트 별칭 기반 외부 프로젝트 배포 및 상태 조회
 
 ## Trigger Keywords
 
+**배포 요청:**
 - "배포해줘", "deploy"
 - "{별칭} {환경} 배포" (예: "랜드 stg 배포")
 - "Milestone close"
+
+**상태 조회:**
+- "stg에 뭐 올라가있어?", "현재 stg 버전"
+- "prd 최신 버전이 뭐야?"
+- "stg 반영 대기 항목 있어?"
+
+## Semicolon 브랜치 전략
+
+| 환경 | 브랜치/태그 | 트리거 | 설명 |
+|------|-------------|--------|------|
+| DEV | `dev` | push | 개발 환경 (기본 브랜치) |
+| STG | `release-x.x.x` | Milestone Close | 마일스톤 기반 릴리즈 브랜치 |
+| PRD | `vx.x.x` 태그 | Production Tagging | 릴리즈 태그 |
 
 ## 프로젝트 별칭 참조
 
@@ -87,8 +102,63 @@ gh api repos/{owner}/{repo}/milestones/{number} -X PATCH -f state=closed
   → GitHub Actions: https://github.com/semicolon-devteam/cm-land/actions
 ```
 
+## 상태 조회 Workflow
+
+### STG 현재 배포 버전 확인
+
+```bash
+# 최근 close된 Milestone 조회 (= STG에 배포된 버전)
+gh api repos/{owner}/{repo}/milestones?state=closed --jq '.[0] | "v\(.title) - \(.closed_at | split("T")[0]) 배포"'
+
+# release- 브랜치 목록 조회
+gh api repos/{owner}/{repo}/branches --jq '.[] | select(.name | startswith("release-")) | .name'
+```
+
+### PRD 최신 버전 확인
+
+```bash
+# 최신 릴리즈 태그 조회
+gh api repos/{owner}/{repo}/releases/latest --jq '"v\(.tag_name) - \(.published_at | split("T")[0]) 릴리즈"'
+
+# 또는 태그 목록에서 조회
+gh api repos/{owner}/{repo}/tags --jq '.[0].name'
+```
+
+### STG 반영 대기 항목 조회
+
+```bash
+# Open 상태 Milestone + 연결된 이슈/PR 조회
+gh api repos/{owner}/{repo}/milestones?state=open --jq '.[] | {title, open_issues, html_url}'
+
+# 특정 Milestone의 이슈 목록
+gh api "repos/{owner}/{repo}/issues?milestone={number}&state=all" --jq '.[] | "- #\(.number) \(.title) [\(.state)]"'
+```
+
+### 상태 조회 출력 포맷
+
+```
+[SEMO] deployer: 배포 상태 조회
+
+📦 cm-land (semicolon-devteam/cm-land)
+
+🟢 PRD: v1.2.2 (2025-12-10 릴리즈)
+🟡 STG: release-1.2.3 (2025-12-15 배포)
+🔵 DEV: dev 브랜치
+
+📋 STG 반영 대기:
+  - release-1.3.0 (Milestone Open)
+    - #45 [Feature] 새 기능 추가 [open]
+    - #46 [Bug] 버그 수정 [closed]
+```
+
 ## 주의사항
 
 - PRD 배포 시 반드시 STG 검증 여부 확인
 - Milestone Close 전 연결된 이슈/PR 상태 확인
 - 배포 실패 시 GitHub Actions 로그 확인 안내
+
+## References
+
+- Milestones: `https://github.com/{owner}/{repo}/milestones`
+- Releases: `https://github.com/{owner}/{repo}/releases`
+- Actions: `https://github.com/{owner}/{repo}/actions`
