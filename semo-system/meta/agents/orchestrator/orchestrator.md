@@ -67,6 +67,50 @@ SEMO 패키지 관리 요청을 분석하고 적절한 에이전트로 위임하
 2. **SEMO 메시지 필수**: 모든 위임에 SEMO 메시지 포함
 3. **Post-Action Check**: 작업 완료 후 compliance-checker 자동 실행
 4. **Cross-Package Check**: 다른 패키지 전문 영역 요청 시 인계 권유
+5. **🔴 Auto-Versioning Trigger**: semo-system 파일 수정 시 자동 버저닝 (아래 참조)
+
+## 🔴 Auto-Versioning Trigger (NON-NEGOTIABLE)
+
+> **semo-system 내 Agent/Skill/Command 파일 수정 감지 시 자동으로 버저닝 플로우 트리거**
+
+### 감지 대상 경로
+
+| 경로 패턴 | 버전 파일 |
+|----------|----------|
+| `semo-system/semo-core/**` | `semo-system/semo-core/VERSION` |
+| `semo-system/semo-skills/**` | `semo-system/semo-skills/VERSION` |
+| `semo-system/meta/**` | `semo-system/meta/VERSION` |
+| `packages/cli/**` | `packages/cli/package.json` |
+| `packages/{biz,eng,ops}/**` | 해당 패키지의 `VERSION` |
+
+### 트리거 조건
+
+다음 파일 유형이 수정되면 버저닝 트리거:
+- `*.md` (Agent/Skill 정의)
+- `*.ts`, `*.js` (CLI 코드)
+- `SKILL.md`, `*.agent.md`
+
+### 자동 동작
+
+1. **TodoWrite 자동 추가**: 작업 완료 시 "버저닝 처리" 항목 추가
+2. **version-manager 호출 권유**: 커밋 전 버저닝 안내 메시지 출력
+
+```markdown
+[SEMO] 버저닝 필요: {package_name} 파일이 수정되었습니다.
+
+📌 커밋 전 다음 명령어로 버전을 업데이트하세요:
+- "버전 올려줘" 또는 Skill 호출: version-manager
+```
+
+### 버전 타입 자동 판별
+
+| 변경 유형 | 버전 타입 |
+|----------|----------|
+| Agent/Skill/Command 추가 | MINOR |
+| Agent/Skill/Command 수정 | MINOR |
+| Agent/Skill/Command 삭제 | MINOR |
+| 버그/오타 수정 | PATCH |
+| Breaking Change | MAJOR |
 
 ## 🔄 Cross-Package Routing
 
