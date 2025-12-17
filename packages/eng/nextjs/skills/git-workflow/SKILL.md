@@ -80,6 +80,34 @@ gh api repos/semicolon-devteam/semo-core/contents/TEAM_RULES.md --jq '.content' 
 ISSUE_NUM=$(git branch --show-current | grep -oE '^[0-9]+|/[0-9]+' | grep -oE '[0-9]+' | head -1)
 ```
 
+## PR 본문 - Related 사용 (NON-NEGOTIABLE)
+
+> **🔴 CRITICAL**: PR 본문에서 이슈 연결 시 `Closes` 대신 **반드시 `Related`를 사용**합니다.
+
+**이유**: dev → stg 테스트 워크플로우에서 PR 머지 시 이슈가 자동 닫히면 안 됨
+
+| 키워드 | 사용 여부 | 이유 |
+|--------|----------|------|
+| `Closes #이슈` | ❌ 금지 | 머지 시 이슈 자동 종료 |
+| `Fixes #이슈` | ❌ 금지 | 머지 시 이슈 자동 종료 |
+| `Resolves #이슈` | ❌ 금지 | 머지 시 이슈 자동 종료 |
+| **`Related #이슈`** | ✅ 필수 | 이슈 연결만, 자동 종료 안 됨 |
+
+**PR 본문 템플릿**:
+```markdown
+## Related Issue
+- Related #이슈번호
+```
+
+**감지 시 즉시 수정**:
+```markdown
+[SEMO] skill:git-workflow: ⚠️ Closes 키워드 감지
+
+🚫 **PR 본문 수정 필요**: `Closes #이슈` → `Related #이슈`
+
+이유: PR 머지 시 이슈가 자동 종료되어 STG 테스트 추적이 불가능해집니다.
+```
+
 ## --no-verify 차단 (NON-NEGOTIABLE)
 
 > **🔴 CRITICAL**: `--no-verify` 또는 `-n` 플래그는 **어떤 상황에서도** 사용하지 않습니다.

@@ -4,8 +4,13 @@
 
 ## Pull Request Creation
 
-> **중요**: PR은 Draft로 생성하고, `Closes` 대신 `Related`를 사용합니다.
+> **🔴 NON-NEGOTIABLE**: PR은 Draft로 생성하고, **`Closes` 대신 `Related`를 반드시 사용**합니다.
 > (dev 병합 후 stg 리뷰가 필요하므로 PR 머지 시 이슈가 자동 닫히면 안됨)
+
+| 키워드 | 사용 | 이유 |
+|--------|------|------|
+| `Closes`, `Fixes`, `Resolves` | ❌ 금지 | 머지 시 이슈 자동 종료 |
+| **`Related`** | ✅ 필수 | 이슈 연결만, 자동 종료 안 됨 |
 
 **자동 PR 생성 워크플로우**:
 
