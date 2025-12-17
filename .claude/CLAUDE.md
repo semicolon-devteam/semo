@@ -115,6 +115,7 @@ semo-system/           # White Box (읽기 전용)
 | `/SEMO:feedback` | 피드백 제출 |
 | `/SEMO:update` | SEMO 업데이트 |
 | `/SEMO:onboarding` | 온보딩 가이드 |
+| `/SEMO:dry-run {프롬프트}` | 명령 검증 (라우팅 시뮬레이션) |
 
 ## Context Mesh 사용
 
