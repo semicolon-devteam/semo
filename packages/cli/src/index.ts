@@ -136,36 +136,40 @@ async function showVersionComparison(cwd: string): Promise<void> {
       needsUpdate: latestCliVersion ? isVersionLower(currentCliVersion, latestCliVersion) : false,
     });
 
-    if (hasSemoSystem) {
-      // semo-core는 semo-system 바깥에 있음
-      const corePath = path.join(cwd, "semo-core", "VERSION");
-      const localCore = fs.existsSync(corePath) ? fs.readFileSync(corePath, "utf-8").trim() : null;
+    // semo-core (루트 또는 semo-system 내부)
+    const corePathRoot = path.join(cwd, "semo-core", "VERSION");
+    const corePathSystem = path.join(semoSystemDir, "semo-core", "VERSION");
+    const corePath = fs.existsSync(corePathRoot) ? corePathRoot : corePathSystem;
+
+    if (fs.existsSync(corePath)) {
+      const localCore = fs.readFileSync(corePath, "utf-8").trim();
       const remoteCore = await getRemoteCoreVersion("semo-core");
+      versionInfos.push({
+        name: "semo-core",
+        local: localCore,
+        remote: remoteCore,
+        needsUpdate: remoteCore ? isVersionLower(localCore, remoteCore) : false,
+      });
+    }
 
-      if (localCore) {
-        versionInfos.push({
-          name: "semo-core",
-          local: localCore,
-          remote: remoteCore,
-          needsUpdate: remoteCore ? isVersionLower(localCore, remoteCore) : false,
-        });
-      }
+    // semo-skills (루트 또는 semo-system 내부)
+    const skillsPathRoot = path.join(cwd, "semo-skills", "VERSION");
+    const skillsPathSystem = path.join(semoSystemDir, "semo-skills", "VERSION");
+    const skillsPath = fs.existsSync(skillsPathRoot) ? skillsPathRoot : skillsPathSystem;
 
-      // semo-skills
-      const skillsPath = path.join(cwd, "semo-skills", "VERSION");
-      const localSkills = fs.existsSync(skillsPath) ? fs.readFileSync(skillsPath, "utf-8").trim() : null;
+    if (fs.existsSync(skillsPath)) {
+      const localSkills = fs.readFileSync(skillsPath, "utf-8").trim();
       const remoteSkills = await getRemoteCoreVersion("semo-skills");
+      versionInfos.push({
+        name: "semo-skills",
+        local: localSkills,
+        remote: remoteSkills,
+        needsUpdate: remoteSkills ? isVersionLower(localSkills, remoteSkills) : false,
+      });
+    }
 
-      if (localSkills) {
-        versionInfos.push({
-          name: "semo-skills",
-          local: localSkills,
-          remote: remoteSkills,
-          needsUpdate: remoteSkills ? isVersionLower(localSkills, remoteSkills) : false,
-        });
-      }
-
-      // Extensions (semo-system 내부)
+    // Extensions (semo-system 내부)
+    if (hasSemoSystem) {
       for (const key of Object.keys(EXTENSION_PACKAGES)) {
         const extVersionPath = path.join(semoSystemDir, key, "VERSION");
         if (fs.existsSync(extVersionPath)) {
