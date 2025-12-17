@@ -23,7 +23,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 
-const VERSION = "3.0.14";
+const VERSION = "3.0.17";
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 
 // === 버전 비교 유틸리티 ===
@@ -1980,6 +1980,39 @@ async function setupClaudeMd(cwd: string, extensions: string[], force: boolean) 
     }
   }
 
+  // 4. Orchestrator 참조 경로 결정 (Extension 패키지 우선)
+  // Extension 패키지 중 orchestrator가 있는 첫 번째 패키지를 Primary로 설정
+  let primaryOrchestratorPath = "semo-core/agents/orchestrator/orchestrator.md";
+  const orchestratorPaths: string[] = [];
+
+  for (const pkg of extensions) {
+    const pkgOrchestratorPath = path.join(semoSystemDir, pkg, "agents/orchestrator/orchestrator.md");
+    if (fs.existsSync(pkgOrchestratorPath)) {
+      orchestratorPaths.push(`semo-system/${pkg}/agents/orchestrator/orchestrator.md`);
+      // 첫 번째 Extension 패키지의 orchestrator를 Primary로 설정
+      if (primaryOrchestratorPath === "semo-core/agents/orchestrator/orchestrator.md") {
+        primaryOrchestratorPath = `${pkg}/agents/orchestrator/orchestrator.md`;
+      }
+    }
+  }
+
+  // semo-core orchestrator는 항상 포함
+  orchestratorPaths.unshift("semo-system/semo-core/agents/orchestrator/orchestrator.md");
+
+  // Orchestrator 참조 섹션 생성
+  const orchestratorRefSection = orchestratorPaths.length > 1
+    ? `**Primary Orchestrator**: \`semo-system/${primaryOrchestratorPath}\`
+
+> Extension 패키지가 설치되어 해당 패키지의 Orchestrator를 우선 참조합니다.
+
+**모든 Orchestrator 파일** (라우팅 테이블 병합됨):
+${orchestratorPaths.map(p => `- \`${p}\``).join("\n")}
+
+이 파일들에서 라우팅 테이블, 의도 분류, 메시지 포맷을 확인하세요.`
+    : `**반드시 읽어야 할 파일**: \`semo-system/semo-core/agents/orchestrator/orchestrator.md\`
+
+이 파일에서 라우팅 테이블, 의도 분류, 메시지 포맷을 확인하세요.`;
+
   const claudeMdContent = `# SEMO Project Configuration
 
 > SEMO (Semicolon Orchestrate) - AI Agent Orchestration Framework v${VERSION}
@@ -2009,9 +2042,7 @@ async function setupClaudeMd(cwd: string, extensions: string[], force: boolean) 
 
 ### Orchestrator 참조
 
-**반드시 읽어야 할 파일**: \`semo-system/semo-core/agents/orchestrator/orchestrator.md\`
-
-이 파일에서 라우팅 테이블, 의도 분류, 메시지 포맷을 확인하세요.
+${orchestratorRefSection}
 
 ---
 
