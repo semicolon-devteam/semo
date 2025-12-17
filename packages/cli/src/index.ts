@@ -405,37 +405,134 @@ program
  * 상세 버전 정보 표시 및 업데이트 확인
  */
 async function showVersionInfo(): Promise<void> {
-  console.log(chalk.cyan.bold("\n📦 SEMO CLI 버전 정보\n"));
+  const cwd = process.cwd();
 
-  // 현재 버전 표시
-  console.log(chalk.white(`  현재 버전: ${chalk.green.bold(VERSION)}`));
+  console.log(chalk.cyan.bold("\n📦 SEMO 버전 정보\n"));
 
-  // 최신 버전 확인
-  const spinner = ora("  최신 버전 확인 중...").start();
-  const latestVersion = await getLatestVersion();
-
-  if (latestVersion === null) {
-    spinner.warn("  최신 버전 확인 실패 (네트워크 오류)");
-    console.log(chalk.gray("  npm registry에 접속할 수 없습니다.\n"));
-    return;
+  // 버전 정보 수집
+  interface VersionInfo {
+    name: string;
+    local: string | null;
+    remote: string | null;
+    needsUpdate: boolean;
   }
 
-  spinner.stop();
-  console.log(chalk.white(`  최신 버전: ${chalk.blue.bold(latestVersion)}`));
+  const versionInfos: VersionInfo[] = [];
 
-  // 버전 비교 및 업데이트 권유
-  if (isVersionLower(VERSION, latestVersion)) {
-    console.log();
-    console.log(chalk.yellow.bold("  ⚠️  새로운 버전이 있습니다!"));
-    console.log();
-    console.log(chalk.white("  업데이트 방법:"));
-    console.log(chalk.cyan(`    npm update -g ${PACKAGE_NAME}`));
-    console.log();
-    console.log(chalk.gray("  또는 프로젝트 내 SEMO 업데이트:"));
-    console.log(chalk.gray("    semo update"));
+  // 1. CLI 버전
+  const latestCliVersion = await getLatestVersion();
+  versionInfos.push({
+    name: "semo-cli",
+    local: VERSION,
+    remote: latestCliVersion,
+    needsUpdate: latestCliVersion ? isVersionLower(VERSION, latestCliVersion) : false,
+  });
+
+  // 2. semo-core 버전 (루트 또는 semo-system 내부)
+  const corePathRoot = path.join(cwd, "semo-core", "VERSION");
+  const corePathSystem = path.join(cwd, "semo-system", "semo-core", "VERSION");
+  const corePath = fs.existsSync(corePathRoot) ? corePathRoot : corePathSystem;
+
+  if (fs.existsSync(corePath)) {
+    const localCore = fs.readFileSync(corePath, "utf-8").trim();
+    const remoteCore = await getRemoteCoreVersion("semo-core");
+    versionInfos.push({
+      name: "semo-core",
+      local: localCore,
+      remote: remoteCore,
+      needsUpdate: remoteCore ? isVersionLower(localCore, remoteCore) : false,
+    });
+  }
+
+  // 3. semo-skills 버전 (루트 또는 semo-system 내부)
+  const skillsPathRoot = path.join(cwd, "semo-skills", "VERSION");
+  const skillsPathSystem = path.join(cwd, "semo-system", "semo-skills", "VERSION");
+  const skillsPath = fs.existsSync(skillsPathRoot) ? skillsPathRoot : skillsPathSystem;
+
+  if (fs.existsSync(skillsPath)) {
+    const localSkills = fs.readFileSync(skillsPath, "utf-8").trim();
+    const remoteSkills = await getRemoteCoreVersion("semo-skills");
+    versionInfos.push({
+      name: "semo-skills",
+      local: localSkills,
+      remote: remoteSkills,
+      needsUpdate: remoteSkills ? isVersionLower(localSkills, remoteSkills) : false,
+    });
+  }
+
+  // 4. Extension 패키지들 (semo-system 내부)
+  const semoSystemDir = path.join(cwd, "semo-system");
+  if (fs.existsSync(semoSystemDir)) {
+    for (const key of Object.keys(EXTENSION_PACKAGES)) {
+      const extVersionPath = path.join(semoSystemDir, key, "VERSION");
+      if (fs.existsSync(extVersionPath)) {
+        const localExt = fs.readFileSync(extVersionPath, "utf-8").trim();
+        const remoteExt = await getRemotePackageVersion(key);
+        versionInfos.push({
+          name: key,
+          local: localExt,
+          remote: remoteExt,
+          needsUpdate: remoteExt ? isVersionLower(localExt, remoteExt) : false,
+        });
+      }
+    }
+  }
+
+
+  // 결과 출력
+  const needsUpdateCount = versionInfos.filter(v => v.needsUpdate).length;
+
+  if (versionInfos.length === 1) {
+    // CLI만 있는 경우 (SEMO 미설치)
+    const cli = versionInfos[0];
+    console.log(chalk.white(`  semo-cli: ${chalk.green.bold(cli.local)}`));
+    if (cli.remote) {
+      console.log(chalk.gray(`            (최신: ${cli.remote})`));
+    }
+    if (cli.needsUpdate) {
+      console.log();
+      console.log(chalk.yellow.bold("  ⚠️  CLI 업데이트 가능"));
+      console.log(chalk.cyan(`    npm update -g ${PACKAGE_NAME}`));
+    } else {
+      console.log();
+      console.log(chalk.green("  ✓ 최신 버전"));
+    }
   } else {
-    console.log();
-    console.log(chalk.green("  ✓ 최신 버전을 사용 중입니다."));
+    // 테이블 형식으로 출력
+    console.log(chalk.gray("  ┌────────────────────────┬──────────┬──────────┬────────┐"));
+    console.log(chalk.gray("  │ 패키지                 │ 설치됨   │ 최신     │ 상태   │"));
+    console.log(chalk.gray("  ├────────────────────────┼──────────┼──────────┼────────┤"));
+
+    for (const info of versionInfos) {
+      const name = info.name.padEnd(22);
+      const local = (info.local || "-").padEnd(8);
+      const remote = (info.remote || "-").padEnd(8);
+      const status = info.needsUpdate ? "⬆ 업데이트" : "✓ 최신  ";
+      const statusColor = info.needsUpdate ? chalk.yellow : chalk.green;
+
+      console.log(
+        chalk.gray("  │ ") +
+          chalk.white(name) +
+          chalk.gray(" │ ") +
+          chalk.green(local) +
+          chalk.gray(" │ ") +
+          chalk.blue(remote) +
+          chalk.gray(" │ ") +
+          statusColor(status) +
+          chalk.gray(" │")
+      );
+    }
+
+    console.log(chalk.gray("  └────────────────────────┴──────────┴──────────┴────────┘"));
+
+    if (needsUpdateCount > 0) {
+      console.log();
+      console.log(chalk.yellow.bold(`  ⚠️  ${needsUpdateCount}개 패키지 업데이트 가능`));
+      console.log(chalk.gray("    semo update 명령으로 업데이트하세요."));
+    } else {
+      console.log();
+      console.log(chalk.green("  ✓ 모든 패키지가 최신 버전입니다."));
+    }
   }
 
   console.log();
