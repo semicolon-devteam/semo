@@ -1,6 +1,6 @@
 {
   "name": "@team-semicolon/semo-cli",
-  "version": "3.0.13",
+  "version": "3.0.14",
   "description": "SEMO CLI - AI Agent Orchestration Framework Installer",
   "main": "dist/index.js",
   "bin": {

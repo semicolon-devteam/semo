@@ -59,7 +59,7 @@ const child_process_1 = require("child_process");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
-const VERSION = "3.0.13";
+const VERSION = "3.0.14";
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 // === 버전 비교 유틸리티 ===
 /**
@@ -472,8 +472,16 @@ program
     if (extensionsToInstall.length > 0) {
         await setupExtensionSymlinks(cwd, extensionsToInstall);
     }
+    // 11. 설치 검증
+    const verificationResult = verifyInstallation(cwd, extensionsToInstall);
+    printVerificationResult(verificationResult);
     // 완료 메시지
-    console.log(chalk_1.default.green.bold("\n✅ SEMO 설치 완료!\n"));
+    if (verificationResult.success) {
+        console.log(chalk_1.default.green.bold("\n✅ SEMO 설치 완료!\n"));
+    }
+    else {
+        console.log(chalk_1.default.yellow.bold("\n⚠️ SEMO 설치 완료 (일부 문제 발견)\n"));
+    }
     console.log(chalk_1.default.cyan("설치된 구성:"));
     console.log(chalk_1.default.gray("  [Standard]"));
     console.log(chalk_1.default.gray("    ✓ semo-core (원칙, 오케스트레이터)"));
@@ -592,6 +600,226 @@ async function createStandardSymlinks(cwd) {
     if (fs.existsSync(commandsTarget)) {
         createSymlinkOrJunction(commandsTarget, semoCommandsLink);
         console.log(chalk_1.default.green("  ✓ .claude/commands/SEMO → semo-system/semo-core/commands/SEMO"));
+    }
+}
+/**
+ * 설치 상태를 검증하고 문제점을 리포트
+ */
+function verifyInstallation(cwd, installedExtensions = []) {
+    const claudeDir = path.join(cwd, ".claude");
+    const semoSystemDir = path.join(cwd, "semo-system");
+    const result = {
+        success: true,
+        errors: [],
+        warnings: [],
+        stats: {
+            agents: { expected: 0, linked: 0, broken: 0 },
+            skills: { expected: 0, linked: 0, broken: 0 },
+            commands: { exists: false, valid: false },
+            extensions: [],
+        },
+    };
+    // 1. semo-system 기본 구조 검증
+    if (!fs.existsSync(semoSystemDir)) {
+        result.errors.push("semo-system 디렉토리가 없습니다");
+        result.success = false;
+        return result;
+    }
+    const coreDir = path.join(semoSystemDir, "semo-core");
+    const skillsDir = path.join(semoSystemDir, "semo-skills");
+    if (!fs.existsSync(coreDir)) {
+        result.errors.push("semo-core가 설치되지 않았습니다");
+        result.success = false;
+    }
+    if (!fs.existsSync(skillsDir)) {
+        result.errors.push("semo-skills가 설치되지 않았습니다");
+        result.success = false;
+    }
+    // 2. agents 링크 검증
+    const claudeAgentsDir = path.join(claudeDir, "agents");
+    const coreAgentsDir = path.join(coreDir, "agents");
+    if (fs.existsSync(coreAgentsDir)) {
+        const expectedAgents = fs.readdirSync(coreAgentsDir).filter(f => fs.statSync(path.join(coreAgentsDir, f)).isDirectory());
+        result.stats.agents.expected = expectedAgents.length;
+        if (fs.existsSync(claudeAgentsDir)) {
+            for (const agent of expectedAgents) {
+                const linkPath = path.join(claudeAgentsDir, agent);
+                if (fs.existsSync(linkPath)) {
+                    if (fs.lstatSync(linkPath).isSymbolicLink()) {
+                        try {
+                            fs.readlinkSync(linkPath);
+                            const targetExists = fs.existsSync(linkPath);
+                            if (targetExists) {
+                                result.stats.agents.linked++;
+                            }
+                            else {
+                                result.stats.agents.broken++;
+                                result.warnings.push(`깨진 링크: .claude/agents/${agent}`);
+                            }
+                        }
+                        catch {
+                            result.stats.agents.broken++;
+                        }
+                    }
+                    else {
+                        result.stats.agents.linked++; // 디렉토리로 복사된 경우
+                    }
+                }
+            }
+        }
+    }
+    // 3. skills 링크 검증
+    if (fs.existsSync(skillsDir)) {
+        const expectedSkills = fs.readdirSync(skillsDir).filter(f => fs.statSync(path.join(skillsDir, f)).isDirectory());
+        result.stats.skills.expected = expectedSkills.length;
+        const claudeSkillsDir = path.join(claudeDir, "skills");
+        if (fs.existsSync(claudeSkillsDir)) {
+            for (const skill of expectedSkills) {
+                const linkPath = path.join(claudeSkillsDir, skill);
+                if (fs.existsSync(linkPath)) {
+                    if (fs.lstatSync(linkPath).isSymbolicLink()) {
+                        try {
+                            fs.readlinkSync(linkPath);
+                            const targetExists = fs.existsSync(linkPath);
+                            if (targetExists) {
+                                result.stats.skills.linked++;
+                            }
+                            else {
+                                result.stats.skills.broken++;
+                                result.warnings.push(`깨진 링크: .claude/skills/${skill}`);
+                            }
+                        }
+                        catch {
+                            result.stats.skills.broken++;
+                        }
+                    }
+                    else {
+                        result.stats.skills.linked++;
+                    }
+                }
+            }
+        }
+    }
+    // 4. commands 검증
+    const semoCommandsLink = path.join(claudeDir, "commands", "SEMO");
+    result.stats.commands.exists = fs.existsSync(semoCommandsLink);
+    if (result.stats.commands.exists) {
+        if (fs.lstatSync(semoCommandsLink).isSymbolicLink()) {
+            result.stats.commands.valid = fs.existsSync(semoCommandsLink);
+            if (!result.stats.commands.valid) {
+                result.warnings.push("깨진 링크: .claude/commands/SEMO");
+            }
+        }
+        else {
+            result.stats.commands.valid = true;
+        }
+    }
+    // 5. Extensions 검증
+    for (const ext of installedExtensions) {
+        const extDir = path.join(semoSystemDir, ext);
+        const extResult = { name: ext, valid: true, issues: [] };
+        if (!fs.existsSync(extDir)) {
+            extResult.valid = false;
+            extResult.issues.push("디렉토리 없음");
+        }
+        else {
+            // Extension agents 검증
+            const extAgentsDir = path.join(extDir, "agents");
+            if (fs.existsSync(extAgentsDir)) {
+                const extAgents = fs.readdirSync(extAgentsDir).filter(f => fs.statSync(path.join(extAgentsDir, f)).isDirectory());
+                for (const agent of extAgents) {
+                    const linkPath = path.join(claudeAgentsDir, agent);
+                    if (!fs.existsSync(linkPath)) {
+                        extResult.issues.push(`agent 링크 누락: ${agent}`);
+                    }
+                }
+            }
+            // Extension skills 검증
+            const extSkillsDir = path.join(extDir, "skills");
+            if (fs.existsSync(extSkillsDir)) {
+                const extSkills = fs.readdirSync(extSkillsDir).filter(f => fs.statSync(path.join(extSkillsDir, f)).isDirectory());
+                const claudeSkillsDir = path.join(claudeDir, "skills");
+                for (const skill of extSkills) {
+                    const linkPath = path.join(claudeSkillsDir, skill);
+                    if (!fs.existsSync(linkPath)) {
+                        extResult.issues.push(`skill 링크 누락: ${skill}`);
+                    }
+                }
+            }
+        }
+        if (extResult.issues.length > 0) {
+            extResult.valid = false;
+        }
+        result.stats.extensions.push(extResult);
+    }
+    // 6. 최종 성공 여부 판단
+    if (result.stats.agents.expected > 0 && result.stats.agents.linked === 0) {
+        result.errors.push("agents가 하나도 링크되지 않았습니다");
+        result.success = false;
+    }
+    if (result.stats.skills.expected > 0 && result.stats.skills.linked === 0) {
+        result.errors.push("skills가 하나도 링크되지 않았습니다");
+        result.success = false;
+    }
+    if (!result.stats.commands.exists) {
+        result.errors.push("commands/SEMO가 설치되지 않았습니다");
+        result.success = false;
+    }
+    // 부분 누락 경고
+    if (result.stats.agents.linked < result.stats.agents.expected) {
+        const missing = result.stats.agents.expected - result.stats.agents.linked;
+        result.warnings.push(`${missing}개 agent 링크 누락`);
+    }
+    if (result.stats.skills.linked < result.stats.skills.expected) {
+        const missing = result.stats.skills.expected - result.stats.skills.linked;
+        result.warnings.push(`${missing}개 skill 링크 누락`);
+    }
+    return result;
+}
+/**
+ * 검증 결과를 콘솔에 출력
+ */
+function printVerificationResult(result) {
+    console.log(chalk_1.default.cyan("\n🔍 설치 검증"));
+    // Stats
+    const agentStatus = result.stats.agents.linked === result.stats.agents.expected
+        ? chalk_1.default.green("✓")
+        : (result.stats.agents.linked > 0 ? chalk_1.default.yellow("△") : chalk_1.default.red("✗"));
+    const skillStatus = result.stats.skills.linked === result.stats.skills.expected
+        ? chalk_1.default.green("✓")
+        : (result.stats.skills.linked > 0 ? chalk_1.default.yellow("△") : chalk_1.default.red("✗"));
+    const cmdStatus = result.stats.commands.valid ? chalk_1.default.green("✓") : chalk_1.default.red("✗");
+    console.log(`  ${agentStatus} agents: ${result.stats.agents.linked}/${result.stats.agents.expected}` +
+        (result.stats.agents.broken > 0 ? chalk_1.default.red(` (깨진 링크: ${result.stats.agents.broken})`) : ""));
+    console.log(`  ${skillStatus} skills: ${result.stats.skills.linked}/${result.stats.skills.expected}` +
+        (result.stats.skills.broken > 0 ? chalk_1.default.red(` (깨진 링크: ${result.stats.skills.broken})`) : ""));
+    console.log(`  ${cmdStatus} commands/SEMO`);
+    // Extensions
+    for (const ext of result.stats.extensions) {
+        const extStatus = ext.valid ? chalk_1.default.green("✓") : chalk_1.default.yellow("△");
+        console.log(`  ${extStatus} ${ext.name}` +
+            (ext.issues.length > 0 ? chalk_1.default.gray(` (${ext.issues.length}개 이슈)`) : ""));
+    }
+    // Warnings
+    if (result.warnings.length > 0) {
+        console.log(chalk_1.default.yellow("\n  ⚠️  경고:"));
+        result.warnings.forEach(w => console.log(chalk_1.default.yellow(`     - ${w}`)));
+    }
+    // Errors
+    if (result.errors.length > 0) {
+        console.log(chalk_1.default.red("\n  ❌ 오류:"));
+        result.errors.forEach(e => console.log(chalk_1.default.red(`     - ${e}`)));
+    }
+    // Final status
+    if (result.success && result.warnings.length === 0) {
+        console.log(chalk_1.default.green.bold("\n  ✅ 설치 검증 완료 - 모든 항목 정상"));
+    }
+    else if (result.success) {
+        console.log(chalk_1.default.yellow.bold("\n  ⚠️  설치 완료 - 일부 경고 확인 필요"));
+    }
+    else {
+        console.log(chalk_1.default.red.bold("\n  ❌ 설치 검증 실패 - 오류 확인 필요"));
+        console.log(chalk_1.default.gray("     'semo init --force'로 재설치하거나 수동으로 문제를 해결하세요."));
     }
 }
 // === Extensions 다운로드 (심볼릭 링크 제외) ===
@@ -1914,7 +2142,15 @@ program
             }
         }
     }
-    console.log(chalk_1.default.green.bold("\n✅ SEMO 업데이트 완료!\n"));
+    // === 설치 검증 ===
+    const verificationResult = verifyInstallation(cwd, installedExtensions);
+    printVerificationResult(verificationResult);
+    if (verificationResult.success) {
+        console.log(chalk_1.default.green.bold("\n✅ SEMO 업데이트 완료!\n"));
+    }
+    else {
+        console.log(chalk_1.default.yellow.bold("\n⚠️ SEMO 업데이트 완료 (일부 문제 발견)\n"));
+    }
 });
 // === -v 옵션 처리 (program.parse 전에 직접 처리) ===
 async function main() {
