@@ -72,6 +72,156 @@ function isVersionLower(current: string, latest: string): boolean {
   return false;
 }
 
+/**
+ * GitHub raw URL에서 패키지 버전 가져오기
+ */
+async function getRemotePackageVersion(packagePath: string): Promise<string | null> {
+  try {
+    const url = `https://raw.githubusercontent.com/semicolon-devteam/semo/main/packages/${packagePath}/VERSION`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) return null;
+    const version = await response.text();
+    return version.trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * semo-core/semo-skills 원격 버전 가져오기
+ */
+async function getRemoteCoreVersion(type: "semo-core" | "semo-skills"): Promise<string | null> {
+  try {
+    const url = `https://raw.githubusercontent.com/semicolon-devteam/semo/main/${type}/VERSION`;
+    const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
+    if (!response.ok) return null;
+    const version = await response.text();
+    return version.trim();
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * init/update 시작 시 버전 비교 결과 출력
+ */
+async function showVersionComparison(cwd: string): Promise<void> {
+  console.log(chalk.cyan("📊 버전 확인\n"));
+
+  const spinner = ora("  버전 정보 조회 중...").start();
+
+  try {
+    // 1. CLI 버전 비교
+    const currentCliVersion = VERSION;
+    const latestCliVersion = await getLatestVersion();
+
+    // 2. semo-core, semo-skills 버전 비교
+    const semoSystemDir = path.join(cwd, "semo-system");
+    const hasSemoSystem = fs.existsSync(semoSystemDir);
+
+    interface VersionInfo {
+      name: string;
+      local: string | null;
+      remote: string | null;
+      needsUpdate: boolean;
+    }
+
+    const versionInfos: VersionInfo[] = [];
+
+    // CLI
+    versionInfos.push({
+      name: "semo-cli (npm)",
+      local: currentCliVersion,
+      remote: latestCliVersion,
+      needsUpdate: latestCliVersion ? isVersionLower(currentCliVersion, latestCliVersion) : false,
+    });
+
+    if (hasSemoSystem) {
+      // semo-core는 semo-system 바깥에 있음
+      const corePath = path.join(cwd, "semo-core", "VERSION");
+      const localCore = fs.existsSync(corePath) ? fs.readFileSync(corePath, "utf-8").trim() : null;
+      const remoteCore = await getRemoteCoreVersion("semo-core");
+
+      if (localCore) {
+        versionInfos.push({
+          name: "semo-core",
+          local: localCore,
+          remote: remoteCore,
+          needsUpdate: remoteCore ? isVersionLower(localCore, remoteCore) : false,
+        });
+      }
+
+      // semo-skills
+      const skillsPath = path.join(cwd, "semo-skills", "VERSION");
+      const localSkills = fs.existsSync(skillsPath) ? fs.readFileSync(skillsPath, "utf-8").trim() : null;
+      const remoteSkills = await getRemoteCoreVersion("semo-skills");
+
+      if (localSkills) {
+        versionInfos.push({
+          name: "semo-skills",
+          local: localSkills,
+          remote: remoteSkills,
+          needsUpdate: remoteSkills ? isVersionLower(localSkills, remoteSkills) : false,
+        });
+      }
+
+      // Extensions (semo-system 내부)
+      for (const key of Object.keys(EXTENSION_PACKAGES)) {
+        const extVersionPath = path.join(semoSystemDir, key, "VERSION");
+        if (fs.existsSync(extVersionPath)) {
+          const localExt = fs.readFileSync(extVersionPath, "utf-8").trim();
+          const remoteExt = await getRemotePackageVersion(key);
+
+          versionInfos.push({
+            name: key,
+            local: localExt,
+            remote: remoteExt,
+            needsUpdate: remoteExt ? isVersionLower(localExt, remoteExt) : false,
+          });
+        }
+      }
+    }
+
+    spinner.stop();
+
+    // 결과 출력
+    const needsUpdateCount = versionInfos.filter(v => v.needsUpdate).length;
+
+    console.log(chalk.gray("  ┌────────────────────────┬──────────┬──────────┬────────┐"));
+    console.log(chalk.gray("  │ 패키지                 │ 설치됨   │ 최신     │ 상태   │"));
+    console.log(chalk.gray("  ├────────────────────────┼──────────┼──────────┼────────┤"));
+
+    for (const info of versionInfos) {
+      const name = info.name.padEnd(22);
+      const local = (info.local || "-").padEnd(8);
+      const remote = (info.remote || "-").padEnd(8);
+      const status = info.needsUpdate
+        ? chalk.yellow("⬆ 업데이트")
+        : chalk.green("✓ 최신");
+
+      if (info.needsUpdate) {
+        console.log(chalk.yellow(`  │ ${name} │ ${local} │ ${remote} │ ${status} │`));
+      } else {
+        console.log(chalk.gray(`  │ ${name} │ ${local} │ ${remote} │ `) + status + chalk.gray(" │"));
+      }
+    }
+
+    console.log(chalk.gray("  └────────────────────────┴──────────┴──────────┴────────┘"));
+
+    if (needsUpdateCount > 0) {
+      console.log(chalk.yellow(`\n  ⚠ ${needsUpdateCount}개 패키지 업데이트 가능`));
+    } else {
+      console.log(chalk.green("\n  ✓ 모든 패키지가 최신 버전입니다"));
+    }
+
+    console.log("");
+  } catch (error) {
+    spinner.fail("  버전 정보 조회 실패");
+    console.log(chalk.gray(`     ${error}`));
+    console.log("");
+  }
+}
+
 // === Windows 지원 유틸리티 ===
 const isWindows = os.platform() === "win32";
 
@@ -440,7 +590,10 @@ program
 
     const cwd = process.cwd();
 
-    // 0. 필수 도구 확인
+    // 0. 버전 비교
+    await showVersionComparison(cwd);
+
+    // 1. 필수 도구 확인
     const shouldContinue = await showToolsStatus();
     if (!shouldContinue) {
       console.log(chalk.yellow("\n설치가 취소되었습니다. 필수 도구 설치 후 다시 시도하세요.\n"));
@@ -2206,6 +2359,9 @@ program
     const cwd = process.cwd();
     const semoSystemDir = path.join(cwd, "semo-system");
     const claudeDir = path.join(cwd, ".claude");
+
+    // 0. 버전 비교
+    await showVersionComparison(cwd);
 
     // --only 옵션 파싱
     const onlyPackages: string[] = options.only
