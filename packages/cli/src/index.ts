@@ -80,6 +80,20 @@ const isWindows = os.platform() === "win32";
  * Junction은 관리자 권한 없이 디렉토리 링크를 생성할 수 있음
  */
 function createSymlinkOrJunction(targetPath: string, linkPath: string): void {
+  // 이미 존재하는 링크/파일 제거 (깨진 심볼릭 링크도 처리)
+  try {
+    const stats = fs.lstatSync(linkPath);
+    if (stats.isSymbolicLink() || stats.isFile() || stats.isDirectory()) {
+      try {
+        fs.unlinkSync(linkPath);
+      } catch {
+        removeRecursive(linkPath);
+      }
+    }
+  } catch {
+    // 파일이 존재하지 않음 - 정상
+  }
+
   if (isWindows) {
     // Windows: Junction 사용 (절대 경로 필요)
     const absoluteTarget = path.resolve(targetPath);
