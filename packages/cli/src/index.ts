@@ -23,7 +23,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 
-const VERSION = "3.0.12";
+const VERSION = "3.0.13";
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 
 // === 버전 비교 유틸리티 ===
@@ -1921,6 +1921,7 @@ program
   .option("--self", "CLI만 업데이트")
   .option("--system", "semo-system만 업데이트")
   .option("--skip-cli", "CLI 업데이트 건너뛰기")
+  .option("--only <packages>", "특정 패키지만 업데이트 (쉼표 구분: semo-core,semo-skills,biz/management)")
   .action(async (options) => {
     console.log(chalk.cyan.bold("\n🔄 SEMO 업데이트\n"));
 
@@ -1928,8 +1929,14 @@ program
     const semoSystemDir = path.join(cwd, "semo-system");
     const claudeDir = path.join(cwd, ".claude");
 
+    // --only 옵션 파싱
+    const onlyPackages: string[] = options.only
+      ? options.only.split(",").map((p: string) => p.trim())
+      : [];
+    const isSelectiveUpdate = onlyPackages.length > 0;
+
     // === 1. CLI 자체 업데이트 ===
-    if (options.self || (!options.system && !options.skipCli)) {
+    if (options.self || (!options.system && !options.skipCli && !isSelectiveUpdate)) {
       console.log(chalk.cyan("📦 CLI 업데이트"));
       const cliSpinner = ora("  @team-semicolon/semo-cli 업데이트 중...").start();
 
@@ -1968,13 +1975,27 @@ program
       }
     }
 
+    // 업데이트 대상 결정
+    const updateSemoCore = !isSelectiveUpdate || onlyPackages.includes("semo-core");
+    const updateSemoSkills = !isSelectiveUpdate || onlyPackages.includes("semo-skills");
+    const extensionsToUpdate = isSelectiveUpdate
+      ? installedExtensions.filter(ext => onlyPackages.includes(ext))
+      : installedExtensions;
+
     console.log(chalk.cyan("\n📚 semo-system 업데이트"));
     console.log(chalk.gray("  대상:"));
-    console.log(chalk.gray("    - semo-core"));
-    console.log(chalk.gray("    - semo-skills"));
-    installedExtensions.forEach(pkg => {
+    if (updateSemoCore) console.log(chalk.gray("    - semo-core"));
+    if (updateSemoSkills) console.log(chalk.gray("    - semo-skills"));
+    extensionsToUpdate.forEach(pkg => {
       console.log(chalk.gray(`    - ${pkg}`));
     });
+
+    if (!updateSemoCore && !updateSemoSkills && extensionsToUpdate.length === 0) {
+      console.log(chalk.yellow("\n  ⚠️ 업데이트할 패키지가 없습니다."));
+      console.log(chalk.gray("     설치된 패키지: semo-core, semo-skills" +
+        (installedExtensions.length > 0 ? ", " + installedExtensions.join(", ") : "")));
+      return;
+    }
 
     const spinner = ora("\n  최신 버전 다운로드 중...").start();
 
@@ -1983,14 +2004,18 @@ program
       removeRecursive(tempDir);
       execSync(`git clone --depth 1 ${SEMO_REPO} "${tempDir}"`, { stdio: "pipe" });
 
-      // Standard 업데이트
-      removeRecursive(path.join(semoSystemDir, "semo-core"));
-      removeRecursive(path.join(semoSystemDir, "semo-skills"));
-      copyRecursive(path.join(tempDir, "semo-core"), path.join(semoSystemDir, "semo-core"));
-      copyRecursive(path.join(tempDir, "semo-skills"), path.join(semoSystemDir, "semo-skills"));
+      // Standard 업데이트 (선택적)
+      if (updateSemoCore) {
+        removeRecursive(path.join(semoSystemDir, "semo-core"));
+        copyRecursive(path.join(tempDir, "semo-core"), path.join(semoSystemDir, "semo-core"));
+      }
+      if (updateSemoSkills) {
+        removeRecursive(path.join(semoSystemDir, "semo-skills"));
+        copyRecursive(path.join(tempDir, "semo-skills"), path.join(semoSystemDir, "semo-skills"));
+      }
 
-      // Extensions 업데이트
-      for (const pkg of installedExtensions) {
+      // Extensions 업데이트 (선택적)
+      for (const pkg of extensionsToUpdate) {
         const srcPath = path.join(tempDir, "packages", pkg);
         const destPath = path.join(semoSystemDir, pkg);
         if (fs.existsSync(srcPath)) {
