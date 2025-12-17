@@ -7,7 +7,7 @@ tools: [Read, Glob, Grep]
 model: inherit
 ---
 
-> **시스템 메시지**: `[SEMO] Skill: planner 호출`
+> **🔔 호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: planner` 시스템 메시지를 첫 줄에 출력하세요.
 
 # planner Skill
 

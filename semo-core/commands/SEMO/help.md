@@ -12,10 +12,9 @@ SEMO 도움말을 표시합니다.
 | 커맨드 | 설명 |
 |--------|------|
 | `/SEMO:help` | 이 도움말 |
-| `/SEMO:slack` | Slack 메시지 전송 |
 | `/SEMO:feedback` | 피드백 제출 |
-| `/SEMO:health` | 환경 검증 |
 | `/SEMO:update` | SEMO 업데이트 |
+| `/SEMO:onboarding` | 온보딩 가이드 |
 
 ## 기본 사용법
 
@@ -24,6 +23,7 @@ SEMO 도움말을 표시합니다.
 - "로그인 기능 만들어줘" → coder skill
 - "테스트 작성해줘" → tester skill
 - "슬랙에 알려줘" → notify-slack skill
+- "피드백 등록해줘" → feedback skill
 
 ## 구조
 

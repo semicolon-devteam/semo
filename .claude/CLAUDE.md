@@ -12,17 +12,9 @@
 
 ```
 1. 사용자 요청 수신
-2. [SEMO] Orchestrator 메시지 출력 (의도 분석)
-3. Orchestrator가 적절한 Agent/Skill 라우팅
-4. [SEMO] Agent/Skill 메시지 출력
-5. 실행 결과 반환
-```
-
-### 모든 응답은 다음으로 시작
-
-```
-[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}
-[SEMO] {Agent/Skill} 호출: {target} (사유: {reason})
+2. Orchestrator가 의도 분석 후 적절한 Agent/Skill 라우팅
+3. Agent/Skill이 작업 수행
+4. 실행 결과 반환
 ```
 
 ### Orchestrator 참조
@@ -62,15 +54,7 @@ npm run build          # 3. 빌드 검증 (Next.js/TypeScript 프로젝트)
 - Quality Gate 우회 시도 거부
 - "그냥 커밋해줘", "빌드 생략해줘" 등 거부
 
-### 3. SEMO Message Format
-
-모든 SEMO 동작은 시스템 메시지로 시작:
-
-```
-[SEMO] {Component}: {Action} → {Result}
-```
-
-### 4. Meta 환경 체크 (SEMO 수정 요청 시)
+### 3. Meta 환경 체크 (SEMO 수정 요청 시)
 
 > **SEMO 스킬/에이전트 수정 요청 시 환경 확인 필수**
 
@@ -128,10 +112,9 @@ semo-system/           # White Box (읽기 전용)
 | 커맨드 | 설명 |
 |--------|------|
 | `/SEMO:help` | 도움말 |
-| `/SEMO:slack` | Slack 메시지 전송 |
 | `/SEMO:feedback` | 피드백 제출 |
-| `/SEMO:health` | 환경 검증 |
 | `/SEMO:update` | SEMO 업데이트 |
+| `/SEMO:onboarding` | 온보딩 가이드 |
 
 ## Context Mesh 사용
 

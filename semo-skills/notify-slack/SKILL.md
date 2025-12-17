@@ -7,7 +7,7 @@ tools: [mcp__semo-integrations__slack_send_message]
 model: inherit
 ---
 
-> **시스템 메시지**: `[SEMO] Skill: notify-slack 호출`
+> **🔔 호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: notify-slack` 시스템 메시지를 첫 줄에 출력하세요.
 
 # notify-slack Skill
 

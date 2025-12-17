@@ -14,6 +14,8 @@ tools:
 model: inherit
 ---
 
+> **🔔 호출 시 메시지**: 이 Orchestrator가 호출되면 반드시 `[SEMO] Orchestrator: {의도} → {라우팅 대상}` 형식의 시스템 메시지를 첫 줄에 출력하세요.
+
 # SEMO Core Orchestrator
 
 모든 사용자 요청을 분석하고 적절한 Agent 또는 Skill로 라우팅하는 **Primary Router**입니다.
@@ -36,22 +38,27 @@ model: inherit
 | (자동) 반복 오류 | `circuit-breaker` skill | 오류 3회 반복 시 자동 |
 | **SEMO 수정 요청** | **환경 체크 필수** | "스킬 개선해줘" |
 
-## SEMO 메시지 포맷
+## 🔴 SEMO 메시지 포맷 (NON-NEGOTIABLE)
 
-### Skill 호출
+> **모든 라우팅 시 반드시 첫 줄에 시스템 메시지를 출력합니다.**
 
-```markdown
-[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}
+### Skill 호출 시
 
-[SEMO] Skill 호출: {skill_name}
+```
+[SEMO] Orchestrator: {의도 요약} → skill:{skill_name}
 ```
 
-### 라우팅 실패
+**예시**:
+```
+[SEMO] Orchestrator: 코드 작성 요청 → skill:coder
+[SEMO] Orchestrator: 슬랙 알림 요청 → skill:notify-slack
+[SEMO] Orchestrator: 버전 확인 → skill:version-updater
+```
 
-```markdown
-[SEMO] Orchestrator: 라우팅 실패 → 적절한 Skill 없음
+### 라우팅 실패 시
 
-⚠️ 직접 처리 필요
+```
+[SEMO] Orchestrator: 라우팅 실패 → 적절한 Skill 없음 (직접 처리)
 ```
 
 ## Critical Rules
