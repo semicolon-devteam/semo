@@ -13,12 +13,22 @@ model: inherit
 
 > GitHub Projects Status 필드 변경
 
+## 🔴 필수 참조 파일
+
+**반드시 먼저 읽을 파일**: `.claude/memory/projects.md`
+
+이 파일에서 다음 정보를 확인합니다:
+- GitHub Projects 설정 (Project ID, Number)
+- Status 옵션 및 Option ID
+- **상태값 Alias** (사용자 입력 → Status 값 매핑)
+
 ## Trigger Keywords
 
 - "상태 변경해줘", "Status 바꿔줘"
 - "#123 작업중으로 변경해줘"
 - "Epic #78 완료 처리해줘"
 - "차곡 Epic들 전부 작업중으로 변경해줘"
+- "리뷰요청 이슈들 테스트중으로 바꿔줘"
 
 ## 권한 요구사항
 
@@ -156,10 +166,29 @@ done
 
 ## Configuration
 
+> **⚠️ 아래 값은 예시입니다. 실제 값은 `.claude/memory/projects.md`에서 확인하세요.**
+
 ```
-Project ID: PVT_kwDOC01-Rc4AtDz2 (이슈관리)
-Organization: semicolon-devteam
-Project Number: 1
+Project ID: .claude/memory/projects.md 참조
+Organization: .claude/memory/projects.md 참조
+Project Number: .claude/memory/projects.md 참조
+```
+
+## 상태값 Alias 사용
+
+사용자가 "리뷰요청", "테스트중" 등의 한글/영문 키워드를 사용하면,
+`.claude/memory/projects.md`의 **상태값 Alias** 테이블을 참조하여
+실제 Status 필드값으로 매핑합니다.
+
+**예시:**
+```
+입력: "리뷰요청 이슈들 테스트중으로 바꿔줘"
+
+1. projects.md 읽기
+2. "리뷰요청" → Status "리뷰요청" 매핑
+3. "테스트중" → Status "테스트중" 매핑
+4. 해당 Status의 이슈들 조회
+5. Status 변경 실행
 ```
 
 ## References

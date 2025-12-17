@@ -58,17 +58,34 @@
 |----------|----------|------|
 | `packages/cli/**` | @team-semicolon/semo-cli | `deploy-npm` |
 | `packages/mcp-server/**` | @team-semicolon/semo-mcp | `deploy-npm` |
-| `semo-core/**`, `semo-skills/**` | Git push only | - |
-| `packages/meta/**` | Git push only | - |
+| `semo-core/**`, `semo-skills/**` | **@team-semicolon/semo-cli** | `deploy-npm` |
+| `packages/{biz,eng,ops}/**` | **@team-semicolon/semo-cli** | `deploy-npm` |
+| `packages/meta/**` | **@team-semicolon/semo-cli** | `deploy-npm` |
 
-### 🔴 필수 동작 순서 (CLI/MCP 변경 시)
+> **⚠️ 중요**: CLI 코드 변경이 없더라도, semo-core/semo-skills/packages 변경 시 **반드시 CLI 버전을 올려서 npm publish** 해야 합니다.
+> 이는 사용자가 `semo version`으로 업데이트 여부를 확인할 수 있게 하기 위함입니다.
+
+### 🔴 단일 버전 정책 (Single Version Policy)
+
+> **SEMO의 모든 구성요소는 CLI 버전으로 통합 관리됩니다.**
+
+```
+CLI 버전 = semo-core 버전 = semo-skills 버전 = packages 버전
+```
+
+**이유**:
+1. 사용자가 `semo version`으로 업데이트 여부를 쉽게 확인
+2. `semo update` 실행 시 모든 구성요소가 동기화됨
+3. 버전 불일치로 인한 혼란 방지
+
+### 🔴 필수 동작 순서 (모든 SEMO 변경 시)
 
 ```text
 1. 작업 완료
    ↓
-2. [SEMO] Skill 호출: deploy-npm
+2. [SEMO] Skill 호출: deploy-npm (대상: packages/cli)
    ↓
-3. (deploy-npm에 의해) 버전 범프 (package.json)
+3. (deploy-npm에 의해) CLI 버전 범프 (package.json + index.ts)
    ↓
 4. (deploy-npm에 의해) 빌드 (npm run build)
    ↓
@@ -79,17 +96,7 @@
 7. (deploy-npm에 의해) 슬랙 알림
 ```
 
-### 🔴 필수 동작 순서 (Core/Skills/Meta 변경 시)
-
-```text
-1. 작업 완료
-   ↓
-2. 커밋 + 푸시 (직접 실행)
-   ↓
-3. 슬랙 알림 (선택)
-```
-
-> **예외 없음**: 커밋/푸시 없이는 작업 완료로 간주하지 않습니다.
+> **예외 없음**: npm publish 없이는 SEMO 작업 완료로 간주하지 않습니다.
 
 ---
 

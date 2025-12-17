@@ -23,7 +23,7 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 
-const VERSION = "3.0.8";
+const VERSION = "3.0.12";
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 
 // === 버전 비교 유틸리티 ===
@@ -311,6 +311,21 @@ function detectProjectType(cwd: string): string[] {
   return detected;
 }
 
+// === 설치된 Extension 패키지 스캔 ===
+function getInstalledExtensions(cwd: string): string[] {
+  const semoSystemDir = path.join(cwd, "semo-system");
+  const installed: string[] = [];
+
+  for (const key of Object.keys(EXTENSION_PACKAGES)) {
+    const pkgPath = path.join(semoSystemDir, key);
+    if (fs.existsSync(pkgPath)) {
+      installed.push(key);
+    }
+  }
+
+  return installed;
+}
+
 // === 필수 도구 확인 ===
 interface ToolCheckResult {
   name: string;
@@ -403,6 +418,7 @@ program
   .description("현재 프로젝트에 SEMO를 설치합니다")
   .option("-f, --force", "기존 설정 덮어쓰기")
   .option("--skip-mcp", "MCP 설정 생략")
+  .option("--no-gitignore", ".gitignore 수정 생략")
   .option("--with <packages>", "추가 설치할 패키지 (쉼표 구분: next,backend)")
   .action(async (options) => {
     console.log(chalk.cyan.bold("\n🚀 SEMO 설치 시작\n"));
@@ -476,10 +492,15 @@ program
     // 7. Context Mesh 초기화
     await setupContextMesh(cwd);
 
-    // 8. CLAUDE.md 생성
+    // 8. .gitignore 업데이트
+    if (options.gitignore !== false) {
+      updateGitignore(cwd);
+    }
+
+    // 9. CLAUDE.md 생성
     await setupClaudeMd(cwd, extensionsToInstall, options.force);
 
-    // 9. Extensions 심볼릭 링크 (agents/skills 병합)
+    // 10. Extensions 심볼릭 링크 (agents/skills 병합)
     if (extensionsToInstall.length > 0) {
       await setupExtensionSymlinks(cwd, extensionsToInstall);
     }
@@ -1265,6 +1286,38 @@ async function mergeExtensionSettings(cwd: string, packages: string[]) {
   }
 }
 
+// === .gitignore 업데이트 ===
+function updateGitignore(cwd: string) {
+  console.log(chalk.cyan("\n📝 .gitignore 업데이트"));
+
+  const gitignorePath = path.join(cwd, ".gitignore");
+
+  const semoIgnoreBlock = `
+# === SEMO ===
+.claude/*
+!.claude/memory/
+!.claude/memory/**
+`;
+
+  if (fs.existsSync(gitignorePath)) {
+    const content = fs.readFileSync(gitignorePath, "utf-8");
+
+    // 이미 SEMO 블록이 있으면 스킵
+    if (content.includes("# === SEMO ===")) {
+      console.log(chalk.gray("  → SEMO 블록 이미 존재 (건너뜀)"));
+      return;
+    }
+
+    // 기존 파일에 추가
+    fs.appendFileSync(gitignorePath, semoIgnoreBlock);
+    console.log(chalk.green("✓ .gitignore에 SEMO 규칙 추가됨"));
+  } else {
+    // 새로 생성
+    fs.writeFileSync(gitignorePath, semoIgnoreBlock.trim() + "\n");
+    console.log(chalk.green("✓ .gitignore 생성됨 (SEMO 규칙 포함)"));
+  }
+}
+
 // === Context Mesh 초기화 ===
 async function setupContextMesh(cwd: string) {
   console.log(chalk.cyan("\n🧠 Context Mesh 초기화"));
@@ -1347,6 +1400,70 @@ _아직 기록된 결정이 없습니다._
 `;
     fs.writeFileSync(decisionsPath, decisionsContent);
     console.log(chalk.green("✓ .claude/memory/decisions.md 생성됨"));
+  }
+
+  // projects.md
+  const projectsPath = path.join(memoryDir, "projects.md");
+  if (!fs.existsSync(projectsPath)) {
+    const projectsContent = `# 프로젝트 별칭 매핑
+
+> 외부 프로젝트 배포 및 GitHub Projects 상태 관리
+> SEMO의 deployer, project-status 스킬이 이 파일을 참조합니다.
+
+---
+
+## GitHub Projects 설정
+
+> **⚠️ 프로젝트 상태 관리 시 이 설정을 참조합니다.**
+
+### 기본 프로젝트
+
+| 프로젝트 | 번호 | Project ID | 용도 |
+|---------|------|------------|------|
+| 이슈관리 | #1 | \`PVT_xxx\` | 메인 태스크 관리 (기본값) |
+
+### Status 옵션
+
+| Status | 설명 |
+|--------|------|
+| 백로그 | 초기 상태 |
+| 작업중 | 개발 진행 중 |
+| 리뷰요청 | 코드 리뷰 대기 |
+| 테스트중 | QA 테스트 단계 |
+| 완료 | 작업 완료 |
+
+### 🔴 상태값 Alias (한글 ↔ 영문)
+
+> **SEMO는 아래 키워드를 자동으로 Status 필드값으로 매핑합니다.**
+
+| 사용자 입력 | → Status 값 | 비고 |
+|------------|-------------|------|
+| 리뷰요청, 리뷰 요청, review | 리뷰요청 | 코드 리뷰 대기 |
+| 테스트중, 테스트 중, testing, qa | 테스트중 | QA 단계 |
+| 작업중, 작업 중, 진행중, in progress, wip | 작업중 | 개발 중 |
+| 완료, done, closed | 완료 | 완료 처리 |
+| 백로그, 대기, pending, backlog | 백로그 | 초기 상태 |
+
+**예시:**
+\`\`\`
+"리뷰요청 이슈들 테스트중으로 바꿔줘"
+→ Status == "리뷰요청" 인 항목들을 Status = "테스트중" 으로 변경
+\`\`\`
+
+---
+
+## 프로젝트 별칭
+
+| 별칭 | 레포지토리 | 환경 | 배포 방법 |
+|------|-----------|------|----------|
+| 예시 | owner/repo | stg | Milestone close |
+
+---
+
+*마지막 업데이트: ${new Date().toISOString().split("T")[0]}*
+`;
+    fs.writeFileSync(projectsPath, projectsContent);
+    console.log(chalk.green("✓ .claude/memory/projects.md 생성됨"));
   }
 
   // rules 디렉토리
@@ -1619,7 +1736,10 @@ program
       console.log();
     }
 
-    // 이미 설치된 패키지 확인
+    // 기존에 설치된 모든 Extension 패키지 스캔
+    const previouslyInstalled = getInstalledExtensions(cwd);
+
+    // 요청한 패키지 중 이미 설치된 것과 새로 설치할 것 분류
     const alreadyInstalled: string[] = [];
     const toInstall: string[] = [];
 
@@ -1651,8 +1771,8 @@ program
     // 2. settings.json 병합
     await mergeExtensionSettings(cwd, toInstall);
 
-    // 3. 심볼릭 링크 설정 (모든 설치된 패키지 포함하여 orchestrator 병합)
-    const allInstalledPackages = [...new Set([...alreadyInstalled, ...toInstall])];
+    // 3. 심볼릭 링크 설정 (기존 + 새로 설치한 모든 패키지 포함)
+    const allInstalledPackages = [...new Set([...previouslyInstalled, ...toInstall])];
     await setupExtensionSymlinks(cwd, allInstalledPackages);
 
     // 4. CLAUDE.md 재생성 (모든 설치된 패키지 반영)
