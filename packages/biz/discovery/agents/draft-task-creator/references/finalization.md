@@ -26,6 +26,32 @@ gh api graphql -f query='
 
 > **Note**: `PVT_kwDOCr2fqM4A0TQd`는 semicolon-devteam의 `이슈관리` Projects (#1) ID입니다.
 
+## 1.5 GitHub Issue Type 설정 (필수)
+
+**모든 Draft Task에 Issue Type을 'Task'로 설정합니다.**
+
+```bash
+# Issue Type: Task 설정
+ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/{repo}/issues/{issue_number} --jq '.node_id')
+
+gh api graphql -f query='
+  mutation {
+    updateIssue(input: {
+      id: "'"$ISSUE_NODE_ID"'"
+      issueTypeId: "IT_kwDOC01-Rc4BdOub"
+    }) {
+      issue { id title }
+    }
+  }
+'
+```
+
+> **Issue Type ID Reference**:
+> - Task: `IT_kwDOC01-Rc4BdOub`
+> - Bug: `IT_kwDOC01-Rc4BdOuc`
+> - Feature: `IT_kwDOC01-Rc4BdOud`
+> - Epic: `IT_kwDOC01-Rc4BvVz5`
+
 ## 2. GitHub Projects Field Update
 
 For each Draft Task:
@@ -76,6 +102,7 @@ Check required items:
 - [ ] draft label
 - [ ] Epic Sub-issue relationship
 - [ ] **Projects 등록** (이슈관리 #1)
+- [ ] **Issue Type = Task** (GitHub Issue Type)
 
 **If validation fails**:
 - Fill missing items
