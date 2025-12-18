@@ -372,16 +372,23 @@ const EXTENSION_PACKAGES: Record<string, { name: string; desc: string; detect: s
   meta: { name: "Meta", desc: "SEMO 프레임워크 자체 개발/관리", layer: "meta", detect: ["semo-core", "semo-skills"] },
 };
 
-// 레거시 패키지 → 새 패키지 매핑 (하위호환성)
-const LEGACY_MAPPING: Record<string, string> = {
-  next: "eng/nextjs",
-  backend: "eng/spring",
+// 단축명 → 전체 패키지 경로 매핑
+const SHORTNAME_MAPPING: Record<string, string> = {
+  // 하위 패키지명 단축 (discovery → biz/discovery)
+  discovery: "biz/discovery",
+  design: "biz/design",
+  management: "biz/management",
+  poc: "biz/poc",
+  nextjs: "eng/nextjs",
+  spring: "eng/spring",
   ms: "eng/ms",
   infra: "eng/infra",
   qa: "ops/qa",
-  po: "biz/discovery",
-  pm: "biz/management",
-  design: "biz/design",
+  monitor: "ops/monitor",
+  improve: "ops/improve",
+  // 추가 별칭
+  next: "eng/nextjs",
+  backend: "eng/spring",
   mvp: "biz/poc",
 };
 
@@ -414,9 +421,9 @@ function resolvePackageInput(input: string): { packages: string[]; isGroup: bool
       continue;
     }
 
-    // 2. 레거시 매핑 확인
-    if (part in LEGACY_MAPPING) {
-      resolvedPackages.push(LEGACY_MAPPING[part]);
+    // 2. 단축명 매핑 확인 (discovery → biz/discovery 등)
+    if (part in SHORTNAME_MAPPING) {
+      resolvedPackages.push(SHORTNAME_MAPPING[part]);
       continue;
     }
 
@@ -2349,7 +2356,7 @@ program
       console.log(chalk.red(`\n알 수 없는 패키지: ${packagesInput}`));
       console.log(chalk.gray(`사용 가능한 그룹: ${PACKAGE_GROUPS.join(", ")}`));
       console.log(chalk.gray(`사용 가능한 패키지: ${Object.keys(EXTENSION_PACKAGES).join(", ")}`));
-      console.log(chalk.gray(`레거시 별칭: ${Object.keys(LEGACY_MAPPING).join(", ")}\n`));
+      console.log(chalk.gray(`단축명: ${Object.keys(SHORTNAME_MAPPING).join(", ")}\n`));
       process.exit(1);
     }
 
@@ -2481,12 +2488,12 @@ program
     console.log(chalk.gray("  semo add ops      → Operations 전체 (qa, monitor, improve)"));
     console.log();
 
-    // 레거시 호환성 안내
+    // 단축명 안내
     console.log(chalk.gray("─".repeat(50)));
-    console.log(chalk.gray("레거시 명령어도 지원됩니다:"));
-    console.log(chalk.gray("  semo add next     → eng/nextjs"));
-    console.log(chalk.gray("  semo add backend  → eng/spring"));
-    console.log(chalk.gray("  semo add mvp      → biz/poc\n"));
+    console.log(chalk.white.bold("⚡ 단축명 지원"));
+    console.log(chalk.gray("  semo add discovery  → biz/discovery"));
+    console.log(chalk.gray("  semo add qa         → ops/qa"));
+    console.log(chalk.gray("  semo add nextjs     → eng/nextjs\n"));
   });
 
 // === status 명령어 ===

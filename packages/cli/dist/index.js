@@ -375,16 +375,23 @@ const EXTENSION_PACKAGES = {
     // Meta
     meta: { name: "Meta", desc: "SEMO 프레임워크 자체 개발/관리", layer: "meta", detect: ["semo-core", "semo-skills"] },
 };
-// 레거시 패키지 → 새 패키지 매핑 (하위호환성)
-const LEGACY_MAPPING = {
-    next: "eng/nextjs",
-    backend: "eng/spring",
+// 단축명 → 전체 패키지 경로 매핑
+const SHORTNAME_MAPPING = {
+    // 하위 패키지명 단축 (discovery → biz/discovery)
+    discovery: "biz/discovery",
+    design: "biz/design",
+    management: "biz/management",
+    poc: "biz/poc",
+    nextjs: "eng/nextjs",
+    spring: "eng/spring",
     ms: "eng/ms",
     infra: "eng/infra",
     qa: "ops/qa",
-    po: "biz/discovery",
-    pm: "biz/management",
-    design: "biz/design",
+    monitor: "ops/monitor",
+    improve: "ops/improve",
+    // 추가 별칭
+    next: "eng/nextjs",
+    backend: "eng/spring",
     mvp: "biz/poc",
 };
 // 그룹 이름 목록 (biz, eng, ops)
@@ -411,9 +418,9 @@ function resolvePackageInput(input) {
             groupName = part;
             continue;
         }
-        // 2. 레거시 매핑 확인
-        if (part in LEGACY_MAPPING) {
-            resolvedPackages.push(LEGACY_MAPPING[part]);
+        // 2. 단축명 매핑 확인 (discovery → biz/discovery 등)
+        if (part in SHORTNAME_MAPPING) {
+            resolvedPackages.push(SHORTNAME_MAPPING[part]);
             continue;
         }
         // 3. 직접 패키지명 확인
@@ -2091,7 +2098,7 @@ program
         console.log(chalk_1.default.red(`\n알 수 없는 패키지: ${packagesInput}`));
         console.log(chalk_1.default.gray(`사용 가능한 그룹: ${PACKAGE_GROUPS.join(", ")}`));
         console.log(chalk_1.default.gray(`사용 가능한 패키지: ${Object.keys(EXTENSION_PACKAGES).join(", ")}`));
-        console.log(chalk_1.default.gray(`레거시 별칭: ${Object.keys(LEGACY_MAPPING).join(", ")}\n`));
+        console.log(chalk_1.default.gray(`단축명: ${Object.keys(SHORTNAME_MAPPING).join(", ")}\n`));
         process.exit(1);
     }
     // 그룹 설치인 경우 안내
@@ -2205,12 +2212,12 @@ program
     console.log(chalk_1.default.gray("  semo add eng      → Engineering 전체 (nextjs, spring, ms, infra)"));
     console.log(chalk_1.default.gray("  semo add ops      → Operations 전체 (qa, monitor, improve)"));
     console.log();
-    // 레거시 호환성 안내
+    // 단축명 안내
     console.log(chalk_1.default.gray("─".repeat(50)));
-    console.log(chalk_1.default.gray("레거시 명령어도 지원됩니다:"));
-    console.log(chalk_1.default.gray("  semo add next     → eng/nextjs"));
-    console.log(chalk_1.default.gray("  semo add backend  → eng/spring"));
-    console.log(chalk_1.default.gray("  semo add mvp      → biz/poc\n"));
+    console.log(chalk_1.default.white.bold("⚡ 단축명 지원"));
+    console.log(chalk_1.default.gray("  semo add discovery  → biz/discovery"));
+    console.log(chalk_1.default.gray("  semo add qa         → ops/qa"));
+    console.log(chalk_1.default.gray("  semo add nextjs     → eng/nextjs\n"));
 });
 // === status 명령어 ===
 program
