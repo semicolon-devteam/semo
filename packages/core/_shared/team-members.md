@@ -76,10 +76,14 @@ SLACK_NAME=$(get_slack_name "reus-jeon")  # "Reus"
 
 ## 역할별 담당자
 
-| 역할 | 담당자 | 알림 대상 |
-|------|--------|----------|
-| QA | kyago (강용준) | 테스트 요청, 버그 리포트 |
-| PO | Reus (전준영) | Epic 생성, 요구사항 확인 |
+| 역할 | 담당자 | GitHub ID | 알림 대상 |
+|------|--------|-----------|----------|
+| QA | Goni (고권희) | kokkh | 테스트 요청, 버그 리포트 |
+| PO | Roki (노영록) | Roki-Noh | Epic 생성, 요구사항 확인 |
+| FE Lead | Reus (전준영) | reus-jeon | 프론트엔드 코드 리뷰 |
+| BE Lead | kyago (강용준) | kyago | 백엔드 코드 리뷰 |
+| Infra Lead | Garden (서정원) | garden92 | 인프라/배포 관련 |
+| Design Lead | Yeomso (염현준) | Yeomsoyam | 디자인 리뷰 |
 
 ## 팀원 추가/변경 시
 
