@@ -200,6 +200,39 @@ async function showVersionComparison(cwd) {
                 }
             }
         }
+        // packages/ 디렉토리의 설치된 패키지들 (로컬 버전만 표시)
+        const packagesDir = path.join(cwd, "packages");
+        if (fs.existsSync(packagesDir)) {
+            // 패키지 경로 매핑 (표시 이름 → 상대 경로)
+            const packagePaths = {
+                "packages/core": "core",
+                "packages/meta": "meta",
+                "packages/eng/nextjs": "eng/nextjs",
+                "packages/eng/spring": "eng/spring",
+                "packages/eng/ms": "eng/ms",
+                "packages/eng/infra": "eng/infra",
+                "packages/biz/discovery": "biz/discovery",
+                "packages/biz/management": "biz/management",
+                "packages/biz/design": "biz/design",
+                "packages/biz/poc": "biz/poc",
+                "packages/ops/qa": "ops/qa",
+                "packages/ops/monitor": "ops/monitor",
+                "packages/ops/improve": "ops/improve",
+            };
+            for (const [displayName, relativePath] of Object.entries(packagePaths)) {
+                const pkgVersionPath = path.join(packagesDir, relativePath, "VERSION");
+                if (fs.existsSync(pkgVersionPath)) {
+                    const localPkg = fs.readFileSync(pkgVersionPath, "utf-8").trim();
+                    const remotePkg = await getRemotePackageVersion(`packages/${relativePath}`);
+                    versionInfos.push({
+                        name: displayName,
+                        local: localPkg,
+                        remote: remotePkg,
+                        needsUpdate: remotePkg ? isVersionLower(localPkg, remotePkg) : false,
+                    });
+                }
+            }
+        }
         spinner.stop();
         // 결과 출력
         const needsUpdateCount = versionInfos.filter(v => v.needsUpdate).length;
@@ -455,6 +488,38 @@ async function showVersionInfo() {
                     local: localExt,
                     remote: remoteExt,
                     needsUpdate: remoteExt ? isVersionLower(localExt, remoteExt) : false,
+                });
+            }
+        }
+    }
+    // 5. packages/ 디렉토리의 설치된 패키지들
+    const packagesDir = path.join(cwd, "packages");
+    if (fs.existsSync(packagesDir)) {
+        const packagePaths = {
+            "packages/core": "core",
+            "packages/meta": "meta",
+            "packages/eng/nextjs": "eng/nextjs",
+            "packages/eng/spring": "eng/spring",
+            "packages/eng/ms": "eng/ms",
+            "packages/eng/infra": "eng/infra",
+            "packages/biz/discovery": "biz/discovery",
+            "packages/biz/management": "biz/management",
+            "packages/biz/design": "biz/design",
+            "packages/biz/poc": "biz/poc",
+            "packages/ops/qa": "ops/qa",
+            "packages/ops/monitor": "ops/monitor",
+            "packages/ops/improve": "ops/improve",
+        };
+        for (const [displayName, relativePath] of Object.entries(packagePaths)) {
+            const pkgVersionPath = path.join(packagesDir, relativePath, "VERSION");
+            if (fs.existsSync(pkgVersionPath)) {
+                const localPkg = fs.readFileSync(pkgVersionPath, "utf-8").trim();
+                const remotePkg = await getRemotePackageVersion(`packages/${relativePath}`);
+                versionInfos.push({
+                    name: displayName,
+                    local: localPkg,
+                    remote: remotePkg,
+                    needsUpdate: remotePkg ? isVersionLower(localPkg, remotePkg) : false,
                 });
             }
         }
