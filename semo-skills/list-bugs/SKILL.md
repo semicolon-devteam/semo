@@ -57,7 +57,7 @@ query($owner: String!, $repo: String!, $number: Int!) {
 ## 출력 형식
 
 ```markdown
-## 🐛 Open 버그 목록
+## 🐛 {repo} Open 버그 목록
 
 | # | 제목 | 담당자 | 상태 |
 |---|------|--------|------|
@@ -65,6 +65,40 @@ query($owner: String!, $repo: String!, $number: Int!) {
 | #658 | 메인페이지 갤러리 4번째 탭 안나오는 현상 | - | 검수대기 |
 
 **총 2건의 Open 버그**
+
+---
+💡 다른 프로젝트(cm-office, core-backend 등)의 이슈도 확인할까요?
+```
+
+## 🔴 현재 레포지토리 우선 규칙 (Context-First)
+
+> **필수**: 레포지토리 명시 없이 요청 시 현재 git remote 기반 조회
+
+### 컨텍스트 감지 우선순위
+
+```bash
+# 1순위: 현재 디렉토리의 git remote
+REPO=$(git remote get-url origin 2>/dev/null | sed 's/.*github.com[:/]\(.*\)\.git/\1/')
+
+# 2순위: 사용자 명시 레포 (예: "cm-land 버그 목록")
+# 3순위: 전체 조회 ("모든 레포", "전체 이슈" 키워드 감지 시)
+```
+
+### 예시
+
+| 요청 | 동작 |
+|------|------|
+| "버그 목록 보여줘" | 현재 git remote 레포만 조회 |
+| "cm-land 버그 목록" | cm-land 레포만 조회 |
+| "모든 레포 버그 목록" | 전체 레포 조회 |
+
+### 추가 확인 제안
+
+응답 말미에 항상 다음 문구 추가:
+
+```markdown
+---
+💡 다른 프로젝트({other_repos})의 이슈도 확인할까요?
 ```
 
 ## 레포지토리 지정

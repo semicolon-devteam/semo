@@ -98,10 +98,39 @@ gh api graphql -f query='
       }
     }
   }
-' -f projectId="PVT_kwDOCr2fqM4A0TQd" -f contentId="$ISSUE_NODE_ID"
+' -f projectId="PVT_kwDOC01-Rc4AtDz2" -f contentId="$ISSUE_NODE_ID"
 ```
 
-> **Note**: `PVT_kwDOCr2fqM4A0TQd`는 semicolon-devteam의 `이슈관리` Projects (#1) ID입니다.
+> **Note**: `PVT_kwDOC01-Rc4AtDz2`는 semicolon-devteam의 `이슈관리` Projects (#1) ID입니다.
+
+### Phase 7.5: Set GitHub Issue Type (필수)
+
+생성된 Issue에 적절한 Issue Type 설정:
+
+```bash
+# Issue Type 설정 (기본: Task)
+gh api graphql -f query='
+  mutation {
+    updateIssue(input: {
+      id: "'"$ISSUE_NODE_ID"'"
+      issueTypeId: "IT_kwDOC01-Rc4BdOub"
+    }) {
+      issue { id title }
+    }
+  }
+'
+```
+
+**Issue Type ID Reference**:
+
+| Type | ID | 사용 시점 |
+|------|-----|----------|
+| Task | `IT_kwDOC01-Rc4BdOub` | 일반 태스크 (기본값) |
+| Bug | `IT_kwDOC01-Rc4BdOuc` | 버그 리포트 |
+| Feature | `IT_kwDOC01-Rc4BdOud` | 기능 요청 |
+| Epic | `IT_kwDOC01-Rc4BvVz5` | 에픽 생성 시 |
+
+> **Note**: Epic 생성 시에만 Epic Type 사용, 그 외 Sub-Task는 Task Type 사용
 
 ### Phase 8: Report
 

@@ -52,44 +52,58 @@
 > **⚠️ Meta 환경에서 작업 완료 시 반드시 전체 배포 플로우를 실행합니다.**
 > **사용자가 별도로 요청하지 않아도 자동으로 진행합니다.**
 
+### 🔴 분리 버전 정책 (Separate Version Policy)
+
+> **SEMO는 각 패키지별로 독립적인 버전을 관리합니다.**
+
+```
+semo-cli (npm)           → package.json (독립)
+semo-core/VERSION        → 독립 버전
+semo-skills/VERSION      → 독립 버전
+packages/*/VERSION       → 각 Extension 독립 버전
+```
+
+**이유**:
+1. CLI 변경 없이 스킬/패키지만 업데이트 가능
+2. 필요한 패키지만 선택적 업데이트 (`semo update --only semo-skills`)
+3. 각 구성요소의 변경 이력 독립 관리
+
 ### 🔴 배포 대상 감지
 
-| 변경 파일 | 배포 대상 | 스킬 |
-|----------|----------|------|
-| `packages/cli/**` | @team-semicolon/semo-cli | `deploy-npm` |
-| `packages/mcp-server/**` | @team-semicolon/semo-mcp | `deploy-npm` |
-| `semo-core/**`, `semo-skills/**` | Git push only | - |
-| `packages/meta/**` | Git push only | - |
+| 변경 파일 | 배포 대상 | 버전 파일 |
+|----------|----------|----------|
+| `packages/cli/**` | @team-semicolon/semo-cli (npm) | `packages/cli/package.json` |
+| `packages/mcp-server/**` | @team-semicolon/semo-mcp (npm) | `packages/mcp-server/package.json` |
+| `semo-core/**` | semo-core | `semo-core/VERSION` |
+| `semo-skills/**` | semo-skills | `semo-skills/VERSION` |
+| `packages/{biz,eng,ops}/**` | 각 Extension | `packages/*/VERSION` |
 
-### 🔴 필수 동작 순서 (CLI/MCP 변경 시)
+### 🔴 필수 동작 순서 (패키지별)
 
+**CLI 변경 시**:
 ```text
 1. 작업 완료
    ↓
-2. [SEMO] Skill 호출: deploy-npm
+2. CLI 버전 범프 (package.json + index.ts)
    ↓
-3. (deploy-npm에 의해) 버전 범프 (package.json)
+3. 빌드 (npm run build)
    ↓
-4. (deploy-npm에 의해) 빌드 (npm run build)
+4. 커밋 + 푸시
    ↓
-5. (deploy-npm에 의해) 커밋 + 푸시
-   ↓
-6. (deploy-npm에 의해) npm publish
-   ↓
-7. (deploy-npm에 의해) 슬랙 알림
+5. npm publish
 ```
 
-### 🔴 필수 동작 순서 (Core/Skills/Meta 변경 시)
-
+**semo-core/semo-skills/Extension 변경 시**:
 ```text
 1. 작업 완료
    ↓
-2. 커밋 + 푸시 (직접 실행)
+2. 해당 패키지 VERSION 파일 범프
    ↓
-3. 슬랙 알림 (선택)
+3. 커밋 + 푸시
 ```
 
-> **예외 없음**: 커밋/푸시 없이는 작업 완료로 간주하지 않습니다.
+> **참고**: semo-system 패키지는 npm이 아닌 GitHub에서 직접 다운로드되므로,
+> VERSION 파일만 올리면 사용자가 `semo update`로 최신화할 수 있습니다.
 
 ---
 
@@ -117,17 +131,40 @@
 ### 트리거 조건
 
 - 새 Claude Code 세션 시작 (대화 기록 없음)
-- SEMO가 설치된 프로젝트 (.claude/semo-* 존재)
+- SEMO가 설치된 프로젝트 (semo-system/ 존재)
 
-### Step 1: 버전 체크
+### Step 1: 버전 체크 (각 패키지별)
 
 ```bash
-# 로컬 vs 원격 버전 비교
-LOCAL=$(cat .claude/semo-meta/VERSION 2>/dev/null)
-REMOTE=$(gh api repos/semicolon-devteam/semo-meta/contents/VERSION --jq '.content' | base64 -d 2>/dev/null)
+# 설치된 패키지 확인
+ls semo-system/
+
+# 각 패키지 로컬 vs 원격 VERSION 비교
+# semo-core
+LOCAL_CORE=$(cat semo-system/semo-core/VERSION 2>/dev/null)
+REMOTE_CORE=$(gh api repos/semicolon-devteam/semo/contents/semo-core/VERSION --jq '.content' | base64 -d 2>/dev/null)
+
+# semo-skills
+LOCAL_SKILLS=$(cat semo-system/semo-skills/VERSION 2>/dev/null)
+REMOTE_SKILLS=$(gh api repos/semicolon-devteam/semo/contents/semo-skills/VERSION --jq '.content' | base64 -d 2>/dev/null)
+
+# 설치된 Extension 패키지도 동일하게 체크
+# 예: biz/management
+LOCAL_EXT=$(cat semo-system/biz/management/VERSION 2>/dev/null)
+REMOTE_EXT=$(gh api repos/semicolon-devteam/semo/contents/packages/biz/management/VERSION --jq '.content' | base64 -d 2>/dev/null)
 ```
 
-**업데이트 필요 시**: `[SEMO] 업데이트 가능: {local} → {remote}. "SEMO 업데이트해줘"`
+**업데이트 필요 시**:
+```
+[SEMO] 버전 체크 완료
+
+📦 업데이트 가능:
+  - semo-core: 1.0.0 → 1.0.1
+  - semo-skills: 1.0.0 → 1.0.2
+
+💡 "semo update" 또는 "SEMO 업데이트해줘"로 업데이트하세요.
+   특정 패키지만: semo update --only semo-skills
+```
 
 ### Step 2: 구조 검증 (필수)
 
@@ -136,7 +173,7 @@ REMOTE=$(gh api repos/semicolon-devteam/semo-meta/contents/VERSION --jq '.conten
 **스킬 호출** (폴백 체인):
 
 1. `.claude/skills/semo-architecture-checker/SKILL.md` 존재 → 실행
-2. 없으면 → `.claude/semo-core/skills/semo-architecture-checker/SKILL.md` 실행
+2. 없으면 → `semo-system/semo-skills/semo-architecture-checker/SKILL.md` 실행
 
 **검증 항목**:
 
@@ -148,7 +185,9 @@ REMOTE=$(gh api repos/semicolon-devteam/semo-meta/contents/VERSION --jq '.conten
 
 ```markdown
 [SEMO] 세션 초기화 완료
-- 버전: {version} ✅
+- semo-core: 1.0.0 ✅
+- semo-skills: 1.0.0 ✅
+- biz/management: 1.0.0 ✅
 - 구조: 정상 ✅
 ```
 

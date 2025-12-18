@@ -131,7 +131,20 @@ QA 담당자: @kokkh
 
 ### 6. Slack 알림
 
-**채널**: #_협업
+> **📖 프로젝트별 채널 매핑**: `.claude/memory/projects.md`의 "프로젝트 맵" 섹션 참조
+
+**채널 결정 로직**:
+1. `.claude/memory/projects.md`에서 레포지토리 → Slack 채널 매핑 조회
+2. 매핑이 있으면 해당 채널로 발송
+3. 매핑이 없으면 `#_협업`으로 fallback
+
+**채널 매핑 예시**:
+| 레포지토리 | Slack 채널 |
+|-----------|------------|
+| cm-land | #cm-land |
+| cm-office | #cm-office |
+| core-backend | #backend |
+| (기타) | #_협업 |
 
 ```text
 🧪 QA 테스트 요청
@@ -160,7 +173,7 @@ QA 담당자: @kokkh
 - [x] GitHub Project 상태 변경
 - [x] QA 담당자 자동 할당 (@kokkh)
 - [x] 이슈 코멘트 작성
-- [x] Slack 알림 전송 (#_협업)
+- [x] Slack 알림 전송 ({프로젝트_채널})
 
 ### 다음 단계
 

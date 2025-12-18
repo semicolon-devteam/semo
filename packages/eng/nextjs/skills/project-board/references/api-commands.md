@@ -406,6 +406,56 @@ fi
 echo "✅ 완료: ${REPO}#${ISSUE_NUM} → ${TARGET_STATUS}"
 ```
 
+## 8. GitHub Issue Type 설정 (필수)
+
+> **⚠️ Projects 커스텀 필드 `타입` 대신 GitHub Issue 기본 `Type` 필드 사용**
+
+### Issue Type ID Reference
+
+| Type | ID | 용도 |
+|------|-----|------|
+| Task | `IT_kwDOC01-Rc4BdOub` | 일반 태스크 (기본값) |
+| Bug | `IT_kwDOC01-Rc4BdOuc` | 버그 리포트 |
+| Feature | `IT_kwDOC01-Rc4BdOud` | 기능 요청 |
+| Epic | `IT_kwDOC01-Rc4BvVz5` | 에픽 |
+
+### Issue Type 설정 (GraphQL Mutation)
+
+```bash
+# 1. Issue node_id 조회
+ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/{repo}/issues/{issue_number} --jq '.node_id')
+
+# 2. Issue Type 설정
+gh api graphql -f query='
+  mutation {
+    updateIssue(input: {
+      id: "'"$ISSUE_NODE_ID"'"
+      issueTypeId: "IT_kwDOC01-Rc4BdOub"
+    }) {
+      issue { id title }
+    }
+  }
+'
+```
+
+### Issue Type 조회
+
+```bash
+# 현재 Issue의 Type 확인
+gh api repos/semicolon-devteam/{repo}/issues/{issue_number} --jq '.type.name // "없음"'
+```
+
+### 사용 시점
+
+| 이슈 생성 유형 | Issue Type |
+|--------------|------------|
+| Draft Task 생성 | Task |
+| 버그 등록 | Bug |
+| Epic 생성 | Epic |
+| 기능 요청 | Feature |
+
+> **Note**: Projects 커스텀 필드 `타입`은 더 이상 사용하지 않습니다. GitHub Issue 기본 Type 필드를 사용하세요.
+
 ## 에러 코드
 
 | 에러 메시지 | 원인 | 해결 방법 |
@@ -415,3 +465,4 @@ echo "✅ 완료: ${REPO}#${ISSUE_NUM} → ${TARGET_STATUS}"
 | `Field was not found` | Status 필드 없음 | 프로젝트 설정에서 Status 필드 확인 |
 | `Could not find single select option` | 상태값 없음 | 상태 목록 조회 후 정확한 이름 사용 |
 | `Item was not found` | 이슈가 프로젝트에 없음 | `gh project item-add`로 먼저 추가 |
+| `issueTypeId is invalid` | Issue Type ID 오류 | 위 Issue Type ID Reference 확인 |
