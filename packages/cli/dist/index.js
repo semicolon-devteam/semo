@@ -59,8 +59,19 @@ const child_process_1 = require("child_process");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
-const VERSION = "3.0.17";
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
+// package.json에서 버전 동적 로드
+function getCliVersion() {
+    try {
+        const pkgPath = path.join(__dirname, "..", "package.json");
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
+        return pkg.version || "unknown";
+    }
+    catch {
+        return "unknown";
+    }
+}
+const VERSION = getCliVersion();
 // === 버전 비교 유틸리티 ===
 /**
  * npm registry에서 최신 버전을 가져옴
