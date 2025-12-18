@@ -41,6 +41,7 @@ v0.1.x: PROJECT   - DDD structure scaffolding
 v0.2.x: TESTS     - Repository, Hooks, Component tests (BEFORE implementation)
 v0.3.x: DATA      - Models, Supabase schemas, migrations
 v0.4.x: CODE      - Repository → API Client → Hooks → Components
+v0.5.x: E2E       - Playwright 런타임 테스트 (필수)
 ```
 
 > 📚 **상세 워크플로우**: [references/phase-workflow.md](references/phase-workflow.md)
@@ -176,9 +177,52 @@ v0.4.x Phase 완료
     ↓
 [자동] Quality Gate 실행
     ↓
-✅ 통과 → 다음 단계 제안
+✅ 통과 → v0.5.x E2E 테스트
 ❌ 실패 → 에러 수정 필요, 커밋 차단
 ```
+
+## 🔴 v0.5.x E2E 테스트 (NON-NEGOTIABLE)
+
+> **⚠️ Quality Gate 통과 후 반드시 E2E 테스트 실행**
+
+### 트리거
+
+- Quality Gate 통과 직후 자동 제안
+- `skill:e2e-test` 호출
+
+### E2E 테스트 워크플로우
+
+```text
+Quality Gate 통과
+    ↓
+[SEMO] v0.5.x E2E 테스트 시작
+    ↓
+Dev Server 실행 확인
+    ↓
+Playwright로 페이지 접근
+    ↓
+기본 검증 (로드, 콘솔 에러, UI)
+    ↓
+✅ 통과 → 다음 단계 제안
+❌ 실패 → 에러 수정 필요, PR 차단
+```
+
+### E2E 테스트 출력
+
+```markdown
+[SEMO] v0.5.x E2E 테스트 실행
+
+→ skill:e2e-test 호출
+```
+
+### E2E 차단 조건
+
+| 조건 | PR 가능 여부 |
+|------|-------------|
+| E2E 전체 통과 | ✅ 가능 |
+| 콘솔 에러 있음 | ❌ 차단 |
+| 주요 UI 미표시 | ❌ 차단 |
+| 반응형 이슈만 | ⚠️ 경고 (진행 가능) |
 
 ### 완료 메시지 템플릿
 
@@ -190,6 +234,7 @@ v0.4.x Phase 완료
 | Phase | 상태 | 요약 |
 |-------|------|------|
 | v0.0.x ~ v0.4.x | ✅ | All phases complete |
+| v0.5.x E2E | ✅ | 런타임 테스트 통과 |
 
 ## 🔍 Quality Gate 결과
 
@@ -198,6 +243,14 @@ v0.4.x Phase 완료
 | Lint | ✅ |
 | TypeScript | ✅ |
 | Build | ✅ |
+
+## 🧪 E2E 테스트 결과
+
+| 테스트 | 결과 |
+|--------|------|
+| 페이지 로드 | ✅ |
+| 콘솔 에러 | ✅ (0 errors) |
+| 주요 UI | ✅ |
 
 ---
 

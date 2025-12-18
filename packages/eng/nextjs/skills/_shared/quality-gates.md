@@ -10,6 +10,7 @@
 | TypeScript | `npx tsc --noEmit` | 0 errors | PR 차단 |
 | Tests | `npm test` | 100% passing | PR 차단 |
 | Coverage | `npm test -- --coverage` | 80%/80%/70% | 경고 |
+| **E2E** | `skill:e2e-test` | 콘솔 에러 0, UI 표시 | PR 차단 |
 
 ## Coverage Thresholds
 
@@ -34,6 +35,7 @@
 - Console.log 남아있음
 - Constitution 원칙 위반
 - `--no-verify` 사용
+- **E2E 테스트 실패 (콘솔 에러, UI 미표시)**
 
 ## Warning Issues
 
@@ -45,9 +47,21 @@
 ## Quick Validation Command
 
 ```bash
-# 전체 검증
+# 전체 검증 (Unit Test + Static Analysis)
 npm run lint && npx tsc --noEmit && npm test -- --coverage
 
 # Debug 코드 체크
 grep -rn "console\.log\|debugger" src/ --include="*.ts" --include="*.tsx"
+
+# E2E 테스트 (런타임 검증)
+# → "E2E 테스트해줘" 또는 skill:e2e-test 호출
 ```
+
+## E2E 테스트 기준
+
+| 테스트 | 기준 | 실패 시 |
+|--------|------|---------|
+| 페이지 로드 | HTTP 200, 렌더링 완료 | PR 차단 |
+| 콘솔 에러 | 0 errors | PR 차단 |
+| 주요 UI | 핵심 컴포넌트 표시 | PR 차단 |
+| 반응형 | 모바일/데스크톱 레이아웃 | 경고 (진행 가능) |
