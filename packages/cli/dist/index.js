@@ -766,6 +766,33 @@ program
             extensionsToInstall = detected;
         }
     }
+    else {
+        // 프로젝트 유형이 감지되지 않은 경우 패키지 선택 프롬프트
+        console.log(chalk_1.default.cyan("\n📦 추가 패키지 선택"));
+        console.log(chalk_1.default.gray("   기본 설치 (semo-core + semo-skills) 외에 추가할 패키지를 선택하세요.\n"));
+        // 그룹별로 패키지 구성
+        const packageChoices = [
+            new inquirer_1.default.Separator(chalk_1.default.yellow("── Engineering ──")),
+            { name: `eng/nextjs - ${EXTENSION_PACKAGES["eng/nextjs"].desc}`, value: "eng/nextjs" },
+            { name: `eng/spring - ${EXTENSION_PACKAGES["eng/spring"].desc}`, value: "eng/spring" },
+            { name: `eng/infra - ${EXTENSION_PACKAGES["eng/infra"].desc}`, value: "eng/infra" },
+            new inquirer_1.default.Separator(chalk_1.default.yellow("── Business ──")),
+            { name: `biz/discovery - ${EXTENSION_PACKAGES["biz/discovery"].desc}`, value: "biz/discovery" },
+            { name: `biz/management - ${EXTENSION_PACKAGES["biz/management"].desc}`, value: "biz/management" },
+            { name: `biz/design - ${EXTENSION_PACKAGES["biz/design"].desc}`, value: "biz/design" },
+            new inquirer_1.default.Separator(chalk_1.default.yellow("── Operations ──")),
+            { name: `ops/qa - ${EXTENSION_PACKAGES["ops/qa"].desc}`, value: "ops/qa" },
+        ];
+        const { selectedPackages } = await inquirer_1.default.prompt([
+            {
+                type: "checkbox",
+                name: "selectedPackages",
+                message: "설치할 패키지 선택 (Space로 선택, Enter로 완료):",
+                choices: packageChoices,
+            },
+        ]);
+        extensionsToInstall = selectedPackages;
+    }
     // 3. .claude 디렉토리 생성
     const claudeDir = path.join(cwd, ".claude");
     if (!fs.existsSync(claudeDir)) {

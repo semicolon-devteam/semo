@@ -834,6 +834,35 @@ program
       if (installDetected) {
         extensionsToInstall = detected;
       }
+    } else {
+      // 프로젝트 유형이 감지되지 않은 경우 패키지 선택 프롬프트
+      console.log(chalk.cyan("\n📦 추가 패키지 선택"));
+      console.log(chalk.gray("   기본 설치 (semo-core + semo-skills) 외에 추가할 패키지를 선택하세요.\n"));
+
+      // 그룹별로 패키지 구성
+      const packageChoices = [
+        new inquirer.Separator(chalk.yellow("── Engineering ──")),
+        { name: `eng/nextjs - ${EXTENSION_PACKAGES["eng/nextjs"].desc}`, value: "eng/nextjs" },
+        { name: `eng/spring - ${EXTENSION_PACKAGES["eng/spring"].desc}`, value: "eng/spring" },
+        { name: `eng/infra - ${EXTENSION_PACKAGES["eng/infra"].desc}`, value: "eng/infra" },
+        new inquirer.Separator(chalk.yellow("── Business ──")),
+        { name: `biz/discovery - ${EXTENSION_PACKAGES["biz/discovery"].desc}`, value: "biz/discovery" },
+        { name: `biz/management - ${EXTENSION_PACKAGES["biz/management"].desc}`, value: "biz/management" },
+        { name: `biz/design - ${EXTENSION_PACKAGES["biz/design"].desc}`, value: "biz/design" },
+        new inquirer.Separator(chalk.yellow("── Operations ──")),
+        { name: `ops/qa - ${EXTENSION_PACKAGES["ops/qa"].desc}`, value: "ops/qa" },
+      ];
+
+      const { selectedPackages } = await inquirer.prompt([
+        {
+          type: "checkbox",
+          name: "selectedPackages",
+          message: "설치할 패키지 선택 (Space로 선택, Enter로 완료):",
+          choices: packageChoices,
+        },
+      ]);
+
+      extensionsToInstall = selectedPackages;
     }
 
     // 3. .claude 디렉토리 생성
