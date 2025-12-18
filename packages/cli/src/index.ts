@@ -598,10 +598,21 @@ async function showVersionInfo(): Promise<void> {
 
     console.log(chalk.gray("  └────────────────────────┴──────────┴──────────┴────────┘"));
 
-    if (needsUpdateCount > 0) {
+    // CLI와 다른 패키지 업데이트 가이드 분리
+    const cliNeedsUpdate = versionInfos[0]?.needsUpdate;
+    const otherNeedsUpdateCount = versionInfos.slice(1).filter((v) => v.needsUpdate).length;
+
+    if (cliNeedsUpdate || otherNeedsUpdateCount > 0) {
       console.log();
-      console.log(chalk.yellow.bold(`  ⚠️  ${needsUpdateCount}개 패키지 업데이트 가능`));
-      console.log(chalk.gray("    semo update 명령으로 업데이트하세요."));
+      if (cliNeedsUpdate) {
+        console.log(chalk.yellow.bold("  ⚠️  CLI 업데이트 가능"));
+        console.log(chalk.cyan(`    npm update -g ${PACKAGE_NAME}`));
+      }
+      if (otherNeedsUpdateCount > 0) {
+        if (cliNeedsUpdate) console.log();
+        console.log(chalk.yellow.bold(`  ⚠️  ${otherNeedsUpdateCount}개 패키지 업데이트 가능`));
+        console.log(chalk.gray("    semo update 명령으로 업데이트하세요."));
+      }
     } else {
       console.log();
       console.log(chalk.green("  ✓ 모든 패키지가 최신 버전입니다."));
