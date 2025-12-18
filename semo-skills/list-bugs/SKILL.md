@@ -21,7 +21,60 @@ model: inherit
 
 ## 조회 명령
 
+### 기본 조회 (Assignee 포함)
+
 ```bash
-gh api repos/semicolon-devteam/semo/issues \
-  --jq '.[] | select(.state == "open") | "- #\(.number) \(.title)"'
+# 현재 레포지토리 또는 지정된 레포에서 조회
+REPO="${REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo 'semicolon-devteam/semo')}"
+
+gh api "repos/$REPO/issues" \
+  --jq '.[] | select(.state == "open") | "| #\(.number) | \(.title) | @\(.assignee.login // "-") |"'
+```
+
+### Status 포함 조회 (Projects GraphQL)
+
+```bash
+# 이슈의 Projects Status 조회
+gh api graphql -f query='
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    issue(number: $number) {
+      projectItems(first: 1) {
+        nodes {
+          fieldValueByName(name: "Status") {
+            ... on ProjectV2ItemFieldSingleSelectValue {
+              name
+            }
+          }
+        }
+      }
+    }
+  }
+}' -f owner="semicolon-devteam" -f repo="$REPO_NAME" -F number=$ISSUE_NUMBER \
+  --jq '.data.repository.issue.projectItems.nodes[0].fieldValueByName.name // "-"'
+```
+
+## 출력 형식
+
+```markdown
+## 🐛 Open 버그 목록
+
+| # | 제목 | 담당자 | 상태 |
+|---|------|--------|------|
+| #659 | SEO가 각 게시판별로 적용되지 않음 | @reus-jeon | 작업중 |
+| #658 | 메인페이지 갤러리 4번째 탭 안나오는 현상 | - | 검수대기 |
+
+**총 2건의 Open 버그**
+```
+
+## 레포지토리 지정
+
+```bash
+# 특정 레포 버그 조회
+"cm-land 버그 목록 보여줘"
+→ REPO="semicolon-devteam/cm-land" 로 조회
+
+# 현재 레포 버그 조회 (기본)
+"버그 목록 보여줘"
+→ 현재 디렉토리의 git remote 기반 조회
 ```
