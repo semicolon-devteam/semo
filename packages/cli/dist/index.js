@@ -166,6 +166,7 @@ async function showVersionComparison(cwd) {
             local: currentCliVersion,
             remote: latestCliVersion,
             needsUpdate: latestCliVersion ? isVersionLower(currentCliVersion, latestCliVersion) : false,
+            level: 0,
         });
         // semo-core (루트 또는 semo-system 내부)
         const corePathRoot = path.join(cwd, "semo-core", "VERSION");
@@ -179,6 +180,7 @@ async function showVersionComparison(cwd) {
                 local: localCore,
                 remote: remoteCore,
                 needsUpdate: remoteCore ? isVersionLower(localCore, remoteCore) : false,
+                level: 0,
             });
         }
         // semo-skills (루트 또는 semo-system 내부)
@@ -193,11 +195,51 @@ async function showVersionComparison(cwd) {
                 local: localSkills,
                 remote: remoteSkills,
                 needsUpdate: remoteSkills ? isVersionLower(localSkills, remoteSkills) : false,
+                level: 0,
             });
         }
-        // Extensions (semo-system 내부)
+        // 그룹 패키지 (eng, biz, ops) 및 하위 Extension - semo-system 내부
+        // 그룹별로 묶어서 계층 구조로 출력
         if (hasSemoSystem) {
-            for (const key of Object.keys(EXTENSION_PACKAGES)) {
+            for (const group of PACKAGE_GROUPS) {
+                const groupVersionPath = path.join(semoSystemDir, group, "VERSION");
+                const hasGroupVersion = fs.existsSync(groupVersionPath);
+                // 해당 그룹의 하위 패키지 찾기
+                const groupExtensions = Object.keys(EXTENSION_PACKAGES).filter(key => key.startsWith(`${group}/`));
+                const installedGroupExtensions = groupExtensions.filter(key => fs.existsSync(path.join(semoSystemDir, key, "VERSION")));
+                // 그룹 버전이 있거나 하위 패키지가 설치된 경우에만 표시
+                if (hasGroupVersion || installedGroupExtensions.length > 0) {
+                    // 그룹 패키지 버전 추가
+                    if (hasGroupVersion) {
+                        const localGroup = fs.readFileSync(groupVersionPath, "utf-8").trim();
+                        const remoteGroup = await getRemotePackageVersion(group);
+                        versionInfos.push({
+                            name: group,
+                            local: localGroup,
+                            remote: remoteGroup,
+                            needsUpdate: remoteGroup ? isVersionLower(localGroup, remoteGroup) : false,
+                            level: 1,
+                        });
+                    }
+                    // 하위 Extension 패키지들 추가
+                    for (const key of installedGroupExtensions) {
+                        const extVersionPath = path.join(semoSystemDir, key, "VERSION");
+                        const localExt = fs.readFileSync(extVersionPath, "utf-8").trim();
+                        const remoteExt = await getRemotePackageVersion(key);
+                        versionInfos.push({
+                            name: key,
+                            local: localExt,
+                            remote: remoteExt,
+                            needsUpdate: remoteExt ? isVersionLower(localExt, remoteExt) : false,
+                            level: 2,
+                            group: group,
+                        });
+                    }
+                }
+            }
+            // 그룹에 속하지 않는 Extension (meta 등)
+            const nonGroupExtensions = Object.keys(EXTENSION_PACKAGES).filter(key => !PACKAGE_GROUPS.some(g => key.startsWith(`${g}/`)));
+            for (const key of nonGroupExtensions) {
                 const extVersionPath = path.join(semoSystemDir, key, "VERSION");
                 if (fs.existsSync(extVersionPath)) {
                     const localExt = fs.readFileSync(extVersionPath, "utf-8").trim();
@@ -207,40 +249,61 @@ async function showVersionComparison(cwd) {
                         local: localExt,
                         remote: remoteExt,
                         needsUpdate: remoteExt ? isVersionLower(localExt, remoteExt) : false,
+                        level: 1,
                     });
                 }
             }
         }
-        // packages/ 디렉토리의 설치된 패키지들 (로컬 버전만 표시)
+        // packages/ 디렉토리의 설치된 패키지들 (로컬 버전만 표시) - 개발 환경용
         const packagesDir = path.join(cwd, "packages");
         if (fs.existsSync(packagesDir)) {
-            // 패키지 경로 매핑 (표시 이름 → 상대 경로)
-            const packagePaths = {
-                "packages/core": "core",
-                "packages/meta": "meta",
-                "packages/eng/nextjs": "eng/nextjs",
-                "packages/eng/spring": "eng/spring",
-                "packages/eng/ms": "eng/ms",
-                "packages/eng/infra": "eng/infra",
-                "packages/biz/discovery": "biz/discovery",
-                "packages/biz/management": "biz/management",
-                "packages/biz/design": "biz/design",
-                "packages/biz/poc": "biz/poc",
-                "packages/ops/qa": "ops/qa",
-                "packages/ops/monitor": "ops/monitor",
-                "packages/ops/improve": "ops/improve",
+            // 그룹별 패키지 매핑
+            const packageGroups = {
+                "packages/core": { level: 0, packages: [{ name: "packages/core", path: "core" }] },
+                "packages/meta": { level: 0, packages: [{ name: "packages/meta", path: "meta" }] },
+                "packages/eng": {
+                    level: 1,
+                    packages: [
+                        { name: "packages/eng/nextjs", path: "eng/nextjs" },
+                        { name: "packages/eng/spring", path: "eng/spring" },
+                        { name: "packages/eng/ms", path: "eng/ms" },
+                        { name: "packages/eng/infra", path: "eng/infra" },
+                    ],
+                },
+                "packages/biz": {
+                    level: 1,
+                    packages: [
+                        { name: "packages/biz/discovery", path: "biz/discovery" },
+                        { name: "packages/biz/management", path: "biz/management" },
+                        { name: "packages/biz/design", path: "biz/design" },
+                        { name: "packages/biz/poc", path: "biz/poc" },
+                    ],
+                },
+                "packages/ops": {
+                    level: 1,
+                    packages: [
+                        { name: "packages/ops/qa", path: "ops/qa" },
+                        { name: "packages/ops/monitor", path: "ops/monitor" },
+                        { name: "packages/ops/improve", path: "ops/improve" },
+                    ],
+                },
             };
-            for (const [displayName, relativePath] of Object.entries(packagePaths)) {
-                const pkgVersionPath = path.join(packagesDir, relativePath, "VERSION");
-                if (fs.existsSync(pkgVersionPath)) {
-                    const localPkg = fs.readFileSync(pkgVersionPath, "utf-8").trim();
-                    const remotePkg = await getRemotePackageVersion(`packages/${relativePath}`);
-                    versionInfos.push({
-                        name: displayName,
-                        local: localPkg,
-                        remote: remotePkg,
-                        needsUpdate: remotePkg ? isVersionLower(localPkg, remotePkg) : false,
-                    });
+            for (const [groupKey, groupData] of Object.entries(packageGroups)) {
+                for (const pkg of groupData.packages) {
+                    const pkgVersionPath = path.join(packagesDir, pkg.path, "VERSION");
+                    if (fs.existsSync(pkgVersionPath)) {
+                        const localPkg = fs.readFileSync(pkgVersionPath, "utf-8").trim();
+                        const remotePkg = await getRemotePackageVersion(`packages/${pkg.path}`);
+                        const isSubPackage = pkg.path.includes("/");
+                        versionInfos.push({
+                            name: pkg.name,
+                            local: localPkg,
+                            remote: remotePkg,
+                            needsUpdate: remotePkg ? isVersionLower(localPkg, remotePkg) : false,
+                            level: isSubPackage ? 2 : groupData.level,
+                            group: isSubPackage ? pkg.path.split("/")[0] : undefined,
+                        });
+                    }
                 }
             }
         }
@@ -251,7 +314,20 @@ async function showVersionComparison(cwd) {
         console.log(chalk_1.default.gray("  │ 패키지                 │ 설치됨   │ 최신     │ 상태   │"));
         console.log(chalk_1.default.gray("  ├────────────────────────┼──────────┼──────────┼────────┤"));
         for (const info of versionInfos) {
-            const name = info.name.padEnd(22);
+            // 계층 구조 표시를 위한 접두사
+            let prefix = "";
+            let displayName = info.name;
+            if (info.level === 1) {
+                // 그룹 패키지 (eng, biz, ops)
+                prefix = "📦 ";
+            }
+            else if (info.level === 2) {
+                // 하위 패키지
+                prefix = "  └─ ";
+                // 그룹명 제거하고 하위 이름만 표시 (예: biz/discovery → discovery)
+                displayName = info.name.includes("/") ? info.name.split("/").pop() || info.name : info.name;
+            }
+            const name = (prefix + displayName).padEnd(22);
             const local = (info.local || "-").padEnd(8);
             const remote = (info.remote || "-").padEnd(8);
             const status = info.needsUpdate
@@ -464,6 +540,7 @@ async function showVersionInfo() {
         local: VERSION,
         remote: latestCliVersion,
         needsUpdate: latestCliVersion ? isVersionLower(VERSION, latestCliVersion) : false,
+        level: 0,
     });
     // 2. semo-core 버전 (루트 또는 semo-system 내부)
     const corePathRoot = path.join(cwd, "semo-core", "VERSION");
@@ -477,6 +554,7 @@ async function showVersionInfo() {
             local: localCore,
             remote: remoteCore,
             needsUpdate: remoteCore ? isVersionLower(localCore, remoteCore) : false,
+            level: 0,
         });
     }
     // 3. semo-skills 버전 (루트 또는 semo-system 내부)
@@ -491,12 +569,50 @@ async function showVersionInfo() {
             local: localSkills,
             remote: remoteSkills,
             needsUpdate: remoteSkills ? isVersionLower(localSkills, remoteSkills) : false,
+            level: 0,
         });
     }
-    // 4. Extension 패키지들 (semo-system 내부)
+    // 4. 그룹 패키지 (eng, biz, ops) 및 하위 Extension - semo-system 내부
     const semoSystemDir = path.join(cwd, "semo-system");
     if (fs.existsSync(semoSystemDir)) {
-        for (const key of Object.keys(EXTENSION_PACKAGES)) {
+        for (const group of PACKAGE_GROUPS) {
+            const groupVersionPath = path.join(semoSystemDir, group, "VERSION");
+            const hasGroupVersion = fs.existsSync(groupVersionPath);
+            // 해당 그룹의 하위 패키지 찾기
+            const groupExtensions = Object.keys(EXTENSION_PACKAGES).filter(key => key.startsWith(`${group}/`));
+            const installedGroupExtensions = groupExtensions.filter(key => fs.existsSync(path.join(semoSystemDir, key, "VERSION")));
+            if (hasGroupVersion || installedGroupExtensions.length > 0) {
+                // 그룹 패키지 버전 추가
+                if (hasGroupVersion) {
+                    const localGroup = fs.readFileSync(groupVersionPath, "utf-8").trim();
+                    const remoteGroup = await getRemotePackageVersion(group);
+                    versionInfos.push({
+                        name: group,
+                        local: localGroup,
+                        remote: remoteGroup,
+                        needsUpdate: remoteGroup ? isVersionLower(localGroup, remoteGroup) : false,
+                        level: 1,
+                    });
+                }
+                // 하위 Extension 패키지들 추가
+                for (const key of installedGroupExtensions) {
+                    const extVersionPath = path.join(semoSystemDir, key, "VERSION");
+                    const localExt = fs.readFileSync(extVersionPath, "utf-8").trim();
+                    const remoteExt = await getRemotePackageVersion(key);
+                    versionInfos.push({
+                        name: key,
+                        local: localExt,
+                        remote: remoteExt,
+                        needsUpdate: remoteExt ? isVersionLower(localExt, remoteExt) : false,
+                        level: 2,
+                        group: group,
+                    });
+                }
+            }
+        }
+        // 그룹에 속하지 않는 Extension (meta 등)
+        const nonGroupExtensions = Object.keys(EXTENSION_PACKAGES).filter(key => !PACKAGE_GROUPS.some(g => key.startsWith(`${g}/`)));
+        for (const key of nonGroupExtensions) {
             const extVersionPath = path.join(semoSystemDir, key, "VERSION");
             if (fs.existsSync(extVersionPath)) {
                 const localExt = fs.readFileSync(extVersionPath, "utf-8").trim();
@@ -506,39 +622,60 @@ async function showVersionInfo() {
                     local: localExt,
                     remote: remoteExt,
                     needsUpdate: remoteExt ? isVersionLower(localExt, remoteExt) : false,
+                    level: 1,
                 });
             }
         }
     }
-    // 5. packages/ 디렉토리의 설치된 패키지들
+    // 5. packages/ 디렉토리의 설치된 패키지들 - 개발 환경용
     const packagesDir = path.join(cwd, "packages");
     if (fs.existsSync(packagesDir)) {
-        const packagePaths = {
-            "packages/core": "core",
-            "packages/meta": "meta",
-            "packages/eng/nextjs": "eng/nextjs",
-            "packages/eng/spring": "eng/spring",
-            "packages/eng/ms": "eng/ms",
-            "packages/eng/infra": "eng/infra",
-            "packages/biz/discovery": "biz/discovery",
-            "packages/biz/management": "biz/management",
-            "packages/biz/design": "biz/design",
-            "packages/biz/poc": "biz/poc",
-            "packages/ops/qa": "ops/qa",
-            "packages/ops/monitor": "ops/monitor",
-            "packages/ops/improve": "ops/improve",
+        const packageGroups = {
+            "packages/core": { level: 0, packages: [{ name: "packages/core", path: "core" }] },
+            "packages/meta": { level: 0, packages: [{ name: "packages/meta", path: "meta" }] },
+            "packages/eng": {
+                level: 1,
+                packages: [
+                    { name: "packages/eng/nextjs", path: "eng/nextjs" },
+                    { name: "packages/eng/spring", path: "eng/spring" },
+                    { name: "packages/eng/ms", path: "eng/ms" },
+                    { name: "packages/eng/infra", path: "eng/infra" },
+                ],
+            },
+            "packages/biz": {
+                level: 1,
+                packages: [
+                    { name: "packages/biz/discovery", path: "biz/discovery" },
+                    { name: "packages/biz/management", path: "biz/management" },
+                    { name: "packages/biz/design", path: "biz/design" },
+                    { name: "packages/biz/poc", path: "biz/poc" },
+                ],
+            },
+            "packages/ops": {
+                level: 1,
+                packages: [
+                    { name: "packages/ops/qa", path: "ops/qa" },
+                    { name: "packages/ops/monitor", path: "ops/monitor" },
+                    { name: "packages/ops/improve", path: "ops/improve" },
+                ],
+            },
         };
-        for (const [displayName, relativePath] of Object.entries(packagePaths)) {
-            const pkgVersionPath = path.join(packagesDir, relativePath, "VERSION");
-            if (fs.existsSync(pkgVersionPath)) {
-                const localPkg = fs.readFileSync(pkgVersionPath, "utf-8").trim();
-                const remotePkg = await getRemotePackageVersion(`packages/${relativePath}`);
-                versionInfos.push({
-                    name: displayName,
-                    local: localPkg,
-                    remote: remotePkg,
-                    needsUpdate: remotePkg ? isVersionLower(localPkg, remotePkg) : false,
-                });
+        for (const [, groupData] of Object.entries(packageGroups)) {
+            for (const pkg of groupData.packages) {
+                const pkgVersionPath = path.join(packagesDir, pkg.path, "VERSION");
+                if (fs.existsSync(pkgVersionPath)) {
+                    const localPkg = fs.readFileSync(pkgVersionPath, "utf-8").trim();
+                    const remotePkg = await getRemotePackageVersion(`packages/${pkg.path}`);
+                    const isSubPackage = pkg.path.includes("/");
+                    versionInfos.push({
+                        name: pkg.name,
+                        local: localPkg,
+                        remote: remotePkg,
+                        needsUpdate: remotePkg ? isVersionLower(localPkg, remotePkg) : false,
+                        level: isSubPackage ? 2 : groupData.level,
+                        group: isSubPackage ? pkg.path.split("/")[0] : undefined,
+                    });
+                }
             }
         }
     }
@@ -567,7 +704,20 @@ async function showVersionInfo() {
         console.log(chalk_1.default.gray("  │ 패키지                 │ 설치됨   │ 최신     │ 상태   │"));
         console.log(chalk_1.default.gray("  ├────────────────────────┼──────────┼──────────┼────────┤"));
         for (const info of versionInfos) {
-            const name = info.name.padEnd(22);
+            // 계층 구조 표시를 위한 접두사
+            let prefix = "";
+            let displayName = info.name;
+            if (info.level === 1) {
+                // 그룹 패키지 (eng, biz, ops)
+                prefix = "📦 ";
+            }
+            else if (info.level === 2) {
+                // 하위 패키지
+                prefix = "  └─ ";
+                // 그룹명 제거하고 하위 이름만 표시
+                displayName = info.name.includes("/") ? info.name.split("/").pop() || info.name : info.name;
+            }
+            const name = (prefix + displayName).padEnd(22);
             const local = (info.local || "-").padEnd(8);
             const remote = (info.remote || "-").padEnd(8);
             const status = info.needsUpdate ? "⬆ 업데이트" : "✓ 최신  ";
@@ -1913,7 +2063,68 @@ _SEMO 기본 규칙의 예외 사항을 여기에 추가하세요._
         console.log(chalk_1.default.green("✓ .claude/memory/rules/project-specific.md 생성됨"));
     }
 }
-// === CLAUDE.md 생성 (패키지 CLAUDE.md 병합 지원) ===
+// === CLAUDE.md 중복 섹션 감지 ===
+// "Core Rules (상속)" 패턴을 사용하는 Extension은 고유 섹션만 추출
+function extractUniqueContent(content, pkgName) {
+    // "Core Rules (상속)" 섹션이 있는지 확인
+    const hasCoreRulesRef = /## Core Rules \(상속\)/i.test(content);
+    if (hasCoreRulesRef) {
+        // "고유:" 패턴이 포함된 섹션만 추출
+        const uniqueSectionPattern = /## [^\n]* 고유:/g;
+        const sections = [];
+        // 섹션별로 분리
+        const allSections = content.split(/(?=^## )/gm);
+        for (const section of allSections) {
+            // "고유:" 키워드가 있는 섹션만 포함
+            if (/고유:/i.test(section)) {
+                sections.push(section.trim());
+            }
+            // References 섹션도 포함
+            if (/^## References/i.test(section)) {
+                sections.push(section.trim());
+            }
+            // 패키지 구조, Keywords 섹션 포함
+            if (/^## (패키지 구조|Keywords|Routing)/i.test(section)) {
+                sections.push(section.trim());
+            }
+        }
+        if (sections.length > 0) {
+            return sections.join("\n\n");
+        }
+    }
+    // 공유 규칙 패턴 감지 (이 패턴이 있으면 중복 가능성 높음)
+    const sharedPatterns = [
+        /Orchestrator-First Policy/i,
+        /Quality Gate|Pre-Commit/i,
+        /세션 초기화|Session Init/i,
+        /버저닝 규칙|Versioning/i,
+        /패키지 접두사|PREFIX_ROUTING/i,
+        /SEMO Core 필수 참조/i,
+        /NON-NEGOTIABLE.*Orchestrator/i,
+    ];
+    // 공유 패턴이 많이 발견되면 간소화된 참조만 반환
+    let sharedPatternCount = 0;
+    for (const pattern of sharedPatterns) {
+        if (pattern.test(content)) {
+            sharedPatternCount++;
+        }
+    }
+    // 3개 이상의 공유 패턴이 발견되면 중복이 많은 것으로 판단
+    if (sharedPatternCount >= 3) {
+        // 기본 헤더와 References만 추출
+        const headerMatch = content.match(/^# .+\n\n>[^\n]+/);
+        const referencesMatch = content.match(/## References[\s\S]*$/);
+        let simplified = headerMatch ? headerMatch[0] : `# ${pkgName}`;
+        simplified += "\n\n> Core Rules는 semo-core/principles/를 참조합니다.";
+        if (referencesMatch) {
+            simplified += "\n\n" + referencesMatch[0];
+        }
+        return simplified;
+    }
+    // 그 외에는 전체 내용 반환
+    return content;
+}
+// === CLAUDE.md 생성 (패키지 CLAUDE.md 병합 지원 + 중복 제거) ===
 async function setupClaudeMd(cwd, extensions, force) {
     console.log(chalk_1.default.cyan("\n📄 CLAUDE.md 설정"));
     const claudeMdPath = path.join(cwd, ".claude", "CLAUDE.md");
@@ -1932,31 +2143,36 @@ async function setupClaudeMd(cwd, extensions, force) {
     let packageClaudeMdSections = "";
     // 1. 설치된 패키지에서 그룹 추출 (중복 제거)
     const installedGroups = [...new Set(extensions.map(pkg => pkg.split("/")[0]).filter(g => PACKAGE_GROUPS.includes(g)))];
-    // 2. 그룹 레벨 CLAUDE.md 먼저 병합 (biz, eng, ops)
+    // 2. 그룹 레벨 CLAUDE.md 먼저 병합 (biz, eng, ops) - 중복 제거 적용
     for (const group of installedGroups) {
         const groupClaudeMdPath = path.join(semoSystemDir, group, "CLAUDE.md");
         if (fs.existsSync(groupClaudeMdPath)) {
             const groupContent = fs.readFileSync(groupClaudeMdPath, "utf-8");
-            // 그룹 CLAUDE.md 헤더 레벨 조정 (# → ##, ## → ###)
-            const adjustedContent = groupContent
+            // 중복 제거 후 고유 콘텐츠만 추출
+            const uniqueContent = extractUniqueContent(groupContent, group);
+            // 헤더 레벨 조정 (# → ##, ## → ###)
+            const adjustedContent = uniqueContent
                 .replace(/^# /gm, "## ")
                 .replace(/^## /gm, "### ")
                 .replace(/^### /gm, "#### ");
             packageClaudeMdSections += `\n\n---\n\n${adjustedContent}`;
-            console.log(chalk_1.default.green(`  + ${group}/ 그룹 CLAUDE.md 병합됨`));
+            console.log(chalk_1.default.green(`  + ${group}/ 그룹 CLAUDE.md 병합됨 (고유 섹션만)`));
         }
     }
-    // 3. 개별 패키지 CLAUDE.md 병합
+    // 3. 개별 패키지 CLAUDE.md 병합 - 중복 제거 적용
     for (const pkg of extensions) {
         const pkgClaudeMdPath = path.join(semoSystemDir, pkg, "CLAUDE.md");
         if (fs.existsSync(pkgClaudeMdPath)) {
             const pkgContent = fs.readFileSync(pkgClaudeMdPath, "utf-8");
-            // 첫 헤더(#)를 ##로 변경하여 하위 섹션으로 만듦
-            const adjustedContent = pkgContent
+            const pkgName = EXTENSION_PACKAGES[pkg]?.name || pkg;
+            // 중복 제거 후 고유 콘텐츠만 추출
+            const uniqueContent = extractUniqueContent(pkgContent, pkgName);
+            // 헤더 레벨 조정
+            const adjustedContent = uniqueContent
                 .replace(/^# /gm, "### ")
                 .replace(/^## /gm, "#### ");
-            packageClaudeMdSections += `\n\n---\n\n## ${EXTENSION_PACKAGES[pkg].name} 패키지 컨텍스트\n\n${adjustedContent}`;
-            console.log(chalk_1.default.gray(`  + ${pkg}/CLAUDE.md 병합됨`));
+            packageClaudeMdSections += `\n\n---\n\n## ${pkgName} 패키지 컨텍스트\n\n${adjustedContent}`;
+            console.log(chalk_1.default.gray(`  + ${pkg}/CLAUDE.md 병합됨 (고유 섹션만)`));
         }
     }
     // 4. Orchestrator 참조 경로 결정 (Extension 패키지 우선)
