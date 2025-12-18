@@ -132,6 +132,46 @@ SEMO 스킬/에이전트를 직접 수정할 수 없습니다.
 | `semo-architecture-checker` | 아키텍처 검증 |
 | `routing-map` | 라우팅 구조 시각화 |
 
+## 🔴 Post-Action Triggers (자동 후속 조치)
+
+> **특정 조건 충족 시 자동으로 후속 스킬을 호출합니다.**
+
+| 조건 | 자동 트리거 | 설명 |
+|------|------------|------|
+| Meta 환경 + CLI 코드 수정 완료 | → `deploy-npm` skill | semo-cli npm 자동 배포 |
+| Meta 환경 + 스킬/에이전트 수정 완료 | → `version-manager` skill | 버전 범프 및 CHANGELOG 생성 |
+
+### 트리거 조건 판별
+
+```bash
+# 1. Meta 환경 확인
+if [ -d "semo-system" ] && [ ! -L "semo-system" ]; then
+  IS_META=true
+fi
+
+# 2. CLI 수정 여부 확인
+if git diff --name-only HEAD~1 | grep -q "packages/cli/"; then
+  CLI_MODIFIED=true
+fi
+
+# 3. 스킬/에이전트 수정 여부 확인
+if git diff --name-only HEAD~1 | grep -qE "(semo-skills|semo-core|packages/.*/skills)"; then
+  SEMO_MODIFIED=true
+fi
+```
+
+### 자동 트리거 메시지
+
+```
+[SEMO] Post-Action: {조건} 감지 → skill:{후속스킬}
+```
+
+**예시**:
+```
+[SEMO] Post-Action: CLI 수정 완료 → skill:deploy-npm
+[SEMO] Post-Action: 스킬 수정 완료 → skill:version-manager
+```
+
 ## 프로젝트 별칭 인식
 
 배포 요청 시 `.claude/memory/projects.md` 파일에서 프로젝트 별칭을 조회합니다.
