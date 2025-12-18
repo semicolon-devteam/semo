@@ -565,7 +565,7 @@ async function showVersionInfo(): Promise<void> {
     if (cli.needsUpdate) {
       console.log();
       console.log(chalk.yellow.bold("  ⚠️  CLI 업데이트 가능"));
-      console.log(chalk.cyan(`    npm update -g ${PACKAGE_NAME}`));
+      console.log(chalk.cyan(`    npm install -g ${PACKAGE_NAME}@latest`));
     } else {
       console.log();
       console.log(chalk.green("  ✓ 최신 버전"));
@@ -606,7 +606,7 @@ async function showVersionInfo(): Promise<void> {
       console.log();
       if (cliNeedsUpdate) {
         console.log(chalk.yellow.bold("  ⚠️  CLI 업데이트 가능"));
-        console.log(chalk.cyan(`    npm update -g ${PACKAGE_NAME}`));
+        console.log(chalk.cyan(`    npm install -g ${PACKAGE_NAME}@latest`));
       }
       if (otherNeedsUpdateCount > 0) {
         if (cliNeedsUpdate) console.log();
