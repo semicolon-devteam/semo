@@ -113,16 +113,18 @@ query {
 
 ---
 
-## 커뮤니티 프로젝트
+## 프로젝트 맵
 
-| 별칭 | 레포지토리 | 환경 | 배포 방법 |
-|------|-----------|------|----------|
-| 랜드, land, cm-land | semicolon-devteam/cm-land | dev | `dev` 브랜치 push |
-| 랜드, land, cm-land | semicolon-devteam/cm-land | stg | Milestone close |
-| 랜드, land, cm-land | semicolon-devteam/cm-land | prd | Milestone close + `source-tag` 라벨 |
-| 오피스, office, cm-office | semicolon-devteam/cm-office | dev | `dev` 브랜치 push |
-| 오피스, office, cm-office | semicolon-devteam/cm-office | stg | Milestone close |
-| 오피스, office, cm-office | semicolon-devteam/cm-office | prd | Milestone close + `source-tag` 라벨 |
+> **프로젝트 별칭, 레포지토리, Slack 채널 매핑**
+> 사용자가 별칭으로 프로젝트를 지칭하면 이 테이블을 참조합니다.
+
+| 별칭 | 레포지토리 | Slack 채널 | 설명 |
+|------|-----------|------------|------|
+| 랜드, land, cm-land | semicolon-devteam/cm-land | #cm-land | 랜드 커뮤니티 서비스 |
+| 오피스, office, cm-office | semicolon-devteam/cm-office | #cm-office | 오피스 커뮤니티 서비스 |
+| 백엔드, backend, core-backend | semicolon-devteam/core-backend | #backend | Spring Boot 중앙 서버 |
+| 정칩, jungchipan, cm-jungchipan | semicolon-devteam/cm-jungchipan | #cm-jungchipan | 정칩 커뮤니티 서비스 |
+| 협업, 일반 | - | #_협업 | 팀 공용 채널 |
 
 ---
 
