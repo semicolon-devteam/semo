@@ -47,7 +47,7 @@ gh issue create \
   --body "{rendered_template}" \
   --label "epic"
 
-# 3. Projects 연동 + 타입/우선순위 설정 (필수)
+# 3. Projects 연동 + Issue Type/우선순위 설정 (필수)
 ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/docs/issues/{issue_number} --jq '.node_id')
 
 # 3-1. Projects에 Item 추가 및 Item ID 획득
@@ -66,22 +66,17 @@ if [ -z "$ITEM_ID" ]; then
   exit 1
 fi
 
-# 3-2. 🔴 타입 필드를 "에픽"으로 설정 (필수)
+# 3-2. 🔴 GitHub Issue Type을 "Epic"으로 설정 (필수)
 gh api graphql -f query='
-  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
-    updateProjectV2ItemFieldValue(input: {
-      projectId: $projectId
-      itemId: $itemId
-      fieldId: $fieldId
-      value: { singleSelectOptionId: $optionId }
+  mutation {
+    updateIssue(input: {
+      id: "'"$ISSUE_NODE_ID"'"
+      issueTypeId: "IT_kwDOC01-Rc4BvVz5"
     }) {
-      projectV2Item { id }
+      issue { id title }
     }
   }
-' -f projectId="PVT_kwDOC01-Rc4AtDz2" \
-  -f itemId="$ITEM_ID" \
-  -f fieldId="PVTSSF_lADOC01-Rc4AtDz2zg2XDtA" \
-  -f optionId="389a3389"
+'
 
 # 3-3. 우선순위 필드 설정
 gh api graphql -f query='
@@ -137,7 +132,7 @@ gh api graphql -f query='
 
 > **Note**: `PVT_kwDOC01-Rc4AtDz2`는 `이슈관리` Projects (#1) ID입니다.
 >
-> **타입 옵션**: 에픽(`389a3389`), 버그(`acbe6dfc`), 태스크(`851de036`) - [priority-config.md](../common/priority-config.md) 참조
+> **GitHub Issue Type**: Epic(`IT_kwDOC01-Rc4BvVz5`), Bug(`IT_kwDOC01-Rc4BdOuc`), Task(`IT_kwDOC01-Rc4BdOub`), Feature(`IT_kwDOC01-Rc4BdOud`)
 
 ## 우선순위 옵션
 

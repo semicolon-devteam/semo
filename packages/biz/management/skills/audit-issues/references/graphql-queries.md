@@ -184,28 +184,32 @@ done
 
 ## 필드 값 추출 헬퍼
 
-### 특정 필드 값 추출 (jq)
+### GitHub Issue Type 조회
+
+> **Projects 커스텀 필드 '타입' 대신 GitHub Issue Type을 사용합니다.**
 
 ```bash
-# 타입 필드 추출
-gh api graphql -f query='...' | jq '
-  .data.organization.projectV2.items.nodes[] |
-  {
-    issue: .content.number,
-    title: .content.title,
-    type: (.fieldValues.nodes[] | select(.field.name == "타입") | .name)
-  }
-'
+# GitHub Issue Type 조회 (gh issue list)
+gh issue list --repo semicolon-devteam/semo --state open \
+  --json number,title,issueType \
+  --jq '.[] | {issue: .number, title: .title, type: .issueType.name}'
 ```
 
-### 필수 필드 누락 이슈 필터링
+### Issue Type 미설정 이슈 필터링
+
+```bash
+# GitHub Issue Type이 설정되지 않은 이슈 필터링
+gh issue list --repo semicolon-devteam/semo --state open \
+  --json number,title,issueType \
+  --jq '.[] | select(.issueType == null or .issueType.name == null)'
+```
+
+### 우선순위 미설정 이슈 필터링 (Projects 필드)
 
 ```bash
 gh api graphql -f query='...' | jq '
   .data.organization.projectV2.items.nodes[] |
   select(
-    (.fieldValues.nodes | map(select(.field.name == "타입")) | length) == 0
-    or
     (.fieldValues.nodes | map(select(.field.name == "우선순위")) | length) == 0
   ) |
   {
@@ -216,17 +220,20 @@ gh api graphql -f query='...' | jq '
 '
 ```
 
-### 작업량 미할당 태스크 필터링
+### 작업량 미할당 Task 필터링
 
 ```bash
+# Issue Type이 Task인 이슈 중 작업량 미설정 필터링
+# 1단계: Task 타입 이슈 조회
+gh issue list --repo semicolon-devteam/semo --state open \
+  --json number,title,issueType \
+  --jq '.[] | select(.issueType.name == "Task") | .number'
+
+# 2단계: Projects 작업량 필드 확인 (GraphQL)
 gh api graphql -f query='...' | jq '
   .data.organization.projectV2.items.nodes[] |
   select(
-    (.fieldValues.nodes[] | select(.field.name == "타입") | .name) == "태스크"
-    and
-    ((.fieldValues.nodes | map(select(.field.name == "작업량")) | length) == 0
-     or
-     (.fieldValues.nodes[] | select(.field.name == "작업량") | .number) == null)
+    (.fieldValues.nodes | map(select(.field.name == "작업량" and .number != null)) | length) == 0
   ) |
   {
     issue: .content.number,
@@ -282,22 +289,22 @@ PROJECT_DATA=$(gh api graphql -f query='
 echo "$PROJECT_DATA" > /tmp/project_items.json
 
 # 감사 실행
-echo "=== 필수 필드 누락 검토 ==="
+echo "=== 우선순위 누락 검토 ==="
 jq '.data.organization.projectV2.items.nodes[] |
   select(.content.state == "OPEN") |
   select(
-    ([.fieldValues.nodes[] | select(.field.name == "타입")] | length) == 0
+    ([.fieldValues.nodes[] | select(.field.name == "우선순위")] | length) == 0
   ) |
-  "\(.content.repository.name)#\(.content.number): \(.content.title) - 타입 누락"
+  "\(.content.repository.name)#\(.content.number): \(.content.title) - 우선순위 누락"
 ' /tmp/project_items.json
 
 echo ""
-echo "=== 작업량 미할당 태스크 ==="
+echo "=== 작업량 미할당 Task ==="
+# Note: Issue Type은 GitHub Issue의 기본 속성으로, gh issue list --json issueType으로 조회
+# Projects GraphQL에서는 작업량 필드만 확인
 jq '.data.organization.projectV2.items.nodes[] |
   select(.content.state == "OPEN") |
   select(
-    ([.fieldValues.nodes[] | select(.field.name == "타입" and .name == "태스크")] | length) > 0
-    and
     ([.fieldValues.nodes[] | select(.field.name == "작업량" and .number != null)] | length) == 0
   ) |
   "\(.content.repository.name)#\(.content.number): \(.content.title)"

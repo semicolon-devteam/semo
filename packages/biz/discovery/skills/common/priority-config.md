@@ -1,22 +1,40 @@
 # Priority Configuration
 
-> GitHub Projects #1 (이슈관리) 우선순위/타입 필드 설정을 위한 공통 설정
+> GitHub Projects #1 (이슈관리) 우선순위 필드 및 GitHub Issue Type 설정을 위한 공통 설정
 
 ## Project & Field IDs
 
 ```yaml
 Project ID: PVT_kwDOC01-Rc4AtDz2
 Field ID (우선순위): PVTSSF_lADOC01-Rc4AtDz2zg0YPyI
-Field ID (타입): PVTSSF_lADOC01-Rc4AtDz2zg2XDtA
 ```
 
-## 타입 옵션
+## GitHub Issue Type (이슈 유형)
 
-| 타입 | Option ID | 설명 |
-|------|-----------|------|
-| 에픽 | `389a3389` | Epic 이슈 |
-| 버그 | `acbe6dfc` | Bug 이슈 |
-| 태스크 | `851de036` | Task 이슈 |
+> **Projects 커스텀 필드 '타입' 대신 GitHub Issue Type을 사용합니다.**
+
+| Issue Type | ID | 설명 |
+|------------|-----|------|
+| Task | `IT_kwDOC01-Rc4BdOub` | 일반 태스크 |
+| Bug | `IT_kwDOC01-Rc4BdOuc` | 버그 리포트 |
+| Feature | `IT_kwDOC01-Rc4BdOud` | 기능 요청 |
+| Epic | `IT_kwDOC01-Rc4BvVz5` | 에픽 |
+
+**Issue Type 설정:**
+```bash
+ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/{repo}/issues/{number} --jq '.node_id')
+
+gh api graphql -f query='
+  mutation {
+    updateIssue(input: {
+      id: "'"$ISSUE_NODE_ID"'"
+      issueTypeId: "{ISSUE_TYPE_ID}"
+    }) {
+      issue { id title }
+    }
+  }
+'
+```
 
 ## 우선순위 옵션
 

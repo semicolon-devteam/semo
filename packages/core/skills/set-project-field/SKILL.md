@@ -2,7 +2,7 @@
 name: set-project-field
 description: |
   GitHub Projects 필드 값 설정 (공통 Skill). Use when (1) Issue에 작업량/우선순위 설정,
-  (2) Draft Task 생성 후 필드 자동 설정, (3) 타입/기술영역 필드 업데이트.
+  (2) Draft Task 생성 후 필드 자동 설정, (3) 기술영역 필드 업데이트.
 tools: [Bash, Read]
 model: inherit
 ---
@@ -15,19 +15,30 @@ model: inherit
 
 ## Purpose
 
-GitHub Issues를 '이슈관리' Project에 추가한 후, 작업량/우선순위/타입 등의 필드 값을 자동으로 설정합니다.
+GitHub Issues를 '이슈관리' Project에 추가한 후, 작업량/우선순위 등의 필드 값을 자동으로 설정합니다.
 
-### 지원 필드
+> **⚠️ Issue Type (Task/Bug/Epic 등)은 GitHub Issue Type을 사용합니다.**
+> Projects 커스텀 필드 '타입' 대신 GitHub 기본 속성인 Issue Type을 설정하세요.
+
+### 지원 필드 (Projects)
 
 | 필드명 | 필드 ID | 데이터 타입 | 설명 |
 |--------|---------|-------------|------|
 | **Status** | `PVTSSF_lADOC01-Rc4AtDz2zg0XXXX` | SINGLE_SELECT | 검수대기/작업중/완료 등 |
 | **작업량** | `PVTF_lADOC01-Rc4AtDz2zg0bhf0` | NUMBER | Estimation Point (1, 2, 3, 5, 8, 13) |
 | **우선순위** | `PVTSSF_lADOC01-Rc4AtDz2zg0YPyI` | SINGLE_SELECT | P0~P4 |
-| **타입** | `PVTSSF_lADOC01-Rc4AtDz2zg2XDtA` | SINGLE_SELECT | 에픽/버그/태스크 |
 | **기술영역** | `PVTSSF_lADOC01-Rc4AtDz2zg0X5BE` | SINGLE_SELECT | 프론트/백엔드/인프라 등 |
 | **시작일** | `PVTF_lADOC01-Rc4AtDz2zgs0OE4` | DATE | 작업 시작 예정일 |
 | **목표일** | `PVTF_lADOC01-Rc4AtDz2zg0X7kk` | DATE | 작업 완료 목표일 |
+
+### GitHub Issue Type (이슈 유형)
+
+| Type | ID | 용도 |
+|------|-----|------|
+| Task | `IT_kwDOC01-Rc4BdOub` | 일반 태스크 |
+| Bug | `IT_kwDOC01-Rc4BdOuc` | 버그 리포트 |
+| Feature | `IT_kwDOC01-Rc4BdOud` | 기능 요청 |
+| Epic | `IT_kwDOC01-Rc4BvVz5` | 에픽 |
 
 > **Note**: Status 필드 ID는 동적으로 조회해야 합니다. 아래 "Status 필드 조회" 섹션 참조.
 
@@ -127,28 +138,24 @@ gh api graphql -f query='
   -f optionId="$PRIORITY_OPTION"
 ```
 
-### 4. 타입 설정
+### 4. GitHub Issue Type 설정
 
 ```bash
-# 타입 옵션: 에픽(389a3389), 버그(acbe6dfc), 태스크(851de036)
+# Issue Type: Task(IT_kwDOC01-Rc4BdOub), Bug(IT_kwDOC01-Rc4BdOuc),
+#             Feature(IT_kwDOC01-Rc4BdOud), Epic(IT_kwDOC01-Rc4BvVz5)
 
-TYPE_OPTION="851de036"  # 태스크
+ISSUE_NODE_ID=$(gh api repos/$REPO/issues/$ISSUE_NUMBER --jq '.node_id')
 
 gh api graphql -f query='
-  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
-    updateProjectV2ItemFieldValue(input: {
-      projectId: $projectId
-      itemId: $itemId
-      fieldId: $fieldId
-      value: { singleSelectOptionId: $optionId }
+  mutation {
+    updateIssue(input: {
+      id: "'"$ISSUE_NODE_ID"'"
+      issueTypeId: "IT_kwDOC01-Rc4BdOub"
     }) {
-      projectV2Item { id }
+      issue { id title }
     }
   }
-' -f projectId="PVT_kwDOC01-Rc4AtDz2" \
-  -f itemId="$ITEM_ID" \
-  -f fieldId="PVTSSF_lADOC01-Rc4AtDz2zg2XDtA" \
-  -f optionId="$TYPE_OPTION"
+'
 ```
 
 ### 5. 날짜 필드 설정
@@ -187,7 +194,7 @@ input:
   repo: "semicolon-devteam/docs"
   effort: 3          # Estimation Point
   priority: "P2"     # 우선순위
-  type: "태스크"      # 타입
+  issue_type: "Task" # GitHub Issue Type
 ```
 
 ### Bug 이슈 Point 할당
@@ -214,13 +221,14 @@ input:
 | P3(낮음) | `2ba68eff` |
 | P4(매우 낮음) | `746928cf` |
 
-### 타입
+### GitHub Issue Type
 
-| 값 | Option ID |
-|----|-----------|
-| 에픽 | `389a3389` |
-| 버그 | `acbe6dfc` |
-| 태스크 | `851de036` |
+| Type | ID |
+|------|-----|
+| Task | `IT_kwDOC01-Rc4BdOub` |
+| Bug | `IT_kwDOC01-Rc4BdOuc` |
+| Feature | `IT_kwDOC01-Rc4BdOud` |
+| Epic | `IT_kwDOC01-Rc4BvVz5` |
 
 ## Status 필드 변경 (#16)
 

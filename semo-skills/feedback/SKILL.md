@@ -44,23 +44,14 @@ mcp__semo-integrations__github_create_issue
 
 ### Step 2: 이슈관리 프로젝트에 추가
 ```bash
-gh project item-add 13 --owner semicolon-devteam --url https://github.com/semicolon-devteam/semo/issues/{ISSUE_NUMBER}
+gh project item-add 1 --owner semicolon-devteam --url https://github.com/semicolon-devteam/semo/issues/{ISSUE_NUMBER}
 ```
 
-### Step 3: 타입 필드를 '버그'로 설정
-```bash
-# 프로젝트 아이템 ID 조회
-ITEM_ID=$(gh project item-list 13 --owner semicolon-devteam --format json | jq -r '.items[] | select(.content.number == {ISSUE_NUMBER}) | .id')
+### Step 3: GitHub Issue Type 설정 (필수!)
 
-# 타입 필드를 '버그'로 설정
-gh project item-edit --project-id PVT_kwDOC01-Rc4AtDz2 --id $ITEM_ID --field-id PVTSSF_lADOC01-Rc4AtDz2zg2XDtA --single-select-option-id acbe6dfc
-```
-
-### Step 4: GitHub Issue Type을 'Bug'로 설정 (필수!)
-
-> ⚠️ **프로젝트 필드 타입**과 **GitHub Issue Type**은 다른 개념입니다!
-> - Step 3: 프로젝트 보드의 커스텀 필드
-> - Step 4: GitHub 이슈 자체의 타입 속성 (`type:Bug` 필터용)
+> **GitHub Issue Type을 사용하여 이슈 유형을 관리합니다.**
+> - `type:Bug` 필터로 버그 이슈만 조회 가능
+> - Projects 커스텀 필드 대신 GitHub 기본 속성 사용
 
 ```bash
 # 이슈 node_id 조회
@@ -79,20 +70,9 @@ gh api graphql -f query='
 '
 ```
 
-**중요**: Step 4를 생략하면 GitHub의 `type:Bug` 필터에서 이슈가 보이지 않음!
-
-## 프로젝트 필드 ID 참조
-
-| 항목 | ID |
-|------|-----|
-| 이슈관리 프로젝트 | `PVT_kwDOC01-Rc4AtDz2` |
-| 타입 필드 | `PVTSSF_lADOC01-Rc4AtDz2zg2XDtA` |
-| 버그 옵션 | `acbe6dfc` |
-| 기능요청 옵션 | (조회 필요) |
+**중요**: Issue Type을 설정하지 않으면 GitHub의 `type:Bug` 필터에서 이슈가 보이지 않음!
 
 ## GitHub Issue Type ID 참조
-
-> **주의**: 프로젝트 필드 ID와 별개입니다!
 
 | 레포지토리 | Issue Type | ID |
 |-----------|------------|-----|
@@ -114,3 +94,9 @@ gh api graphql -f query='
   }
 '
 ```
+
+## 프로젝트 필드 ID 참조
+
+| 항목 | ID |
+|------|-----|
+| 이슈관리 프로젝트 | `PVT_kwDOC01-Rc4AtDz2` |

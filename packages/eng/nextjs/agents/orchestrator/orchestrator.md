@@ -95,6 +95,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 | 빠른 수정           | `skill:fast-track`      | "패스트트랙", "핫픽스", "오타수정" |
 | **태스크 리뷰**     | `skill:review-task`     | `리뷰해줘`, `태스크 리뷰`, `PR 전 검토` |
 | Draft Task 완성     | `skill:complete-draft-task` | "Draft Task 완성", "draft 라벨 제거" |
+| **테스트 요청**     | `skill:change-to-testing` | "테스트 요청", "QA에 넘겨", "테스트중으로" |
 
 ### 라우팅 우선순위 규칙
 
@@ -260,6 +261,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 - `skill:complete-draft-task` - Draft Task → 완성된 Task 변환
 - `skill:review-task` - 태스크 이슈카드 기반 구현 리뷰
 - `skill:spring-integration` - Spring Backend API 연동 가이드
+- `skill:change-to-testing` - QA 테스트 요청 (상태 변경 + QA 자동 할당)
 
 ## References
 

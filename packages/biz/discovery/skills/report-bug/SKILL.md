@@ -109,7 +109,7 @@ EOF
   --label "bug"
 ```
 
-### Step 3: Projects #1 연동 + 타입/우선순위 설정 (필수)
+### Step 3: Projects #1 연동 + Issue Type/우선순위 설정 (필수)
 
 ```bash
 # 1. Issue의 node_id 조회
@@ -132,22 +132,17 @@ if [ -z "$ITEM_ID" ]; then
   exit 1
 fi
 
-# 3. 🔴 타입 필드를 "버그"로 설정 (필수)
+# 3. 🔴 GitHub Issue Type을 "Bug"로 설정 (필수)
 gh api graphql -f query='
-  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
-    updateProjectV2ItemFieldValue(input: {
-      projectId: $projectId
-      itemId: $itemId
-      fieldId: $fieldId
-      value: { singleSelectOptionId: $optionId }
+  mutation {
+    updateIssue(input: {
+      id: "'"$ISSUE_NODE_ID"'"
+      issueTypeId: "IT_kwDOC01-Rc4BdOuc"
     }) {
-      projectV2Item { id }
+      issue { id title }
     }
   }
-' -f projectId="PVT_kwDOC01-Rc4AtDz2" \
-  -f itemId="$ITEM_ID" \
-  -f fieldId="PVTSSF_lADOC01-Rc4AtDz2zg2XDtA" \
-  -f optionId="acbe6dfc"
+'
 
 # 4. 심각도 → 우선순위 자동 매핑 후 설정
 # Critical → P0, High → P1, Medium → P2, Low → P3
@@ -168,7 +163,7 @@ gh api graphql -f query='
   -f optionId="{mapped_priority_option_id}"
 ```
 
-> **타입 옵션**: 버그(`acbe6dfc`), 에픽(`389a3389`), 태스크(`851de036`) - [priority-config.md](../common/priority-config.md) 참조
+> **GitHub Issue Type**: Bug(`IT_kwDOC01-Rc4BdOuc`), Task(`IT_kwDOC01-Rc4BdOub`), Epic(`IT_kwDOC01-Rc4BvVz5`), Feature(`IT_kwDOC01-Rc4BdOud`)
 >
 > **심각도 → 우선순위 매핑**: [severity-guide.md](references/severity-guide.md) 참조
 
@@ -183,7 +178,7 @@ gh api graphql -f query='
 **제목**: [Bug] {버그 제목}
 **라벨**: `bug`
 **심각도**: {severity}
-**타입**: 버그 (자동 설정)
+**Issue Type**: Bug (자동 설정)
 **우선순위**: {priority} (심각도에서 자동 설정)
 **Projects**: 이슈관리 (#1)에 연동 완료
 

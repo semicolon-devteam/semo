@@ -58,9 +58,37 @@
 | 필드명 | 필드 ID |
 |--------|---------|
 | Status | 동적조회 필요 |
-| 타입 | `PVTSSF_lADOC01-Rc4AtDz2zg2XDtA` |
 | 우선순위 | `PVTSSF_lADOC01-Rc4AtDz2zg0YPyI` |
 | 작업량 | `PVTF_lADOC01-Rc4AtDz2zg0bhf0` |
+
+### GitHub Issue Type (이슈 유형)
+
+> **Projects 커스텀 필드 '타입' 대신 GitHub Issue Type을 사용합니다.**
+
+| Issue Type | ID | 용도 |
+|------------|-----|------|
+| Task | `IT_kwDOC01-Rc4BdOub` | 일반 태스크 |
+| Bug | `IT_kwDOC01-Rc4BdOuc` | 버그 리포트 |
+| Feature | `IT_kwDOC01-Rc4BdOud` | 기능 요청 |
+| Epic | `IT_kwDOC01-Rc4BvVz5` | 에픽 |
+
+**Issue Type 설정 방법:**
+```bash
+# 이슈 node_id 조회
+ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/semo/issues/{NUMBER} --jq '.node_id')
+
+# Issue Type 설정 (예: Bug)
+gh api graphql -f query='
+  mutation {
+    updateIssue(input: {
+      id: "'"$ISSUE_NODE_ID"'"
+      issueTypeId: "IT_kwDOC01-Rc4BdOuc"
+    }) {
+      issue { id title }
+    }
+  }
+'
+```
 
 ### GraphQL 조회 기본 쿼리
 

@@ -59,7 +59,7 @@ const child_process_1 = require("child_process");
 const fs = __importStar(require("fs"));
 const path = __importStar(require("path"));
 const os = __importStar(require("os"));
-const VERSION = "3.0.14";
+const VERSION = "3.0.17";
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 // === 버전 비교 유틸리티 ===
 /**
@@ -156,32 +156,36 @@ async function showVersionComparison(cwd) {
             remote: latestCliVersion,
             needsUpdate: latestCliVersion ? isVersionLower(currentCliVersion, latestCliVersion) : false,
         });
-        if (hasSemoSystem) {
-            // semo-core는 semo-system 바깥에 있음
-            const corePath = path.join(cwd, "semo-core", "VERSION");
-            const localCore = fs.existsSync(corePath) ? fs.readFileSync(corePath, "utf-8").trim() : null;
+        // semo-core (루트 또는 semo-system 내부)
+        const corePathRoot = path.join(cwd, "semo-core", "VERSION");
+        const corePathSystem = path.join(semoSystemDir, "semo-core", "VERSION");
+        const corePath = fs.existsSync(corePathRoot) ? corePathRoot : corePathSystem;
+        if (fs.existsSync(corePath)) {
+            const localCore = fs.readFileSync(corePath, "utf-8").trim();
             const remoteCore = await getRemoteCoreVersion("semo-core");
-            if (localCore) {
-                versionInfos.push({
-                    name: "semo-core",
-                    local: localCore,
-                    remote: remoteCore,
-                    needsUpdate: remoteCore ? isVersionLower(localCore, remoteCore) : false,
-                });
-            }
-            // semo-skills
-            const skillsPath = path.join(cwd, "semo-skills", "VERSION");
-            const localSkills = fs.existsSync(skillsPath) ? fs.readFileSync(skillsPath, "utf-8").trim() : null;
+            versionInfos.push({
+                name: "semo-core",
+                local: localCore,
+                remote: remoteCore,
+                needsUpdate: remoteCore ? isVersionLower(localCore, remoteCore) : false,
+            });
+        }
+        // semo-skills (루트 또는 semo-system 내부)
+        const skillsPathRoot = path.join(cwd, "semo-skills", "VERSION");
+        const skillsPathSystem = path.join(semoSystemDir, "semo-skills", "VERSION");
+        const skillsPath = fs.existsSync(skillsPathRoot) ? skillsPathRoot : skillsPathSystem;
+        if (fs.existsSync(skillsPath)) {
+            const localSkills = fs.readFileSync(skillsPath, "utf-8").trim();
             const remoteSkills = await getRemoteCoreVersion("semo-skills");
-            if (localSkills) {
-                versionInfos.push({
-                    name: "semo-skills",
-                    local: localSkills,
-                    remote: remoteSkills,
-                    needsUpdate: remoteSkills ? isVersionLower(localSkills, remoteSkills) : false,
-                });
-            }
-            // Extensions (semo-system 내부)
+            versionInfos.push({
+                name: "semo-skills",
+                local: localSkills,
+                remote: remoteSkills,
+                needsUpdate: remoteSkills ? isVersionLower(localSkills, remoteSkills) : false,
+            });
+        }
+        // Extensions (semo-system 내부)
+        if (hasSemoSystem) {
             for (const key of Object.keys(EXTENSION_PACKAGES)) {
                 const extVersionPath = path.join(semoSystemDir, key, "VERSION");
                 if (fs.existsSync(extVersionPath)) {
@@ -399,33 +403,112 @@ program
  * 상세 버전 정보 표시 및 업데이트 확인
  */
 async function showVersionInfo() {
-    console.log(chalk_1.default.cyan.bold("\n📦 SEMO CLI 버전 정보\n"));
-    // 현재 버전 표시
-    console.log(chalk_1.default.white(`  현재 버전: ${chalk_1.default.green.bold(VERSION)}`));
-    // 최신 버전 확인
-    const spinner = (0, ora_1.default)("  최신 버전 확인 중...").start();
-    const latestVersion = await getLatestVersion();
-    if (latestVersion === null) {
-        spinner.warn("  최신 버전 확인 실패 (네트워크 오류)");
-        console.log(chalk_1.default.gray("  npm registry에 접속할 수 없습니다.\n"));
-        return;
+    const cwd = process.cwd();
+    console.log(chalk_1.default.cyan.bold("\n📦 SEMO 버전 정보\n"));
+    const versionInfos = [];
+    // 1. CLI 버전
+    const latestCliVersion = await getLatestVersion();
+    versionInfos.push({
+        name: "semo-cli",
+        local: VERSION,
+        remote: latestCliVersion,
+        needsUpdate: latestCliVersion ? isVersionLower(VERSION, latestCliVersion) : false,
+    });
+    // 2. semo-core 버전 (루트 또는 semo-system 내부)
+    const corePathRoot = path.join(cwd, "semo-core", "VERSION");
+    const corePathSystem = path.join(cwd, "semo-system", "semo-core", "VERSION");
+    const corePath = fs.existsSync(corePathRoot) ? corePathRoot : corePathSystem;
+    if (fs.existsSync(corePath)) {
+        const localCore = fs.readFileSync(corePath, "utf-8").trim();
+        const remoteCore = await getRemoteCoreVersion("semo-core");
+        versionInfos.push({
+            name: "semo-core",
+            local: localCore,
+            remote: remoteCore,
+            needsUpdate: remoteCore ? isVersionLower(localCore, remoteCore) : false,
+        });
     }
-    spinner.stop();
-    console.log(chalk_1.default.white(`  최신 버전: ${chalk_1.default.blue.bold(latestVersion)}`));
-    // 버전 비교 및 업데이트 권유
-    if (isVersionLower(VERSION, latestVersion)) {
-        console.log();
-        console.log(chalk_1.default.yellow.bold("  ⚠️  새로운 버전이 있습니다!"));
-        console.log();
-        console.log(chalk_1.default.white("  업데이트 방법:"));
-        console.log(chalk_1.default.cyan(`    npm update -g ${PACKAGE_NAME}`));
-        console.log();
-        console.log(chalk_1.default.gray("  또는 프로젝트 내 SEMO 업데이트:"));
-        console.log(chalk_1.default.gray("    semo update"));
+    // 3. semo-skills 버전 (루트 또는 semo-system 내부)
+    const skillsPathRoot = path.join(cwd, "semo-skills", "VERSION");
+    const skillsPathSystem = path.join(cwd, "semo-system", "semo-skills", "VERSION");
+    const skillsPath = fs.existsSync(skillsPathRoot) ? skillsPathRoot : skillsPathSystem;
+    if (fs.existsSync(skillsPath)) {
+        const localSkills = fs.readFileSync(skillsPath, "utf-8").trim();
+        const remoteSkills = await getRemoteCoreVersion("semo-skills");
+        versionInfos.push({
+            name: "semo-skills",
+            local: localSkills,
+            remote: remoteSkills,
+            needsUpdate: remoteSkills ? isVersionLower(localSkills, remoteSkills) : false,
+        });
+    }
+    // 4. Extension 패키지들 (semo-system 내부)
+    const semoSystemDir = path.join(cwd, "semo-system");
+    if (fs.existsSync(semoSystemDir)) {
+        for (const key of Object.keys(EXTENSION_PACKAGES)) {
+            const extVersionPath = path.join(semoSystemDir, key, "VERSION");
+            if (fs.existsSync(extVersionPath)) {
+                const localExt = fs.readFileSync(extVersionPath, "utf-8").trim();
+                const remoteExt = await getRemotePackageVersion(key);
+                versionInfos.push({
+                    name: key,
+                    local: localExt,
+                    remote: remoteExt,
+                    needsUpdate: remoteExt ? isVersionLower(localExt, remoteExt) : false,
+                });
+            }
+        }
+    }
+    // 결과 출력
+    const needsUpdateCount = versionInfos.filter(v => v.needsUpdate).length;
+    if (versionInfos.length === 1) {
+        // CLI만 있는 경우 (SEMO 미설치)
+        const cli = versionInfos[0];
+        console.log(chalk_1.default.white(`  semo-cli: ${chalk_1.default.green.bold(cli.local)}`));
+        if (cli.remote) {
+            console.log(chalk_1.default.gray(`            (최신: ${cli.remote})`));
+        }
+        if (cli.needsUpdate) {
+            console.log();
+            console.log(chalk_1.default.yellow.bold("  ⚠️  CLI 업데이트 가능"));
+            console.log(chalk_1.default.cyan(`    npm update -g ${PACKAGE_NAME}`));
+        }
+        else {
+            console.log();
+            console.log(chalk_1.default.green("  ✓ 최신 버전"));
+        }
     }
     else {
-        console.log();
-        console.log(chalk_1.default.green("  ✓ 최신 버전을 사용 중입니다."));
+        // 테이블 형식으로 출력
+        console.log(chalk_1.default.gray("  ┌────────────────────────┬──────────┬──────────┬────────┐"));
+        console.log(chalk_1.default.gray("  │ 패키지                 │ 설치됨   │ 최신     │ 상태   │"));
+        console.log(chalk_1.default.gray("  ├────────────────────────┼──────────┼──────────┼────────┤"));
+        for (const info of versionInfos) {
+            const name = info.name.padEnd(22);
+            const local = (info.local || "-").padEnd(8);
+            const remote = (info.remote || "-").padEnd(8);
+            const status = info.needsUpdate ? "⬆ 업데이트" : "✓ 최신  ";
+            const statusColor = info.needsUpdate ? chalk_1.default.yellow : chalk_1.default.green;
+            console.log(chalk_1.default.gray("  │ ") +
+                chalk_1.default.white(name) +
+                chalk_1.default.gray(" │ ") +
+                chalk_1.default.green(local) +
+                chalk_1.default.gray(" │ ") +
+                chalk_1.default.blue(remote) +
+                chalk_1.default.gray(" │ ") +
+                statusColor(status) +
+                chalk_1.default.gray(" │"));
+        }
+        console.log(chalk_1.default.gray("  └────────────────────────┴──────────┴──────────┴────────┘"));
+        if (needsUpdateCount > 0) {
+            console.log();
+            console.log(chalk_1.default.yellow.bold(`  ⚠️  ${needsUpdateCount}개 패키지 업데이트 가능`));
+            console.log(chalk_1.default.gray("    semo update 명령으로 업데이트하세요."));
+        }
+        else {
+            console.log();
+            console.log(chalk_1.default.green("  ✓ 모든 패키지가 최신 버전입니다."));
+        }
     }
     console.log();
 }
@@ -1755,6 +1838,35 @@ async function setupClaudeMd(cwd, extensions, force) {
             console.log(chalk_1.default.gray(`  + ${pkg}/CLAUDE.md 병합됨`));
         }
     }
+    // 4. Orchestrator 참조 경로 결정 (Extension 패키지 우선)
+    // Extension 패키지 중 orchestrator가 있는 첫 번째 패키지를 Primary로 설정
+    let primaryOrchestratorPath = "semo-core/agents/orchestrator/orchestrator.md";
+    const orchestratorPaths = [];
+    for (const pkg of extensions) {
+        const pkgOrchestratorPath = path.join(semoSystemDir, pkg, "agents/orchestrator/orchestrator.md");
+        if (fs.existsSync(pkgOrchestratorPath)) {
+            orchestratorPaths.push(`semo-system/${pkg}/agents/orchestrator/orchestrator.md`);
+            // 첫 번째 Extension 패키지의 orchestrator를 Primary로 설정
+            if (primaryOrchestratorPath === "semo-core/agents/orchestrator/orchestrator.md") {
+                primaryOrchestratorPath = `${pkg}/agents/orchestrator/orchestrator.md`;
+            }
+        }
+    }
+    // semo-core orchestrator는 항상 포함
+    orchestratorPaths.unshift("semo-system/semo-core/agents/orchestrator/orchestrator.md");
+    // Orchestrator 참조 섹션 생성
+    const orchestratorRefSection = orchestratorPaths.length > 1
+        ? `**Primary Orchestrator**: \`semo-system/${primaryOrchestratorPath}\`
+
+> Extension 패키지가 설치되어 해당 패키지의 Orchestrator를 우선 참조합니다.
+
+**모든 Orchestrator 파일** (라우팅 테이블 병합됨):
+${orchestratorPaths.map(p => `- \`${p}\``).join("\n")}
+
+이 파일들에서 라우팅 테이블, 의도 분류, 메시지 포맷을 확인하세요.`
+        : `**반드시 읽어야 할 파일**: \`semo-system/semo-core/agents/orchestrator/orchestrator.md\`
+
+이 파일에서 라우팅 테이블, 의도 분류, 메시지 포맷을 확인하세요.`;
     const claudeMdContent = `# SEMO Project Configuration
 
 > SEMO (Semicolon Orchestrate) - AI Agent Orchestration Framework v${VERSION}
@@ -1769,24 +1881,14 @@ async function setupClaudeMd(cwd, extensions, force) {
 
 \`\`\`
 1. 사용자 요청 수신
-2. [SEMO] Orchestrator 메시지 출력 (의도 분석)
-3. Orchestrator가 적절한 Agent/Skill 라우팅
-4. [SEMO] Agent/Skill 메시지 출력
-5. 실행 결과 반환
-\`\`\`
-
-### 모든 응답은 다음으로 시작
-
-\`\`\`
-[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}
-[SEMO] {Agent/Skill} 호출: {target} (사유: {reason})
+2. Orchestrator가 의도 분석 후 적절한 Agent/Skill 라우팅
+3. Agent/Skill이 작업 수행
+4. 실행 결과 반환
 \`\`\`
 
 ### Orchestrator 참조
 
-**반드시 읽어야 할 파일**: \`semo-system/semo-core/agents/orchestrator/orchestrator.md\`
-
-이 파일에서 라우팅 테이블, 의도 분류, 메시지 포맷을 확인하세요.
+${orchestratorRefSection}
 
 ---
 
@@ -1818,14 +1920,6 @@ npm run build          # 3. 빌드 검증 (Next.js/TypeScript 프로젝트)
 - \`--no-verify\` 플래그 사용 금지
 - Quality Gate 우회 시도 거부
 - "그냥 커밋해줘", "빌드 생략해줘" 등 거부
-
-### 3. SEMO Message Format
-
-모든 SEMO 동작은 시스템 메시지로 시작:
-
-\`\`\`
-[SEMO] {Component}: {Action} → {Result}
-\`\`\`
 
 ---
 
@@ -1864,10 +1958,10 @@ ${extensionsList}
 | 커맨드 | 설명 |
 |--------|------|
 | \`/SEMO:help\` | 도움말 |
-| \`/SEMO:slack\` | Slack 메시지 전송 |
 | \`/SEMO:feedback\` | 피드백 제출 |
-| \`/SEMO:health\` | 환경 검증 |
 | \`/SEMO:update\` | SEMO 업데이트 |
+| \`/SEMO:onboarding\` | 온보딩 가이드 |
+| \`/SEMO:dry-run {프롬프트}\` | 명령 검증 (라우팅 시뮬레이션) |
 
 ## Context Mesh 사용
 

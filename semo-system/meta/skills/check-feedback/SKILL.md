@@ -189,14 +189,14 @@ gh api repos/semicolon-devteam/semo/issues --jq '.[] | select(.state == "open") 
 semo-po         #12
 
 제목
-[Bug] Epic 생성 시 Projects 타입 필드 미설정
+[Bug] Epic 생성 시 GitHub Issue Type 미설정
 
 문의자
 @Reus
 
 수정 내용
 • v0.23.0에서 이미 수정됨
-• create-epic 스킬에 타입 필드 설정 추가
+• create-epic 스킬에 Issue Type 설정 추가
 
 🔗 GitHub 이슈 확인
 ```
