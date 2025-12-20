@@ -1877,6 +1877,7 @@ function updateGitignore(cwd) {
 .claude/*
 !.claude/memory/
 !.claude/memory/**
+semo-system/
 `;
     if (fs.existsSync(gitignorePath)) {
         const content = fs.readFileSync(gitignorePath, "utf-8");

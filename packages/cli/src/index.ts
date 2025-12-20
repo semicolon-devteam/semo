@@ -2134,6 +2134,7 @@ function updateGitignore(cwd: string) {
 .claude/*
 !.claude/memory/
 !.claude/memory/**
+semo-system/
 `;
 
   if (fs.existsSync(gitignorePath)) {
