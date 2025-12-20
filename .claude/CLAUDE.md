@@ -1,6 +1,6 @@
 # SEMO Project Configuration
 
-> SEMO (Semicolon Orchestrate) - AI Agent Orchestration Framework v3.0.21
+> SEMO (Semicolon Orchestrate) - AI Agent Orchestration Framework v3.0.23
 
 ---
 
@@ -31,18 +31,29 @@
 
 ---
 
-## 🔴 NON-NEGOTIABLE RULES
+## 🔴 NON-NEGOTIABLE RULES (Context-Independent)
+
+> **⚠️ 이 규칙은 컨텍스트 이월(summarization) 여부와 무관하게 항상 적용됩니다.**
+> **세션 요약 후에도 반드시 이 규칙을 따라야 합니다.**
 
 ### 1. Orchestrator-First Policy
 
 > **모든 요청은 반드시 Orchestrator를 통해 라우팅됩니다. 직접 처리 금지.**
 
-**직접 처리 금지 항목**:
-- 코드 작성/수정 → `implementation-master` 또는 `coder` 스킬
-- Git 커밋/푸시 → `git-workflow` 스킬
-- 품질 검증 → `quality-master` 또는 `verify` 스킬
-- 명세 작성 → `spec-master`
-- 일반 작업 → Orchestrator 분석 후 라우팅
+**Pre-Action Checklist** (작업 시작 전 필수 확인):
+| 작업 유형 | 라우팅 대상 | 직접 처리 |
+|----------|------------|----------|
+| 코드 작성/수정 | `coder` 스킬 | ❌ 금지 |
+| Git 커밋/푸시/PR | `git-workflow` 스킬 | ❌ 금지 |
+| 품질 검증 | `verify` 스킬 | ❌ 금지 |
+| 테스트 실행 | `tester` 스킬 | ❌ 금지 |
+| 배포 | `deployer` 스킬 | ❌ 금지 |
+
+**위반 감지 시 자동 리다이렉트**:
+```markdown
+[SEMO] ⚠️ Orchestrator-First 위반 감지
+→ skill:{적절한_스킬}로 라우팅합니다.
+```
 
 ### 2. Pre-Commit Quality Gate
 

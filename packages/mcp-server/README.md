@@ -83,6 +83,29 @@ npx @team-semicolon/semo-mcp
 | `SUPABASE_URL` | Supabase 프로젝트 URL | Supabase 사용 시 |
 | `SUPABASE_KEY` | Supabase 서비스 키 | Supabase 사용 시 |
 
+## 트러블슈팅
+
+### MCP 연결 끊김 (`Not connected` 에러)
+
+장시간 세션 사용 시 MCP 서버 연결이 끊어질 수 있습니다.
+
+**증상**:
+- `<error>Not connected</error>` 에러 반환
+- Slack, GitHub 등 MCP 도구 사용 불가
+
+**원인**:
+- MCP 서버 프로세스가 백그라운드에서 종료됨
+- Claude Code 내부 타임아웃 발생
+
+**해결 방법**:
+1. **VSCode/Claude Code 재시작** (가장 확실)
+2. 명령 팔레트에서 "Developer: Reload Window" 실행
+3. MCP 서버 상태 확인: `/mcp` 명령어로 연결 상태 체크
+
+**예방**:
+- 장시간 세션 시 주기적으로 MCP 도구 사용하여 연결 유지
+- 중요 작업 전 간단한 MCP 호출로 연결 상태 확인
+
 ## 개발
 
 ```bash
