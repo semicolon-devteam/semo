@@ -600,60 +600,94 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const body = args?.body as string;
       const labels = args?.labels as string;
 
-      if (!GITHUB_TOKEN) {
-        // gh CLI 사용 (토큰 없는 경우)
-        return {
-          content: [
-            {
-              type: "text",
-              text: `[SEMO] Integration: github/issues\n\n다음 명령어로 이슈를 생성하세요:\n\ngh issue create --repo ${repo} --title "${title}" --body "${body}"${labels ? ` --label "${labels}"` : ""}`,
+      // API 토큰이 있으면 직접 API 호출
+      if (GITHUB_TOKEN) {
+        try {
+          const response = await fetch(`https://api.github.com/repos/${repo}/issues`, {
+            method: "POST",
+            headers: {
+              "Authorization": `token ${GITHUB_TOKEN}`,
+              "Content-Type": "application/json",
+              "Accept": "application/vnd.github.v3+json",
             },
-          ],
-        };
-      }
+            body: JSON.stringify({
+              title,
+              body,
+              labels: labels ? labels.split(",").map((l) => l.trim()) : undefined,
+            }),
+          });
 
-      try {
-        const response = await fetch(`https://api.github.com/repos/${repo}/issues`, {
-          method: "POST",
-          headers: {
-            "Authorization": `token ${GITHUB_TOKEN}`,
-            "Content-Type": "application/json",
-            "Accept": "application/vnd.github.v3+json",
-          },
-          body: JSON.stringify({
-            title,
-            body,
-            labels: labels ? labels.split(",").map((l) => l.trim()) : undefined,
-          }),
-        });
+          const result = await response.json() as { html_url?: string; number?: number; message?: string };
 
-        const result = await response.json() as { html_url?: string; number?: number; message?: string };
-
-        if (result.html_url) {
+          if (result.html_url) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `[SEMO] Integration: github/issues 완료\n\n✅ 이슈 생성됨: #${result.number}\n${result.html_url}`,
+                },
+              ],
+            };
+          } else {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `[SEMO] Integration: github/issues 실패\n\n❌ ${result.message}`,
+                },
+              ],
+            };
+          }
+        } catch (error) {
           return {
             content: [
               {
                 type: "text",
-                text: `[SEMO] Integration: github/issues 완료\n\n✅ 이슈 생성됨: #${result.number}\n${result.html_url}`,
-              },
-            ],
-          };
-        } else {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `[SEMO] Integration: github/issues 실패\n\n❌ ${result.message}`,
+                text: `[SEMO] Integration: github/issues 오류\n\n❌ ${error}`,
               },
             ],
           };
         }
-      } catch (error) {
+      }
+
+      // 토큰 없으면 gh CLI 사용 (직접 실행)
+      try {
+        const { execSync } = await import("child_process");
+        const labelFlag = labels ? ` --label "${labels}"` : "";
+        // body를 파일로 저장하여 긴 텍스트 처리
+        const fs = await import("fs");
+        const os = await import("os");
+        const path = await import("path");
+        const tmpFile = path.join(os.tmpdir(), `semo-issue-${Date.now()}.md`);
+        fs.writeFileSync(tmpFile, body);
+
+        const cmd = `gh issue create --repo ${repo} --title "${title.replace(/"/g, '\\"')}" --body-file "${tmpFile}"${labelFlag}`;
+        const result = execSync(cmd, { encoding: "utf-8" });
+
+        // 임시 파일 정리
+        fs.unlinkSync(tmpFile);
+
+        // gh issue create는 URL을 반환함
+        const urlMatch = result.match(/https:\/\/github\.com\/[^\s]+/);
+        const issueUrl = urlMatch ? urlMatch[0] : result.trim();
+        const issueNumberMatch = issueUrl.match(/\/issues\/(\d+)/);
+        const issueNumber = issueNumberMatch ? issueNumberMatch[1] : "?";
+
         return {
           content: [
             {
               type: "text",
-              text: `[SEMO] Integration: github/issues 오류\n\n❌ ${error}`,
+              text: `[SEMO] Integration: github/issues 완료\n\n✅ 이슈 생성됨: #${issueNumber}\n${issueUrl}`,
+            },
+          ],
+        };
+      } catch (error) {
+        // gh CLI 실패 시 명령어 안내
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[SEMO] Integration: github/issues 오류\n\n❌ gh CLI 실행 실패: ${error}\n\n수동으로 이슈를 생성하세요:\ngh issue create --repo ${repo} --title "${title}" --body "..."${labels ? ` --label "${labels}"` : ""}`,
             },
           ],
         };
@@ -667,55 +701,85 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const head = args?.head as string;
       const base = (args?.base as string) || "main";
 
-      if (!GITHUB_TOKEN) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `[SEMO] Integration: github/pr\n\n다음 명령어로 PR을 생성하세요:\n\ngh pr create --repo ${repo} --title "${title}" --body "${body}" --head ${head} --base ${base}`,
+      // API 토큰이 있으면 직접 API 호출
+      if (GITHUB_TOKEN) {
+        try {
+          const response = await fetch(`https://api.github.com/repos/${repo}/pulls`, {
+            method: "POST",
+            headers: {
+              "Authorization": `token ${GITHUB_TOKEN}`,
+              "Content-Type": "application/json",
+              "Accept": "application/vnd.github.v3+json",
             },
-          ],
-        };
-      }
+            body: JSON.stringify({ title, body, head, base }),
+          });
 
-      try {
-        const response = await fetch(`https://api.github.com/repos/${repo}/pulls`, {
-          method: "POST",
-          headers: {
-            "Authorization": `token ${GITHUB_TOKEN}`,
-            "Content-Type": "application/json",
-            "Accept": "application/vnd.github.v3+json",
-          },
-          body: JSON.stringify({ title, body, head, base }),
-        });
+          const result = await response.json() as { html_url?: string; number?: number; message?: string };
 
-        const result = await response.json() as { html_url?: string; number?: number; message?: string };
-
-        if (result.html_url) {
+          if (result.html_url) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `[SEMO] Integration: github/pr 완료\n\n✅ PR 생성됨: #${result.number}\n${result.html_url}`,
+                },
+              ],
+            };
+          } else {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `[SEMO] Integration: github/pr 실패\n\n❌ ${result.message}`,
+                },
+              ],
+            };
+          }
+        } catch (error) {
           return {
             content: [
               {
                 type: "text",
-                text: `[SEMO] Integration: github/pr 완료\n\n✅ PR 생성됨: #${result.number}\n${result.html_url}`,
-              },
-            ],
-          };
-        } else {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `[SEMO] Integration: github/pr 실패\n\n❌ ${result.message}`,
+                text: `[SEMO] Integration: github/pr 오류\n\n❌ ${error}`,
               },
             ],
           };
         }
+      }
+
+      // 토큰 없으면 gh CLI 사용 (직접 실행)
+      try {
+        const { execSync } = await import("child_process");
+        const fs = await import("fs");
+        const os = await import("os");
+        const path = await import("path");
+        const tmpFile = path.join(os.tmpdir(), `semo-pr-${Date.now()}.md`);
+        fs.writeFileSync(tmpFile, body);
+
+        const cmd = `gh pr create --repo ${repo} --title "${title.replace(/"/g, '\\"')}" --body-file "${tmpFile}" --head ${head} --base ${base}`;
+        const result = execSync(cmd, { encoding: "utf-8" });
+
+        fs.unlinkSync(tmpFile);
+
+        const urlMatch = result.match(/https:\/\/github\.com\/[^\s]+/);
+        const prUrl = urlMatch ? urlMatch[0] : result.trim();
+        const prNumberMatch = prUrl.match(/\/pull\/(\d+)/);
+        const prNumber = prNumberMatch ? prNumberMatch[1] : "?";
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[SEMO] Integration: github/pr 완료\n\n✅ PR 생성됨: #${prNumber}\n${prUrl}`,
+            },
+          ],
+        };
       } catch (error) {
         return {
           content: [
             {
               type: "text",
-              text: `[SEMO] Integration: github/pr 오류\n\n❌ ${error}`,
+              text: `[SEMO] Integration: github/pr 오류\n\n❌ gh CLI 실행 실패: ${error}\n\n수동으로 PR을 생성하세요:\ngh pr create --repo ${repo} --title "${title}" --body "..." --head ${head} --base ${base}`,
             },
           ],
         };
