@@ -49,6 +49,7 @@ model: sonnet
 | **개선, 리팩토링, 품질, 최적화** | `skill:improve-code` |
 | **테스트, 검증해, 확인해** | `skill:run-tests` |
 | **분석, 스캔, 취약점, 보안 검사** | `skill:analyze-code` |
+| **리뷰, /SEMO:review, PR 리뷰** | `skill:review` |
 | 커밋, PR, 브랜치 | `skill:git-workflow` |
 | 도움말, SEMO 뭐야 | `skill:semo-help` |
 

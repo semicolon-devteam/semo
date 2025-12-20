@@ -49,6 +49,7 @@ model: inherit
 | 배포, 서비스 올려 | `deploy-service` | "stg에 배포해줘" |
 | 롤백, 되돌려 | `rollback-service` | "이전 버전으로 롤백" |
 | env 체크, 환경변수 | `sync-env` | "환경변수 확인해줘" |
+| **리뷰, /SEMO:review, PR 리뷰** | `review` | "리뷰해줘", "PR 리뷰" |
 | 도움말, 사용법 | `semo-help` | "/SEMO:help" |
 
 ---

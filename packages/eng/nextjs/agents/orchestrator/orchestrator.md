@@ -93,7 +93,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 | UI/프론트엔드 디자인 | `skill:frontend-design` | "UI 디자인", "화면 설계" |
 | **Spring API 연동** | `skill:spring-integration` | "Spring 연동", "API Client" |
 | 빠른 수정           | `skill:fast-track`      | "패스트트랙", "핫픽스", "오타수정" |
-| **태스크 리뷰**     | `skill:review-task`     | `리뷰해줘`, `태스크 리뷰`, `PR 전 검토` |
+| **PR/코드 리뷰**    | `skill:review`          | `/SEMO:review`, `리뷰해줘`, `PR 리뷰`, `태스크 리뷰`, `PR 전 검토` |
 | Draft Task 완성     | `skill:complete-draft-task` | "Draft Task 완성", "draft 라벨 제거" |
 | **테스트 요청**     | `skill:change-to-testing` | "테스트 요청", "QA에 넘겨", "테스트중으로" |
 | **E2E 테스트**     | `skill:e2e-test`          | "E2E 테스트", "런타임 테스트", "브라우저 테스트" |
@@ -260,7 +260,7 @@ Orchestrator는 다음을 **직접 처리하지 않습니다**:
 - `skill:frontend-design` - UI/프론트엔드 디자인
 - `skill:spec` - SDD 명세 (Phase 0 Brainstorming 포함)
 - `skill:complete-draft-task` - Draft Task → 완성된 Task 변환
-- `skill:review-task` - 태스크 이슈카드 기반 구현 리뷰
+- `skill:review` - PR/코드 통합 리뷰 (review-task + semicolon-reviewer)
 - `skill:spring-integration` - Spring Backend API 연동 가이드
 - `skill:change-to-testing` - QA 테스트 요청 (상태 변경 + QA 자동 할당)
 - `skill:e2e-test` - Playwright E2E 런타임 테스트

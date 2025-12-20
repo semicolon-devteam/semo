@@ -19,6 +19,7 @@ tools: [Read]
 | 워커, 백그라운드, 큐, 폴링 | `worker-architect` | 비동기 작업 처리 |
 | Prisma, 마이그레이션, 테이블 | `setup-prisma` Skill | DB 스키마 설정 |
 | 보일러플레이트, 스캐폴드 | `scaffold-service` Skill | 서비스 템플릿 |
+| **리뷰, /SEMO:review, PR 리뷰** | `skill:review` | PR/코드 리뷰 |
 
 ## Routing Logic
 
