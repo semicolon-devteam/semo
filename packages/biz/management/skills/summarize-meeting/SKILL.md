@@ -4,7 +4,7 @@ description: |
   정기 회고/회의 내용 정리. STT 스크립트와 회의록 링크를 받아 주요 결정사항 정리.
   Use when (1) "회의 내용 정리해줘", (2) STT 스크립트 + 회의록 URL 제공,
   (3) 정기 회고 결정사항 문서화.
-tools: [Bash, Read, WebFetch, AskUserQuestion]
+tools: [Bash, Read, WebFetch, AskUserQuestion, mcp__semo-integrations__slack_send_message]
 model: inherit
 ---
 
@@ -36,6 +36,8 @@ model: inherit
 | 파라미터 | 타입 | 설명 |
 |----------|------|------|
 | `agenda` | string[] | 회의 안건 목록 (없으면 STT에서 추론) |
+| `slack_channel` | string | Slack 알림 채널 (ID 또는 이름, 예: `#_협업`) |
+| `slack_mention` | string | 멘션 대상 (`@channel`, `@here`, 또는 특정 유저) |
 
 ## Workflow
 
@@ -55,7 +57,11 @@ STT 스크립트 + 회의록 URL 수신
     ↓
 5. 의사결정 로그 생성 제안
    ├─ 사용자 승인 → create-decision-log 스킬 호출
-   └─ 거절 → 종료
+   └─ 거절 → 계속
+    ↓
+6. (선택) Slack 알림 전송
+   ├─ slack_channel 파라미터 있음 → 알림 전송
+   └─ 없음 → 생략
     ↓
 완료
 ```
@@ -125,6 +131,45 @@ STT 스크립트에서 다음 패턴을 찾아 결정사항 추출:
 
 사용자가 승인하면 → `create-decision-log` 스킬 호출
 
+### Step 5: Slack 알림 전송 (선택)
+
+`slack_channel` 파라미터가 제공된 경우에만 실행:
+
+```
+mcp__semo-integrations__slack_send_message
+- channel: {slack_channel}
+- text: (아래 포맷)
+```
+
+#### Slack 메시지 포맷
+
+```markdown
+📋 *회의록 정리 완료*
+
+*회의*: {meeting_title}
+*일시*: {meeting_date}
+
+*주요 결정사항*:
+• {결정사항 1}
+• {결정사항 2}
+
+*액션 아이템*:
+• @{담당자1} - {할 일} (기한: {날짜})
+• @{담당자2} - {할 일} (기한: {날짜})
+
+📎 <{meeting_url}|회의록 보기>
+
+{slack_mention 있으면: @channel 또는 @here 또는 @user}
+```
+
+#### 멘션 처리
+
+| slack_mention 값 | 처리 |
+|-----------------|------|
+| `@channel` | `<!channel>` |
+| `@here` | `<!here>` |
+| `@사용자명` | Slack User ID 조회 후 `<@USER_ID>` |
+
 ## Output
 
 ### 성공
@@ -147,6 +192,8 @@ STT 스크립트에서 다음 패턴을 찾아 결정사항 추출:
 **의사결정 로그**: 2건 생성됨
 - [API 버전 관리 전략](https://github.com/.../discussions/YYY)
 - [모니터링 도구 선정](https://github.com/.../discussions/ZZZ)
+
+**Slack 알림**: #_협업 채널에 전송됨 ✅
 ```
 
 ## Quick Start
@@ -163,6 +210,18 @@ stt_script: |
   ...
 
 meeting_url: "https://github.com/semicolon-devteam/command-center/discussions/123"
+```
+
+### Slack 알림 포함
+
+```yaml
+stt_script: |
+  [화자1] 오늘 안건은 API 버전 관리에 대한 거예요.
+  ...
+
+meeting_url: "https://github.com/semicolon-devteam/command-center/discussions/123"
+slack_channel: "#_협업"
+slack_mention: "@channel"
 ```
 
 ## Related
