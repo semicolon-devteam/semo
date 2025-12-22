@@ -4,7 +4,7 @@ description: |
   외부 프로젝트 배포 관리. Use when (1) "배포해줘", "deploy",
   (2) 프로젝트 별칭 + 환경 (예: "랜드 stg 배포"), (3) Milestone 관리,
   (4) "stg에 뭐 올라가있어?", "prd 최신 버전", (5) "stg 반영 대기".
-tools: [Read, Bash, mcp__github__*]
+tools: [Read, Bash]
 model: inherit
 ---
 

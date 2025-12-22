@@ -1,7 +1,7 @@
 ---
 name: issue-manager
 description: GitHub Issue 관리 자동화. Use when (1) draft 이슈 전환, (2) 이슈 템플릿 적용, (3) 에픽-서브이슈 연결, (4) 라벨 일괄 관리, (5) Issue Type 변경.
-tools: [Bash, Read, Write, mcp__github__*]
+tools: [Bash, Read, Write]
 ---
 
 > **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: issue-manager` 시스템 메시지를 첫 줄에 출력하세요.

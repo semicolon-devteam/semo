@@ -3,7 +3,7 @@ name: feedback
 description: |
   피드백 관리. Use when (1) "피드백 등록해줘", "버그 신고",
   (2) GitHub 이슈 생성, (3) 피드백 확인.
-tools: [mcp__semo-integrations__github_create_issue, Bash]
+tools: [Bash]
 model: inherit
 ---
 
@@ -19,27 +19,42 @@ model: inherit
 - "이슈 만들어줘"
 - "피드백 확인해줘"
 
-## 이슈 생성
+## 🔴 gh CLI First Policy
 
-```
-mcp__semo-integrations__github_create_issue
-- repo: "semicolon-devteam/semo"
-- title: "이슈 제목"
-- body: "이슈 내용"
-- labels: "bug" 또는 "enhancement"
+> **GitHub 이슈 생성은 MCP 대신 `gh` CLI를 기본으로 사용합니다.**
+>
+> 📖 참조: [PRINCIPLES.md - gh CLI First Policy](../../semo-core/principles/PRINCIPLES.md#6-gh-cli-first-policy)
+
+### 이유
+
+- MCP 서버가 `settings.json`의 환경변수를 인식하지 못하는 문제 (#66)
+- `gh auth login`으로 인증된 로컬 CLI가 더 안정적
+- 별도의 토큰 설정 없이 바로 사용 가능
+
+## 이슈 생성 (gh CLI 사용)
+
+```bash
+# 이슈 생성
+gh issue create --repo semicolon-devteam/semo \
+  --title "이슈 제목" \
+  --body "이슈 내용" \
+  --label "bug"  # 또는 "enhancement"
 ```
 
 ## 버그 리포트 생성 워크플로우
 
 버그 리포트 생성 시 반드시 다음 3단계를 순차 실행:
 
-### Step 1: 이슈 생성
-```
-mcp__semo-integrations__github_create_issue
-- repo: "semicolon-devteam/semo"
-- title: "[Bug] {버그 제목}"
-- body: "{버그 내용}"
-- labels: "bug"
+### Step 1: 이슈 생성 (gh CLI)
+```bash
+# gh CLI로 이슈 생성 (권장)
+ISSUE_URL=$(gh issue create --repo semicolon-devteam/semo \
+  --title "[Bug] {버그 제목}" \
+  --body "{버그 내용}" \
+  --label "bug")
+
+# 이슈 번호 추출
+ISSUE_NUMBER=$(echo "$ISSUE_URL" | grep -oE '[0-9]+$')
 ```
 
 ### Step 2: 이슈관리 프로젝트에 추가
