@@ -64,6 +64,7 @@ model: inherit
 | 도움말, /SEMO:help | `skill:semo-help` | "도움말" |
 | 메모리, 컨텍스트 | `skill:memory` | "기억해줘" |
 | 버그 목록 | `skill:list-bugs` | "버그 목록" |
+| 이슈 관리, draft 전환, 라벨 | `skill:issue-manager` | "draft 이슈 전환해줘" |
 | 아키텍처, /SEMO:health | `skill:semo-architecture-checker` | "구조 검증" |
 | **리뷰, /SEMO:review** | `skill:review` | "리뷰해줘", "PR 리뷰" |
 | SEMO 수정 요청 | **환경 체크 필수** | "스킬 개선해줘" |
@@ -134,6 +135,7 @@ fi
 | `version-updater` | 버전 체크 |
 | `semo-help` | 도움말 |
 | `review` | PR/코드 리뷰 |
+| `issue-manager` | 이슈 관리 |
 
 ## 프로젝트 별칭
 
