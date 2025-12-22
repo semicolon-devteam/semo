@@ -40,12 +40,15 @@ Epic 작성 시 개발자가 구현 단계에서 할 질문들을 사전에 점�
 # 1. 템플릿 로드
 .claude/semo-po/templates/epic-template.md
 
-# 2. GitHub Issue 생성
+# 2. GitHub Issue 생성 (프로젝트명 라벨 사용)
+# 🔴 기술영역 라벨(epic, frontend, backend) 대신 프로젝트명 라벨 사용
 gh issue create \
   --repo semicolon-devteam/docs \
   --title "[Epic] {DOMAIN_NAME} · {short_description}" \
   --body "{rendered_template}" \
-  --label "epic"
+  --label "{project_label}"
+
+# 프로젝트명 라벨 예시: 차곡, 노조관리, 랜드, 오피스, 코인톡, 공통
 
 # 3. Projects 연동 + Issue Type/우선순위 설정 (필수)
 ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/docs/issues/{issue_number} --jq '.node_id')
