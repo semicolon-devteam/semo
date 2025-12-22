@@ -40,3 +40,8 @@ coverage/
 
 # === 민감한 디렉토리 ===
 core-db/
+
+.claude/*
+!.claude/memory/
+!.claude/memory/**
+semo-system
