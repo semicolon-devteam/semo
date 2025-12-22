@@ -17,11 +17,13 @@ echo $SLACK_BOT_TOKEN
 ### 설정 방법
 
 1. 프로젝트 루트에 `.env` 파일 생성 (`.gitignore`에 포함됨)
-2. 아래 형식으로 토큰 추가:
+2. 아래 Slack 문서에서 토큰을 복사하여 추가:
+
+   **[Slack Bot Token 문서](https://semicolon-devteam.slack.com/docs/TS7EF9R6K/F09M5E15WTX)**
+
    ```
    SLACK_BOT_TOKEN=xoxb-xxx-xxx-xxx
    ```
-3. 팀원에게 토큰은 별도 채널로 공유
 
 ## 채널 정보
 
