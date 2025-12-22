@@ -37,17 +37,17 @@ gh auth status
 
 ### 2. Slack Token
 
-> **📄 중앙 문서에서 관리**
+> **📁 로컬 .env 파일에서 관리 (Git 제외)**
 
 📖 **참조**: [slack-config.md](slack-config.md)
 
 ```text
-SLACK_BOT_TOKEN=xoxb-xxx...
+SLACK_BOT_TOKEN=xoxb-xxx-xxx-xxx
 ```
 
 **토큰 갱신 절차:**
 1. Slack App 설정에서 새 토큰 생성
-2. `slack-config.md` 업데이트
+2. `.env` 파일 업데이트
 3. semo-core 버저닝 (PATCH)
 
 ### 3. Supabase Token
@@ -67,7 +67,7 @@ SUPABASE_KEY=eyJ...
 | 서비스 | 관리 방법 | 위치 |
 |--------|----------|------|
 | GitHub | gh CLI 인증 | 로컬 (`gh auth login`) |
-| Slack | 중앙 문서 | `semo-core/_shared/slack-config.md` |
+| Slack | 로컬 .env | 프로젝트 루트 `.env` 파일 |
 | Supabase | 프로젝트별 | 각 프로젝트 `.env` |
 
 ## MCP vs CLI 선택 가이드

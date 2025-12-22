@@ -4,11 +4,24 @@
 
 ## Bot Token
 
-> 🔴 **토큰 갱신 시 이 파일만 수정하면 됩니다.**
+> 🔴 **토큰은 `.env` 파일에서 관리합니다. Git에 커밋하지 마세요!**
 
-```text
-SLACK_BOT_TOKEN=xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7
+```bash
+# 프로젝트 루트의 .env 파일에서 로드
+source .env  # 또는 export $(cat .env | xargs)
+
+# 환경변수 사용
+echo $SLACK_BOT_TOKEN
 ```
+
+### 설정 방법
+
+1. 프로젝트 루트에 `.env` 파일 생성 (`.gitignore`에 포함됨)
+2. 아래 형식으로 토큰 추가:
+   ```
+   SLACK_BOT_TOKEN=xoxb-xxx-xxx-xxx
+   ```
+3. 팀원에게 토큰은 별도 채널로 공유
 
 ## 채널 정보
 
@@ -36,19 +49,11 @@ SLACK_BOT_TOKEN=xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7
 
 ### Skill/Command에서 참조
 
-```markdown
-## Slack Bot Token
-
-> 📖 [semo-core/_shared/slack-config.md](../../semo-core/_shared/slack-config.md) 참조
-```
-
-### curl 명령어 템플릿
-
 ```bash
-# 이 파일에서 토큰 읽기 (실제 스크립트용)
-SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7"
+# .env에서 토큰 로드 후 사용
+SLACK_BOT_TOKEN="${SLACK_BOT_TOKEN}"
 
-curl -X POST https://slack.com/api/chat.postMessage \
+curl -s -X POST "https://slack.com/api/chat.postMessage" \
   -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
   -H "Content-Type: application/json; charset=utf-8" \
   -d '{
@@ -57,26 +62,35 @@ curl -X POST https://slack.com/api/chat.postMessage \
   }'
 ```
 
+### Claude Code에서 사용
+
+Claude Code는 환경변수를 직접 읽을 수 없으므로, 스킬 실행 시 `.env` 파일에서 토큰을 읽습니다:
+
+```bash
+# .env 파일에서 토큰 읽기
+SLACK_BOT_TOKEN=$(grep SLACK_BOT_TOKEN .env | cut -d '=' -f2)
+```
+
 ## 토큰 갱신 절차
 
 1. Slack App 설정에서 새 토큰 생성
-2. **이 파일의 Bot Token만 업데이트**
-3. semo-core 버저닝 (PATCH)
-4. `.claude/semo-core/` 동기화
+2. **프로젝트 루트의 `.env` 파일 업데이트**
+3. 팀원에게 새 토큰 공유 (Slack DM 또는 1Password 등)
 
-> 💡 다른 파일에서는 이 파일을 참조하므로, 토큰 갱신 시 이 파일만 수정하면 됩니다.
+> 💡 `.env` 파일은 Git에 커밋되지 않으므로, 토큰 공유는 별도 보안 채널을 사용하세요.
 
 ## 토큰 테스트
 
 ```bash
-SLACK_BOT_TOKEN="xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7"
+# .env에서 토큰 로드
+SLACK_BOT_TOKEN=$(grep SLACK_BOT_TOKEN .env | cut -d '=' -f2)
 
-curl -X POST https://slack.com/api/chat.postMessage \
+curl -s -X POST "https://slack.com/api/chat.postMessage" \
   -H "Authorization: Bearer $SLACK_BOT_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
     "channel": "C09KNL91QBZ",
-    "text": "🧪 SEMO Slack 연동 테스트"
+    "text": "SEMO Slack 연동 테스트"
   }'
 ```
 
