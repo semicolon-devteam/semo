@@ -1,6 +1,6 @@
 ---
 name: issue-manager
-description: GitHub Issue 관리 자동화. Use when (1) draft 이슈 전환, (2) 이슈 템플릿 적용, (3) 에픽-서브이슈 연결, (4) 라벨 일괄 관리.
+description: GitHub Issue 관리 자동화. Use when (1) draft 이슈 전환, (2) 이슈 템플릿 적용, (3) 에픽-서브이슈 연결, (4) 라벨 일괄 관리, (5) Issue Type 변경.
 tools: [Bash, Read, Write, mcp__github__*]
 ---
 
@@ -17,6 +17,7 @@ tools: [Bash, Read, Write, mcp__github__*]
 - "라벨 일괄", "라벨 변경"
 - "에픽 연결", "서브이슈 연결"
 - "이슈 템플릿"
+- "타입 변경", "Issue Type"
 
 ---
 
@@ -203,6 +204,52 @@ gh api repos/{owner}/{repo}/issues --jq '.[] | select(.labels[].name == "{label}
 
 **총 {N}개 이슈 변경 완료**
 ```
+
+---
+
+## 5. GitHub Issue Type 변경
+
+> **🔴 "타입" 요청 시 프로젝트 필드가 아닌 GitHub Issue Type을 우선 사용합니다.**
+
+### 트리거
+
+- "타입을 Bug로 변경해줘"
+- "이슈 타입 변경"
+- "Epic으로 바꿔줘"
+
+### 워크플로우
+
+```bash
+# 이슈 node_id 조회
+ISSUE_NODE_ID=$(gh api repos/{owner}/{repo}/issues/{issue_number} --jq '.node_id')
+
+# GitHub Issue Type 변경
+gh api graphql -f query='
+  mutation {
+    updateIssue(input: {
+      id: "'"$ISSUE_NODE_ID"'"
+      issueTypeId: "{issue_type_id}"
+    }) {
+      issue { id title }
+    }
+  }
+'
+```
+
+### Issue Type ID 참조
+
+| Type | ID | 설명 |
+|------|-----|------|
+| Task | `IT_kwDOC01-Rc4BdOub` | 일반 작업 |
+| Bug | `IT_kwDOC01-Rc4BdOuc` | 버그 리포트 |
+| Feature | `IT_kwDOC01-Rc4BdOud` | 기능 요청 |
+| Epic | `IT_kwDOC01-Rc4BvVz5` | 에픽 |
+
+### 주의사항
+
+- **프로젝트 필드의 "타입" 필드와 혼동 금지**
+- GitHub Issue Type은 `type:Bug` 같은 필터로 조회 가능
+- 프로젝트 필드는 프로젝트 보드 내에서만 사용
 
 ---
 
