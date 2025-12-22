@@ -27,6 +27,7 @@ model: inherit
 - 빌드 캐싱 전략
 - 시크릿 관리 가이드
 - 모노레포/멀티레포 CI 전략
+- **온프레미스 Supabase 환경 배포 플로우 가이드**
 
 ---
 
@@ -79,6 +80,21 @@ on:
 | `release-by-milestone.yml` | 마일스톤 릴리스 |
 | `tag-by-ops.yml` | 운영 태깅 |
 | `rollback.yml` | 롤백 |
+
+### 4. 온프레미스 Supabase 배포 플로우
+
+> 상세: [onpremise-supabase-deploy-flow.md](references/onpremise-supabase-deploy-flow.md)
+
+```text
+feature → dev (자동) → stg (Milestone) → prd (태깅) → 운영 (수동)
+```
+
+| 단계 | 트리거 | 액션 |
+|------|--------|------|
+| dev 배포 | PR 머지 to dev | 자동 배포 |
+| stg 배포 | Staging CI/CD 실행 | Milestone 기반 브랜치 생성 |
+| prd 태깅 | Production Tagging 실행 | Release 생성, Milestone close |
+| 운영 배포 | infra 레포 수동 | docker compose 재시작 |
 
 ---
 
@@ -185,3 +201,4 @@ gh api repos/semicolon-devteam/actions-template/contents/.github/workflows/{name
 
 - [workflow-templates.md](references/workflow-templates.md)
 - [dockerfile-patterns.md](references/dockerfile-patterns.md)
+- [onpremise-supabase-deploy-flow.md](references/onpremise-supabase-deploy-flow.md) - 온프레미스 Supabase 배포 플로우
