@@ -65,6 +65,8 @@
 | 동기화, sync | sync-project-status | Projects 관련 |
 | 작업량 설정, estimate 설정 | set-estimate | Sprint 할당 없이 작업량만 설정 |
 | 작업 시작, start task | start-task | 상태+시작일+이터레이션 일괄 설정 |
+| 회의 정리, 회의록, STT, 회고 정리 | summarize-meeting | STT 스크립트 + 회의록 URL 제공 시 |
+| 의사결정 로그, decision log | create-decision-log | 결정사항 기록 요청 시 |
 
 ---
 
