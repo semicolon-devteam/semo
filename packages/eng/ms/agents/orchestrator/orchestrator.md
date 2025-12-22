@@ -15,10 +15,13 @@ tools: [Read]
 | 키워드 | Agent/Skill | 사유 |
 |--------|-------------|------|
 | 서비스 설계, 아키텍처, 구조 | `service-architect` | 전체 서비스 설계 |
+| Go, Golang, Go 서비스, Go 아키텍처 | `go-architect` | Go 기반 MS 설계 |
 | 이벤트, 알림, 봉투, 스키마 | `event-designer` | 이벤트 기반 통신 |
 | 워커, 백그라운드, 큐, 폴링 | `worker-architect` | 비동기 작업 처리 |
-| Prisma, 마이그레이션, 테이블 | `setup-prisma` Skill | DB 스키마 설정 |
+| Prisma, 마이그레이션, 테이블 | `migrate-db` Skill | DB 마이그레이션 |
 | 보일러플레이트, 스캐폴드 | `scaffold-service` Skill | 서비스 템플릿 |
+| 배포, deploy, Docker, PM2, 롤백 | `deploy-service` Skill | 서비스 배포 |
+| 디버깅, 로그, 에러 분석, 헬스체크 | `debug-service` Skill | 서비스 디버깅 |
 | **리뷰, /SEMO:review, PR 리뷰** | `skill:review` | PR/코드 리뷰 |
 
 ## Routing Logic
@@ -29,17 +32,26 @@ Input Analysis
     ├─ "서비스 설계" / "아키텍처" / "새 서비스"
     │   └→ service-architect Agent
     │
+    ├─ "Go" / "Golang" / "Go 서비스" / "Makefile"
+    │   └→ go-architect Agent
+    │
     ├─ "이벤트" / "알림" / "봉투" / "EventEnvelope"
     │   └→ event-designer Agent
     │
     ├─ "워커" / "백그라운드" / "작업 큐" / "폴링"
     │   └→ worker-architect Agent
     │
-    ├─ "Prisma" / "스키마" / "마이그레이션"
-    │   └→ setup-prisma Skill
+    ├─ "Prisma" / "스키마" / "마이그레이션" / "migrate"
+    │   └→ migrate-db Skill
     │
     ├─ "보일러플레이트" / "스캐폴드" / "템플릿"
     │   └→ scaffold-service Skill
+    │
+    ├─ "배포" / "deploy" / "Docker 빌드" / "PM2" / "롤백"
+    │   └→ deploy-service Skill
+    │
+    ├─ "디버깅" / "로그" / "에러 분석" / "헬스체크 실패"
+    │   └→ debug-service Skill
     │
     └─ 기타 / 불명확
         └→ 직접 처리 또는 사용자에게 명확화 요청
@@ -89,6 +101,21 @@ Input Analysis
 - 워커 패턴 (microservice-conventions.md 섹션 6)
 - ms-scheduler 패턴
 
+### go-architect
+
+**역할**: Go 기반 마이크로서비스 설계
+
+**담당 영역**:
+- Go 프로젝트 구조 설계 (cmd/, internal/, pkg/)
+- Makefile 설정
+- Dockerfile 멀티스테이지 빌드
+- golangci-lint 설정
+- Swagger/OpenAPI 설정
+
+**참조 문서**:
+- [Go Project Layout](https://github.com/golang-standards/project-layout)
+- ms-gamer 참조
+
 ## Skill Descriptions
 
 ### scaffold-service
@@ -111,14 +138,45 @@ Input Analysis
 - 서비스별 이벤트 타입
 - Zod 스키마 (검증용)
 
-### setup-prisma
+### migrate-db
 
-Prisma 스키마 및 마이그레이션 설정
+Prisma/SQL 마이그레이션 관리
 
 **생성 항목**:
-- schema.prisma
-- 서비스별 스키마 설정
+- schema.prisma (Prisma)
+- SQL 마이그레이션 파일 (Go)
 - 테이블 prefix 적용
+
+**지원 스택**:
+- Prisma (Next.js/Node.js)
+- golang-migrate (Go)
+- Supabase CLI
+
+### deploy-service
+
+마이크로서비스 배포 자동화
+
+**지원 환경**:
+- development: Docker Compose
+- staging: Docker + PM2
+- production: Blue-Green 배포
+
+**주요 기능**:
+- Docker 이미지 빌드
+- 원격 서버 배포
+- 헬스체크 검증
+- 롤백 지원
+
+### debug-service
+
+마이크로서비스 디버깅 및 로그 분석
+
+**진단 항목**:
+- 서비스 상태 (헬스체크)
+- 로그 수집 (Docker/PM2)
+- 데이터베이스 연결
+- 환경변수 검증
+- 리소스 사용량
 
 ## Example Routing
 

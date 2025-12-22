@@ -6,20 +6,24 @@
 
 - **Package**: eng/platforms/ms
 - **Version**: [../../VERSION](../../VERSION) 참조
-- **Target**: ms-notifier, ms-scheduler, ms-ledger, ms-media-processor, ms-crawler
+- **Target**: ms-notifier, ms-scheduler, ms-ledger, ms-media-processor, ms-crawler, ms-collector, ms-allocator, ms-gamer
 - **Audience**: Backend 개발자 (마이크로서비스 담당)
 
 ---
 
 ## 서비스 코드 체계
 
-| 서비스 | 코드 | 테이블 Prefix | 포트 |
-|--------|------|---------------|------|
-| ms-notifier | NF | nf_ | 3000 |
-| ms-scheduler | SC | sc_ | 3003 |
-| ms-ledger | LG | lg_ | 3000 |
-| ms-media-processor | MP | - | 3001 |
-| ms-crawler | CR | - | 3333 |
+| 서비스 | 코드 | 테이블 Prefix | 포트 | 기술 스택 |
+|--------|------|---------------|------|-----------|
+| ms-notifier | NF | nf_ | 3000 | Next.js |
+| ms-scheduler | SC | sc_ | 3003 | Next.js |
+| ms-ledger | LG | lg_ | 3000 | Next.js |
+| ms-media-processor | MP | - | 3001 | Node.js |
+| ms-crawler | CR | - | 3333 | Node.js |
+| ms-collector | AG | ag_ | 3002 | Node.js |
+| ms-allocator | AL | al_ | 3004 | Next.js |
+| ms-gamer | GM | ladder_ | 8080 | Go |
+| ms-template | - | - | 3000 | Next.js (템플릿) |
 
 ---
 

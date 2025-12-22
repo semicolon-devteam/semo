@@ -86,6 +86,11 @@ src/
 
 ## Constraints
 
-- 기존 서비스 코드와 중복 금지 (NF, SC, LG, MP, CR 사용 중)
-- 포트 범위: 3000-3999
-- 반드시 헬스체크 엔드포인트 포함
+- 기존 서비스 코드와 중복 금지:
+  - Next.js: NF (notifier), SC (scheduler), LG (ledger), AL (allocator)
+  - Node.js: MP (media-processor), CR (crawler), AG (collector)
+  - Go: GM (gamer)
+- 포트 범위:
+  - Next.js/Node.js: 3000-3999
+  - Go: 8000-8999
+- 반드시 헬스체크 엔드포인트 포함 (`/api/health` 또는 `/health`)
