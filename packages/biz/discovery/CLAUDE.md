@@ -102,8 +102,47 @@ biz/management (스프린트 할당)
 
 ---
 
+## MVP/PoC 개발 시 커뮤니티 솔루션 컨텍스트
+
+> MVP/PoC 개발 요청 시 커뮤니티 솔루션 기반 옵션 제공
+
+### 트리거 키워드
+
+- "MVP 개발", "PoC 만들어줘", "프로토타입"
+- "빠른 검증", "패스트트랙"
+
+### 선택 워크플로우
+
+MVP/PoC 요청 감지 시 다음 옵션 제공:
+
+| 옵션 | 설명 |
+|------|------|
+| **커뮤니티 솔루션 기반** | cm-template + DDD 4-Layer + core-supabase 스키마 |
+| **패스트트랙 (독립)** | 최소 구조, 자체 스키마, 빠른 프로토타이핑 |
+
+### 커뮤니티 솔루션 선택 시
+
+1. DB 스키마: `core-supabase/document/combined.sql` 사용 (별도 SQL 제공 금지)
+2. 프로젝트 템플릿: cm-template 클론
+3. 상세 컨텍스트: [community-solution.md](../../semo-core/_shared/community-solution.md) 참조
+
+### poc 패키지 미설치 시 안내
+
+```markdown
+[SEMO] MVP/PoC 개발 권장 패키지
+
+⚠️ `biz/poc` 패키지가 설치되어 있지 않습니다.
+
+추천 액션:
+1. `semo add biz/poc` - PoC/MVP 전용 워크플로우 설치
+2. 현재 `discovery` 패키지로 진행 (Epic/Task 기반)
+```
+
+---
+
 ## References
 
 - [biz 레이어](../CLAUDE.md)
 - [design 패키지](../design/CLAUDE.md)
 - [management 패키지](../management/CLAUDE.md)
+- [커뮤니티 솔루션 컨텍스트](../../semo-core/_shared/community-solution.md)
