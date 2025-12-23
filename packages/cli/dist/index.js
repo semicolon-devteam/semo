@@ -806,8 +806,12 @@ function checkRequiredTools() {
         {
             name: "Supabase CLI",
             installed: false,
-            installCmd: isWindows ? "npm install -g supabase" : "brew install supabase/tap/supabase",
+            installCmd: isWindows ? "winget install Supabase.CLI" : "brew install supabase/tap/supabase",
             description: "Supabase 데이터베이스 연동",
+            windowsAltCmds: isWindows ? [
+                "scoop bucket add supabase https://github.com/supabase/scoop-bucket.git && scoop install supabase",
+                "choco install supabase"
+            ] : undefined,
         },
     ];
     // GitHub CLI 확인
@@ -849,6 +853,12 @@ async function showToolsStatus() {
         console.log(chalk_1.default.cyan("📋 설치 명령어:"));
         for (const tool of missingTools) {
             console.log(chalk_1.default.white(`   ${tool.installCmd}`));
+            if (tool.windowsAltCmds && tool.windowsAltCmds.length > 0) {
+                console.log(chalk_1.default.gray("   (대체 방법)"));
+                for (const altCmd of tool.windowsAltCmds) {
+                    console.log(chalk_1.default.gray(`   ${altCmd}`));
+                }
+            }
         }
         console.log();
         const { continueWithout } = await inquirer_1.default.prompt([

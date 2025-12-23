@@ -10,6 +10,30 @@ tools: [Bash, GitHub CLI]
 
 > GitHub Project 보드에 이슈 추가 및 상태 관리 자동화
 
+## 🔴 이슈관리 프로젝트 설정 (하드코딩)
+
+> **⚠️ 이슈관리 프로젝트 설정은 SEMO에 하드코딩되어 있습니다.**
+
+📖 **공통 설정 참조**: [github-projects.md](../../../core/_shared/github-projects.md)
+
+| 항목 | 값 |
+|------|-----|
+| **Project ID** | `PVT_kwDOC01-Rc4AtDz2` |
+| **Status Field ID** | `PVTSSF_lADOC01-Rc4AtDz2zgj4dzs` |
+| **Organization** | semicolon-devteam |
+| **Project Number** | 1 |
+
+### Status Option IDs
+
+| Status | Option ID |
+|--------|-----------|
+| 작업중 | `47fc9ee4` |
+| 리뷰요청 | `9b58620e` |
+| 테스트중 | `13a75176` |
+| 병합됨 | `98236657` |
+
+---
+
 ## Purpose
 
 이슈의 GitHub Projects 상태를 관리합니다:

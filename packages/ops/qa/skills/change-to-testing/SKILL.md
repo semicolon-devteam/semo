@@ -13,6 +13,20 @@ tools: [Bash, GitHub CLI]
 
 > 이슈를 "테스트중" 상태로 변경하고 QA 담당자를 자동 할당
 
+## 🔴 이슈관리 프로젝트 설정 (하드코딩)
+
+> **⚠️ 이슈관리 프로젝트 설정은 SEMO에 하드코딩되어 있습니다.**
+
+📖 **공통 설정 참조**: [github-projects.md](../../../../core/_shared/github-projects.md)
+
+| 항목 | 값 |
+|------|-----|
+| **Project ID** | `PVT_kwDOC01-Rc4AtDz2` |
+| **Status Field ID** | `PVTSSF_lADOC01-Rc4AtDz2zgj4dzs` |
+| **테스트중 Option ID** | `13a75176` |
+
+---
+
 ## 트리거
 
 - "테스트중으로 변경해줘", "테스트중으로 바꿔줘"

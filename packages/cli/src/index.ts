@@ -874,6 +874,7 @@ interface ToolCheckResult {
   version?: string;
   installCmd: string;
   description: string;
+  windowsAltCmds?: string[];
 }
 
 function checkRequiredTools(): ToolCheckResult[] {
@@ -887,8 +888,12 @@ function checkRequiredTools(): ToolCheckResult[] {
     {
       name: "Supabase CLI",
       installed: false,
-      installCmd: isWindows ? "npm install -g supabase" : "brew install supabase/tap/supabase",
+      installCmd: isWindows ? "winget install Supabase.CLI" : "brew install supabase/tap/supabase",
       description: "Supabase 데이터베이스 연동",
+      windowsAltCmds: isWindows ? [
+        "scoop bucket add supabase https://github.com/supabase/scoop-bucket.git && scoop install supabase",
+        "choco install supabase"
+      ] : undefined,
     },
   ];
 
@@ -935,6 +940,12 @@ async function showToolsStatus(): Promise<boolean> {
     console.log(chalk.cyan("📋 설치 명령어:"));
     for (const tool of missingTools) {
       console.log(chalk.white(`   ${tool.installCmd}`));
+      if (tool.windowsAltCmds && tool.windowsAltCmds.length > 0) {
+        console.log(chalk.gray("   (대체 방법)"));
+        for (const altCmd of tool.windowsAltCmds) {
+          console.log(chalk.gray(`   ${altCmd}`));
+        }
+      }
     }
     console.log();
 
