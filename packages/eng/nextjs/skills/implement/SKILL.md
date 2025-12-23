@@ -45,6 +45,56 @@ skill: implement({ resume: "v0.3.x" }); // Resume from phase
 3. **Supabase Patterns**: ALWAYS invoke `skill:fetch-supabase-example`
 4. **DDD Compliance**: All 4 layers MUST be implemented
 5. **Atomic Commits**: 작업 단위 최소화하여 중간중간 커밋
+6. **Icon Pack Standard**: 아이콘은 표준 팩 사용 (아래 참조)
+
+---
+
+## 🔴 Icon Pack Standard (NON-NEGOTIABLE)
+
+> **⚠️ SVG 인라인 작성 금지. 반드시 표준 아이콘 팩을 사용합니다.**
+
+### 권장 아이콘 팩 (우선순위)
+
+| 순위 | 패키지 | 설치 | 특징 |
+|------|--------|------|------|
+| 1 | **Lucide React** | `npm i lucide-react` | 트리쉐이킹 최적, 200+ 아이콘 |
+| 2 | Heroicons | `npm i @heroicons/react` | Tailwind 공식, 24px/20px |
+| 3 | React Icons | `npm i react-icons` | 멀티 팩 지원 (Feather, FA 등) |
+
+### 기본: Lucide React
+
+```tsx
+// ✅ 올바른 사용
+import { Search, Menu, X, ChevronDown } from 'lucide-react';
+
+<Search className="w-5 h-5" />
+<Menu className="w-6 h-6 text-gray-500" />
+```
+
+### 금지 패턴
+
+```tsx
+// ❌ SVG 인라인 작성 금지
+<svg viewBox="0 0 24 24">
+  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+</svg>
+
+// ❌ 직접 path 작성 금지 (렌더링 버그 위험)
+const Icon = () => <svg><path d="...복잡한 경로..."/></svg>;
+```
+
+### 프로젝트에 패키지 없을 시
+
+```bash
+# v0.0.x (CONFIG) 단계에서 설치
+npm install lucide-react
+```
+
+### 아이콘 검색
+
+- Lucide: https://lucide.dev/icons
+- Heroicons: https://heroicons.com/
+- React Icons: https://react-icons.github.io/react-icons/
 
 ## Dependencies
 

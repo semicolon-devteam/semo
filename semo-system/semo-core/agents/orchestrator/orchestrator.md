@@ -118,6 +118,8 @@ fi
 |------|------------|
 | Meta + CLI 수정 완료 | → `skill:deploy-npm` |
 | Meta + 스킬/에이전트 수정 완료 | → `skill:version-manager` |
+| **coder 스킬 완료** (구현 작업) | → 커밋 프롬프트 제시 |
+| coder + 이슈 브랜치 | → GitHub Issue 진행상황 코멘트 |
 
 ## Available Skills
 
