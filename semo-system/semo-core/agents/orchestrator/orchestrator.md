@@ -39,6 +39,7 @@ model: inherit
 | 메모리, 컨텍스트 | `skill:memory` | "기억해줘" |
 | 버그 목록 | `skill:list-bugs` | "버그 목록" |
 | 아키텍처, /SEMO:health | `skill:semo-architecture-checker` | "구조 검증" |
+| **중앙 DB, 마이크로서비스 DB, DB 스키마** | **직접 참조** | "중앙 DB 구조", "MS DB 현황" |
 | SEMO 수정 요청 | **환경 체크 필수** | "스킬 개선해줘" |
 
 ## 🔴 Extension 우선 라우팅 (구현 요청)
@@ -254,3 +255,78 @@ skill:implement 완료
 |------|------|
 | 랜드, land | cm-land |
 | 오피스, office | cm-office |
+
+---
+
+## 🔵 DB 컨텍스트 직접 참조
+
+> **"중앙 DB", "마이크로서비스 DB", "DB 스키마" 관련 질문은 컨텍스트 파일을 직접 읽어 응답합니다.**
+
+### 키워드 매칭
+
+| 키워드 | 참조 파일 | 내용 |
+|--------|----------|------|
+| 중앙 DB, core-central-db, 팀 DB | `semo-core/_shared/central-db.md` | 중앙 DB 역할, 서비스별 Prefix |
+| 마이크로서비스, MS 목록, 서비스 현황 | `.claude/memory/microservices.md` | 14개 MS 목록, 포트, 기술스택 |
+| DB 스키마, 테이블 prefix | 둘 다 참조 | 스키마 분리 규칙, Prefix 매핑 |
+| Supabase, core-supabase | `semo-core/_shared/central-db.md` | core-supabase vs core-central-db 구분 |
+| DB 연동, 메모리 연동 | `docs/semo-memory-core-db-integration-analysis.md` | SEMO-DB 연동 분석 리포트 |
+
+### 라우팅 로직
+
+```text
+Input Analysis
+    │
+    ├─ "중앙 DB" / "core-central-db" / "팀 데이터베이스"
+    │   └→ Read: semo-core/_shared/central-db.md
+    │
+    ├─ "마이크로서비스" / "MS 목록" / "서비스 현황" / "ms-*"
+    │   └→ Read: .claude/memory/microservices.md
+    │
+    ├─ "DB 스키마" / "테이블 prefix" / "스키마 분리"
+    │   └→ Read: 둘 다 참조 후 통합 응답
+    │
+    ├─ "Supabase" / "core-supabase"
+    │   └→ Read: semo-core/_shared/central-db.md (구분 설명)
+    │
+    └─ "DB 연동" / "메모리 연동" / "SEMO DB 통합"
+        └→ Read: docs/semo-memory-core-db-integration-analysis.md
+```
+
+### 응답 포맷
+
+```markdown
+[SEMO] Orchestrator: DB 컨텍스트 질의 → 직접 참조
+
+📄 참조: {file_path}
+
+{파일 내용 요약 또는 전체}
+```
+
+### 예시
+
+```markdown
+User: "중앙 DB 구조 알려줘"
+
+[SEMO] Orchestrator: DB 컨텍스트 질의 → 직접 참조
+
+📄 참조: semo-core/_shared/central-db.md
+
+## 중앙 DB (core-central-db)
+
+| 항목 | 값 |
+|------|-----|
+| **레포지토리** | `semicolon-devteam/core-central-db` |
+| **용도** | 팀 운영 + 마이크로서비스 DB |
+| **인프라** | On-premise Supabase |
+
+### 서비스별 DB Prefix
+
+| 서비스 | Prefix |
+|--------|--------|
+| ms-crawler | gt_ |
+| ms-collector | ag_ |
+| ms-gamer | gm_ |
+| ms-ledger | lg_ |
+...
+```
