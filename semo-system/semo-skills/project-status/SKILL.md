@@ -13,30 +13,14 @@ model: inherit
 
 > GitHub Projects Status 필드 변경
 
-## 🔴 이슈관리 프로젝트 설정 (하드코딩)
+## 🔴 필수 참조 파일
 
-> **⚠️ 이슈관리 프로젝트 설정은 SEMO에 하드코딩되어 있습니다.**
-> **프로젝트별 `.claude/memory/projects.md` 설정 불필요.**
+**반드시 먼저 읽을 파일**: `.claude/memory/projects.md`
 
-📖 **공통 설정 참조**: [github-projects.md](../../packages/core/_shared/github-projects.md)
-
-### 필수 값
-
-| 항목 | 값 |
-|------|-----|
-| **Project ID** | `PVT_kwDOC01-Rc4AtDz2` |
-| **Status Field ID** | `PVTSSF_lADOC01-Rc4AtDz2zgj4dzs` |
-| **Organization** | semicolon-devteam |
-| **Project Number** | 1 |
-
-### Status Option IDs
-
-| Status | Option ID |
-|--------|-----------|
-| 작업중 | `47fc9ee4` |
-| 리뷰요청 | `9b58620e` |
-| 테스트중 | `13a75176` |
-| 병합됨 | `98236657` |
+이 파일에서 다음 정보를 확인합니다:
+- GitHub Projects 설정 (Project ID, Number)
+- Status 옵션 및 Option ID
+- **상태값 Alias** (사용자 입력 → Status 값 매핑)
 
 ## Trigger Keywords
 
@@ -180,19 +164,31 @@ for ISSUE in $ISSUES; do
 done
 ```
 
+## Configuration
+
+> **⚠️ 아래 값은 예시입니다. 실제 값은 `.claude/memory/projects.md`에서 확인하세요.**
+
+```
+Project ID: .claude/memory/projects.md 참조
+Organization: .claude/memory/projects.md 참조
+Project Number: .claude/memory/projects.md 참조
+```
+
 ## 상태값 Alias 사용
 
 사용자가 "리뷰요청", "테스트중" 등의 한글/영문 키워드를 사용하면,
-위의 **Status Option IDs** 테이블을 참조하여 실제 Option ID로 매핑합니다.
+`.claude/memory/projects.md`의 **상태값 Alias** 테이블을 참조하여
+실제 Status 필드값으로 매핑합니다.
 
 **예시:**
 ```
 입력: "리뷰요청 이슈들 테스트중으로 바꿔줘"
 
-1. "리뷰요청" → Option ID "9b58620e"
-2. "테스트중" → Option ID "13a75176"
-3. 해당 Status의 이슈들 조회
-4. Status 변경 실행
+1. projects.md 읽기
+2. "리뷰요청" → Status "리뷰요청" 매핑
+3. "테스트중" → Status "테스트중" 매핑
+4. 해당 Status의 이슈들 조회
+5. Status 변경 실행
 ```
 
 ## References
