@@ -100,6 +100,70 @@ fi
 3. **Skill 우선**: 가능한 Skill로 위임
 4. **Meta 환경 체크**: SEMO 수정 요청 시 환경 확인
 
+---
+
+## 🔴 Pre-Action Guard (코드 작성 감지 시 스킬 강제 호출)
+
+> **⚠️ Edit/Write 도구로 코드 파일 수정 시도 감지 시, 반드시 implement 스킬로 라우팅합니다.**
+> **이 규칙은 Continuation 모드에서도 예외 없이 적용됩니다.**
+
+### 감지 대상
+
+| 파일 확장자 | 유형 |
+|------------|------|
+| `.ts`, `.tsx`, `.js`, `.jsx` | TypeScript/JavaScript |
+| `.py` | Python |
+| `.java`, `.kt` | Java/Kotlin |
+| `.go` | Go |
+| `.vue`, `.svelte` | Frontend Framework |
+| `.css`, `.scss`, `.sass` | Stylesheet |
+
+### 예외 (직접 수정 허용)
+
+| 파일 유형 | 사유 |
+|----------|------|
+| `.md` 파일 | 문서/스펙 작성 |
+| `package.json`, `*.config.*` | 설정 파일 |
+| `.env*` | 환경 변수 |
+| `VERSION`, `CHANGELOG*` | 버전 관리 |
+
+### 감지 시 동작
+
+```markdown
+[SEMO] ⚠️ Pre-Action Guard 발동
+
+코드 파일 수정 시도 감지: {file_path}
+
+→ Orchestrator-First Policy에 따라 skill:implement로 라우팅합니다.
+
+[SEMO] Orchestrator: 코드 작성 → skill:implement
+```
+
+### Continuation 모드 감지
+
+> **컨텍스트 재개(continuation) 상황에서도 Pre-Action Guard가 적용됩니다.**
+
+```text
+[Continuation 감지]
+    │
+    ├─ 이전 작업 상태 확인
+    │   └→ "기능 구현 중이었음" → skill:implement 자동 라우팅
+    │
+    └─ 코드 수정 시도 감지
+        └→ Pre-Action Guard 발동 → skill:implement
+```
+
+### 위반 감지 시 자동 리다이렉트
+
+```markdown
+[SEMO] ⚠️ Orchestrator-First 위반 감지
+
+직접 코드 수정 시도가 감지되었습니다.
+→ skill:implement로 자동 라우팅합니다.
+
+[SEMO] Skill: implement 호출 - {작업 설명}
+```
+
 ## Meta 환경 감지 (SEMO 수정 요청 시)
 
 ### 환경 판별
