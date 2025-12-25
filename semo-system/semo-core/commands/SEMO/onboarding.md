@@ -56,39 +56,11 @@ npx @team-semicolon/semo-cli add
 2. 패키지 선택 (Standard / Extension)
 3. .claude/ 디렉토리 생성
 4. semo-system/ 파일 설치
-5. 환경변수 설정 (아래 참조)
-6. Claude Code 재시작
-7. /SEMO:help로 시작
-```
-
-## 🔴 환경변수 설정 (필수)
-
-> **Slack 알림 기능을 사용하려면 환경변수 설정이 필요합니다.**
-
-### 설정 방법
-
-1. 프로젝트 루트에 `.env` 파일 생성 (없는 경우)
-2. 아래 Slack 문서에서 토큰을 복사하여 `.env`에 추가:
-
-   **[Slack Bot Token 문서](https://semicolon-devteam.slack.com/docs/TS7EF9R6K/F09M5E15WTX)**
-
-   ```bash
-   # .env 파일 내용
-   SLACK_BOT_TOKEN=xoxb-xxx-xxx-xxx
-   ```
-
-3. `.env` 파일은 `.gitignore`에 포함되어 Git에 커밋되지 않음
-
-### GitHub 인증
-
-GitHub 관련 기능은 `gh` CLI 인증을 사용합니다:
-
-```bash
-gh auth login
+5. Claude Code 재시작
+6. /SEMO:help로 시작
 ```
 
 ## 참조
 
 - [SEMO CLI](https://www.npmjs.com/package/@team-semicolon/semo-cli)
 - [SEMO 원칙](semo-system/semo-core/principles/PRINCIPLES.md)
-- [토큰 관리 가이드](packages/core/_shared/token-management.md)

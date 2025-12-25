@@ -20,41 +20,14 @@ model: inherit
 
 모든 사용자 요청을 분석하고 적절한 Agent 또는 Skill로 라우팅하는 **Primary Router**입니다.
 
-## 🔴 라우팅 우선순위 (NON-NEGOTIABLE)
-
-> **⚠️ SEMO 컴포넌트 CRUD 요청은 coder/planner/tester가 아닌 전용 manager로 라우팅합니다.**
-
-### 우선순위 체크 (순서대로)
-
-```text
-1. SEMO 컴포넌트 키워드 감지?
-   → "스킬", "에이전트", "커맨드", "Skill", "Agent", "Command"
-   → YES: skill-manager / agent-manager / command-manager 로 라우팅
-   → NO: 다음 단계
-
-2. 일반 코드 작업?
-   → coder / planner / tester 로 라우팅
-```
-
-### SEMO 컴포넌트 CRUD → 전용 Manager
-
-| 키워드 조합 | Route To | 예시 |
-|------------|----------|------|
-| 스킬/Skill + 만들어/추가/수정/삭제 | `agent:skill-manager` | "스킬 만들어줘" |
-| 에이전트/Agent + CRUD | `agent:agent-manager` | "에이전트 추가해줘" |
-| 커맨드/Command + CRUD | `agent:command-manager` | "커맨드 수정해줘" |
-
-> **coder 스킬은 일반 애플리케이션 코드 작성용입니다. SEMO 컴포넌트 관리는 전용 manager를 사용합니다.**
-
----
-
 ## Quick Routing Table
 
 > 📄 상세: [_shared/routing-base.md](_shared/routing-base.md)
 
 | 키워드 | Route To | 예시 |
 |--------|----------|------|
-| 코드 작성, 구현 (일반) | `skill:coder` | "로그인 기능 만들어줘" |
+| 구현, implement | **Extension 우선** | "기능 구현해줘" |
+| 코드 작성, 수정 | `skill:coder` | "함수 하나 만들어줘" |
 | 테스트 | `skill:tester` | "테스트 작성해줘" |
 | 계획, 설계 | `skill:planner` | "구현 계획 세워줘" |
 | 배포, {별칭} 배포 | `skill:deployer` | "랜드 stg 배포해줘" |
@@ -64,10 +37,53 @@ model: inherit
 | 도움말, /SEMO:help | `skill:semo-help` | "도움말" |
 | 메모리, 컨텍스트 | `skill:memory` | "기억해줘" |
 | 버그 목록 | `skill:list-bugs` | "버그 목록" |
-| 이슈 관리, draft 전환, 라벨 | `skill:issue-manager` | "draft 이슈 전환해줘" |
 | 아키텍처, /SEMO:health | `skill:semo-architecture-checker` | "구조 검증" |
-| **리뷰, /SEMO:review** | `skill:review` | "리뷰해줘", "PR 리뷰" |
 | SEMO 수정 요청 | **환경 체크 필수** | "스킬 개선해줘" |
+
+## 🔴 Extension 우선 라우팅 (구현 요청)
+
+> **"구현해줘", "implement" 요청 시 Extension 패키지의 implement 스킬 우선 호출**
+
+### 라우팅 우선순위
+
+```text
+"구현해줘" / "기능 구현" / "implement"
+    │
+    ├─ eng/nextjs 설치됨?
+    │   └→ skill:implement (nextjs) - ADD Phase 4, DDD 4-layer
+    │
+    ├─ eng/spring 설치됨?
+    │   └→ skill:implement (spring) - CQRS + Reactive
+    │
+    ├─ biz/poc 설치됨?
+    │   └→ skill:implement-mvp - 간소화 MVP 구현
+    │
+    └→ 기본: skill:coder - 단순 코드 작성
+```
+
+### 환경 감지
+
+```bash
+# Extension 패키지 설치 여부 확인
+if [ -d "semo-system/eng/nextjs" ]; then
+  IMPL_SKILL="implement"  # nextjs implement
+elif [ -d "semo-system/eng/spring" ]; then
+  IMPL_SKILL="implement"  # spring implement
+elif [ -d "semo-system/biz/poc" ]; then
+  IMPL_SKILL="implement-mvp"
+else
+  IMPL_SKILL="coder"  # 기본
+fi
+```
+
+### coder vs implement 구분
+
+| 요청 유형 | 라우팅 대상 | 특징 |
+|----------|------------|------|
+| "함수 하나 만들어줘" | `coder` | 단순 코드 작성 |
+| "버그 수정해줘" | `coder` | 파일 단위 수정 |
+| "기능 구현해줘" | `implement` | ADD Phase 4 워크플로우 |
+| "태스크 구현해줘" | `implement` | spec.md 기반 체계적 구현 |
 
 ## SEMO Message Format
 
@@ -118,8 +134,6 @@ fi
 |------|------------|
 | Meta + CLI 수정 완료 | → `skill:deploy-npm` |
 | Meta + 스킬/에이전트 수정 완료 | → `skill:version-manager` |
-| **coder 스킬 완료** (구현 작업) | → 커밋 프롬프트 제시 |
-| coder + 이슈 브랜치 | → GitHub Issue 진행상황 코멘트 |
 
 ## Available Skills
 
@@ -136,8 +150,6 @@ fi
 | `memory` | 컨텍스트 관리 |
 | `version-updater` | 버전 체크 |
 | `semo-help` | 도움말 |
-| `review` | PR/코드 리뷰 |
-| `issue-manager` | 이슈 관리 |
 
 ## 프로젝트 별칭
 

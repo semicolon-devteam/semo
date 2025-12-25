@@ -18,34 +18,6 @@
 | 메모리, 컨텍스트 | `skill:memory` | "컨텍스트 저장해줘" |
 | 구조, 아키텍처 | `skill:semo-architecture-checker` | "구조 검증해줘" |
 
-## 🔴 GitHub Issue Type 우선 정책
-
-> **"타입" 관련 요청 시 프로젝트 필드가 아닌 GitHub Issue Type을 우선 사용합니다.**
-
-### 구분
-
-| 구분 | 설명 | 용도 |
-|------|------|------|
-| **GitHub Issue Type** | 이슈 자체의 타입 속성 | `type:Bug`, `type:Epic` 필터링 |
-| 프로젝트 타입 필드 | 프로젝트 보드 커스텀 필드 | 프로젝트 내 분류용 (사용 지양) |
-
-### 타입 변경 요청 처리
-
-```markdown
-요청: "이슈 타입을 Bug로 변경해줘"
-→ GitHub Issue Type 변경 (updateIssue mutation)
-→ 프로젝트 필드 변경 ❌
-```
-
-### Issue Type ID 참조
-
-| Type | ID |
-|------|-----|
-| Task | `IT_kwDOC01-Rc4BdOub` |
-| Bug | `IT_kwDOC01-Rc4BdOuc` |
-| Feature | `IT_kwDOC01-Rc4BdOud` |
-| Epic | `IT_kwDOC01-Rc4BvVz5` |
-
 ## 키워드 우선순위
 
 동일 요청에 여러 키워드가 매칭될 경우:
@@ -53,7 +25,6 @@
 1. **구체적 키워드 우선**: "테스트 코드 작성" → `tester` (not `coder`)
 2. **접두사 우선**: `[next] 구현해줘` → eng/nextjs orchestrator
 3. **이슈 번호 우선**: "#123 작업해줘" → 이슈 기반 라우팅
-4. **Issue Type 우선**: "타입 변경" → GitHub Issue Type (not 프로젝트 필드)
 
 ## 라우팅 실패 시
 

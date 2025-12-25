@@ -24,7 +24,8 @@ SEMO 패키지 관리 요청을 분석하고 적절한 에이전트로 위임하
 | 키워드 | Route To | 예시 |
 |--------|----------|------|
 | Agent + CRUD | `agent-manager` | "Agent 만들어줘" |
-| Skill + CRUD | `skill-manager` | "Skill 검토해줘" |
+| Skill + 생성, 만들어 | `skill-creator` | "Skill 만들어줘", "스킬 생성" |
+| Skill + CRUD (검토/수정/삭제) | `skill-manager` | "Skill 검토해줘" |
 | Command + CRUD | `command-manager` | "커맨드 추가해줘" |
 | 검증, validate | `package-validator` | "패키지 체크해줘" |
 | 버전, 릴리스 | `version-manager` | "버전 올려줘" |

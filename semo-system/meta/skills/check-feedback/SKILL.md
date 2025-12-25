@@ -25,50 +25,7 @@ tools: [Bash]
 ### 1. semo 레포지토리 Open 이슈 수집
 
 ```bash
-gh api repos/semicolon-devteam/semo/issues --jq '.[] | select(.state == "open") | {
-  number: .number,
-  title: .title,
-  labels: [.labels[].name],
-  created_at: (.created_at | split("T")[0]),
-  author: .user.login,
-  body: .body
-}'
-```
-
-### 2. 프로젝트 정보 추출
-
-이슈 본문에서 프로젝트 정보를 추출합니다:
-
-```bash
-# 본문에서 프로젝트명 패턴 추출
-# 패턴: "발생 프로젝트: {name}", "[{project}]", "프로젝트: {name}"
-extract_project() {
-  local body="$1"
-  # 우선순위: 명시적 필드 > 라벨 > 접두사
-  echo "$body" | grep -oE '(발생 프로젝트|프로젝트)[:\s]*[가-힣a-zA-Z0-9_-]+' | head -1 | sed 's/.*[:\s]//'
-}
-```
-
-### 3. GitHub → Slack 사용자 매칭
-
-> 📖 **팀원 매핑**: [semo-core/_shared/team-members.md](../../semo-core/_shared/team-members.md) 참조
-
-```bash
-# GitHub ID → 팀원 이름 변환
-get_member_name() {
-  local github_id="$1"
-  case "$github_id" in
-    "reus-jeon") echo "Reus" ;;
-    "garden92") echo "Garden" ;;
-    "kokkh") echo "Goni" ;;
-    "kyago") echo "kyago" ;;
-    "Roki-Noh") echo "Roki" ;;
-    "Brightbong92") echo "bon" ;;
-    "gtod8010") echo "dwight.k" ;;
-    "Yeomsoyam") echo "Yeomso" ;;
-    *) echo "$github_id" ;;
-  esac
-}
+gh api repos/semicolon-devteam/semo/issues --jq '.[] | select(.state == "open") | "- #\(.number) | \(.title) | [\(.labels | map(.name) | join(\", \"))] | \(.created_at | split(\"T\")[0])"'
 ```
 
 ## Output Format
@@ -77,74 +34,12 @@ get_member_name() {
 ## 📋 SEMO 피드백 현황
 
 ### 📦 semo
-| # | 제목 | 프로젝트 | 작성자 | 라벨 | 생성일 |
-|---|------|----------|--------|------|--------|
-| #1 | 이슈 제목 | cm-labor-union | Reus | bug | 2024-12-01 |
+| # | 제목 | 라벨 | 생성일 |
+|---|------|------|--------|
+| #1 | 이슈 제목 | bug, feedback | 2024-12-01 |
 
 ---
 **총 {N}개의 Open 이슈**
-
----
-
-## 🎯 처리 우선순위 제안
-
-{우선순위 제안 섹션}
-```
-
-## 처리 우선순위 제안 로직
-
-> **리스트업 후 반드시 처리 우선순위를 제안합니다.**
-
-### 우선순위 결정 기준
-
-| 순위 | 조건 | 가중치 |
-|------|------|--------|
-| 1 | `bug` 라벨 | +3 |
-| 2 | 오래된 이슈 (7일 이상) | +2 |
-| 3 | `enhancement` 라벨 | +1 |
-| 4 | 동일 프로젝트 이슈 묶음 | +1 (효율성) |
-
-### 우선순위 제안 포맷
-
-```markdown
-## 🎯 처리 우선순위 제안
-
-### 즉시 처리 (High Priority)
-1. **#{number}** - {title}
-   - 사유: Bug 라벨, {N}일 경과
-   - 프로젝트: {project}
-
-### 일반 처리 (Normal Priority)
-2. **#{number}** - {title}
-   - 사유: Enhancement 요청
-   - 프로젝트: {project}
-
-### 묶음 처리 제안
-- **{project}** 관련 이슈 {N}개를 함께 처리하면 효율적
-  - #{n1}, #{n2}, #{n3}
-
----
-💡 **제안**: #{number}부터 시작하시겠습니까?
-```
-
-### 우선순위 계산 예시
-
-```javascript
-// 우선순위 점수 계산
-function calculatePriority(issue) {
-  let score = 0;
-
-  // 라벨 기반 가중치
-  if (issue.labels.includes('bug')) score += 3;
-  if (issue.labels.includes('enhancement')) score += 1;
-
-  // 경과일 기반 가중치
-  const daysOld = daysSince(issue.created_at);
-  if (daysOld >= 7) score += 2;
-  else if (daysOld >= 3) score += 1;
-
-  return score;
-}
 ```
 
 ## No Issues Case
