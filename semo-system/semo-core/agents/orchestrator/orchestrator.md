@@ -30,7 +30,8 @@ model: inherit
 | 커밋, 푸시, PR | `skill:git-workflow` (Extension 우선) | "커밋해줘", "PR 만들어줘" |
 | 테스트 | `skill:tester` | "테스트 작성해줘" |
 | 계획, 설계 | `skill:planner` | "구현 계획 세워줘" |
-| 배포, {별칭} 배포 | `skill:deployer` | "랜드 stg 배포해줘" |
+| 배포 (프로젝트 별칭, Milestone, 릴리즈) | `skill:deployer` | "랜드 stg 배포해줘" |
+| 배포 (ms-*, Docker, PM2, SSH) | `skill:deploy-service` (eng/ms) | "ms-notifier stg 배포" |
 | 슬랙, 알림 | `skill:notify-slack` | "슬랙에 알려줘" |
 | 피드백 | `skill:feedback` | "피드백 등록해줘" |
 | 버전, 업데이트 | `skill:version-updater` | "버전 체크해줘" |

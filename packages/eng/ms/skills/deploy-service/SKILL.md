@@ -1,31 +1,50 @@
 ---
 name: deploy-service
 description: |
-  마이크로서비스 배포 자동화. Use when:
-  (1) Docker 빌드, (2) 서비스 배포, (3) PM2 재시작,
-  (4) 롤백 필요 시, (5) 배포 상태 확인.
+  **Docker/SSH 기반** 마이크로서비스 직접 배포.
+  로컬 빌드 → SSH 전송 → PM2 재시작.
+  Use when:
+  (1) ms-* 서비스 배포 (ms-notifier, ms-scheduler 등),
+  (2) Docker 빌드/이미지 생성,
+  (3) PM2 재시작/롤백,
+  (4) SSH 접근 필요한 직접 배포.
+  ⚠️ GitHub Actions/Milestone 기반 배포는 deployer 사용.
 tools: [Bash, Read]
 model: inherit
 triggers:
-  - 서비스 배포
-  - 배포해줘
+  - ms-* 배포
   - Docker 빌드
   - PM2 재시작
   - 롤백
+  - SSH 배포
 ---
 
 > **호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: deploy-service 호출 - {service_name} ({env})` 시스템 메시지를 첫 줄에 출력하세요.
 
 # Deploy Service Skill
 
-> 마이크로서비스 배포 자동화
+> **Docker/SSH 기반** 마이크로서비스 직접 배포 자동화
+>
+> ⚠️ **deployer와 혼동 주의**: GitHub Actions/Milestone 기반 배포는 `deployer` 사용
+
+## 🔴 deploy-service vs deployer 선택 기준
+
+| 조건 | 선택 스킬 | 이유 |
+|------|----------|------|
+| ms-* 마이크로서비스 배포 | `deploy-service` | Docker + PM2 방식 |
+| "Docker 빌드", "PM2" 언급 | `deploy-service` | SSH 직접 제어 |
+| SSH 접근 필요한 직접 배포 | `deploy-service` | 원격 서버 직접 접근 |
+| 프로젝트 별칭 사용 (랜드, 오피스 등) | `deployer` | projects.md에 별칭 등록 |
+| "Milestone", "릴리즈" 언급 | `deployer` | GitHub 릴리즈 워크플로우 |
+| GitHub Actions 기반 배포 | `deployer` | CI/CD 자동 트리거 |
 
 ## Trigger Keywords
 
-- `서비스 배포`, `배포해줘`
+- `ms-* 배포` (예: "ms-notifier 배포", "ms-scheduler stg 배포")
 - `Docker 빌드`, `이미지 빌드`
 - `PM2 재시작`, `서비스 재시작`
 - `롤백`, `이전 버전으로`
+- `SSH 배포`
 
 ## 배포 환경
 

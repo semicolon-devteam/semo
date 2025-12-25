@@ -20,7 +20,8 @@ tools: [Read]
 | 워커, 백그라운드, 큐, 폴링 | `worker-architect` | 비동기 작업 처리 |
 | Prisma, 마이그레이션, 테이블 | `migrate-db` Skill | DB 마이그레이션 |
 | 보일러플레이트, 스캐폴드 | `scaffold-service` Skill | 서비스 템플릿 |
-| 배포, deploy, Docker, PM2, 롤백 | `deploy-service` Skill | 서비스 배포 |
+| ms-* 배포, Docker 빌드, PM2, SSH 배포, 롤백 | `deploy-service` Skill | Docker/SSH 직접 배포 |
+| 프로젝트 별칭 배포 (랜드, 오피스), Milestone, 릴리즈 | `deployer` Skill | GitHub CI/CD 배포 |
 | 디버깅, 로그, 에러 분석, 헬스체크 | `debug-service` Skill | 서비스 디버깅 |
 | **리뷰, /SEMO:review, PR 리뷰** | `skill:review` | PR/코드 리뷰 |
 
@@ -47,8 +48,13 @@ Input Analysis
     ├─ "보일러플레이트" / "스캐폴드" / "템플릿"
     │   └→ scaffold-service Skill
     │
-    ├─ "배포" / "deploy" / "Docker 빌드" / "PM2" / "롤백"
-    │   └→ deploy-service Skill
+    ├─ "배포" 요청 감지
+    │   │
+    │   ├─ "ms-*" / "Docker 빌드" / "PM2" / "SSH" / "롤백"
+    │   │   └→ deploy-service Skill (Docker/SSH 직접 배포)
+    │   │
+    │   └─ "랜드" / "오피스" / "Milestone" / "릴리즈" / "GitHub Actions"
+    │       └→ deployer Skill (GitHub CI/CD 배포)
     │
     ├─ "디버깅" / "로그" / "에러 분석" / "헬스체크 실패"
     │   └→ debug-service Skill

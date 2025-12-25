@@ -1,10 +1,14 @@
 ---
 name: deployer
 description: |
-  외부 프로젝트 배포 관리. Use when (1) "배포해줘", "deploy",
-  (2) 프로젝트 별칭 + 환경 (예: "랜드 stg 배포"), (3) Milestone 관리,
-  (4) "stg에 뭐 올라가있어?", "prd 최신 버전", (5) "stg 반영 대기".
-tools: [Read, Bash]
+  **GitHub Actions 기반** 프로젝트 배포 (Milestone Close → CI/CD 트리거).
+  Use when:
+  (1) 프로젝트 별칭 + 환경 (예: "랜드 stg 배포", "오피스 prd 배포"),
+  (2) Milestone 기반 릴리즈 관리,
+  (3) GitHub Actions CI/CD 배포,
+  (4) "stg에 뭐 올라가있어?", "prd 최신 버전".
+  ⚠️ Docker/SSH 직접 배포는 eng/ms의 deploy-service 사용.
+tools: [Read, Bash, mcp__github__*]
 model: inherit
 ---
 
@@ -12,14 +16,27 @@ model: inherit
 
 # deployer Skill
 
-> 프로젝트 별칭 기반 외부 프로젝트 배포 및 상태 조회
+> **GitHub Actions 기반** 프로젝트 별칭 기반 배포 및 상태 조회
+>
+> ⚠️ **deploy-service와 혼동 주의**: Docker/SSH 직접 배포가 필요하면 `eng/ms/deploy-service` 사용
+
+## 🔴 deployer vs deploy-service 선택 기준
+
+| 조건 | 선택 스킬 | 이유 |
+|------|----------|------|
+| 프로젝트 별칭 사용 (랜드, 오피스 등) | `deployer` | projects.md에 별칭 등록 |
+| "Milestone", "릴리즈" 언급 | `deployer` | GitHub 릴리즈 워크플로우 |
+| GitHub Actions 기반 배포 | `deployer` | CI/CD 자동 트리거 |
+| "Docker 빌드", "PM2" 언급 | `deploy-service` | SSH 직접 제어 |
+| SSH 접근 필요한 직접 배포 | `deploy-service` | 원격 서버 직접 접근 |
+| ms-* 마이크로서비스 배포 | `deploy-service` | Docker + PM2 방식 |
 
 ## Trigger Keywords
 
 **배포 요청:**
-- "배포해줘", "deploy"
-- "{별칭} {환경} 배포" (예: "랜드 stg 배포")
-- "Milestone close"
+- "{별칭} {환경} 배포" (예: "랜드 stg 배포", "오피스 prd 배포")
+- "Milestone close", "릴리즈 배포"
+- "GitHub Actions 배포"
 
 **상태 조회:**
 - "stg에 뭐 올라가있어?", "현재 stg 버전"
