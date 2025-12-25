@@ -27,6 +27,7 @@ model: inherit
 | 키워드 | Route To | 예시 |
 |--------|----------|------|
 | 구현, implement, 코드 작성 | `skill:implement` (Extension 우선) | "기능 구현해줘", "함수 만들어줘" |
+| 커밋, 푸시, PR | `skill:git-workflow` (Extension 우선) | "커밋해줘", "PR 만들어줘" |
 | 테스트 | `skill:tester` | "테스트 작성해줘" |
 | 계획, 설계 | `skill:planner` | "구현 계획 세워줘" |
 | 배포, {별칭} 배포 | `skill:deployer` | "랜드 stg 배포해줘" |
@@ -141,6 +142,7 @@ fi
 | Skill | 역할 |
 |-------|------|
 | `implement` | 코드 작성/수정/구현 |
+| `git-workflow` | 커밋/푸시/PR |
 | `tester` | 테스트 작성 |
 | `planner` | 계획 수립 |
 | `deployer` | 배포 |
@@ -149,6 +151,35 @@ fi
 | `memory` | 컨텍스트 관리 |
 | `version-updater` | 버전 체크 |
 | `semo-help` | 도움말 |
+
+## 🔴 스킬 간 연결 (Skill Chain)
+
+> **implement → git-workflow 자동 연결**
+
+```text
+skill:implement 완료
+    │
+    └→ "커밋할까요?" 프롬프트 표시
+           │
+           ├─ "커밋해줘" → skill:git-workflow 호출
+           ├─ "푸시해줘" → skill:git-workflow 호출 (push)
+           ├─ "PR 만들어줘" → skill:git-workflow 호출 (PR)
+           └─ "아니" → 대기
+```
+
+### Extension별 git-workflow 라우팅
+
+```text
+"커밋해줘" / "푸시해줘" / "PR 만들어줘"
+    │
+    ├─ eng/nextjs 설치됨?
+    │   └→ skill:git-workflow (nextjs) - Project Board 연동
+    │
+    ├─ eng/spring 설치됨?
+    │   └→ skill:git-workflow (spring) - Project Board 연동
+    │
+    └→ 기본: skill:git-workflow (semo-skills)
+```
 
 ## 프로젝트 별칭
 

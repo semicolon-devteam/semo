@@ -152,6 +152,48 @@ v0.3.x DATA → Entity, DTO, Repository 작성
 - `sync-openapi` - v0.4.x CODE
 - `verify-reactive` - 완료 후 검증
 
+## Related Skills
+
+- `git-workflow` - 커밋/푸시/PR (구현 완료 후)
+- `verify-reactive` - Reactive 패턴 검증
+- `check-team-codex` - 품질 검증
+
+---
+
+## 🔴 Post-Action: 완료 시 푸시/PR 프롬프트 (NON-NEGOTIABLE)
+
+> **⚠️ 전체 Phase 완료 시 푸시/PR 여부 프롬프트를 표시합니다.**
+
+### 완료 시 출력
+
+```markdown
+[SEMO] Skill: implement → Phase 4 완료
+
+✅ **구현 완료**: {feature_name}
+
+**Phase 커밋 현황**:
+- v0.0.x CONFIG: ✅ committed
+- v0.1.x PROJECT: ✅ committed
+- v0.2.x TESTS: ✅ committed
+- v0.3.x DATA: ✅ committed
+- v0.4.x CODE: ✅ committed
+
+---
+
+💡 **다음 단계**:
+   - "푸시해줘" → 원격 저장소에 푸시
+   - "PR 만들어줘" → `skill:git-workflow` 호출하여 Draft PR 생성
+   - "verify-reactive" → Reactive 패턴 검증
+```
+
+### 자동 동작
+
+- **Phase 완료 시**: 자동으로 Atomic Commit 생성 (Gitmoji)
+- **전체 완료 시**: 푸시/PR 여부 프롬프트 표시
+- **사용자 "PR 만들어줘"**: `skill:git-workflow` 호출
+
+---
+
 ## References
 
 - [Phase Workflow](references/phase-workflow.md)

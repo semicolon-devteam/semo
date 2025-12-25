@@ -107,6 +107,56 @@ npm install lucide-react
 - `spec` - SDD Phase 1-3 specification
 - `verify` - Phase 5 verification
 - `spike` - Technical exploration
+- `git-workflow` - 커밋/푸시/PR (구현 완료 후)
+
+---
+
+## 🔴 Post-Action: Phase별 커밋 및 완료 프롬프트 (NON-NEGOTIABLE)
+
+> **⚠️ 각 Phase 완료 시 Atomic Commit을 수행하고, 전체 완료 시 커밋 프롬프트를 표시합니다.**
+
+### Phase별 Atomic Commit
+
+| Phase | 커밋 시점 | 커밋 메시지 예시 |
+|-------|----------|-----------------|
+| v0.0.x | CONFIG 완료 | `chore: add dependencies for {feature}` |
+| v0.1.x | PROJECT 완료 | `feat: scaffold DDD structure for {feature}` |
+| v0.2.x | TESTS 완료 | `test: add tests for {feature}` |
+| v0.3.x | DATA 완료 | `feat: add models and types for {feature}` |
+| v0.4.x | CODE 완료 | `feat: implement {feature}` |
+
+### 전체 완료 시 출력
+
+```markdown
+[SEMO] Skill: implement → Phase 4 완료
+
+✅ **구현 완료**: {feature_name}
+📁 **변경 파일**: {file_count}개
+🔍 **테스트**: {test_count}개 통과
+
+**Phase 커밋 현황**:
+- v0.0.x CONFIG: ✅ committed
+- v0.1.x PROJECT: ✅ committed
+- v0.2.x TESTS: ✅ committed
+- v0.3.x DATA: ✅ committed
+- v0.4.x CODE: ✅ committed
+
+---
+
+💡 **다음 단계**:
+   - "푸시해줘" → 원격 저장소에 푸시
+   - "PR 만들어줘" → `skill:git-workflow` 호출하여 Draft PR 생성
+   - "verify" → `skill:verify` 호출하여 최종 검증
+```
+
+### 자동 커밋 동작
+
+- **Phase 완료 시**: 자동으로 Atomic Commit 생성 (Gitmoji 사용)
+- **전체 완료 시**: 푸시/PR 여부 프롬프트 표시
+- **사용자 "푸시해줘"**: `skill:git-workflow` 호출
+- **사용자 "PR 만들어줘"**: `skill:git-workflow` 호출 (Draft PR 생성)
+
+---
 
 ## References
 

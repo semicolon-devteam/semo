@@ -151,7 +151,68 @@ npm run build
 
 ---
 
+## 🔴 Post-Action: 커밋 프롬프트 (NON-NEGOTIABLE)
+
+> **⚠️ 구현 완료 후 반드시 커밋 여부를 확인합니다.**
+
+### 트리거 조건
+
+```text
+구현 완료 감지:
+- 파일 생성/수정 완료
+- lint + typecheck 통과
+- 사용자 요청 작업 완료
+    ↓
+자동 프롬프트 출력
+```
+
+### 완료 시 출력
+
+```markdown
+[SEMO] Skill: implement → 완료
+
+✅ **구현 완료**: {작업 요약}
+📁 **변경 파일**: {파일 목록}
+🔍 **검증**: lint ✅ | typecheck ✅
+
+---
+
+💡 **다음 단계**: 변경사항을 커밋할까요?
+   - "커밋해줘" → skill:git-workflow 호출
+   - "아니" / "계속 작업" → 추가 작업 대기
+```
+
+### 자동 커밋 안 함 (명시적 요청 필요)
+
+| 사용자 응답 | 동작 |
+|------------|------|
+| "커밋해줘" | `skill:git-workflow` 호출 |
+| "푸시까지 해줘" | `skill:git-workflow` 호출 (push 포함) |
+| "아니", "계속" | 추가 작업 대기 |
+| 무응답 | 프롬프트만 표시, 대기 |
+
+### 프롬프트 생략 조건
+
+사용자가 아래 키워드 사용 시 커밋 프롬프트 건너뛰기:
+
+- "프롬프트 없이"
+- "커밋 안 해도 돼"
+- "계속 작업할 거야"
+
+---
+
+## Related Skills
+
+| Skill | 역할 | 연결 시점 |
+|-------|------|----------|
+| `git-workflow` | 커밋/푸시/PR | 구현 완료 후 |
+| `tester` | 테스트 작성 | 구현 전/후 |
+| `project-board` | 이슈 상태 변경 | PR 생성 시 |
+
+---
+
 ## References
 
 - [Quality Gate](../../semo-core/principles/QUALITY_GATE.md) - 코드 품질 기준
 - [tester Skill](../tester/SKILL.md) - 테스트 작성
+- [git-workflow Skill](../git-workflow/SKILL.md) - Git 워크플로우
