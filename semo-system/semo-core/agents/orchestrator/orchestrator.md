@@ -26,8 +26,7 @@ model: inherit
 
 | 키워드 | Route To | 예시 |
 |--------|----------|------|
-| 구현, implement | **Extension 우선** | "기능 구현해줘" |
-| 코드 작성, 수정 | `skill:coder` | "함수 하나 만들어줘" |
+| 구현, implement, 코드 작성 | `skill:implement` (Extension 우선) | "기능 구현해줘", "함수 만들어줘" |
 | 테스트 | `skill:tester` | "테스트 작성해줘" |
 | 계획, 설계 | `skill:planner` | "구현 계획 세워줘" |
 | 배포, {별칭} 배포 | `skill:deployer` | "랜드 stg 배포해줘" |
@@ -47,7 +46,7 @@ model: inherit
 ### 라우팅 우선순위
 
 ```text
-"구현해줘" / "기능 구현" / "implement"
+"구현해줘" / "코드 작성" / "함수 만들어줘" / "버그 수정해줘"
     │
     ├─ eng/nextjs 설치됨?
     │   └→ skill:implement (nextjs) - ADD Phase 4, DDD 4-layer
@@ -58,7 +57,7 @@ model: inherit
     ├─ biz/poc 설치됨?
     │   └→ skill:implement-mvp - 간소화 MVP 구현
     │
-    └→ 기본: skill:coder - 단순 코드 작성
+    └→ 기본: skill:implement (semo-skills) - 범용 코드 작성
 ```
 
 ### 환경 감지
@@ -66,24 +65,24 @@ model: inherit
 ```bash
 # Extension 패키지 설치 여부 확인
 if [ -d "semo-system/eng/nextjs" ]; then
-  IMPL_SKILL="implement"  # nextjs implement
+  IMPL_SKILL="implement"  # nextjs implement (ADD Phase 4)
 elif [ -d "semo-system/eng/spring" ]; then
-  IMPL_SKILL="implement"  # spring implement
+  IMPL_SKILL="implement"  # spring implement (CQRS)
 elif [ -d "semo-system/biz/poc" ]; then
-  IMPL_SKILL="implement-mvp"
+  IMPL_SKILL="implement-mvp"  # 간소화 MVP
 else
-  IMPL_SKILL="coder"  # 기본
+  IMPL_SKILL="implement"  # 기본 (semo-skills)
 fi
 ```
 
-### coder vs implement 구분
+### 요청 유형별 처리
 
 | 요청 유형 | 라우팅 대상 | 특징 |
 |----------|------------|------|
-| "함수 하나 만들어줘" | `coder` | 단순 코드 작성 |
-| "버그 수정해줘" | `coder` | 파일 단위 수정 |
-| "기능 구현해줘" | `implement` | ADD Phase 4 워크플로우 |
-| "태스크 구현해줘" | `implement` | spec.md 기반 체계적 구현 |
+| "함수 하나 만들어줘" | `skill:implement` | 범용 코드 작성 |
+| "버그 수정해줘" | `skill:implement` | 파일 단위 수정 |
+| "기능 구현해줘" | `skill:implement` | Extension 있으면 체계적 워크플로우 |
+| "태스크 구현해줘" | `skill:implement` | spec.md 기반 구현 (Extension 시) |
 
 ## SEMO Message Format
 
@@ -141,7 +140,7 @@ fi
 
 | Skill | 역할 |
 |-------|------|
-| `coder` | 코드 작성/수정 |
+| `implement` | 코드 작성/수정/구현 |
 | `tester` | 테스트 작성 |
 | `planner` | 계획 수립 |
 | `deployer` | 배포 |
