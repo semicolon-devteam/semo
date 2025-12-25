@@ -11,6 +11,7 @@ tools: [Read, Write, Edit, Bash]
 @./../_shared/development-workflow.md
 @./../_shared/ddd-patterns.md
 @./../_shared/test-templates.md
+@./../_shared/test-policy.md
 @./../_shared/commit-guide.md
 
 **Purpose**: Orchestrate Agent-Driven Development (ADD) Phase 4 implementation workflow
@@ -27,9 +28,11 @@ tools: [Read, Write, Edit, Bash]
 |-------|------|------------|
 | v0.0.x | CONFIG | Dependencies, spike if needed |
 | v0.1.x | PROJECT | Scaffold DDD 4-layer structure |
-| v0.2.x | TESTS | TDD - Write tests FIRST |
+| v0.2.x | TESTS | 테스트 작성 (유연한 TDD - 아래 참조) |
 | v0.3.x | DATA | Models, types, Supabase schema |
 | v0.4.x | CODE | Implement all 4 layers |
+
+> 📖 **테스트 정책**: [_shared/test-policy.md](../_shared/test-policy.md) 참조
 
 ## Usage
 
@@ -41,11 +44,73 @@ skill: implement({ resume: "v0.3.x" }); // Resume from phase
 ## Critical Rules
 
 1. **Phase Discipline**: NEVER skip phases without agent approval
-2. **TDD Enforcement**: v0.2.x (TESTS) MUST complete before v0.4.x (CODE)
+2. **Flexible TDD**: 레이어/작업 유형에 따라 테스트 정책 적용 (아래 참조)
 3. **Supabase Patterns**: ALWAYS invoke `skill:fetch-supabase-example`
 4. **DDD Compliance**: All 4 layers MUST be implemented
 5. **Atomic Commits**: 작업 단위 최소화하여 중간중간 커밋
 6. **Icon Pack Standard**: 아이콘은 표준 팩 사용 (아래 참조)
+
+---
+
+## 🔄 Flexible TDD (테스트 정책 유연화)
+
+> **"테스트는 품질 보장 도구이지, 개발 속도를 저하시키는 의무가 아니다"**
+
+### 레이어별 테스트 필수 여부
+
+| 레이어 | Unit Test | 필수 여부 | 커버리지 목표 |
+|--------|-----------|----------|--------------|
+| **Repository/API Client** | ✅ 필수 | 🔴 PR 차단 | 80% |
+| **Hooks (비즈니스 로직)** | ✅ 필수 | 🔴 PR 차단 | 70% |
+| **Components (로직 포함)** | ⚠️ 권장 | 🟡 경고 | 50% |
+| **Components (순수 UI)** | 🔄 E2E 대체 | 🟢 선택 | - |
+
+### v0.2.x Phase 진행 옵션
+
+| 옵션 | 설명 | 적합한 경우 |
+|------|------|------------|
+| **A. TDD (테스트 먼저)** | v0.2.x → v0.3.x → v0.4.x | 복잡한 비즈니스 로직 |
+| **B. 동시 작성** | v0.3.x + v0.4.x 중 테스트 작성 | 일반적인 기능 |
+| **C. E2E 우선** | Unit Test 생략, E2E로 검증 | 순수 UI 변경 |
+
+### Phase 시작 시 테스트 옵션 제시
+
+```markdown
+[SEMO] v0.2.x TESTS Phase 시작
+
+**레이어 분석 결과**:
+- Repository: ✅ Unit Test 필수
+- Hooks: ✅ Unit Test 필수
+- Components: 🔄 E2E 대체 가능 (순수 UI)
+
+**테스트 진행 옵션**:
+| 옵션 | 설명 |
+|------|------|
+| A | TDD - 테스트 먼저 작성 (권장) |
+| B | 동시 작성 - 구현하면서 테스트 |
+| C | E2E 우선 - UI는 E2E로 검증 |
+
+**선택하세요**: A, B, 또는 C
+```
+
+### 테스트 생략 허용 조건
+
+다음 조건을 **모두** 만족하면 특정 레이어의 Unit Test 생략 가능:
+
+1. **순수 UI 컴포넌트** (로직 없음)
+2. **기존 테스트 전체 통과**
+3. **E2E 테스트로 동작 검증 완료**
+
+### 생략 시 출력
+
+```markdown
+[SEMO] 테스트 정책: Unit Test 생략 (Components)
+
+**사유**: 순수 UI 컴포넌트 (로직 없음)
+**대체 검증**: E2E 테스트 ✅
+
+⚠️ 추후 로직 추가 시 Unit Test 작성 권장
+```
 
 ---
 
