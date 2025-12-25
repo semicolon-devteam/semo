@@ -1,12 +1,39 @@
 /**
  * semo-hooks DB 연결 모듈
  *
- * mcp-server/memory.ts의 패턴을 재사용하되,
- * 암호화된 토큰 대신 환경변수만 사용 (간소화)
+ * mcp-server/memory.ts의 패턴을 재사용
+ * 암호화된 토큰 또는 환경변수 지원
  */
 
 import { Pool } from 'pg';
+import { decrypt } from './crypto.js';
 import type { InteractionLogInsert, SessionUpsert } from './types.js';
+
+// 암호화된 토큰 로드
+function loadEncryptedDbPassword(): string {
+  try {
+    // CI/CD에서 생성된 암호화 토큰 (배포 패키지용)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const generated = require('./tokens.generated.js');
+    if (generated.ENCRYPTED_TOKENS?.DB_PASSWORD) {
+      const decrypted = decrypt(generated.ENCRYPTED_TOKENS.DB_PASSWORD);
+      if (decrypted) return decrypted;
+    }
+  } catch {
+    // tokens.generated.js 없음 - 로컬 개발 환경
+  }
+  return '';
+}
+
+// DB 비밀번호 가져오기 (우선순위: 환경변수 > 암호화된 팀 토큰)
+function getDbPassword(): string {
+  // 1. 환경변수 우선 (로컬 개발/테스트용)
+  if (process.env.SEMO_DB_PASSWORD) {
+    return process.env.SEMO_DB_PASSWORD;
+  }
+  // 2. 암호화된 팀 토큰 (배포 패키지용)
+  return loadEncryptedDbPassword();
+}
 
 // DB 설정 (환경변수 또는 기본값)
 const DB_CONFIG = {
@@ -14,7 +41,7 @@ const DB_CONFIG = {
   port: parseInt(process.env.SEMO_DB_PORT || '5432'),
   database: process.env.SEMO_DB_NAME || 'appdb',
   user: process.env.SEMO_DB_USER || 'app',
-  password: process.env.SEMO_DB_PASSWORD || '',
+  password: getDbPassword(),
   max: 3, // Hook은 짧게 실행되므로 적은 연결
   idleTimeoutMillis: 10000,
   connectionTimeoutMillis: 5000,
