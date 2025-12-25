@@ -127,33 +127,39 @@ gh issue edit {issue_number} --add-assignee {tester_id} --repo {owner}/{repo}
 ## 🔴 프로젝트 보드 상태 변경
 
 > **테스트 요청 시 해당 이슈를 '테스트중' 상태로 변경**
+>
+> 📖 **설정 참조**: [github-projects.md](../../semo-core/_shared/github-projects.md)
+
+### 사전 저장된 설정 (API 조회 불필요)
+
+> **⚠️ 아래 ID는 `semo-core/_shared/github-projects.md`에서 조회**
+
+```yaml
+# 이슈관리 보드 (semicolon-devteam)
+project_id: "PVT_kwDOC01-Rc4AtDz2"
+status_field_id: "PVTSSF_lADOC01-Rc4AtDz2zgj4dzs"
+testing_option_id: "13a75176"  # 테스트중
+```
 
 ### 상태 변경 절차
 
-1. **프로젝트 보드 확인**
+1. **아이템 ID 조회** (이슈별로 다름)
 
 ```bash
-# 이슈가 속한 프로젝트 확인
-gh issue view {issue_number} --repo {owner}/{repo} --json projectItems
+# 이슈 번호로 아이템 ID 조회
+ITEM_ID=$(gh project item-list 1 --owner semicolon-devteam --format json | \
+  jq -r '.items[] | select(.content.number == {issue_number}) | .id')
 ```
 
-2. **상태 변경 (GraphQL)**
+2. **상태 변경 (gh project item-edit)**
 
 ```bash
-# 프로젝트 보드 상태 변경
-gh api graphql -f query='
-mutation {
-  updateProjectV2ItemFieldValue(
-    input: {
-      projectId: "{project_id}"
-      itemId: "{item_id}"
-      fieldId: "{status_field_id}"
-      value: { singleSelectOptionId: "{testing_option_id}" }
-    }
-  ) {
-    projectV2Item { id }
-  }
-}'
+# 캐싱된 설정 사용 - API 조회 불필요
+gh project item-edit \
+  --project-id "PVT_kwDOC01-Rc4AtDz2" \
+  --id "$ITEM_ID" \
+  --field-id "PVTSSF_lADOC01-Rc4AtDz2zgj4dzs" \
+  --single-select-option-id "13a75176"
 ```
 
 3. **상태 변경 완료 메시지**
@@ -167,11 +173,13 @@ mutation {
 
 ### 상태 매핑
 
-| 보드 상태 | 설명 |
-|----------|------|
-| 테스트중 | QA 테스트 진행 중 |
-| 테스트완료 | QA 테스트 완료 (Pass) |
-| 버그발견 | QA 테스트 중 버그 발견 |
+> 📖 전체 상태 목록: [github-projects.md](../../semo-core/_shared/github-projects.md)
+
+| 보드 상태 | Option ID | 설명 |
+|----------|-----------|------|
+| 테스트중 | 13a75176 | QA 테스트 진행 중 |
+| 병합됨 | 98236657 | 테스트 완료 후 머지 |
+| 버려짐 | ff05bc88 | 테스트 실패/취소 |
 
 ---
 
@@ -206,5 +214,4 @@ mutation {
 
 ## References
 
-- [team-members.md](../../semo-core/_shared/team-members.md) - 팀원 정보
-- [project-board-api.md](../../semo-core/_shared/project-board-api.md) - 프로젝트 보드 API
+- [github-projects.md](../../semo-core/_shared/github-projects.md) - 프로젝트 보드 설정 (캐싱)
