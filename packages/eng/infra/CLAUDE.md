@@ -117,6 +117,37 @@ services:
 
 ---
 
+## 마이크로서비스 컨텍스트
+
+> 팀 마이크로서비스들은 중앙 DB (core-central-db)를 공유합니다.
+
+### 마이크로서비스 목록
+
+| 서비스 | 레포지토리 | DB Prefix | 설명 |
+|--------|-----------|-----------|------|
+| **Crawler** | `ms-crawler` | `gt_` | 데이터 수집 (구 Gatherer) |
+| **Collector** | `ms-collector` | `ag_` | 데이터 집계 (구 Aggregator) |
+| **Media-Processor** | `media-processor` | `pl_` | 미디어 처리 (구 Polisher) |
+| **Gamer** | `ms-gamer` | `gm_` | 게임 서비스 |
+| **Ledger** | `ledger` | `lg_` | 재무 관리 |
+
+### 운영 현황
+
+| 상태 | 서비스 |
+|------|--------|
+| **운영 중** | ms-gamer (중앙 DB 연동 완료) |
+| **마이그레이션 예정** | crawler, media-processor, ledger |
+
+### 인프라 작업 시 참조
+
+- **중앙 DB 스키마**: `semicolon-devteam/core-central-db` 참조
+- **Docker Compose**: 서비스별 개별 compose 파일 관리
+- **CI/CD**: GitHub Actions 기반 배포
+
+> 📖 상세: [중앙 DB 컨텍스트](../../semo-core/_shared/central-db.md)
+
+---
+
 ## References
 
 - [eng 레이어](../CLAUDE.md)
