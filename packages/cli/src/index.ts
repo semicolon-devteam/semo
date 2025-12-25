@@ -1081,15 +1081,18 @@ program
       updateGitignore(cwd);
     }
 
-    // 9. CLAUDE.md 생성
+    // 9. Hooks 설치 (대화 로깅)
+    await setupHooks(cwd, false);
+
+    // 10. CLAUDE.md 생성
     await setupClaudeMd(cwd, extensionsToInstall, options.force);
 
-    // 10. Extensions 심볼릭 링크 (agents/skills 병합)
+    // 11. Extensions 심볼릭 링크 (agents/skills 병합)
     if (extensionsToInstall.length > 0) {
       await setupExtensionSymlinks(cwd, extensionsToInstall);
     }
 
-    // 11. 설치 검증
+    // 12. 설치 검증
     const verificationResult = verifyInstallation(cwd, extensionsToInstall);
     printVerificationResult(verificationResult);
 
@@ -2167,6 +2170,127 @@ semo-system/
   }
 }
 
+// === Hooks 설치/업데이트 ===
+async function setupHooks(cwd: string, isUpdate: boolean = false) {
+  const action = isUpdate ? "업데이트" : "설치";
+  console.log(chalk.cyan(`\n🪝 Claude Code Hooks ${action}`));
+  console.log(chalk.gray("   전체 대화 로깅 시스템\n"));
+
+  const hooksDir = path.join(cwd, "semo-system", "semo-hooks");
+
+  // semo-hooks 디렉토리 확인
+  if (!fs.existsSync(hooksDir)) {
+    console.log(chalk.yellow("  ⚠ semo-hooks 디렉토리 없음 (건너뜀)"));
+    return;
+  }
+
+  // 1. npm install
+  console.log(chalk.gray("  → 의존성 설치 중..."));
+  try {
+    execSync("npm install", {
+      cwd: hooksDir,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  } catch {
+    console.log(chalk.yellow("  ⚠ npm install 실패 (건너뜀)"));
+    return;
+  }
+
+  // 2. 빌드
+  console.log(chalk.gray("  → 빌드 중..."));
+  try {
+    execSync("npm run build", {
+      cwd: hooksDir,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+  } catch {
+    console.log(chalk.yellow("  ⚠ 빌드 실패 (건너뜀)"));
+    return;
+  }
+
+  // 3. settings.local.json 설정
+  const homeDir = process.env.HOME || process.env.USERPROFILE || "";
+  const settingsPath = path.join(homeDir, ".claude", "settings.local.json");
+  const hooksCmd = `node ${path.join(hooksDir, "dist", "index.js")}`;
+
+  // hooks 설정 객체
+  const hooksConfig = {
+    SessionStart: [
+      {
+        matcher: "",
+        hooks: [
+          {
+            type: "command",
+            command: `${hooksCmd} session-start`,
+            timeout: 10,
+          },
+        ],
+      },
+    ],
+    UserPromptSubmit: [
+      {
+        matcher: "",
+        hooks: [
+          {
+            type: "command",
+            command: `${hooksCmd} user-prompt`,
+            timeout: 5,
+          },
+        ],
+      },
+    ],
+    Stop: [
+      {
+        matcher: "",
+        hooks: [
+          {
+            type: "command",
+            command: `${hooksCmd} stop`,
+            timeout: 10,
+          },
+        ],
+      },
+    ],
+    SessionEnd: [
+      {
+        matcher: "",
+        hooks: [
+          {
+            type: "command",
+            command: `${hooksCmd} session-end`,
+            timeout: 10,
+          },
+        ],
+      },
+    ],
+  };
+
+  // 기존 설정 로드 또는 새로 생성
+  let existingSettings: Record<string, unknown> = {};
+  const claudeConfigDir = path.join(homeDir, ".claude");
+
+  if (!fs.existsSync(claudeConfigDir)) {
+    fs.mkdirSync(claudeConfigDir, { recursive: true });
+  }
+
+  if (fs.existsSync(settingsPath)) {
+    try {
+      existingSettings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+    } catch {
+      existingSettings = {};
+    }
+  }
+
+  // hooks 설정 병합
+  existingSettings.hooks = hooksConfig;
+
+  // 설정 저장
+  fs.writeFileSync(settingsPath, JSON.stringify(existingSettings, null, 2));
+
+  console.log(chalk.green(`  ✓ Hooks ${action} 완료`));
+  console.log(chalk.gray(`    설정: ${settingsPath}`));
+}
+
 // === Context Mesh 초기화 ===
 async function setupContextMesh(cwd: string) {
   console.log(chalk.cyan("\n🧠 Context Mesh 초기화"));
@@ -3075,7 +3199,10 @@ program
       }
     }
 
-    // === 설치 검증 ===
+    // === 6. Hooks 업데이트 ===
+    await setupHooks(cwd, true);
+
+    // === 7. 설치 검증 ===
     const verificationResult = verifyInstallation(cwd, installedExtensions);
     printVerificationResult(verificationResult);
 
