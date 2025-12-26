@@ -10,6 +10,41 @@ tools: [Bash, Read, Write, Edit]
 
 > SEMO 패키지 버저닝 자동화 Skill
 
+---
+
+## 🔴 NON-NEGOTIABLE: 버저닝 완료 조건
+
+> **⚠️ 아래 체크리스트를 모두 완료해야 버저닝 완료로 간주합니다. 하나라도 누락 시 미완료 상태입니다.**
+
+### 필수 완료 체크리스트
+
+| # | 단계 | 완료 확인 메시지 |
+|---|------|-----------------|
+| 1 | VERSION 파일 업데이트 | `[SEMO] Versioning: {old} → {new}` |
+| 2 | CHANGELOG 생성 | `✓ CHANGELOG/{version}.md 생성` |
+| 3 | 커밋 | `[SEMO] Versioning: 커밋 완료` |
+| 4 | 푸시 | `[SEMO] Versioning: 푸시 완료` |
+| **5** | **🔴 Slack 알림** | `[SEMO] Versioning: Slack 알림 전송 완료` |
+| 6 | (semo-meta만) 로컬 동기화 | `[SEMO] Versioning: 로컬 동기화 완료` |
+
+### 자동 체인 실행
+
+버저닝 푸시 완료 즉시 **자동으로** notify-slack을 호출합니다:
+
+```text
+git push 성공
+    ↓
+[자동] notify-slack Skill 호출
+    ↓
+Slack 알림 전송 완료
+    ↓
+버저닝 완료
+```
+
+**⚠️ Slack 알림 없이 "버저닝 완료"라고 말하지 마세요.**
+
+---
+
 ## Purpose
 
 SEMO 패키지의 Semantic Versioning 관리를 자동화합니다.

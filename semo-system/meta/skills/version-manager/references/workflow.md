@@ -140,7 +140,9 @@ cd semo-po && git push origin main
 cd semo-next && git push origin main
 ```
 
-## Phase 9: Slack 릴리스 알림 (필수)
+> **⚠️ Phase 8 완료 즉시 Phase 9로 자동 진행합니다. 멈추지 마세요.**
+
+## Phase 9: Slack 릴리스 알림 (필수) - 🔴 자동 체인
 
 > **🔴 필수 단계**: 버저닝은 Slack 알림까지 완료해야 완료로 간주됩니다.
 
