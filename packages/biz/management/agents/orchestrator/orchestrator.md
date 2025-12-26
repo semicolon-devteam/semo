@@ -64,6 +64,7 @@ projectV2(number: 2)  # 금지!
 | 로드맵, roadmap, 일정 | roadmap-planner | Roadmap 관리 |
 | 마일스톤, milestone | roadmap-planner | 마일스톤 관리 |
 | Velocity, 속도 | sprint-master | Velocity 계산 |
+| 테스트 요청, 테스트요청, QA 요청 | request-test | Slack 테스트 알림 전송 |
 
 ## Workflow
 

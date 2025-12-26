@@ -89,12 +89,41 @@ URL=$(echo "$ISSUE" | jq -r '.url')
 | 테스트중 | stg | QA 테스트 진행 |
 | 작업중 | dev | 개발 중 확인 |
 
+## 🔴 Slack 실제 멘션 (NON-NEGOTIABLE)
+
+> **⚠️ 텍스트 `@이름`이 아닌 실제 Slack 멘션 `<@SLACK_USER_ID>` 사용 필수!**
+
+### 멘션 변환 프로세스
+
+```bash
+# 1. GitHub ID → Slack Display Name (team-members.md 참조)
+# kokkh → Goni
+
+# 2. Slack User ID 조회 (MCP 도구 사용)
+mcp__semo-integrations__slack_lookup_user(name: "Goni")
+# 반환값 예시: { "user_id": "U12345678", "display_name": "Goni" }
+
+# 3. 실제 멘션 형식으로 메시지 생성
+# ❌ 잘못된 예: "@Goni" (텍스트만 표시됨, 멘션 안 됨)
+# ✅ 올바른 예: "<@U12345678>" (실제 멘션됨, 알림 발송)
+```
+
+### 멘션 포함 메시지 전송
+
+```bash
+# MCP 도구를 사용하여 메시지 전송
+mcp__semo-integrations__slack_send_message(
+  channel: "#프로젝트채널",
+  text: "<@U12345678> [이슈제목] 테스트 요청드립니다\n\n📍 테스트 환경: STG\n🔗 URL: https://stg.example.com\n📋 이슈: https://github.com/..."
+)
+```
+
 ## 메시지 템플릿
 
 ### 기본 템플릿
 
 ```
-@{tester} [{issue_title}] 테스트 요청드립니다
+<@{SLACK_USER_ID}> [{issue_title}] 테스트 요청드립니다
 
 📍 테스트 환경: {env}
 🔗 URL: {env_url}
@@ -104,12 +133,14 @@ URL=$(echo "$ISSUE" | jq -r '.url')
 ### 출력 예시
 
 ```
-@Goni [글로벌 검색 기능 오류] 테스트 요청드립니다
+<@U12345678> [글로벌 검색 기능 오류] 테스트 요청드립니다
 
 📍 테스트 환경: STG
 🔗 URL: https://stg.cm-land.com
 📋 이슈: https://github.com/semicolon-devteam/cm-land/issues/482
 ```
+
+> Slack에서 `<@U12345678>`은 **@Goni**로 렌더링되며 실제 알림이 발송됩니다.
 
 ## 입력 파라미터
 
