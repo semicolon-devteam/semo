@@ -1,6 +1,6 @@
 {
   "name": "@team-semicolon/semo-hooks",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "SEMO Hooks - Claude Code Hooks 기반 전체 대화 로깅 시스템",
   "main": "dist/index.js",
   "bin": {

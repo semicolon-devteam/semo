@@ -7,7 +7,7 @@
 
 import { Pool } from 'pg';
 import { decrypt } from './crypto.js';
-import type { InteractionLogInsert, SessionUpsert } from './types.js';
+import type { InteractionLogInsert, SessionUpsert, RemoteRequestInsert, RemoteRequest } from './types.js';
 
 // 암호화된 토큰 로드
 function loadEncryptedDbPassword(): string {
@@ -174,6 +174,141 @@ export async function endSession(sessionId: string, reason: string): Promise<voi
   } catch (error) {
     if (process.env.SEMO_HOOKS_DEBUG) {
       console.error('[semo-hooks] Session end failed:', (error as Error).message);
+    }
+  }
+}
+
+// =============================================================================
+// Remote Request Functions (semo-remote 패키지용)
+// =============================================================================
+
+/**
+ * Remote 요청 생성
+ */
+export async function createRemoteRequest(params: RemoteRequestInsert): Promise<string | null> {
+  if (!isDbEnabled()) return null;
+
+  try {
+    const p = getPool();
+    const expiresAt = params.expires_at || new Date(Date.now() + 5 * 60 * 1000); // 기본 5분
+
+    const result = await p.query(`
+      INSERT INTO remote_requests
+        (session_id, user_id, type, tool_name, message, options, expires_at, metadata)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id
+    `, [
+      params.session_id,
+      params.user_id || getDefaultUserId(),
+      params.type,
+      params.tool_name,
+      params.message,
+      params.options ? JSON.stringify(params.options) : null,
+      expiresAt.toISOString(),
+      params.metadata ? JSON.stringify(params.metadata) : null,
+    ]);
+
+    return result.rows[0]?.id || null;
+  } catch (error) {
+    if (process.env.SEMO_HOOKS_DEBUG) {
+      console.error('[semo-hooks] Remote request create failed:', (error as Error).message);
+    }
+    return null;
+  }
+}
+
+/**
+ * Remote 요청 응답 폴링
+ * @param requestId 요청 ID
+ * @param timeoutMs 타임아웃 (밀리초)
+ * @param intervalMs 폴링 간격 (밀리초)
+ */
+export async function pollRemoteResponse(
+  requestId: string,
+  timeoutMs: number = 30000,
+  intervalMs: number = 1000
+): Promise<RemoteRequest | null> {
+  if (!isDbEnabled()) return null;
+
+  const startTime = Date.now();
+  const p = getPool();
+
+  while (Date.now() - startTime < timeoutMs) {
+    try {
+      const result = await p.query(`
+        SELECT id, session_id, user_id, type, tool_name, message, options,
+               status, response, created_at, responded_at, expires_at
+        FROM remote_requests
+        WHERE id = $1
+      `, [requestId]);
+
+      const row = result.rows[0];
+      if (!row) return null;
+
+      // 응답이 왔거나 처리된 경우
+      if (row.status !== 'pending') {
+        return {
+          id: row.id,
+          session_id: row.session_id,
+          user_id: row.user_id,
+          type: row.type,
+          tool_name: row.tool_name,
+          message: row.message,
+          options: row.options,
+          status: row.status,
+          response: row.response,
+          created_at: row.created_at,
+          responded_at: row.responded_at,
+          expires_at: row.expires_at,
+        };
+      }
+
+      // 아직 pending - 대기 후 재시도
+      await new Promise(resolve => setTimeout(resolve, intervalMs));
+    } catch (error) {
+      if (process.env.SEMO_HOOKS_DEBUG) {
+        console.error('[semo-hooks] Poll failed:', (error as Error).message);
+      }
+      return null;
+    }
+  }
+
+  // 타임아웃 - 요청 상태를 timeout으로 업데이트
+  try {
+    await p.query(`
+      UPDATE remote_requests
+      SET status = 'timeout'
+      WHERE id = $1 AND status = 'pending'
+    `, [requestId]);
+  } catch {
+    // 무시
+  }
+
+  return null;
+}
+
+/**
+ * Remote 세션 상태 업데이트
+ */
+export async function updateRemoteSessionStatus(
+  sessionId: string,
+  status: 'active' | 'idle' | 'waiting_input' | 'processing' | 'disconnected'
+): Promise<void> {
+  if (!isDbEnabled()) return;
+
+  try {
+    const p = getPool();
+    await p.query(`
+      INSERT INTO remote_sessions (session_id, user_id, status, last_activity_at)
+      VALUES ($1, $2, $3, NOW())
+      ON CONFLICT (session_id) DO UPDATE SET
+        status = EXCLUDED.status,
+        last_activity_at = NOW(),
+        updated_at = NOW()
+    `, [sessionId, getDefaultUserId(), status]);
+  } catch (error) {
+    if (process.env.SEMO_HOOKS_DEBUG) {
+      console.error('[semo-hooks] Remote session update failed:', (error as Error).message);
     }
   }
 }

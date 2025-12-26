@@ -9,7 +9,9 @@ export type HookEventName =
   | 'SessionStart'
   | 'SessionEnd'
   | 'UserPromptSubmit'
-  | 'Stop';
+  | 'Stop'
+  | 'PermissionRequest'
+  | 'Notification';
 
 /**
  * SessionStart source 타입
@@ -65,13 +67,42 @@ export interface StopInput extends BaseHookInput {
 }
 
 /**
+ * PermissionRequest Hook 입력
+ */
+export interface PermissionRequestInput extends BaseHookInput {
+  hook_event_name: 'PermissionRequest';
+  tool_name: string;
+  tool_input: Record<string, unknown>;
+}
+
+/**
+ * Notification 타입
+ */
+export type NotificationType =
+  | 'permission_prompt'
+  | 'idle_prompt'
+  | 'auth_success'
+  | 'elicitation_dialog';
+
+/**
+ * Notification Hook 입력
+ */
+export interface NotificationInput extends BaseHookInput {
+  hook_event_name: 'Notification';
+  notification_type: NotificationType;
+  message: string;
+}
+
+/**
  * 모든 Hook 입력 타입 유니온
  */
 export type HookInput =
   | SessionStartInput
   | SessionEndInput
   | UserPromptSubmitInput
-  | StopInput;
+  | StopInput
+  | PermissionRequestInput
+  | NotificationInput;
 
 /**
  * SessionStart Hook 출력
@@ -81,6 +112,62 @@ export interface SessionStartOutput {
     hookEventName: 'SessionStart';
     additionalContext?: string;
   };
+}
+
+/**
+ * PermissionRequest Hook 출력 (decision 필수)
+ */
+export interface PermissionRequestOutput {
+  hookSpecificOutput: {
+    hookEventName: 'PermissionRequest';
+    decision: {
+      behavior: 'allow' | 'deny';
+      updatedInput?: Record<string, unknown>;
+      message?: string;
+    };
+  };
+}
+
+/**
+ * Notification Hook 출력
+ */
+export interface NotificationOutput {
+  hookSpecificOutput?: {
+    hookEventName: 'Notification';
+    additionalContext?: string;
+  };
+}
+
+/**
+ * remote_requests 테이블 insert 타입
+ */
+export interface RemoteRequestInsert {
+  session_id: string;
+  user_id?: string;
+  type: 'permission' | 'user_question' | 'text_input' | 'selection';
+  tool_name?: string;
+  message: string;
+  options?: unknown[];
+  expires_at?: Date;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * remote_requests 테이블 row 타입
+ */
+export interface RemoteRequest {
+  id: string;
+  session_id: string;
+  user_id?: string;
+  type: 'permission' | 'user_question' | 'text_input' | 'selection';
+  tool_name?: string;
+  message: string;
+  options?: unknown[];
+  status: 'pending' | 'approved' | 'denied' | 'responded' | 'timeout' | 'cancelled';
+  response?: string;
+  created_at: Date;
+  responded_at?: Date;
+  expires_at?: Date;
 }
 
 /**

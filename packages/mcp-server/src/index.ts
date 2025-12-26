@@ -438,6 +438,80 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["user_id", "query"],
         },
       },
+      // === SEMO Remote (semo-remote 패키지) ===
+      {
+        name: "semo_remote_request",
+        description: "원격 요청을 생성합니다. 모바일 PWA에서 응답을 기다립니다. (semo-remote 패키지 전용)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            session_id: {
+              type: "string",
+              description: "현재 세션 ID",
+            },
+            type: {
+              type: "string",
+              enum: ["permission", "user_question", "text_input", "selection"],
+              description: "요청 유형",
+            },
+            message: {
+              type: "string",
+              description: "표시할 메시지",
+            },
+            options: {
+              type: "array",
+              items: { type: "string" },
+              description: "선택지 (selection 타입 시)",
+            },
+            tool_name: {
+              type: "string",
+              description: "도구 이름 (permission 타입 시)",
+            },
+          },
+          required: ["session_id", "type", "message"],
+        },
+      },
+      {
+        name: "semo_remote_respond",
+        description: "원격 요청에 응답합니다. (모바일 PWA에서 호출)",
+        inputSchema: {
+          type: "object",
+          properties: {
+            request_id: {
+              type: "string",
+              description: "요청 ID",
+            },
+            response: {
+              type: "string",
+              description: "응답 내용",
+            },
+            status: {
+              type: "string",
+              enum: ["approved", "denied", "responded"],
+              description: "응답 상태",
+            },
+          },
+          required: ["request_id", "status"],
+        },
+      },
+      {
+        name: "semo_remote_pending",
+        description: "대기 중인 원격 요청을 조회합니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            session_id: {
+              type: "string",
+              description: "세션 ID로 필터 (선택)",
+            },
+            limit: {
+              type: "number",
+              description: "결과 개수 (기본: 10)",
+            },
+          },
+          required: [],
+        },
+      },
     ],
   };
 });
@@ -1216,6 +1290,201 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           },
         ],
       };
+    }
+
+    // === SEMO Remote Tools ===
+    case "semo_remote_request": {
+      if (!isMemoryEnabled()) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[SEMO Remote] ❌ DB 연결이 필요합니다.\nSEMO_DB_PASSWORD 환경변수를 설정하세요.`,
+            },
+          ],
+        };
+      }
+
+      const sessionId = args?.session_id as string;
+      const reqType = args?.type as string;
+      const message = args?.message as string;
+      const options = args?.options as string[] | undefined;
+      const toolName = args?.tool_name as string | undefined;
+
+      try {
+        const { Pool } = await import("pg");
+        const pool = new Pool({
+          host: process.env.SEMO_DB_HOST || "3.38.162.21",
+          port: parseInt(process.env.SEMO_DB_PORT || "5432"),
+          database: process.env.SEMO_DB_NAME || "appdb",
+          user: process.env.SEMO_DB_USER || "app",
+          password: process.env.SEMO_DB_PASSWORD,
+        });
+
+        const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5분
+
+        const result = await pool.query(`
+          INSERT INTO remote_requests
+            (session_id, type, tool_name, message, options, expires_at)
+          VALUES ($1, $2, $3, $4, $5, $6)
+          RETURNING id
+        `, [sessionId, reqType, toolName, message, options ? JSON.stringify(options) : null, expiresAt.toISOString()]);
+
+        await pool.end();
+
+        const requestId = result.rows[0]?.id;
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[SEMO Remote] ✅ 원격 요청 생성됨\n\nID: ${requestId}\n유형: ${reqType}\n메시지: ${message}\n만료: 5분`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[SEMO Remote] ❌ 요청 생성 실패: ${error}`,
+            },
+          ],
+        };
+      }
+    }
+
+    case "semo_remote_respond": {
+      if (!isMemoryEnabled()) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[SEMO Remote] ❌ DB 연결이 필요합니다.`,
+            },
+          ],
+        };
+      }
+
+      const requestId = args?.request_id as string;
+      const response = args?.response as string | undefined;
+      const status = args?.status as string;
+
+      try {
+        const { Pool } = await import("pg");
+        const pool = new Pool({
+          host: process.env.SEMO_DB_HOST || "3.38.162.21",
+          port: parseInt(process.env.SEMO_DB_PORT || "5432"),
+          database: process.env.SEMO_DB_NAME || "appdb",
+          user: process.env.SEMO_DB_USER || "app",
+          password: process.env.SEMO_DB_PASSWORD,
+        });
+
+        await pool.query(`
+          UPDATE remote_requests
+          SET status = $2, response = $3, responded_at = NOW()
+          WHERE id = $1 AND status = 'pending'
+        `, [requestId, status, response]);
+
+        await pool.end();
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[SEMO Remote] ✅ 응답 처리됨\n\nID: ${requestId}\n상태: ${status}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[SEMO Remote] ❌ 응답 처리 실패: ${error}`,
+            },
+          ],
+        };
+      }
+    }
+
+    case "semo_remote_pending": {
+      if (!isMemoryEnabled()) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[SEMO Remote] ❌ DB 연결이 필요합니다.`,
+            },
+          ],
+        };
+      }
+
+      const sessionId = args?.session_id as string | undefined;
+      const limit = (args?.limit as number) || 10;
+
+      try {
+        const { Pool } = await import("pg");
+        const pool = new Pool({
+          host: process.env.SEMO_DB_HOST || "3.38.162.21",
+          port: parseInt(process.env.SEMO_DB_PORT || "5432"),
+          database: process.env.SEMO_DB_NAME || "appdb",
+          user: process.env.SEMO_DB_USER || "app",
+          password: process.env.SEMO_DB_PASSWORD,
+        });
+
+        let query = `
+          SELECT id, session_id, type, tool_name, message, created_at
+          FROM remote_requests
+          WHERE status = 'pending'
+            AND (expires_at IS NULL OR expires_at > NOW())
+        `;
+        const params: (string | number)[] = [];
+
+        if (sessionId) {
+          params.push(sessionId);
+          query += ` AND session_id = $${params.length}`;
+        }
+
+        params.push(limit);
+        query += ` ORDER BY created_at ASC LIMIT $${params.length}`;
+
+        const result = await pool.query(query, params);
+        await pool.end();
+
+        if (result.rows.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `[SEMO Remote] ✅ 대기 중인 요청 없음`,
+              },
+            ],
+          };
+        }
+
+        const formatted = result.rows.map((r: { id: string; type: string; message: string; created_at: Date }) =>
+          `• ${r.id.substring(0, 8)}... [${r.type}] ${r.message.substring(0, 50)}`
+        ).join("\n");
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[SEMO Remote] 대기 중인 요청 (${result.rows.length}건)\n\n${formatted}`,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[SEMO Remote] ❌ 조회 실패: ${error}`,
+            },
+          ],
+        };
+      }
     }
 
     default:
