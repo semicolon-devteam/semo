@@ -28,7 +28,8 @@ Issue에 대한 테스트 요청 시 환경 정보(URL 등)를 자동으로 첨�
 | 항목 | 파일 |
 |------|------|
 | **환경 정보** | `.claude/memory/projects.md` > 환경 정보 섹션 |
-| **테스터 정보** | `.claude/memory/team.md` (있는 경우) |
+| **테스터 정보** | `semo-core/_shared/team-members.md` |
+| **프로젝트 채널** | `semo-core/_shared/project-channels.md` |
 
 ## Quick Start
 
@@ -54,11 +55,15 @@ URL=$(echo "$ISSUE" | jq -r '.url')
     ↓
 2. 레포지토리 확인 → 환경 URL 매핑
     ↓
-3. Issue Status 확인 → 권장 환경 결정
+3. 레포지토리 → 프로젝트 채널 매핑 (project-channels.md)
     ↓
-4. 메시지 생성 (템플릿 적용)
+4. 테스터 GitHub ID → Slack Name 매핑 (team-members.md)
     ↓
-5. Slack 전송 (notify-slack 호출)
+5. Slack User ID 조회 (slack_lookup_user)
+    ↓
+6. 메시지 생성 (테스터 멘션 포함)
+    ↓
+7. 프로젝트 채널로 Slack 전송
     ↓
 완료
 ```
@@ -113,8 +118,8 @@ URL=$(echo "$ISSUE" | jq -r '.url')
 | issue | O | Issue 번호 또는 URL | - |
 | repo | △ | 레포지토리 | Issue URL에서 추출 |
 | env | X | 테스트 환경 | stg |
-| tester | X | 테스터 멘션 | @Goni |
-| channel | X | Slack 채널 | #_협업 |
+| tester | X | 테스터 멘션 | @Goni (kokkh) |
+| channel | X | Slack 채널 | 프로젝트 채널 → Fallback: #_협업 |
 
 ## 사용 예시
 
@@ -186,4 +191,6 @@ URL=$(echo "$ISSUE" | jq -r '.url')
 ## References
 
 - [환경 정보](/.claude/memory/projects.md#환경-정보)
+- [프로젝트 채널 매핑](../../../../semo-system/semo-core/_shared/project-channels.md)
+- [팀원 매핑](../../../../semo-system/semo-core/_shared/team-members.md)
 - [notify-slack Skill](../../../core/skills/notify-slack/SKILL.md)

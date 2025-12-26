@@ -174,7 +174,35 @@ mcp__semo-integrations__slack_lookup_user
 
 ---
 
+## 🔴 프로젝트 채널 연동
+
+> **레포지토리별 프로젝트 채널로 알림 전송**
+>
+> 📖 **설정 참조**: [project-channels.md](../../semo-core/_shared/project-channels.md)
+
+### 채널 결정 로직
+
+```text
+1. 요청에 채널 지정 → 해당 채널 사용
+2. 레포지토리 정보 있음 → 프로젝트 채널 조회
+3. 프로젝트 채널 없음 → #_협업 (기본)
+```
+
+### 프로젝트 채널 매핑 (빠른 참조)
+
+| 레포지토리 | Slack 채널 |
+|-----------|-----------|
+| mvp-link-collect | #mvp-link-collect |
+| cm-land | #cm-land |
+| cm-office | #cm-office |
+| semo | #_협업 |
+
+> 전체 목록: [project-channels.md](../../semo-core/_shared/project-channels.md)
+
+---
+
 ## Related
 
 - [team-members.md](../../semo-core/_shared/team-members.md) - GitHub ↔ Slack 매핑
+- [project-channels.md](../../semo-core/_shared/project-channels.md) - 프로젝트별 Slack 채널 매핑
 - [check-feedback Skill](../check-feedback/SKILL.md) - 피드백 알림 시 멘션

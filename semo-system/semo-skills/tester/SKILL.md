@@ -183,6 +183,42 @@ gh project item-edit \
 
 ---
 
+## 🔴 프로젝트 채널 연동
+
+> **테스트 요청 시 프로젝트 전용 채널로 알림 전송**
+>
+> 📖 **설정 참조**: [project-channels.md](../../semo-core/_shared/project-channels.md)
+
+### 채널 결정 로직
+
+```text
+1. 이슈/PR의 레포지토리 확인
+2. project-channels.md에서 채널 조회
+3. 프로젝트 채널로 전송 (테스터 멘션 포함)
+4. 채널 없으면 #_협업으로 Fallback
+```
+
+### 채널 매핑 (빠른 참조)
+
+| 레포지토리 | Slack 채널 |
+|-----------|-----------|
+| mvp-link-collect | #mvp-link-collect |
+| cm-land | #cm-land |
+| cm-office | #cm-office |
+| 기타 | #_협업 (기본) |
+
+### 테스트 요청 알림 형식
+
+```text
+<@{tester_slack_id}> 🧪 테스트 요청
+
+📋 이슈: #{issue_number} {issue_title}
+🔗 URL: {test_url}
+📊 상태: 테스트중
+```
+
+---
+
 ## 출력 형식
 
 ### 테스트 작성 완료
@@ -201,6 +237,7 @@ gh project item-edit \
 
 📋 이슈: #{issue_number}
 👤 테스터: @{tester_name}
+📢 채널: #{project_channel}
 📊 보드 상태: 테스트중
 📝 테스트케이스: {count}개 작성됨
 
@@ -215,3 +252,5 @@ gh project item-edit \
 ## References
 
 - [github-projects.md](../../semo-core/_shared/github-projects.md) - 프로젝트 보드 설정 (캐싱)
+- [project-channels.md](../../semo-core/_shared/project-channels.md) - 프로젝트별 Slack 채널 매핑
+- [team-members.md](../../semo-core/_shared/team-members.md) - GitHub ↔ Slack 사용자 매핑
