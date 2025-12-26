@@ -5,7 +5,7 @@
 ## Semicolon Team Workflow
 
 ```
-Epic (command-center)
+Epic (docs)
   ↓ /speckit.specify
 Spec (specs/{n}-{name}/spec.md)
   ↓ /speckit.plan
