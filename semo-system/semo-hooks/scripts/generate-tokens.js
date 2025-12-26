@@ -5,7 +5,7 @@
  * CI/CD에서 실행되어 암호화된 토큰을 생성합니다.
  *
  * 사용법:
- *   SEMO_DB_PASSWORD=xxx node scripts/generate-tokens.js
+ *   SEMO_DB_PASSWORD=xxx SEMO_SLACK_BOT_TOKEN=xoxb-xxx node scripts/generate-tokens.js
  *
  * 출력:
  *   src/lib/tokens.generated.ts 파일 생성
@@ -35,14 +35,16 @@ function encrypt(text) {
 }
 
 function main() {
-  const dbPassword = process.env.SEMO_DB_PASSWORD;
+  const dbPassword = process.env.SEMO_DB_PASSWORD || "";
+  const slackToken = process.env.SEMO_SLACK_BOT_TOKEN || "";
 
-  if (!dbPassword) {
-    console.error("Error: SEMO_DB_PASSWORD environment variable is required");
+  if (!dbPassword && !slackToken) {
+    console.error("Error: At least one of SEMO_DB_PASSWORD or SEMO_SLACK_BOT_TOKEN is required");
     process.exit(1);
   }
 
-  const encryptedDbPassword = encrypt(dbPassword);
+  const encryptedDbPassword = dbPassword ? encrypt(dbPassword) : "";
+  const encryptedSlackToken = slackToken ? encrypt(slackToken) : "";
 
   const content = `/**
  * SEMO Hooks Encrypted Tokens
@@ -57,6 +59,9 @@ function main() {
 export const ENCRYPTED_TOKENS = {
   // SEMO DB Password (Long-term Memory)
   DB_PASSWORD: "${encryptedDbPassword}",
+
+  // Slack Bot Token (Semicolon Notifier)
+  SLACK_BOT_TOKEN: "${encryptedSlackToken}",
 };
 
 // 토큰 존재 여부 확인
@@ -69,7 +74,12 @@ export function hasEncryptedToken(name: keyof typeof ENCRYPTED_TOKENS): boolean 
   fs.writeFileSync(outputPath, content);
 
   console.log(`[SEMO] Encrypted tokens generated: ${outputPath}`);
-  console.log(`[SEMO] DB password: ${encryptedDbPassword.slice(0, 20)}...`);
+  if (encryptedDbPassword) {
+    console.log(`[SEMO] DB password: ${encryptedDbPassword.slice(0, 20)}...`);
+  }
+  if (encryptedSlackToken) {
+    console.log(`[SEMO] Slack token: ${encryptedSlackToken.slice(0, 20)}...`);
+  }
 }
 
 main();

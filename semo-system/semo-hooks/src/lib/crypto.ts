@@ -57,3 +57,40 @@ export function decrypt(encryptedText: string): string {
     return '';
   }
 }
+
+/**
+ * 암호화된 Slack 토큰 로드
+ */
+function loadEncryptedSlackToken(): string {
+  try {
+    // CI/CD에서 생성된 암호화 토큰 (배포 패키지용)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const generated = require('./tokens.generated.js');
+    if (generated.ENCRYPTED_TOKENS?.SLACK_BOT_TOKEN) {
+      const decrypted = decrypt(generated.ENCRYPTED_TOKENS.SLACK_BOT_TOKEN);
+      if (decrypted) return decrypted;
+    }
+  } catch {
+    // tokens.generated.js 없음 - 로컬 개발 환경
+  }
+  return '';
+}
+
+/**
+ * Slack Bot Token 가져오기 (우선순위: 환경변수 > 암호화된 팀 토큰)
+ */
+export function getSlackBotToken(): string {
+  // 1. 환경변수 우선 (로컬 개발/테스트용)
+  if (process.env.SEMO_SLACK_BOT_TOKEN) {
+    return process.env.SEMO_SLACK_BOT_TOKEN;
+  }
+  // 2. 암호화된 팀 토큰 (배포 패키지용)
+  return loadEncryptedSlackToken();
+}
+
+/**
+ * Slack 토큰 사용 가능 여부
+ */
+export function isSlackEnabled(): boolean {
+  return !!getSlackBotToken();
+}
