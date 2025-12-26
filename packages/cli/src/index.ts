@@ -830,7 +830,7 @@ async function confirmOverwrite(itemName: string, itemPath: string): Promise<boo
       type: "confirm",
       name: "shouldOverwrite",
       message: chalk.yellow(`${itemName} 이미 존재합니다. SEMO 기준으로 덮어쓰시겠습니까?`),
-      default: false,
+      default: true,
     },
   ]);
 
