@@ -460,6 +460,10 @@ const EXTENSION_PACKAGES: Record<string, { name: string; desc: string; detect: s
 
   // Meta
   meta: { name: "Meta", desc: "SEMO 프레임워크 자체 개발/관리", layer: "meta", detect: ["semo-core", "semo-skills"] },
+
+  // System (semo-system 하위 패키지)
+  "semo-hooks": { name: "Hooks", desc: "Claude Code Hooks 기반 로깅 시스템", layer: "system", detect: [] },
+  "semo-remote": { name: "Remote", desc: "Claude Code 원격 제어 (모바일 PWA)", layer: "system", detect: [] },
 };
 
 // 단축명 → 전체 패키지 경로 매핑
@@ -480,10 +484,13 @@ const SHORTNAME_MAPPING: Record<string, string> = {
   next: "eng/nextjs",
   backend: "eng/spring",
   mvp: "biz/poc",
+  // System 패키지 단축명
+  hooks: "semo-hooks",
+  remote: "semo-remote",
 };
 
-// 그룹 이름 목록 (biz, eng, ops)
-const PACKAGE_GROUPS = ["biz", "eng", "ops", "meta"] as const;
+// 그룹 이름 목록 (biz, eng, ops, meta, system)
+const PACKAGE_GROUPS = ["biz", "eng", "ops", "meta", "system"] as const;
 type PackageGroup = typeof PACKAGE_GROUPS[number];
 
 // 그룹명 → 해당 그룹의 모든 패키지 반환
@@ -2757,7 +2764,7 @@ ${packageClaudeMdSections}
 // === add 명령어 ===
 program
   .command("add <packages>")
-  .description("Extension 패키지를 추가로 설치합니다 (그룹: biz, eng, ops / 개별: biz/discovery, eng/nextjs)")
+  .description("Extension 패키지를 추가로 설치합니다 (그룹: biz, eng, ops, system / 개별: biz/discovery, eng/nextjs, semo-hooks)")
   .option("-f, --force", "기존 설정 덮어쓰기")
   .action(async (packagesInput: string, options) => {
     const cwd = process.cwd();
@@ -2879,6 +2886,7 @@ program
       eng: { title: "Engineering Layer", emoji: "⚙️" },
       ops: { title: "Operations Layer", emoji: "📊" },
       meta: { title: "Meta", emoji: "🔧" },
+      system: { title: "System", emoji: "🔩" },
     };
 
     for (const [layerKey, layerInfo] of Object.entries(layers)) {
@@ -2905,6 +2913,7 @@ program
     console.log(chalk.gray("  semo add biz      → Business 전체 (discovery, design, management, poc)"));
     console.log(chalk.gray("  semo add eng      → Engineering 전체 (nextjs, spring, ms, infra)"));
     console.log(chalk.gray("  semo add ops      → Operations 전체 (qa, monitor, improve)"));
+    console.log(chalk.gray("  semo add system   → System 전체 (hooks, remote)"));
     console.log();
 
     // 단축명 안내
