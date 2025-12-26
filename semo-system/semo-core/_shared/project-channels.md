@@ -9,6 +9,7 @@
 | MVP Link Collect | mvp-link-collect | #mvp-link-collect | - | 현재 프로젝트 |
 | CM Land | cm-land | #cm-land | - | 커뮤니티 랜드 |
 | CM Office | cm-office | #cm-office | - | 커뮤니티 오피스 |
+| CM Labor Union | cm-labor-union | #_협업 | C09KNL91QBZ | 노조 프로젝트 |
 | Core Backend | core-backend | #_협업 | C09KNL91QBZ | 기본 채널 사용 |
 | SEMO | semo | #_협업 | C09KNL91QBZ | 기본 채널 사용 |
 
@@ -31,6 +32,7 @@ const PROJECT_CHANNELS = {
   "mvp-link-collect": "#mvp-link-collect",
   "cm-land": "#cm-land",
   "cm-office": "#cm-office",
+  "cm-labor-union": "#_협업",
   "core-backend": "#_협업",
   "semo": "#_협업"
 };

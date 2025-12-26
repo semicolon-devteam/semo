@@ -78,8 +78,29 @@ URL=$(echo "$ISSUE" | jq -r '.url')
 | cm-office | dev | https://dev.cm-office.com |
 | cm-office | stg | https://stg.cm-office.com |
 | cm-office | prd | https://cm-office.com |
+| cm-labor-union | - | Vercel Preview (PR별) |
 
 > **기본값**: stg 환경 (QA 테스트 기준)
+
+## 🔴 Fallback 규칙 (참조 파일 없을 때)
+
+> **참조 파일이 없거나 매핑이 없어도 워크플로우가 중단되지 않도록 기본값을 사용합니다.**
+
+| 항목 | Fallback 규칙 |
+|------|--------------|
+| **프로젝트 채널** | 매핑 없음 → `#_협업` 사용 |
+| **테스터** | 지정 없음 → `Goni (kokkh)` 기본 QA 담당자 |
+| **환경 URL** | 매핑 없음 → Issue URL만 표시 (환경 URL 생략) |
+
+### Fallback 적용 예시
+
+```text
+레포지토리: cm-labor-union (project-channels.md에 없는 경우)
+    ↓
+Fallback: #_협업 채널 사용
+    ↓
+메시지에 "[Fallback: 프로젝트 채널 미설정]" 표시
+```
 
 ## 환경 선택 규칙
 
