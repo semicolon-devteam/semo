@@ -34,7 +34,8 @@ SEMO 패키지 관리 요청을 분석하고 적절한 에이전트로 위임하
 | 배포, deploy | `package-deploy` | "SEMO 설치해줘" |
 | 구조, 설계 | `semo-architect` | "아키텍처 검토" |
 | 도움말, help | `semo-help` | "/SEMO:help" |
-| 피드백, feedback, 이슈 | `check-feedback` | "피드백 확인해줘" |
+| 피드백 확인, feedback 확인 | `check-feedback` | "피드백 확인해줘" |
+| 피드백 처리, 이슈 처리/반영 | `process-feedback` | "피드백 처리해줘" |
 
 ## SEMO 메시지 포맷
 
@@ -160,3 +161,4 @@ semo-ms → eng/ms
 | `skill-creator` | Skill 생성 자동화 |
 | `version-updater` | 버전 체크 및 업데이트 알림 |
 | `check-feedback` | SEMO 피드백 이슈 수집 |
+| `process-feedback` | SEMO 피드백 분석/반영/배포 |

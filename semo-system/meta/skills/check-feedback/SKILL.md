@@ -217,8 +217,43 @@ semo-po         #12
 - 이슈 작성자가 본인인 경우 (자기 자신에게 알림 불필요)
 - Slack 사용자 매칭 실패 시 (경고 메시지만 출력)
 
+---
+
+## 🔴 스킬 체이닝: process-feedback 호출
+
+> **피드백 확인 후 사용자가 "처리해줘"라고 요청하면 자동으로 `process-feedback` 스킬을 호출합니다.**
+
+### 트리거 키워드
+
+- "처리해줘", "이슈 처리해줘"
+- "반영해줘", "수정해줘"
+- "해결해줘", "고쳐줘"
+
+### 체이닝 흐름
+
+```text
+[check-feedback] Open 이슈 리스트 출력
+    ↓
+사용자: "처리해줘" / "#{number} 반영해줘"
+    ↓
+[자동] skill:process-feedback 호출
+    ↓
+피드백 분석 → 설계 → 구현 → 버저닝 → 배포 → Slack 알림
+```
+
+### 호출 형식
+
+```markdown
+[SEMO] Skill: check-feedback → process-feedback 체이닝
+
+→ skill:process-feedback 호출 - #{issue_number}
+```
+
+---
+
 ## References
 
+- [process-feedback Skill](../process-feedback/SKILL.md) - 피드백 처리 (체이닝 대상)
 - [Slack 설정 (토큰, 채널)](../../semo-core/_shared/slack-config.md)
 - [팀원 정보 (GitHub ↔ Slack 매핑)](../../semo-core/_shared/team-members.md)
 - [notify-slack Skill](../../semo-core/skills/notify-slack/SKILL.md)
