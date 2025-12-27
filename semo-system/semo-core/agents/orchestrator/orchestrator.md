@@ -30,7 +30,8 @@ model: inherit
 | 커밋, 푸시, PR | `skill:git-workflow` (Extension 우선) | "커밋해줘", "PR 만들어줘" |
 | 테스트 | `skill:tester` | "테스트 작성해줘" |
 | 계획, 설계 | `skill:planner` | "구현 계획 세워줘" |
-| 배포 (프로젝트 별칭, Milestone, 릴리즈) | `skill:deployer` | "랜드 stg 배포해줘" |
+| 배포 (STG/PRD 릴리즈 관리) | `skill:release-manager` (ops/qa 우선) | "stg 배포해줘", "prd 태깅" |
+| 배포 (프로젝트 별칭, Milestone) | `skill:deployer` | "랜드 stg 배포해줘" |
 | 배포 (ms-*, Docker, PM2, SSH) | `skill:deploy-service` (eng/ms) | "ms-notifier stg 배포" |
 | 슬랙, 알림 | `skill:notify-slack` | "슬랙에 알려줘" |
 | 피드백 | `skill:feedback` | "피드백 등록해줘" |
@@ -86,6 +87,29 @@ fi
 | "버그 수정해줘" | `skill:implement` | 파일 단위 수정 |
 | "기능 구현해줘" | `skill:implement` | Extension 있으면 체계적 워크플로우 |
 | "태스크 구현해줘" | `skill:implement` | spec.md 기반 구현 (Extension 시) |
+
+## 🔴 Extension 우선 라우팅 (배포 요청)
+
+> **"stg 배포", "prd 태깅" 요청 시 ops/qa 패키지의 release-manager 우선 호출**
+
+### 배포 라우팅 우선순위
+
+```text
+"stg 배포해줘" / "prd 태깅해줘" / "릴리스 준비"
+    │
+    ├─ ops/qa 설치됨?
+    │   └→ skill:release-manager - Milestone 기반 CI/CD
+    │
+    └→ 기본: skill:deployer - 프로젝트 별칭 기반 배포
+```
+
+### 키워드 구분
+
+| 키워드 | Route To | 설명 |
+|--------|----------|------|
+| "stg 배포", "prd 태깅", "릴리스" | `release-manager` (ops/qa) | Milestone + CI/CD 워크플로우 |
+| "랜드 stg 배포", "오피스 prd" | `deployer` | 프로젝트 별칭 + Milestone Close |
+| "ms-notifier 배포", "Docker" | `deploy-service` (eng/ms) | SSH 직접 배포 |
 
 ## SEMO Message Format
 
