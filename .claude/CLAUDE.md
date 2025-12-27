@@ -69,6 +69,7 @@
     │   └→ "기능 구현 중" → skill:implement 자동 라우팅
     │   └→ "테스트 작성 중" → skill:tester 자동 라우팅
     │   └→ "커밋 준비 중" → skill:git-workflow 자동 라우팅
+    │   └→ "문서/패키지 수정 중" → 작업 완료 후 skill:version-manager 자동 호출
     │
     └─ 코드 수정 시도 감지
         └→ Pre-Action Guard 발동 → skill:implement
@@ -78,6 +79,7 @@
 - Summary만 보고 직접 코드 수정 시작 ❌
 - 스킬 호출 없이 Edit/Write 도구 사용 ❌
 - "이전 세션에서 하던 작업 계속" 식의 직접 진행 ❌
+- **작업 완료 후 버저닝 없이 종료 ❌** (Meta 환경)
 
 **올바른 동작**:
 ```markdown
@@ -90,6 +92,43 @@
 
 [SEMO] Skill: implement 호출 - #39 UI 구현 계속
 ```
+
+### 1-2. Meta 환경 자동 버저닝 (NON-NEGOTIABLE)
+
+> **⚠️ Meta 환경(semo-system/ 수정)에서 작업 완료 시 반드시 버저닝을 실행합니다.**
+> **사용자가 별도로 요청하지 않아도 자동으로 진행합니다.**
+
+**트리거 조건** (하나라도 해당 시 자동 실행):
+
+| 변경 대상 | 버전 파일 | 버저닝 스킬 |
+|----------|----------|------------|
+| `semo-system/semo-core/**` | `semo-core/VERSION` | `version-manager` |
+| `semo-system/semo-skills/**` | `semo-skills/VERSION` | `version-manager` |
+| `semo-system/semo-remote/**` | `semo-remote/VERSION` | `version-manager` |
+| `semo-system/semo-hooks/**` | `semo-hooks/VERSION` | `version-manager` |
+| `semo-system/meta/**` | `meta/VERSION` | `version-manager` |
+| `packages/cli/**` | `packages/cli/package.json` | `deploy-npm` |
+
+**필수 동작 순서**:
+
+```text
+1. 작업 완료
+   ↓
+2. 변경된 패키지 VERSION 파일 범프 (MAJOR/MINOR/PATCH)
+   ↓
+3. CHANGELOG/{version}.md 생성
+   ↓
+4. 커밋 + 푸시
+   ↓
+5. Slack 알림 (notify-slack)
+   ↓
+6. (CLI인 경우) npm publish
+```
+
+**금지 사항**:
+- 사용자가 "버저닝해줘"라고 요청하기를 기다리지 않음 ❌
+- 작업만 완료하고 버저닝 없이 종료 ❌
+- Slack 알림 생략 ❌
 
 ### 2. Pre-Commit Quality Gate
 
