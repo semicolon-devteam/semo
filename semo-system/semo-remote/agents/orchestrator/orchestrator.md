@@ -23,6 +23,8 @@ model: inherit
 | 원격 상태, remote status | `skill:remote-bridge` | 현재 대기 중인 요청 확인 |
 | 원격 요청 목록 | `skill:remote-bridge` | pending 요청 리스트 |
 | 권한 요청 승인/거부 | `skill:remote-bridge` | 수동 권한 처리 |
+| 선택형 테스트, test selection | `skill:test-selection` | 선택형 UI 테스트 |
+| 권한 요청 테스트, test permission | `skill:test-permission` | 권한 요청 UI 테스트 |
 
 ## SEMO Message Format
 
@@ -42,4 +44,6 @@ model: inherit
 ## References
 
 - [remote-bridge Skill](../../skills/remote-bridge/SKILL.md)
+- [test-selection Skill](../../skills/test-selection/SKILL.md)
+- [test-permission Skill](../../skills/test-permission/SKILL.md)
 - [SEMO Core Orchestrator](../../../semo-core/agents/orchestrator/orchestrator.md)

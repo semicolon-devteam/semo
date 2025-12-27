@@ -49,6 +49,32 @@
 | 품질 검증 | `skill:verify` | ❌ 금지 |
 | 테스트 실행 | `skill:tester` | ❌ 금지 |
 | 배포 | `skill:deployer` | ❌ 금지 |
+| `/SEMO:*` 커맨드 | 해당 스킬 직접 호출 | ❌ 금지 |
+
+### 🔴 /SEMO:* 커맨드 직접 라우팅 (NON-NEGOTIABLE)
+
+> **⚠️ `/SEMO:*` 커맨드는 해당 스킬로 직접 라우팅됩니다. 커맨드 인자를 해석하여 직접 작업 수행 금지!**
+
+| 커맨드 | 스킬 | 동작 |
+|--------|------|------|
+| `/SEMO:feedback {내용}` | `skill:feedback` | 내용을 이슈로 생성 |
+| `/SEMO:help` | `skill:semo-help` | 도움말 표시 |
+
+**금지 사항**:
+- `/SEMO:feedback` 인자를 "수정 요청"으로 해석하여 직접 파일 수정 ❌
+- 커맨드 인자 내용을 직접 반영하려 시도 ❌
+- 스킬 호출 없이 커맨드 처리 ❌
+
+**올바른 동작**:
+```text
+/SEMO:feedback "summarize-meeting 라우팅 조건 개선해줘"
+    ↓
+[SEMO] Skill: feedback 호출
+    ↓
+semicolon-devteam/semo 레포에 이슈 생성
+    ↓
+이슈관리 프로젝트에 추가
+```
 
 **위반 감지 시 자동 리다이렉트**:
 ```markdown
