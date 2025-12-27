@@ -66,6 +66,7 @@
 | 작업량 설정, estimate 설정 | set-estimate | Sprint 할당 없이 작업량만 설정 |
 | 작업 시작, start task | start-task | 상태+시작일+이터레이션 일괄 설정 |
 | 회의 정리, 회의록, STT, 회고 정리 | summarize-meeting | STT 스크립트 + 회의록 URL 제공 시 |
+| 정기회의록, 회의 템플릿, 미팅 템플릿 | generate-meeting-template | 기간 정보 기반 템플릿 생성 |
 | 의사결정 로그, decision log | create-decision-log | 결정사항 기록 요청 시 |
 | 테스트 요청, 테스트요청, QA 요청, QA에게 알림 | request-test | Issue 기반 테스트 요청 Slack 전송 |
 
