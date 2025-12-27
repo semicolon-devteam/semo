@@ -28,7 +28,8 @@ model: inherit
 |--------|----------|------|
 | 구현, implement, 코드 작성 | `skill:implement` (Extension 우선) | "기능 구현해줘", "함수 만들어줘" |
 | 커밋, 푸시, PR | `skill:git-workflow` (Extension 우선) | "커밋해줘", "PR 만들어줘" |
-| 테스트 | `skill:tester` | "테스트 작성해줘" |
+| 테스트 작성 | `skill:tester` | "테스트 작성해줘" |
+| 테스트 요청, QA 요청, 테스트요청 | `skill:request-test` (biz/management) | "#123 테스트 요청", "QA 테스트 요청해줘" |
 | 계획, 설계 | `skill:planner` | "구현 계획 세워줘" |
 | 배포 (STG/PRD 릴리즈 관리) | `skill:release-manager` (ops/qa 우선) | "stg 배포해줘", "prd 태깅" |
 | 배포 (프로젝트 별칭, Milestone) | `skill:deployer` | "랜드 stg 배포해줘" |
