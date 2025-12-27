@@ -62,7 +62,57 @@ Remote 요청 저장 완료
 ls semo-system/semo-remote/VERSION
 ```
 
+## 관련 레포지토리
+
+> **⚠️ 기능 구현 여부 및 구현도는 정적 문서에 의존하지 마세요.**
+> 최신 정보가 필요하면 `gh` CLI로 해당 레포지토리를 직접 탐색하세요.
+
+### semo-remote-client (Electron 앱)
+
+데스크탑에서 Claude Code 세션을 모니터링하는 Electron 기반 클라이언트
+
+```bash
+# 레포지토리 탐색
+gh repo view semicolon-devteam/semo-remote-client
+
+# 최신 구조 확인
+gh api repos/semicolon-devteam/semo-remote-client/contents --jq '.[].name'
+
+# README 확인
+gh api repos/semicolon-devteam/semo-remote-client/readme --jq '.content' | base64 -d
+```
+
+**기술 스택**: Electron, TypeScript, iTerm2 Python API, Supabase Realtime
+
+### semo-remote-app (Next.js PWA)
+
+모바일에서 Claude Code 세션을 제어하는 Progressive Web App
+
+```bash
+# 레포지토리 탐색
+gh repo view semicolon-devteam/semo-remote-app
+
+# 최신 구조 확인
+gh api repos/semicolon-devteam/semo-remote-app/contents --jq '.[].name'
+
+# README 확인
+gh api repos/semicolon-devteam/semo-remote-app/readme --jq '.content' | base64 -d
+```
+
+**기술 스택**: Next.js 14, PWA, Supabase Auth/Realtime, Zustand
+
+### Epic 이슈
+
+전체 semo-remote 시스템 설계 및 진행 상황:
+
+```bash
+# Epic 이슈 확인
+gh issue view 108 --repo semicolon-devteam/docs
+```
+
 ## References
 
 - [Orchestrator](agents/orchestrator/orchestrator.md)
 - [remote-bridge Skill](skills/remote-bridge/SKILL.md)
+- [DB Schema](db/schema.sql) - remote_requests, remote_sessions 테이블 정의
+- [QUICKSTART](QUICKSTART.md) - 빠른 시작 가이드
