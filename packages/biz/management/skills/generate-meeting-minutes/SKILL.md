@@ -1,18 +1,18 @@
 ---
-name: generate-meeting-template
+name: generate-meeting-minutes
 description: |
-  정기회의록 템플릿 자동 생성. command-center의 meeting-minutes.yml 템플릿 기반.
-  Use when (1) "정기회의록 만들어줘", (2) "회의 템플릿 생성",
+  정기회의록(Meeting Minutes) 자동 생성. command-center의 meeting-minutes.yml 템플릿 기반.
+  Use when (1) "정기회의록 만들어줘", (2) "회의록 생성",
   (3) "25년 12월 4/4 회의록" 형식 요청.
 tools: [Bash, Read, Glob, AskUserQuestion]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: generate-meeting-template 호출` 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: generate-meeting-minutes 호출` 메시지를 첫 줄에 출력하세요.
 
-# generate-meeting-template Skill
+# generate-meeting-minutes Skill
 
-> 정기회의 템플릿 자동 생성 (command-center 템플릿 기반)
+> 정기회의록(Meeting Minutes) 자동 생성 (command-center 템플릿 기반)
 
 ## Purpose
 
@@ -225,7 +225,7 @@ gh discussion create \
 ### 성공
 
 ```markdown
-[SEMO] Skill: generate-meeting-template 완료
+[SEMO] Skill: generate-meeting-minutes 완료
 
 ✅ 정기회의록 Discussion 생성 완료
 
@@ -246,7 +246,7 @@ gh discussion create \
 ### 불참자 있는 경우
 
 ```markdown
-[SEMO] Skill: generate-meeting-template 완료
+[SEMO] Skill: generate-meeting-minutes 완료
 
 ✅ 정기회의록 Discussion 생성 완료
 

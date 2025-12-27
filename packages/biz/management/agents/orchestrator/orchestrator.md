@@ -99,6 +99,20 @@ Agent 실행
 | "도움말" | semo-help |
 | "Projects 동기화" | sync-project-status |
 
+### 회의록 관련 스킬 라우팅
+
+> **🔴 "회의록" 키워드 충돌 방지**: 더 구체적인 키워드 우선 매칭
+
+```text
+"회의록" 키워드 감지
+    │
+    ├─ "정기회의록" / "N월 N/N 회의록" / "회의록 만들어줘"
+    │   └→ skill:generate-meeting-minutes (새 Discussion 생성)
+    │
+    └─ "STT" / "회의 정리" / 회의록 URL 제공됨
+        └→ skill:summarize-meeting (기존 Discussion에 내용 작성)
+```
+
 ## References
 
 - [Routing Table](references/routing-table.md)

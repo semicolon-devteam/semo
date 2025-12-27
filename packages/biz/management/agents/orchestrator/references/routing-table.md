@@ -59,16 +59,29 @@
 
 ## Skill 직접 라우팅
 
-| 키워드 | Skill | 조건 |
-|--------|-------|------|
-| 도움말, help, 사용법 | semo-help | - |
-| 동기화, sync | sync-project-status | Projects 관련 |
-| 작업량 설정, estimate 설정 | set-estimate | Sprint 할당 없이 작업량만 설정 |
-| 작업 시작, start task | start-task | 상태+시작일+이터레이션 일괄 설정 |
-| 회의 정리, 회의록, STT, 회고 정리 | summarize-meeting | STT 스크립트 + 회의록 URL 제공 시 |
-| 정기회의록, 회의 템플릿, 미팅 템플릿 | generate-meeting-template | 기간 정보 기반 템플릿 생성 |
-| 의사결정 로그, decision log | create-decision-log | 결정사항 기록 요청 시 |
-| 테스트 요청, 테스트요청, QA 요청, QA에게 알림 | request-test | Issue 기반 테스트 요청 Slack 전송 |
+> **🔴 라우팅 우선순위**: 더 구체적인 키워드가 우선. "정기회의록" > "회의록"
+
+| 키워드 | Skill | 조건 | 우선순위 |
+|--------|-------|------|----------|
+| 도움말, help, 사용법 | semo-help | - | - |
+| 동기화, sync | sync-project-status | Projects 관련 | - |
+| 작업량 설정, estimate 설정 | set-estimate | Sprint 할당 없이 작업량만 설정 | - |
+| 작업 시작, start task | start-task | 상태+시작일+이터레이션 일괄 설정 | - |
+| **정기회의록**, 회의록 생성, N월 N/N 회의록 | **generate-meeting-minutes** | 기간 정보 기반 회의록 생성 | **1 (높음)** |
+| 회의 정리, STT, 회고 정리 | summarize-meeting | STT 스크립트 + 회의록 URL 제공 시 | 2 (낮음) |
+| 의사결정 로그, decision log | create-decision-log | 결정사항 기록 요청 시 | - |
+| 테스트 요청, 테스트요청, QA 요청, QA에게 알림 | request-test | Issue 기반 테스트 요청 Slack 전송 | - |
+
+### 회의록 관련 스킬 라우팅 규칙
+
+```text
+"회의록" 키워드 감지
+    │
+    ├─ "정기회의록" / "N월 N/N" / "회의록 만들어줘" / "회의록 생성"
+    │   └→ generate-meeting-minutes (새 회의록 Discussion 생성)
+    │
+    └─ "STT" / "회의 정리" / "회고 정리" + 회의록 URL 있음
+        └→ summarize-meeting (기존 회의록에 내용 작성)
 
 ---
 
