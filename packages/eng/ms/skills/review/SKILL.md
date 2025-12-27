@@ -14,11 +14,6 @@ model: inherit
 
 > 마이크로서비스 아키텍처 검증 + PR 리뷰 등록
 
-## Trigger Keywords
-
-- `/SEMO:review`
-- `리뷰해줘`, `PR 리뷰`, `코드 리뷰`
-
 ## 지원 기술 스택
 
 | 스택 | 서비스 예시 | 감지 방법 |

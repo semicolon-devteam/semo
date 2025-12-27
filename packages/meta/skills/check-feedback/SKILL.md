@@ -14,12 +14,6 @@ tools: [Bash]
 
 `semicolon-devteam/semo` 레포지토리에서 open 상태인 이슈를 수집하여 리스트업합니다.
 
-## Trigger Keywords
-
-- "피드백 확인", "피드백 있는지 확인"
-- "유저 피드백 체크", "피드백 체크"
-- "SEMO 이슈 확인", "open 이슈"
-
 ## Workflow
 
 ### 1. semo 레포지토리 Open 이슈 수집

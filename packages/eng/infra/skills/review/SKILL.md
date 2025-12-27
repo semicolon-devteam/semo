@@ -14,11 +14,6 @@ model: inherit
 
 > 인프라 설정 검증 + PR 리뷰 등록
 
-## Trigger Keywords
-
-- `/SEMO:review`
-- `리뷰해줘`, `PR 리뷰`, `인프라 리뷰`
-
 ## 워크플로우
 
 ### Phase 1: Docker Compose 검증

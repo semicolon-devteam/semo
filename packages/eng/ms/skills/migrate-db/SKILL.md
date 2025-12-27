@@ -20,13 +20,6 @@ triggers:
 
 > Prisma/SQL 마이그레이션 안전 관리
 
-## Trigger Keywords
-
-- `마이그레이션`, `migrate`
-- `스키마 변경`, `테이블 추가`
-- `DB 동기화`, `prisma push`
-- `마이그레이션 상태`
-
 ## 지원 기술 스택
 
 | 스택 | 도구 | 서비스 예시 |

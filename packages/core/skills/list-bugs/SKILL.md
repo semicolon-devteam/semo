@@ -36,12 +36,6 @@ gh issue list --label "🐛" --state open
 gh issue list --repo semicolon-devteam/semo --state open --json number,title,issueType --jq '.[] | select(.issueType.name == "Bug")'
 ```
 
-## Trigger Keywords
-
-- "버그 이슈", "버그 목록", "버그 조회"
-- "열린 버그", "open 버그"
-- "Projects 버그"
-
 ## Configuration
 
 ### GitHub Issue Type 정보

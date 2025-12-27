@@ -15,15 +15,6 @@ tools: [Read, Write, Bash]
 1. Spring Boot 백엔드가 미가동 상태일 때 Supabase를 직접 쿼리
 2. **온프레미스 Supabase 환경에서 PostgREST API로 DB 접근** (SSH 불가 환경)
 
-## Trigger Keywords
-
-- "supabase 직접", "graphql", "fallback"
-- "spring 없이", "백엔드 없이"
-- **"DB 조회", "테이블 데이터", "데이터 수정"**
-- **"site_config_kv", "PostgREST"**
-
----
-
 ## 온프레미스 Supabase PostgREST API
 
 ### 환경 구분

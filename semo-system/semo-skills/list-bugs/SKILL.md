@@ -13,12 +13,6 @@ model: inherit
 
 > GitHub 버그/이슈 목록 조회
 
-## Trigger Keywords
-
-- "버그 목록", "이슈 목록"
-- "open 버그 뭐 있어"
-- "해결해야 할 버그"
-
 ## 조회 명령
 
 ### 기본 조회 (Assignee 포함)

@@ -18,13 +18,6 @@ model: inherit
 
 현재 프로젝트에 설치된 SEMO 구성 요소(Core, Packages)와 전체 라우팅 경로를 시각적으로 표시합니다.
 
-## Trigger Keywords
-
-- `/SEMO:routing-map`
-- "라우팅 구조", "SEMO 구조"
-- "설치된 패키지", "SEMO 버전"
-- "에이전트 목록", "스킬 목록"
-
 ## Workflow
 
 ### Phase 1: 버전 정보 수집

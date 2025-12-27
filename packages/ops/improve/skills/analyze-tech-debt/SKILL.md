@@ -17,12 +17,6 @@ model: inherit
 
 코드베이스를 분석하여 기술 부채를 식별하고 우선순위를 매깁니다.
 
-## Trigger Keywords
-
-- "기술 부채", "tech debt"
-- "코드 품질", "code smell"
-- "리팩토링 필요", "개선 필요"
-
 ## Analysis Categories
 
 ### 1. 보안 취약점 (최우선)

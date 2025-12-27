@@ -17,12 +17,6 @@ model: inherit
 
 분석된 기술 부채에 대해 구체적인 리팩토링 방안을 제시합니다.
 
-## Trigger Keywords
-
-- "리팩토링 제안", "개선 방안"
-- "어떻게 고치면", "수정 방법"
-- "코드 개선"
-
 ## Refactoring Patterns
 
 ### 1. N+1 쿼리 해결

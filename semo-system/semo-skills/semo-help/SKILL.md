@@ -13,12 +13,6 @@ model: inherit
 
 > SEMO 도움말 제공
 
-## Trigger Keywords
-
-- "/SEMO:help", "도움말"
-- "SEMO 사용법", "어떻게 써"
-- "기능 뭐 있어"
-
 ## 도움말 내용
 
 SEMO 커맨드, 스킬 목록, 기본 사용법 안내

@@ -17,12 +17,6 @@ model: inherit
 
 운영 중인 서비스의 현재 상태를 확인합니다.
 
-## Trigger Keywords
-
-- "현황", "상태", "status"
-- "서비스 확인", "체크"
-- 특정 서비스: "cm-land 상태", "core-backend 확인"
-
 ## Workflow
 
 ### Step 1: 서비스 목록 조회

@@ -17,12 +17,6 @@ model: inherit
 
 운영 중인 서비스들의 open 상태 이슈를 모아서 보여줍니다.
 
-## Trigger Keywords
-
-- "이슈 목록", "open 이슈"
-- "활성 이슈", "이슈 확인"
-- "블로커", "critical 이슈"
-
 ## Workflow
 
 ### Step 1: 서비스별 이슈 조회

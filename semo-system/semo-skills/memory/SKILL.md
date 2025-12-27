@@ -13,12 +13,6 @@ model: inherit
 
 > 세션 간 컨텍스트 영속화
 
-## Trigger Keywords
-
-- "기억해줘", "저장해줘"
-- "컨텍스트 업데이트"
-- "결정 기록해줘"
-
 ## 관리 파일
 
 - `.claude/memory/context.md` - 프로젝트 상태

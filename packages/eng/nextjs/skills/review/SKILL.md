@@ -14,12 +14,6 @@ model: inherit
 
 > review-task + semicolon-reviewer 통합 워크플로우
 
-## Trigger Keywords
-
-- `/SEMO:review`
-- `리뷰해줘`, `PR 리뷰`, `코드 리뷰`
-- `태스크 리뷰`, `PR 전 검토`
-
 ## 워크플로우
 
 ### Phase 1-5: 태스크 리뷰 (review-task 기반)

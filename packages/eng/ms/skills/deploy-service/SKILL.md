@@ -38,14 +38,6 @@ triggers:
 | "Milestone", "릴리즈" 언급 | `deployer` | GitHub 릴리즈 워크플로우 |
 | GitHub Actions 기반 배포 | `deployer` | CI/CD 자동 트리거 |
 
-## Trigger Keywords
-
-- `ms-* 배포` (예: "ms-notifier 배포", "ms-scheduler stg 배포")
-- `Docker 빌드`, `이미지 빌드`
-- `PM2 재시작`, `서비스 재시작`
-- `롤백`, `이전 버전으로`
-- `SSH 배포`
-
 ## 배포 환경
 
 | 환경 | 대상 | 배포 방식 |

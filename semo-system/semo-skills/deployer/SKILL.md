@@ -31,18 +31,6 @@ model: inherit
 | SSH 접근 필요한 직접 배포 | `deploy-service` | 원격 서버 직접 접근 |
 | ms-* 마이크로서비스 배포 | `deploy-service` | Docker + PM2 방식 |
 
-## Trigger Keywords
-
-**배포 요청:**
-- "{별칭} {환경} 배포" (예: "랜드 stg 배포", "오피스 prd 배포")
-- "Milestone close", "릴리즈 배포"
-- "GitHub Actions 배포"
-
-**상태 조회:**
-- "stg에 뭐 올라가있어?", "현재 stg 버전"
-- "prd 최신 버전이 뭐야?"
-- "stg 반영 대기 항목 있어?"
-
 ## Semicolon 브랜치 전략
 
 | 환경 | 브랜치/태그 | 트리거 | 설명 |

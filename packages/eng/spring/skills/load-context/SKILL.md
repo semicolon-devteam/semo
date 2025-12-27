@@ -20,16 +20,6 @@ tools: [Read, Glob, Grep, Bash]
 - 세션 시작 시 작업 컨텍스트 로드
 - 버그 수정 전 관련 코드 파악 (`debug-master`와 연계)
 
-## Trigger Keywords
-
-| Keyword | Example |
-|---------|---------|
-| 컨텍스트 | "posts 도메인 컨텍스트 파악해" |
-| 파악해 | "채팅 기능에 대해 파악해" |
-| 이해해 | "인증 시스템 이해해줘" |
-| 분석해 | "결제 모듈 분석해줘" |
-| 알려줘 | "알림 기능 구조 알려줘" |
-
 ## Context Sources
 
 ### 1. Spec Documents (specs/)

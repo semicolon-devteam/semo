@@ -13,15 +13,6 @@ model: inherit
 
 > Git 커밋, 푸시, PR 생성 자동화
 
-## Trigger Keywords
-
-- "커밋해줘", "commit"
-- "푸시해줘", "push"
-- "PR 만들어줘", "pull request"
-- "브랜치 만들어줘", "branch"
-
----
-
 ## 🔴 Extension 우선 라우팅
 
 > **Extension 패키지가 설치되어 있으면 해당 패키지의 git-workflow 스킬이 우선 호출됩니다.**

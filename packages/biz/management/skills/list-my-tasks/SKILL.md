@@ -17,12 +17,6 @@ model: inherit
 
 GitHub에서 로그인된 사용자(@me)에게 할당된 Open 상태의 이슈를 조회합니다.
 
-## Trigger Keywords
-
-- "내 할당된 작업", "내 업무"
-- "나한테 할당된", "내 이슈"
-- "할당된 거 확인", "내 작업 뭐 있어"
-
 ## Workflow
 
 ### Step 1: 현재 사용자 확인

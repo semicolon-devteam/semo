@@ -17,12 +17,6 @@ model: inherit
 
 분석된 기술 부채나 개선 제안을 GitHub 이슈로 등록합니다.
 
-## Trigger Keywords
-
-- "개선 이슈 생성", "리팩토링 이슈"
-- "기술 부채 이슈", "improvement 등록"
-- "이슈로 만들어줘"
-
 ## Issue Template
 
 ```markdown

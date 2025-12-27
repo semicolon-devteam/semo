@@ -31,17 +31,6 @@ model: sonnet
 
 ## When to Activate
 
-### Trigger Keywords
-
-| Category | Keywords |
-|----------|----------|
-| 에러 | 에러, error, exception, 예외 |
-| 버그 | 버그, bug, 오류, 결함 |
-| 문제 | 문제, 이슈, issue, problem |
-| 동작 | 동작하지 않, 안 됨, 안됨, 작동 안 |
-| 디버그 | 디버그, debug, 디버깅, 추적 |
-| 실패 | 실패, fail, 터짐, crash |
-
 ## Diagnostic Workflow
 
 ```text

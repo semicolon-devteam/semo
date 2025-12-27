@@ -18,13 +18,6 @@ model: inherit
 Meta 환경에서 CLI 또는 MCP 서버 변경 후 npm 레지스트리에 배포합니다.
 **Git commit/push, Slack 알림까지 포함된 End-to-End 배포 워크플로우입니다.**
 
-## Trigger Keywords
-
-- "npm 배포해줘", "패키지 배포"
-- "CLI 배포", "MCP 배포"
-- "버전 올리고 배포해줘"
-- "배포하고 알림 보내줘"
-
 ## 배포 대상 패키지
 
 | 패키지 | npm 이름 | 경로 |

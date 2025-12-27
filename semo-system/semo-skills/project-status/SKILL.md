@@ -22,14 +22,6 @@ model: inherit
 - Status 옵션 및 Option ID
 - **상태값 Alias** (사용자 입력 → Status 값 매핑)
 
-## Trigger Keywords
-
-- "상태 변경해줘", "Status 바꿔줘"
-- "#123 작업중으로 변경해줘"
-- "Epic #78 완료 처리해줘"
-- "차곡 Epic들 전부 작업중으로 변경해줘"
-- "리뷰요청 이슈들 테스트중으로 바꿔줘"
-
 ## 권한 요구사항
 
 ```bash

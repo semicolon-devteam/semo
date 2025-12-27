@@ -14,11 +14,6 @@ model: inherit
 
 > verify-implementation 확장 + PR 리뷰 등록
 
-## Trigger Keywords
-
-- `/SEMO:review`
-- `리뷰해줘`, `PR 리뷰`, `코드 리뷰`
-
 ## 워크플로우
 
 ### Phase 1: 메타데이터 검증

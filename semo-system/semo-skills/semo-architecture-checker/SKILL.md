@@ -13,12 +13,6 @@ model: inherit
 
 > SEMO 설치 및 아키텍처 검증
 
-## Trigger Keywords
-
-- "아키텍처 체크", "구조 검증"
-- "SEMO 상태 확인"
-- "/SEMO:health"
-
 ## 검증 항목
 
 1. semo-system/ 존재 여부
