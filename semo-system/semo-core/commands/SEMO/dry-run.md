@@ -18,9 +18,10 @@ SEMO 명령 검증 (Dry Run). 실제 실행 없이 라우팅 플로우를 시뮬
 ## 동작
 
 1. **CLAUDE.md 규칙 적용** - Orchestrator-First Policy 확인
-2. **Orchestrator 분석** - 의도 분류 및 라우팅 대상 결정
-3. **Skill/Agent 정보 조회** - 대상 컴포넌트의 동작 설명
-4. **예상 응답 포맷 표시** - 실제 출력 형식 미리보기
+2. **Runtime 감지** - 프로젝트 Runtime 자동 감지
+3. **Orchestrator 분석** - 의도 분류 및 라우팅 대상 결정
+4. **Skill 정보 조회** - 대상 스킬의 동작 설명
+5. **예상 응답 포맷 표시** - 실제 출력 형식 미리보기
 
 ## 출력 포맷
 
@@ -37,17 +38,21 @@ SEMO 명령 검증 (Dry Run). 실제 실행 없이 라우팅 플로우를 시뮬
 - Quality Gate: {해당 여부}
 - Meta 환경 체크: {해당 여부}
 
-### Step 2: Orchestrator 라우팅
+### Step 2: Runtime 감지
+- **감지된 Runtime**: nextjs (next.config.ts)
+- **References 참조**: `references/runtimes/nextjs/`
+
+### Step 3: Orchestrator 라우팅
 - **의도 분류**: {intent_category}
 - **매칭 키워드**: {matched_keywords}
 - **라우팅 대상**: `{skill_name}` skill
 
-### Step 3: Skill 정보
+### Step 4: Skill 정보
 - **이름**: {skill_name}
 - **설명**: {skill_description}
 - **사용 도구**: {tools}
 
-### Step 4: 예상 출력
+### Step 5: 예상 출력
 ```
 [SEMO] Orchestrator: {의도} → skill:{skill_name}
 [SEMO] Skill: {skill_name}
@@ -67,27 +72,47 @@ SEMO 명령 검증 (Dry Run). 실제 실행 없이 라우팅 플로우를 시뮬
 
 입력된 프롬프트에서 키워드를 추출하고 orchestrator의 Quick Routing Table과 매칭합니다.
 
-### 2. 라우팅 결정
+### 2. Runtime 감지
+
+```
+파일 스캔 순서:
+1. .claude/memory/runtime.md (캐시된 설정)
+2. next.config.* → nextjs
+3. build.gradle.kts → spring
+4. go.mod → go
+5. docker-compose.yml → infra
+```
+
+### 3. 라우팅 결정
 
 ```
 키워드 매칭 우선순위:
 1. 정확히 일치하는 키워드
-2. 부분 일치 (contains)
-3. 의미적 유사성 (fallback)
+2. Runtime 특화 스킬 (nextjs-implement, spring-implement)
+3. Core 스킬 (implement, tester, git-workflow)
 ```
 
-### 3. Skill 정보 조회
+### 4. Skill 정보 조회
 
-`.claude/skills/{skill_name}/SKILL.md` 파일에서:
+`semo-core/skills/{skill_name}/SKILL.md` 파일에서:
 - description (frontmatter)
 - tools (frontmatter)
-- Trigger Keywords 섹션
+- 동작 설명 섹션
 
-### 4. 예상 결과 생성
+### 5. 예상 결과 생성
 
 Skill의 출력 포맷 섹션을 기반으로 예상 응답 형식을 표시합니다.
 
 ## 특수 케이스 처리
+
+### Runtime 특화 스킬
+
+```markdown
+### Step 2: Runtime 감지
+- **감지된 Runtime**: nextjs
+- **스킬 선택**: nextjs-implement (Runtime 특화)
+- **References**: references/runtimes/nextjs/architecture.md
+```
 
 ### SEMO 수정 요청
 
@@ -132,18 +157,32 @@ Skill의 출력 포맷 섹션을 기반으로 예상 응답 형식을 표시합�
 ```
 ```
 
-## Quick Routing Reference
+## Quick Routing Reference (v4.0)
+
+### Core Skills
 
 | 키워드 패턴 | 라우팅 대상 |
 |-------------|-------------|
-| 코드, 구현, 만들어줘 | `coder` |
+| 코드, 구현, 만들어줘 | `implement` |
 | 테스트, 커버리지 | `tester` |
 | 계획, 설계 | `planner` |
 | 배포, deploy, {별칭} | `deployer` |
 | 슬랙, 알림 | `notify-slack` |
 | 피드백, 이슈 | `feedback` |
-| 버전, 업데이트 | `version-updater` |
+| 커밋, PR, 푸시 | `git-workflow` |
 | 기억, 저장 | `memory` |
 | 버그 목록 | `list-bugs` |
 | 아키텍처, health | `semo-architecture-checker` |
 | 도움말 | `semo-help` |
+
+### Runtime 특화 Skills
+
+| Runtime | 키워드 | 스킬 |
+|---------|--------|------|
+| nextjs | 도메인 생성 | `scaffold-domain` |
+| nextjs | Supabase 타입 | `supabase-typegen` |
+| nextjs | E2E 테스트 | `e2e-test` |
+| spring | CQRS 구현 | `spring-implement` |
+| spring | Reactive 검증 | `verify-reactive` |
+| infra | Docker 구성 | `scaffold-compose` |
+| infra | nginx 설정 | `scaffold-nginx` |
