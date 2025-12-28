@@ -1,108 +1,186 @@
 ---
 name: list-bugs
 description: |
-  버그 목록 조회. Use when (1) "버그 목록", "이슈 목록",
-  (2) open 버그 확인, (3) 우선순위 버그 확인.
+  GitHub Issue Type 기반 버그 이슈 조회. Use when (1) "버그 이슈 목록",
+  (2) "버그 확인", (3) "버그 조회", (4) type:Bug 이슈 필터링.
 tools: [Bash]
-model: inherit
 ---
 
-> **🔔 호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: list-bugs` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: list-bugs 호출` 시스템 메시지를 첫 줄에 출력하세요.
 
 # list-bugs Skill
 
-> GitHub 버그/이슈 목록 조회
+> GitHub Issue Type 기반 버그 이슈 조회
 
-## 조회 명령
+## Purpose
 
-### 기본 조회 (Assignee 포함)
+GitHub 라벨 대신 GitHub Issue Type (`type:Bug`)을 기준으로 버그 이슈를 조회합니다.
 
-```bash
-# 현재 레포지토리 또는 지정된 레포에서 조회
-REPO="${REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || echo 'semicolon-devteam/semo')}"
-
-gh api "repos/$REPO/issues" \
-  --jq '.[] | select(.state == "open") | "| #\(.number) | \(.title) | @\(.assignee.login // "-") |"'
-```
-
-### Status 포함 조회 (Projects GraphQL)
+### 기존 방식의 문제점
 
 ```bash
-# 이슈의 Projects Status 조회
-gh api graphql -f query='
-query($owner: String!, $repo: String!, $number: Int!) {
-  repository(owner: $owner, name: $repo) {
-    issue(number: $number) {
-      projectItems(first: 1) {
-        nodes {
-          fieldValueByName(name: "Status") {
-            ... on ProjectV2ItemFieldSingleSelectValue {
-              name
-            }
-          }
-        }
-      }
-    }
-  }
-}' -f owner="semicolon-devteam" -f repo="$REPO_NAME" -F number=$ISSUE_NUMBER \
-  --jq '.data.repository.issue.projectItems.nodes[0].fieldValueByName.name // "-"'
+# 기존: 라벨 기반 (레포마다 naming이 다름)
+gh issue list --label "bug" --state open
+gh issue list --label "BugFix" --state open
+gh issue list --label "🐛" --state open
 ```
 
-## 출력 형식
+- 레포마다 라벨 naming이 다름 (bug, BugFix, 🐛, fix 등)
+- 일부 레포는 bug 라벨이 없음
+- 일관된 조회 불가
+
+### 새 방식: GitHub Issue Type 기준
+
+```bash
+# GitHub Issue Type으로 버그 필터 조회
+gh issue list --repo semicolon-devteam/semo --state open --json number,title,issueType --jq '.[] | select(.issueType.name == "Bug")'
+```
+
+## Configuration
+
+### GitHub Issue Type 정보
+
+> **Projects 커스텀 필드 '타입' 대신 GitHub Issue Type을 사용합니다.**
+
+| Issue Type | ID | 용도 |
+|------------|-----|------|
+| Task | `IT_kwDOC01-Rc4BdOub` | 일반 태스크 |
+| Bug | `IT_kwDOC01-Rc4BdOuc` | 버그 리포트 |
+| Feature | `IT_kwDOC01-Rc4BdOud` | 기능 요청 |
+| Epic | `IT_kwDOC01-Rc4BvVz5` | 에픽 |
+
+## Workflow
+
+### 1. GitHub Issue Type으로 버그 조회
+
+```bash
+# GitHub Issue Type (type:Bug)으로 버그 이슈 조회
+gh issue list --repo semicolon-devteam/semo --state open \
+  --json number,title,issueType,createdAt,assignees,repository \
+  --jq '.[] | select(.issueType.name == "Bug")'
+```
+
+### 2. 전체 조직 레포지토리 버그 조회
+
+```bash
+# 조직 내 모든 레포지토리에서 Bug 타입 이슈 조회
+REPOS="semo docs core-backend community-web"
+
+for repo in $REPOS; do
+  gh issue list --repo "semicolon-devteam/$repo" --state open \
+    --json number,title,issueType,createdAt,assignees \
+    --jq '.[] | select(.issueType.name == "Bug") | "| #\(.number) | '"$repo"' | \(.title) |"'
+done
+```
+
+### 3. 결과 포맷팅
+
+```bash
+# 테이블 형식으로 출력
+gh issue list --repo semicolon-devteam/semo --state open \
+  --json number,title,issueType,createdAt,assignees \
+  --jq '.[] | select(.issueType.name == "Bug") | "| #\(.number) | \(.title) | \(.createdAt | split("T")[0]) |"'
+```
+
+## Output Format
 
 ```markdown
-## 🐛 {repo} Open 버그 목록
+## 🐛 버그 이슈 현황 (GitHub Issue Type 기준)
 
-| # | 제목 | 담당자 | 상태 |
-|---|------|--------|------|
-| #659 | SEO가 각 게시판별로 적용되지 않음 | @reus-jeon | 작업중 |
-| #658 | 메인페이지 갤러리 4번째 탭 안나오는 현상 | - | 검수대기 |
-
-**총 2건의 Open 버그**
+| # | 레포 | 제목 | 담당자 | 생성일 |
+|---|------|------|--------|--------|
+| #123 | core-backend | API 응답 지연 | kyago | 2025-12-01 |
+| #456 | community-web | 버튼 클릭 안됨 | Reus | 2025-12-05 |
 
 ---
-💡 다른 프로젝트(cm-office, core-backend 등)의 이슈도 확인할까요?
+**총 2개의 Open 버그 이슈**
 ```
 
-## 🔴 현재 레포지토리 우선 규칙 (Context-First)
-
-> **필수**: 레포지토리 명시 없이 요청 시 현재 git remote 기반 조회
-
-### 컨텍스트 감지 우선순위
+## 전체 스크립트
 
 ```bash
-# 1순위: 현재 디렉토리의 git remote
-REPO=$(git remote get-url origin 2>/dev/null | sed 's/.*github.com[:/]\(.*\)\.git/\1/')
+#!/bin/bash
 
-# 2순위: 사용자 명시 레포 (예: "cm-land 버그 목록")
-# 3순위: 전체 조회 ("모든 레포", "전체 이슈" 키워드 감지 시)
+# 조회할 레포지토리 목록
+REPOS="semo docs core-backend community-web"
+
+echo "## 🐛 버그 이슈 현황 (GitHub Issue Type 기준)"
+echo ""
+echo "| # | 레포 | 제목 | 담당자 | 생성일 |"
+echo "|---|------|------|--------|--------|"
+
+COUNT=0
+
+for repo in $REPOS; do
+  # GitHub Issue Type이 Bug인 이슈만 조회
+  RESULT=$(gh issue list --repo "semicolon-devteam/$repo" --state open \
+    --json number,title,issueType,createdAt,assignees \
+    --jq '.[] | select(.issueType.name == "Bug")')
+
+  if [ -n "$RESULT" ]; then
+    echo "$RESULT" | jq -r '"| #\(.number) | '"$repo"' | \(.title) | \(.assignees | map(.login) | join(\", \") | if . == \"\" then \"-\" else . end) | \(.createdAt | split(\"T\")[0]) |"'
+    REPO_COUNT=$(echo "$RESULT" | jq -s 'length')
+    COUNT=$((COUNT + REPO_COUNT))
+  fi
+done
+
+if [ "$COUNT" -eq 0 ]; then
+  echo "| - | - | 버그 이슈 없음 | - | - |"
+fi
+
+echo ""
+echo "---"
+echo "**총 ${COUNT}개의 Open 버그 이슈**"
 ```
 
-### 예시
-
-| 요청 | 동작 |
-|------|------|
-| "버그 목록 보여줘" | 현재 git remote 레포만 조회 |
-| "cm-land 버그 목록" | cm-land 레포만 조회 |
-| "모든 레포 버그 목록" | 전체 레포 조회 |
-
-### 추가 확인 제안
-
-응답 말미에 항상 다음 문구 추가:
+## No Bugs Case
 
 ```markdown
----
-💡 다른 프로젝트({other_repos})의 이슈도 확인할까요?
+## 🐛 버그 이슈 현황 (GitHub Issue Type 기준)
+
+✅ 현재 Open 상태의 버그 이슈가 없습니다.
 ```
 
-## 레포지토리 지정
+## Error Handling
+
+### GitHub CLI 인증 오류
+
+```markdown
+⚠️ **인증 오류**
+
+GitHub CLI 인증이 필요합니다.
+인증 상태를 확인해주세요: `gh auth status`
+```
+
+### 레포지토리 접근 권한 없음
+
+```markdown
+⚠️ **레포지토리 접근 오류**
+
+해당 레포지토리에 접근할 수 없습니다.
+- 조직 멤버십을 확인해주세요.
+```
+
+## SEMO Message Format
+
+```markdown
+[SEMO] Skill: list-bugs 호출
+
+[SEMO] Skill: list-bugs 완료 - {N}개 버그 이슈 발견
+```
+
+## 라벨 기반 조회 (Fallback)
+
+GitHub Issue Type 조회가 실패할 경우 라벨 기반으로 폴백:
 
 ```bash
-# 특정 레포 버그 조회
-"cm-land 버그 목록 보여줘"
-→ REPO="semicolon-devteam/cm-land" 로 조회
-
-# 현재 레포 버그 조회 (기본)
-"버그 목록 보여줘"
-→ 현재 디렉토리의 git remote 기반 조회
+# Fallback: 라벨 기반 조회
+for repo in $(gh repo list semicolon-devteam --json name --jq '.[].name'); do
+  gh issue list --repo "semicolon-devteam/$repo" --label "bug" --state open 2>/dev/null
+done
 ```
+
+## Related
+
+- [이슈 #6](https://github.com/semicolon-devteam/semo-core/issues/6) - 버그 이슈 조회 시 GitHub Issue Type 기준 조회 지원
+- [check-feedback Skill](../check-feedback/SKILL.md) - 피드백 이슈 수집
