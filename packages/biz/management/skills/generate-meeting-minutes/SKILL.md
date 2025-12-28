@@ -4,7 +4,7 @@ description: |
   정기회의록(Meeting Minutes) 자동 생성. command-center의 meeting-minutes.yml 템플릿 기반.
   Use when (1) "정기회의록 만들어줘", (2) "회의록 생성",
   (3) "25년 12월 4/4 회의록" 형식 요청.
-tools: [Bash, Read, Glob, AskUserQuestion]
+tools: [Bash, Read, Glob, AskUserQuestion, mcp]
 model: inherit
 ---
 
@@ -69,8 +69,11 @@ model: inherit
     ├─ 4. Clova Note 링크 확인 (선택)
     │   └→ "Clova Note 링크가 있나요?"
     │
-    └─ 5. Discussion 생성
-        └→ command-center 레포에 생성
+    ├─ 5. Discussion 생성
+    │   └→ command-center 레포에 생성
+    │
+    └─ 6. 🔴 Slack 알림 체이닝 (자동)
+        └→ '개발사업팀' 채널에 회의록 생성 알림 전송
 ```
 
 ## 🔴 필수 질문 (AskUserQuestion)
@@ -275,8 +278,101 @@ additional_agenda: |
 clova_note_link: "https://clovanote.naver.com/..."
 ```
 
+## 🔴 Slack 알림 체이닝 (NON-NEGOTIABLE)
+
+> **⚠️ Discussion 생성 완료 후, 반드시 '개발사업팀' 채널에 Slack 알림을 전송합니다.**
+
+### 트리거
+
+- Discussion 생성 성공 시 자동 실행
+- 사용자 요청 없이도 진행
+
+### 알림 대상 채널
+
+```
+#개발사업팀
+```
+
+### 메시지 포맷
+
+```markdown
+📋 *정기회의록 생성됨*
+
+*회의*: [{month}월 {week}/{total_weeks}] 정기 회고 & 회의
+*참석자*: {participants_mentions}
+*불참*: {absentees_mentions}
+
+📎 <{discussion_url}|회의록 보기>
+```
+
+### 멘션 생성
+
+참석자/불참자 GitHub ID를 Slack 멘션으로 변환:
+
+```text
+1. GitHub ID → Slack Display Name 변환
+   - team-members.md 참조
+
+2. Slack User ID 조회
+   - mcp__semo-integrations__slack_lookup_user 사용
+
+3. 멘션 형식 생성
+   - <@{SLACK_ID}> 형태
+```
+
+### 실행 예시
+
+```bash
+# Slack 메시지 전송
+mcp__semo-integrations__slack_send_message(
+  channel: "#개발사업팀",
+  text: "정기회의록 생성됨",
+  blocks: [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "📋 *정기회의록 생성됨*\n\n*회의*: [12월 4/4] 정기 회고 & 회의\n*참석자*: <@U1234> <@U5678> <@U9012>\n*불참*: <@U3456>\n\n📎 <https://github.com/semicolon-devteam/command-center/discussions/XXX|회의록 보기>"
+      }
+    }
+  ]
+)
+```
+
+### 출력
+
+```markdown
+[SEMO] Skill: generate-meeting-minutes 완료
+
+✅ 정기회의록 Discussion 생성 완료
+...
+
+---
+
+[SEMO] Slack 알림 체이닝
+
+✅ '개발사업팀' 채널에 알림 전송 완료
+- 참석자 멘션: @Roki @Reus @Garden @kyago @Yeomso
+```
+
+### 알림 실패 시
+
+```markdown
+[SEMO] Slack 알림 체이닝
+
+⚠️ '개발사업팀' 채널 전송 실패
+- 원인: {error_message}
+- Discussion은 정상 생성됨
+
+💡 수동으로 #개발사업팀 채널에 공유해주세요:
+{discussion_url}
+```
+
+---
+
 ## Related
 
 - [summarize-meeting](../summarize-meeting/SKILL.md) - STT 분석 후 회의록 작성 (이 스킬 이후 호출)
 - [create-decision-log](../create-decision-log/SKILL.md) - 의사결정 로그 생성
+- [notify-slack](../../../../semo-system/semo-skills/notify-slack/SKILL.md) - Slack 알림 전송
 - [command-center meeting-minutes.yml](https://github.com/semicolon-devteam/command-center/blob/main/.github/DISCUSSION_TEMPLATE/meeting-minutes.yml) - 원본 템플릿
