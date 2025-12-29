@@ -1841,8 +1841,7 @@ const BASE_MCP_SERVERS: MCPServerConfig[] = [
     command: "npx",
     args: ["-y", "@team-semicolon/semo-mcp"],
     env: {
-      GITHUB_TOKEN: "${GITHUB_TOKEN}",
-      SLACK_BOT_TOKEN: "${SLACK_BOT_TOKEN}",
+      // Slack/GitHub/DB 토큰은 패키지에 암호화 포함됨 (설정 불필요)
       SUPABASE_URL: "${SUPABASE_URL}",
       SUPABASE_KEY: "${SUPABASE_KEY}",
     },
@@ -1856,6 +1855,16 @@ const BASE_MCP_SERVERS: MCPServerConfig[] = [
     name: "sequential-thinking",
     command: "npx",
     args: ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+  },
+  {
+    name: "playwright",
+    command: "npx",
+    args: ["-y", "@anthropic-ai/mcp-server-playwright"],
+  },
+  {
+    name: "github",
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-github"],
   },
 ];
 
