@@ -1,7 +1,7 @@
 # /SEMO:onboarding
 
 새 프로젝트에 SEMO를 설치하거나, 새 팀원을 위한 온보딩 가이드를 제공합니다.
-**v4.0 통합 구조 기반으로 동적 가이드를 생성합니다.**
+**v5.0 통합 구조 기반으로 동적 가이드를 생성합니다.**
 
 ## 사용법
 
@@ -11,16 +11,89 @@
 
 ## 동작
 
-1. **Runtime 감지**: 프로젝트 파일을 스캔하여 Runtime 자동 감지
-2. **동적 가이드 생성**: 감지된 Runtime에 맞는 온보딩 가이드 생성
-3. **권장 다음 단계**: 해당 Runtime의 주요 스킬 안내
+1. **🔴 레거시 환경 감지**: 구버전 SEMO 구조가 있는지 확인
+2. **Runtime 감지**: 프로젝트 파일을 스캔하여 Runtime 자동 감지
+3. **동적 가이드 생성**: 감지된 Runtime에 맞는 온보딩 가이드 생성
+4. **권장 다음 단계**: 해당 Runtime의 주요 스킬 안내
+
+---
+
+## 🔴 Phase 0: 레거시 환경 감지 (필수)
+
+> **온보딩 시작 전 반드시 레거시 환경을 확인합니다.**
+
+### 레거시 구조 판별
+
+| 레거시 경로 | 정상 경로 | 설명 |
+|------------|----------|------|
+| `/semo-core/` (루트) | `/semo-system/semo-core/` | 구버전 위치 |
+| `/semo-skills/` (루트) | `/semo-system/semo-skills/` | 구버전 위치 |
+| `/sax-core/` (루트) | 삭제 필요 | SAX 레거시 |
+| `/sax-skills/` (루트) | 삭제 필요 | SAX 레거시 |
+| `.claude/agents → ../semo-core/` | `.claude/agents → ../semo-system/semo-core/agents/` | 심볼릭 링크 |
+
+### 감지 시 동작
+
+```text
+/SEMO:onboarding 실행
+    │
+    ├─ 레거시 환경 감지됨
+    │   ├─ ⚠️ 경고 메시지 출력
+    │   ├─ 마이그레이션 가이드 안내
+    │   └─ 온보딩 중단 (마이그레이션 먼저)
+    │
+    └─ 레거시 없음
+        └─ 정상 온보딩 진행
+```
+
+### 레거시 감지 시 출력
+
+```markdown
+[SEMO] Skill: onboarding 호출
+
+⚠️ 레거시 SEMO 환경이 감지되었습니다.
+
+### 감지된 레거시 경로
+- semo-core/ (루트에 직접 위치)
+- semo-skills/ (루트에 직접 위치)
+- .claude/agents → ../semo-core/agents (레거시 링크)
+
+### 마이그레이션 필요
+
+v5.0 구조에서는 모든 Standard 패키지가 `semo-system/` 하위에 위치합니다:
+
+```
+semo-system/
+├── semo-core/
+├── semo-skills/
+├── semo-agents/
+└── semo-scripts/
+```
+
+### 마이그레이션 방법
+
+**CLI 사용 (권장):**
+```bash
+semo migrate --force
+semo init
+```
+
+**수동 마이그레이션:**
+1. 루트의 `semo-core/`, `semo-skills/` 폴더 삭제
+2. `.claude/` 폴더 삭제
+3. `semo init` 실행
+
+[SEMO] Skill: onboarding 중단 - 마이그레이션 후 다시 실행하세요.
+```
+
+---
 
 ## 실행 프로세스
 
 ```
 [SEMO] Skill: onboarding 호출
 
-=== SEMO 온보딩 가이드 (v4.0) ===
+=== SEMO 온보딩 가이드 (v5.0) ===
 
 ## 1. 설치된 구성
 
