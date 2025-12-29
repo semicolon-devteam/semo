@@ -2849,6 +2849,7 @@ program
     .option("--system", "semo-system만 업데이트")
     .option("--skip-cli", "CLI 업데이트 건너뛰기")
     .option("--only <packages>", "특정 패키지만 업데이트 (쉼표 구분: semo-core,semo-skills,biz/management)")
+    .option("--migrate", "레거시 환경 강제 마이그레이션")
     .action(async (options) => {
     console.log(chalk_1.default.cyan.bold("\n🔄 SEMO 업데이트\n"));
     const cwd = process.cwd();
@@ -2856,6 +2857,16 @@ program
     const claudeDir = path.join(cwd, ".claude");
     // 0. 버전 비교
     await showVersionComparison(cwd);
+    // 0.5. 레거시 환경 감지 및 마이그레이션
+    const legacyCheck = detectLegacyEnvironment(cwd);
+    if (legacyCheck.hasLegacy || options.migrate) {
+        console.log(chalk_1.default.yellow("\n⚠️  레거시 환경이 감지되어 업데이트 전 마이그레이션이 필요합니다.\n"));
+        const migrationSuccess = await migrateLegacyEnvironment(cwd);
+        if (migrationSuccess) {
+            console.log(chalk_1.default.cyan("마이그레이션 완료. 'semo init'으로 새 환경을 설치하세요.\n"));
+        }
+        process.exit(0);
+    }
     // --only 옵션 파싱
     const onlyPackages = options.only
         ? options.only.split(",").map((p) => p.trim())
