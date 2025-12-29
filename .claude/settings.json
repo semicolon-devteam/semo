@@ -7,8 +7,6 @@
         "@team-semicolon/semo-mcp"
       ],
       "env": {
-        "GITHUB_TOKEN": "${GITHUB_TOKEN}",
-        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
         "SUPABASE_URL": "${SUPABASE_URL}",
         "SUPABASE_KEY": "${SUPABASE_KEY}"
       }
@@ -27,15 +25,19 @@
         "@modelcontextprotocol/server-sequential-thinking"
       ]
     },
+    "playwright": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@anthropic-ai/mcp-server-playwright"
+      ]
+    },
     "github": {
       "command": "npx",
       "args": [
         "-y",
         "@modelcontextprotocol/server-github"
-      ],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "<YOUR_GITHUB_TOKEN>"
-      }
+      ]
     }
   },
   "permissions": {

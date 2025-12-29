@@ -28,8 +28,6 @@ npx @team-semicolon/semo-mcp
       "command": "npx",
       "args": ["-y", "@team-semicolon/semo-mcp"],
       "env": {
-        "GITHUB_TOKEN": "${GITHUB_TOKEN}",
-        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
         "SUPABASE_URL": "${SUPABASE_URL}",
         "SUPABASE_KEY": "${SUPABASE_KEY}"
       }
@@ -37,6 +35,9 @@ npx @team-semicolon/semo-mcp
   }
 }
 ```
+
+> **Note**: Slack Bot Token은 패키지에 암호화되어 포함되어 있어 별도 설정이 필요 없습니다.
+> GitHub 연동은 `gh` CLI가 인증되어 있으면 자동으로 동작합니다.
 
 ## 사용 가능한 도구
 
@@ -78,10 +79,18 @@ npx @team-semicolon/semo-mcp
 
 | 변수 | 설명 | 필수 |
 |------|------|------|
-| `SLACK_BOT_TOKEN` | Slack Bot Token | Slack 사용 시 |
-| `GITHUB_TOKEN` | GitHub Personal Access Token | GitHub 사용 시 |
 | `SUPABASE_URL` | Supabase 프로젝트 URL | Supabase 사용 시 |
 | `SUPABASE_KEY` | Supabase 서비스 키 | Supabase 사용 시 |
+
+### 기본 제공 토큰 (설정 불필요)
+
+| 기능 | 토큰 | 상태 |
+|------|------|------|
+| Slack 알림 | Semicolon Notifier Bot | 암호화 배포 |
+| GitHub 연동 | gh CLI 인증 사용 | 자동 |
+| SEMO Memory | Core DB 접속 정보 | 암호화 배포 |
+
+> 환경변수를 설정하면 기본 제공 토큰보다 우선 적용됩니다.
 
 ## 트러블슈팅
 
