@@ -27,6 +27,7 @@
 | **5** | [역할 기반에서 기능 기반으로](./05-architecture-shift.md) | 3-Layer Architecture |
 | **6** | [팀 공용 토큰과 원클릭 설치](./06-infrastructure.md) | MCP Server, CI/CD |
 | **7** | [AI 에이전트가 기억하는 세상](./07-future-memory.md) | Long-term Memory, 비전 |
+| **8** | [SEMO v5.0 - 구조의 대수술](./08-v5-restructuring.md) | 패키지 통합, 페르소나 에이전트 |
 
 ---
 

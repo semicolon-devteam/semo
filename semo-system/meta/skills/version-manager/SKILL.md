@@ -29,7 +29,7 @@ tools: [Bash, Read, Write, Edit]
 
 ### 자동 체인 실행
 
-버저닝 푸시 완료 즉시 **자동으로** notify-slack을 호출합니다:
+버저닝 푸시 완료 즉시 **자동으로** 체인 스킬을 호출합니다:
 
 ```text
 git push 성공
@@ -38,10 +38,26 @@ git push 성공
     ↓
 Slack 알림 전송 완료
     ↓
+[자동] changelog-writer Skill 호출 (MAJOR/MINOR만)
+    ↓
+블로그 원고 생성
+    ↓
 버저닝 완료
 ```
 
 **⚠️ Slack 알림 없이 "버저닝 완료"라고 말하지 마세요.**
+
+### 블로그 원고 자동 생성 (선택)
+
+MAJOR 또는 MINOR 버전 변경 시 `changelog-writer`가 자동 호출됩니다:
+
+| 버전 유형 | 원고 생성 |
+|----------|----------|
+| MAJOR | ✅ 자동 |
+| MINOR (기능 추가) | ✅ 자동 |
+| PATCH | ❌ 스킵 |
+
+원고 위치: `docs/blog/drafts/{YYYY-MM-DD}-{package}-{version}.md`
 
 ---
 
