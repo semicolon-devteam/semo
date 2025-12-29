@@ -100,11 +100,12 @@ async function getRemotePackageVersion(packagePath: string): Promise<string | nu
 }
 
 /**
- * semo-core/semo-skills 원격 버전 가져오기
+ * semo-core/semo-skills 원격 버전 가져오기 (semo-system/ 하위 경로)
  */
-async function getRemoteCoreVersion(type: "semo-core" | "semo-skills"): Promise<string | null> {
+async function getRemoteCoreVersion(type: "semo-core" | "semo-skills" | "semo-agents" | "semo-scripts"): Promise<string | null> {
   try {
-    const url = `https://raw.githubusercontent.com/semicolon-devteam/semo/main/${type}/VERSION`;
+    // v5.0: semo-system/ 하위에 Standard 패키지가 위치
+    const url = `https://raw.githubusercontent.com/semicolon-devteam/semo/main/semo-system/${type}/VERSION`;
     const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
     if (!response.ok) return null;
     const version = await response.text();
@@ -151,13 +152,26 @@ async function showVersionComparison(cwd: string): Promise<void> {
       level: 0,
     });
 
-    // semo-core (루트 또는 semo-system 내부)
-    const corePathRoot = path.join(cwd, "semo-core", "VERSION");
-    const corePathSystem = path.join(semoSystemDir, "semo-core", "VERSION");
-    const corePath = fs.existsSync(corePathRoot) ? corePathRoot : corePathSystem;
+    // 레거시 환경 경고 (루트에 semo-core/semo-skills가 있는 경우)
+    const hasLegacyCore = fs.existsSync(path.join(cwd, "semo-core"));
+    const hasLegacySkills = fs.existsSync(path.join(cwd, "semo-skills"));
+    if (hasLegacyCore || hasLegacySkills) {
+      spinner.warn("레거시 환경 감지됨");
+      console.log(chalk.yellow("\n  ⚠️  구버전 SEMO 구조가 감지되었습니다."));
+      console.log(chalk.gray("     루트에 semo-core/ 또는 semo-skills/가 있습니다."));
+      console.log(chalk.cyan("\n  💡 마이그레이션 방법:"));
+      console.log(chalk.gray("     1. 기존 semo-core/, semo-skills/ 폴더 삭제"));
+      console.log(chalk.gray("     2. .claude/ 폴더 삭제"));
+      console.log(chalk.gray("     3. semo init 다시 실행\n"));
+      console.log(chalk.gray("     또는: semo migrate --force\n"));
+      return;
+    }
 
-    if (fs.existsSync(corePath)) {
-      const localCore = fs.readFileSync(corePath, "utf-8").trim();
+    // semo-core (semo-system/ 내부만 확인)
+    const corePathSystem = path.join(semoSystemDir, "semo-core", "VERSION");
+
+    if (fs.existsSync(corePathSystem)) {
+      const localCore = fs.readFileSync(corePathSystem, "utf-8").trim();
       const remoteCore = await getRemoteCoreVersion("semo-core");
       versionInfos.push({
         name: "semo-core",
@@ -168,19 +182,45 @@ async function showVersionComparison(cwd: string): Promise<void> {
       });
     }
 
-    // semo-skills (루트 또는 semo-system 내부)
-    const skillsPathRoot = path.join(cwd, "semo-skills", "VERSION");
+    // semo-skills (semo-system/ 내부만 확인)
     const skillsPathSystem = path.join(semoSystemDir, "semo-skills", "VERSION");
-    const skillsPath = fs.existsSync(skillsPathRoot) ? skillsPathRoot : skillsPathSystem;
 
-    if (fs.existsSync(skillsPath)) {
-      const localSkills = fs.readFileSync(skillsPath, "utf-8").trim();
+    if (fs.existsSync(skillsPathSystem)) {
+      const localSkills = fs.readFileSync(skillsPathSystem, "utf-8").trim();
       const remoteSkills = await getRemoteCoreVersion("semo-skills");
       versionInfos.push({
         name: "semo-skills",
         local: localSkills,
         remote: remoteSkills,
         needsUpdate: remoteSkills ? isVersionLower(localSkills, remoteSkills) : false,
+        level: 0,
+      });
+    }
+
+    // semo-agents (semo-system/ 내부)
+    const agentsPathSystem = path.join(semoSystemDir, "semo-agents", "VERSION");
+    if (fs.existsSync(agentsPathSystem)) {
+      const localAgents = fs.readFileSync(agentsPathSystem, "utf-8").trim();
+      const remoteAgents = await getRemoteCoreVersion("semo-agents");
+      versionInfos.push({
+        name: "semo-agents",
+        local: localAgents,
+        remote: remoteAgents,
+        needsUpdate: remoteAgents ? isVersionLower(localAgents, remoteAgents) : false,
+        level: 0,
+      });
+    }
+
+    // semo-scripts (semo-system/ 내부)
+    const scriptsPathSystem = path.join(semoSystemDir, "semo-scripts", "VERSION");
+    if (fs.existsSync(scriptsPathSystem)) {
+      const localScripts = fs.readFileSync(scriptsPathSystem, "utf-8").trim();
+      const remoteScripts = await getRemoteCoreVersion("semo-scripts");
+      versionInfos.push({
+        name: "semo-scripts",
+        local: localScripts,
+        remote: remoteScripts,
+        needsUpdate: remoteScripts ? isVersionLower(localScripts, remoteScripts) : false,
         level: 0,
       });
     }
