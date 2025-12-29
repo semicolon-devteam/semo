@@ -25,11 +25,11 @@ Issue에 대한 테스트 요청 시 환경 정보(URL 등)를 자동으로 첨�
 
 ## 🔴 필수 참조
 
-| 항목 | 파일 |
-|------|------|
+| 항목 | 파일/API |
+|------|----------|
 | **환경 정보** | `.claude/memory/projects.md` > 환경 정보 섹션 |
 | **테스터 정보** | `semo-core/_shared/team-members.md` |
-| **프로젝트 채널** | `semo-core/_shared/project-channels.md` |
+| **프로젝트 채널** | Slack API 동적 조회 (레포명 기반 채널 매칭) |
 
 ## Quick Start
 
@@ -55,7 +55,7 @@ URL=$(echo "$ISSUE" | jq -r '.url')
     ↓
 2. 레포지토리 확인 → 환경 URL 매핑
     ↓
-3. 레포지토리 → 프로젝트 채널 매핑 (project-channels.md)
+3. 레포지토리명으로 Slack 채널 동적 조회 (Slack API)
     ↓
 4. 테스터 GitHub ID → Slack Name 매핑 (team-members.md)
     ↓
@@ -67,6 +67,48 @@ URL=$(echo "$ISSUE" | jq -r '.url')
     ↓
 완료
 ```
+
+## 🔴 프로젝트 채널 동적 조회 (NON-NEGOTIABLE)
+
+> **⚠️ 하드코딩된 채널 매핑 대신 Slack API를 통해 채널을 동적으로 조회합니다.**
+
+### 채널 매칭 로직
+
+```text
+레포지토리명: cm-labor-union
+    ↓
+1차 시도: #cm-labor-union (레포명 그대로)
+    ↓
+2차 시도: #{repo} 형식 변환 (하이픈 유지)
+    ↓
+Fallback: #_협업 (채널 없을 경우)
+```
+
+### MCP 도구 사용
+
+```bash
+# Slack 채널 목록에서 레포지토리명과 일치하는 채널 검색
+# semo-integrations MCP를 통해 Supabase 또는 직접 Slack API 호출
+
+# 방법 1: Slack conversations.list API 활용
+# Bot이 참여한 채널 중 레포명과 일치하는 채널 찾기
+
+# 방법 2: 채널명 직접 전송 시도 → 실패 시 Fallback
+mcp__semo-integrations__slack_send_message(
+  channel: "#cm-labor-union",  # 레포명으로 채널 시도
+  text: "테스트 메시지"
+)
+# 성공 → 해당 채널 사용
+# 실패 (channel_not_found) → #_협업으로 Fallback
+```
+
+### 채널 검색 우선순위
+
+| 순서 | 채널명 패턴                    | 예시                         |
+|------|-------------------------------|------------------------------|
+| 1    | `#{repo}` (레포명 그대로)      | `#cm-labor-union`            |
+| 2    | `#_{repo}` (언더스코어 접두사) | `#_cm-labor-union`           |
+| 3    | `#_협업` (Fallback)           | 항상 존재하는 기본 채널       |
 
 ## 환경 URL 매핑
 
@@ -82,24 +124,28 @@ URL=$(echo "$ISSUE" | jq -r '.url')
 
 > **기본값**: stg 환경 (QA 테스트 기준)
 
-## 🔴 Fallback 규칙 (참조 파일 없을 때)
+## 🔴 Fallback 규칙
 
-> **참조 파일이 없거나 매핑이 없어도 워크플로우가 중단되지 않도록 기본값을 사용합니다.**
+> **채널을 찾을 수 없거나 참조 파일이 없어도 워크플로우가 중단되지 않도록 기본값을 사용합니다.**
 
 | 항목 | Fallback 규칙 |
 |------|--------------|
-| **프로젝트 채널** | 매핑 없음 → `#_협업` 사용 |
+| **프로젝트 채널** | Slack API 조회 실패 → `#_협업` 사용 |
 | **테스터** | 지정 없음 → `Goni (kokkh)` 기본 QA 담당자 |
 | **환경 URL** | 매핑 없음 → Issue URL만 표시 (환경 URL 생략) |
 
 ### Fallback 적용 예시
 
 ```text
-레포지토리: cm-labor-union (project-channels.md에 없는 경우)
+레포지토리: unknown-repo
+    ↓
+1차 시도: #unknown-repo → channel_not_found
+    ↓
+2차 시도: #_unknown-repo → channel_not_found
     ↓
 Fallback: #_협업 채널 사용
     ↓
-메시지에 "[Fallback: 프로젝트 채널 미설정]" 표시
+메시지에 "[Fallback: 프로젝트 채널 미발견]" 표시
 ```
 
 ## 환경 선택 규칙
