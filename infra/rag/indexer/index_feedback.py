@@ -28,11 +28,7 @@ COLLECTION_NAME = os.getenv("COLLECTION_NAME", "semo-feedback")
 
 # GitHub 조직/레포 목록
 REPOS = [
-    "semicolon-devteam/sax-core",
-    "semicolon-devteam/sax-next",
-    "semicolon-devteam/sax-backend",
-    "semicolon-devteam/sax-po",
-    "semicolon-devteam/sax-qa",
+    "semicolon-devteam/semo",
 ]
 
 # 벡터 차원 (Claude Embedding 대신 간단한 해시 기반)
