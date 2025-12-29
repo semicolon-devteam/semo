@@ -506,6 +506,24 @@ function detectLegacyEnvironment(cwd: string): LegacyDetectionResult {
     }
   }
 
+  // semo-system/ 내부의 레거시 Extension 구조 확인
+  // 구버전: semo-system/biz/, semo-system/eng/, semo-system/ops/ (그룹 디렉토리)
+  // 신버전: semo-system/biz/design/, semo-system/eng/nextjs/ 등 (개별 패키지)
+  const semoSystemDir = path.join(cwd, "semo-system");
+  if (fs.existsSync(semoSystemDir)) {
+    const legacyExtGroups = ["biz", "eng", "ops"];
+    for (const group of legacyExtGroups) {
+      const groupDir = path.join(semoSystemDir, group);
+      if (fs.existsSync(groupDir) && fs.statSync(groupDir).isDirectory()) {
+        // VERSION 파일이 그룹 디렉토리에 직접 있으면 레거시 구조
+        const groupVersionFile = path.join(groupDir, "VERSION");
+        if (fs.existsSync(groupVersionFile)) {
+          legacyPaths.push(`semo-system/${group} (레거시 그룹 구조)`);
+        }
+      }
+    }
+  }
+
   // .claude/ 내부의 레거시 구조 확인
   const claudeDir = path.join(cwd, ".claude");
   if (fs.existsSync(claudeDir)) {
@@ -597,10 +615,29 @@ async function migrateLegacyEnvironment(cwd: string): Promise<boolean> {
       }
     }
 
-    // 3. 기존 semo-system이 있으면 삭제 (새로 설치)
+    // 3. semo-system/ 내부의 레거시 Extension 그룹 삭제
     const semoSystemDir = path.join(cwd, "semo-system");
     if (fs.existsSync(semoSystemDir)) {
-      removeRecursive(semoSystemDir);
+      const legacyExtGroups = ["biz", "eng", "ops"];
+      for (const group of legacyExtGroups) {
+        const groupDir = path.join(semoSystemDir, group);
+        const groupVersionFile = path.join(groupDir, "VERSION");
+        // VERSION 파일이 그룹 디렉토리에 직접 있으면 레거시 구조이므로 삭제
+        if (fs.existsSync(groupVersionFile)) {
+          removeRecursive(groupDir);
+          console.log(chalk.gray(`     ✓ semo-system/${group}/ 삭제됨 (레거시 그룹 구조)`));
+        }
+      }
+    }
+
+    // 4. 기존 semo-system이 완전히 레거시인 경우에만 삭제
+    // (Standard 패키지가 없는 경우)
+    if (fs.existsSync(semoSystemDir)) {
+      const hasStandard = fs.existsSync(path.join(semoSystemDir, "semo-core"));
+      if (!hasStandard) {
+        removeRecursive(semoSystemDir);
+        console.log(chalk.gray(`     ✓ semo-system/ 삭제됨 (완전 재설치)`));
+      }
     }
 
     spinner.succeed("레거시 환경 정리 완료");
