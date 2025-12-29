@@ -389,17 +389,188 @@ function createSymlinkOrJunction(targetPath: string, linkPath: string): void {
   if (isWindows) {
     // Windows: Junction 사용 (절대 경로 필요)
     const absoluteTarget = path.resolve(targetPath);
-    try {
-      execSync(`cmd /c "mklink /J "${linkPath}" "${absoluteTarget}""`, { stdio: "pipe" });
-    } catch {
-      // fallback: 디렉토리 복사
-      console.log(chalk.yellow(`  ⚠ Junction 생성 실패, 복사로 대체: ${path.basename(linkPath)}`));
+
+    // 재시도 메커니즘 (최대 3회)
+    let success = false;
+    let lastError: unknown = null;
+
+    for (let attempt = 1; attempt <= 3 && !success; attempt++) {
+      try {
+        execSync(`cmd /c "mklink /J "${linkPath}" "${absoluteTarget}""`, { stdio: "pipe" });
+        success = true;
+      } catch (err) {
+        lastError = err;
+        if (attempt < 3) {
+          // 잠시 대기 후 재시도
+          execSync("timeout /t 1 /nobreak >nul 2>&1", { stdio: "pipe" });
+        }
+      }
+    }
+
+    if (!success) {
+      // fallback: 디렉토리 복사 (경고 표시)
+      console.log(chalk.yellow(`  ⚠ Junction 생성 실패 (3회 시도), 복사로 대체: ${path.basename(linkPath)}`));
+      console.log(chalk.gray(`     원인: ${lastError}`));
+      console.log(chalk.gray(`     💡 관리자 권한으로 실행하거나 개발자 모드를 활성화하세요.`));
       execSync(`xcopy /E /I /Q "${absoluteTarget}" "${linkPath}"`, { stdio: "pipe" });
     }
   } else {
     // Unix: 상대 경로 심볼릭 링크
     const relativeTarget = path.relative(path.dirname(linkPath), targetPath);
     fs.symlinkSync(relativeTarget, linkPath);
+  }
+}
+
+/**
+ * 심볼릭 링크가 유효한지 확인 (타겟 존재 여부)
+ */
+function isSymlinkValid(linkPath: string): boolean {
+  try {
+    const stats = fs.lstatSync(linkPath);
+    if (!stats.isSymbolicLink()) return true; // 일반 파일/디렉토리
+
+    // 심볼릭 링크인 경우 타겟 존재 확인
+    const target = fs.readlinkSync(linkPath);
+    const absoluteTarget = path.isAbsolute(target)
+      ? target
+      : path.resolve(path.dirname(linkPath), target);
+
+    return fs.existsSync(absoluteTarget);
+  } catch {
+    return false;
+  }
+}
+
+// === 레거시 환경 감지 및 마이그레이션 ===
+
+interface LegacyDetectionResult {
+  hasLegacy: boolean;
+  legacyPaths: string[];
+  hasSemoSystem: boolean;
+}
+
+/**
+ * 레거시 SEMO 환경을 감지합니다.
+ * 레거시: 프로젝트 루트에 semo-core/, semo-skills/ 가 직접 있는 경우
+ * 신규: semo-system/ 하위에 있는 경우
+ */
+function detectLegacyEnvironment(cwd: string): LegacyDetectionResult {
+  const legacyPaths: string[] = [];
+
+  // 루트에 직접 있는 레거시 디렉토리 확인
+  const legacyDirs = ["semo-core", "semo-skills", "sax-core", "sax-skills"];
+  for (const dir of legacyDirs) {
+    const dirPath = path.join(cwd, dir);
+    if (fs.existsSync(dirPath) && !fs.lstatSync(dirPath).isSymbolicLink()) {
+      legacyPaths.push(dir);
+    }
+  }
+
+  // .claude/ 내부의 레거시 구조 확인
+  const claudeDir = path.join(cwd, ".claude");
+  if (fs.existsSync(claudeDir)) {
+    // 심볼릭 링크가 레거시 경로를 가리키는지 확인
+    const checkLegacyLink = (linkName: string) => {
+      const linkPath = path.join(claudeDir, linkName);
+      if (fs.existsSync(linkPath) && fs.lstatSync(linkPath).isSymbolicLink()) {
+        try {
+          const target = fs.readlinkSync(linkPath);
+          // 레거시 경로 패턴: ../semo-core, ../sax-core 등
+          if (target.match(/^\.\.\/(semo|sax)-(core|skills)/)) {
+            legacyPaths.push(`.claude/${linkName} → ${target}`);
+          }
+        } catch {
+          // 읽기 실패 무시
+        }
+      }
+    };
+    checkLegacyLink("agents");
+    checkLegacyLink("skills");
+    checkLegacyLink("commands");
+  }
+
+  return {
+    hasLegacy: legacyPaths.length > 0,
+    legacyPaths,
+    hasSemoSystem: fs.existsSync(path.join(cwd, "semo-system")),
+  };
+}
+
+/**
+ * 레거시 환경을 새 환경으로 마이그레이션합니다.
+ */
+async function migrateLegacyEnvironment(cwd: string): Promise<boolean> {
+  const detection = detectLegacyEnvironment(cwd);
+
+  if (!detection.hasLegacy) {
+    return true; // 마이그레이션 불필요
+  }
+
+  console.log(chalk.yellow("\n⚠️  레거시 SEMO 환경이 감지되었습니다.\n"));
+  console.log(chalk.gray("   감지된 레거시 경로:"));
+  detection.legacyPaths.forEach(p => {
+    console.log(chalk.gray(`     - ${p}`));
+  });
+  console.log();
+
+  // 사용자 확인
+  const { shouldMigrate } = await inquirer.prompt([
+    {
+      type: "confirm",
+      name: "shouldMigrate",
+      message: "레거시 환경을 새 구조(semo-system/)로 마이그레이션하시겠습니까?",
+      default: true,
+    },
+  ]);
+
+  if (!shouldMigrate) {
+    console.log(chalk.yellow("\n마이그레이션이 취소되었습니다."));
+    console.log(chalk.gray("💡 수동 마이그레이션 방법:"));
+    console.log(chalk.gray("   1. 기존 semo-core/, semo-skills/ 폴더 삭제"));
+    console.log(chalk.gray("   2. .claude/ 폴더 삭제"));
+    console.log(chalk.gray("   3. semo init 다시 실행\n"));
+    return false;
+  }
+
+  const spinner = ora("레거시 환경 마이그레이션 중...").start();
+
+  try {
+    // 1. 루트의 레거시 디렉토리 삭제
+    const legacyDirs = ["semo-core", "semo-skills", "sax-core", "sax-skills"];
+    for (const dir of legacyDirs) {
+      const dirPath = path.join(cwd, dir);
+      if (fs.existsSync(dirPath) && !fs.lstatSync(dirPath).isSymbolicLink()) {
+        removeRecursive(dirPath);
+        console.log(chalk.gray(`     ✓ ${dir}/ 삭제됨`));
+      }
+    }
+
+    // 2. .claude/ 내부의 레거시 심볼릭 링크 삭제
+    const claudeDir = path.join(cwd, ".claude");
+    if (fs.existsSync(claudeDir)) {
+      const linksToCheck = ["agents", "skills", "commands"];
+      for (const linkName of linksToCheck) {
+        const linkPath = path.join(claudeDir, linkName);
+        if (fs.existsSync(linkPath)) {
+          removeRecursive(linkPath);
+        }
+      }
+    }
+
+    // 3. 기존 semo-system이 있으면 삭제 (새로 설치)
+    const semoSystemDir = path.join(cwd, "semo-system");
+    if (fs.existsSync(semoSystemDir)) {
+      removeRecursive(semoSystemDir);
+    }
+
+    spinner.succeed("레거시 환경 정리 완료");
+    console.log(chalk.green("   → 새 환경으로 설치를 진행합니다.\n"));
+
+    return true;
+  } catch (error) {
+    spinner.fail("마이그레이션 실패");
+    console.error(chalk.red(`   ${error}`));
+    return false;
   }
 }
 
@@ -979,6 +1150,7 @@ program
   .option("--skip-mcp", "MCP 설정 생략")
   .option("--no-gitignore", ".gitignore 수정 생략")
   .option("--with <packages>", "추가 설치할 패키지 (쉼표 구분: next,backend)")
+  .option("--migrate", "레거시 환경 강제 마이그레이션")
   .action(async (options) => {
     console.log(chalk.cyan.bold("\n🚀 SEMO 설치 시작\n"));
     console.log(chalk.gray("Gemini 하이브리드 전략: White Box + Black Box\n"));
@@ -988,6 +1160,15 @@ program
     // 0. 버전 비교
     await showVersionComparison(cwd);
 
+    // 0.5. 레거시 환경 감지 및 마이그레이션
+    const legacyCheck = detectLegacyEnvironment(cwd);
+    if (legacyCheck.hasLegacy || options.migrate) {
+      const migrationSuccess = await migrateLegacyEnvironment(cwd);
+      if (!migrationSuccess) {
+        process.exit(0);
+      }
+    }
+
     // 1. 필수 도구 확인
     const shouldContinue = await showToolsStatus();
     if (!shouldContinue) {
@@ -995,7 +1176,7 @@ program
       process.exit(0);
     }
 
-    // 1. Git 레포지토리 확인
+    // 1.5. Git 레포지토리 확인
     const spinner = ora("Git 레포지토리 확인 중...").start();
     try {
       execSync("git rev-parse --git-dir", { cwd, stdio: "pipe" });
@@ -1114,6 +1295,8 @@ program
     console.log(chalk.gray("  [Standard]"));
     console.log(chalk.gray("    ✓ semo-core (원칙, 오케스트레이터)"));
     console.log(chalk.gray("    ✓ semo-skills (13개 통합 스킬)"));
+    console.log(chalk.gray("    ✓ semo-agents (14개 페르소나 Agent)"));
+    console.log(chalk.gray("    ✓ semo-scripts (자동화 스크립트)"));
 
     if (extensionsToInstall.length > 0) {
       console.log(chalk.gray("  [Extensions]"));
@@ -1139,7 +1322,9 @@ async function setupStandard(cwd: string, force: boolean) {
 
   console.log(chalk.cyan("\n📚 Standard 설치 (White Box)"));
   console.log(chalk.gray("   semo-core: 원칙, 오케스트레이터"));
-  console.log(chalk.gray("   semo-skills: 13개 통합 스킬\n"));
+  console.log(chalk.gray("   semo-skills: 13개 통합 스킬"));
+  console.log(chalk.gray("   semo-agents: 14개 페르소나 Agent"));
+  console.log(chalk.gray("   semo-scripts: 자동화 스크립트\n"));
 
   // 기존 디렉토리 확인
   if (fs.existsSync(semoSystemDir) && !force) {
@@ -1152,7 +1337,7 @@ async function setupStandard(cwd: string, force: boolean) {
     console.log(chalk.green("  ✓ 기존 semo-system/ 삭제됨"));
   }
 
-  const spinner = ora("semo-core, semo-skills 다운로드 중...").start();
+  const spinner = ora("semo-core, semo-skills, semo-agents, semo-scripts 다운로드 중...").start();
 
   try {
     const tempDir = path.join(cwd, ".semo-temp");
@@ -1161,14 +1346,16 @@ async function setupStandard(cwd: string, force: boolean) {
 
     fs.mkdirSync(semoSystemDir, { recursive: true });
 
-    // semo-core 복사
-    if (fs.existsSync(path.join(tempDir, "semo-core"))) {
-      copyRecursive(path.join(tempDir, "semo-core"), path.join(semoSystemDir, "semo-core"));
-    }
+    // Standard 패키지 목록 (semo-system/ 하위에 있는 것들)
+    const standardPackages = ["semo-core", "semo-skills", "semo-agents", "semo-scripts"];
 
-    // semo-skills 복사
-    if (fs.existsSync(path.join(tempDir, "semo-skills"))) {
-      copyRecursive(path.join(tempDir, "semo-skills"), path.join(semoSystemDir, "semo-skills"));
+    for (const pkg of standardPackages) {
+      const srcPath = path.join(tempDir, "semo-system", pkg);
+      const destPath = path.join(semoSystemDir, pkg);
+
+      if (fs.existsSync(srcPath)) {
+        copyRecursive(srcPath, destPath);
+      }
     }
 
     removeRecursive(tempDir);
@@ -1310,7 +1497,7 @@ function verifyInstallation(cwd: string, installedExtensions: string[] = []): Ve
     result.success = false;
   }
 
-  // 2. agents 링크 검증
+  // 2. agents 링크 검증 (isSymlinkValid 사용)
   const claudeAgentsDir = path.join(claudeDir, "agents");
   const coreAgentsDir = path.join(coreDir, "agents");
 
@@ -1323,29 +1510,19 @@ function verifyInstallation(cwd: string, installedExtensions: string[] = []): Ve
     if (fs.existsSync(claudeAgentsDir)) {
       for (const agent of expectedAgents) {
         const linkPath = path.join(claudeAgentsDir, agent);
-        if (fs.existsSync(linkPath)) {
-          if (fs.lstatSync(linkPath).isSymbolicLink()) {
-            try {
-              fs.readlinkSync(linkPath);
-              const targetExists = fs.existsSync(linkPath);
-              if (targetExists) {
-                result.stats.agents.linked++;
-              } else {
-                result.stats.agents.broken++;
-                result.warnings.push(`깨진 링크: .claude/agents/${agent}`);
-              }
-            } catch {
-              result.stats.agents.broken++;
-            }
+        if (fs.existsSync(linkPath) || fs.lstatSync(linkPath).isSymbolicLink()) {
+          if (isSymlinkValid(linkPath)) {
+            result.stats.agents.linked++;
           } else {
-            result.stats.agents.linked++; // 디렉토리로 복사된 경우
+            result.stats.agents.broken++;
+            result.warnings.push(`깨진 링크: .claude/agents/${agent}`);
           }
         }
       }
     }
   }
 
-  // 3. skills 링크 검증
+  // 3. skills 링크 검증 (isSymlinkValid 사용)
   if (fs.existsSync(skillsDir)) {
     const expectedSkills = fs.readdirSync(skillsDir).filter(f =>
       fs.statSync(path.join(skillsDir, f)).isDirectory()
@@ -1356,40 +1533,36 @@ function verifyInstallation(cwd: string, installedExtensions: string[] = []): Ve
     if (fs.existsSync(claudeSkillsDir)) {
       for (const skill of expectedSkills) {
         const linkPath = path.join(claudeSkillsDir, skill);
-        if (fs.existsSync(linkPath)) {
-          if (fs.lstatSync(linkPath).isSymbolicLink()) {
-            try {
-              fs.readlinkSync(linkPath);
-              const targetExists = fs.existsSync(linkPath);
-              if (targetExists) {
-                result.stats.skills.linked++;
-              } else {
-                result.stats.skills.broken++;
-                result.warnings.push(`깨진 링크: .claude/skills/${skill}`);
-              }
-            } catch {
+        try {
+          if (fs.existsSync(linkPath) || fs.lstatSync(linkPath).isSymbolicLink()) {
+            if (isSymlinkValid(linkPath)) {
+              result.stats.skills.linked++;
+            } else {
               result.stats.skills.broken++;
+              result.warnings.push(`깨진 링크: .claude/skills/${skill}`);
             }
-          } else {
-            result.stats.skills.linked++;
           }
+        } catch {
+          // 링크가 존재하지 않음
         }
       }
     }
   }
 
-  // 4. commands 검증
+  // 4. commands 검증 (isSymlinkValid 사용)
   const semoCommandsLink = path.join(claudeDir, "commands", "SEMO");
-  result.stats.commands.exists = fs.existsSync(semoCommandsLink);
-  if (result.stats.commands.exists) {
-    if (fs.lstatSync(semoCommandsLink).isSymbolicLink()) {
-      result.stats.commands.valid = fs.existsSync(semoCommandsLink);
+  try {
+    const linkExists = fs.existsSync(semoCommandsLink) || fs.lstatSync(semoCommandsLink).isSymbolicLink();
+    result.stats.commands.exists = linkExists;
+    if (linkExists) {
+      result.stats.commands.valid = isSymlinkValid(semoCommandsLink);
       if (!result.stats.commands.valid) {
         result.warnings.push("깨진 링크: .claude/commands/SEMO");
       }
-    } else {
-      result.stats.commands.valid = true;
     }
+  } catch {
+    result.stats.commands.exists = false;
+    result.stats.commands.valid = false;
   }
 
   // 5. Extensions 검증
@@ -3064,6 +3237,8 @@ program
     // 업데이트 대상 결정
     const updateSemoCore = !isSelectiveUpdate || onlyPackages.includes("semo-core");
     const updateSemoSkills = !isSelectiveUpdate || onlyPackages.includes("semo-skills");
+    const updateSemoAgents = !isSelectiveUpdate || onlyPackages.includes("semo-agents");
+    const updateSemoScripts = !isSelectiveUpdate || onlyPackages.includes("semo-scripts");
     const extensionsToUpdate = isSelectiveUpdate
       ? installedExtensions.filter(ext => onlyPackages.includes(ext))
       : installedExtensions;
@@ -3072,13 +3247,15 @@ program
     console.log(chalk.gray("  대상:"));
     if (updateSemoCore) console.log(chalk.gray("    - semo-core"));
     if (updateSemoSkills) console.log(chalk.gray("    - semo-skills"));
+    if (updateSemoAgents) console.log(chalk.gray("    - semo-agents"));
+    if (updateSemoScripts) console.log(chalk.gray("    - semo-scripts"));
     extensionsToUpdate.forEach(pkg => {
       console.log(chalk.gray(`    - ${pkg}`));
     });
 
-    if (!updateSemoCore && !updateSemoSkills && extensionsToUpdate.length === 0) {
+    if (!updateSemoCore && !updateSemoSkills && !updateSemoAgents && !updateSemoScripts && extensionsToUpdate.length === 0) {
       console.log(chalk.yellow("\n  ⚠️ 업데이트할 패키지가 없습니다."));
-      console.log(chalk.gray("     설치된 패키지: semo-core, semo-skills" +
+      console.log(chalk.gray("     설치된 패키지: semo-core, semo-skills, semo-agents, semo-scripts" +
         (installedExtensions.length > 0 ? ", " + installedExtensions.join(", ") : "")));
       return;
     }
@@ -3090,14 +3267,23 @@ program
       removeRecursive(tempDir);
       execSync(`git clone --depth 1 ${SEMO_REPO} "${tempDir}"`, { stdio: "pipe" });
 
-      // Standard 업데이트 (선택적)
-      if (updateSemoCore) {
-        removeRecursive(path.join(semoSystemDir, "semo-core"));
-        copyRecursive(path.join(tempDir, "semo-core"), path.join(semoSystemDir, "semo-core"));
-      }
-      if (updateSemoSkills) {
-        removeRecursive(path.join(semoSystemDir, "semo-skills"));
-        copyRecursive(path.join(tempDir, "semo-skills"), path.join(semoSystemDir, "semo-skills"));
+      // Standard 업데이트 (선택적) - semo-system/ 하위에서 복사
+      const standardUpdates = [
+        { flag: updateSemoCore, name: "semo-core" },
+        { flag: updateSemoSkills, name: "semo-skills" },
+        { flag: updateSemoAgents, name: "semo-agents" },
+        { flag: updateSemoScripts, name: "semo-scripts" },
+      ];
+
+      for (const { flag, name } of standardUpdates) {
+        if (flag) {
+          const srcPath = path.join(tempDir, "semo-system", name);
+          const destPath = path.join(semoSystemDir, name);
+          if (fs.existsSync(srcPath)) {
+            removeRecursive(destPath);
+            copyRecursive(srcPath, destPath);
+          }
+        }
       }
 
       // Extensions 업데이트 (선택적)
@@ -3229,6 +3415,151 @@ program
     } else {
       console.log(chalk.yellow.bold("\n⚠️ SEMO 업데이트 완료 (일부 문제 발견)\n"));
     }
+  });
+
+// === migrate 명령어 ===
+program
+  .command("migrate")
+  .description("레거시 SEMO 환경을 새 구조(semo-system/)로 마이그레이션")
+  .option("-f, --force", "확인 없이 강제 마이그레이션")
+  .action(async (options) => {
+    console.log(chalk.cyan.bold("\n🔄 SEMO 마이그레이션\n"));
+
+    const cwd = process.cwd();
+    const detection = detectLegacyEnvironment(cwd);
+
+    if (!detection.hasLegacy) {
+      console.log(chalk.green("✅ 레거시 환경이 감지되지 않았습니다."));
+
+      if (detection.hasSemoSystem) {
+        console.log(chalk.gray("   현재 환경: semo-system/ (정상)"));
+      } else {
+        console.log(chalk.gray("   SEMO가 설치되지 않았습니다. 'semo init'을 실행하세요."));
+      }
+      console.log();
+      return;
+    }
+
+    console.log(chalk.yellow("⚠️  레거시 SEMO 환경이 감지되었습니다.\n"));
+    console.log(chalk.gray("   감지된 레거시 경로:"));
+    detection.legacyPaths.forEach(p => {
+      console.log(chalk.gray(`     - ${p}`));
+    });
+    console.log();
+
+    if (!options.force) {
+      const { confirm } = await inquirer.prompt([
+        {
+          type: "confirm",
+          name: "confirm",
+          message: "레거시 환경을 삭제하고 새 구조로 마이그레이션하시겠습니까?",
+          default: true,
+        },
+      ]);
+
+      if (!confirm) {
+        console.log(chalk.yellow("\n마이그레이션이 취소되었습니다.\n"));
+        return;
+      }
+    }
+
+    const migrationSuccess = await migrateLegacyEnvironment(cwd);
+
+    if (migrationSuccess) {
+      console.log(chalk.cyan("\n새 환경 설치를 위해 'semo init'을 실행하세요.\n"));
+    }
+  });
+
+// === doctor 명령어 (설치 상태 진단) ===
+program
+  .command("doctor")
+  .description("SEMO 설치 상태를 진단하고 문제를 리포트")
+  .action(async () => {
+    console.log(chalk.cyan.bold("\n🩺 SEMO 진단\n"));
+
+    const cwd = process.cwd();
+    const semoSystemDir = path.join(cwd, "semo-system");
+    const claudeDir = path.join(cwd, ".claude");
+
+    // 1. 레거시 환경 확인
+    console.log(chalk.cyan("1. 레거시 환경 확인"));
+    const legacyCheck = detectLegacyEnvironment(cwd);
+    if (legacyCheck.hasLegacy) {
+      console.log(chalk.yellow("   ⚠️ 레거시 환경 감지됨"));
+      legacyCheck.legacyPaths.forEach(p => {
+        console.log(chalk.gray(`      - ${p}`));
+      });
+      console.log(chalk.gray("   💡 해결: semo migrate 실행"));
+    } else {
+      console.log(chalk.green("   ✅ 레거시 환경 없음"));
+    }
+
+    // 2. semo-system 확인
+    console.log(chalk.cyan("\n2. semo-system 구조 확인"));
+    if (!fs.existsSync(semoSystemDir)) {
+      console.log(chalk.red("   ❌ semo-system/ 없음"));
+      console.log(chalk.gray("   💡 해결: semo init 실행"));
+    } else {
+      const packages = ["semo-core", "semo-skills", "semo-agents", "semo-scripts"];
+      for (const pkg of packages) {
+        const pkgPath = path.join(semoSystemDir, pkg);
+        if (fs.existsSync(pkgPath)) {
+          const versionPath = path.join(pkgPath, "VERSION");
+          const version = fs.existsSync(versionPath)
+            ? fs.readFileSync(versionPath, "utf-8").trim()
+            : "?";
+          console.log(chalk.green(`   ✅ ${pkg} v${version}`));
+        } else {
+          console.log(chalk.yellow(`   ⚠️ ${pkg} 없음`));
+        }
+      }
+    }
+
+    // 3. 심볼릭 링크 확인
+    console.log(chalk.cyan("\n3. 심볼릭 링크 상태"));
+    if (fs.existsSync(claudeDir)) {
+      const linksToCheck = [
+        { name: "agents", dir: path.join(claudeDir, "agents") },
+        { name: "skills", dir: path.join(claudeDir, "skills") },
+        { name: "commands/SEMO", dir: path.join(claudeDir, "commands", "SEMO") },
+      ];
+
+      for (const { name, dir } of linksToCheck) {
+        if (fs.existsSync(dir)) {
+          if (fs.lstatSync(dir).isSymbolicLink()) {
+            if (isSymlinkValid(dir)) {
+              console.log(chalk.green(`   ✅ .claude/${name} (심볼릭 링크)`));
+            } else {
+              console.log(chalk.red(`   ❌ .claude/${name} (깨진 링크)`));
+              console.log(chalk.gray("      💡 해결: semo update 실행"));
+            }
+          } else {
+            console.log(chalk.green(`   ✅ .claude/${name} (복사본)`));
+          }
+        } else {
+          console.log(chalk.yellow(`   ⚠️ .claude/${name} 없음`));
+        }
+      }
+    } else {
+      console.log(chalk.red("   ❌ .claude/ 디렉토리 없음"));
+    }
+
+    // 4. 설치 검증
+    console.log(chalk.cyan("\n4. 전체 설치 검증"));
+    const verificationResult = verifyInstallation(cwd, []);
+    if (verificationResult.success) {
+      console.log(chalk.green("   ✅ 설치 상태 정상"));
+    } else {
+      console.log(chalk.yellow("   ⚠️ 문제 발견"));
+      verificationResult.errors.forEach(err => {
+        console.log(chalk.red(`      ❌ ${err}`));
+      });
+      verificationResult.warnings.forEach(warn => {
+        console.log(chalk.yellow(`      ⚠️ ${warn}`));
+      });
+    }
+
+    console.log();
   });
 
 // === -v 옵션 처리 (program.parse 전에 직접 처리) ===
