@@ -222,8 +222,10 @@ semo-system/           # White Box (읽기 전용)
 | `/SEMO:help` | 도움말 |
 | `/SEMO:feedback` | 피드백 제출 |
 | `/SEMO:update` | SEMO 업데이트 |
+| `/SEMO:health` | 환경 헬스체크 |
 | `/SEMO:onboarding` | 온보딩 가이드 |
 | `/SEMO:dry-run {프롬프트}` | 명령 검증 (라우팅 시뮬레이션) |
+| `/SEMO:routing-map` | 라우팅 맵 표시 |
 
 ## Context Mesh 사용
 
