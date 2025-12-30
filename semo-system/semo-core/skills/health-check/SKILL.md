@@ -1,21 +1,62 @@
 ---
 name: health-check
-description: Automatically verify development environment and authentication status for SEMO-Next. Use when (1) onboarding new team members, (2) checking tool installation status, (3) validating GitHub/Supabase authentication, (4) orchestrator starts workflow.
+description: |
+  개발 환경 및 인증 상태 자동 검증. Use when (1) 온보딩 시 환경 확인,
+  (2) 도구/인증 상태 체크, (3) `/SEMO:health-check` 명령,
+  (4) orchestrator 업무 시작 시 자동 실행.
 tools: [Bash, Read, Grep]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: health-check 실행` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 호출 시 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: health-check` 시스템 메시지를 첫 줄에 출력하세요.
 
 # health-check Skill
 
-> 개발 환경 및 인증 상태 자동 검증
+> 개발 환경 및 인증 상태 자동 검증 (통합 스킬)
+
+## 🔴 플랫폼 자동 감지
+
+> **이 스킬은 플랫폼을 자동 감지하여 해당 환경에 맞는 도구를 검증합니다.**
+
+### 플랫폼 감지 순서
+
+```bash
+# 1. SEMO 메타데이터에서 position 확인
+POSITION=$(cat ~/.claude.json 2>/dev/null | jq -r '.SEMO.position // "unknown"')
+
+# 2. 프로젝트 파일로 Runtime 감지
+detect_runtime() {
+  if [ -f "next.config.ts" ] || [ -f "next.config.js" ] || [ -f "next.config.mjs" ]; then
+    echo "nextjs"
+  elif [ -f "build.gradle.kts" ] || [ -f "build.gradle" ]; then
+    echo "spring"
+  elif [ -f "docker-compose.yml" ] || [ -f "docker-compose.yaml" ]; then
+    echo "infra"
+  elif [ -f "go.mod" ]; then
+    echo "go"
+  else
+    echo "generic"
+  fi
+}
+```
+
+### 플랫폼별 도구 매핑
+
+| 플랫폼 | Position | 필수 도구 | 선택 도구 |
+|--------|----------|-----------|----------|
+| **nextjs** | developer | gh, git, node, pnpm, supabase | postgresql |
+| **spring** | backend | gh, git, node, pnpm, supabase | postgresql |
+| **infra** | infra | gh, git, docker | kubectl, terraform, nginx |
+| **design** | designer | gh, git, node, pnpm, chrome | figma |
+| **generic** | - | gh, git, node, pnpm | - |
+
+---
 
 ## 트리거
 
 - `/SEMO:health-check` 명령어
 - "환경 확인", "도구 확인", "설치 확인" 키워드
 - onboarding-master Agent에서 자동 호출
-- orchestrator가 업무 시작 시 자동 실행
+- orchestrator가 업무 시작 시 자동 실행 (30일 경과 시)
 
 ## 검증 항목 요약
 
