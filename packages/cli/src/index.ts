@@ -3543,8 +3543,90 @@ program
       }
     }
 
-    // 5. 전체 설치 검증
-    console.log(chalk.cyan("\n5. 전체 설치 검증"));
+    // 5. semo-mcp (MCP 서버) 상태 확인
+    console.log(chalk.cyan("\n5. semo-mcp (MCP 서버)"));
+    const userHomeDir = process.env.HOME || process.env.USERPROFILE || "";
+    const claudeSettingsPath = path.join(userHomeDir, ".claude", "settings.local.json");
+
+    // MCP 서버 설정 확인
+    if (!fs.existsSync(claudeSettingsPath)) {
+      console.log(chalk.yellow("   ⚠️ settings.local.json 없음"));
+      console.log(chalk.gray("   💡 MCP 서버 설정이 필요합니다"));
+    } else {
+      try {
+        const settings = JSON.parse(fs.readFileSync(claudeSettingsPath, "utf-8"));
+        const mcpServers = settings.mcpServers || {};
+
+        // semo-integrations MCP 서버 확인
+        const semoMcp = mcpServers["semo-integrations"];
+        if (!semoMcp) {
+          console.log(chalk.yellow("   ⚠️ semo-integrations MCP 서버 미등록"));
+          console.log(chalk.gray("   💡 .claude/settings.json에 MCP 서버 추가 필요"));
+        } else {
+          console.log(chalk.green("   ✅ semo-integrations MCP 서버 등록됨"));
+
+          // 명령어 경로 확인
+          const mcpCommand = semoMcp.command || "";
+          const mcpArgs = semoMcp.args || [];
+
+          if (mcpCommand === "npx") {
+            console.log(chalk.green("   ✅ npx 방식 실행 (자동 업데이트)"));
+          } else if (mcpCommand === "node") {
+            const scriptPath = mcpArgs[0] || "";
+            if (scriptPath && fs.existsSync(scriptPath)) {
+              console.log(chalk.green(`   ✅ 로컬 스크립트: ${scriptPath}`));
+            } else if (scriptPath) {
+              console.log(chalk.red(`   ❌ 스크립트 경로 없음: ${scriptPath}`));
+            }
+          }
+
+          // 환경변수 확인
+          const env = semoMcp.env || {};
+          const requiredEnvVars = ["SLACK_BOT_TOKEN", "GITHUB_TOKEN"];
+          const missingEnvVars: string[] = [];
+          const configuredEnvVars: string[] = [];
+
+          for (const envVar of requiredEnvVars) {
+            if (env[envVar]) {
+              configuredEnvVars.push(envVar);
+            } else {
+              missingEnvVars.push(envVar);
+            }
+          }
+
+          if (configuredEnvVars.length > 0) {
+            console.log(chalk.green(`   ✅ 환경변수: ${configuredEnvVars.join(", ")}`));
+          }
+          if (missingEnvVars.length > 0) {
+            console.log(chalk.yellow(`   ⚠️ 미설정 환경변수: ${missingEnvVars.join(", ")}`));
+            console.log(chalk.gray("      💡 일부 기능이 제한될 수 있습니다"));
+          }
+
+          // 도구 목록 (알려진 도구)
+          const knownTools = [
+            "slack_send_message",
+            "slack_lookup_user",
+            "slack_list_channels",
+            "slack_find_channel",
+            "github_create_issue",
+            "github_create_pr",
+            "supabase_query",
+          ];
+          console.log(chalk.gray(`   📦 제공 도구: ${knownTools.length}개`));
+        }
+
+        // 다른 MCP 서버 확인
+        const otherServers = Object.keys(mcpServers).filter(k => k !== "semo-integrations");
+        if (otherServers.length > 0) {
+          console.log(chalk.gray(`   📡 기타 MCP 서버: ${otherServers.join(", ")}`));
+        }
+      } catch {
+        console.log(chalk.red("   ❌ settings.local.json 파싱 오류"));
+      }
+    }
+
+    // 6. 전체 설치 검증
+    console.log(chalk.cyan("\n6. 전체 설치 검증"));
     const verificationResult = verifyInstallation(cwd, []);
     if (verificationResult.success) {
       console.log(chalk.green("   ✅ 설치 상태 정상"));
