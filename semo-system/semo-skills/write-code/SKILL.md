@@ -142,9 +142,27 @@ npm run build
 
 ---
 
-## 🔴 Post-Action: 커밋 프롬프트 (NON-NEGOTIABLE)
+## 🔴 Post-Action: 체이닝 프롬프트 (NON-NEGOTIABLE)
 
-> **⚠️ 구현 완료 후 반드시 커밋 여부를 확인합니다.**
+> **⚠️ 구현 완료 후 반드시 다음 단계를 확인합니다.**
+
+### 체이닝 플로우
+
+```text
+skill:write-code 완료
+    │
+    └→ "다음 단계" 프롬프트
+           │
+           ├─ "테스트 작성해줘" → skill:write-test
+           │       │
+           │       └→ "검증해줘" → skill:quality-gate
+           │               │
+           │               └→ "커밋해줘" → skill:git-workflow
+           │
+           ├─ "검증해줘" → skill:quality-gate (테스트 건너뜀)
+           │
+           └─ "커밋해줘" → skill:git-workflow (검증 건너뜀)
+```
 
 ### 트리거 조건
 
@@ -160,7 +178,7 @@ npm run build
 ### 완료 시 출력
 
 ```markdown
-[SEMO] Skill: implement → 완료
+[SEMO] Skill: write-code → 완료
 
 ✅ **구현 완료**: {작업 요약}
 📁 **변경 파일**: {파일 목록}
@@ -168,15 +186,19 @@ npm run build
 
 ---
 
-💡 **다음 단계**: 변경사항을 커밋할까요?
+💡 **다음 단계**:
+   - "테스트 작성해줘" → skill:write-test 호출
+   - "검증해줘" → skill:quality-gate 호출
    - "커밋해줘" → skill:git-workflow 호출
    - "아니" / "계속 작업" → 추가 작업 대기
 ```
 
-### 자동 커밋 안 함 (명시적 요청 필요)
+### 사용자 응답별 동작
 
 | 사용자 응답 | 동작 |
 |------------|------|
+| "테스트 작성해줘" | `skill:write-test` 호출 |
+| "검증해줘" | `skill:quality-gate` 호출 |
 | "커밋해줘" | `skill:git-workflow` 호출 |
 | "푸시까지 해줘" | `skill:git-workflow` 호출 (push 포함) |
 | "아니", "계속" | 추가 작업 대기 |
@@ -184,7 +206,7 @@ npm run build
 
 ### 프롬프트 생략 조건
 
-사용자가 아래 키워드 사용 시 커밋 프롬프트 건너뛰기:
+사용자가 아래 키워드 사용 시 프롬프트 건너뛰기:
 
 - "프롬프트 없이"
 - "커밋 안 해도 돼"
