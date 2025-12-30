@@ -1168,6 +1168,16 @@ program
       });
     }
 
+    // GitHub MCP 토큰 설정 안내
+    if (!isGitHubTokenConfigured()) {
+      console.log(chalk.yellow("\n⚠️  GitHub MCP 설정 필요"));
+      console.log(chalk.gray("   GitHub 이슈/PR 생성 기능을 사용하려면 토큰을 설정하세요:"));
+      console.log(chalk.white("\n   export GITHUB_PERSONAL_ACCESS_TOKEN=\"$(gh auth token)\""));
+      console.log(chalk.gray("\n   영구 설정: ~/.zshrc 또는 ~/.bashrc에 위 명령어 추가"));
+    } else {
+      console.log(chalk.green("\n✓ GitHub 토큰 감지됨 (MCP 사용 가능)"));
+    }
+
     console.log(chalk.cyan("\n다음 단계:"));
     console.log(chalk.gray("  1. Claude Code에서 프로젝트 열기"));
     console.log(chalk.gray("  2. 자연어로 요청하기 (예: \"댓글 기능 구현해줘\")"));
@@ -1901,8 +1911,30 @@ const BASE_MCP_SERVERS: MCPServerConfig[] = [
     name: "github",
     command: "npx",
     args: ["-y", "@modelcontextprotocol/server-github"],
+    env: {
+      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}",
+    },
   },
 ];
+
+// === GitHub 토큰 자동 감지 ===
+function getGitHubTokenFromCLI(): string | null {
+  try {
+    const token = execSync("gh auth token", { stdio: "pipe", encoding: "utf-8" }).trim();
+    return token || null;
+  } catch {
+    return null;
+  }
+}
+
+function isGitHubTokenConfigured(): boolean {
+  // 환경변수 확인
+  if (process.env.GITHUB_PERSONAL_ACCESS_TOKEN) {
+    return true;
+  }
+  // gh CLI 토큰 확인
+  return getGitHubTokenFromCLI() !== null;
+}
 
 // === Claude MCP 서버 존재 여부 확인 ===
 function isMCPServerRegistered(serverName: string): boolean {
@@ -2972,6 +3004,104 @@ program
       console.log(chalk.green.bold("SEMO가 정상적으로 설치되어 있습니다."));
     } else {
       console.log(chalk.yellow("일부 구성 요소가 누락되었습니다. 'semo init'을 실행하세요."));
+    }
+    console.log();
+  });
+
+// === doctor 명령어 ===
+program
+  .command("doctor")
+  .description("SEMO 및 MCP 설정 문제를 진단합니다")
+  .action(() => {
+    console.log(chalk.cyan.bold("\n🩺 SEMO 진단\n"));
+
+    const cwd = process.cwd();
+    let hasIssues = false;
+
+    // 1. gh CLI 확인
+    console.log(chalk.white.bold("GitHub CLI:"));
+    try {
+      const ghVersion = execSync("gh --version", { stdio: "pipe", encoding: "utf-8" }).split("\n")[0];
+      console.log(chalk.green(`  ✓ 설치됨 (${ghVersion.replace("gh version ", "")})`));
+
+      // gh 인증 상태
+      try {
+        execSync("gh auth status", { stdio: "pipe" });
+        console.log(chalk.green("  ✓ 인증됨"));
+      } catch {
+        console.log(chalk.red("  ✗ 인증 필요: gh auth login"));
+        hasIssues = true;
+      }
+    } catch {
+      console.log(chalk.red("  ✗ 미설치: brew install gh"));
+      hasIssues = true;
+    }
+
+    // 2. GitHub 토큰 확인
+    console.log(chalk.white.bold("\nGitHub MCP 토큰:"));
+    const ghToken = getGitHubTokenFromCLI();
+    const envToken = process.env.GITHUB_PERSONAL_ACCESS_TOKEN;
+
+    if (envToken) {
+      console.log(chalk.green("  ✓ 환경변수 설정됨 (GITHUB_PERSONAL_ACCESS_TOKEN)"));
+    } else if (ghToken) {
+      console.log(chalk.yellow("  ⚠ gh CLI 토큰 있음 (환경변수 미설정)"));
+      console.log(chalk.gray("    GitHub MCP 사용하려면:"));
+      console.log(chalk.white('    export GITHUB_PERSONAL_ACCESS_TOKEN="$(gh auth token)"'));
+      hasIssues = true;
+    } else {
+      console.log(chalk.red("  ✗ 토큰 없음"));
+      console.log(chalk.gray("    1. gh auth login 실행"));
+      console.log(chalk.white('    2. export GITHUB_PERSONAL_ACCESS_TOKEN="$(gh auth token)"'));
+      hasIssues = true;
+    }
+
+    // 3. MCP 서버 등록 상태
+    console.log(chalk.white.bold("\nMCP 서버:"));
+    const requiredServers = ["semo-integrations", "github", "context7"];
+
+    for (const server of requiredServers) {
+      if (isMCPServerRegistered(server)) {
+        console.log(chalk.green(`  ✓ ${server}`));
+      } else {
+        console.log(chalk.yellow(`  ⚠ ${server} 미등록`));
+        hasIssues = true;
+      }
+    }
+
+    // 4. settings.json 확인
+    console.log(chalk.white.bold("\n설정 파일:"));
+    const settingsPath = path.join(cwd, ".claude", "settings.json");
+    if (fs.existsSync(settingsPath)) {
+      console.log(chalk.green("  ✓ .claude/settings.json"));
+
+      try {
+        const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+        if (settings.mcpServers?.github?.env?.GITHUB_PERSONAL_ACCESS_TOKEN) {
+          console.log(chalk.green("  ✓ GitHub MCP 환경변수 설정됨"));
+        } else {
+          console.log(chalk.yellow("  ⚠ GitHub MCP 환경변수 누락"));
+          hasIssues = true;
+        }
+      } catch {
+        console.log(chalk.yellow("  ⚠ settings.json 파싱 실패"));
+        hasIssues = true;
+      }
+    } else {
+      console.log(chalk.red("  ✗ .claude/settings.json 없음"));
+      hasIssues = true;
+    }
+
+    // 결과
+    console.log();
+    if (hasIssues) {
+      console.log(chalk.yellow.bold("⚠️  일부 문제가 발견되었습니다."));
+      console.log(chalk.gray("\nGitHub MCP 빠른 설정:"));
+      console.log(chalk.white('  export GITHUB_PERSONAL_ACCESS_TOKEN="$(gh auth token)"'));
+      console.log(chalk.gray("\n영구 설정 (셸 재시작 후 적용):"));
+      console.log(chalk.white('  echo \'export GITHUB_PERSONAL_ACCESS_TOKEN="$(gh auth token)"\' >> ~/.zshrc'));
+    } else {
+      console.log(chalk.green.bold("✅ 모든 설정이 정상입니다."));
     }
     console.log();
   });
