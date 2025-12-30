@@ -24,25 +24,56 @@ model: inherit
 
 > 📄 상세: [_shared/routing-base.md](_shared/routing-base.md)
 
+### Skill 직접 라우팅 (단순 작업)
+
 | 키워드 | Route To | 예시 |
 |--------|----------|------|
 | 구현, implement, 코드 작성 | `skill:implement` (Extension 우선) | "기능 구현해줘", "함수 만들어줘" |
 | 커밋, 푸시, PR | `skill:git-workflow` (Extension 우선) | "커밋해줘", "PR 만들어줘" |
 | 테스트 작성 | `skill:tester` | "테스트 작성해줘" |
-| 테스트 요청, QA 요청, 테스트요청 | `skill:request-test` (biz/management) | "#123 테스트 요청", "QA 테스트 요청해줘" |
+| 테스트 요청, QA 요청 | `skill:request-test` | "#123 테스트 요청" |
 | 계획, 설계 | `skill:planner` | "구현 계획 세워줘" |
-| 배포 (STG/PRD 릴리즈 관리) | `skill:release-manager` (ops/qa 우선) | "stg 배포해줘", "prd 태깅" |
-| 배포 (프로젝트 별칭, Milestone) | `skill:deployer` | "랜드 stg 배포해줘" |
-| 배포 (ms-*, Docker, PM2, SSH) | `skill:deploy-service` (eng/ms) | "ms-notifier stg 배포" |
+| 배포 (STG/PRD) | `skill:release-manager` | "stg 배포해줘" |
+| 배포 (프로젝트 별칭) | `skill:deployer` | "랜드 stg 배포해줘" |
+| 배포 (ms-*, Docker) | `skill:deploy-service` | "ms-notifier 배포" |
 | 슬랙, 알림 | `skill:notify-slack` | "슬랙에 알려줘" |
 | 피드백 | `skill:feedback` | "피드백 등록해줘" |
 | 버전, 업데이트 | `skill:version-updater` | "버전 체크해줘" |
-| 도움말, /SEMO:help | `skill:semo-help` | "도움말" |
-| 메모리, 컨텍스트 | `skill:memory` | "기억해줘" |
+| 도움말 | `skill:semo-help` | "도움말" |
+| 메모리 | `skill:memory` | "기억해줘" |
 | 버그 목록 | `skill:list-bugs` | "버그 목록" |
-| 아키텍처, /SEMO:health | `skill:semo-architecture-checker` | "구조 검증" |
-| **중앙 DB, 마이크로서비스 DB, DB 스키마** | **직접 참조** | "중앙 DB 구조", "MS DB 현황" |
-| SEMO 수정 요청 | **환경 체크 필수** | "스킬 개선해줘" |
+| 아키텍처 검증 | `skill:semo-architecture-checker` | "구조 검증" |
+| **중앙 DB, MS DB** | **직접 참조** | "중앙 DB 구조" |
+
+### Agent 라우팅 (복합 작업)
+
+> **복합 작업은 역할 기반 Agent에게 위임하여 Agent가 스킬을 선택합니다.**
+
+| 키워드/상황 | Route To | 에이전트 역할 |
+|------------|----------|-------------|
+| Epic 생성, 태스크 생성, 요구사항 | `agent:po` | Product Owner - 백로그/요구사항 관리 |
+| 스프린트 관리, 진행 추적, 회의록 | `agent:sm` | Scrum Master - 스프린트/프로세스 관리 |
+| 아키텍처 설계, 도메인 설계, ADR | `agent:architect` | Architect - 설계/기술 검토 |
+| Next.js, UI 구현, 컴포넌트 | `agent:frontend` | Frontend - Next.js 개발 |
+| API 개발, DB 마이그레이션, 백엔드 | `agent:backend` | Backend - Spring/Node 개발 |
+| 범용 코드, 버그 수정, 리팩토링 | `agent:dev` | Dev - 범용 개발 |
+| 테스트, 품질 검증, 릴리스 승인 | `agent:qa` | QA - 품질 보증 |
+| 배포 전략, 롤백, 인프라 | `agent:devops` | DevOps - 배포/인프라 |
+| 코드 설명, 온보딩, 교육 | `agent:teacher` | Teacher - 교육/멘토링 |
+
+### 라우팅 결정 기준
+
+```text
+사용자 요청
+    │
+    ├─ 단순 작업 (명확한 단일 스킬)?
+    │   └→ Skill 직접 호출
+    │       예: "커밋해줘" → skill:git-workflow
+    │
+    └─ 복합 작업 (여러 스킬 조합 필요)?
+        └→ Agent 호출 → Agent가 스킬 선택
+            예: "Epic 만들고 태스크 분배해줘" → agent:po
+```
 
 ## 🔴 Extension 우선 라우팅 (구현 요청)
 
@@ -225,6 +256,22 @@ fi
 |------|------------|
 | Meta + CLI 수정 완료 | → `skill:deploy-npm` |
 | Meta + 스킬/에이전트 수정 완료 | → `skill:version-manager` |
+
+## Available Agents
+
+> **역할 기반 에이전트 - 복합 작업 시 스킬 조합을 자율적으로 결정**
+
+| Agent | 역할 | 주요 스킬 |
+|-------|------|----------|
+| `po` | Product Owner | create-epic, create-issues, spec, project-kickoff |
+| `sm` | Scrum Master | task-progress, project-board, close-sprint, summarize-meeting |
+| `architect` | Architect | scaffold-domain, validate-architecture, spike, create-decision-log |
+| `frontend` | Frontend Dev | frontend-design, typescript-write, e2e-test, design-handoff |
+| `backend` | Backend Dev | sync-openapi, migrate-db, supabase-typegen, debug-service |
+| `dev` | General Dev | typescript-write, analyze-code, fast-track, verify |
+| `qa` | QA Engineer | run-tests, e2e-test, production-gate, request-test |
+| `devops` | DevOps | deploy-service, release-manager, rollback-service, health-check |
+| `teacher` | Teacher/Mentor | analyze-code, check-team-codex, spike, project-context |
 
 ## Available Skills
 
