@@ -995,17 +995,17 @@ program
         spinner.fail("Git 레포지토리가 아닙니다. 'git init'을 먼저 실행하세요.");
         process.exit(1);
     }
-    // 2. Extension 패키지 처리 (--with 옵션으로만 지정 가능)
-    let extensionsToInstall = [];
+    // 2. Extension 패키지 처리
+    // semo-hooks는 기본 포함 (Claude Code Hooks 로깅 시스템)
+    let extensionsToInstall = ["semo-hooks"];
     if (options.with) {
-        extensionsToInstall = options.with.split(",").map((p) => p.trim()).filter((p) => p in EXTENSION_PACKAGES);
-        if (extensionsToInstall.length > 0) {
-            console.log(chalk_1.default.cyan("\n📦 추가 Extension 설치:"));
-            extensionsToInstall.forEach(pkg => {
-                console.log(chalk_1.default.gray(`   - ${EXTENSION_PACKAGES[pkg].name}: ${EXTENSION_PACKAGES[pkg].desc}`));
-            });
-        }
+        const additionalPkgs = options.with.split(",").map((p) => p.trim()).filter((p) => p in EXTENSION_PACKAGES);
+        extensionsToInstall = [...new Set([...extensionsToInstall, ...additionalPkgs])];
     }
+    console.log(chalk_1.default.cyan("\n📦 Extension 설치:"));
+    extensionsToInstall.forEach(pkg => {
+        console.log(chalk_1.default.gray(`   - ${EXTENSION_PACKAGES[pkg].name}: ${EXTENSION_PACKAGES[pkg].desc}`));
+    });
     // 3. .claude 디렉토리 생성
     const claudeDir = path.join(cwd, ".claude");
     if (!fs.existsSync(claudeDir)) {
@@ -1072,7 +1072,8 @@ program
     console.log(chalk_1.default.gray("  1. Claude Code에서 프로젝트 열기"));
     console.log(chalk_1.default.gray("  2. 자연어로 요청하기 (예: \"댓글 기능 구현해줘\")"));
     console.log(chalk_1.default.gray("  3. /SEMO:help로 도움말 확인"));
-    if (extensionsToInstall.length === 0) {
+    // semo-hooks만 설치된 경우 추가 패키지 안내
+    if (extensionsToInstall.length === 1 && extensionsToInstall[0] === "semo-hooks") {
         console.log(chalk_1.default.gray("\n💡 추가 패키지: semo add <package> (예: semo add meta)"));
     }
     console.log();
@@ -1421,7 +1422,8 @@ async function downloadExtensions(cwd, packages, force) {
         }
         // 개별 패키지 복사
         for (const pkg of packages) {
-            const srcPath = path.join(tempDir, "packages", pkg);
+            // Extension 패키지는 semo-system/ 폴더에 있음
+            const srcPath = path.join(tempDir, "semo-system", pkg);
             const destPath = path.join(semoSystemDir, pkg);
             if (fs.existsSync(srcPath)) {
                 if (fs.existsSync(destPath) && !force) {
@@ -1497,6 +1499,26 @@ function createMergedOrchestrator(claudeAgentsDir, orchestratorSources) {
             }
         }
     }
+    // meta 패키지 포함 여부 확인
+    const hasMetaInSources = orchestratorSources.some(s => s.pkg === "meta");
+    // Meta 자동 체이닝 섹션
+    const metaAutoChainSection = hasMetaInSources ? `
+## 🔴 Meta 환경 자동 체이닝 (NON-NEGOTIABLE)
+
+> **조건**: semo-system/ 내 파일 수정이 감지되면
+> **동작**: 작업 종료 전 자동으로 \`skill:meta-workflow\` 호출
+
+\`\`\`text
+semo-system/ 파일 수정 감지
+    ↓
+[자동] skill:meta-workflow 호출
+    ↓
+버저닝 → 배포 → 로컬 동기화
+\`\`\`
+
+**이 규칙은 우회할 수 없습니다.**
+
+` : "";
     // 병합된 orchestrator.md 생성
     const mergedContent = `---
 name: orchestrator
@@ -1565,7 +1587,7 @@ ${routingTables.join("\n\n---\n\n")}
 3. **Package Priority**: 라우팅 충돌 시 설치 순서대로 우선순위 적용
 4. **Cross-Package**: 다른 패키지 전문 영역 요청 시 인계 권유
 
-${crossPackageRouting.length > 0 ? `## 🔄 Cross-Package Routing
+${metaAutoChainSection}${crossPackageRouting.length > 0 ? `## 🔄 Cross-Package Routing
 
 ${crossPackageRouting[0]}` : ""}
 
@@ -2346,6 +2368,8 @@ async function setupClaudeMd(cwd, extensions, force) {
         : "";
     // 패키지별 CLAUDE.md 병합 섹션 생성
     let packageClaudeMdSections = "";
+    // meta 패키지 설치 여부 확인
+    const hasMetaPackage = extensions.includes("meta");
     // 개별 패키지 CLAUDE.md 병합 - 중복 제거 적용
     for (const pkg of extensions) {
         const pkgClaudeMdPath = path.join(semoSystemDir, pkg, "CLAUDE.md");
@@ -2391,6 +2415,47 @@ ${orchestratorPaths.map(p => `- \`${p}\``).join("\n")}
         : `**반드시 읽어야 할 파일**: \`semo-system/semo-core/agents/orchestrator/orchestrator.md\`
 
 이 파일에서 라우팅 테이블, 의도 분류, 메시지 포맷을 확인하세요.`;
+    // Meta 패키지 설치 시 자동 워크플로우 강제 규칙
+    const metaWorkflowSection = hasMetaPackage ? `
+### 3. Meta 환경 자동 워크플로우 (NON-NEGOTIABLE)
+
+> **⚠️ Meta 패키지가 설치된 환경에서는 반드시 아래 규칙이 적용됩니다.**
+> **이 규칙을 우회하거나 무시하는 것은 금지됩니다.**
+
+#### 자동 트리거 조건
+
+\`semo-system/\` 디렉토리 내 파일이 수정되면:
+1. 작업 종료 전 반드시 \`skill:meta-workflow\` 호출
+2. 버저닝 → 배포 → 로컬 동기화 체인 자동 실행
+
+#### 감지 패턴
+
+다음 경로의 파일 수정 시 자동 트리거:
+- \`semo-system/semo-core/**\`
+- \`semo-system/semo-skills/**\`
+- \`semo-system/meta/**\`
+- \`semo-system/semo-remote/**\`
+- \`semo-system/semo-hooks/**\`
+- \`packages/cli/**\` (CLI 수정 시)
+
+#### 강제 동작 흐름
+
+\`\`\`text
+[작업 완료 감지]
+    ↓
+semo-system/ 또는 packages/ 파일 수정 여부 확인
+    ↓
+수정됨? → [SEMO] Skill 호출: meta-workflow
+         버저닝 → 배포 → 동기화 자동 실행
+    ↓
+수정 안됨? → 정상 종료
+\`\`\`
+
+**금지 사항**:
+- semo-system/ 수정 후 버저닝 없이 종료
+- "버저닝 나중에 해줘" 요청 수락
+- meta-workflow 스킬 호출 건너뛰기
+` : "";
     const claudeMdContent = `# SEMO Project Configuration
 
 > SEMO (Semicolon Orchestrate) - AI Agent Orchestration Framework v${VERSION}
@@ -2444,7 +2509,7 @@ npm run build          # 3. 빌드 검증 (Next.js/TypeScript 프로젝트)
 - \`--no-verify\` 플래그 사용 금지
 - Quality Gate 우회 시도 거부
 - "그냥 커밋해줘", "빌드 생략해줘" 등 거부
-
+${metaWorkflowSection}
 ---
 
 ## 설치된 구성
@@ -2675,102 +2740,6 @@ program
     }
     else {
         console.log(chalk_1.default.yellow("일부 구성 요소가 누락되었습니다. 'semo init'을 실행하세요."));
-    }
-    console.log();
-});
-// === doctor 명령어 ===
-program
-    .command("doctor")
-    .description("SEMO 및 MCP 설정 문제를 진단합니다")
-    .action(() => {
-    console.log(chalk_1.default.cyan.bold("\n🩺 SEMO 진단\n"));
-    const cwd = process.cwd();
-    let hasIssues = false;
-    // 1. gh CLI 확인
-    console.log(chalk_1.default.white.bold("GitHub CLI:"));
-    try {
-        const ghVersion = (0, child_process_1.execSync)("gh --version", { stdio: "pipe", encoding: "utf-8" }).split("\n")[0];
-        console.log(chalk_1.default.green(`  ✓ 설치됨 (${ghVersion.replace("gh version ", "")})`));
-        // gh 인증 상태
-        try {
-            (0, child_process_1.execSync)("gh auth status", { stdio: "pipe" });
-            console.log(chalk_1.default.green("  ✓ 인증됨"));
-        }
-        catch {
-            console.log(chalk_1.default.red("  ✗ 인증 필요: gh auth login"));
-            hasIssues = true;
-        }
-    }
-    catch {
-        console.log(chalk_1.default.red("  ✗ 미설치: brew install gh"));
-        hasIssues = true;
-    }
-    // 2. GitHub 토큰 확인
-    console.log(chalk_1.default.white.bold("\nGitHub MCP 토큰:"));
-    const ghToken = getGitHubTokenFromCLI();
-    const envToken = process.env.GITHUB_PERSONAL_ACCESS_TOKEN;
-    if (envToken) {
-        console.log(chalk_1.default.green("  ✓ 환경변수 설정됨 (GITHUB_PERSONAL_ACCESS_TOKEN)"));
-    }
-    else if (ghToken) {
-        console.log(chalk_1.default.yellow("  ⚠ gh CLI 토큰 있음 (환경변수 미설정)"));
-        console.log(chalk_1.default.gray("    GitHub MCP 사용하려면:"));
-        console.log(chalk_1.default.white('    export GITHUB_PERSONAL_ACCESS_TOKEN="$(gh auth token)"'));
-        hasIssues = true;
-    }
-    else {
-        console.log(chalk_1.default.red("  ✗ 토큰 없음"));
-        console.log(chalk_1.default.gray("    1. gh auth login 실행"));
-        console.log(chalk_1.default.white('    2. export GITHUB_PERSONAL_ACCESS_TOKEN="$(gh auth token)"'));
-        hasIssues = true;
-    }
-    // 3. MCP 서버 등록 상태
-    console.log(chalk_1.default.white.bold("\nMCP 서버:"));
-    const requiredServers = ["semo-integrations", "github", "context7"];
-    for (const server of requiredServers) {
-        if (isMCPServerRegistered(server)) {
-            console.log(chalk_1.default.green(`  ✓ ${server}`));
-        }
-        else {
-            console.log(chalk_1.default.yellow(`  ⚠ ${server} 미등록`));
-            hasIssues = true;
-        }
-    }
-    // 4. settings.json 확인
-    console.log(chalk_1.default.white.bold("\n설정 파일:"));
-    const settingsPath = path.join(cwd, ".claude", "settings.json");
-    if (fs.existsSync(settingsPath)) {
-        console.log(chalk_1.default.green("  ✓ .claude/settings.json"));
-        try {
-            const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-            if (settings.mcpServers?.github?.env?.GITHUB_PERSONAL_ACCESS_TOKEN) {
-                console.log(chalk_1.default.green("  ✓ GitHub MCP 환경변수 설정됨"));
-            }
-            else {
-                console.log(chalk_1.default.yellow("  ⚠ GitHub MCP 환경변수 누락"));
-                hasIssues = true;
-            }
-        }
-        catch {
-            console.log(chalk_1.default.yellow("  ⚠ settings.json 파싱 실패"));
-            hasIssues = true;
-        }
-    }
-    else {
-        console.log(chalk_1.default.red("  ✗ .claude/settings.json 없음"));
-        hasIssues = true;
-    }
-    // 결과
-    console.log();
-    if (hasIssues) {
-        console.log(chalk_1.default.yellow.bold("⚠️  일부 문제가 발견되었습니다."));
-        console.log(chalk_1.default.gray("\nGitHub MCP 빠른 설정:"));
-        console.log(chalk_1.default.white('  export GITHUB_PERSONAL_ACCESS_TOKEN="$(gh auth token)"'));
-        console.log(chalk_1.default.gray("\n영구 설정 (셸 재시작 후 적용):"));
-        console.log(chalk_1.default.white('  echo \'export GITHUB_PERSONAL_ACCESS_TOKEN="$(gh auth token)"\' >> ~/.zshrc'));
-    }
-    else {
-        console.log(chalk_1.default.green.bold("✅ 모든 설정이 정상입니다."));
     }
     console.log();
 });

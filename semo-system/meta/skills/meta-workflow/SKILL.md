@@ -68,12 +68,73 @@ Phase 4: 로컬 동기화
 
 ---
 
+## 🔴 모노레포 구조 (NON-NEGOTIABLE)
+
+> **SEMO는 모노레포 구조입니다. 반드시 올바른 경로에서 작업하세요.**
+
+### 디렉토리 구조
+
+```text
+/path/to/project/              # 사용자 프로젝트 (git repo 아님)
+├── .claude/                   # Claude 설정 (심링크)
+├── semo-system/               # 로컬 심링크 타겟
+│   └── ... (심링크)
+│
+└── semo/                      # ← 실제 모노레포 (semicolon-devteam/semo)
+    ├── .git/                  # git 레포지토리
+    ├── packages/
+    │   ├── cli/               # @team-semicolon/semo-cli
+    │   └── mcp-server/        # @team-semicolon/semo-mcp
+    └── semo-system/           # ← 실제 SEMO 패키지 소스
+        ├── semo-core/
+        ├── semo-skills/
+        ├── semo-hooks/
+        └── meta/
+```
+
+### 모노레포 감지
+
+```bash
+# 모노레포 경로 찾기
+MONOREPO_PATH=""
+if [ -d "semo/.git" ]; then
+  MONOREPO_PATH="semo"
+elif [ -d "../semo/.git" ]; then
+  MONOREPO_PATH="../semo"
+fi
+
+if [ -z "$MONOREPO_PATH" ]; then
+  echo "❌ 모노레포를 찾을 수 없습니다"
+  exit 1
+fi
+echo "✅ 모노레포 경로: $MONOREPO_PATH"
+```
+
+### 작업 위치 규칙
+
+| 작업 유형 | 경로 | 설명 |
+|----------|------|------|
+| 스킬/에이전트 수정 | semo/semo-system/ | 모노레포 내 실제 소스 |
+| CLI 수정 | semo/packages/cli/ | npm 패키지 |
+| git 커밋/푸시 | semo/ | 모노레포 루트 |
+| 로컬 심링크 | ./semo-system/ | 사용자 프로젝트 |
+
+---
+
 ## Phase 1: 환경 검증
+
+### 모노레포 확인
+
+```bash
+# 모노레포 경로 및 원격 확인
+cd semo 2>/dev/null || cd ../semo 2>/dev/null
+git remote -v | grep "semicolon-devteam/semo"
+```
 
 ### Meta 환경 확인
 
 ```bash
-# Meta 패키지 설치 확인
+# Meta 패키지 설치 확인 (모노레포 내)
 if [ -d "semo-system/meta" ]; then
   echo "✅ Meta 환경 확인됨"
 else
