@@ -1,5 +1,5 @@
 ---
-name: memory
+name: persist-context
 description: |
   SEMO 세션 간 컨텍스트 영속화 (공통 Skill). Use when (1) 아키텍처 결정 사항 저장,
   (2) 팀 선호도 기록, (3) 자주 참조하는 파일 캐싱, (4) 세션 간 맥락 유지.
@@ -7,9 +7,9 @@ tools: [Read, Write, Bash, Glob]
 model: inherit
 ---
 
-> **시스템 메시지**: `[SEMO] Skill: memory 호출 - {action}`
+> **시스템 메시지**: `[SEMO] Skill: persist-context 호출 - {action}`
 
-# SEMO Memory Skill
+# persist-context Skill
 
 > 세션 간 컨텍스트 영속화를 위한 장기 메모리 시스템 (SEMO Core 공통 Skill)
 

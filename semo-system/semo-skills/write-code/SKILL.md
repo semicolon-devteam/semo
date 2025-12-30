@@ -1,5 +1,5 @@
 ---
-name: implement
+name: write-code
 description: |
   코드 작성, 수정, 구현. Use when (1) "코드 작성해줘", "구현해줘",
   (2) 기능 추가/수정, (3) 버그 수정.
@@ -7,9 +7,9 @@ tools: [Read, Write, Edit, Bash, Glob, Grep]
 model: inherit
 ---
 
-> **🔔 호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: implement` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: write-code` 시스템 메시지를 첫 줄에 출력하세요.
 
-# implement Skill
+# write-code Skill
 
 > 코드 작성, 수정, 기능 구현 통합 스킬
 

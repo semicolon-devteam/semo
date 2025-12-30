@@ -1,12 +1,12 @@
 ---
-name: spike
+name: explore-approach
 description: Prototype and explore technical approaches. Use when (1) multiple valid technical approaches exist, (2) performance characteristics unknown, (3) implementation path unclear, (4) need evidence-based technical recommendation.
 tools: [Bash, Read, Write, Edit]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: spike 호출 - {주제}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: explore-approach 호출 - {주제}` 시스템 메시지를 첫 줄에 출력하세요.
 
-# Spike Skill
+# explore-approach Skill
 
 **Purpose**: Systematic technical exploration and evidence-based recommendation
 

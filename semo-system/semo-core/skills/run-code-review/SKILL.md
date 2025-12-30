@@ -1,5 +1,5 @@
 ---
-name: review
+name: run-code-review
 description: |
   Next.js 프로젝트 통합 리뷰. review-task 6단계 + semicolon-reviewer 코드 리뷰를
   하나의 워크플로우로 통합 실행합니다. PR에 리뷰 코멘트를 자동 등록합니다.
@@ -8,9 +8,9 @@ tools: [Bash, Read, Grep, Glob, Edit]
 model: inherit
 ---
 
-> **호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: review (nextjs)` 시스템 메시지를 첫 줄에 출력하세요.
+> **호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: run-code-review` 시스템 메시지를 첫 줄에 출력하세요.
 
-# Next.js 통합 리뷰 Skill
+# run-code-review Skill
 
 > review-task + semicolon-reviewer 통합 워크플로우
 

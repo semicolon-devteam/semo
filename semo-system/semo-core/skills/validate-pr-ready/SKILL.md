@@ -1,13 +1,13 @@
 ---
-name: verify
+name: validate-pr-ready
 description: Execute Phase 5 comprehensive verification before PR. Use when (1) implementation is complete, (2) before creating Pull Request, (3) user requests quality check, (4) pre-commit validation needed, (5) Constitution compliance verification required.
 tools: [Bash, Read, Grep, GitHub CLI]
 location: project
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: verify 호출 - {검증 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: validate-pr-ready 호출 - {검증 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
-# Verify Skill
+# validate-pr-ready Skill
 
 @./../_shared/quality-gates.md
 @./../_shared/ddd-patterns.md

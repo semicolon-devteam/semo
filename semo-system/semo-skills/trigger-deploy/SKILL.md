@@ -1,5 +1,5 @@
 ---
-name: deployer
+name: trigger-deploy
 description: |
   **GitHub Actions 기반** 프로젝트 배포 (Milestone Close → CI/CD 트리거).
   Use when:
@@ -7,20 +7,20 @@ description: |
   (2) Milestone 기반 릴리즈 관리,
   (3) GitHub Actions CI/CD 배포,
   (4) "stg에 뭐 올라가있어?", "prd 최신 버전".
-  ⚠️ Docker/SSH 직접 배포는 eng/ms의 deploy-service 사용.
+  ⚠️ Docker/SSH 직접 배포는 deploy-service 사용.
 tools: [Read, Bash, mcp__github__*]
 model: inherit
 ---
 
-> **🔔 호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: deployer` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: trigger-deploy` 시스템 메시지를 첫 줄에 출력하세요.
 
-# deployer Skill
+# trigger-deploy Skill
 
 > **GitHub Actions 기반** 프로젝트 별칭 기반 배포 및 상태 조회
 >
-> ⚠️ **deploy-service와 혼동 주의**: Docker/SSH 직접 배포가 필요하면 `eng/ms/deploy-service` 사용
+> ⚠️ **deploy-service와 혼동 주의**: Docker/SSH 직접 배포가 필요하면 `deploy-service` 사용
 
-## 🔴 deployer vs deploy-service 선택 기준
+## 🔴 trigger-deploy vs deploy-service 선택 기준
 
 | 조건 | 선택 스킬 | 이유 |
 |------|----------|------|

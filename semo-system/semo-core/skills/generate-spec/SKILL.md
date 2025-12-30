@@ -1,5 +1,5 @@
 ---
-name: spec
+name: generate-spec
 description: Execute SDD Phase 0-3 workflow (brainstorm? → specify → plan → tasks). Use when (1) rough idea needs refinement, (2) starting new feature needing specification, (3) user requests spec creation, (4) need to create spec.md/plan.md/tasks.md before implementation.
 tools: [Read, Write, Edit]
 location: project
@@ -12,9 +12,9 @@ triggers:
   - spec
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: spec 호출 - {기능명}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: generate-spec 호출 - {기능명}` 시스템 메시지를 첫 줄에 출력하세요.
 
-# Spec Skill (Enhanced with Brainstorming)
+# generate-spec Skill (Enhanced with Brainstorming)
 
 **Purpose**: Orchestrate complete Spec-Driven Development (SDD) workflow with optional brainstorming phase
 

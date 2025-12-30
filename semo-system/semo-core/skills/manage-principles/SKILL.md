@@ -1,13 +1,13 @@
 ---
-name: constitution
+name: manage-principles
 description: Manage and update project Constitution. Use when (1) Constitution violation detected during implementation, (2) proposing new architectural principle, (3) templates need sync after Constitution update, (4) reviewing project architecture rules.
 tools: [Read, Write, Edit]
 location: project
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: constitution 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: manage-principles 호출 - {작업 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
-# Constitution Skill
+# manage-principles Skill
 
 **Purpose**: Project Constitution management with violation detection and template synchronization
 

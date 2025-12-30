@@ -1,19 +1,18 @@
 ---
-name: tester
+name: write-test
 description: |
   테스트 코드 작성 및 실행. Use when (1) "테스트 작성해줘",
   (2) "테스트 실행해줘", (3) 테스트 커버리지 확인.
 
   ⚠️ QA 테스트 요청은 별도 스킬 사용:
-  - 상태 변경 + QA 할당 → ops/qa의 change-to-testing
-  - Slack 알림 전송 → biz/management의 request-test
+  - Slack 알림 전송 → request-test
 tools: [Read, Write, Edit, Bash, Glob]
 model: inherit
 ---
 
-> **🔔 호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: tester` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: write-test` 시스템 메시지를 첫 줄에 출력하세요.
 
-# tester Skill
+# write-test Skill
 
 > 테스트 코드 작성 및 실행 자동화
 
@@ -103,7 +102,7 @@ test('사용자 시나리오', async ({ page }) => {
 ### 테스트 작성 완료
 
 ```markdown
-[SEMO] Skill: tester → 테스트 작성 완료
+[SEMO] Skill: write-test → 테스트 작성 완료
 
 📁 파일: {test_file_path}
 ✅ 테스트 케이스: {count}개
@@ -113,7 +112,7 @@ test('사용자 시나리오', async ({ page }) => {
 ### 테스트 실행 결과
 
 ```markdown
-[SEMO] Skill: tester → 테스트 실행 완료
+[SEMO] Skill: write-test → 테스트 실행 완료
 
 ✅ Passed: {pass_count}
 ❌ Failed: {fail_count}

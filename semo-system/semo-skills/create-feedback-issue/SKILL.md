@@ -1,5 +1,5 @@
 ---
-name: feedback
+name: create-feedback-issue
 description: |
   SEMO 패키지 피드백 수집 및 GitHub 이슈 생성 (공통 Skill).
   Use when (1) /SEMO:feedback 명령어 호출, (2) 사용자가 SEMO 동작 오류 지적, (3) 개선 제안 요청.
@@ -7,9 +7,9 @@ tools: [Bash, Read]
 model: inherit
 ---
 
-> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: feedback 호출 - {피드백 유형}` 시스템 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: create-feedback-issue 호출 - {피드백 유형}` 시스템 메시지를 첫 줄에 출력하세요.
 
-# feedback Skill
+# create-feedback-issue Skill
 
 > SEMO 패키지에 대한 사용자 피드백을 GitHub 이슈로 생성 (SEMO 공통 Skill)
 

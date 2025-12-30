@@ -28,21 +28,26 @@ model: inherit
 
 | 키워드 | Route To | 예시 |
 |--------|----------|------|
-| 구현, implement, 코드 작성 | `skill:implement` (Extension 우선) | "기능 구현해줘", "함수 만들어줘" |
+| 구현, implement, 코드 작성 | `skill:write-code` (Extension 우선) | "기능 구현해줘", "함수 만들어줘" |
 | 커밋, 푸시, PR | `skill:git-workflow` (Extension 우선) | "커밋해줘", "PR 만들어줘" |
-| 테스트 작성 | `skill:tester` | "테스트 작성해줘" |
+| 테스트 작성 | `skill:write-test` | "테스트 작성해줘" |
 | 테스트 요청, QA 요청 | `skill:request-test` | "#123 테스트 요청" |
-| 계획, 설계 | `skill:planner` | "구현 계획 세워줘" |
+| 계획, 설계 | `skill:create-impl-plan` | "구현 계획 세워줘" |
 | 배포 (STG/PRD) | `skill:release-manager` | "stg 배포해줘" |
-| 배포 (프로젝트 별칭) | `skill:deployer` | "랜드 stg 배포해줘" |
+| 배포 (프로젝트 별칭) | `skill:trigger-deploy` | "랜드 stg 배포해줘" |
 | 배포 (ms-*, Docker) | `skill:deploy-service` | "ms-notifier 배포" |
 | 슬랙, 알림 | `skill:notify-slack` | "슬랙에 알려줘" |
-| 피드백 | `skill:feedback` | "피드백 등록해줘" |
+| 피드백 | `skill:create-feedback-issue` | "피드백 등록해줘" |
 | 버전, 업데이트 | `skill:version-updater` | "버전 체크해줘" |
 | 도움말 | `skill:semo-help` | "도움말" |
-| 메모리 | `skill:memory` | "기억해줘" |
+| 메모리 | `skill:persist-context` | "기억해줘" |
 | 버그 목록 | `skill:list-bugs` | "버그 목록" |
 | 아키텍처 검증 | `skill:semo-architecture-checker` | "구조 검증" |
+| 명세 작성 | `skill:generate-spec` | "spec 작성해줘" |
+| 리뷰 | `skill:run-code-review` | "리뷰해줘" |
+| PR 검증 | `skill:validate-pr-ready` | "PR 전 검증해줘" |
+| 기술 탐색 | `skill:explore-approach` | "기술 비교해줘" |
+| 원칙 관리 | `skill:manage-principles` | "Constitution 업데이트" |
 | **중앙 DB, MS DB** | **직접 참조** | "중앙 DB 구조" |
 
 ### Agent 라우팅 (복합 작업)

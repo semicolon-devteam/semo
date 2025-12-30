@@ -1,20 +1,18 @@
 ---
-name: planner
+name: create-impl-plan
 description: |
   구현 계획 수립. Use when (1) "계획 세워줘", "설계해줘",
   (2) 복잡한 기능 구현 전, (3) 리팩토링 계획.
 
   ⚠️ 특화된 계획은 별도 스킬 사용:
-  - Sprint 계획 → biz/management의 sprint-master
-  - Roadmap 계획 → biz/management의 roadmap-planner
-  - 테스트 계획 → tester 스킬
+  - 테스트 계획 → write-test 스킬
 tools: [Read, Glob, Grep, Task]
 model: inherit
 ---
 
-> **🔔 호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: planner` 시스템 메시지를 첫 줄에 출력하세요.
+> **🔔 호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: create-impl-plan` 시스템 메시지를 첫 줄에 출력하세요.
 
-# planner Skill
+# create-impl-plan Skill
 
 > 기능 구현 및 리팩토링 계획 수립
 
