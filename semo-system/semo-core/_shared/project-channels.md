@@ -17,25 +17,82 @@
 2차 시도: #_{repo} (언더스코어 접두사)
     예: cm-labor-union → #_cm-labor-union
     ↓
+3차 시도: 부분 일치 검색
+    예: semo → #_semo-dev (부분 매칭)
+    ↓
 Fallback: #_협업 (채널 없을 경우)
 ```
 
-### MCP 도구를 사용한 채널 전송
+## 🔴 MCP 도구 사용 (권장)
 
-```bash
-# 방법 1: 레포명으로 직접 채널 전송 시도
-mcp__semo-integrations__slack_send_message(
-  channel: "#cm-labor-union",  # 레포명으로 채널 시도
+### slack_find_channel - 채널 동적 조회
+
+가장 권장하는 방법입니다. 채널을 찾고 없으면 자동으로 Fallback 채널을 반환합니다.
+
+```typescript
+// 채널 찾기 (자동 Fallback 포함)
+mcp__semo-integrations__slack_find_channel({
+  name: "semo",           // 찾을 채널명
+  fallback: "#_협업"      // Fallback 채널 (기본값)
+})
+
+// 반환 예시 1: 채널 찾음
+// [SEMO] 채널 찾음
+// 채널: #_semo
+// ID: C123456789
+// 상태: 사용 가능
+
+// 반환 예시 2: Fallback 사용
+// [SEMO] 채널 'semo' 없음 → Fallback 사용
+// 채널: #_협업
+// ID: C09KNL91QBZ
+// 원래 요청: semo
+```
+
+### slack_list_channels - 채널 목록 조회
+
+채널 목록을 조회하거나 검색할 때 사용합니다.
+
+```typescript
+// 전체 채널 목록
+mcp__semo-integrations__slack_list_channels({
+  limit: 100
+})
+
+// 키워드 검색
+mcp__semo-integrations__slack_list_channels({
+  search: "cm-",
+  limit: 20
+})
+```
+
+### slack_send_message - 메시지 전송
+
+```typescript
+// 채널에 메시지 전송
+mcp__semo-integrations__slack_send_message({
+  channel: "#_협업",      // 채널명 또는 ID
   text: "메시지 내용"
-)
-# 성공 → 해당 채널 사용
-# 실패 (channel_not_found) → Fallback 시도
+})
+```
 
-# 방법 2: Fallback으로 기본 채널 전송
-mcp__semo-integrations__slack_send_message(
-  channel: "#_협업",
-  text: "[Fallback: #cm-labor-union 채널 미발견]\n메시지 내용"
-)
+## 권장 워크플로우
+
+```typescript
+// 1단계: 채널 찾기
+const channelResult = await mcp__semo-integrations__slack_find_channel({
+  name: "semo"
+});
+
+// 2단계: 결과에서 채널 추출 (항상 유효한 채널 반환)
+// - 찾음: #semo 또는 #_semo
+// - 못찾음: #_협업 (Fallback)
+
+// 3단계: 메시지 전송
+await mcp__semo-integrations__slack_send_message({
+  channel: extractedChannel,  // slack_find_channel 결과에서 추출
+  text: "알림 메시지"
+});
 ```
 
 ## 기본 채널
@@ -50,16 +107,22 @@ default_channel_id: "C09KNL91QBZ"
 ```text
 프로젝트 채널 전송 시도
     │
-    ├─ #{repo} 시도
-    │   ├─ 성공 → 완료
-    │   └─ 실패 → 다음 시도
+    ├─ slack_find_channel 호출
+    │   ├─ #{repo} 시도
+    │   │   ├─ 성공 → 해당 채널 반환
+    │   │   └─ 실패 → 다음 시도
+    │   │
+    │   ├─ #_{repo} 시도
+    │   │   ├─ 성공 → 해당 채널 반환
+    │   │   └─ 실패 → 다음 시도
+    │   │
+    │   ├─ 부분 일치 시도
+    │   │   ├─ 성공 → 해당 채널 반환
+    │   │   └─ 실패 → Fallback
+    │   │
+    │   └─ Fallback 채널 (#_협업) 반환
     │
-    ├─ #_{repo} 시도
-    │   ├─ 성공 → 완료
-    │   └─ 실패 → Fallback
-    │
-    └─ 기본 채널 (#_협업)으로 전송
-        └─ 메시지에 원래 채널명 표시
+    └─ 반환된 채널로 slack_send_message 호출
 ```
 
 ## 참고: 알려진 프로젝트 채널
@@ -81,16 +144,9 @@ default_channel_id: "C09KNL91QBZ"
 2. Slack 앱(SEMO Bot)을 해당 채널에 초대
 3. 자동으로 동적 조회됨 (별도 설정 불필요)
 
-```bash
-# 채널 ID 조회 (필요한 경우)
-curl -X GET "https://slack.com/api/conversations.list" \
-  -H "Authorization: Bearer $SLACK_BOT_TOKEN" | \
-  jq '.channels[] | select(.name == "cm-labor-union") | .id'
-```
-
 ## Related
 
 - [Slack 설정](slack-config.md) - Bot Token, 권한
 - [팀원 매핑](team-members.md) - GitHub ↔ Slack 사용자 매핑
 - [notify-slack Skill](../../semo-skills/notify-slack/SKILL.md)
-- [request-test Skill](../../skills/request-test/SKILL.md)
+- [request-test Skill](../skills/request-test/SKILL.md)

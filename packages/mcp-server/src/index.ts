@@ -169,6 +169,42 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["name"],
         },
       },
+      {
+        name: "slack_list_channels",
+        description: "Slack 채널 목록을 조회합니다. 채널명으로 검색하거나 전체 목록을 가져옵니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            search: {
+              type: "string",
+              description: "검색할 채널명 (부분 일치, 선택사항)",
+            },
+            limit: {
+              type: "number",
+              description: "반환할 최대 채널 수 (기본: 100)",
+            },
+          },
+          required: [],
+        },
+      },
+      {
+        name: "slack_find_channel",
+        description: "채널명으로 Slack 채널을 찾고, 없으면 Fallback 채널을 반환합니다. notify-slack에서 동적 채널 조회에 사용합니다.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            name: {
+              type: "string",
+              description: "찾을 채널명 (예: 'semo', 'cm-labor-union')",
+            },
+            fallback: {
+              type: "string",
+              description: "Fallback 채널 (기본: '#_협업')",
+            },
+          },
+          required: ["name"],
+        },
+      },
       // === GitHub Integration ===
       {
         name: "github_create_issue",
@@ -655,6 +691,175 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             },
           ],
         };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[SEMO] 오류: ${error}`,
+            },
+          ],
+        };
+      }
+    }
+
+    case "slack_list_channels": {
+      const search = args?.search as string | undefined;
+      const limit = (args?.limit as number) || 100;
+
+      try {
+        const response = await fetch(
+          `https://slack.com/api/conversations.list?types=public_channel&limit=${Math.min(limit, 1000)}`,
+          {
+            headers: {
+              "Authorization": `Bearer ${SLACK_BOT_TOKEN}`,
+            },
+          }
+        );
+
+        const result = await response.json() as {
+          ok: boolean;
+          error?: string;
+          channels?: Array<{
+            id: string;
+            name: string;
+            is_archived: boolean;
+            num_members: number;
+          }>;
+        };
+
+        if (result.ok && result.channels) {
+          let channels = result.channels.filter((c) => !c.is_archived);
+
+          if (search) {
+            const searchLower = search.toLowerCase().replace(/^#_?/, "");
+            channels = channels.filter((c) =>
+              c.name.toLowerCase().includes(searchLower)
+            );
+          }
+
+          const channelList = channels
+            .slice(0, limit)
+            .map((c) => `#${c.name} (${c.id}, ${c.num_members}명)`)
+            .join("\n");
+
+          return {
+            content: [
+              {
+                type: "text",
+                text: `[SEMO] Slack 채널 목록 (${channels.length}개)\n\n${channelList || "검색 결과 없음"}`,
+              },
+            ],
+          };
+        } else {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `[SEMO] Slack 채널 조회 실패: ${result.error}`,
+              },
+            ],
+          };
+        }
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `[SEMO] 오류: ${error}`,
+            },
+          ],
+        };
+      }
+    }
+
+    case "slack_find_channel": {
+      const channelName = args?.name as string;
+      const fallback = (args?.fallback as string) || "#_협업";
+
+      try {
+        const response = await fetch(
+          "https://slack.com/api/conversations.list?types=public_channel&limit=1000",
+          {
+            headers: {
+              "Authorization": `Bearer ${SLACK_BOT_TOKEN}`,
+            },
+          }
+        );
+
+        const result = await response.json() as {
+          ok: boolean;
+          error?: string;
+          channels?: Array<{
+            id: string;
+            name: string;
+            is_archived: boolean;
+          }>;
+        };
+
+        if (result.ok && result.channels) {
+          const activeChannels = result.channels.filter((c) => !c.is_archived);
+          const searchName = channelName.toLowerCase().replace(/^#_?/, "");
+
+          // 1차: 정확히 일치 (#{name})
+          let found = activeChannels.find((c) => c.name.toLowerCase() === searchName);
+
+          // 2차: 언더스코어 접두사 (#{_name})
+          if (!found) {
+            found = activeChannels.find((c) => c.name.toLowerCase() === `_${searchName}`);
+          }
+
+          // 3차: 부분 일치
+          if (!found) {
+            found = activeChannels.find((c) => c.name.toLowerCase().includes(searchName));
+          }
+
+          if (found) {
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `[SEMO] 채널 찾음\n\n채널: #${found.name}\nID: ${found.id}\n상태: 사용 가능`,
+                },
+              ],
+            };
+          } else {
+            // Fallback 채널 찾기
+            const fallbackName = fallback.replace(/^#_?/, "");
+            const fallbackChannel = activeChannels.find(
+              (c) => c.name.toLowerCase() === fallbackName || c.name.toLowerCase() === `_${fallbackName}`
+            );
+
+            if (fallbackChannel) {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `[SEMO] 채널 '${channelName}' 없음 → Fallback 사용\n\n채널: #${fallbackChannel.name}\nID: ${fallbackChannel.id}\n원래 요청: ${channelName}`,
+                  },
+                ],
+              };
+            } else {
+              return {
+                content: [
+                  {
+                    type: "text",
+                    text: `[SEMO] 채널 '${channelName}' 및 Fallback '${fallback}' 모두 없음`,
+                  },
+                ],
+              };
+            }
+          }
+        } else {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `[SEMO] Slack API 오류: ${result.error}`,
+              },
+            ],
+          };
+        }
       } catch (error) {
         return {
           content: [
@@ -1542,7 +1747,7 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
                   {
                     name: "slack",
                     modules: ["notify", "feedback"],
-                    tools: ["slack_send_message", "slack_lookup_user"],
+                    tools: ["slack_send_message", "slack_lookup_user", "slack_list_channels", "slack_find_channel"],
                   },
                   {
                     name: "supabase",
