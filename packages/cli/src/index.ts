@@ -3464,8 +3464,87 @@ program
       console.log(chalk.red("   ❌ .claude/ 디렉토리 없음"));
     }
 
-    // 4. 설치 검증
-    console.log(chalk.cyan("\n4. 전체 설치 검증"));
+    // 4. semo-hooks 상태 확인
+    console.log(chalk.cyan("\n4. semo-hooks (Claude Code Hooks)"));
+    const hooksDir = path.join(semoSystemDir, "semo-hooks");
+    const hooksDistDir = path.join(hooksDir, "dist");
+    const hooksIndexJs = path.join(hooksDistDir, "index.js");
+
+    if (!fs.existsSync(hooksDir)) {
+      console.log(chalk.gray("   ⏭️ semo-hooks 미설치 (선택 패키지)"));
+      console.log(chalk.gray("   💡 설치: semo add hooks"));
+    } else {
+      // hooks 버전 확인
+      const hooksVersionPath = path.join(hooksDir, "VERSION");
+      const hooksVersion = fs.existsSync(hooksVersionPath)
+        ? fs.readFileSync(hooksVersionPath, "utf-8").trim()
+        : "?";
+      console.log(chalk.green(`   ✅ semo-hooks v${hooksVersion} 설치됨`));
+
+      // 빌드 상태 확인
+      if (!fs.existsSync(hooksDistDir) || !fs.existsSync(hooksIndexJs)) {
+        console.log(chalk.red("   ❌ 빌드되지 않음 (dist/index.js 없음)"));
+        console.log(chalk.gray("      💡 해결: semo hooks enable"));
+      } else {
+        console.log(chalk.green("   ✅ 빌드 완료 (dist/index.js 존재)"));
+      }
+
+      // settings.local.json hooks 설정 확인
+      const homeDir = process.env.HOME || process.env.USERPROFILE || "";
+      const settingsPath = path.join(homeDir, ".claude", "settings.local.json");
+
+      if (!fs.existsSync(settingsPath)) {
+        console.log(chalk.yellow("   ⚠️ settings.local.json 없음"));
+        console.log(chalk.gray("      💡 해결: semo hooks enable"));
+      } else {
+        try {
+          const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+          const hooksConfig = settings.hooks;
+
+          if (!hooksConfig) {
+            console.log(chalk.yellow("   ⚠️ hooks 설정 없음"));
+            console.log(chalk.gray("      💡 해결: semo hooks enable"));
+          } else {
+            const requiredHooks = ["SessionStart", "UserPromptSubmit", "Stop", "SessionEnd"];
+            const missingHooks: string[] = [];
+            const invalidPathHooks: string[] = [];
+
+            for (const hookName of requiredHooks) {
+              const hookArray = hooksConfig[hookName];
+              if (!hookArray || !Array.isArray(hookArray) || hookArray.length === 0) {
+                missingHooks.push(hookName);
+              } else {
+                // 경로 검증
+                const hookEntry = hookArray[0];
+                const innerHooks = hookEntry?.hooks;
+                if (innerHooks && Array.isArray(innerHooks) && innerHooks.length > 0) {
+                  const command = innerHooks[0]?.command || "";
+                  // 현재 프로젝트의 semo-hooks 경로와 비교
+                  if (!command.includes(hooksDir) && !command.includes("semo-hooks")) {
+                    invalidPathHooks.push(hookName);
+                  }
+                }
+              }
+            }
+
+            if (missingHooks.length > 0) {
+              console.log(chalk.yellow(`   ⚠️ 누락된 hooks: ${missingHooks.join(", ")}`));
+              console.log(chalk.gray("      💡 해결: semo hooks enable"));
+            } else if (invalidPathHooks.length > 0) {
+              console.log(chalk.yellow(`   ⚠️ 경로 불일치: ${invalidPathHooks.join(", ")}`));
+              console.log(chalk.gray("      💡 해결: semo hooks enable (다른 프로젝트 설정 감지)"));
+            } else {
+              console.log(chalk.green("   ✅ hooks 설정 완료 (4개 hook 등록됨)"));
+            }
+          }
+        } catch {
+          console.log(chalk.red("   ❌ settings.local.json 파싱 오류"));
+        }
+      }
+    }
+
+    // 5. 전체 설치 검증
+    console.log(chalk.cyan("\n5. 전체 설치 검증"));
     const verificationResult = verifyInstallation(cwd, []);
     if (verificationResult.success) {
       console.log(chalk.green("   ✅ 설치 상태 정상"));
