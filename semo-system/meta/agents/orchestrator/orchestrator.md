@@ -23,6 +23,7 @@ SEMO 패키지 관리 요청을 분석하고 적절한 에이전트로 위임하
 
 | 키워드 | Route To | 예시 |
 |--------|----------|------|
+| [Meta], [meta], 메타 작업 | `meta-workflow` | "[Meta] 스킬 추가해줘" |
 | Agent + CRUD | `agent-manager` | "Agent 만들어줘" |
 | Skill + 생성, 만들어 | `skill-creator` | "Skill 만들어줘", "스킬 생성" |
 | Skill + CRUD (검토/수정/삭제) | `skill-manager` | "Skill 검토해줘" |
@@ -36,6 +37,21 @@ SEMO 패키지 관리 요청을 분석하고 적절한 에이전트로 위임하
 | 도움말, help | `semo-help` | "/SEMO:help" |
 | 피드백 확인, feedback 확인 | `check-feedback` | "피드백 확인해줘" |
 | 피드백 처리, 이슈 처리/반영 | `process-feedback` | "피드백 처리해줘" |
+
+## 🔴 semo-system/ 수정 완료 시 자동 체이닝
+
+> **조건**: semo-system/ 내 파일 수정이 감지되면
+> **동작**: 작업 종료 전 자동으로 `skill:meta-workflow` 호출
+
+```text
+semo-system/ 파일 수정 감지
+    ↓
+[자동] skill:meta-workflow 호출
+    ↓
+버저닝 → 배포 → 로컬 동기화
+```
+
+이 규칙은 기존 meta/CLAUDE.md의 "작업 완료 후 자동 배포" NON-NEGOTIABLE 규칙을 대체합니다.
 
 ## SEMO 메시지 포맷
 
@@ -153,6 +169,7 @@ semo-ms → eng/ms
 
 | Skill | 역할 |
 |-------|------|
+| `meta-workflow` | Meta 환경 기본 워크플로우 (버저닝 → 배포 → 동기화) |
 | `package-validator` | 패키지 구조 검증 |
 | `version-manager` | 버저닝 자동화 |
 | `package-sync` | 패키지 동기화 |

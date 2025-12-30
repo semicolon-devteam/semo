@@ -52,6 +52,12 @@
 > **⚠️ Meta 환경에서 작업 완료 시 반드시 전체 배포 플로우를 실행합니다.**
 > **사용자가 별도로 요청하지 않아도 자동으로 진행합니다.**
 
+**📌 이 규칙은 `skill:meta-workflow`가 자동으로 처리합니다.**
+
+- semo-system/ 내 파일 수정 감지 시 자동 호출
+- 버저닝 → 배포 → 로컬 동기화 체인 실행
+- 상세: [meta-workflow Skill](skills/meta-workflow/SKILL.md)
+
 ### 🔴 분리 버전 정책 (Separate Version Policy)
 
 > **SEMO는 각 패키지별로 독립적인 버전을 관리합니다.**
