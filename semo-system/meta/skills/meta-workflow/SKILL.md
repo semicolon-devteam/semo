@@ -14,7 +14,7 @@ triggers:
 ---
 
 > **시스템 메시지**: 이 Skill이 호출되면
-> `[SEMO] Skill: meta-workflow 호출 - {작업 요약}` 시스템 메시지를 첫 줄에 출력
+> `[SEMO] - [META] Skill: meta-workflow 호출 - {작업 요약}` 시스템 메시지를 첫 줄에 출력
 
 # meta-workflow Skill
 
@@ -265,7 +265,7 @@ fi
 ### 동기화 완료 메시지
 
 ```markdown
-[SEMO] Skill: meta-workflow 완료
+[SEMO] - [META] Skill: meta-workflow 완료
 
 ✅ 버저닝: {package} {old} → {new}
 ✅ 원격 배포: git push 완료

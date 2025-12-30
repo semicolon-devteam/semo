@@ -14,6 +14,40 @@
 
 ---
 
+## 🔴 Meta 환경 메시지 포맷 (NON-NEGOTIABLE)
+
+> **⚠️ Meta 환경에서는 모든 시스템 메시지에 `[META]` 태그를 포함해야 합니다.**
+
+### Meta 환경 감지
+
+```bash
+# semo-system/meta 디렉토리 존재 시 Meta 환경
+if [ -d "semo-system/meta" ]; then
+  IS_META_ENV=true
+fi
+```
+
+### 메시지 포맷 규칙
+
+| 기본 포맷 | Meta 환경 포맷 |
+|----------|---------------|
+| `[SEMO] Orchestrator: ...` | `[SEMO] - [META] Orchestrator: ...` |
+| `[SEMO] Skill: ...` | `[SEMO] - [META] Skill: ...` |
+| `[SEMO] Agent: ...` | `[SEMO] - [META] Agent: ...` |
+
+### 예시
+
+```markdown
+[SEMO] - [META] Orchestrator: 의도 분석 완료 → 스킬 생성
+[SEMO] - [META] Skill: skill-creator 새 스킬을 생성합니다.
+[SEMO] - [META] 버저닝 완료: semo-skills 1.15.0 → 1.16.0
+[SEMO] - [META] git push 완료
+```
+
+> 🔴 **Meta 환경에서 `[META]` 태그 없이 메시지 출력 금지**
+
+---
+
 ## 🔴 Orchestrator-First (최우선 규칙)
 
 > **⚠️ 이 규칙은 예외 없이 적용됩니다. 직접 처리 절대 금지.**
@@ -36,9 +70,9 @@
 **접두사 감지 시 첫 출력**:
 
 ```markdown
-[SEMO] Orchestrator: 의도 분석 완료 → {intent_category}
+[SEMO] - [META] Orchestrator: 의도 분석 완료 → {intent_category}
 
-[SEMO] Agent 위임: {agent_name} (사유: {reason})
+[SEMO] - [META] Agent 위임: {agent_name} (사유: {reason})
 ```
 
 > 🔴 이 메시지 없이 작업 진행 금지
