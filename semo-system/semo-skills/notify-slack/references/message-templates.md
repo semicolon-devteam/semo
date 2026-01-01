@@ -83,11 +83,13 @@ semo-meta          v0.30.0
 ### curl 명령어 예시 (heredoc 방식 권장)
 
 > **⚠️ 중요**: 쉘 이스케이프 문제를 방지하기 위해 **heredoc 방식**을 사용하세요.
+> **토큰 획득**: `mcp__semo-integrations__semo_get_slack_token()` 호출 후 사용
 
 ```bash
 # ✅ 권장: heredoc 방식 (쉘 이스케이프 문제 방지)
+# TOKEN은 mcp__semo-integrations__semo_get_slack_token()에서 획득
 curl -s -X POST 'https://slack.com/api/chat.postMessage' \
-  -H 'Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7' \
+  -H 'Authorization: Bearer {TOKEN}' \
   -H 'Content-Type: application/json; charset=utf-8' \
   -d @- << 'EOF'
 {
@@ -271,12 +273,21 @@ EOF
 
 ## curl 명령어 템플릿
 
+### 토큰 획득
+
+```
+mcp__semo-integrations__semo_get_slack_token()
+```
+
+응답에서 `token:` 접두사 뒤의 토큰 값을 추출합니다.
+
 ### 파일 기반 방식
 
 ```bash
 # message.json 파일에 메시지 저장 후 전송
+# TOKEN은 mcp__semo-integrations__semo_get_slack_token()에서 획득
 curl -s -X POST 'https://slack.com/api/chat.postMessage' \
-  -H 'Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7' \
+  -H 'Authorization: Bearer {TOKEN}' \
   -H 'Content-Type: application/json; charset=utf-8' \
   -d '@message.json'
 ```
@@ -285,8 +296,9 @@ curl -s -X POST 'https://slack.com/api/chat.postMessage' \
 
 ```bash
 # 쉘 이스케이프 문제 없이 직접 전송
+# TOKEN은 mcp__semo-integrations__semo_get_slack_token()에서 획득
 curl -s -X POST 'https://slack.com/api/chat.postMessage' \
-  -H 'Authorization: Bearer xoxb-891491331223-9421307124626-IytLQOaiaN2R97EMUdElgdX7' \
+  -H 'Authorization: Bearer {TOKEN}' \
   -H 'Content-Type: application/json; charset=utf-8' \
   -d @- << 'EOF'
 {

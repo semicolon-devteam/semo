@@ -3,7 +3,7 @@ name: request-test
 description: |
   QA 테스트 요청 스킬. Use when (1) 태스크카드 테스트 요청,
   (2) QA 담당자 할당, (3) 테스트 범위 지정, (4) Slack 알림 전송.
-tools: [Read, Bash, mcp__github__update_issue, mcp__github__get_issue, mcp__semo-integrations__slack_lookup_user, mcp__semo-integrations__slack_send_message]
+tools: [Read, Bash, mcp__semo-integrations__semo_get_slack_token]
 model: inherit
 ---
 
@@ -16,11 +16,12 @@ model: inherit
 ## Purpose
 
 개발 완료된 태스크카드에 대해 QA 테스트를 요청합니다.
+
 - GitHub 이슈 Assignee 할당
 - Slack 알림 발송
 - 테스트 항목 검증
 
-## 🔴 필수 조건 (NON-NEGOTIABLE)
+## 필수 조건
 
 ### 1. 프로젝트 및 태스크카드 지정
 
@@ -32,11 +33,13 @@ model: inherit
 ### 2. QA 테스트 항목 존재 검증
 
 태스크카드 본문에 다음 중 하나 이상 포함 필수:
+
 - `## QA 테스트 항목` 섹션
 - `## 테스트 항목` 섹션
 - `- [ ]` 체크박스 형태의 테스트 케이스
 
 **검증 실패 시**:
+
 ```markdown
 [SEMO] request-test 실패
 
@@ -61,59 +64,73 @@ model: inherit
 ## Execution Flow
 
 ```text
-1. 태스크카드(이슈) 정보 조회
+1. 이슈 정보 조회 (gh CLI)
    ↓
 2. QA 테스트 항목 존재 검증
    ↓
-3. GitHub 이슈 Assignee 할당 (kokkh)
+3. GitHub 이슈 Assignee 할당 (gh CLI)
    ↓
-4. Slack 사용자 ID 조회 (Goni)
+4. Slack Token 획득 (MCP)
    ↓
-5. Slack 테스트 요청 메시지 발송
+5. Slack 사용자 ID 조회 + 알림 발송 (curl)
 ```
 
 ## Step-by-Step Instructions
 
-### Step 1: 이슈 정보 조회
+### Step 1: 이슈 정보 조회 (gh CLI)
 
-```
-mcp__github__get_issue(
-  owner: "semicolon-devteam",
-  repo: "{프로젝트}",
-  issue_number: {이슈번호}
-)
+```bash
+gh issue view {이슈번호} --repo semicolon-devteam/{프로젝트} --json title,body,url
 ```
 
 ### Step 2: QA 테스트 항목 검증
 
 이슈 body에서 다음 패턴 확인:
+
 - `## QA 테스트 항목` 또는 `## 테스트 항목`
 - `- [ ]` 체크박스 최소 1개 이상
 
-### Step 3: Assignee 할당
+### Step 3: Assignee 할당 (gh CLI)
 
-```
-mcp__github__update_issue(
-  owner: "semicolon-devteam",
-  repo: "{프로젝트}",
-  issue_number: {이슈번호},
-  assignees: ["kokkh"]
-)
+```bash
+gh issue edit {이슈번호} --repo semicolon-devteam/{프로젝트} --add-assignee kokkh
 ```
 
-### Step 4: Slack ID 조회
+### Step 4: Slack Token 획득
 
-```
-mcp__semo-integrations__slack_lookup_user(name: "Goni")
+```text
+mcp__semo-integrations__semo_get_slack_token()
 ```
 
-### Step 5: Slack 알림 발송
+응답에서 `token:` 접두사 뒤의 토큰 값을 추출합니다.
 
-```
-mcp__semo-integrations__slack_send_message(
-  channel: "#_협업",
-  text: "🧪 *QA 테스트 요청*\n\n<@{SLACK_ID}> 님, 테스트 요청드립니다.\n\n📋 *이슈*: {이슈 제목}\n🔗 *링크*: {이슈 URL}\n📝 *요청자*: {요청자}\n\n테스트 항목을 확인하고 완료 시 체크해주세요!"
-)
+### Step 5: Slack 사용자 ID 조회 + 알림 발송
+
+```bash
+# 사용자 ID 조회
+curl -s 'https://slack.com/api/users.list' \
+  -H 'Authorization: Bearer {TOKEN}' | \
+  jq -r '.members[] | select(.profile.display_name=="Goni") | .id'
+
+# 알림 발송 (heredoc 방식)
+curl -s -X POST 'https://slack.com/api/chat.postMessage' \
+  -H 'Authorization: Bearer {TOKEN}' \
+  -H 'Content-Type: application/json; charset=utf-8' \
+  -d @- << 'EOF'
+{
+  "channel": "C09KNL91QBZ",
+  "text": "QA 테스트 요청",
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "🧪 *QA 테스트 요청*\n\n<@{SLACK_ID}> 님, 테스트 요청드립니다.\n\n📋 *이슈*: {이슈 제목}\n🔗 *링크*: {이슈 URL}\n📝 *요청자*: {요청자}\n\n테스트 항목을 확인하고 완료 시 체크해주세요!"
+      }
+    }
+  ]
+}
+EOF
 ```
 
 ## Output
