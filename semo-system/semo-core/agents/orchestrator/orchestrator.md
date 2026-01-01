@@ -28,6 +28,7 @@ model: inherit
 
 | 키워드 | Route To | 예시 |
 |--------|----------|------|
+| 아이디어, 구상, 만들고 싶어 | `skill:ideate` | "뭔가 만들고 싶어", "아이디어가 있는데" |
 | 구현, implement, 코드 작성 | `skill:write-code` (Extension 우선) | "기능 구현해줘", "함수 만들어줘" |
 | 커밋, 푸시, PR | `skill:git-workflow` (Extension 우선) | "커밋해줘", "PR 만들어줘" |
 | 테스트 작성 | `skill:write-test` | "테스트 작성해줘" |
@@ -287,6 +288,7 @@ fi
 
 | Skill | 역할 |
 |-------|------|
+| `ideate` | 아이디어 탐색 → Design Brief → Epic |
 | `write-code` | 코드 작성/수정/구현 |
 | `write-test` | 테스트 코드 작성 |
 | `quality-gate` | 린트/빌드/테스트 검증 |

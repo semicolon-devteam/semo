@@ -92,24 +92,7 @@ function getSlackToken(): string {
   return "";
 }
 
-// GitHub 토큰 (개인 토큰 필요)
-function getGithubToken(): string {
-  // 1. 환경변수 우선 (개인 토큰)
-  if (process.env.GITHUB_TOKEN) {
-    return process.env.GITHUB_TOKEN;
-  }
-  // 2. 암호화된 팀 토큰 (있는 경우)
-  if (hasEncryptedToken("GITHUB_APP_TOKEN")) {
-    const decrypted = decrypt(ENCRYPTED_TOKENS.GITHUB_APP_TOKEN);
-    if (decrypted) return decrypted;
-  }
-  return "";
-}
-
 // 환경 변수
-const SLACK_BOT_TOKEN = getSlackToken();
-const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID || "C09KNL91QBZ";
-const GITHUB_TOKEN = getGithubToken();
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_KEY;
 
@@ -117,7 +100,7 @@ const SUPABASE_KEY = process.env.SUPABASE_KEY;
 const server = new Server(
   {
     name: "semo-integrations",
-    version: "2.0.0",
+    version: "2.5.0",
   },
   {
     capabilities: {
@@ -132,134 +115,14 @@ const server = new Server(
 server.setRequestHandler(ListToolsRequestSchema, async () => {
   return {
     tools: [
-      // === Slack Integration ===
+      // === Slack Token (토큰 조회만 제공, 실제 API 호출은 Skill에서 curl로) ===
       {
-        name: "slack_send_message",
-        description: "Slack 채널에 메시지를 전송합니다. (semo-integrations/slack/notify)",
+        name: "semo_get_slack_token",
+        description: "MCP 서버에서 관리하는 Slack Bot Token을 조회합니다. notify-slack 스킬에서 curl 호출 시 사용합니다.",
         inputSchema: {
           type: "object",
-          properties: {
-            channel: {
-              type: "string",
-              description: "채널 ID 또는 이름 (예: 'C09KNL91QBZ' 또는 '#_협업')",
-            },
-            text: {
-              type: "string",
-              description: "메시지 텍스트",
-            },
-            blocks: {
-              type: "string",
-              description: "Block Kit JSON (선택사항)",
-            },
-          },
-          required: ["text"],
-        },
-      },
-      {
-        name: "slack_lookup_user",
-        description: "Slack 사용자 ID를 조회합니다. 멘션용 ID를 얻을 때 사용합니다.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            name: {
-              type: "string",
-              description: "사용자 display_name, name, 또는 real_name",
-            },
-          },
-          required: ["name"],
-        },
-      },
-      {
-        name: "slack_list_channels",
-        description: "Slack 채널 목록을 조회합니다. 채널명으로 검색하거나 전체 목록을 가져옵니다.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            search: {
-              type: "string",
-              description: "검색할 채널명 (부분 일치, 선택사항)",
-            },
-            limit: {
-              type: "number",
-              description: "반환할 최대 채널 수 (기본: 100)",
-            },
-          },
+          properties: {},
           required: [],
-        },
-      },
-      {
-        name: "slack_find_channel",
-        description: "채널명으로 Slack 채널을 찾고, 없으면 Fallback 채널을 반환합니다. notify-slack에서 동적 채널 조회에 사용합니다.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            name: {
-              type: "string",
-              description: "찾을 채널명 (예: 'semo', 'cm-labor-union')",
-            },
-            fallback: {
-              type: "string",
-              description: "Fallback 채널 (기본: '#_협업')",
-            },
-          },
-          required: ["name"],
-        },
-      },
-      // === GitHub Integration ===
-      {
-        name: "github_create_issue",
-        description: "GitHub 이슈를 생성합니다. (semo-integrations/github/issues)",
-        inputSchema: {
-          type: "object",
-          properties: {
-            repo: {
-              type: "string",
-              description: "레포지토리 (예: 'semicolon-devteam/semo')",
-            },
-            title: {
-              type: "string",
-              description: "이슈 제목",
-            },
-            body: {
-              type: "string",
-              description: "이슈 본문",
-            },
-            labels: {
-              type: "string",
-              description: "라벨 (쉼표 구분)",
-            },
-          },
-          required: ["repo", "title", "body"],
-        },
-      },
-      {
-        name: "github_create_pr",
-        description: "GitHub PR을 생성합니다. (semo-integrations/github/pr)",
-        inputSchema: {
-          type: "object",
-          properties: {
-            repo: {
-              type: "string",
-              description: "레포지토리 (예: 'semicolon-devteam/semo')",
-            },
-            title: {
-              type: "string",
-              description: "PR 제목",
-            },
-            body: {
-              type: "string",
-              description: "PR 본문",
-            },
-            head: {
-              type: "string",
-              description: "소스 브랜치",
-            },
-            base: {
-              type: "string",
-              description: "타겟 브랜치 (기본: main)",
-            },
-          },
-          required: ["repo", "title", "head"],
         },
       },
       // === Supabase Integration ===
@@ -576,489 +439,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 
   switch (name) {
-    // === Slack Tools ===
-    case "slack_send_message": {
-      const channel = (args?.channel as string) || SLACK_CHANNEL_ID;
-      const text = args?.text as string;
-      const blocksJson = args?.blocks as string;
-
-      try {
-        const body: Record<string, unknown> = { channel, text };
-        if (blocksJson) {
-          body.blocks = JSON.parse(blocksJson);
-        }
-
-        const response = await fetch("https://slack.com/api/chat.postMessage", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${SLACK_BOT_TOKEN}`,
-            "Content-Type": "application/json; charset=utf-8",
-          },
-          body: JSON.stringify(body),
-        });
-
-        const result = await response.json() as { ok: boolean; error?: string; ts?: string };
-
-        if (result.ok) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `[SEMO] Integration: slack/notify 완료\n\n✅ 메시지 전송 성공\n채널: ${channel}\nts: ${result.ts}`,
-              },
-            ],
-          };
-        } else {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `[SEMO] Integration: slack/notify 실패\n\n❌ 오류: ${result.error}`,
-              },
-            ],
-          };
-        }
-      } catch (error) {
+    // === Slack Token Tool ===
+    case "semo_get_slack_token": {
+      const token = getSlackToken();
+      if (token) {
         return {
           content: [
             {
               type: "text",
-              text: `[SEMO] Integration: slack/notify 오류\n\n❌ ${error}`,
+              text: `token:${token}`,
             },
           ],
         };
-      }
-    }
-
-    case "slack_lookup_user": {
-      const searchName = args?.name as string;
-
-      try {
-        const response = await fetch("https://slack.com/api/users.list", {
-          headers: {
-            "Authorization": `Bearer ${SLACK_BOT_TOKEN}`,
-          },
-        });
-
-        const result = await response.json() as {
-          ok: boolean;
-          members?: Array<{
-            id: string;
-            name: string;
-            real_name: string;
-            deleted: boolean;
-            is_bot: boolean;
-            profile: { display_name: string };
-          }>;
-        };
-
-        if (result.ok && result.members) {
-          const user = result.members.find(
-            (m) =>
-              !m.deleted &&
-              !m.is_bot &&
-              (m.profile.display_name.toLowerCase() === searchName.toLowerCase() ||
-                m.name.toLowerCase() === searchName.toLowerCase() ||
-                m.real_name.toLowerCase() === searchName.toLowerCase())
-          );
-
-          if (user) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: `[SEMO] Slack 사용자 조회 완료\n\nID: ${user.id}\n이름: ${user.profile.display_name || user.name}\n멘션: <@${user.id}>`,
-                },
-              ],
-            };
-          } else {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: `[SEMO] 사용자 '${searchName}'을 찾을 수 없습니다.`,
-                },
-              ],
-            };
-          }
-        }
-
+      } else {
         return {
           content: [
             {
               type: "text",
-              text: `[SEMO] Slack API 오류`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `[SEMO] 오류: ${error}`,
-            },
-          ],
-        };
-      }
-    }
-
-    case "slack_list_channels": {
-      const search = args?.search as string | undefined;
-      const limit = (args?.limit as number) || 100;
-
-      try {
-        const response = await fetch(
-          `https://slack.com/api/conversations.list?types=public_channel&limit=${Math.min(limit, 1000)}`,
-          {
-            headers: {
-              "Authorization": `Bearer ${SLACK_BOT_TOKEN}`,
-            },
-          }
-        );
-
-        const result = await response.json() as {
-          ok: boolean;
-          error?: string;
-          channels?: Array<{
-            id: string;
-            name: string;
-            is_archived: boolean;
-            num_members: number;
-          }>;
-        };
-
-        if (result.ok && result.channels) {
-          let channels = result.channels.filter((c) => !c.is_archived);
-
-          if (search) {
-            const searchLower = search.toLowerCase().replace(/^#_?/, "");
-            channels = channels.filter((c) =>
-              c.name.toLowerCase().includes(searchLower)
-            );
-          }
-
-          const channelList = channels
-            .slice(0, limit)
-            .map((c) => `#${c.name} (${c.id}, ${c.num_members}명)`)
-            .join("\n");
-
-          return {
-            content: [
-              {
-                type: "text",
-                text: `[SEMO] Slack 채널 목록 (${channels.length}개)\n\n${channelList || "검색 결과 없음"}`,
-              },
-            ],
-          };
-        } else {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `[SEMO] Slack 채널 조회 실패: ${result.error}`,
-              },
-            ],
-          };
-        }
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `[SEMO] 오류: ${error}`,
-            },
-          ],
-        };
-      }
-    }
-
-    case "slack_find_channel": {
-      const channelName = args?.name as string;
-      const fallback = (args?.fallback as string) || "#_협업";
-
-      try {
-        const response = await fetch(
-          "https://slack.com/api/conversations.list?types=public_channel&limit=1000",
-          {
-            headers: {
-              "Authorization": `Bearer ${SLACK_BOT_TOKEN}`,
-            },
-          }
-        );
-
-        const result = await response.json() as {
-          ok: boolean;
-          error?: string;
-          channels?: Array<{
-            id: string;
-            name: string;
-            is_archived: boolean;
-          }>;
-        };
-
-        if (result.ok && result.channels) {
-          const activeChannels = result.channels.filter((c) => !c.is_archived);
-          const searchName = channelName.toLowerCase().replace(/^#_?/, "");
-
-          // 1차: 정확히 일치 (#{name})
-          let found = activeChannels.find((c) => c.name.toLowerCase() === searchName);
-
-          // 2차: 언더스코어 접두사 (#{_name})
-          if (!found) {
-            found = activeChannels.find((c) => c.name.toLowerCase() === `_${searchName}`);
-          }
-
-          // 3차: 부분 일치
-          if (!found) {
-            found = activeChannels.find((c) => c.name.toLowerCase().includes(searchName));
-          }
-
-          if (found) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: `[SEMO] 채널 찾음\n\n채널: #${found.name}\nID: ${found.id}\n상태: 사용 가능`,
-                },
-              ],
-            };
-          } else {
-            // Fallback 채널 찾기
-            const fallbackName = fallback.replace(/^#_?/, "");
-            const fallbackChannel = activeChannels.find(
-              (c) => c.name.toLowerCase() === fallbackName || c.name.toLowerCase() === `_${fallbackName}`
-            );
-
-            if (fallbackChannel) {
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: `[SEMO] 채널 '${channelName}' 없음 → Fallback 사용\n\n채널: #${fallbackChannel.name}\nID: ${fallbackChannel.id}\n원래 요청: ${channelName}`,
-                  },
-                ],
-              };
-            } else {
-              return {
-                content: [
-                  {
-                    type: "text",
-                    text: `[SEMO] 채널 '${channelName}' 및 Fallback '${fallback}' 모두 없음`,
-                  },
-                ],
-              };
-            }
-          }
-        } else {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `[SEMO] Slack API 오류: ${result.error}`,
-              },
-            ],
-          };
-        }
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `[SEMO] 오류: ${error}`,
-            },
-          ],
-        };
-      }
-    }
-
-    // === GitHub Tools ===
-    case "github_create_issue": {
-      const repo = args?.repo as string;
-      const title = args?.title as string;
-      const body = args?.body as string;
-      const labels = args?.labels as string;
-
-      // API 토큰이 있으면 직접 API 호출
-      if (GITHUB_TOKEN) {
-        try {
-          const response = await fetch(`https://api.github.com/repos/${repo}/issues`, {
-            method: "POST",
-            headers: {
-              "Authorization": `token ${GITHUB_TOKEN}`,
-              "Content-Type": "application/json",
-              "Accept": "application/vnd.github.v3+json",
-            },
-            body: JSON.stringify({
-              title,
-              body,
-              labels: labels ? labels.split(",").map((l) => l.trim()) : undefined,
-            }),
-          });
-
-          const result = await response.json() as { html_url?: string; number?: number; message?: string };
-
-          if (result.html_url) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: `[SEMO] Integration: github/issues 완료\n\n✅ 이슈 생성됨: #${result.number}\n${result.html_url}`,
-                },
-              ],
-            };
-          } else {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: `[SEMO] Integration: github/issues 실패\n\n❌ ${result.message}`,
-                },
-              ],
-            };
-          }
-        } catch (error) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `[SEMO] Integration: github/issues 오류\n\n❌ ${error}`,
-              },
-            ],
-          };
-        }
-      }
-
-      // 토큰 없으면 gh CLI 사용 (직접 실행)
-      try {
-        const { execSync } = await import("child_process");
-        const labelFlag = labels ? ` --label "${labels}"` : "";
-        // body를 파일로 저장하여 긴 텍스트 처리
-        const fs = await import("fs");
-        const os = await import("os");
-        const path = await import("path");
-        const tmpFile = path.join(os.tmpdir(), `semo-issue-${Date.now()}.md`);
-        fs.writeFileSync(tmpFile, body);
-
-        const cmd = `gh issue create --repo ${repo} --title "${title.replace(/"/g, '\\"')}" --body-file "${tmpFile}"${labelFlag}`;
-        const result = execSync(cmd, { encoding: "utf-8" });
-
-        // 임시 파일 정리
-        fs.unlinkSync(tmpFile);
-
-        // gh issue create는 URL을 반환함
-        const urlMatch = result.match(/https:\/\/github\.com\/[^\s]+/);
-        const issueUrl = urlMatch ? urlMatch[0] : result.trim();
-        const issueNumberMatch = issueUrl.match(/\/issues\/(\d+)/);
-        const issueNumber = issueNumberMatch ? issueNumberMatch[1] : "?";
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: `[SEMO] Integration: github/issues 완료\n\n✅ 이슈 생성됨: #${issueNumber}\n${issueUrl}`,
-            },
-          ],
-        };
-      } catch (error) {
-        // gh CLI 실패 시 명령어 안내
-        return {
-          content: [
-            {
-              type: "text",
-              text: `[SEMO] Integration: github/issues 오류\n\n❌ gh CLI 실행 실패: ${error}\n\n수동으로 이슈를 생성하세요:\ngh issue create --repo ${repo} --title "${title}" --body "..."${labels ? ` --label "${labels}"` : ""}`,
-            },
-          ],
-        };
-      }
-    }
-
-    case "github_create_pr": {
-      const repo = args?.repo as string;
-      const title = args?.title as string;
-      const body = (args?.body as string) || "";
-      const head = args?.head as string;
-      const base = (args?.base as string) || "main";
-
-      // API 토큰이 있으면 직접 API 호출
-      if (GITHUB_TOKEN) {
-        try {
-          const response = await fetch(`https://api.github.com/repos/${repo}/pulls`, {
-            method: "POST",
-            headers: {
-              "Authorization": `token ${GITHUB_TOKEN}`,
-              "Content-Type": "application/json",
-              "Accept": "application/vnd.github.v3+json",
-            },
-            body: JSON.stringify({ title, body, head, base }),
-          });
-
-          const result = await response.json() as { html_url?: string; number?: number; message?: string };
-
-          if (result.html_url) {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: `[SEMO] Integration: github/pr 완료\n\n✅ PR 생성됨: #${result.number}\n${result.html_url}`,
-                },
-              ],
-            };
-          } else {
-            return {
-              content: [
-                {
-                  type: "text",
-                  text: `[SEMO] Integration: github/pr 실패\n\n❌ ${result.message}`,
-                },
-              ],
-            };
-          }
-        } catch (error) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: `[SEMO] Integration: github/pr 오류\n\n❌ ${error}`,
-              },
-            ],
-          };
-        }
-      }
-
-      // 토큰 없으면 gh CLI 사용 (직접 실행)
-      try {
-        const { execSync } = await import("child_process");
-        const fs = await import("fs");
-        const os = await import("os");
-        const path = await import("path");
-        const tmpFile = path.join(os.tmpdir(), `semo-pr-${Date.now()}.md`);
-        fs.writeFileSync(tmpFile, body);
-
-        const cmd = `gh pr create --repo ${repo} --title "${title.replace(/"/g, '\\"')}" --body-file "${tmpFile}" --head ${head} --base ${base}`;
-        const result = execSync(cmd, { encoding: "utf-8" });
-
-        fs.unlinkSync(tmpFile);
-
-        const urlMatch = result.match(/https:\/\/github\.com\/[^\s]+/);
-        const prUrl = urlMatch ? urlMatch[0] : result.trim();
-        const prNumberMatch = prUrl.match(/\/pull\/(\d+)/);
-        const prNumber = prNumberMatch ? prNumberMatch[1] : "?";
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: `[SEMO] Integration: github/pr 완료\n\n✅ PR 생성됨: #${prNumber}\n${prUrl}`,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `[SEMO] Integration: github/pr 오류\n\n❌ gh CLI 실행 실패: ${error}\n\n수동으로 PR을 생성하세요:\ngh pr create --repo ${repo} --title "${title}" --body "..." --head ${head} --base ${base}`,
+              text: `[SEMO] Slack Token 조회 실패\n\n❌ SLACK_BOT_TOKEN 환경변수 또는 암호화된 토큰이 설정되지 않았습니다.`,
             },
           ],
         };
@@ -1740,20 +1138,30 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
                 type: "Black Box (MCP)",
                 integrations: [
                   {
-                    name: "github",
-                    modules: ["issues", "pr", "actions"],
-                    tools: ["github_create_issue", "github_create_pr"],
-                  },
-                  {
-                    name: "slack",
-                    modules: ["notify", "feedback"],
-                    tools: ["slack_send_message", "slack_lookup_user", "slack_list_channels", "slack_find_channel"],
-                  },
-                  {
                     name: "supabase",
                     modules: ["query", "sync"],
                     tools: ["supabase_query"],
                   },
+                  {
+                    name: "memory",
+                    modules: ["remember", "recall", "facts", "history"],
+                    tools: ["semo_remember", "semo_recall", "semo_save_fact", "semo_get_facts", "semo_get_history", "semo_memory_status", "semo_process_embeddings", "semo_recall_smart"],
+                  },
+                  {
+                    name: "remote",
+                    modules: ["request", "respond", "pending"],
+                    tools: ["semo_remote_request", "semo_remote_respond", "semo_remote_pending"],
+                  },
+                  {
+                    name: "tokens",
+                    modules: ["slack"],
+                    tools: ["semo_get_slack_token"],
+                    description: "Slack API 호출용 토큰 조회. 실제 API 호출은 Skill에서 curl로 수행.",
+                  },
+                ],
+                deprecated: [
+                  { name: "github", reason: "gh CLI 사용", migration: "gh issue create, gh pr create" },
+                  { name: "slack", reason: "curl + semo_get_slack_token 사용", migration: "curl -H 'Authorization: Bearer {token}'" },
                 ],
               },
               null,
@@ -1824,8 +1232,9 @@ async function main() {
 
   // 메모리 시스템 상태 로깅
   const memoryStatus = isMemoryEnabled() ? "enabled" : "disabled (set SEMO_DB_PASSWORD)";
-  console.error("[SEMO MCP] Server v2.1.0 started (Hybrid Strategy)");
-  console.error("[SEMO MCP] Integrations: github, slack, supabase, memory");
+  console.error("[SEMO MCP] Server v2.5.0 started");
+  console.error("[SEMO MCP] Integrations: supabase, memory, remote, tokens");
+  console.error("[SEMO MCP] Deprecated: github (use gh CLI), slack (use curl + semo_get_slack_token)");
   console.error(`[SEMO MCP] Long-term Memory: ${memoryStatus}`);
 
   // 세션 시작 로깅 (메모리 활성화 시)
@@ -1846,7 +1255,7 @@ async function main() {
       sessionId,
       role: "assistant",
       content: "[SEMO MCP] Server started",
-      metadata: { event: "server_start", version: "2.1.0" },
+      metadata: { event: "server_start", version: "2.5.0" },
     });
   }
 }
