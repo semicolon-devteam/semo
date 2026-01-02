@@ -3179,8 +3179,95 @@ program
             }
         }
     }
-    // 5. 전체 설치 검증
-    console.log(chalk_1.default.cyan("\n5. 전체 설치 검증"));
+    // 5. semo-mcp (MCP 서버) 상태 확인
+    // v3.0: semo-mcp는 Memory + Remote만 제공 (선택사항)
+    // Slack/GitHub/Supabase는 스킬에서 CLI 직접 호출
+    console.log(chalk_1.default.cyan("\n5. semo-mcp (MCP 서버) - 선택사항"));
+    const userHomeDir = process.env.HOME || process.env.USERPROFILE || "";
+    const claudeSettingsPath = path.join(userHomeDir, ".claude", "settings.local.json");
+    // MCP 서버 설정 확인
+    if (!fs.existsSync(claudeSettingsPath)) {
+        console.log(chalk_1.default.gray("   ⏭️ settings.local.json 없음 (MCP 미사용)"));
+        console.log(chalk_1.default.gray("   💡 장기 기억이 필요하면 semo-mcp 설정 추가"));
+    }
+    else {
+        try {
+            const settings = JSON.parse(fs.readFileSync(claudeSettingsPath, "utf-8"));
+            const mcpServers = settings.mcpServers || {};
+            // semo-integrations MCP 서버 확인
+            const semoMcp = mcpServers["semo-integrations"];
+            if (!semoMcp) {
+                console.log(chalk_1.default.gray("   ⏭️ semo-integrations 미등록 (선택사항)"));
+                console.log(chalk_1.default.gray("   💡 장기 기억/원격 제어가 필요하면 MCP 설정 추가"));
+            }
+            else {
+                console.log(chalk_1.default.green("   ✅ semo-integrations MCP 서버 등록됨"));
+                // 명령어 경로 확인
+                const mcpCommand = semoMcp.command || "";
+                const mcpArgs = semoMcp.args || [];
+                if (mcpCommand === "npx") {
+                    console.log(chalk_1.default.green("   ✅ npx 방식 실행 (자동 업데이트)"));
+                }
+                else if (mcpCommand === "node") {
+                    const scriptPath = mcpArgs[0] || "";
+                    if (scriptPath && fs.existsSync(scriptPath)) {
+                        console.log(chalk_1.default.green(`   ✅ 로컬 스크립트: ${scriptPath}`));
+                    }
+                    else if (scriptPath) {
+                        console.log(chalk_1.default.red(`   ❌ 스크립트 경로 없음: ${scriptPath}`));
+                    }
+                }
+                // v3.0: 환경변수 체크 - SEMO_DB_PASSWORD만 확인 (장기 기억용)
+                const env = semoMcp.env || {};
+                if (env["SEMO_DB_PASSWORD"]) {
+                    console.log(chalk_1.default.green("   ✅ 장기 기억: 활성화 (SEMO_DB_PASSWORD 설정됨)"));
+                }
+                else {
+                    console.log(chalk_1.default.gray("   ⏭️ 장기 기억: 비활성화"));
+                    console.log(chalk_1.default.gray("      💡 SEMO_DB_PASSWORD 설정 시 활성화"));
+                }
+                // v3.0: 도구 목록 업데이트 (Memory + Remote만)
+                const v3Tools = [
+                    // Memory
+                    "semo_remember", "semo_recall", "semo_save_fact",
+                    "semo_get_facts", "semo_get_history", "semo_memory_status",
+                    "semo_process_embeddings", "semo_recall_smart",
+                    // Remote
+                    "semo_remote_request", "semo_remote_respond", "semo_remote_pending",
+                ];
+                console.log(chalk_1.default.gray(`   📦 제공 도구: ${v3Tools.length}개 (Memory ${8}, Remote ${3})`));
+            }
+            // 다른 MCP 서버 확인
+            const otherServers = Object.keys(mcpServers).filter(k => k !== "semo-integrations");
+            if (otherServers.length > 0) {
+                console.log(chalk_1.default.gray(`   📡 기타 MCP 서버: ${otherServers.join(", ")}`));
+            }
+        }
+        catch {
+            console.log(chalk_1.default.red("   ❌ settings.local.json 파싱 오류"));
+        }
+    }
+    // 5-1. CLI 도구 확인 (v3.0: 스킬에서 CLI 직접 호출)
+    console.log(chalk_1.default.cyan("\n5-1. CLI 도구 (Skill용)"));
+    const cliTools = [
+        { name: "gh", desc: "GitHub CLI", check: "gh --version" },
+        { name: "supabase", desc: "Supabase CLI", check: "supabase --version" },
+    ];
+    for (const tool of cliTools) {
+        try {
+            const { execSync } = require("child_process");
+            const version = execSync(tool.check, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim().split("\n")[0];
+            console.log(chalk_1.default.green(`   ✅ ${tool.name}: ${version}`));
+        }
+        catch {
+            console.log(chalk_1.default.yellow(`   ⚠️ ${tool.name} 미설치 (${tool.desc})`));
+            console.log(chalk_1.default.gray(`      💡 일부 스킬 기능이 제한될 수 있습니다`));
+        }
+    }
+    // Slack은 curl로 호출하므로 별도 체크 불필요
+    console.log(chalk_1.default.gray("   ℹ️ Slack: curl 사용 (별도 CLI 불필요)"));
+    // 6. 전체 설치 검증
+    console.log(chalk_1.default.cyan("\n6. 전체 설치 검증"));
     const verificationResult = verifyInstallation(cwd, []);
     if (verificationResult.success) {
         console.log(chalk_1.default.green("   ✅ 설치 상태 정상"));

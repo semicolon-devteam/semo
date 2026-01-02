@@ -1,7 +1,7 @@
 {
   "name": "@team-semicolon/semo-mcp",
-  "version": "2.5.0",
-  "description": "SEMO MCP Server - Integrations (GitHub, Slack, Supabase) for Claude Code",
+  "version": "3.0.0",
+  "description": "SEMO MCP Server - Memory & Remote for Claude Code (v3: CLI-first approach)",
   "main": "dist/index.js",
   "bin": {
     "semo-mcp": "./dist/index.js"
