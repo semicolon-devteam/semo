@@ -1,10 +1,13 @@
 ---
 name: create-epic
-description: Create Epic issue in docs repository. Use when (1) epic-master needs to create new Epic from PO/기획자 requirements, (2) migrating Epic from another repository, (3) converting requirements into GitHub Issue with epic-template.
+description: |
+  Create Epic issue in docs repository. Use when (1) ideate 스킬에서 자동 호출,
+  (2) epic-master needs to create new Epic, (3) Design Brief → Epic 변환,
+  (4) converting requirements into GitHub Issue.
 tools: [Bash, Read, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: create-epic 호출 - {Epic 제목}` 시스템 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: `[SEMO] Skill: create-epic 호출 - {Epic 제목}`
 
 # create-epic Skill
 
@@ -12,7 +15,15 @@ tools: [Bash, Read, GitHub CLI]
 
 ## 개요
 
-PO/기획자가 정의한 요구사항을 GitHub Issue로 생성합니다.
+Design Brief 또는 PO/기획자 요구사항을 GitHub Epic Issue로 생성합니다.
+
+## 호출 방식
+
+| 호출자 | 입력 | 특징 |
+|--------|------|------|
+| `ideate` 스킬 | Design Brief + dev-checklist | 자동 연계, 검증 완료 상태 |
+| `epic-master` 에이전트 | 요구사항 정보 | 수동 정보 수집 |
+| 직접 호출 | 사용자 입력 | dev-checklist 수동 검증 |
 
 ## 🔴 개발자 관점 체크리스트 (필수)
 
@@ -163,12 +174,11 @@ gh api graphql -f query='
 
 ## Related
 
+- `ideate` - 아이디어 탐색 → Epic 원스톱 워크플로우 (이 스킬 자동 호출)
+- `epic-master` Agent - 요구사항 수집 후 이 스킬 호출
 - [Epic Template](../templates/epic-template.md)
-- [epic-master Agent](../agents/epic-master.md)
 
 ## References
-
-For detailed documentation, see:
 
 - [Workflow](references/workflow.md) - 입력 스키마, 상세 동작 프로세스
 - [Output Format](references/output-format.md) - 성공 출력, 에러 처리

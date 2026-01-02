@@ -9,37 +9,57 @@ location: project
 
 # Create Issues Skill
 
-**Purpose**: Automated GitHub Issues creation from tasks.md with Epic linking and metadata
+**Purpose**: specs/ 폴더의 산출물을 기반으로 협업 중심의 완성된 GitHub Issues 생성
+
+## 핵심 원칙
+
+> **Source of Truth**: specs/ 폴더가 상세 명세의 진실 소스
+> **Issue 역할**: 협업 허브 (진행상황 추적, AC 체크, 테스트 결과)
 
 ## Quick Start
 
 ### Input
 
 - `tasks.md` file from `skill:spec`
+- `spec.md` for AC and test cases extraction
 - Optional: Epic number or create new Epic
 - Optional: Custom labels
 
 ### Process
 
-1. **Parse tasks.md** → Extract tasks by DDD layer (CONFIG, PROJECT, TESTS, DATA, CODE)
+1. **Parse specs/ 폴더** → tasks.md + spec.md + plan.md 통합 파싱
 2. **Find/Create Epic** → Link all issues to parent Epic
-3. **Generate Issues** → Create GitHub Issues with proper labels, dependencies
+3. **Generate Issues** → 협업 중심 구조의 완성된 Issue 생성
 4. **Update tasks.md** → Add issue references to original tasks
 
 ### Output
 
-- GitHub Issues created in dependency order
+- 완성된 GitHub Issues (Speckit Progress + AC + 테스트 케이스 포함)
 - Epic linked to all sub-issues
 - tasks.md updated with issue numbers
 - Summary report with issue URLs
 
 ## Workflow
 
-### Phase 1: Parse tasks.md
+### Phase 1: Parse specs/ 폴더
 
-- Read `specs/N-short-name/tasks.md`
-- Extract task metadata (ID, description, layer, dependencies, complexity)
-- Analyze dependency chains
+```bash
+# specs 폴더 위치 확인
+SPECS_DIR="specs/N-short-name"
+
+# 필수 파일 읽기
+cat $SPECS_DIR/tasks.md    # Task 목록, Dependencies, Layer
+cat $SPECS_DIR/spec.md     # AC, 테스트 케이스 추출
+cat $SPECS_DIR/plan.md     # 기술 접근 방식 (링크용)
+```
+
+**추출 항목**:
+
+| 파일 | 추출 내용 |
+|------|----------|
+| tasks.md | Task 목록, ID, Layer, Dependencies, Complexity |
+| spec.md | Acceptance Criteria, 엔지니어 테스트, QA 테스트 |
+| plan.md | (링크만 생성, 내용 복사 X) |
 
 ### Phase 2: Find Parent Epic
 
@@ -49,12 +69,48 @@ location: project
 
 ### Phase 3: Generate Issues
 
-For each task:
+**새로운 Issue Body 구조**:
 
-- Title: `[Layer] Task Description`
-- Body: Description + Acceptance Criteria + Dependencies + Metadata
-- Labels: Layer + Domain + Complexity + Type
-- Link to Epic
+```markdown
+## 📋 {task_description}
+
+## 🔄 Speckit Progress
+
+- [x] specify → [spec.md](https://github.com/{owner}/{repo}/blob/dev/specs/{N}-{feature}/spec.md)
+- [x] plan → [plan.md](https://github.com/{owner}/{repo}/blob/dev/specs/{N}-{feature}/plan.md)
+- [ ] checklist
+- [x] tasks → [tasks.md](https://github.com/{owner}/{repo}/blob/dev/specs/{N}-{feature}/tasks.md)
+- [ ] implement
+
+## 🎯 Acceptance Criteria
+
+- [ ] {AC 1 from spec.md}
+- [ ] {AC 2 from spec.md}
+- [ ] {AC 3 from spec.md}
+
+## 🧪 테스트 케이스
+
+### 엔지니어 테스트
+
+- [ ] {테스트 케이스 1}: {예상 결과}
+- [ ] {테스트 케이스 2}: {예상 결과}
+
+### QA 테스트
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 1 | {수행 동작} | {예상 결과} |
+| 2 | {수행 동작} | {예상 결과} |
+
+## 📊 Metadata
+
+| Field | Value |
+|-------|-------|
+| Layer | {v0.x.x LAYER} |
+| Domain | {domain} |
+| Epic | #{epic_number} |
+| Depends on | #{dep_issue} |
+```
 
 ### Phase 4: Execute Creation
 
@@ -68,17 +124,7 @@ For each task:
 - Add issue references to each task
 - Add summary section with all created issues
 
-### Phase 6: Complete Draft Tasks (Optional)
-
-Draft Task가 존재하는 경우:
-
-- `skill:complete-draft-task` 호출
-- Draft 라벨 제거 및 AC 추가
-- Epic Sub-issue 연결
-
-> 📚 상세: [complete-draft-task Skill](../complete-draft-task/SKILL.md)
-
-### Phase 7: Add to GitHub Projects (필수)
+### Phase 6: Add to GitHub Projects (필수)
 
 생성된 모든 Issue를 `이슈관리` Projects (#1)에 등록:
 
@@ -103,7 +149,7 @@ gh api graphql -f query='
 
 > **Note**: `PVT_kwDOC01-Rc4AtDz2`는 semicolon-devteam의 `이슈관리` Projects (#1) ID입니다.
 
-### Phase 7.5: Set GitHub Issue Type (필수)
+### Phase 6.5: Set GitHub Issue Type (필수)
 
 생성된 Issue에 적절한 Issue Type 설정:
 
@@ -132,53 +178,61 @@ gh api graphql -f query='
 
 > **Note**: Epic 생성 시에만 Epic Type 사용, 그 외 Sub-Task는 Task Type 사용
 
-### Phase 8: Report
+### Phase 7: Report
 
 - Generate summary with issue URLs
 - Report by layer grouping
-- Draft → Task 변환 요약 (해당 시)
 - Projects 등록 결과
 - Provide next steps
 
-## Issue Format
+## specs/ URL 생성 규칙
 
-### Title
+> **브랜치 고정**: SDD 워크플로우가 dev 브랜치 필수이므로 링크도 dev 고정
+
+```bash
+# GitHub URL 패턴 (dev 브랜치 고정)
+SPECS_URL="https://github.com/${OWNER}/${REPO}/blob/dev/specs/${FEATURE_SLUG}"
+
+# 예시
+# https://github.com/semicolon-devteam/cm-land/blob/dev/specs/5-comments/spec.md
+```
+
+## AC 및 테스트 케이스 추출
+
+### spec.md에서 AC 추출
+
+```markdown
+# 패턴 1
+## Acceptance Criteria
+- AC 항목 1
+- AC 항목 2
+
+# 패턴 2
+## Requirements
+### Functional Requirements
+- 요구사항 1
+- 요구사항 2
+```
+
+### spec.md에서 테스트 케이스 추출
+
+```markdown
+# 엔지니어 테스트
+## Test Cases
+### Unit Tests
+- 테스트 1: 예상 결과
+
+# QA 테스트
+### E2E Tests
+| Step | Action | Expected |
+|------|--------|----------|
+| 1 | 동작 | 결과 |
+```
+
+## Issue Title Format
 
 ```text
 [v0.1.x PROJECT] Scaffold domain structure
-```
-
-### Body
-
-```markdown
-## 📋 Task Description
-[Task description from tasks.md]
-
-## 🎯 Acceptance Criteria
-- [ ] [Criterion 1]
-- [ ] [Criterion 2]
-
-## 🧪 테스트 요구사항
-
-### 엔지니어 테스트
-<!-- speckit.implement 단계에서 테스트케이스로 작성하여 하나씩 검증 -->
-- [ ] [테스트 케이스 1]: [예상 결과]
-- [ ] [테스트 케이스 2]: [예상 결과]
-
-### QA 테스트
-<!-- QA가 수동으로 검증할 유스케이스 -->
-| Step | Action | Expected Result |
-|------|--------|-----------------|
-| 1 | [수행 동작] | [예상 결과] |
-| 2 | [수행 동작] | [예상 결과] |
-
-## 🔗 Dependencies
-Depends on: #[issue-number]
-
-## 📊 Metadata
-- **Layer**: [CONFIG | PROJECT | TESTS | DATA | CODE]
-- **Complexity**: [Simple | Medium | Complex]
-- **Epic**: #[epic-number]
 ```
 
 ## Related
@@ -188,6 +242,5 @@ Depends on: #[issue-number]
 - [Dependency Handling](references/dependency-handling.md) - Dependency chain management
 - [Epic Creation](references/epic-creation.md) - How to create parent Epics
 - [Error Handling](references/error-handling.md) - Error scenarios and success criteria
-- [complete-draft-task](../complete-draft-task/SKILL.md) - Draft Task → 완성된 Task 변환
 - `spec` - Generates tasks.md that feeds this skill
 - `implement` - Uses created issues for tracking

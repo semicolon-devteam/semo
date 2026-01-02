@@ -1,10 +1,12 @@
 ---
 name: estimate-epic-timeline
-description: Estimate Epic timeline by summing all Draft Tasks points. Use when (1) all Draft Tasks are created with estimation, (2) need to calculate total Epic duration, (3) identifying parallel/sequential tasks and critical path. Posts timeline prediction as Epic comment.
+description: |
+  Estimate Epic timeline by summing all Task points. Use when (1) tasks.md 생성 후,
+  (2) Epic 전체 일정 예측 필요, (3) 병렬/순차 작업 및 Critical Path 분석.
 tools: [Bash, GitHub CLI]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: estimate-epic-timeline 호출 - {Epic 번호}` 시스템 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: `[SEMO] Skill: estimate-epic-timeline 호출 - {Epic 번호}`
 
 # estimate-epic-timeline Skill
 
@@ -12,12 +14,12 @@ tools: [Bash, GitHub CLI]
 
 ## Purpose
 
-모든 Draft Tasks의 Estimation Point를 합산하여 Epic 전체 일정을 예측합니다.
+tasks.md의 모든 Task Point를 합산하여 Epic 전체 일정을 예측합니다.
 
 ## Process
 
-1. 모든 Draft Tasks의 Point 수집
-2. 병렬/순차 작업 구분
+1. tasks.md에서 모든 Task의 Point 수집
+2. 병렬/순차 작업 구분 (Layer 기반)
 3. 총 예상 일정 계산
 
 ## 일정 계산 공식
@@ -62,5 +64,6 @@ tools: [Bash, GitHub CLI]
 
 ## Related
 
-- [draft-task-creator Agent](../../agents/draft-task-creator.md)
-- [assign-estimation-point Skill](../assign-estimation-point/SKILL.md)
+- `ideate` - 아이디어 → Epic 생성
+- `generate-spec` - tasks.md 생성 (이 스킬 전에 호출)
+- `create-issues` - Task Issue 생성

@@ -5,19 +5,19 @@
 ```javascript
 // After tasks.md generation (from skill:spec)
 skill: create-issues({
-  tasksFile: "specs/5-post-likes/tasks.md",
+  specsDir: "specs/5-post-likes",  // specs 폴더 경로
   epic: 144, // Optional: auto-detect if omitted
 });
 
 // Standalone conversion
 skill: create-issues({
-  tasksFile: "specs/7-notifications/tasks.md",
+  specsDir: "specs/7-notifications",
   createEpic: true, // Create new Epic if none exists
 });
 
 // With custom labels
 skill: create-issues({
-  tasksFile: "specs/9-search/tasks.md",
+  specsDir: "specs/9-search",
   labels: ["priority:high", "team:frontend"],
 });
 ```
@@ -28,7 +28,7 @@ skill: create-issues({
 # GitHub Issues Creation Report
 
 **Feature**: Add comment functionality
-**Tasks File**: specs/5-comments/tasks.md
+**Specs Dir**: specs/5-comments
 **Date**: 2025-01-20
 
 ---
@@ -38,6 +38,51 @@ skill: create-issues({
 ✅ **15 issues created** from 15 tasks
 🔗 **Epic #144** linked
 📋 **tasks.md** updated with issue references
+📎 **Speckit Progress** 섹션 포함
+
+---
+
+## Issue Body 구조 (새로운 협업 중심 형식)
+
+생성된 각 Issue는 다음 구조를 가집니다:
+
+```markdown
+## 📋 Scaffold domain structure
+
+## 🔄 Speckit Progress
+
+- [x] specify → [spec.md](https://github.com/semicolon-devteam/cm-template/blob/dev/specs/5-comments/spec.md)
+- [x] plan → [plan.md](https://github.com/semicolon-devteam/cm-template/blob/dev/specs/5-comments/plan.md)
+- [ ] checklist
+- [x] tasks → [tasks.md](https://github.com/semicolon-devteam/cm-template/blob/dev/specs/5-comments/tasks.md)
+- [ ] implement
+
+## 🎯 Acceptance Criteria
+
+- [ ] AC 1 from spec.md
+- [ ] AC 2 from spec.md
+
+## 🧪 테스트 케이스
+
+### 엔지니어 테스트
+
+- [ ] 테스트 1: 예상 결과
+
+### QA 테스트
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 1 | 동작 | 결과 |
+
+## 📊 Metadata
+
+| Field | Value |
+|-------|-------|
+| Layer | v0.1.x PROJECT |
+| Domain | posts |
+| Epic | #144 |
+| Depends on | #145 |
+```
 
 ---
 
@@ -61,46 +106,17 @@ skill: create-issues({
 - **#147**: Write Repository tests
   - Labels: `v0.2.x-tests`, `domain:posts`, `complexity:medium`, `task`
   - Depends on: #146
-  - URL: https://github.com/semicolon-devteam/cm-template/issues/147
-
-- **#148**: Write Hooks tests
-  - Labels: `v0.2.x-tests`, `domain:posts`, `complexity:medium`, `task`
-  - Depends on: #146
-  - URL: https://github.com/semicolon-devteam/cm-template/issues/148
-
-- **#149**: Write Component tests
-  - Labels: `v0.2.x-tests`, `domain:posts`, `complexity:simple`, `task`
-  - Depends on: #146
-  - URL: https://github.com/semicolon-devteam/cm-template/issues/149
 
 ### v0.3.x DATA (1 issue)
 
 - **#150**: Define models and types
   - Labels: `v0.3.x-data`, `domain:posts`, `task`
   - Depends on: #146
-  - URL: https://github.com/semicolon-devteam/cm-template/issues/150
 
 ### v0.4.x CODE (9 issues)
 
-- **#151**: Implement Repository layer
-  - Labels: `v0.4.x-code`, `domain:posts`, `complexity:complex`, `task`
-  - Depends on: #147, #150
-  - URL: https://github.com/semicolon-devteam/cm-template/issues/151
-
-- **#152**: Implement API Client layer
-  - Labels: `v0.4.x-code`, `domain:posts`, `complexity:medium`, `task`
-  - Depends on: #146
-  - URL: https://github.com/semicolon-devteam/cm-template/issues/152
-
-- **#153**: Implement Hooks layer
-  - Labels: `v0.4.x-code`, `domain:posts`, `complexity:medium`, `task`
-  - Depends on: #148, #152
-  - URL: https://github.com/semicolon-devteam/cm-template/issues/153
-
-- **#154-#159**: Implement Components (6 standard)
-  - Labels: `v0.4.x-code`, `domain:posts`, `complexity:simple`, `task`
-  - Depends on: #149, #153
-  - URLs: [list of 6 URLs]
+- **#151-#159**: Implementation tasks
+  - Labels: `v0.4.x-code`, `domain:posts`, `task`
 
 ---
 
@@ -118,7 +134,7 @@ All issues linked to Epic for tracking.
 
 모든 생성된 Issue는 `이슈관리` Projects (#1)에 자동 등록됩니다.
 
-**Projects ID**: `PVT_kwDOCr2fqM4A0TQd`
+**Projects ID**: `PVT_kwDOC01-Rc4AtDz2`
 
 ✅ **15 issues** added to Projects
 
@@ -147,16 +163,20 @@ All issues linked to Epic for tracking.
 gh issue create --title "Add comment functionality" \
   --label "epic" --body "..."
 
-# Create task issues
+# Create task issues with new body structure
 gh issue create --title "[v0.1.x PROJECT] Scaffold domain structure" \
   --label "v0.1.x-project,domain:posts,task" \
-  --body "..." \
+  --body "$(cat <<'EOF'
+## 📋 Scaffold domain structure
+
+## 🔄 Speckit Progress
+
+- [x] specify → [spec.md](...)
+- [x] plan → [plan.md](...)
+...
+EOF
+)" \
   --assignee "@me"
-
-# Link to Epic
-gh issue edit 146 --add-field "Epic=#144"
-
-# Add dependencies (via body text)
 
 # Add to Projects (필수)
 ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/{repo}/issues/{issue_number} \
@@ -171,7 +191,7 @@ gh api graphql -f query='
       item { id }
     }
   }
-' -f projectId="PVT_kwDOCr2fqM4A0TQd" -f contentId="$ISSUE_NODE_ID"
+' -f projectId="PVT_kwDOC01-Rc4AtDz2" -f contentId="$ISSUE_NODE_ID"
 ```
 
 ---
@@ -179,6 +199,6 @@ gh api graphql -f query='
 ## Next Steps
 
 1. **View All Issues**: https://github.com/semicolon-devteam/cm-template/issues?q=is%3Aissue+label%3Atask+is%3Aopen
-2. **Project Board**: https://github.com/orgs/semicolon-devteam/projects/[board-id]
+2. **Project Board**: https://github.com/orgs/semicolon-devteam/projects/1
 3. **Start Implementation**: Begin with issue #145
 4. **Track Progress**: Close issues as tasks complete
