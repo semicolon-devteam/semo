@@ -996,6 +996,12 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
                 type: "Black Box (MCP)",
                 integrations: [
                   {
+                    name: "slack-token",
+                    description: "Slack API 호출용 팀 공용 토큰 제공",
+                    tools: ["semo_get_slack_token"],
+                    usage: "notify-slack 스킬에서 자동으로 호출됨",
+                  },
+                  {
                     name: "memory",
                     modules: ["remember", "recall", "facts", "history", "embeddings"],
                     tools: ["semo_remember", "semo_recall", "semo_save_fact", "semo_get_facts", "semo_get_history", "semo_memory_status", "semo_process_embeddings", "semo_recall_smart"],
@@ -1010,10 +1016,13 @@ server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
                   reason: "스킬에서 CLI 직접 호출 방식으로 전환",
                   tools: [
                     { name: "supabase_query", migration: "supabase CLI" },
-                    { name: "semo_get_slack_token", migration: "curl + SLACK_BOT_TOKEN 환경변수" },
                     { name: "semo_route", migration: "Orchestrator 서브에이전트" },
-                    { name: "slack_send_message", migration: "curl" },
+                    { name: "slack_send_message", migration: "skill:notify-slack 사용" },
+                    { name: "slack_lookup_user", migration: "skill:notify-slack 사용" },
+                    { name: "slack_list_channels", migration: "skill:notify-slack 사용" },
+                    { name: "slack_find_channel", migration: "skill:notify-slack 사용" },
                     { name: "github_create_issue", migration: "gh issue create" },
+                    { name: "github_create_pr", migration: "gh pr create" },
                   ],
                 },
               },
