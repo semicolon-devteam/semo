@@ -1299,26 +1299,48 @@ async function createStandardSymlinks(cwd: string) {
     console.log(chalk.green(`  ✓ .claude/skills/ (${skills.length}개 skill 링크됨)`));
   }
 
-  // commands 링크
+  // commands 링크 (개별 파일 심볼릭 링크 방식 - 여러 패키지 지원)
   const commandsDir = path.join(claudeDir, "commands");
   fs.mkdirSync(commandsDir, { recursive: true });
 
-  const semoCommandsLink = path.join(commandsDir, "SEMO");
-  const commandsTarget = path.join(semoSystemDir, "semo-core", "commands", "SEMO");
+  const semoCommandsDir = path.join(commandsDir, "SEMO");
 
-  // 기존 링크가 있으면 삭제 후 재생성 (업데이트 시에도 최신 반영)
-  if (fs.existsSync(semoCommandsLink)) {
-    if (fs.lstatSync(semoCommandsLink).isSymbolicLink()) {
-      fs.unlinkSync(semoCommandsLink);
+  // 기존 링크/디렉토리가 있으면 삭제 후 재생성
+  if (fs.existsSync(semoCommandsDir)) {
+    if (fs.lstatSync(semoCommandsDir).isSymbolicLink()) {
+      fs.unlinkSync(semoCommandsDir);
     } else {
-      removeRecursive(semoCommandsLink);
+      removeRecursive(semoCommandsDir);
     }
   }
 
-  if (fs.existsSync(commandsTarget)) {
-    createSymlinkOrJunction(commandsTarget, semoCommandsLink);
-    console.log(chalk.green("  ✓ .claude/commands/SEMO → semo-system/semo-core/commands/SEMO"));
+  // SEMO 커맨드 디렉토리 생성 (실제 디렉토리)
+  fs.mkdirSync(semoCommandsDir, { recursive: true });
+
+  // 커맨드 소스 디렉토리 목록 (semo-core + semo-remote)
+  const commandSources = [
+    { name: "semo-core", dir: path.join(semoSystemDir, "semo-core", "commands", "SEMO") },
+    { name: "semo-remote", dir: path.join(semoSystemDir, "semo-remote", "commands", "SEMO") },
+  ];
+
+  let totalCommands = 0;
+  for (const source of commandSources) {
+    if (fs.existsSync(source.dir)) {
+      const commandFiles = fs.readdirSync(source.dir).filter(f => f.endsWith(".md"));
+      for (const cmdFile of commandFiles) {
+        const cmdTarget = path.join(source.dir, cmdFile);
+        const cmdLink = path.join(semoCommandsDir, cmdFile);
+
+        // 이미 링크가 있으면 건너뛰기 (semo-core 우선)
+        if (!fs.existsSync(cmdLink)) {
+          createSymlinkOrJunction(cmdTarget, cmdLink);
+          totalCommands++;
+        }
+      }
+    }
   }
+
+  console.log(chalk.green(`  ✓ .claude/commands/SEMO (${totalCommands}개 command 링크됨)`));
 }
 
 // === 설치 검증 ===
@@ -1424,15 +1446,25 @@ function verifyInstallation(cwd: string, installedExtensions: string[] = []): Ve
     }
   }
 
-  // 4. commands 검증 (isSymlinkValid 사용)
-  const semoCommandsLink = path.join(claudeDir, "commands", "SEMO");
+  // 4. commands 검증 (디렉토리 또는 개별 파일 심볼릭 링크 방식)
+  const semoCommandsDir = path.join(claudeDir, "commands", "SEMO");
   try {
-    const linkExists = fs.existsSync(semoCommandsLink) || fs.lstatSync(semoCommandsLink).isSymbolicLink();
-    result.stats.commands.exists = linkExists;
-    if (linkExists) {
-      result.stats.commands.valid = isSymlinkValid(semoCommandsLink);
-      if (!result.stats.commands.valid) {
-        result.warnings.push("깨진 링크: .claude/commands/SEMO");
+    const dirExists = fs.existsSync(semoCommandsDir);
+    result.stats.commands.exists = dirExists;
+    if (dirExists) {
+      // 디렉토리인 경우: 내부 파일 검증
+      if (fs.lstatSync(semoCommandsDir).isDirectory() && !fs.lstatSync(semoCommandsDir).isSymbolicLink()) {
+        const cmdFiles = fs.readdirSync(semoCommandsDir).filter(f => f.endsWith(".md"));
+        result.stats.commands.valid = cmdFiles.length > 0;
+        if (!result.stats.commands.valid) {
+          result.warnings.push("commands/SEMO 디렉토리가 비어 있습니다");
+        }
+      } else if (fs.lstatSync(semoCommandsDir).isSymbolicLink()) {
+        // 심볼릭 링크인 경우 (구버전 호환)
+        result.stats.commands.valid = isSymlinkValid(semoCommandsDir);
+        if (!result.stats.commands.valid) {
+          result.warnings.push("깨진 링크: .claude/commands/SEMO");
+        }
       }
     }
   } catch {
