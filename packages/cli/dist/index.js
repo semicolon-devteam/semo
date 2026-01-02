@@ -2968,9 +2968,71 @@ program
             }
         }
     }
-    // === 6. Hooks 업데이트 ===
-    await setupHooks(cwd, true);
-    // === 7. 설치 검증 ===
+    // === 6. semo-hooks 체크 및 업데이트 ===
+    console.log(chalk_1.default.cyan("\n🪝 semo-hooks 상태 확인"));
+    const hooksDir = path.join(semoSystemDir, "semo-hooks");
+    if (!fs.existsSync(hooksDir)) {
+        console.log(chalk_1.default.gray("  ⏭️ semo-hooks 미설치 (선택 패키지)"));
+        console.log(chalk_1.default.gray("     💡 설치: semo add hooks"));
+    }
+    else {
+        const hooksVersionPath = path.join(hooksDir, "VERSION");
+        const hooksVersion = fs.existsSync(hooksVersionPath)
+            ? fs.readFileSync(hooksVersionPath, "utf-8").trim()
+            : "?";
+        console.log(chalk_1.default.green(`  ✓ semo-hooks v${hooksVersion} 설치됨`));
+        // hooks 빌드 및 설정 업데이트
+        await setupHooks(cwd, true);
+    }
+    // === 7. semo-mcp 체크 ===
+    console.log(chalk_1.default.cyan("\n📡 semo-mcp 상태 확인"));
+    const userHomeDir2 = process.env.HOME || process.env.USERPROFILE || "";
+    const claudeSettingsPath = path.join(userHomeDir2, ".claude", "settings.local.json");
+    if (!fs.existsSync(claudeSettingsPath)) {
+        console.log(chalk_1.default.gray("  ⏭️ MCP 설정 없음 (선택사항)"));
+        console.log(chalk_1.default.gray("     💡 장기 기억이 필요하면 settings.local.json 설정 추가"));
+    }
+    else {
+        try {
+            const settings = JSON.parse(fs.readFileSync(claudeSettingsPath, "utf-8"));
+            const mcpServers = settings.mcpServers || {};
+            const semoMcp = mcpServers["semo-integrations"];
+            if (!semoMcp) {
+                console.log(chalk_1.default.gray("  ⏭️ semo-integrations 미등록 (선택사항)"));
+                console.log(chalk_1.default.gray("     💡 장기 기억/원격 제어가 필요하면 MCP 설정 추가"));
+            }
+            else {
+                console.log(chalk_1.default.green("  ✓ semo-integrations MCP 서버 등록됨"));
+                // v3.0: SEMO_DB_PASSWORD만 체크
+                const env = semoMcp.env || {};
+                if (env["SEMO_DB_PASSWORD"]) {
+                    console.log(chalk_1.default.green("  ✓ 장기 기억: 활성화"));
+                }
+                else {
+                    console.log(chalk_1.default.gray("  ⏭️ 장기 기억: 비활성화 (SEMO_DB_PASSWORD 미설정)"));
+                }
+            }
+        }
+        catch {
+            console.log(chalk_1.default.yellow("  ⚠ settings.local.json 파싱 오류"));
+        }
+    }
+    // CLI 도구 체크 (v3.0: 스킬에서 CLI 직접 호출)
+    console.log(chalk_1.default.cyan("\n🔧 CLI 도구 확인"));
+    const cliToolsUpdate = [
+        { name: "gh", desc: "GitHub CLI" },
+        { name: "supabase", desc: "Supabase CLI" },
+    ];
+    for (const tool of cliToolsUpdate) {
+        try {
+            (0, child_process_1.execSync)(`${tool.name} --version`, { stdio: ["pipe", "pipe", "pipe"] });
+            console.log(chalk_1.default.green(`  ✓ ${tool.name} 설치됨`));
+        }
+        catch {
+            console.log(chalk_1.default.yellow(`  ⚠ ${tool.name} 미설치 (${tool.desc})`));
+        }
+    }
+    // === 8. 설치 검증 ===
     const verificationResult = verifyInstallation(cwd, installedExtensions);
     printVerificationResult(verificationResult);
     if (verificationResult.success) {
