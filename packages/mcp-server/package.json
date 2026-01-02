@@ -1,6 +1,6 @@
 {
   "name": "@team-semicolon/semo-mcp",
-  "version": "3.0.1",
+  "version": "3.0.2",
   "description": "SEMO MCP Server - Memory & Remote for Claude Code (v3: CLI-first approach)",
   "main": "dist/index.js",
   "bin": {
