@@ -28,13 +28,57 @@ model: inherit
 ## Execution Flow
 
 ```text
-1. MCP에서 Slack Token 조회
+1. Token 획득 (Fallback 전략)
+   ├─ 1차: MCP semo_get_slack_token 시도
+   ├─ 2차: 환경변수 SLACK_BOT_TOKEN 확인
+   └─ 3차: 캐시된 토큰 사용 (.claude/memory/slack-token.md)
    ↓
 2. 채널 ID 확인 (기본: C09KNL91QBZ = #_협업)
    ↓
 3. (필요시) 사용자 ID 조회 (curl로 Slack API 호출)
    ↓
 4. 메시지 전송 (curl + heredoc)
+   ├─ 성공 → 완료
+   └─ 실패 → Fallback 처리
+```
+
+## 🔴 Fallback 전략 (필수)
+
+> MCP 서버 인증 실패 시에도 메시지 전송을 보장합니다.
+
+### Token 획득 순서
+
+| 우선순위 | 소스                              | 설명                       |
+|----------|-----------------------------------|----------------------------|
+| 1        | MCP `semo_get_slack_token`        | 암호화된 팀 토큰           |
+| 2        | 환경변수 `SLACK_BOT_TOKEN`        | 로컬 설정                  |
+| 3        | `.claude/memory/slack-token.md`   | 캐시된 토큰 (있는 경우)    |
+
+### 전송 실패 시 처리
+
+```text
+메시지 전송 실패 (not_authed 등)
+    ↓
+1차 Fallback: 환경변수로 재시도
+    ↓
+2차 Fallback: 수동 전송 안내
+    - 메시지 내용을 마크다운으로 출력
+    - 직접 Slack에 붙여넣기 가능하도록 포맷팅
+```
+
+### 수동 전송 안내 형식
+
+```markdown
+⚠️ Slack 자동 전송 실패
+
+**원인**: {error_message}
+
+**수동 전송용 메시지**:
+---
+{formatted_message}
+---
+
+**전송 채널**: #_협업 (C09KNL91QBZ)
 ```
 
 ### Step 1: Token 획득

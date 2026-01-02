@@ -37,8 +37,25 @@ jobs:
           SEMO_DB_PASSWORD: ${{ secrets.SEMO_DB_PASSWORD }}
         run: node scripts/generate-tokens.js
 
+      - name: Verify tokens.generated.ts created
+        run: |
+          if [ ! -f src/tokens.generated.ts ]; then
+            echo "❌ Error: src/tokens.generated.ts not found!"
+            exit 1
+          fi
+          echo "✅ src/tokens.generated.ts exists"
+
       - name: Build
         run: npm run build
+
+      - name: Verify tokens.generated.js in dist
+        run: |
+          if [ ! -f dist/tokens.generated.js ]; then
+            echo "❌ Error: dist/tokens.generated.js not found after build!"
+            exit 1
+          fi
+          echo "✅ dist/tokens.generated.js exists"
+          npm pack --dry-run 2>&1 | grep tokens
 
       - name: Update version (if manual dispatch)
         if: github.event_name == 'workflow_dispatch'
