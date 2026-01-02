@@ -29,16 +29,48 @@ const crypto_1 = require("crypto");
 const index_js_1 = require("@modelcontextprotocol/sdk/server/index.js");
 const stdio_js_1 = require("@modelcontextprotocol/sdk/server/stdio.js");
 const types_js_1 = require("@modelcontextprotocol/sdk/types.js");
-// v3.0: crypto.js 사용 제거 - 스킬에서 CLI 직접 호출 방식으로 변경
+const crypto_js_1 = require("./crypto.js");
 const memory_js_1 = require("./memory.js");
-// v3.0: Slack/GitHub/Supabase 토큰 관리 제거
-// loadTokens() 함수 제거 - 토큰 관련 기능 삭제됨
-// 스킬에서 직접 CLI (gh, supabase, curl) 호출 방식으로 변경
-// MCP는 SEMO Memory + Remote 기능만 제공
+// 토큰 로드 (CI/CD 생성 파일 우선, 없으면 환경변수)
+function loadTokens() {
+    try {
+        // CI/CD에서 생성된 암호화 토큰 (배포 패키지용)
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const generated = require("./tokens.generated.js");
+        if (generated.ENCRYPTED_TOKENS?.SLACK_BOT_TOKEN) {
+            return generated.ENCRYPTED_TOKENS;
+        }
+    }
+    catch {
+        // tokens.generated.js 없음 - 로컬 개발 환경
+    }
+    // 로컬 개발용 (환경변수 기반)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const fallback = require("./tokens.js");
+    return fallback.ENCRYPTED_TOKENS;
+}
+// Slack 토큰 조회 (암호화된 토큰 복호화 또는 환경변수)
+function getSlackToken() {
+    // 1. 환경변수 우선 (사용자 커스텀)
+    if (process.env.SLACK_BOT_TOKEN) {
+        return process.env.SLACK_BOT_TOKEN;
+    }
+    // 2. 암호화된 팀 토큰 (패키지 내장)
+    try {
+        const tokens = loadTokens();
+        if (tokens.SLACK_BOT_TOKEN) {
+            return (0, crypto_js_1.decrypt)(tokens.SLACK_BOT_TOKEN);
+        }
+    }
+    catch {
+        // 토큰 로드 실패
+    }
+    return "";
+}
 // 서버 초기화
 const server = new index_js_1.Server({
     name: "semo-integrations",
-    version: "3.0.0",
+    version: "3.0.1",
 }, {
     capabilities: {
         tools: {},
@@ -46,11 +78,21 @@ const server = new index_js_1.Server({
     },
 });
 // === Tools ===
-// v3.0: Slack/GitHub/Supabase 도구 제거 - 스킬에서 CLI로 직접 호출
-// 유지: SEMO Memory, SEMO Remote
+// v3.0.1: semo_get_slack_token 복원 (암호화된 팀 토큰 제공)
+// GitHub/Supabase는 gh/supabase CLI 사용
 server.setRequestHandler(types_js_1.ListToolsRequestSchema, async () => {
     return {
         tools: [
+            // === Slack Token (팀 공용 토큰 제공) ===
+            {
+                name: "semo_get_slack_token",
+                description: "MCP 서버에서 관리하는 Slack Bot Token을 조회합니다. notify-slack 스킬에서 curl 호출 시 사용합니다.",
+                inputSchema: {
+                    type: "object",
+                    properties: {},
+                    required: [],
+                },
+            },
             // === SEMO Memory (Long-term Memory) ===
             {
                 name: "semo_remember",
@@ -319,6 +361,30 @@ server.setRequestHandler(types_js_1.CallToolRequestSchema, async (request) => {
         }
     }
     switch (name) {
+        // === Slack Token Tool ===
+        case "semo_get_slack_token": {
+            const token = getSlackToken();
+            if (token) {
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: `token:${token}`,
+                        },
+                    ],
+                };
+            }
+            else {
+                return {
+                    content: [
+                        {
+                            type: "text",
+                            text: `[SEMO] Slack Token 조회 실패\n\n❌ SLACK_BOT_TOKEN 환경변수 또는 암호화된 토큰이 설정되지 않았습니다.`,
+                        },
+                    ],
+                };
+            }
+        }
         // === SEMO Memory Tools ===
         case "semo_remember": {
             if (!(0, memory_js_1.isMemoryEnabled)()) {
@@ -821,7 +887,7 @@ server.setRequestHandler(types_js_1.ReadResourceRequestSchema, async (request) =
                         uri,
                         mimeType: "application/json",
                         text: JSON.stringify({
-                            version: "3.0.0",
+                            version: "3.0.1",
                             layer: "Layer 2 (External Connections)",
                             type: "Black Box (MCP)",
                             integrations: [
@@ -899,9 +965,9 @@ async function main() {
     await server.connect(transport);
     // 메모리 시스템 상태 로깅
     const memoryStatus = (0, memory_js_1.isMemoryEnabled)() ? "enabled" : "disabled (set SEMO_DB_PASSWORD)";
-    console.error("[SEMO MCP] Server v3.0.0 started");
-    console.error("[SEMO MCP] Integrations: memory, remote");
-    console.error("[SEMO MCP] Removed v3.0: slack, github, supabase (use CLI in skills)");
+    console.error("[SEMO MCP] Server v3.0.1 started");
+    console.error("[SEMO MCP] Integrations: slack-token, memory, remote");
+    console.error("[SEMO MCP] v3.0.1: semo_get_slack_token 복원 (팀 토큰 제공)");
     console.error(`[SEMO MCP] Long-term Memory: ${memoryStatus}`);
     // 세션 시작 로깅 (메모리 활성화 시)
     if ((0, memory_js_1.isMemoryEnabled)()) {
