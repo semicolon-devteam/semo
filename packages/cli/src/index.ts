@@ -405,11 +405,22 @@ async function showVersionComparison(cwd: string): Promise<void> {
 }
 
 // === Windows 지원 유틸리티 ===
-const isWindows = os.platform() === "win32";
+// Git Bash, WSL 등에서도 Windows로 인식하도록 확장
+const isWindows = os.platform() === "win32" ||
+  process.env.OSTYPE?.includes("msys") ||
+  process.env.OSTYPE?.includes("cygwin") ||
+  process.env.TERM_PROGRAM === "mintty";
 
 /**
  * Windows에서 Junction 링크를 생성하거나, Unix에서 심볼릭 링크를 생성
  * Junction은 관리자 권한 없이 디렉토리 링크를 생성할 수 있음
+ *
+ * Windows 환경 (Git Bash, PowerShell, CMD 포함):
+ * 1. Junction 시도 (폴더만 가능)
+ * 2. 실패 시 xcopy로 복사
+ *
+ * Unix/Mac 환경:
+ * - 상대 경로 심볼릭 링크
  */
 function createSymlinkOrJunction(targetPath: string, linkPath: string): void {
   // 이미 존재하는 링크/파일 제거 (깨진 심볼릭 링크도 처리)
@@ -427,32 +438,44 @@ function createSymlinkOrJunction(targetPath: string, linkPath: string): void {
   }
 
   if (isWindows) {
-    // Windows: Junction 사용 (절대 경로 필요)
+    // Windows: Junction 사용 (절대 경로, Windows 형식 필요)
+    // path.resolve는 Git Bash에서도 Windows 경로를 반환
     const absoluteTarget = path.resolve(targetPath);
+    const absoluteLink = path.resolve(linkPath);
 
-    // 재시도 메커니즘 (최대 3회)
-    let success = false;
-    let lastError: unknown = null;
+    // 타겟이 파일인지 폴더인지 확인
+    const targetStats = fs.statSync(targetPath);
+    const isDirectory = targetStats.isDirectory();
 
-    for (let attempt = 1; attempt <= 3 && !success; attempt++) {
+    if (isDirectory) {
+      // 폴더: Junction 시도
+      let success = false;
+
       try {
-        execSync(`cmd /c "mklink /J "${linkPath}" "${absoluteTarget}""`, { stdio: "pipe" });
+        // mklink /J 사용 (관리자 권한 불필요)
+        execSync(`cmd /c mklink /J "${absoluteLink}" "${absoluteTarget}"`, {
+          stdio: "pipe",
+          windowsHide: true,
+        });
         success = true;
-      } catch (err) {
-        lastError = err;
-        if (attempt < 3) {
-          // 잠시 대기 후 재시도
-          execSync("timeout /t 1 /nobreak >nul 2>&1", { stdio: "pipe" });
-        }
+      } catch {
+        // Junction 실패 - xcopy로 복사
+        success = false;
       }
-    }
 
-    if (!success) {
-      // fallback: 디렉토리 복사 (경고 표시)
-      console.log(chalk.yellow(`  ⚠ Junction 생성 실패 (3회 시도), 복사로 대체: ${path.basename(linkPath)}`));
-      console.log(chalk.gray(`     원인: ${lastError}`));
-      console.log(chalk.gray(`     💡 관리자 권한으로 실행하거나 개발자 모드를 활성화하세요.`));
-      execSync(`xcopy /E /I /Q "${absoluteTarget}" "${linkPath}"`, { stdio: "pipe" });
+      if (!success) {
+        // fallback: 디렉토리 복사
+        console.log(chalk.yellow(`  ⚠ Junction 생성 실패, 복사로 대체: ${path.basename(linkPath)}`));
+        console.log(chalk.gray(`     💡 업데이트 시 semo update 명령으로 동기화하세요.`));
+        fs.mkdirSync(absoluteLink, { recursive: true });
+        execSync(`xcopy /E /I /Q /Y "${absoluteTarget}" "${absoluteLink}"`, {
+          stdio: "pipe",
+          windowsHide: true,
+        });
+      }
+    } else {
+      // 파일: 직접 복사 (Junction은 폴더만 지원)
+      fs.copyFileSync(absoluteTarget, absoluteLink);
     }
   } else {
     // Unix: 상대 경로 심볼릭 링크

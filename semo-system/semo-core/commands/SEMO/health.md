@@ -32,6 +32,33 @@ SEMO 환경 헬스체크. `.claude` 디렉토리 구조와 패키지 상태를 �
 | agents/ | .merged 마커 + 심링크 유효성 |
 | skills/ | .merged 마커 + 심링크 유효성 |
 | commands/SEMO | .merged 마커 + 심링크 유효성 |
+| MCP 서버 | settings.json에 semo-integrations 설정 여부 |
+
+## MCP 설정 안내 (v3.0+)
+
+> **v3.0부터 GitHub/Slack MCP 도구가 CLI 기반으로 전환되었습니다.**
+
+### 현재 MCP 통합 (semo-integrations)
+
+| 기능 | 도구 | 비고 |
+|------|------|------|
+| Slack 토큰 | `semo_get_slack_token` | notify-slack 스킬에서 사용 |
+| 장기 기억 | `semo_remember`, `semo_recall` 등 | 선택적 (DB 설정 필요) |
+| Remote 제어 | `semo_remote_*` | semo-remote 패키지용 |
+
+### 제거된 MCP 도구 (v3.0)
+
+| 제거된 도구 | 대체 방법 |
+|------------|----------|
+| `github_create_issue` | `gh issue create` (CLI) |
+| `github_create_pr` | `gh pr create` (CLI) |
+| `slack_send_message` | `skill:notify-slack` (curl 사용) |
+
+### MCP 설정이 없어도 동작하는 기능
+
+- 모든 GitHub 작업 (gh CLI 사용)
+- Slack 알림 (curl + 내장 토큰)
+- Supabase 작업 (supabase CLI 사용)
 
 ## 출력 예시
 
