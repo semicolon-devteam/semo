@@ -225,9 +225,59 @@ async function showVersionComparison(cwd: string): Promise<void> {
       });
     }
 
-    // Extension 패키지들 (meta, semo-hooks, semo-remote 등) - semo-system 내부
+    // 그룹 패키지 (eng, biz, ops) 및 하위 Extension - semo-system 내부
+    // 그룹별로 묶어서 계층 구조로 출력
     if (hasSemoSystem) {
-      for (const key of Object.keys(EXTENSION_PACKAGES)) {
+      for (const group of PACKAGE_GROUPS) {
+        const groupVersionPath = path.join(semoSystemDir, group, "VERSION");
+        const hasGroupVersion = fs.existsSync(groupVersionPath);
+
+        // 해당 그룹의 하위 패키지 찾기
+        const groupExtensions = Object.keys(EXTENSION_PACKAGES).filter(key => key.startsWith(`${group}/`));
+        const installedGroupExtensions = groupExtensions.filter(key =>
+          fs.existsSync(path.join(semoSystemDir, key, "VERSION"))
+        );
+
+        // 그룹 버전이 있거나 하위 패키지가 설치된 경우에만 표시
+        if (hasGroupVersion || installedGroupExtensions.length > 0) {
+          // 그룹 패키지 버전 추가
+          if (hasGroupVersion) {
+            const localGroup = fs.readFileSync(groupVersionPath, "utf-8").trim();
+            const remoteGroup = await getRemotePackageVersion(group);
+
+            versionInfos.push({
+              name: group,
+              local: localGroup,
+              remote: remoteGroup,
+              needsUpdate: remoteGroup ? isVersionLower(localGroup, remoteGroup) : false,
+              level: 1,
+            });
+          }
+
+          // 하위 Extension 패키지들 추가
+          for (const key of installedGroupExtensions) {
+            const extVersionPath = path.join(semoSystemDir, key, "VERSION");
+            const localExt = fs.readFileSync(extVersionPath, "utf-8").trim();
+            const remoteExt = await getRemotePackageVersion(key);
+
+            versionInfos.push({
+              name: key,
+              local: localExt,
+              remote: remoteExt,
+              needsUpdate: remoteExt ? isVersionLower(localExt, remoteExt) : false,
+              level: 2,
+              group: group,
+            });
+          }
+        }
+      }
+
+      // 그룹에 속하지 않는 Extension (meta 등)
+      const nonGroupExtensions = Object.keys(EXTENSION_PACKAGES).filter(key =>
+        !PACKAGE_GROUPS.some(g => key.startsWith(`${g}/`))
+      );
+
+      for (const key of nonGroupExtensions) {
         const extVersionPath = path.join(semoSystemDir, key, "VERSION");
         if (fs.existsSync(extVersionPath)) {
           const localExt = fs.readFileSync(extVersionPath, "utf-8").trim();
@@ -637,45 +687,106 @@ function copyRecursive(src: string, dest: string): void {
 
 const SEMO_REPO = "https://github.com/semicolon-devteam/semo.git";
 
-// Extension 패키지 정의 (통합 구조)
-const EXTENSION_PACKAGES: Record<string, { name: string; desc: string }> = {
-  meta: { name: "Meta", desc: "SEMO 프레임워크 자체 개발/관리" },
-  "semo-hooks": { name: "Hooks", desc: "Claude Code Hooks 기반 로깅 시스템" },
-  "semo-remote": { name: "Remote", desc: "Claude Code 원격 제어 (모바일 PWA)" },
+// 확장 패키지 정의 (v3.0 구조)
+const EXTENSION_PACKAGES: Record<string, { name: string; desc: string; detect: string[]; layer: string }> = {
+  // Business Layer
+  "biz/discovery": { name: "Discovery", desc: "아이템 발굴, 시장 조사, Epic/Task", layer: "biz", detect: [] },
+  "biz/design": { name: "Design", desc: "컨셉 설계, 목업, UX", layer: "biz", detect: [] },
+  "biz/management": { name: "Management", desc: "일정/인력/스프린트 관리", layer: "biz", detect: [] },
+  "biz/poc": { name: "PoC", desc: "빠른 PoC, 패스트트랙", layer: "biz", detect: [] },
+
+  // Engineering Layer
+  "eng/nextjs": { name: "Next.js", desc: "Next.js 프론트엔드 개발", layer: "eng", detect: ["next.config.js", "next.config.mjs", "next.config.ts"] },
+  "eng/spring": { name: "Spring", desc: "Spring Boot 백엔드 개발", layer: "eng", detect: ["pom.xml", "build.gradle"] },
+  "eng/ms": { name: "Microservice", desc: "마이크로서비스 아키텍처", layer: "eng", detect: [] },
+  "eng/infra": { name: "Infra", desc: "인프라/배포 관리", layer: "eng", detect: ["docker-compose.yml", "Dockerfile"] },
+
+  // Operations Layer
+  "ops/qa": { name: "QA", desc: "테스트/품질 관리", layer: "ops", detect: [] },
+  "ops/monitor": { name: "Monitor", desc: "서비스 현황 모니터링", layer: "ops", detect: [] },
+  "ops/improve": { name: "Improve", desc: "개선 제안", layer: "ops", detect: [] },
+
+  // Meta
+  meta: { name: "Meta", desc: "SEMO 프레임워크 자체 개발/관리", layer: "meta", detect: ["semo-core", "semo-skills"] },
+
+  // System (semo-system 하위 패키지)
+  "semo-hooks": { name: "Hooks", desc: "Claude Code Hooks 기반 로깅 시스템", layer: "system", detect: [] },
+  "semo-remote": { name: "Remote", desc: "Claude Code 원격 제어 (모바일 PWA)", layer: "system", detect: [] },
 };
 
 // 단축명 → 전체 패키지 경로 매핑
 const SHORTNAME_MAPPING: Record<string, string> = {
+  // 하위 패키지명 단축 (discovery → biz/discovery)
+  discovery: "biz/discovery",
+  design: "biz/design",
+  management: "biz/management",
+  poc: "biz/poc",
+  nextjs: "eng/nextjs",
+  spring: "eng/spring",
+  ms: "eng/ms",
+  infra: "eng/infra",
+  qa: "ops/qa",
+  monitor: "ops/monitor",
+  improve: "ops/improve",
+  // 추가 별칭
+  next: "eng/nextjs",
+  backend: "eng/spring",
+  mvp: "biz/poc",
+  // System 패키지 단축명
   hooks: "semo-hooks",
   remote: "semo-remote",
 };
 
-// 패키지 입력을 해석
-function resolvePackageInput(input: string): { packages: string[] } {
+// 그룹 이름 목록 (biz, eng, ops, meta, system)
+const PACKAGE_GROUPS = ["biz", "eng", "ops", "meta", "system"] as const;
+type PackageGroup = typeof PACKAGE_GROUPS[number];
+
+// 그룹명 → 해당 그룹의 모든 패키지 반환
+function getPackagesByGroup(group: PackageGroup): string[] {
+  return Object.entries(EXTENSION_PACKAGES)
+    .filter(([, pkg]) => pkg.layer === group)
+    .map(([key]) => key);
+}
+
+// 패키지 입력을 해석 (그룹, 레거시, 쉼표 구분 모두 처리)
+function resolvePackageInput(input: string): { packages: string[]; isGroup: boolean; groupName?: string } {
   // 쉼표로 구분된 여러 패키지 처리
   const parts = input.split(",").map(p => p.trim()).filter(p => p);
   const resolvedPackages: string[] = [];
+  let isGroup = false;
+  let groupName: string | undefined;
 
   for (const part of parts) {
-    // 1. 단축명 매핑 확인 (hooks → semo-hooks 등)
+    // 1. 그룹명인지 확인 (biz, eng, ops, meta)
+    if (PACKAGE_GROUPS.includes(part as PackageGroup)) {
+      const groupPackages = getPackagesByGroup(part as PackageGroup);
+      resolvedPackages.push(...groupPackages);
+      isGroup = true;
+      groupName = part;
+      continue;
+    }
+
+    // 2. 단축명 매핑 확인 (discovery → biz/discovery 등)
     if (part in SHORTNAME_MAPPING) {
       resolvedPackages.push(SHORTNAME_MAPPING[part]);
       continue;
     }
 
-    // 2. 직접 패키지명 확인
+    // 3. 직접 패키지명 확인
     if (part in EXTENSION_PACKAGES) {
       resolvedPackages.push(part);
       continue;
     }
 
-    // 3. 유효하지 않은 패키지명
+    // 4. 유효하지 않은 패키지명
     // (빈 배열 대신 null을 추가하여 나중에 에러 처리)
   }
 
   // 중복 제거
   return {
     packages: [...new Set(resolvedPackages)],
+    isGroup,
+    groupName
   };
 }
 
@@ -758,10 +869,56 @@ async function showVersionInfo(): Promise<void> {
     });
   }
 
-  // 4. Extension 패키지들 (meta, semo-hooks, semo-remote 등) - semo-system 내부
+  // 4. 그룹 패키지 (eng, biz, ops) 및 하위 Extension - semo-system 내부
   const semoSystemDir = path.join(cwd, "semo-system");
   if (fs.existsSync(semoSystemDir)) {
-    for (const key of Object.keys(EXTENSION_PACKAGES)) {
+    for (const group of PACKAGE_GROUPS) {
+      const groupVersionPath = path.join(semoSystemDir, group, "VERSION");
+      const hasGroupVersion = fs.existsSync(groupVersionPath);
+
+      // 해당 그룹의 하위 패키지 찾기
+      const groupExtensions = Object.keys(EXTENSION_PACKAGES).filter(key => key.startsWith(`${group}/`));
+      const installedGroupExtensions = groupExtensions.filter(key =>
+        fs.existsSync(path.join(semoSystemDir, key, "VERSION"))
+      );
+
+      if (hasGroupVersion || installedGroupExtensions.length > 0) {
+        // 그룹 패키지 버전 추가
+        if (hasGroupVersion) {
+          const localGroup = fs.readFileSync(groupVersionPath, "utf-8").trim();
+          const remoteGroup = await getRemotePackageVersion(group);
+          versionInfos.push({
+            name: group,
+            local: localGroup,
+            remote: remoteGroup,
+            needsUpdate: remoteGroup ? isVersionLower(localGroup, remoteGroup) : false,
+            level: 1,
+          });
+        }
+
+        // 하위 Extension 패키지들 추가
+        for (const key of installedGroupExtensions) {
+          const extVersionPath = path.join(semoSystemDir, key, "VERSION");
+          const localExt = fs.readFileSync(extVersionPath, "utf-8").trim();
+          const remoteExt = await getRemotePackageVersion(key);
+          versionInfos.push({
+            name: key,
+            local: localExt,
+            remote: remoteExt,
+            needsUpdate: remoteExt ? isVersionLower(localExt, remoteExt) : false,
+            level: 2,
+            group: group,
+          });
+        }
+      }
+    }
+
+    // 그룹에 속하지 않는 Extension (meta 등)
+    const nonGroupExtensions = Object.keys(EXTENSION_PACKAGES).filter(key =>
+      !PACKAGE_GROUPS.some(g => key.startsWith(`${g}/`))
+    );
+
+    for (const key of nonGroupExtensions) {
       const extVersionPath = path.join(semoSystemDir, key, "VERSION");
       if (fs.existsSync(extVersionPath)) {
         const localExt = fs.readFileSync(extVersionPath, "utf-8").trim();
@@ -935,6 +1092,21 @@ async function confirmOverwrite(itemName: string, itemPath: string): Promise<boo
   return shouldOverwrite;
 }
 
+function detectProjectType(cwd: string): string[] {
+  const detected: string[] = [];
+
+  for (const [key, pkg] of Object.entries(EXTENSION_PACKAGES)) {
+    for (const file of pkg.detect) {
+      if (fs.existsSync(path.join(cwd, file))) {
+        detected.push(key);
+        break;
+      }
+    }
+  }
+
+  return detected;
+}
+
 // === 설치된 Extension 패키지 스캔 ===
 function getInstalledExtensions(cwd: string): string[] {
   const semoSystemDir = path.join(cwd, "semo-system");
@@ -1091,19 +1263,60 @@ program
       process.exit(1);
     }
 
-    // 2. Extension 패키지 처리
-    // semo-hooks는 기본 포함 (Claude Code Hooks 로깅 시스템)
-    let extensionsToInstall: string[] = ["semo-hooks"];
+    // 2. 프로젝트 유형 감지
+    const detected = detectProjectType(cwd);
+    let extensionsToInstall: string[] = [];
 
     if (options.with) {
-      const additionalPkgs = options.with.split(",").map((p: string) => p.trim()).filter((p: string) => p in EXTENSION_PACKAGES);
-      extensionsToInstall = [...new Set([...extensionsToInstall, ...additionalPkgs])];
-    }
+      extensionsToInstall = options.with.split(",").map((p: string) => p.trim()).filter((p: string) => p in EXTENSION_PACKAGES);
+    } else if (detected.length > 0) {
+      console.log(chalk.cyan("\n📦 감지된 프로젝트 유형:"));
+      detected.forEach(pkg => {
+        console.log(chalk.gray(`   - ${EXTENSION_PACKAGES[pkg].name}: ${EXTENSION_PACKAGES[pkg].desc}`));
+      });
 
-    console.log(chalk.cyan("\n📦 Extension 설치:"));
-    extensionsToInstall.forEach(pkg => {
-      console.log(chalk.gray(`   - ${EXTENSION_PACKAGES[pkg].name}: ${EXTENSION_PACKAGES[pkg].desc}`));
-    });
+      const { installDetected } = await inquirer.prompt([
+        {
+          type: "confirm",
+          name: "installDetected",
+          message: "감지된 패키지를 함께 설치할까요?",
+          default: true,
+        },
+      ]);
+
+      if (installDetected) {
+        extensionsToInstall = detected;
+      }
+    } else {
+      // 프로젝트 유형이 감지되지 않은 경우 패키지 선택 프롬프트
+      console.log(chalk.cyan("\n📦 추가 패키지 선택"));
+      console.log(chalk.gray("   기본 설치 (semo-core + semo-skills) 외에 추가할 패키지를 선택하세요.\n"));
+
+      // 그룹별로 패키지 구성
+      const packageChoices = [
+        new inquirer.Separator(chalk.yellow("── Engineering ──")),
+        { name: `eng/nextjs - ${EXTENSION_PACKAGES["eng/nextjs"].desc}`, value: "eng/nextjs" },
+        { name: `eng/spring - ${EXTENSION_PACKAGES["eng/spring"].desc}`, value: "eng/spring" },
+        { name: `eng/infra - ${EXTENSION_PACKAGES["eng/infra"].desc}`, value: "eng/infra" },
+        new inquirer.Separator(chalk.yellow("── Business ──")),
+        { name: `biz/discovery - ${EXTENSION_PACKAGES["biz/discovery"].desc}`, value: "biz/discovery" },
+        { name: `biz/management - ${EXTENSION_PACKAGES["biz/management"].desc}`, value: "biz/management" },
+        { name: `biz/design - ${EXTENSION_PACKAGES["biz/design"].desc}`, value: "biz/design" },
+        new inquirer.Separator(chalk.yellow("── Operations ──")),
+        { name: `ops/qa - ${EXTENSION_PACKAGES["ops/qa"].desc}`, value: "ops/qa" },
+      ];
+
+      const { selectedPackages } = await inquirer.prompt([
+        {
+          type: "checkbox",
+          name: "selectedPackages",
+          message: "설치할 패키지 선택 (Space로 선택, Enter로 완료):",
+          choices: packageChoices,
+        },
+      ]);
+
+      extensionsToInstall = selectedPackages;
+    }
 
     // 3. .claude 디렉토리 생성
     const claudeDir = path.join(cwd, ".claude");
@@ -1169,24 +1382,13 @@ program
       });
     }
 
-    // GitHub MCP 토큰 설정 안내
-    if (!isGitHubTokenConfigured()) {
-      console.log(chalk.yellow("\n⚠️  GitHub MCP 설정 필요"));
-      console.log(chalk.gray("   GitHub 이슈/PR 생성 기능을 사용하려면 토큰을 설정하세요:"));
-      console.log(chalk.white("\n   export GITHUB_PERSONAL_ACCESS_TOKEN=\"$(gh auth token)\""));
-      console.log(chalk.gray("\n   영구 설정: ~/.zshrc 또는 ~/.bashrc에 위 명령어 추가"));
-    } else {
-      console.log(chalk.green("\n✓ GitHub 토큰 감지됨 (MCP 사용 가능)"));
-    }
-
     console.log(chalk.cyan("\n다음 단계:"));
     console.log(chalk.gray("  1. Claude Code에서 프로젝트 열기"));
     console.log(chalk.gray("  2. 자연어로 요청하기 (예: \"댓글 기능 구현해줘\")"));
     console.log(chalk.gray("  3. /SEMO:help로 도움말 확인"));
 
-    // semo-hooks만 설치된 경우 추가 패키지 안내
-    if (extensionsToInstall.length === 1 && extensionsToInstall[0] === "semo-hooks") {
-      console.log(chalk.gray("\n💡 추가 패키지: semo add <package> (예: semo add meta)"));
+    if (extensionsToInstall.length === 0 && detected.length === 0) {
+      console.log(chalk.gray("\n💡 추가 패키지: semo add <package> (예: semo add next)"));
     }
     console.log();
   });
@@ -1299,48 +1501,26 @@ async function createStandardSymlinks(cwd: string) {
     console.log(chalk.green(`  ✓ .claude/skills/ (${skills.length}개 skill 링크됨)`));
   }
 
-  // commands 링크 (개별 파일 심볼릭 링크 방식 - 여러 패키지 지원)
+  // commands 링크
   const commandsDir = path.join(claudeDir, "commands");
   fs.mkdirSync(commandsDir, { recursive: true });
 
-  const semoCommandsDir = path.join(commandsDir, "SEMO");
+  const semoCommandsLink = path.join(commandsDir, "SEMO");
+  const commandsTarget = path.join(semoSystemDir, "semo-core", "commands", "SEMO");
 
-  // 기존 링크/디렉토리가 있으면 삭제 후 재생성
-  if (fs.existsSync(semoCommandsDir)) {
-    if (fs.lstatSync(semoCommandsDir).isSymbolicLink()) {
-      fs.unlinkSync(semoCommandsDir);
+  // 기존 링크가 있으면 삭제 후 재생성 (업데이트 시에도 최신 반영)
+  if (fs.existsSync(semoCommandsLink)) {
+    if (fs.lstatSync(semoCommandsLink).isSymbolicLink()) {
+      fs.unlinkSync(semoCommandsLink);
     } else {
-      removeRecursive(semoCommandsDir);
+      removeRecursive(semoCommandsLink);
     }
   }
 
-  // SEMO 커맨드 디렉토리 생성 (실제 디렉토리)
-  fs.mkdirSync(semoCommandsDir, { recursive: true });
-
-  // 커맨드 소스 디렉토리 목록 (semo-core + semo-remote)
-  const commandSources = [
-    { name: "semo-core", dir: path.join(semoSystemDir, "semo-core", "commands", "SEMO") },
-    { name: "semo-remote", dir: path.join(semoSystemDir, "semo-remote", "commands", "SEMO") },
-  ];
-
-  let totalCommands = 0;
-  for (const source of commandSources) {
-    if (fs.existsSync(source.dir)) {
-      const commandFiles = fs.readdirSync(source.dir).filter(f => f.endsWith(".md"));
-      for (const cmdFile of commandFiles) {
-        const cmdTarget = path.join(source.dir, cmdFile);
-        const cmdLink = path.join(semoCommandsDir, cmdFile);
-
-        // 이미 링크가 있으면 건너뛰기 (semo-core 우선)
-        if (!fs.existsSync(cmdLink)) {
-          createSymlinkOrJunction(cmdTarget, cmdLink);
-          totalCommands++;
-        }
-      }
-    }
+  if (fs.existsSync(commandsTarget)) {
+    createSymlinkOrJunction(commandsTarget, semoCommandsLink);
+    console.log(chalk.green("  ✓ .claude/commands/SEMO → semo-system/semo-core/commands/SEMO"));
   }
-
-  console.log(chalk.green(`  ✓ .claude/commands/SEMO (${totalCommands}개 command 링크됨)`));
 }
 
 // === 설치 검증 ===
@@ -1446,25 +1626,15 @@ function verifyInstallation(cwd: string, installedExtensions: string[] = []): Ve
     }
   }
 
-  // 4. commands 검증 (디렉토리 또는 개별 파일 심볼릭 링크 방식)
-  const semoCommandsDir = path.join(claudeDir, "commands", "SEMO");
+  // 4. commands 검증 (isSymlinkValid 사용)
+  const semoCommandsLink = path.join(claudeDir, "commands", "SEMO");
   try {
-    const dirExists = fs.existsSync(semoCommandsDir);
-    result.stats.commands.exists = dirExists;
-    if (dirExists) {
-      // 디렉토리인 경우: 내부 파일 검증
-      if (fs.lstatSync(semoCommandsDir).isDirectory() && !fs.lstatSync(semoCommandsDir).isSymbolicLink()) {
-        const cmdFiles = fs.readdirSync(semoCommandsDir).filter(f => f.endsWith(".md"));
-        result.stats.commands.valid = cmdFiles.length > 0;
-        if (!result.stats.commands.valid) {
-          result.warnings.push("commands/SEMO 디렉토리가 비어 있습니다");
-        }
-      } else if (fs.lstatSync(semoCommandsDir).isSymbolicLink()) {
-        // 심볼릭 링크인 경우 (구버전 호환)
-        result.stats.commands.valid = isSymlinkValid(semoCommandsDir);
-        if (!result.stats.commands.valid) {
-          result.warnings.push("깨진 링크: .claude/commands/SEMO");
-        }
+    const linkExists = fs.existsSync(semoCommandsLink) || fs.lstatSync(semoCommandsLink).isSymbolicLink();
+    result.stats.commands.exists = linkExists;
+    if (linkExists) {
+      result.stats.commands.valid = isSymlinkValid(semoCommandsLink);
+      if (!result.stats.commands.valid) {
+        result.warnings.push("깨진 링크: .claude/commands/SEMO");
       }
     }
   } catch {
@@ -1642,8 +1812,7 @@ async function downloadExtensions(cwd: string, packages: string[], force: boolea
 
     // 개별 패키지 복사
     for (const pkg of packages) {
-      // Extension 패키지는 semo-system/ 폴더에 있음
-      const srcPath = path.join(tempDir, "semo-system", pkg);
+      const srcPath = path.join(tempDir, "packages", pkg);
       const destPath = path.join(semoSystemDir, pkg);
 
       if (fs.existsSync(srcPath)) {
@@ -1736,28 +1905,6 @@ function createMergedOrchestrator(
     }
   }
 
-  // meta 패키지 포함 여부 확인
-  const hasMetaInSources = orchestratorSources.some(s => s.pkg === "meta");
-
-  // Meta 자동 체이닝 섹션
-  const metaAutoChainSection = hasMetaInSources ? `
-## 🔴 Meta 환경 자동 체이닝 (NON-NEGOTIABLE)
-
-> **조건**: semo-system/ 내 파일 수정이 감지되면
-> **동작**: 작업 종료 전 자동으로 \`skill:meta-workflow\` 호출
-
-\`\`\`text
-semo-system/ 파일 수정 감지
-    ↓
-[자동] skill:meta-workflow 호출
-    ↓
-버저닝 → 배포 → 로컬 동기화
-\`\`\`
-
-**이 규칙은 우회할 수 없습니다.**
-
-` : "";
-
   // 병합된 orchestrator.md 생성
   const mergedContent = `---
 name: orchestrator
@@ -1826,7 +1973,7 @@ ${routingTables.join("\n\n---\n\n")}
 3. **Package Priority**: 라우팅 충돌 시 설치 순서대로 우선순위 적용
 4. **Cross-Package**: 다른 패키지 전문 영역 요청 시 인계 권유
 
-${metaAutoChainSection}${crossPackageRouting.length > 0 ? `## 🔄 Cross-Package Routing
+${crossPackageRouting.length > 0 ? `## 🔄 Cross-Package Routing
 
 ${crossPackageRouting[0]}` : ""}
 
@@ -1968,30 +2115,8 @@ const BASE_MCP_SERVERS: MCPServerConfig[] = [
     name: "github",
     command: "npx",
     args: ["-y", "@modelcontextprotocol/server-github"],
-    env: {
-      GITHUB_PERSONAL_ACCESS_TOKEN: "${GITHUB_PERSONAL_ACCESS_TOKEN}",
-    },
   },
 ];
-
-// === GitHub 토큰 자동 감지 ===
-function getGitHubTokenFromCLI(): string | null {
-  try {
-    const token = execSync("gh auth token", { stdio: "pipe", encoding: "utf-8" }).trim();
-    return token || null;
-  } catch {
-    return null;
-  }
-}
-
-function isGitHubTokenConfigured(): boolean {
-  // 환경변수 확인
-  if (process.env.GITHUB_PERSONAL_ACCESS_TOKEN) {
-    return true;
-  }
-  // gh CLI 토큰 확인
-  return getGitHubTokenFromCLI() !== null;
-}
 
 // === Claude MCP 서버 존재 여부 확인 ===
 function isMCPServerRegistered(serverName: string): boolean {
@@ -2698,14 +2823,40 @@ async function setupClaudeMd(cwd: string, extensions: string[], force: boolean) 
     ? extensions.map(pkg => `├── ${pkg}/              # ${EXTENSION_PACKAGES[pkg].name}`).join("\n")
     : "";
 
-  // 패키지별 CLAUDE.md 병합 섹션 생성
+  // 그룹 및 패키지별 CLAUDE.md 병합 섹션 생성
   let packageClaudeMdSections = "";
 
-  // meta 패키지 설치 여부 확인
-  const hasMetaPackage = extensions.includes("meta");
+  // 0. meta 패키지가 설치된 경우 먼저 확인 (meta는 특별 처리)
+  const isMetaInstalled = extensions.includes("meta") ||
+    fs.existsSync(path.join(semoSystemDir, "meta", "VERSION"));
 
-  // 개별 패키지 CLAUDE.md 병합 - 중복 제거 적용
+  // 1. 설치된 패키지에서 그룹 추출 (중복 제거)
+  const installedGroups = [...new Set(
+    extensions.map(pkg => pkg.split("/")[0]).filter(g => PACKAGE_GROUPS.includes(g as PackageGroup))
+  )] as PackageGroup[];
+
+  // 2. 그룹 레벨 CLAUDE.md 먼저 병합 (biz, eng, ops) - 중복 제거 적용
+  for (const group of installedGroups) {
+    const groupClaudeMdPath = path.join(semoSystemDir, group, "CLAUDE.md");
+    if (fs.existsSync(groupClaudeMdPath)) {
+      const groupContent = fs.readFileSync(groupClaudeMdPath, "utf-8");
+      // 중복 제거 후 고유 콘텐츠만 추출
+      const uniqueContent = extractUniqueContent(groupContent, group);
+      // 헤더 레벨 조정 (# → ##, ## → ###)
+      const adjustedContent = uniqueContent
+        .replace(/^# /gm, "## ")
+        .replace(/^## /gm, "### ")
+        .replace(/^### /gm, "#### ");
+      packageClaudeMdSections += `\n\n---\n\n${adjustedContent}`;
+      console.log(chalk.green(`  + ${group}/ 그룹 CLAUDE.md 병합됨 (고유 섹션만)`));
+    }
+  }
+
+  // 3. 개별 패키지 CLAUDE.md 병합 - 중복 제거 적용
   for (const pkg of extensions) {
+    // meta 패키지는 별도 처리 (아래에서 전체 내용 병합)
+    if (pkg === "meta") continue;
+
     const pkgClaudeMdPath = path.join(semoSystemDir, pkg, "CLAUDE.md");
     if (fs.existsSync(pkgClaudeMdPath)) {
       const pkgContent = fs.readFileSync(pkgClaudeMdPath, "utf-8");
@@ -2721,24 +2872,52 @@ async function setupClaudeMd(cwd: string, extensions: string[], force: boolean) 
     }
   }
 
-  // 4. Orchestrator 참조 경로 결정 (Extension 패키지 우선)
+  // 3.5. meta 패키지 CLAUDE.md 병합 (전체 내용 - Meta 환경 규칙 포함)
+  if (isMetaInstalled) {
+    const metaClaudeMdPath = path.join(semoSystemDir, "meta", "CLAUDE.md");
+    if (fs.existsSync(metaClaudeMdPath)) {
+      const metaContent = fs.readFileSync(metaClaudeMdPath, "utf-8");
+      const pkgName = EXTENSION_PACKAGES["meta"]?.name || "Meta";
+      // meta는 중복 제거 없이 전체 내용 유지 (Core Rules가 중요)
+      // 헤더 레벨만 조정 (# → ###, ## → ####)
+      const adjustedContent = metaContent
+        .replace(/^# /gm, "### ")
+        .replace(/^## /gm, "#### ");
+      packageClaudeMdSections += `\n\n---\n\n## ${pkgName} 패키지 컨텍스트\n\n${adjustedContent}`;
+      console.log(chalk.green(`  + meta/CLAUDE.md 병합됨 (전체 내용 - Meta 환경 규칙 포함)`));
+    }
+  }
+
+  // 4. Orchestrator 참조 경로 결정 (Extension 패키지 우선, meta 포함)
   // Extension 패키지 중 orchestrator가 있는 첫 번째 패키지를 Primary로 설정
   let primaryOrchestratorPath = "semo-core/agents/orchestrator/orchestrator.md";
   const orchestratorPaths: string[] = [];
 
+  // meta 패키지 orchestrator 먼저 확인 (meta가 설치되어 있으면 최우선)
+  if (isMetaInstalled) {
+    const metaOrchestratorPath = path.join(semoSystemDir, "meta", "agents/orchestrator/orchestrator.md");
+    if (fs.existsSync(metaOrchestratorPath)) {
+      orchestratorPaths.push("semo-system/meta/agents/orchestrator/orchestrator.md");
+      primaryOrchestratorPath = "meta/agents/orchestrator/orchestrator.md";
+    }
+  }
+
+  // 나머지 Extension 패키지 orchestrator 확인
   for (const pkg of extensions) {
+    if (pkg === "meta") continue; // meta는 위에서 이미 처리
+
     const pkgOrchestratorPath = path.join(semoSystemDir, pkg, "agents/orchestrator/orchestrator.md");
     if (fs.existsSync(pkgOrchestratorPath)) {
       orchestratorPaths.push(`semo-system/${pkg}/agents/orchestrator/orchestrator.md`);
-      // 첫 번째 Extension 패키지의 orchestrator를 Primary로 설정
+      // Primary가 아직 semo-core이면 이 패키지를 Primary로 설정
       if (primaryOrchestratorPath === "semo-core/agents/orchestrator/orchestrator.md") {
         primaryOrchestratorPath = `${pkg}/agents/orchestrator/orchestrator.md`;
       }
     }
   }
 
-  // semo-core orchestrator는 항상 포함
-  orchestratorPaths.unshift("semo-system/semo-core/agents/orchestrator/orchestrator.md");
+  // semo-core orchestrator는 항상 마지막에 포함 (fallback)
+  orchestratorPaths.push("semo-system/semo-core/agents/orchestrator/orchestrator.md");
 
   // Orchestrator 참조 섹션 생성
   const orchestratorRefSection = orchestratorPaths.length > 1
@@ -2753,48 +2932,6 @@ ${orchestratorPaths.map(p => `- \`${p}\``).join("\n")}
     : `**반드시 읽어야 할 파일**: \`semo-system/semo-core/agents/orchestrator/orchestrator.md\`
 
 이 파일에서 라우팅 테이블, 의도 분류, 메시지 포맷을 확인하세요.`;
-
-  // Meta 패키지 설치 시 자동 워크플로우 강제 규칙
-  const metaWorkflowSection = hasMetaPackage ? `
-### 3. Meta 환경 자동 워크플로우 (NON-NEGOTIABLE)
-
-> **⚠️ Meta 패키지가 설치된 환경에서는 반드시 아래 규칙이 적용됩니다.**
-> **이 규칙을 우회하거나 무시하는 것은 금지됩니다.**
-
-#### 자동 트리거 조건
-
-\`semo-system/\` 디렉토리 내 파일이 수정되면:
-1. 작업 종료 전 반드시 \`skill:meta-workflow\` 호출
-2. 버저닝 → 배포 → 로컬 동기화 체인 자동 실행
-
-#### 감지 패턴
-
-다음 경로의 파일 수정 시 자동 트리거:
-- \`semo-system/semo-core/**\`
-- \`semo-system/semo-skills/**\`
-- \`semo-system/meta/**\`
-- \`semo-system/semo-remote/**\`
-- \`semo-system/semo-hooks/**\`
-- \`packages/cli/**\` (CLI 수정 시)
-
-#### 강제 동작 흐름
-
-\`\`\`text
-[작업 완료 감지]
-    ↓
-semo-system/ 또는 packages/ 파일 수정 여부 확인
-    ↓
-수정됨? → [SEMO] Skill 호출: meta-workflow
-         버저닝 → 배포 → 동기화 자동 실행
-    ↓
-수정 안됨? → 정상 종료
-\`\`\`
-
-**금지 사항**:
-- semo-system/ 수정 후 버저닝 없이 종료
-- "버저닝 나중에 해줘" 요청 수락
-- meta-workflow 스킬 호출 건너뛰기
-` : "";
 
   const claudeMdContent = `# SEMO Project Configuration
 
@@ -2849,7 +2986,46 @@ npm run build          # 3. 빌드 검증 (Next.js/TypeScript 프로젝트)
 - \`--no-verify\` 플래그 사용 금지
 - Quality Gate 우회 시도 거부
 - "그냥 커밋해줘", "빌드 생략해줘" 등 거부
-${metaWorkflowSection}
+${isMetaInstalled ? `
+### 3. Meta 환경 자동 워크플로우 (NON-NEGOTIABLE)
+
+> **⚠️ Meta 패키지가 설치된 환경에서는 반드시 아래 규칙이 적용됩니다.**
+> **이 규칙을 우회하거나 무시하는 것은 금지됩니다.**
+
+#### 자동 트리거 조건
+
+\`semo-system/\` 디렉토리 내 파일이 수정되면:
+1. 작업 종료 전 반드시 \`skill:meta-workflow\` 호출
+2. 버저닝 → 배포 → 로컬 동기화 체인 자동 실행
+
+#### 감지 패턴
+
+다음 경로의 파일 수정 시 자동 트리거:
+- \`semo-system/semo-core/**\`
+- \`semo-system/semo-skills/**\`
+- \`semo-system/meta/**\`
+- \`semo-system/semo-remote/**\`
+- \`semo-system/semo-hooks/**\`
+- \`packages/cli/**\` (CLI 수정 시)
+
+#### 강제 동작 흐름
+
+\`\`\`text
+[작업 완료 감지]
+    ↓
+semo-system/ 또는 packages/ 파일 수정 여부 확인
+    ↓
+수정됨? → [SEMO] Skill 호출: meta-workflow
+         버저닝 → 배포 → 동기화 자동 실행
+    ↓
+수정 안됨? → 정상 종료
+\`\`\`
+
+**금지 사항**:
+- semo-system/ 수정 후 버저닝 없이 종료
+- "버저닝 나중에 해줘" 요청 수락
+- meta-workflow 스킬 호출 건너뛰기
+` : ``}
 ---
 
 ## 설치된 구성
@@ -2921,7 +3097,7 @@ ${packageClaudeMdSections}
 // === add 명령어 ===
 program
   .command("add <packages>")
-  .description("Extension 패키지를 추가로 설치합니다 (meta, semo-hooks, semo-remote)")
+  .description("Extension 패키지를 추가로 설치합니다 (그룹: biz, eng, ops, system / 개별: biz/discovery, eng/nextjs, semo-hooks)")
   .option("-f, --force", "기존 설정 덮어쓰기")
   .action(async (packagesInput: string, options) => {
     const cwd = process.cwd();
@@ -2932,18 +3108,26 @@ program
       process.exit(1);
     }
 
-    // 패키지 입력 해석
-    const { packages } = resolvePackageInput(packagesInput);
+    // 패키지 입력 해석 (그룹, 레거시, 쉼표 구분 모두 처리)
+    const { packages, isGroup, groupName } = resolvePackageInput(packagesInput);
 
     if (packages.length === 0) {
       console.log(chalk.red(`\n알 수 없는 패키지: ${packagesInput}`));
+      console.log(chalk.gray(`사용 가능한 그룹: ${PACKAGE_GROUPS.join(", ")}`));
       console.log(chalk.gray(`사용 가능한 패키지: ${Object.keys(EXTENSION_PACKAGES).join(", ")}`));
       console.log(chalk.gray(`단축명: ${Object.keys(SHORTNAME_MAPPING).join(", ")}\n`));
       process.exit(1);
     }
 
-    // 패키지 설치 안내
-    if (packages.length === 1) {
+    // 그룹 설치인 경우 안내
+    if (isGroup) {
+      console.log(chalk.cyan.bold(`\n📦 ${groupName?.toUpperCase()} 그룹 패키지 일괄 설치\n`));
+      console.log(chalk.gray("   포함된 패키지:"));
+      for (const pkg of packages) {
+        console.log(chalk.gray(`   - ${pkg} (${EXTENSION_PACKAGES[pkg].name})`));
+      }
+      console.log();
+    } else if (packages.length === 1) {
       // 단일 패키지
       const pkg = packages[0];
       console.log(chalk.cyan(`\n📦 ${EXTENSION_PACKAGES[pkg].name} 패키지 설치\n`));
@@ -3018,9 +3202,9 @@ program
     const cwd = process.cwd();
     const semoSystemDir = path.join(cwd, "semo-system");
 
-    console.log(chalk.cyan.bold("\n📦 SEMO 패키지 목록\n"));
+    console.log(chalk.cyan.bold("\n📦 SEMO 패키지 목록 (v3.0)\n"));
 
-    // Standard (필수)
+    // Standard
     console.log(chalk.white.bold("Standard (필수)"));
     const coreInstalled = fs.existsSync(path.join(semoSystemDir, "semo-core"));
     const skillsInstalled = fs.existsSync(path.join(semoSystemDir, "semo-skills"));
@@ -3029,21 +3213,48 @@ program
     console.log(`  ${skillsInstalled ? chalk.green("✓") : chalk.gray("○")} semo-skills - 통합 스킬`);
     console.log();
 
-    // Extensions
-    console.log(chalk.white.bold("Extensions (선택)"));
-    const extensionList = [
-      { key: "meta", name: "Meta", desc: "SEMO 프레임워크 자체 개발/관리" },
-      { key: "semo-hooks", name: "Hooks", desc: "Claude Code Hooks 기반 로깅 시스템" },
-      { key: "semo-remote", name: "Remote", desc: "Claude Code 원격 제어 (모바일 PWA)" },
-    ];
+    // Extensions - 레이어별 그룹화
+    const layers: Record<string, { title: string; emoji: string }> = {
+      biz: { title: "Business Layer", emoji: "💼" },
+      eng: { title: "Engineering Layer", emoji: "⚙️" },
+      ops: { title: "Operations Layer", emoji: "📊" },
+      meta: { title: "Meta", emoji: "🔧" },
+      system: { title: "System", emoji: "🔩" },
+    };
 
-    for (const ext of extensionList) {
-      const isInstalled = fs.existsSync(path.join(semoSystemDir, ext.key));
-      const status = isInstalled ? chalk.green("✓") : chalk.gray("○");
-      console.log(`  ${status} ${chalk.cyan(ext.key)} - ${ext.desc}`);
-      console.log(chalk.gray(`      semo add ${ext.key}`));
+    for (const [layerKey, layerInfo] of Object.entries(layers)) {
+      const layerPackages = Object.entries(EXTENSION_PACKAGES).filter(
+        ([, pkg]) => pkg.layer === layerKey
+      );
+
+      if (layerPackages.length === 0) continue;
+
+      console.log(chalk.white.bold(`${layerInfo.emoji} ${layerInfo.title}`));
+      for (const [key, pkg] of layerPackages) {
+        const isInstalled = fs.existsSync(path.join(semoSystemDir, key));
+        const status = isInstalled ? chalk.green("✓") : chalk.gray("○");
+        const displayKey = key.includes("/") ? key.split("/")[1] : key;
+        console.log(`  ${status} ${chalk.cyan(displayKey)} - ${pkg.desc}`);
+        console.log(chalk.gray(`      semo add ${key}`));
+      }
+      console.log();
     }
+
+    // 그룹 설치 안내
+    console.log(chalk.gray("─".repeat(50)));
+    console.log(chalk.white.bold("📦 그룹 일괄 설치"));
+    console.log(chalk.gray("  semo add biz      → Business 전체 (discovery, design, management, poc)"));
+    console.log(chalk.gray("  semo add eng      → Engineering 전체 (nextjs, spring, ms, infra)"));
+    console.log(chalk.gray("  semo add ops      → Operations 전체 (qa, monitor, improve)"));
+    console.log(chalk.gray("  semo add system   → System 전체 (hooks, remote)"));
     console.log();
+
+    // 단축명 안내
+    console.log(chalk.gray("─".repeat(50)));
+    console.log(chalk.white.bold("⚡ 단축명 지원"));
+    console.log(chalk.gray("  semo add discovery  → biz/discovery"));
+    console.log(chalk.gray("  semo add qa         → ops/qa"));
+    console.log(chalk.gray("  semo add nextjs     → eng/nextjs\n"));
   });
 
 // === status 명령어 ===
@@ -3355,74 +3566,10 @@ program
       }
     }
 
-    // === 6. semo-hooks 체크 및 업데이트 ===
-    console.log(chalk.cyan("\n🪝 semo-hooks 상태 확인"));
-    const hooksDir = path.join(semoSystemDir, "semo-hooks");
+    // === 6. Hooks 업데이트 ===
+    await setupHooks(cwd, true);
 
-    if (!fs.existsSync(hooksDir)) {
-      console.log(chalk.gray("  ⏭️ semo-hooks 미설치 (선택 패키지)"));
-      console.log(chalk.gray("     💡 설치: semo add hooks"));
-    } else {
-      const hooksVersionPath = path.join(hooksDir, "VERSION");
-      const hooksVersion = fs.existsSync(hooksVersionPath)
-        ? fs.readFileSync(hooksVersionPath, "utf-8").trim()
-        : "?";
-      console.log(chalk.green(`  ✓ semo-hooks v${hooksVersion} 설치됨`));
-
-      // hooks 빌드 및 설정 업데이트
-      await setupHooks(cwd, true);
-    }
-
-    // === 7. semo-mcp 체크 ===
-    console.log(chalk.cyan("\n📡 semo-mcp 상태 확인"));
-    const userHomeDir2 = process.env.HOME || process.env.USERPROFILE || "";
-    const claudeSettingsPath = path.join(userHomeDir2, ".claude", "settings.local.json");
-
-    if (!fs.existsSync(claudeSettingsPath)) {
-      console.log(chalk.gray("  ⏭️ MCP 설정 없음 (선택사항)"));
-      console.log(chalk.gray("     💡 장기 기억이 필요하면 settings.local.json 설정 추가"));
-    } else {
-      try {
-        const settings = JSON.parse(fs.readFileSync(claudeSettingsPath, "utf-8"));
-        const mcpServers = settings.mcpServers || {};
-        const semoMcp = mcpServers["semo-integrations"];
-
-        if (!semoMcp) {
-          console.log(chalk.gray("  ⏭️ semo-integrations 미등록 (선택사항)"));
-          console.log(chalk.gray("     💡 장기 기억/원격 제어가 필요하면 MCP 설정 추가"));
-        } else {
-          console.log(chalk.green("  ✓ semo-integrations MCP 서버 등록됨"));
-
-          // v3.0: SEMO_DB_PASSWORD만 체크
-          const env = semoMcp.env || {};
-          if (env["SEMO_DB_PASSWORD"]) {
-            console.log(chalk.green("  ✓ 장기 기억: 활성화"));
-          } else {
-            console.log(chalk.gray("  ⏭️ 장기 기억: 비활성화 (SEMO_DB_PASSWORD 미설정)"));
-          }
-        }
-      } catch {
-        console.log(chalk.yellow("  ⚠ settings.local.json 파싱 오류"));
-      }
-    }
-
-    // CLI 도구 체크 (v3.0: 스킬에서 CLI 직접 호출)
-    console.log(chalk.cyan("\n🔧 CLI 도구 확인"));
-    const cliToolsUpdate = [
-      { name: "gh", desc: "GitHub CLI" },
-      { name: "supabase", desc: "Supabase CLI" },
-    ];
-
-    for (const tool of cliToolsUpdate) {
-      try {
-        execSync(`${tool.name} --version`, { stdio: ["pipe", "pipe", "pipe"] });
-        console.log(chalk.green(`  ✓ ${tool.name} 설치됨`));
-      } catch {
-        console.log(chalk.yellow(`  ⚠ ${tool.name} 미설치 (${tool.desc})`));
-      }
-    }
-
-    // === 8. 설치 검증 ===
+    // === 7. 설치 검증 ===
     const verificationResult = verifyInstallation(cwd, installedExtensions);
     printVerificationResult(verificationResult);
 
@@ -3560,178 +3707,8 @@ program
       console.log(chalk.red("   ❌ .claude/ 디렉토리 없음"));
     }
 
-    // 4. semo-hooks 상태 확인
-    console.log(chalk.cyan("\n4. semo-hooks (Claude Code Hooks)"));
-    const hooksDir = path.join(semoSystemDir, "semo-hooks");
-    const hooksDistDir = path.join(hooksDir, "dist");
-    const hooksIndexJs = path.join(hooksDistDir, "index.js");
-
-    if (!fs.existsSync(hooksDir)) {
-      console.log(chalk.gray("   ⏭️ semo-hooks 미설치 (선택 패키지)"));
-      console.log(chalk.gray("   💡 설치: semo add hooks"));
-    } else {
-      // hooks 버전 확인
-      const hooksVersionPath = path.join(hooksDir, "VERSION");
-      const hooksVersion = fs.existsSync(hooksVersionPath)
-        ? fs.readFileSync(hooksVersionPath, "utf-8").trim()
-        : "?";
-      console.log(chalk.green(`   ✅ semo-hooks v${hooksVersion} 설치됨`));
-
-      // 빌드 상태 확인
-      if (!fs.existsSync(hooksDistDir) || !fs.existsSync(hooksIndexJs)) {
-        console.log(chalk.red("   ❌ 빌드되지 않음 (dist/index.js 없음)"));
-        console.log(chalk.gray("      💡 해결: semo hooks enable"));
-      } else {
-        console.log(chalk.green("   ✅ 빌드 완료 (dist/index.js 존재)"));
-      }
-
-      // settings.local.json hooks 설정 확인
-      const homeDir = process.env.HOME || process.env.USERPROFILE || "";
-      const settingsPath = path.join(homeDir, ".claude", "settings.local.json");
-
-      if (!fs.existsSync(settingsPath)) {
-        console.log(chalk.yellow("   ⚠️ settings.local.json 없음"));
-        console.log(chalk.gray("      💡 해결: semo hooks enable"));
-      } else {
-        try {
-          const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-          const hooksConfig = settings.hooks;
-
-          if (!hooksConfig) {
-            console.log(chalk.yellow("   ⚠️ hooks 설정 없음"));
-            console.log(chalk.gray("      💡 해결: semo hooks enable"));
-          } else {
-            const requiredHooks = ["SessionStart", "UserPromptSubmit", "Stop", "SessionEnd"];
-            const missingHooks: string[] = [];
-            const invalidPathHooks: string[] = [];
-
-            for (const hookName of requiredHooks) {
-              const hookArray = hooksConfig[hookName];
-              if (!hookArray || !Array.isArray(hookArray) || hookArray.length === 0) {
-                missingHooks.push(hookName);
-              } else {
-                // 경로 검증
-                const hookEntry = hookArray[0];
-                const innerHooks = hookEntry?.hooks;
-                if (innerHooks && Array.isArray(innerHooks) && innerHooks.length > 0) {
-                  const command = innerHooks[0]?.command || "";
-                  // 현재 프로젝트의 semo-hooks 경로와 비교
-                  if (!command.includes(hooksDir) && !command.includes("semo-hooks")) {
-                    invalidPathHooks.push(hookName);
-                  }
-                }
-              }
-            }
-
-            if (missingHooks.length > 0) {
-              console.log(chalk.yellow(`   ⚠️ 누락된 hooks: ${missingHooks.join(", ")}`));
-              console.log(chalk.gray("      💡 해결: semo hooks enable"));
-            } else if (invalidPathHooks.length > 0) {
-              console.log(chalk.yellow(`   ⚠️ 경로 불일치: ${invalidPathHooks.join(", ")}`));
-              console.log(chalk.gray("      💡 해결: semo hooks enable (다른 프로젝트 설정 감지)"));
-            } else {
-              console.log(chalk.green("   ✅ hooks 설정 완료 (4개 hook 등록됨)"));
-            }
-          }
-        } catch {
-          console.log(chalk.red("   ❌ settings.local.json 파싱 오류"));
-        }
-      }
-    }
-
-    // 5. semo-mcp (MCP 서버) 상태 확인
-    // v3.0: semo-mcp는 Memory + Remote만 제공 (선택사항)
-    // Slack/GitHub/Supabase는 스킬에서 CLI 직접 호출
-    console.log(chalk.cyan("\n5. semo-mcp (MCP 서버) - 선택사항"));
-    const userHomeDir = process.env.HOME || process.env.USERPROFILE || "";
-    const claudeSettingsPath = path.join(userHomeDir, ".claude", "settings.local.json");
-
-    // MCP 서버 설정 확인
-    if (!fs.existsSync(claudeSettingsPath)) {
-      console.log(chalk.gray("   ⏭️ settings.local.json 없음 (MCP 미사용)"));
-      console.log(chalk.gray("   💡 장기 기억이 필요하면 semo-mcp 설정 추가"));
-    } else {
-      try {
-        const settings = JSON.parse(fs.readFileSync(claudeSettingsPath, "utf-8"));
-        const mcpServers = settings.mcpServers || {};
-
-        // semo-integrations MCP 서버 확인
-        const semoMcp = mcpServers["semo-integrations"];
-        if (!semoMcp) {
-          console.log(chalk.gray("   ⏭️ semo-integrations 미등록 (선택사항)"));
-          console.log(chalk.gray("   💡 장기 기억/원격 제어가 필요하면 MCP 설정 추가"));
-        } else {
-          console.log(chalk.green("   ✅ semo-integrations MCP 서버 등록됨"));
-
-          // 명령어 경로 확인
-          const mcpCommand = semoMcp.command || "";
-          const mcpArgs = semoMcp.args || [];
-
-          if (mcpCommand === "npx") {
-            console.log(chalk.green("   ✅ npx 방식 실행 (자동 업데이트)"));
-          } else if (mcpCommand === "node") {
-            const scriptPath = mcpArgs[0] || "";
-            if (scriptPath && fs.existsSync(scriptPath)) {
-              console.log(chalk.green(`   ✅ 로컬 스크립트: ${scriptPath}`));
-            } else if (scriptPath) {
-              console.log(chalk.red(`   ❌ 스크립트 경로 없음: ${scriptPath}`));
-            }
-          }
-
-          // v3.0: 환경변수 체크 - SEMO_DB_PASSWORD만 확인 (장기 기억용)
-          const env = semoMcp.env || {};
-          if (env["SEMO_DB_PASSWORD"]) {
-            console.log(chalk.green("   ✅ 장기 기억: 활성화 (SEMO_DB_PASSWORD 설정됨)"));
-          } else {
-            console.log(chalk.gray("   ⏭️ 장기 기억: 비활성화"));
-            console.log(chalk.gray("      💡 SEMO_DB_PASSWORD 설정 시 활성화"));
-          }
-
-          // v3.0: 도구 목록 업데이트 (Memory + Remote만)
-          const v3Tools = [
-            // Memory
-            "semo_remember", "semo_recall", "semo_save_fact",
-            "semo_get_facts", "semo_get_history", "semo_memory_status",
-            "semo_process_embeddings", "semo_recall_smart",
-            // Remote
-            "semo_remote_request", "semo_remote_respond", "semo_remote_pending",
-          ];
-          console.log(chalk.gray(`   📦 제공 도구: ${v3Tools.length}개 (Memory ${8}, Remote ${3})`));
-        }
-
-        // 다른 MCP 서버 확인
-        const otherServers = Object.keys(mcpServers).filter(k => k !== "semo-integrations");
-        if (otherServers.length > 0) {
-          console.log(chalk.gray(`   📡 기타 MCP 서버: ${otherServers.join(", ")}`));
-        }
-      } catch {
-        console.log(chalk.red("   ❌ settings.local.json 파싱 오류"));
-      }
-    }
-
-    // 5-1. CLI 도구 확인 (v3.0: 스킬에서 CLI 직접 호출)
-    console.log(chalk.cyan("\n5-1. CLI 도구 (Skill용)"));
-    const cliTools = [
-      { name: "gh", desc: "GitHub CLI", check: "gh --version" },
-      { name: "supabase", desc: "Supabase CLI", check: "supabase --version" },
-    ];
-
-    for (const tool of cliTools) {
-      try {
-        const { execSync } = require("child_process");
-        const version = execSync(tool.check, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim().split("\n")[0];
-        console.log(chalk.green(`   ✅ ${tool.name}: ${version}`));
-      } catch {
-        console.log(chalk.yellow(`   ⚠️ ${tool.name} 미설치 (${tool.desc})`));
-        console.log(chalk.gray(`      💡 일부 스킬 기능이 제한될 수 있습니다`));
-      }
-    }
-
-    // Slack은 curl로 호출하므로 별도 체크 불필요
-    console.log(chalk.gray("   ℹ️ Slack: curl 사용 (별도 CLI 불필요)"));
-
-    // 6. 전체 설치 검증
-    console.log(chalk.cyan("\n6. 전체 설치 검증"));
+    // 4. 설치 검증
+    console.log(chalk.cyan("\n4. 전체 설치 검증"));
     const verificationResult = verifyInstallation(cwd, []);
     if (verificationResult.success) {
       console.log(chalk.green("   ✅ 설치 상태 정상"));
