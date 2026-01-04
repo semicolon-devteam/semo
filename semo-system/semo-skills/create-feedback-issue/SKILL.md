@@ -17,6 +17,44 @@ model: inherit
 
 모든 SEMO 패키지에서 공통으로 사용하는 피드백 수집 Skill입니다.
 
+---
+
+## 🔴 NON-NEGOTIABLE RULES
+
+### 로컬 수정 금지
+
+> **feedback 스킬은 절대로 로컬 스킬 파일을 직접 수정하지 않습니다.**
+
+| 동작 | 허용 여부 | 설명 |
+|------|----------|------|
+| `semo` 레포에 이슈 생성 | ✅ 허용 | GitHub 이슈로 피드백 등록 |
+| 로컬 스킬 파일 수정 | ❌ 금지 | semo-system/ 내 파일 수정 불가 |
+| 로컬 CLAUDE.md 수정 | ❌ 금지 | .claude/ 내 파일 수정 불가 |
+
+### 이유
+
+- 로컬 수정은 npm 패키지 업데이트 시 덮어씌워짐
+- SEMO 팀에 피드백이 전달되지 않음
+- 다른 사용자에게 개선사항이 공유되지 않음
+
+### Meta 환경 예외
+
+Meta 환경(semo 레포 직접 작업)에서만 직접 수정 허용:
+
+```bash
+# Meta 환경 확인 방법
+git remote -v | grep "semicolon-devteam/semo"
+# 또는
+[ -d "semo-system/meta" ] && echo "Meta 환경"
+```
+
+| 환경 | 동작 |
+|------|------|
+| 일반 환경 (semo init 설치) | 이슈 생성만 허용 |
+| Meta 환경 (semo 레포) | 직접 수정 허용 (process-feedback 스킬 사용) |
+
+---
+
 ## Feedback Types
 
 | 유형 | 설명 | 라벨 |

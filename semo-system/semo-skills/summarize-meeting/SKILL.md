@@ -18,7 +18,9 @@ model: inherit
 
 회의 녹취록 텍스트를 분석하여 구조화된 회의록과 의사결정 로그를 **command-center 레포의 GitHub Discussions**에 생성합니다.
 
-## 🔴 출력 위치 (NON-NEGOTIABLE)
+## 🔴 NON-NEGOTIABLE RULES
+
+### 출력 위치
 
 | 유형 | 저장소 | 카테고리 |
 |------|--------|----------|
@@ -26,6 +28,54 @@ model: inherit
 | 의사결정 로그 | `semicolon-devteam/command-center` | Decision-Log |
 
 **로컬 파일 생성 금지** - 반드시 GitHub Discussions에 생성
+
+### 필수 생성물 (Dual Output)
+
+> **모든 회의에 대해 반드시 회의록과 의사결정 로그를 모두 생성해야 합니다.**
+
+| 생성물 | 필수 여부 | 설명 |
+|--------|----------|------|
+| 회의록 | **필수** | 회의 전체 내용 정리 |
+| 의사결정 로그 | **필수** | 결정사항 별도 문서화 (결정이 없어도 "결정사항 없음" 명시) |
+
+**단일 출력 금지** - 회의록만 생성하거나 의사결정 로그만 생성 금지
+
+### Discussion Template 준수 (MANDATORY)
+
+> **반드시 아래 템플릿 파일의 구조를 따라 작성해야 합니다.**
+
+| 템플릿 | 경로 | 용도 |
+|--------|------|------|
+| 회의록 | `.github/DISCUSSION_TEMPLATE/meeting-minutes.yml` | 회의록 구조 정의 |
+| 의사결정 로그 | `.github/DISCUSSION_TEMPLATE/decision-log.yml` | 의사결정 로그 구조 정의 |
+
+**템플릿 무시 금지** - 임의의 형식으로 작성하지 않고 반드시 템플릿 구조 준수
+
+#### 회의록 필수 필드 (meeting-minutes.yml 기반)
+
+**제목 형식**: `[월/일] 정기 회고 & 회의`
+
+| 필드 | 필수 | 설명 |
+|------|------|------|
+| 회의 일시 | ✅ | 날짜 및 시간 |
+| 회의 유형 | ✅ | 정기 회고&회의 / 비정기 회의 / 긴급 회의 |
+| 참석자 | ✅ | @멘션 형식 |
+| 회의 안건 | ✅ | 체크리스트 형태 |
+| Clova Note 링크 | ⬜ | 선택 |
+| 추가 메모 | ⬜ | 선택 |
+
+#### 의사결정 로그 필수 필드 (decision-log.yml 기반)
+
+**제목 형식**: `[YYYY-MM-DD] 결정 내용 요약`
+
+| 필드 | 필수 | 설명 |
+|------|------|------|
+| 의사결정 분류 | ✅ | 기술/아키텍처, 제품/기획, 운영/프로세스, 인사/조직, 비즈니스/전략 |
+| 결정 출처 | ✅ | 정기 회의, 긴급 회의, Slack 논의, GitHub Discussion 등 |
+| 참여자 | ✅ | @멘션 형식 |
+| 의사결정 배경 | ✅ | 결정이 필요했던 배경 |
+| 의사결정 내용 | ✅ | 최종 결정 사항 |
+| 추가 메모 | ⬜ | 선택 |
 
 ## Execution Flow
 
@@ -71,7 +121,7 @@ mutation($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
     }
   }
 }' \
-  -f repoId="R_kgDOOdzh9A" \
+  -f repoId="R_kgDOOdzh9w" \
   -f categoryId="DIC_kwDOOdzh984Cw9Lp" \
   -f title="[회의록] {날짜} - {회의명}" \
   -f body="$MEETING_BODY"
@@ -94,7 +144,7 @@ mutation($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
     }
   }
 }' \
-  -f repoId="R_kgDOOdzh9A" \
+  -f repoId="R_kgDOOdzh9w" \
   -f categoryId="DIC_kwDOOdzh984Cw9Lq" \
   -f title="[{날짜}] {의사결정 제목}" \
   -f body="$DECISION_BODY"
