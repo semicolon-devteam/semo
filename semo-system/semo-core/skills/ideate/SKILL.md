@@ -49,7 +49,7 @@ Phase 3: Epic Issue 직접 생성
   - dev-checklist 검증 (Task에 위임할 항목 수집)
   - Epic Issue 생성 (Design Brief 내용 직접 포함)
       ↓
-[Specification Phase로 진행]
+[Task 생성으로 진행] → skill:create-tasks
 ```
 
 ## Phase 1: Brainstorming
@@ -233,8 +233,8 @@ gh issue create \
 > 💡 개발자 체크리스트는 Task Issue 생성 시 각 Task에 포함됩니다.
 
 ### 다음 단계
-1. **Epic 검토**: {epic_url}에서 내용 확인
-2. **Spec 작성**: "spec 작성해줘" 또는 `skill:generate-spec`
+1. **Task 생성**: "태스크 만들어줘" 또는 `skill:create-tasks`
+2. **Spec 작성**: Task 생성 후 "spec 작성해줘"
 ```
 
 ## Usage
@@ -254,8 +254,8 @@ skill: ideate({ idea: "실시간 알림", spike: true });
 
 - `explore-approach` - 기술 불확실성 탐색 (spike)
 - `create-epic` - Epic 생성 헬퍼 (GitHub API 로직)
-- `generate-spec` - Specification Phase (ideate 이후)
-- `create-issues` - Task Issue 생성 (개발자 체크리스트 포함)
+- `create-tasks` - Epic → Task Issue 분해 (이 스킬 이후 호출)
+- `generate-spec` - Speckit 문서 생성 (Task 생성 후 호출)
 
 ## References
 
