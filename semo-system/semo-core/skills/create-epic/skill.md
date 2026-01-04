@@ -2,8 +2,7 @@
 name: create-epic
 description: |
   Create Epic issue in docs repository. Use when (1) ideate 스킬에서 자동 호출,
-  (2) epic-master needs to create new Epic, (3) Design Brief → Epic 변환,
-  (4) converting requirements into GitHub Issue.
+  (2) epic-master needs to create new Epic, (3) 요구사항 → Epic 변환.
 tools: [Bash, Read, GitHub CLI]
 ---
 
@@ -15,48 +14,98 @@ tools: [Bash, Read, GitHub CLI]
 
 ## 개요
 
-Design Brief 또는 PO/기획자 요구사항을 GitHub Epic Issue로 생성합니다.
+ideate 스킬에서 수집한 정보를 GitHub Epic Issue로 생성합니다.
+
+> **📌 Epic 본문에는 Design Brief 내용이 직접 포함됩니다.**
+> **📌 개발자 체크리스트는 Task Issue로 위임됩니다 (Epic에 포함하지 않음).**
 
 ## 호출 방식
 
 | 호출자 | 입력 | 특징 |
 |--------|------|------|
-| `ideate` 스킬 | Design Brief + dev-checklist | 자동 연계, 검증 완료 상태 |
+| `ideate` 스킬 | Brainstorming 결과 | 자동 연계, Epic 본문 직접 생성 |
 | `epic-master` 에이전트 | 요구사항 정보 | 수동 정보 수집 |
-| 직접 호출 | 사용자 입력 | dev-checklist 수동 검증 |
-
-## 🔴 개발자 관점 체크리스트 (필수)
-
-> **Epic 생성 전 반드시 [dev-checklist.md](references/dev-checklist.md)를 검토합니다.**
-
-Epic 작성 시 개발자가 구현 단계에서 할 질문들을 사전에 점검:
-
-| 카테고리 | 핵심 질문 |
-|----------|----------|
-| 데이터 흐름 | 충돌 해결? 멀티플랫폼 동기화? |
-| 시간/계산 | 집계 기준? 일할 계산? |
-| 플랫폼 제약 | PWA/웹/네이티브 제약사항? |
-| 도메인 지식 | 업계 표준? 엣지 케이스? |
-
-**체크리스트 미검토 시 Epic 생성 금지**
+| 직접 호출 | 사용자 입력 | 정보 수집 필요 |
 
 ## 트리거
 
 - `epic-master` 에이전트에서 호출
 - 명시적 호출: `skill:create-epic`
 
+## Epic 본문 템플릿
+
+```markdown
+## 📋 {기능명}
+
+## 🎯 Problem Statement
+- **현재 상황**: {현재 사용자 경험}
+- **문제점**: {해결해야 할 핵심 문제}
+- **영향**: {비즈니스/사용자 영향}
+
+## 🎯 Goals
+- **Primary**: {핵심 목표}
+- **Secondary**: {부가 목표}
+- **Non-goals**: {명시적 범위 외}
+
+## 👤 User Scenarios
+1. 사용자가 {action}
+2. 시스템이 {response}
+3. 결과로 {outcome}
+
+## ⚠️ Constraints
+- **기술적**: {기존 스택, 성능}
+- **비즈니스**: {일정, 리소스}
+- **사용자**: {접근성, 호환성}
+
+## 📊 Success Metrics
+- [ ] {측정 가능한 지표 1}
+- [ ] {측정 가능한 지표 2}
+```
+
+**Epic 본문에 포함되지 않는 항목**:
+
+- ❌ Design Brief 링크 (내용이 직접 포함되므로 불필요)
+- ❌ 개발자 체크리스트 (Task Issue로 위임)
+
 ## Quick Start
 
 ```bash
-# 1. 템플릿 로드
-.claude/semo-po/templates/epic-template.md
+# 1. Epic 본문 생성 (Design Brief 내용 직접 포함)
+EPIC_BODY=$(cat <<'EOF'
+## 📋 {기능명}
+
+## 🎯 Problem Statement
+- **현재 상황**: {현재 사용자 경험}
+- **문제점**: {해결해야 할 핵심 문제}
+- **영향**: {비즈니스/사용자 영향}
+
+## 🎯 Goals
+- **Primary**: {핵심 목표}
+- **Secondary**: {부가 목표}
+- **Non-goals**: {명시적 범위 외}
+
+## 👤 User Scenarios
+1. 사용자가 {action}
+2. 시스템이 {response}
+3. 결과로 {outcome}
+
+## ⚠️ Constraints
+- **기술적**: {기존 스택, 성능}
+- **비즈니스**: {일정, 리소스}
+- **사용자**: {접근성, 호환성}
+
+## 📊 Success Metrics
+- [ ] {측정 가능한 지표 1}
+- [ ] {측정 가능한 지표 2}
+EOF
+)
 
 # 2. GitHub Issue 생성 (프로젝트명 라벨 사용)
 # 🔴 기술영역 라벨(epic, frontend, backend) 대신 프로젝트명 라벨 사용
 gh issue create \
   --repo semicolon-devteam/docs \
   --title "[Epic] {DOMAIN_NAME} · {short_description}" \
-  --body "{rendered_template}" \
+  --body "$EPIC_BODY" \
   --label "{project_label}"
 
 # 프로젝트명 라벨 예시: 차곡, 노조관리, 랜드, 오피스, 코인톡, 공통
@@ -176,10 +225,10 @@ gh api graphql -f query='
 
 - `ideate` - 아이디어 탐색 → Epic 원스톱 워크플로우 (이 스킬 자동 호출)
 - `epic-master` Agent - 요구사항 수집 후 이 스킬 호출
-- [Epic Template](../templates/epic-template.md)
+- `create-issues` - Task Issue 생성 (개발자 체크리스트 포함)
 
 ## References
 
 - [Workflow](references/workflow.md) - 입력 스키마, 상세 동작 프로세스
 - [Output Format](references/output-format.md) - 성공 출력, 에러 처리
-- [Dev Checklist](references/dev-checklist.md) - 개발자 관점 질문 체크리스트
+- [Dev Checklist](references/dev-checklist.md) - 개발자 관점 질문 체크리스트 (Task 위임용)

@@ -15,6 +15,7 @@ location: project
 
 > **Source of Truth**: specs/ 폴더가 상세 명세의 진실 소스
 > **Issue 역할**: 협업 허브 (진행상황 추적, AC 체크, 테스트 결과)
+> **개발자 체크리스트**: Epic에서 위임받아 각 Task에 포함
 
 ## Quick Start
 
@@ -88,6 +89,31 @@ cat $SPECS_DIR/plan.md     # 기술 접근 방식 (링크용)
 - [ ] {AC 2 from spec.md}
 - [ ] {AC 3 from spec.md}
 
+## 👨‍💻 개발자 체크리스트
+
+<!-- Epic #{epic_number}에서 위임된 검증 항목 -->
+
+### 데이터 흐름
+
+- [ ] 동시 수정 시 충돌 해결 정책: {정책}
+- [ ] 멀티플랫폼 동기화: {전략}
+- [ ] 삭제 정책: {soft/hard delete}
+
+### 시간/계산
+
+- [ ] 집계 기준: {기준}
+- [ ] 타임존: {타임존}
+
+### 플랫폼 제약
+
+- [ ] PWA/웹 제약사항: {제약}
+- [ ] 대안: {대안}
+
+### 도메인 지식
+
+- [ ] 업계 표준: {표준}
+- [ ] 엣지 케이스: {케이스}
+
 ## 🧪 테스트 케이스
 
 ### 엔지니어 테스트
@@ -111,6 +137,8 @@ cat $SPECS_DIR/plan.md     # 기술 접근 방식 (링크용)
 | Epic | #{epic_number} |
 | Depends on | #{dep_issue} |
 ```
+
+> **📌 개발자 체크리스트는 ideate 스킬에서 수집된 정보가 Epic을 통해 위임됩니다.**
 
 ### Phase 4: Execute Creation
 
@@ -237,10 +265,15 @@ SPECS_URL="https://github.com/${OWNER}/${REPO}/blob/dev/specs/${FEATURE_SLUG}"
 
 ## Related
 
+- `ideate` - 아이디어 → Epic (개발자 체크리스트 수집)
+- `create-epic` - Epic Issue 생성
+- `spec` - Generates tasks.md that feeds this skill
+- `implement` - Uses created issues for tracking
+
+## References
+
 - [Usage Guide](references/usage-guide.md) - Detailed usage examples and output formats
 - [Naming Conventions](references/naming-conventions.md) - Label and title standards
 - [Dependency Handling](references/dependency-handling.md) - Dependency chain management
 - [Epic Creation](references/epic-creation.md) - How to create parent Epics
 - [Error Handling](references/error-handling.md) - Error scenarios and success criteria
-- `spec` - Generates tasks.md that feeds this skill
-- `implement` - Uses created issues for tracking
