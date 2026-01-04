@@ -179,3 +179,4 @@ semo-ms → eng/ms
 | `version-updater` | 버전 체크 및 업데이트 알림 |
 | `check-feedback` | SEMO 피드백 이슈 수집 |
 | `process-feedback` | SEMO 피드백 분석/반영/배포 |
+| `assign-task` | 업무 할당 + 작업량 산정 + Slack 알림 |

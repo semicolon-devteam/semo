@@ -28,19 +28,16 @@ model: inherit
 
 | 키워드 | Route To | 예시 |
 |--------|----------|------|
-| 아이디어, 구상, 만들고 싶어 | `skill:ideate` | "뭔가 만들고 싶어", "아이디어가 있는데" |
 | 구현, implement, 코드 작성 | `skill:write-code` (Extension 우선) | "기능 구현해줘", "함수 만들어줘" |
 | 커밋, 푸시, PR | `skill:git-workflow` (Extension 우선) | "커밋해줘", "PR 만들어줘" |
 | 테스트 작성 | `skill:write-test` | "테스트 작성해줘" |
 | 테스트 요청, QA 요청 | `skill:request-test` | "#123 테스트 요청" |
-| 내 테스트, 할당된 테스트, 테스트 목록 | `skill:qa-test` | "내 테스트 목록" |
-| 테스트 결과 업데이트, 테스트 완료 | `skill:qa-test` | "#123 테스트 완료" |
-| 품질 검증, quality gate, 검증 | `skill:quality-gate` | "검증해줘" |
 | 계획, 설계 | `skill:create-impl-plan` | "구현 계획 세워줘" |
 | 배포 (STG/PRD) | `skill:release-manager` | "stg 배포해줘" |
 | 배포 (프로젝트 별칭) | `skill:trigger-deploy` | "랜드 stg 배포해줘" |
 | 배포 (ms-*, Docker) | `skill:deploy-service` | "ms-notifier 배포" |
 | 슬랙, 알림 | `skill:notify-slack` | "슬랙에 알려줘" |
+| 업무 할당, assignee, 담당자 | `skill:assign-task` | "이슈 할당해줘", "#123 @kim 할당" |
 | 피드백 | `skill:create-feedback-issue` | "피드백 등록해줘" |
 | 버전, 업데이트 | `skill:version-updater` | "버전 체크해줘" |
 | 도움말 | `skill:semo-help` | "도움말" |
@@ -288,53 +285,33 @@ fi
 
 | Skill | 역할 |
 |-------|------|
-| `ideate` | 아이디어 탐색 → Design Brief → Epic |
 | `write-code` | 코드 작성/수정/구현 |
-| `write-test` | 테스트 코드 작성 |
-| `quality-gate` | 린트/빌드/테스트 검증 |
 | `git-workflow` | 커밋/푸시/PR |
-| `request-test` | QA에게 테스트 요청 |
-| `qa-test` | QA 테스트 관리 (목록/결과) |
-| `planner` | 계획 수립 |
-| `deployer` | 배포 |
+| `write-test` | 테스트 작성 |
+| `request-test` | QA 테스트 요청 |
+| `create-impl-plan` | 구현 계획 수립 |
+| `trigger-deploy` | 배포 |
 | `notify-slack` | Slack 알림 |
-| `feedback` | 피드백 관리 |
-| `memory` | 컨텍스트 관리 |
+| `create-feedback-issue` | 피드백 등록 |
+| `assign-task` | 업무 할당 + 작업량 산정 |
+| `persist-context` | 컨텍스트 관리 |
 | `version-updater` | 버전 체크 |
 | `semo-help` | 도움말 |
 
 ## 🔴 스킬 간 연결 (Skill Chain)
 
-> **write-code → write-test → quality-gate → git-workflow 체인**
-
-### 체이닝 플로우
+> **implement → git-workflow 자동 연결**
 
 ```text
-skill:write-code 완료
+skill:implement 완료
     │
-    └→ "다음 단계" 프롬프트
+    └→ "커밋할까요?" 프롬프트 표시
            │
-           ├─ "테스트 작성해줘" → skill:write-test
-           │       │
-           │       └→ "검증해줘" → skill:quality-gate
-           │               │
-           │               └→ "커밋해줘" → skill:git-workflow
-           │
-           ├─ "검증해줘" → skill:quality-gate (테스트 건너뜀)
-           │       │
-           │       └→ "커밋해줘" → skill:git-workflow
-           │
-           └─ "커밋해줘" → skill:git-workflow (검증 건너뜀)
+           ├─ "커밋해줘" → skill:git-workflow 호출
+           ├─ "푸시해줘" → skill:git-workflow 호출 (push)
+           ├─ "PR 만들어줘" → skill:git-workflow 호출 (PR)
+           └─ "아니" → 대기
 ```
-
-### 각 스킬 완료 시 프롬프트
-
-| 스킬 | 완료 후 프롬프트 옵션 |
-|------|---------------------|
-| `write-code` | 테스트 작성 / 검증 / 커밋 |
-| `write-test` | 검증 / 커밋 |
-| `quality-gate` | 커밋 |
-| `git-workflow` | 푸시 / PR 생성 |
 
 ### Extension별 git-workflow 라우팅
 
