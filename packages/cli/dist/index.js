@@ -1159,55 +1159,22 @@ program
         spinner.fail("Git 레포지토리가 아닙니다. 'git init'을 먼저 실행하세요.");
         process.exit(1);
     }
-    // 2. 프로젝트 유형 감지
-    const detected = detectProjectType(cwd);
+    // 2. Extension 패키지 처리 (--with 옵션만 지원, 인터랙션 없음)
     let extensionsToInstall = [];
     if (options.with) {
-        extensionsToInstall = options.with.split(",").map((p) => p.trim()).filter((p) => p in EXTENSION_PACKAGES);
+        // --with 옵션으로 명시적 패키지 지정 시에만 Extension 설치
+        extensionsToInstall = options.with.split(",").map((p) => p.trim()).filter((p) => p in EXTENSION_PACKAGES || p in SHORTNAME_MAPPING);
+        // 별칭 처리
+        extensionsToInstall = extensionsToInstall.map((p) => SHORTNAME_MAPPING[p] || p);
     }
-    else if (detected.length > 0) {
-        console.log(chalk_1.default.cyan("\n📦 감지된 프로젝트 유형:"));
+    // 프로젝트 유형 감지는 정보 제공용으로만 사용 (자동 설치 안 함)
+    const detected = detectProjectType(cwd);
+    if (detected.length > 0 && !options.with) {
+        console.log(chalk_1.default.cyan("\n💡 감지된 프로젝트 유형:"));
         detected.forEach(pkg => {
             console.log(chalk_1.default.gray(`   - ${EXTENSION_PACKAGES[pkg].name}: ${EXTENSION_PACKAGES[pkg].desc}`));
         });
-        const { installDetected } = await inquirer_1.default.prompt([
-            {
-                type: "confirm",
-                name: "installDetected",
-                message: "감지된 패키지를 함께 설치할까요?",
-                default: true,
-            },
-        ]);
-        if (installDetected) {
-            extensionsToInstall = detected;
-        }
-    }
-    else {
-        // 프로젝트 유형이 감지되지 않은 경우 패키지 선택 프롬프트
-        console.log(chalk_1.default.cyan("\n📦 추가 패키지 선택"));
-        console.log(chalk_1.default.gray("   기본 설치 (semo-core + semo-skills) 외에 추가할 패키지를 선택하세요.\n"));
-        // 그룹별로 패키지 구성
-        const packageChoices = [
-            new inquirer_1.default.Separator(chalk_1.default.yellow("── Engineering ──")),
-            { name: `eng/nextjs - ${EXTENSION_PACKAGES["eng/nextjs"].desc}`, value: "eng/nextjs" },
-            { name: `eng/spring - ${EXTENSION_PACKAGES["eng/spring"].desc}`, value: "eng/spring" },
-            { name: `eng/infra - ${EXTENSION_PACKAGES["eng/infra"].desc}`, value: "eng/infra" },
-            new inquirer_1.default.Separator(chalk_1.default.yellow("── Business ──")),
-            { name: `biz/discovery - ${EXTENSION_PACKAGES["biz/discovery"].desc}`, value: "biz/discovery" },
-            { name: `biz/management - ${EXTENSION_PACKAGES["biz/management"].desc}`, value: "biz/management" },
-            { name: `biz/design - ${EXTENSION_PACKAGES["biz/design"].desc}`, value: "biz/design" },
-            new inquirer_1.default.Separator(chalk_1.default.yellow("── Operations ──")),
-            { name: `ops/qa - ${EXTENSION_PACKAGES["ops/qa"].desc}`, value: "ops/qa" },
-        ];
-        const { selectedPackages } = await inquirer_1.default.prompt([
-            {
-                type: "checkbox",
-                name: "selectedPackages",
-                message: "설치할 패키지 선택 (Space로 선택, Enter로 완료):",
-                choices: packageChoices,
-            },
-        ]);
-        extensionsToInstall = selectedPackages;
+        console.log(chalk_1.default.gray(`\n   추가 패키지가 필요하면: semo add ${detected[0].split("/")[1] || detected[0]}`));
     }
     // 3. .claude 디렉토리 생성
     const claudeDir = path.join(cwd, ".claude");
@@ -1265,8 +1232,8 @@ program
     console.log(chalk_1.default.gray("  1. Claude Code에서 프로젝트 열기"));
     console.log(chalk_1.default.gray("  2. 자연어로 요청하기 (예: \"댓글 기능 구현해줘\")"));
     console.log(chalk_1.default.gray("  3. /SEMO:help로 도움말 확인"));
-    if (extensionsToInstall.length === 0 && detected.length === 0) {
-        console.log(chalk_1.default.gray("\n💡 추가 패키지: semo add <package> (예: semo add next)"));
+    if (extensionsToInstall.length === 0) {
+        console.log(chalk_1.default.gray("\n💡 추가 패키지가 필요하면: semo add <package> (예: semo add next)"));
     }
     console.log();
 });
