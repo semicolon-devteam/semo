@@ -28,57 +28,13 @@ model: inherit
 ## Execution Flow
 
 ```text
-1. Token 획득 (Fallback 전략)
-   ├─ 1차: MCP semo_get_slack_token 시도
-   ├─ 2차: 환경변수 SLACK_BOT_TOKEN 확인
-   └─ 3차: 캐시된 토큰 사용 (.claude/memory/slack-token.md)
+1. MCP에서 Slack Token 조회
    ↓
 2. 채널 ID 확인 (기본: C09KNL91QBZ = #_협업)
    ↓
 3. (필요시) 사용자 ID 조회 (curl로 Slack API 호출)
    ↓
 4. 메시지 전송 (curl + heredoc)
-   ├─ 성공 → 완료
-   └─ 실패 → Fallback 처리
-```
-
-## 🔴 Fallback 전략 (필수)
-
-> MCP 서버 인증 실패 시에도 메시지 전송을 보장합니다.
-
-### Token 획득 순서
-
-| 우선순위 | 소스                              | 설명                       |
-|----------|-----------------------------------|----------------------------|
-| 1        | MCP `semo_get_slack_token`        | 암호화된 팀 토큰           |
-| 2        | 환경변수 `SLACK_BOT_TOKEN`        | 로컬 설정                  |
-| 3        | `.claude/memory/slack-token.md`   | 캐시된 토큰 (있는 경우)    |
-
-### 전송 실패 시 처리
-
-```text
-메시지 전송 실패 (not_authed 등)
-    ↓
-1차 Fallback: 환경변수로 재시도
-    ↓
-2차 Fallback: 수동 전송 안내
-    - 메시지 내용을 마크다운으로 출력
-    - 직접 Slack에 붙여넣기 가능하도록 포맷팅
-```
-
-### 수동 전송 안내 형식
-
-```markdown
-⚠️ Slack 자동 전송 실패
-
-**원인**: {error_message}
-
-**수동 전송용 메시지**:
----
-{formatted_message}
----
-
-**전송 채널**: #_협업 (C09KNL91QBZ)
 ```
 
 ### Step 1: Token 획득
@@ -92,19 +48,63 @@ mcp__semo-integrations__semo_get_slack_token()
 ### Step 2: 사용자 ID 조회 (필요시)
 
 > **⚠️ 중요**: 모든 사용자 멘션은 반드시 `<@SLACK_ID>` 형식 사용
+> **🔴 NON-NEGOTIABLE**: curl 직접 호출 시 토큰 파싱 문제 발생 가능. **반드시 스크립트 파일로 실행**
+
+#### 방법 1: 스크립트 파일 생성 후 실행 (권장)
 
 ```bash
-# 사용자 목록에서 display_name으로 검색
-curl -s 'https://slack.com/api/users.list' \
-  -H 'Authorization: Bearer {TOKEN}' | \
-  jq -r '.members[] | select(.profile.display_name=="{이름}") | .id'
+# 1. 스크립트 파일 생성
+cat << 'SCRIPT' > /tmp/slack_users.sh
+#!/bin/bash
+TOKEN="$1"
+curl -s "https://slack.com/api/users.list?limit=200" -H "Authorization: Bearer $TOKEN"
+SCRIPT
+chmod +x /tmp/slack_users.sh
+
+# 2. 실행 및 사용자 검색
+/tmp/slack_users.sh "{TOKEN}" | jq -r '.members[] | select(.deleted==false) | select(.profile.display_name | test("{이름}"; "i")) | .id'
 ```
 
-### Step 3: 메시지 전송 (heredoc 방식)
+#### 방법 2: display_name 또는 real_name으로 검색
 
 ```bash
+/tmp/slack_users.sh "{TOKEN}" | jq -r '
+  .members[] |
+  select(.deleted==false) |
+  select(
+    (.profile.display_name | test("{이름}"; "i")) or
+    (.real_name | test("{이름}"; "i"))
+  ) |
+  "\(.profile.display_name // .real_name) | \(.id)"
+'
+```
+
+#### 방법 3: 전체 사용자 목록 조회
+
+```bash
+/tmp/slack_users.sh "{TOKEN}" | jq -r '
+  .members[] |
+  select(.deleted==false) |
+  select(.is_bot==false) |
+  "\(.profile.display_name // .real_name) | \(.id)"
+'
+```
+
+> **⚠️ 주의**: `curl -s 'url' -H 'header'` 형식의 직접 호출은 셸 환경에 따라
+> `curl: option : blank argument` 에러가 발생할 수 있습니다.
+> 항상 스크립트 파일 방식을 사용하세요.
+
+### Step 3: 메시지 전송 (스크립트 + heredoc 방식)
+
+> **🔴 권장**: 복잡한 JSON 메시지는 스크립트 파일로 전송
+
+#### 방법 1: 스크립트 파일 + heredoc (권장)
+
+```bash
+# 토큰을 변수에 저장 후 heredoc 사용
+TOKEN="xoxb-..."
 curl -s -X POST 'https://slack.com/api/chat.postMessage' \
-  -H 'Authorization: Bearer {TOKEN}' \
+  -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json; charset=utf-8' \
   -d @- << 'EOF'
 {
@@ -114,6 +114,38 @@ curl -s -X POST 'https://slack.com/api/chat.postMessage' \
 }
 EOF
 ```
+
+#### 방법 2: 메시지 전송 스크립트 생성
+
+```bash
+# 1. 전송 스크립트 생성
+cat << 'SCRIPT' > /tmp/slack_send.sh
+#!/bin/bash
+TOKEN="$1"
+CHANNEL="$2"
+MESSAGE="$3"
+curl -s -X POST "https://slack.com/api/chat.postMessage" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json; charset=utf-8" \
+  -d "$MESSAGE"
+SCRIPT
+chmod +x /tmp/slack_send.sh
+
+# 2. JSON 메시지 파일 생성
+cat << 'EOF' > /tmp/slack_message.json
+{
+  "channel": "C09KNL91QBZ",
+  "text": "메시지 내용",
+  "blocks": [...]
+}
+EOF
+
+# 3. 전송
+/tmp/slack_send.sh "{TOKEN}" "C09KNL91QBZ" "$(cat /tmp/slack_message.json)"
+```
+
+> **⚠️ 주의**: 인라인 curl 호출 시 셸 환경에 따라 헤더 파싱 오류 발생 가능.
+> `TOKEN` 변수를 먼저 선언하고 `$TOKEN` 형식으로 사용하세요.
 
 ## 채널 정보
 
