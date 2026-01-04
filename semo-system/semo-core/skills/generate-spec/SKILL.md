@@ -1,10 +1,9 @@
 ---
 name: generate-spec
 description: |
-  Execute SDD Phase 1-5 workflow (specify → clarify → plan → checklist → tasks).
-  Supports Reverse Mode: Task Issue → specs/ files + Task Issue update.
-  Use when (1) Task Issue 기반 spec 생성, (2) 명확한 기능 요청이 있을 때,
-  (3) spec.md/plan.md 생성 필요 시.
+  Speckit 워크플로우 통합 실행 (specify → plan → tasks → issues).
+  Epic에서 Task Issue 생성까지 원스톱 처리.
+  Use when (1) Epic 생성 후 Task 분해, (2) spec 문서 생성, (3) Task Issue 생성.
 tools: [Read, Write, Edit, Bash, GitHub CLI]
 location: project
 triggers:
@@ -12,277 +11,387 @@ triggers:
   - spec 작성
   - 스펙 작성해줘
   - speckit
+  - 태스크 만들어줘
+  - 태스크 만들어
+  - task 생성
+  - task 만들어
+  - 이슈 만들어줘
+  - 이슈 생성해줘
+  - 태스크카드 생성해줘
+  - 태스크카드 만들어줘
 ---
 
-> **시스템 메시지**: `[SEMO] Skill: generate-spec 호출 - {기능명/Task 번호}`
+> **시스템 메시지**: `[SEMO] Skill: generate-spec 호출 - {기능명/Epic 번호}`
 
 # generate-spec Skill
 
-**Purpose**: Spec-Driven Development (SDD) 워크플로우 실행 (Forward/Reverse Mode 지원)
+**Purpose**: Speckit 워크플로우 통합 실행 (Epic → spec → plan → tasks → Task Issues)
 
-## 동작 모드
+## 핵심 원칙
 
-| 모드 | 입력 | 출력 | Task 업데이트 |
-|------|------|------|--------------|
-| Forward (기존) | 사용자 요청 | spec.md, plan.md | - |
-| **Reverse (신규)** | Task Issue 번호 | spec.md, plan.md | ✅ 체크리스트 업데이트 |
+> **Source of Truth**: Task Issue가 Speckit 워크플로우의 진실 소스
+> **통합 워크플로우**: spec 생성과 Task Issue 생성을 하나의 스킬에서 처리
+> **DDD Layer 기반**: Task를 CONFIG → PROJECT → DATA → TESTS → CODE 순서로 분해
 
-## When to Use
-
-- **Reverse Mode (권장)**: Task Issue 생성 후 spec 문서화
-- **Forward Mode**: Epic 없이 직접 spec 작성 시
-- SDD workflow 필수 (Constitution Principle VIII)
-
-> **💡 새로운 워크플로우**
-> `ideate` → `create-tasks` → **`generate-spec`** (Reverse Mode)
-> Task Issue가 Source of Truth, specs/ 파일은 문서화/백업
-
-## 🔴 Reverse Mode (Task Issue 기반)
-
-### 입력
-
-```bash
-# Task Issue 번호 지정
-skill:generate-spec --task 201
-
-# 또는 자연어
-"#201 태스크 spec 작성해줘"
-```
-
-### 프로세스
+## Workflow Overview
 
 ```text
-1. Task Issue 본문 조회
-     ↓
-2. 본문 파싱 (Problem Context, Goals, AC, Constraints)
-     ↓
-3. spec.md 생성 (역변환)
-     ↓
-4. plan.md 생성
-     ↓
-5. Task Issue 업데이트 (Speckit Progress 체크 + 링크 추가)
+[Epic Issue]
+      ↓
+Phase 1: /speckit.specify → spec.md
+      ↓
+Phase 2: /speckit.plan → plan.md
+      ↓
+Phase 3: /speckit.tasks → tasks.md (DDD Layer 분해)
+      ↓
+Phase 4: /speckit.issues → Task Issues 생성
+      ↓
+[구현 시작]
 ```
 
-### Phase 1: Task Issue 파싱
+## Phase Flow
+
+| Phase | Command | Output | 설명 |
+|-------|---------|--------|------|
+| 1 | `/speckit.specify` | spec.md | 요구사항 명세 |
+| 2 | `/speckit.plan` | plan.md | 구현 계획 |
+| 3 | `/speckit.tasks` | tasks.md | DDD Layer 기반 Task 분해 |
+| 4 | `/speckit.issues` | Task Issues | GitHub Issue 자동 생성 |
+
+## 🔴 Phase 1: Specify (spec.md)
+
+### Epic Issue 파싱
 
 ```bash
-# Task 본문 조회
-TASK_BODY=$(gh issue view $TASK_NUMBER --repo semicolon-devteam/{repo} --json body --jq '.body')
-TASK_TITLE=$(gh issue view $TASK_NUMBER --repo semicolon-devteam/{repo} --json title --jq '.title')
-
-# Epic 번호 추출 (Metadata 섹션에서)
-EPIC_NUMBER=$(echo "$TASK_BODY" | grep -oP 'Epic \| #\K[0-9]+')
+# Epic 본문 조회
+EPIC_BODY=$(gh issue view $EPIC_NUMBER --repo semicolon-devteam/docs --json body --jq '.body')
+EPIC_TITLE=$(gh issue view $EPIC_NUMBER --repo semicolon-devteam/docs --json title --jq '.title')
 ```
 
-**Task에서 추출할 정보**:
+**Epic에서 추출할 정보**:
 
 | 섹션 | spec.md 매핑 |
 |------|-------------|
-| Problem Context | Background, Problem Statement |
+| Problem Statement | Background, Problem Statement |
 | Goals | Goals & Non-goals |
-| User Scenario | User Stories |
+| User Scenarios | User Stories |
 | Constraints | Technical Constraints |
-| Acceptance Criteria | Acceptance Criteria |
-| 테스트 요구사항 | Test Cases |
+| Success Metrics | Success Criteria |
 
-### Phase 2: spec.md 생성
+### spec.md 생성
 
 ```markdown
 # {Feature Name} Specification
 
 ## Background
-
-{Task의 Problem Context에서 변환}
+{Epic의 Problem Statement - 현재 상황}
 
 ## Problem Statement
-
-{Task의 Problem Context 상세}
+{Epic의 Problem Statement - 문제점, 영향}
 
 ## Goals & Non-goals
 
 ### Goals
-{Task의 Goals 섹션}
+- **Primary**: {Epic의 Primary Goal}
+- **Secondary**: {Epic의 Secondary Goal}
 
 ### Non-goals
-{Task의 Constraints에서 명시적 제외 항목}
+- {Epic의 Non-goals}
 
 ## User Stories
-
-{Task의 User Scenario 테이블을 User Story 형식으로 변환}
+{Epic의 User Scenarios를 User Story 형식으로 변환}
 
 ## Technical Constraints
-
-{Task의 Constraints + 개발자 체크리스트}
+{Epic의 Constraints}
 
 ## Acceptance Criteria
-
-{Task의 Acceptance Criteria}
-
-## Test Cases
-
-### Unit Tests
-{Task의 엔지니어 테스트}
-
-### E2E Tests
-{Task의 QA 테스트}
+{Epic의 Success Metrics 기반 AC}
 ```
 
-### Phase 3: plan.md 생성
+## 🔴 Phase 2: Plan (plan.md)
 
 ```markdown
 # {Feature Name} Implementation Plan
 
 ## Overview
-
 {spec.md 요약}
 
 ## Technical Approach
-
-{Layer 기반 구현 방향}
+{기술 스택, 아키텍처 결정}
 
 ## Dependencies
+{외부 의존성, 선행 작업}
 
-{Task의 Dependencies 섹션}
-
-## Implementation Steps
-
-1. {Step 1}
-2. {Step 2}
-...
+## Risk Assessment
+{기술적 리스크, 대안}
 ```
 
-### Phase 4: Task Issue 업데이트
+## 🔴 Phase 3: Tasks (tasks.md + DDD Layer 분해)
 
-**Before (Task 생성 직후)**:
+### DDD Layer 기반 Task 분해
+
+> **Layer 순서**: CONFIG → PROJECT → DATA → TESTS → CODE
+
+| Layer | 버전 | 설명 | 예시 Task |
+|-------|------|------|----------|
+| CONFIG | v0.1.x | 환경 설정, 의존성 | 패키지 설치, 환경변수 |
+| PROJECT | v0.2.x | 프로젝트 구조 | 폴더 구조, 라우팅 |
+| DATA | v0.3.x | 데이터 스키마, API | DB 스키마, API 엔드포인트 |
+| TESTS | v0.4.x | 테스트 작성 | 유닛 테스트, E2E |
+| CODE | v0.5.x | 비즈니스 로직 | UI 컴포넌트, 핵심 기능 |
+
+### Layer별 정보 선별 위임
+
+| Layer | 위임할 Dev Checklist | 위임할 Constraints |
+|-------|---------------------|-------------------|
+| CONFIG | - | 기술적.의존성 |
+| PROJECT | - | 기술적.아키텍처 |
+| DATA | 데이터 흐름, 시간/계산 | 기술적.데이터 |
+| TESTS | 엣지 케이스 | - |
+| CODE | 플랫폼 제약, 도메인 지식 | 기술적.플랫폼 |
+
+### tasks.md 생성
+
 ```markdown
-## 🔄 Speckit Progress
-<!-- generate-spec 실행 시 자동 업데이트 -->
-- [ ] specify → spec.md
-- [ ] plan → plan.md
-- [ ] implement
+# {Feature Name} Tasks
+
+## Task Overview
+
+| ID | Layer | Task | Complexity | Dependencies |
+|----|-------|------|------------|--------------|
+| T1 | v0.1.x CONFIG | 환경 설정 | S | - |
+| T2 | v0.2.x PROJECT | 폴더 구조 생성 | S | T1 |
+| T3 | v0.3.x DATA | DB 스키마 정의 | M | T2 |
+| T4 | v0.5.x CODE | UI 컴포넌트 구현 | L | T3 |
+
+## Task Details
+
+### T1: [v0.1.x CONFIG] 환경 설정
+- **Complexity**: S
+- **Dependencies**: -
+- **Description**: {상세 설명}
+- **Acceptance Criteria**: {AC 목록}
 ```
 
-**After (generate-spec 실행 후)**:
+## 🔴 Phase 4: Issues (Task Issues 생성)
+
+### Task Issue 본문 템플릿
+
 ```markdown
+## 📋 {task_description}
+
 ## 🔄 Speckit Progress
-<!-- generate-spec 실행 시 자동 업데이트 -->
-- [x] specify → [spec.md](https://github.com/.../specs/5-feature/spec.md)
-- [x] plan → [plan.md](https://github.com/.../specs/5-feature/plan.md)
+- [x] specify → [spec.md]({spec_url})
+- [x] plan → [plan.md]({plan_url})
+- [x] tasks → [tasks.md]({tasks_url})
 - [ ] implement
+
+## 🎯 Problem Context
+<!-- Epic에서 위임 (이 Task 관련 부분만) -->
+{Epic Problem Statement에서 관련 부분}
+
+## 🎯 Goals
+- {관련 Primary Goal}
+
+## 👤 User Scenario
+| Step | 사용자 액션 | 이 Task의 역할 |
+|------|------------|---------------|
+| {N} | {액션} | {역할} |
+
+## ⚠️ Constraints
+### 기술적 제약
+- {이 Layer 관련 제약}
+
+### 개발자 체크리스트
+- [ ] {해당 카테고리 항목}
+
+## 🎯 Acceptance Criteria
+- [ ] {AC 1}
+- [ ] {AC 2}
+
+## 🧪 테스트 요구사항
+### 엔지니어 테스트
+- [ ] {테스트 케이스}: {예상 결과}
+
+### QA 테스트
+| Step | Action | Expected |
+|------|--------|----------|
+| 1 | {동작} | {결과} |
+
+## 🔗 Dependencies
+- Depends on: #{issue}
+- Blocks: #{issue}
+
+## 📊 Metadata
+| Field | Value |
+|-------|-------|
+| Layer | {v0.x.x LAYER} |
+| Domain | {domain} |
+| Epic | #{epic_number} |
 ```
 
-**업데이트 로직**:
+### GitHub 연동
 
 ```bash
-# 현재 본문 조회
-CURRENT_BODY=$(gh issue view $TASK_NUMBER --repo semicolon-devteam/{repo} --json body --jq '.body')
+# 1. Task Issue 생성
+TASK_NUMBER=$(gh issue create \
+  --repo semicolon-devteam/{project_repo} \
+  --title "[v0.1.x CONFIG] {task_title}" \
+  --body "$TASK_BODY" \
+  --label "{project_label}" \
+  | grep -oE '[0-9]+$')
 
-# specs/ URL 생성
-SPEC_URL="https://github.com/semicolon-devteam/{repo}/blob/dev/specs/${FEATURE_SLUG}/spec.md"
-PLAN_URL="https://github.com/semicolon-devteam/{repo}/blob/dev/specs/${FEATURE_SLUG}/plan.md"
+# 2. Projects에 추가
+ISSUE_NODE_ID=$(gh api repos/semicolon-devteam/{project_repo}/issues/$TASK_NUMBER \
+  --jq '.node_id')
 
-# Speckit Progress 섹션 업데이트
-NEW_BODY=$(echo "$CURRENT_BODY" | sed \
-  -e 's|- \[ \] specify → spec.md|- [x] specify → [spec.md]('"$SPEC_URL"')|' \
-  -e 's|- \[ \] plan → plan.md|- [x] plan → [plan.md]('"$PLAN_URL"')|')
+ITEM_ID=$(gh api graphql -f query='
+  mutation($projectId: ID!, $contentId: ID!) {
+    addProjectV2ItemById(input: {projectId: $projectId, contentId: $contentId}) {
+      item { id }
+    }
+  }
+' -f projectId="PVT_kwDOC01-Rc4AtDz2" -f contentId="$ISSUE_NODE_ID" \
+  --jq '.data.addProjectV2ItemById.item.id')
 
-# Issue 업데이트
-gh issue edit $TASK_NUMBER --repo semicolon-devteam/{repo} --body "$NEW_BODY"
+# 3. Issue Type을 Task로 설정
+gh api graphql -f query='
+  mutation {
+    updateIssue(input: {
+      id: "'"$ISSUE_NODE_ID"'"
+      issueTypeId: "IT_kwDOC01-Rc4BdOub"
+    }) {
+      issue { id title }
+    }
+  }
+'
+
+# 4. Status를 "검수대기"로 설정
+STATUS_RESULT=$(gh api graphql -f query='
+query {
+  organization(login: "semicolon-devteam") {
+    projectV2(number: 1) {
+      field(name: "Status") {
+        ... on ProjectV2SingleSelectField {
+          id
+          options { id name }
+        }
+      }
+    }
+  }
+}')
+
+STATUS_FIELD_ID=$(echo "$STATUS_RESULT" | jq -r '.data.organization.projectV2.field.id')
+STATUS_OPTION_ID=$(echo "$STATUS_RESULT" | jq -r '.data.organization.projectV2.field.options[] | select(.name == "검수대기") | .id')
+
+gh api graphql -f query='
+  mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+    updateProjectV2ItemFieldValue(input: {
+      projectId: $projectId
+      itemId: $itemId
+      fieldId: $fieldId
+      value: { singleSelectOptionId: $optionId }
+    }) {
+      projectV2Item { id }
+    }
+  }
+' -f projectId="PVT_kwDOC01-Rc4AtDz2" \
+  -f itemId="$ITEM_ID" \
+  -f fieldId="$STATUS_FIELD_ID" \
+  -f optionId="$STATUS_OPTION_ID"
 ```
-
-## Forward Mode (기존)
-
-> Task Issue 없이 직접 spec 작성 시 사용
-
-### Phase Flow
-
-```text
-specify → clarify? → plan → checklist? → tasks → report
-```
-
-| Phase | Command | Output | Optional |
-|-------|---------|--------|----------|
-| 1 | `/speckit.specify` | spec.md | - |
-| 2 | `/speckit.clarify` | spec.md (updated) | Auto |
-| 3 | `/speckit.plan` | plan.md | - |
-| 4 | `/speckit.checklist` | checklist.md | Ask |
-| 5 | `/speckit.tasks` | tasks.md | - |
 
 ## 🔴 Branch Context (필수)
 
 > **Spec 작성은 반드시 dev 브랜치에서 수행합니다.**
-
-### 브랜치 요구사항
 
 | 조건 | 설명 |
 |------|------|
 | **필수 브랜치** | `dev` |
 | **금지 브랜치** | `main`, `master`, `feature/*` |
 
-### Spec 완료 후 다음 단계
-
-```text
-1. Spec 파일 커밋 (dev 브랜치)
-   git add specs/{domain}/
-   git commit -m "📝 #{이슈번호} Add spec for {도메인}"
-
-2. 원격 dev에 푸시 (팀 공유)
-   git push origin dev
-
-3. Feature 브랜치 생성 (코드 구현용)
-   git checkout -b {issue_number}-{title}
-```
-
 ## Output Format
 
-### Reverse Mode 완료
+### Speckit 완료
 
 ```markdown
-[SEMO] Skill: generate-spec 완료 (Reverse Mode)
+[SEMO] Skill: generate-spec 완료
 
-## 📋 Spec 생성 결과
+## 📋 Speckit 결과
 
-### Task
-- 번호: #{task_number}
-- 제목: {task_title}
+### Epic
+- 번호: #{epic_number}
+- 제목: {epic_title}
 
 ### 생성된 파일
-- spec.md: specs/{feature}/spec.md
-- plan.md: specs/{feature}/plan.md
+- specs/{feature}/spec.md
+- specs/{feature}/plan.md
+- specs/{feature}/tasks.md
 
-### Task Issue 업데이트
-✅ Speckit Progress 체크리스트 업데이트 완료
+### 생성된 Task Issues
+
+| Layer | Task | Issue |
+|-------|------|-------|
+| v0.1.x CONFIG | {task_1} | #{issue_1} |
+| v0.2.x PROJECT | {task_2} | #{issue_2} |
+| v0.3.x DATA | {task_3} | #{issue_3} |
+| v0.5.x CODE | {task_4} | #{issue_4} |
+
+### Speckit 상태
+모든 Task에 Speckit 체크리스트 포함:
 - [x] specify → spec.md
 - [x] plan → plan.md
+- [x] tasks → tasks.md
 - [ ] implement
 
 ### 다음 단계
-1. **Spec 커밋**: `git add specs/ && git commit -m "📝 #{task_number} Add spec"`
+1. **Spec 커밋**: `git add specs/ && git commit -m "📝 Add spec for {feature}"`
 2. **구현 시작**: Feature 브랜치에서 구현
 ```
+
+## Issue Title Format
+
+```text
+[v0.1.x CONFIG] Set up project dependencies
+[v0.2.x PROJECT] Create folder structure for comments
+[v0.3.x DATA] Define comment schema and API
+[v0.5.x CODE] Implement comment UI components
+```
+
+## Issue Type ID Reference
+
+| Type | ID | 사용 시점 |
+|------|-----|----------|
+| Task | `IT_kwDOC01-Rc4BdOub` | 일반 태스크 (기본값) |
+| Bug | `IT_kwDOC01-Rc4BdOuc` | 버그 리포트 |
+| Feature | `IT_kwDOC01-Rc4BdOud` | 기능 요청 |
+| Epic | `IT_kwDOC01-Rc4BvVz5` | 에픽 생성 시 |
 
 ## Usage
 
 ```javascript
-// Reverse Mode (권장) - Task Issue 기반
-skill: generate-spec({ task: 201 });
+// Epic 기반 전체 Speckit 실행 (권장)
+skill: generate-spec({ epic: 144 });
 
-// Forward Mode - 직접 작성
-skill: generate-spec("Add real-time notifications");
+// 자연어 트리거
+"태스크 만들어줘"
+"spec 작성해줘"
+"태스크카드 생성해줘"
 
-// Epic 연계 Forward Mode
-skill: generate-spec({ epic: 144, feature: "comments" });
+// 특정 Phase만 실행
+skill: generate-spec({ epic: 144, phase: "specify" });
+skill: generate-spec({ epic: 144, phase: "tasks" });
 ```
 
 ## Related Skills
 
-- `ideate` - 러프한 아이디어 → Epic
-- `create-tasks` - Epic → Task Issue (이 스킬 전에 호출)
+- `ideate` - 러프한 아이디어 → Epic (이 스킬 전에 호출)
+- `create-epic` - Epic Issue 생성 헬퍼
 - `implement` - 구현 단계 (이 스킬 후에 호출)
 - `explore-approach` - 기술 불확실성 탐색 (spike)
 
 ## References
 
-- [Reverse Mode Details](references/reverse-mode.md) - Task → spec 변환 상세
-- [Phase Details](references/phase-details.md) - Forward Mode Phase 1-5 상세
+- [Phase Details](references/phase-details.md) - Phase 1-4 상세
+- [Layer Delegation](references/layer-delegation.md) - Layer별 정보 위임 상세
 - [Output Format](references/output-format.md) - 완료 리포트 형식
