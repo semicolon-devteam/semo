@@ -410,3 +410,23 @@ User: "중앙 DB 구조 알려줘"
 | ms-ledger | lg_ |
 ...
 ```
+
+---
+
+## 🔵 GitHub 조직 기본값
+
+> **GitHub 조직이 명시되지 않은 요청은 기본값(`semicolon-devteam`)을 사용합니다.**
+
+📄 상세: [_shared/github-config.md](_shared/github-config.md)
+
+| 항목 | 기본값 |
+|------|--------|
+| **Organization** | semicolon-devteam |
+| **기본 레포** | semo |
+
+### 적용 스킬
+
+- `assign-task` - Issue 할당 시 owner 기본값
+- `create-feedback-issue` - 피드백 이슈 생성 시
+- `request-test` - QA 테스트 요청 시
+- `git-workflow` - PR 생성 시 (명시 없으면)
