@@ -1,0 +1,29 @@
+{
+  "name": "semo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SEMO (Semicolon Orchestrate) - AI Agent Orchestration Framework",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev:server": "npm run dev --workspace=@team-semicolon/semo-office-server",
+    "dev:web": "npm run dev --workspace=@team-semicolon/semo-office-web",
+    "dev": "npm run dev:server & npm run dev:web",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "keywords": [
+    "semo",
+    "ai",
+    "agent",
+    "orchestration",
+    "claude"
+  ],
+  "author": "Team Semicolon",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

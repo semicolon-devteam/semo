@@ -1,0 +1,42 @@
+{
+  "name": "@team-semicolon/semo-office-web",
+  "version": "0.1.0",
+  "description": "Semo Office Web - GatherTown-style multi-agent collaboration UI",
+  "private": true,
+  "scripts": {
+    "dev": "next dev -p 3002",
+    "build": "next build",
+    "start": "next start -p 3002",
+    "lint": "next lint"
+  },
+  "keywords": [
+    "semo",
+    "office",
+    "multi-agent",
+    "gathertown",
+    "pixijs"
+  ],
+  "author": "Team Semicolon",
+  "license": "MIT",
+  "dependencies": {
+    "@pixi/react": "^7.1.1",
+    "@supabase/supabase-js": "^2.39.0",
+    "next": "^14.0.4",
+    "pixi.js": "^7.3.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "zustand": "^4.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@types/react": "^18.2.45",
+    "@types/react-dom": "^18.2.18",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
