@@ -1,6 +1,6 @@
 {
   "name": "@team-semicolon/semo-office-server",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Semo Office Server - Multi-agent orchestration backend",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

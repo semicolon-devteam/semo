@@ -2,7 +2,7 @@
  * Realtime Handler
  *
  * Manages Supabase Realtime for agent state synchronization.
- * Handles Presence (agent positions) and Broadcast (messages).
+ * Handles Presence (agent positions) and Broadcast (messages, progress).
  */
 
 import { createClient, SupabaseClient, RealtimeChannel } from '@supabase/supabase-js';
@@ -21,7 +21,49 @@ export interface PresenceState {
   positionY: number;
   currentTask?: string;
   lastMessage?: string;
+  progress?: number; // 0-100
+  animation?: AgentAnimation;
 }
+
+export interface AgentAnimation {
+  type: AnimationType;
+  startedAt: number;
+  duration?: number;
+}
+
+export type AnimationType =
+  | 'idle'
+  | 'walking'
+  | 'working'
+  | 'thinking'
+  | 'celebrating'
+  | 'blocked'
+  | 'handoff';
+
+export interface ProgressUpdate {
+  jobId: string;
+  agentId: string;
+  progress: number; // 0-100
+  phase?: string;
+  message?: string;
+}
+
+export interface UIEvent {
+  type: UIEventType;
+  payload: Record<string, unknown>;
+  timestamp: number;
+}
+
+export type UIEventType =
+  | 'job_started'
+  | 'job_completed'
+  | 'job_failed'
+  | 'handoff_requested'
+  | 'handoff_accepted'
+  | 'pr_created'
+  | 'pr_merged'
+  | 'agent_message'
+  | 'progress_update';
 
 export class RealtimeHandler {
   private supabase: SupabaseClient;
@@ -42,6 +84,8 @@ export class RealtimeHandler {
       onPresenceLeave?: (key: string, leftPresence: PresenceState) => void;
       onAgentMessage?: (message: AgentMessage) => void;
       onJobUpdate?: (job: Job) => void;
+      onProgressUpdate?: (progress: ProgressUpdate) => void;
+      onUIEvent?: (event: UIEvent) => void;
     }
   ): void {
     // Presence channel for agent positions/status
@@ -70,6 +114,12 @@ export class RealtimeHandler {
       .channel(`office:${officeId}:messages`)
       .on('broadcast', { event: 'agent_message' }, ({ payload }) => {
         handlers.onAgentMessage?.(payload as AgentMessage);
+      })
+      .on('broadcast', { event: 'progress_update' }, ({ payload }) => {
+        handlers.onProgressUpdate?.(payload as ProgressUpdate);
+      })
+      .on('broadcast', { event: 'ui_event' }, ({ payload }) => {
+        handlers.onUIEvent?.(payload as UIEvent);
       })
       .subscribe();
 
@@ -119,7 +169,8 @@ export class RealtimeHandler {
    */
   async trackAgentPresence(
     officeId: string,
-    agent: OfficeAgent
+    agent: OfficeAgent,
+    extra?: { progress?: number; animation?: AgentAnimation }
   ): Promise<void> {
     const channel = this.channels.get(`office:${officeId}:presence`);
     if (!channel) return;
@@ -132,6 +183,8 @@ export class RealtimeHandler {
       positionY: agent.position_y,
       currentTask: agent.current_task,
       lastMessage: agent.last_message,
+      progress: extra?.progress,
+      animation: extra?.animation,
     });
   }
 
@@ -153,6 +206,108 @@ export class RealtimeHandler {
         id: `msg-${Date.now()}`,
         created_at: new Date().toISOString(),
       },
+    });
+  }
+
+  /**
+   * Broadcast progress update
+   */
+  async broadcastProgress(
+    officeId: string,
+    update: ProgressUpdate
+  ): Promise<void> {
+    const channel = this.channels.get(`office:${officeId}:messages`);
+    if (!channel) return;
+
+    await channel.send({
+      type: 'broadcast',
+      event: 'progress_update',
+      payload: update,
+    });
+  }
+
+  /**
+   * Broadcast UI event
+   */
+  async broadcastUIEvent(
+    officeId: string,
+    eventType: UIEventType,
+    payload: Record<string, unknown>
+  ): Promise<void> {
+    const channel = this.channels.get(`office:${officeId}:messages`);
+    if (!channel) return;
+
+    const event: UIEvent = {
+      type: eventType,
+      payload,
+      timestamp: Date.now(),
+    };
+
+    await channel.send({
+      type: 'broadcast',
+      event: 'ui_event',
+      payload: event,
+    });
+  }
+
+  /**
+   * Broadcast job started
+   */
+  async broadcastJobStarted(
+    officeId: string,
+    job: Job,
+    agentId: string
+  ): Promise<void> {
+    await this.broadcastUIEvent(officeId, 'job_started', {
+      jobId: job.id,
+      agentId,
+      description: job.description,
+    });
+  }
+
+  /**
+   * Broadcast job completed
+   */
+  async broadcastJobCompleted(
+    officeId: string,
+    job: Job,
+    agentId: string,
+    prNumber?: number
+  ): Promise<void> {
+    await this.broadcastUIEvent(officeId, 'job_completed', {
+      jobId: job.id,
+      agentId,
+      prNumber,
+    });
+  }
+
+  /**
+   * Broadcast PR created
+   */
+  async broadcastPRCreated(
+    officeId: string,
+    jobId: string,
+    prNumber: number,
+    prUrl: string
+  ): Promise<void> {
+    await this.broadcastUIEvent(officeId, 'pr_created', {
+      jobId,
+      prNumber,
+      prUrl,
+    });
+  }
+
+  /**
+   * Broadcast PR merged
+   */
+  async broadcastPRMerged(
+    officeId: string,
+    jobId: string,
+    prNumber: number
+  ): Promise<void> {
+    await this.broadcastUIEvent(officeId, 'pr_merged', {
+      jobId,
+      prNumber,
     });
   }
 
@@ -192,6 +347,12 @@ export class RealtimeHandler {
       content: taskDescription,
       context,
     });
+
+    await this.broadcastUIEvent(officeId, 'handoff_requested', {
+      fromAgentId,
+      toAgentId,
+      description: taskDescription,
+    });
   }
 
   /**
@@ -214,3 +375,6 @@ export class RealtimeHandler {
     this.channels.clear();
   }
 }
+
+// Re-export for convenience
+export { RealtimeHandler as default };
