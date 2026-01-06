@@ -8,6 +8,7 @@
 export { createApp } from './api/index.js';
 export { TaskDecomposer } from './decomposer/index.js';
 export { SessionPool } from './session/pool.js';
+export { SessionExecutor } from './session/executor.js';
 export { WorktreeManager } from './worktree/manager.js';
 export { JobScheduler } from './scheduler/index.js';
 export { RealtimeHandler } from './realtime/broadcast.js';
