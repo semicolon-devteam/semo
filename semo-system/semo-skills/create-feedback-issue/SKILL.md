@@ -59,8 +59,10 @@ git remote -v | grep "semicolon-devteam/semo"
 
 | 유형 | 설명 | 라벨 |
 |------|------|------|
-| **bug** | 의도한 대로 동작하지 않음 | `bug`, `{package}` |
-| **enhancement** | 개선 아이디어, 새 기능 요청 | `enhancement`, `{package}` |
+| **bug** | 의도한 대로 동작하지 않음 | `feedback`, `bug`, `{package}` |
+| **enhancement** | 개선 아이디어, 새 기능 요청 | `feedback`, `enhancement`, `{package}` |
+
+> **Note**: 모든 피드백 이슈에는 `feedback` 라벨이 필수로 포함됩니다.
 
 ## Workflow
 
@@ -114,6 +116,7 @@ gh issue create \
   --repo semicolon-devteam/{package} \
   --title "[Feedback] {제목}" \
   --body-file /tmp/issue-body.md \
+  --label "feedback" \
   --label "bug" \
   --label "{package}"
 
@@ -122,9 +125,12 @@ gh issue create \
   --repo semicolon-devteam/{package} \
   --title "[Enhancement] {제목}" \
   --body-file /tmp/issue-body.md \
+  --label "feedback" \
   --label "enhancement" \
   --label "{package}"
 ```
+
+> **Important**: `feedback` 라벨은 모든 피드백 이슈에 필수로 추가됩니다.
 
 ### Step 4: 임시 파일 정리
 
