@@ -1,0 +1,148 @@
+/**
+ * semo-remote-client/src/main/index.ts 수정 가이드
+ *
+ * 이 파일은 기존 index.ts에 추가해야 할 코드 조각들입니다.
+ * 전체 파일을 교체하지 말고, 아래 섹션들을 적절한 위치에 추가하세요.
+ */
+
+// ============================================================
+// 1. Import 추가 (파일 상단)
+// ============================================================
+
+import {
+  initializeOfficeSubscriber,
+  subscribeToOfficeCommands,
+  unsubscribeFromOfficeCommands,
+  isOfficeModeActive,
+  getActiveOfficeId,
+} from "./officeSubscriber";
+
+// ============================================================
+// 2. Office 환경변수 (Supabase 설정 근처)
+// ============================================================
+
+// Office Mode 설정
+const OFFICE_MODE = process.env.SEMO_OFFICE_MODE === "true";
+const OFFICE_ID = process.env.SEMO_OFFICE_ID;
+
+// ============================================================
+// 3. getSessionOutput 함수 추가 (listItermSessions 근처)
+// ============================================================
+
+// iTerm2 세션 출력 조회
+async function getSessionOutput(
+  sessionId: string,
+  lines: number = 100
+): Promise<{ success: boolean; lines?: string[] }> {
+  try {
+    const result = (await runItermCommand(["output", sessionId, lines.toString()])) as {
+      success: boolean;
+      lines?: string[];
+    };
+    return result;
+  } catch (error) {
+    console.error("Failed to get session output:", error);
+    return { success: false };
+  }
+}
+
+// ============================================================
+// 4. Office Subscriber 초기화 (initializeSupabase 함수 내부, 마지막에 추가)
+// ============================================================
+
+// initializeSupabase() 함수 내부, 기존 코드 마지막에 추가:
+
+// Office Mode 초기화
+if (OFFICE_MODE && OFFICE_ID) {
+  initializeOfficeSubscriber({
+    supabase,
+    sendToClaudeCode,
+    createNewItermTab: createNewItermTab,
+    sendToIterm,
+    getSessionOutput,
+  });
+
+  await subscribeToOfficeCommands(OFFICE_ID);
+  console.log(`[SEMO] Office mode enabled for: ${OFFICE_ID}`);
+}
+
+// ============================================================
+// 5. IPC 핸들러 추가 (기존 IPC 핸들러들 근처)
+// ============================================================
+
+// Office Mode IPC 핸들러
+ipcMain.handle("office:get-status", () => {
+  return {
+    enabled: OFFICE_MODE,
+    officeId: getActiveOfficeId(),
+    isActive: isOfficeModeActive(),
+  };
+});
+
+ipcMain.handle("office:subscribe", async (_, officeId: string) => {
+  if (!OFFICE_MODE) {
+    return { success: false, error: "Office mode is not enabled" };
+  }
+
+  try {
+    initializeOfficeSubscriber({
+      supabase,
+      sendToClaudeCode,
+      createNewItermTab: createNewItermTab,
+      sendToIterm,
+      getSessionOutput,
+    });
+
+    await subscribeToOfficeCommands(officeId);
+    return { success: true, officeId };
+  } catch (error) {
+    console.error("Failed to subscribe to office:", error);
+    return { success: false, error: String(error) };
+  }
+});
+
+ipcMain.handle("office:unsubscribe", async () => {
+  try {
+    await unsubscribeFromOfficeCommands();
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to unsubscribe from office:", error);
+    return { success: false, error: String(error) };
+  }
+});
+
+// ============================================================
+// 6. before-quit 이벤트 수정 (기존 코드에 추가)
+// ============================================================
+
+// 기존 app.on("before-quit") 이벤트 핸들러 내부에 추가:
+
+// Office 구독 정리
+if (isOfficeModeActive()) {
+  await unsubscribeFromOfficeCommands();
+}
+
+// ============================================================
+// 7. Preload API 추가 (src/preload/index.ts)
+// ============================================================
+
+/*
+contextBridge.exposeInMainWorld("semoOffice", {
+  getStatus: () => ipcRenderer.invoke("office:get-status"),
+  subscribe: (officeId: string) => ipcRenderer.invoke("office:subscribe", officeId),
+  unsubscribe: () => ipcRenderer.invoke("office:unsubscribe"),
+});
+*/
+
+// ============================================================
+// 8. 환경변수 설정 (.env 또는 실행 시)
+// ============================================================
+
+/*
+# Office Mode 활성화
+SEMO_OFFICE_MODE=true
+SEMO_OFFICE_ID=your-office-uuid-here
+
+# 실행 예시
+SEMO_OFFICE_MODE=true SEMO_OFFICE_ID=xxx npm run dev
+*/

@@ -491,6 +491,20 @@ curl -X POST http://localhost:3001/api/offices/{office_id}/tasks \
 10. Office UI: Agent 상태 업데이트
 ```
 
+## 구현 파일
+
+실제 구현 파일은 `docs/semo-office/semo-remote-client/` 디렉토리에 있습니다:
+
+| 파일 | 설명 |
+|------|------|
+| `officeSubscriber.ts` | Office Command Subscriber 전체 구현 |
+| `index.ts.patch` | main/index.ts 수정 가이드 |
+
+### 적용 방법
+
+1. `officeSubscriber.ts`를 `semo-remote-client/src/main/officeSubscriber.ts`로 복사
+2. `index.ts.patch`의 코드 조각을 `semo-remote-client/src/main/index.ts`에 추가
+
 ## 다음 단계
 
 1. **semo-remote-client PR 생성**: Office Subscriber 기능 추가
