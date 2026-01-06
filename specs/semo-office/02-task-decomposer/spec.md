@@ -91,6 +91,63 @@ Task Decomposer는 사용자의 자연어 요청을 분석하여 적절한 Agent
 
 ---
 
+### US-2.7: Job Scheduler 연동
+
+> "분해된 Job을 Job Scheduler에 등록하여 실행을 위임한다"
+
+**AC**:
+
+- [ ] DecompositionResult를 Job Scheduler에 전달
+- [ ] 각 Job을 job_queue 테이블에 INSERT
+- [ ] 의존성 그래프 기반 초기 상태 설정
+- [ ] Scheduler 시작 트리거
+- [ ] 실행 결과 콜백 수신
+
+**연동 흐름**:
+
+```text
+[Task Decomposer]
+       │
+       │ DecompositionResult
+       │ (jobs, dependencyGraph)
+       ▼
+┌─────────────────┐
+│  Job Scheduler  │
+│  ├─ enqueue()   │ ← 각 Job INSERT
+│  ├─ start()     │ ← 스케줄러 시작
+│  └─ onComplete()│ ← 완료 콜백
+└─────────────────┘
+       │
+       ▼
+[Session Execution]
+```
+
+**구현 코드**:
+
+```typescript
+class TaskDecomposer {
+  async decompose(request: DecompositionRequest): Promise<DecompositionResult> {
+    // 1. 자연어 분석 및 Job 분해
+    const result = await this.analyzeAndDecompose(request);
+
+    // 2. Job Scheduler에 등록
+    await this.scheduler.enqueueJobs(request.officeId, result.jobs);
+
+    // 3. 의존성 설정
+    for (const edge of result.dependencyGraph) {
+      await this.scheduler.setDependency(edge.from, edge.to);
+    }
+
+    // 4. 스케줄러 시작
+    await this.scheduler.start(request.officeId);
+
+    return result;
+  }
+}
+```
+
+---
+
 ## API Endpoints
 
 | Method | Endpoint | Description |

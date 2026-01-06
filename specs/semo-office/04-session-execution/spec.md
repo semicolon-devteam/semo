@@ -90,9 +90,214 @@ Office Server는 semo-remote-client를 통해 iTerm2 + Claude Code 세션을 원
 > "세션 종료 및 오류 복구를 관리한다"
 
 **AC**:
+
 - Job 완료 시 세션 유지/해제 결정
 - 오류 발생 시 자동 재시작 (Circuit Breaker)
 - 세션 상태 정기 헬스체크
+
+---
+
+### US-SE06: 작업 완료 감지
+
+> "Agent의 작업 완료를 자동으로 감지하여 Job Scheduler에 알린다"
+
+**AC**:
+
+- Claude Code 출력 스트림에서 완료 시그널 감지
+- PR 생성 완료, 커밋 완료 등 특정 패턴 인식
+- 완료 시 Job 상태를 `done`으로 업데이트
+- 후속 Job 활성화 트리거
+
+**감지 패턴**:
+
+```typescript
+const COMPLETION_PATTERNS = [
+  // PR 생성 완료
+  /Created pull request #(\d+)/i,
+  // 커밋 완료
+  /\[.*\] \d+ files? changed/i,
+  // Claude Code 작업 완료
+  /Task completed successfully/i,
+  // 사용자 정의 완료 마커
+  /\[SEMO:DONE\]/i,
+];
+
+const ERROR_PATTERNS = [
+  // 빌드 실패
+  /Build failed/i,
+  // 테스트 실패
+  /Tests? failed/i,
+  // 에러 발생
+  /Error:/i,
+  /Exception:/i,
+];
+```
+
+**구현**:
+
+```typescript
+class OutputMonitor {
+  private jobId: string;
+  private sessionId: string;
+
+  async monitorOutput(): Promise<void> {
+    const output = await this.iterm.getOutput(this.sessionId);
+
+    // 완료 패턴 검사
+    for (const pattern of COMPLETION_PATTERNS) {
+      const match = output.match(pattern);
+      if (match) {
+        await this.handleCompletion(match);
+        return;
+      }
+    }
+
+    // 에러 패턴 검사
+    for (const pattern of ERROR_PATTERNS) {
+      const match = output.match(pattern);
+      if (match) {
+        await this.handleError(match);
+        return;
+      }
+    }
+  }
+
+  private async handleCompletion(match: RegExpMatchArray): Promise<void> {
+    // 1. PR 번호 추출 (있는 경우)
+    const prNumber = this.extractPrNumber(match);
+
+    // 2. Job 상태 업데이트
+    await this.db.update('job_queue', this.jobId, {
+      status: 'done',
+      pr_number: prNumber,
+      completed_at: new Date().toISOString()
+    });
+
+    // 3. Job Scheduler에 완료 알림
+    await this.scheduler.onJobComplete(this.jobId);
+
+    // 4. Realtime 브로드캐스트
+    await this.realtime.broadcast({
+      type: 'job_completed',
+      job_id: this.jobId,
+      pr_number: prNumber
+    });
+  }
+}
+```
+
+---
+
+### US-SE07: Persona 프롬프트 주입
+
+> "세션 생성 시 Agent의 Persona를 시스템 프롬프트로 주입한다"
+
+**AC**:
+
+- 세션 생성 시 Persona 정보 조회
+- CLAUDE.md 파일에 Persona 프롬프트 추가
+- scope_patterns 기반 작업 범위 제한
+- core_skills 기반 사용 가능 스킬 제한
+
+**주입 방식**:
+
+```text
+[세션 생성 요청]
+       │
+       ▼
+┌─────────────────┐
+│ Persona 조회    │ ← DB agent_personas 테이블
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Worktree 준비   │
+│ ├─ .claude/     │
+│ │  └─ CLAUDE.md │ ← Persona 프롬프트 주입
+│ └─ {files}      │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ Claude Code 실행│ ← 주입된 Persona로 동작
+└─────────────────┘
+```
+
+**Persona 프롬프트 템플릿**:
+
+```markdown
+# Agent Persona
+
+{persona_prompt}
+
+## 담당 영역
+
+이 Agent는 다음 파일 패턴에 대해서만 작업합니다:
+{scope_patterns}
+
+다른 영역의 파일은 수정하지 마세요.
+
+## 사용 가능 스킬
+
+- {core_skills}
+
+## 협업 규칙
+
+- 작업 완료 시 `[SEMO:DONE]` 마커를 출력하세요
+- 다른 Agent에게 요청이 필요하면 메시지를 남기세요
+- PR 생성 시 `[{role}]` 프리픽스를 사용하세요
+```
+
+**구현**:
+
+```typescript
+class PersonaInjector {
+  async injectPersona(
+    worktreePath: string,
+    persona: AgentPersona
+  ): Promise<void> {
+    const claudeMdPath = path.join(worktreePath, '.claude', 'CLAUDE.md');
+
+    // 1. 기존 CLAUDE.md 읽기 (있는 경우)
+    let existingContent = '';
+    if (await fs.exists(claudeMdPath)) {
+      existingContent = await fs.readFile(claudeMdPath, 'utf-8');
+    }
+
+    // 2. Persona 섹션 생성
+    const personaSection = this.buildPersonaSection(persona);
+
+    // 3. CLAUDE.md에 주입
+    const newContent = `${personaSection}\n\n---\n\n${existingContent}`;
+    await fs.writeFile(claudeMdPath, newContent);
+  }
+
+  private buildPersonaSection(persona: AgentPersona): string {
+    return `
+# Agent Persona: ${persona.name}
+
+${persona.persona_prompt}
+
+## 담당 영역
+
+이 Agent는 다음 파일 패턴에 대해서만 작업합니다:
+${persona.scope_patterns.map(p => `- \`${p}\``).join('\n')}
+
+다른 영역의 파일은 수정하지 마세요.
+
+## 사용 가능 스킬
+
+${persona.core_skills.map(s => `- ${s}`).join('\n')}
+
+## 협업 규칙
+
+- 작업 완료 시 \`[SEMO:DONE]\` 마커를 출력하세요
+- 다른 Agent에게 요청이 필요하면 메시지를 남기세요
+- PR 생성 시 \`[${persona.role}]\` 프리픽스를 사용하세요
+`;
+  }
+}
+```
 
 ---
 
@@ -396,3 +601,5 @@ Office Server          Supabase           semo-remote-client      iTerm2
 - [02-Task Decomposer](../02-task-decomposer/spec.md) - Job 생성
 - [03-Worktree](../03-worktree/spec.md) - 작업 디렉토리
 - [05-PR Workflow](../05-pr-workflow/spec.md) - 작업 완료 후 PR
+- [07-Agent Communication](../07-agent-communication/spec.md) - Agent 간 통신
+- [08-Job Scheduler](../08-job-scheduler/spec.md) - Job 스케줄링
