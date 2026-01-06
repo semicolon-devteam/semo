@@ -1,0 +1,398 @@
+# 04-Session Execution: Claude Code 세션 관리
+
+> Agent별 Claude Code 세션 생성, 제어, 모니터링
+
+---
+
+## Overview
+
+각 Agent는 독립된 Claude Code 세션에서 작업을 수행합니다.
+Office Server는 semo-remote-client를 통해 iTerm2 + Claude Code 세션을 원격 제어합니다.
+
+### 아키텍처
+
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                      Office Server                               │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
+│  │ Session Pool │    │  Job Queue   │    │   Realtime   │       │
+│  │   Manager    │───▶│  Scheduler   │───▶│  Broadcast   │       │
+│  └──────┬───────┘    └──────────────┘    └──────────────┘       │
+│         │                                                        │
+│         │ INSERT agent_commands                                  │
+│         ▼                                                        │
+│  ┌──────────────────────────────────────┐                       │
+│  │          Supabase (Realtime)          │                       │
+│  │  ├─ agent_commands (명령)             │                       │
+│  │  └─ agent_command_results (응답)      │                       │
+│  └──────────────────────────────────────┘                       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              │ Realtime Subscribe
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   semo-remote-client (Electron)                  │
+│  ┌──────────────┐    ┌──────────────┐    ┌──────────────┐       │
+│  │   Office     │    │   iTerm2     │    │   Output     │       │
+│  │  Subscriber  │───▶│  Python API  │───▶│  Collector   │       │
+│  └──────────────┘    └──────────────┘    └──────────────┘       │
+│                              │                                   │
+│                              ▼                                   │
+│                    ┌──────────────┐                             │
+│                    │ Claude Code  │                             │
+│                    │   Session    │                             │
+│                    └──────────────┘                             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## User Stories
+
+### US-SE01: Agent 세션 생성
+
+> "Office에 Agent가 추가되면 해당 Agent용 Claude Code 세션을 생성한다"
+
+**AC**:
+- Agent 할당 시 자동으로 세션 생성
+- Worktree 경로에서 Claude Code 실행
+- 세션 ID를 DB에 기록
+
+### US-SE02: 프롬프트 전송
+
+> "Job이 할당된 Agent에게 작업 프롬프트를 전송한다"
+
+**AC**:
+- Job description + 컨텍스트를 프롬프트로 변환
+- 활성 세션에 프롬프트 전송
+- 전송 결과 확인
+
+### US-SE03: 세션 출력 모니터링
+
+> "Agent 세션의 실시간 출력을 모니터링한다"
+
+**AC**:
+- Claude Code 출력 스트림 캡처
+- 중요 이벤트 파싱 (완료, 오류, 대기)
+- Realtime으로 상태 브로드캐스트
+
+### US-SE04: 세션 풀 관리
+
+> "효율적인 세션 관리를 위해 Warm/Cold Pool을 운영한다"
+
+**AC**:
+- 자주 사용되는 역할은 Warm Pool (미리 생성)
+- 버스트 트래픽은 Cold Pool (온디맨드)
+- 유휴 세션 자동 정리
+
+### US-SE05: 세션 종료/복구
+
+> "세션 종료 및 오류 복구를 관리한다"
+
+**AC**:
+- Job 완료 시 세션 유지/해제 결정
+- 오류 발생 시 자동 재시작 (Circuit Breaker)
+- 세션 상태 정기 헬스체크
+
+---
+
+## Data Models
+
+### SessionInfo
+
+```typescript
+interface SessionInfo {
+  session_id: string;
+  agent_id: string;
+  worktree_id: string;
+  iterm_tab_id: string;
+  status: SessionStatus;
+  created_at: string;
+  last_activity_at: string;
+}
+
+type SessionStatus =
+  | 'creating'      // 생성 중
+  | 'ready'         // 준비 완료 (대기)
+  | 'executing'     // 프롬프트 실행 중
+  | 'waiting_input' // 사용자 입력 대기
+  | 'error'         // 오류 상태
+  | 'terminated';   // 종료됨
+```
+
+### AgentCommand
+
+```typescript
+// Office Server → semo-remote-client
+interface AgentCommand {
+  id: string;
+  office_id: string;
+  session_id?: string;
+  command_type: CommandType;
+  payload: CommandPayload;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  created_at: string;
+}
+
+type CommandType =
+  | 'create_session'  // 새 세션 생성
+  | 'send_prompt'     // 프롬프트 전송
+  | 'send_text'       // 일반 텍스트 전송
+  | 'get_output'      // 출력 조회
+  | 'cancel'          // Ctrl+C
+  | 'terminate';      // 세션 종료
+
+interface CommandPayload {
+  // create_session
+  worktree_path?: string;
+
+  // send_prompt / send_text
+  text?: string;
+  wait_for_completion?: boolean;
+}
+```
+
+### AgentCommandResult
+
+```typescript
+// semo-remote-client → Office Server
+interface AgentCommandResult {
+  id: string;
+  command_id: string;
+  success: boolean;
+  result?: {
+    session_id?: string;
+    output?: string;
+    status?: SessionStatus;
+  };
+  error?: string;
+  created_at: string;
+}
+```
+
+---
+
+## DB Schema
+
+### 테이블: agent_commands
+
+```sql
+CREATE TABLE agent_commands (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  office_id UUID REFERENCES offices(id) ON DELETE CASCADE,
+  session_id VARCHAR(100),
+  command_type VARCHAR(50) NOT NULL,
+  payload JSONB DEFAULT '{}',
+  status VARCHAR(20) DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  processed_at TIMESTAMPTZ
+);
+
+CREATE INDEX idx_agent_commands_office ON agent_commands(office_id);
+CREATE INDEX idx_agent_commands_status ON agent_commands(status);
+```
+
+### 테이블: agent_command_results
+
+```sql
+CREATE TABLE agent_command_results (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  command_id UUID REFERENCES agent_commands(id) ON DELETE CASCADE,
+  success BOOLEAN NOT NULL,
+  result JSONB DEFAULT '{}',
+  error TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX idx_command_results_command ON agent_command_results(command_id);
+```
+
+---
+
+## API Endpoints
+
+### 세션 관리
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/offices/:id/sessions` | 세션 생성 요청 |
+| GET | `/api/offices/:id/sessions` | 세션 목록 조회 |
+| GET | `/api/offices/:id/sessions/:sessionId` | 세션 상태 조회 |
+| DELETE | `/api/offices/:id/sessions/:sessionId` | 세션 종료 |
+
+### 명령 전송
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/offices/:id/sessions/:sessionId/prompt` | 프롬프트 전송 |
+| POST | `/api/offices/:id/sessions/:sessionId/cancel` | 실행 취소 |
+| GET | `/api/offices/:id/sessions/:sessionId/output` | 출력 조회 |
+
+---
+
+## semo-remote-client 연동
+
+### Office Subscriber
+
+```typescript
+// packages/semo-remote-client/src/main/officeSubscriber.ts
+class OfficeSubscriber {
+  private supabase: SupabaseClient;
+  private sessions: Map<string, SessionInfo>;
+
+  async subscribe(officeId: string): Promise<void> {
+    this.supabase
+      .channel(`office:${officeId}:commands`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'agent_commands',
+        filter: `office_id=eq.${officeId}`
+      }, this.handleCommand)
+      .subscribe();
+  }
+
+  private async handleCommand(payload: AgentCommand): Promise<void> {
+    switch (payload.command_type) {
+      case 'create_session':
+        await this.createSession(payload);
+        break;
+      case 'send_prompt':
+        await this.sendPrompt(payload);
+        break;
+      // ...
+    }
+  }
+
+  private async createSession(command: AgentCommand): Promise<void> {
+    const { worktree_path } = command.payload;
+
+    // iTerm2 Python API로 새 탭 생성
+    const tabId = await this.iterm.createTab();
+
+    // Claude Code 실행
+    await this.iterm.sendText(tabId, `cd ${worktree_path} && claude`);
+
+    // 결과 저장
+    await this.supabase.from('agent_command_results').insert({
+      command_id: command.id,
+      success: true,
+      result: { session_id: tabId }
+    });
+  }
+}
+```
+
+### iTerm2 Python API 래퍼
+
+```typescript
+// packages/semo-remote-client/src/main/itermApi.ts
+class ITermApi {
+  async createTab(): Promise<string>;
+  async sendText(tabId: string, text: string): Promise<void>;
+  async getOutput(tabId: string): Promise<string>;
+  async sendKeystrokes(tabId: string, keys: string): Promise<void>;
+  async closeTab(tabId: string): Promise<void>;
+}
+```
+
+---
+
+## Session Pool Strategy
+
+### Warm Pool
+
+| 역할 | 기본 세션 수 | 설명 |
+|------|-------------|------|
+| FE | 1 | Frontend 작업 |
+| BE | 1 | Backend 작업 |
+| QA | 1 | 테스트 작업 |
+| **Total** | **3** | Office당 기본 세션 |
+
+### Cold Pool
+
+- 동적 생성: Job 큐 대기 시 온디맨드 생성
+- 자동 정리: 10분 유휴 시 종료
+- 최대 제한: Office당 6개
+
+### Pool Manager
+
+```typescript
+class SessionPoolManager {
+  private warmPool: Map<string, SessionInfo[]>;  // role -> sessions
+  private coldPool: SessionInfo[];
+
+  async acquireSession(officeId: string, role: string): Promise<SessionInfo> {
+    // 1. Warm Pool에서 가용 세션 확인
+    const warm = this.warmPool.get(role)?.find(s => s.status === 'ready');
+    if (warm) return warm;
+
+    // 2. Cold Pool에서 생성
+    return this.createColdSession(officeId, role);
+  }
+
+  async releaseSession(sessionId: string): Promise<void> {
+    // 세션 상태 초기화 후 Pool 반환
+  }
+
+  async cleanupIdleSessions(): Promise<void> {
+    // 10분 이상 유휴 세션 정리
+  }
+}
+```
+
+---
+
+## Error Handling
+
+### Circuit Breaker
+
+```typescript
+interface CircuitBreakerConfig {
+  failureThreshold: 3;      // 연속 실패 허용 횟수
+  resetTimeout: 60000;      // 1분 후 재시도
+  halfOpenRequests: 1;      // Half-Open 상태에서 테스트 요청 수
+}
+```
+
+### 재시도 전략
+
+| 오류 유형 | 재시도 | 동작 |
+|----------|--------|------|
+| 세션 생성 실패 | 최대 3회 | 지수 백오프 |
+| 프롬프트 타임아웃 | 최대 2회 | 세션 재시작 |
+| iTerm2 연결 오류 | 최대 3회 | 연결 재시도 |
+
+---
+
+## Sequence Diagram
+
+### 세션 생성 및 프롬프트 전송
+
+```text
+Office Server          Supabase           semo-remote-client      iTerm2
+     │                    │                      │                   │
+     │ INSERT command     │                      │                   │
+     │───────────────────▶│                      │                   │
+     │                    │  Realtime notify     │                   │
+     │                    │─────────────────────▶│                   │
+     │                    │                      │  createTab()      │
+     │                    │                      │──────────────────▶│
+     │                    │                      │                   │
+     │                    │                      │◀──────────────────│
+     │                    │                      │  sendText(claude) │
+     │                    │                      │──────────────────▶│
+     │                    │  INSERT result       │                   │
+     │                    │◀─────────────────────│                   │
+     │◀───────────────────│                      │                   │
+     │  Realtime notify   │                      │                   │
+```
+
+---
+
+## Related Specs
+
+- [01-Core](../01-core/spec.md) - Agent 인스턴스
+- [02-Task Decomposer](../02-task-decomposer/spec.md) - Job 생성
+- [03-Worktree](../03-worktree/spec.md) - 작업 디렉토리
+- [05-PR Workflow](../05-pr-workflow/spec.md) - 작업 완료 후 PR
