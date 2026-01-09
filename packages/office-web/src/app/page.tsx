@@ -44,21 +44,34 @@ export default function Home() {
 
       <div className="mt-16 text-center">
         <h3 className="text-lg font-semibold mb-4">지원하는 Agent 역할</h3>
-        <div className="flex flex-wrap justify-center gap-3">
-          {[
-            { role: 'PO', color: 'bg-agent-po' },
-            { role: 'FE', color: 'bg-agent-fe' },
-            { role: 'BE', color: 'bg-agent-be' },
-            { role: 'QA', color: 'bg-agent-qa' },
-            { role: 'DevOps', color: 'bg-agent-devops' },
-          ].map(({ role, color }) => (
-            <span
-              key={role}
-              className={`${color} px-3 py-1 rounded-full text-sm font-medium`}
-            >
-              {role}
-            </span>
-          ))}
+        <div className="space-y-4">
+          {/* PO Team */}
+          <div>
+            <span className="text-xs text-pink-400 mr-2">PO Team</span>
+            <div className="inline-flex flex-wrap gap-2">
+              {['Researcher', 'Planner', 'Architect', 'Designer'].map((role) => (
+                <span key={role} className="bg-pink-600 px-3 py-1 rounded-full text-sm font-medium">{role}</span>
+              ))}
+            </div>
+          </div>
+          {/* PM Team */}
+          <div>
+            <span className="text-xs text-orange-400 mr-2">PM Team</span>
+            <div className="inline-flex flex-wrap gap-2">
+              {['Publisher', 'FE Dev', 'DBA', 'BE Dev'].map((role) => (
+                <span key={role} className="bg-orange-600 px-3 py-1 rounded-full text-sm font-medium">{role}</span>
+              ))}
+            </div>
+          </div>
+          {/* Ops Team */}
+          <div>
+            <span className="text-xs text-cyan-400 mr-2">Ops Team</span>
+            <div className="inline-flex flex-wrap gap-2">
+              {['QA', 'Healer', 'Infra Eng', 'Marketer'].map((role) => (
+                <span key={role} className="bg-cyan-600 px-3 py-1 rounded-full text-sm font-medium">{role}</span>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </main>

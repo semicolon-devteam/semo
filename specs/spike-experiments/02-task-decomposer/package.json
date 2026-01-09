@@ -1,0 +1,21 @@
+{
+  "name": "spike-task-decomposer",
+  "version": "1.0.0",
+  "description": "Task Decomposer accuracy and optimization testing",
+  "scripts": {
+    "test:all": "node src/run-all.js",
+    "test:few-shot": "node src/test-few-shot.js",
+    "test:context": "node src/test-context.js",
+    "test:prompts": "node src/test-prompts.js",
+    "report": "node src/generate-report.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.17.0",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0"
+  }
+}

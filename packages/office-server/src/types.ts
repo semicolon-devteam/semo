@@ -28,7 +28,15 @@ export interface AgentPersona {
   updated_at: string;
 }
 
-export type AgentRole = 'PO' | 'PM' | 'Architect' | 'FE' | 'BE' | 'QA' | 'DevOps';
+/**
+ * AgentRole is now a flexible string to support dynamic CRUD
+ * without code changes. Common roles include:
+ * - PO Team: Researcher, Planner, Architect, Designer
+ * - PM Team: Publisher, FE, DBA, BE
+ * - Ops Team: QA, Healer, Infra, Marketer
+ * - Special: Orchestrator
+ */
+export type AgentRole = string;
 
 export interface Worktree {
   id: string;
@@ -42,7 +50,7 @@ export interface Worktree {
   updated_at: string;
 }
 
-export type WorktreeStatus = 'idle' | 'working' | 'blocked';
+export type WorktreeStatus = 'idle' | 'active' | 'working' | 'blocked' | 'dirty' | 'failed';
 
 export interface OfficeAgent {
   id: string;
@@ -53,12 +61,23 @@ export interface OfficeAgent {
   status: AgentStatus;
   position_x: number;
   position_y: number;
+  target_x?: number;      // Target position when moving
+  target_y?: number;      // Target position when moving
   current_task?: string;
   last_message?: string;
   updated_at: string;
 }
 
-export type AgentStatus = 'idle' | 'working' | 'blocked';
+/**
+ * Agent status states:
+ * - idle: Agent is waiting/inactive
+ * - working: Agent is processing a job
+ * - blocked: Agent is waiting for dependencies
+ * - moving: Agent is moving to a new position
+ * - listening: Agent is in Order Mode, listening to user
+ * - error: Agent encountered an error
+ */
+export type AgentStatus = 'idle' | 'working' | 'blocked' | 'moving' | 'listening' | 'error';
 
 export interface Job {
   id: string;
@@ -127,4 +146,28 @@ export interface DecomposedJob {
 export interface DependencyEdge {
   from: string;
   to: string;
+}
+
+// Chat Types (PM 조율 워크플로우)
+
+export type ChatType = 'task_submit' | 'proximity_chat';
+
+export interface ChatMessage {
+  id: string;
+  office_id: string;
+  type: ChatType;
+  content: string;
+  sender_type: 'user' | 'agent';
+  sender_id?: string;           // agent_id (agent가 보낸 경우)
+  target_agent_id?: string;     // 대상 agent (proximity_chat인 경우)
+  created_at: string;
+}
+
+export interface ChatRouteResult {
+  success: boolean;
+  type: ChatType;
+  message_id: string;
+  jobs?: DecomposedJob[];       // task_submit인 경우 생성된 Job들
+  session_id?: string;          // proximity_chat인 경우 대상 세션
+  error?: string;
 }

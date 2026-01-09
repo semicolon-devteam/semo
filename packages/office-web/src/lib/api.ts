@@ -4,7 +4,7 @@
  * Client for communicating with the office-server backend.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_OFFICE_SERVER_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_OFFICE_SERVER_URL || 'http://localhost:3030';
 
 export interface Office {
   id: string;
@@ -33,11 +33,15 @@ export interface Agent {
   id: string;
   office_id: string;
   persona_id: string;
-  status: 'idle' | 'working' | 'blocked';
+  status: 'idle' | 'working' | 'blocked' | 'moving' | 'listening' | 'error';
   position_x: number;
   position_y: number;
+  target_x?: number | null;
+  target_y?: number | null;
   current_task?: string;
+  current_job_id?: string;
   last_message?: string;
+  persona?: Persona;
 }
 
 export interface Persona {
@@ -163,6 +167,58 @@ export async function updateJob(
   });
 }
 
+export interface ExecuteJobResult {
+  message: string;
+  job_id: string;
+  status: string;
+}
+
+export async function executeJob(
+  officeId: string,
+  jobId: string,
+  options?: { agent_id?: string; create_worktree?: boolean }
+): Promise<ExecuteJobResult> {
+  return fetchApi(`/api/offices/${officeId}/jobs/${jobId}/execute`, {
+    method: 'POST',
+    body: JSON.stringify(options || {}),
+  });
+}
+
+// === Session API ===
+
+export interface SessionStats {
+  totalSessions: number;
+  idleSessions: number;
+  busySessions: number;
+  pendingExecutions: number;
+}
+
+export interface Session {
+  id: string;
+  agentId?: string;
+  jobId?: string;
+  worktreePath: string;
+  status: 'idle' | 'busy' | 'terminating';
+  createdAt: string;
+  lastActivityAt: string;
+}
+
+export async function getSessionStats(): Promise<SessionStats> {
+  return fetchApi('/api/sessions/stats');
+}
+
+export async function getSessions(): Promise<{ sessions: Session[]; total: number }> {
+  return fetchApi('/api/sessions');
+}
+
+export async function cancelSession(sessionId: string): Promise<{ success: boolean }> {
+  return fetchApi(`/api/sessions/${sessionId}/cancel`, { method: 'POST' });
+}
+
+export async function terminateSession(sessionId: string): Promise<void> {
+  return fetchApi(`/api/sessions/${sessionId}`, { method: 'DELETE' });
+}
+
 // === Agent API ===
 
 export async function getAgents(
@@ -250,6 +306,107 @@ export async function createMessage(
   });
 }
 
+// === Chat API (PM 조율 워크플로우) ===
+
+export type ChatType = 'task_submit' | 'proximity_chat';
+
+export interface ChatMessage {
+  type: ChatType;
+  content: string;
+  target_agent_id?: string;
+  sender_type?: 'user' | 'agent';
+}
+
+export interface ChatResult {
+  success: boolean;
+  type: ChatType;
+  message_id: string;
+  jobs?: Array<{
+    id: string;
+    role: string;
+    description: string;
+    scope: string[];
+    depends_on: string[];
+    skills: string[];
+    priority: number;
+  }>;
+  session_id?: string;
+  error?: string;
+}
+
+export interface AgentSession {
+  agentId: string;
+  sessionId: string;
+  role: string;
+  worktreePath?: string;
+}
+
+/**
+ * Send a chat message to the office
+ * - task_submit: PM이 수신하여 분해/분배
+ * - proximity_chat: 특정 에이전트에게 직접 전송
+ */
+export async function sendChatMessage(
+  officeId: string,
+  message: ChatMessage
+): Promise<ChatResult> {
+  return fetchApi(`/api/offices/${officeId}/chat`, {
+    method: 'POST',
+    body: JSON.stringify(message),
+  });
+}
+
+/**
+ * Get chat router stats
+ */
+export async function getChatStats(officeId: string): Promise<{
+  officeId: string;
+  pmAgentId?: string;
+  registeredSessions: number;
+  sessionsByRole: Record<string, number>;
+}> {
+  return fetchApi(`/api/offices/${officeId}/chat/stats`);
+}
+
+/**
+ * Register an agent session for proximity chat
+ */
+export async function registerAgentSession(
+  officeId: string,
+  data: {
+    agent_id: string;
+    session_id: string;
+    role: string;
+    worktree_path?: string;
+  }
+): Promise<{ success: boolean; message: string }> {
+  return fetchApi(`/api/offices/${officeId}/chat/sessions`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+/**
+ * Unregister an agent session
+ */
+export async function unregisterAgentSession(
+  officeId: string,
+  agentId: string
+): Promise<{ success: boolean; message: string }> {
+  return fetchApi(`/api/offices/${officeId}/chat/sessions/${agentId}`, {
+    method: 'DELETE',
+  });
+}
+
+/**
+ * Get registered agent sessions
+ */
+export async function getAgentSessions(
+  officeId: string
+): Promise<{ sessions: AgentSession[]; total: number }> {
+  return fetchApi(`/api/offices/${officeId}/chat/sessions`);
+}
+
 // === Health Check ===
 
 export async function healthCheck(): Promise<{
@@ -258,4 +415,75 @@ export async function healthCheck(): Promise<{
   version: string;
 }> {
   return fetchApi('/health');
+}
+
+// === Test API (Development Only) ===
+
+export interface TestConfig {
+  playgroundPath: string;
+  configured: boolean;
+}
+
+export interface TestSessionResult {
+  success: boolean;
+  sessionId?: string;
+  playgroundPath: string;
+  message: string;
+}
+
+export interface TestPromptResult {
+  success: boolean;
+  output?: string;
+  sessionId?: string;
+  error?: string;
+}
+
+export interface TestOutputResult {
+  success: boolean;
+  output?: string;
+  sessionId?: string;
+  metadata?: {
+    lineCount: number;
+  };
+}
+
+/**
+ * Get test configuration
+ */
+export async function getTestConfig(): Promise<TestConfig> {
+  return fetchApi('/api/test/config');
+}
+
+/**
+ * Create a test session with Claude Code
+ */
+export async function createTestSession(prompt?: string): Promise<TestSessionResult> {
+  return fetchApi('/api/test/session', {
+    method: 'POST',
+    body: JSON.stringify({ prompt }),
+  });
+}
+
+/**
+ * Send a prompt to a test session
+ */
+export async function sendTestPrompt(
+  sessionId: string,
+  prompt: string
+): Promise<TestPromptResult> {
+  return fetchApi('/api/test/prompt', {
+    method: 'POST',
+    body: JSON.stringify({ sessionId, prompt }),
+  });
+}
+
+/**
+ * Get output from a test session
+ */
+export async function getTestOutput(
+  sessionId: string,
+  lines?: number
+): Promise<TestOutputResult> {
+  const params = lines ? `?lines=${lines}` : '';
+  return fetchApi(`/api/test/output/${sessionId}${params}`);
 }

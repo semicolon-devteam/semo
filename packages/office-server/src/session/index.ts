@@ -39,3 +39,11 @@ export type {
   ProjectContext,
   InjectionResult,
 } from './persona-injector.js';
+
+export { LocalSessionExecutor } from './local-executor.js';
+export type {
+  LocalExecutorConfig,
+  LocalSession,
+  LocalExecutionContext,
+  LocalExecutionResult,
+} from './local-executor.js';

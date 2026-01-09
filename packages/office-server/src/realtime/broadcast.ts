@@ -97,12 +97,12 @@ export class RealtimeHandler {
       })
       .on('presence', { event: 'join' }, ({ key, newPresences }) => {
         for (const presence of newPresences) {
-          handlers.onPresenceJoin?.(key, presence);
+          handlers.onPresenceJoin?.(key, presence as unknown as PresenceState);
         }
       })
       .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
         for (const presence of leftPresences) {
-          handlers.onPresenceLeave?.(key, presence);
+          handlers.onPresenceLeave?.(key, presence as unknown as PresenceState);
         }
       })
       .subscribe();

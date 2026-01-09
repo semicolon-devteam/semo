@@ -299,14 +299,13 @@ export class MessageService extends EventEmitter {
 
     // Clean database
     if (this.supabase) {
-      const { count: dbCount } = await this.supabase
+      const { error } = await this.supabase
         .from('agent_messages')
         .delete()
-        .lt('expires_at', new Date().toISOString())
-        .select('*', { count: 'exact', head: true });
+        .lt('expires_at', new Date().toISOString());
 
-      if (dbCount) {
-        count += dbCount;
+      if (error) {
+        console.warn('[MessageService] Failed to cleanup expired messages:', error);
       }
     }
 

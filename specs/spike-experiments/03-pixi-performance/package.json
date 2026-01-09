@@ -1,0 +1,22 @@
+{
+  "name": "spike-pixi-performance",
+  "version": "1.0.0",
+  "description": "PixiJS rendering performance testing",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test:e2e": "playwright test",
+    "profile": "node scripts/profile.js",
+    "report": "node scripts/generate-report.js"
+  },
+  "dependencies": {
+    "pixi.js": "^7.3.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@types/node": "^18.0.0",
+    "chalk": "^4.1.2",
+    "vite": "^5.0.0"
+  }
+}

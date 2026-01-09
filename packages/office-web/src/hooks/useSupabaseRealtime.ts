@@ -1,18 +1,19 @@
 import { useEffect, useRef } from 'react';
-import { createClient, RealtimeChannel } from '@supabase/supabase-js';
+import { RealtimeChannel } from '@supabase/supabase-js';
+import { getSupabaseClient } from '@/lib/supabase';
 import { useOfficeStore, Agent, Job, Message } from '@/stores/officeStore';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 export function useSupabaseRealtime(officeId: string | null) {
   const channelsRef = useRef<RealtimeChannel[]>([]);
   const { setAgents, updateAgent, updateJob, addMessage } = useOfficeStore();
 
   useEffect(() => {
-    if (!officeId || !supabaseUrl || !supabaseKey) return;
+    if (!officeId || officeId === 'demo' || !supabaseUrl || !supabaseKey) return;
 
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = getSupabaseClient();
 
     // Presence channel for agent positions
     const presenceChannel = supabase
@@ -78,15 +79,46 @@ export function useSupabaseRealtime(officeId: string | null) {
         },
         (payload) => {
           const job = payload.new as any;
-          updateJob(job.id, {
-            status: job.status,
-            prNumber: job.pr_number,
-          });
+          if (job) {
+            updateJob(job.id, {
+              status: job.status,
+              prNumber: job.pr_number,
+              progress: job.status === 'done' || job.status === 'merged' ? 100 :
+                        job.status === 'processing' ? 50 :
+                        job.status === 'ready' ? 10 : 0,
+            });
+          }
         }
       )
       .subscribe();
 
     channelsRef.current.push(jobChannel);
+
+    // Postgres changes for agents
+    const agentChannel = supabase
+      .channel(`office:${officeId}:agents`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'office_agents',
+          filter: `office_id=eq.${officeId}`,
+        },
+        (payload) => {
+          const agent = payload.new as any;
+          if (agent) {
+            updateAgent(agent.id, {
+              status: agent.status,
+              currentTask: agent.current_task,
+              lastMessage: agent.last_message,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    channelsRef.current.push(agentChannel);
 
     // Cleanup
     return () => {

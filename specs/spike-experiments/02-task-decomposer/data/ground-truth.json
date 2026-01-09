@@ -1,0 +1,188 @@
+[
+  {
+    "id": 1,
+    "level": "simple",
+    "request": "로그인 페이지 만들어줘",
+    "expected": {
+      "jobs": [
+        { "role": "FE", "description": "로그인 UI 구현" },
+        { "role": "BE", "description": "인증 API 구현" },
+        { "role": "QA", "description": "로그인 테스트" }
+      ],
+      "dependencies": [
+        { "from": "BE", "to": "FE" },
+        { "from": "FE", "to": "QA" }
+      ]
+    }
+  },
+  {
+    "id": 2,
+    "level": "simple",
+    "request": "사용자 프로필 조회 API",
+    "expected": {
+      "jobs": [
+        { "role": "BE", "description": "프로필 조회 API 구현" },
+        { "role": "QA", "description": "API 테스트" }
+      ],
+      "dependencies": [
+        { "from": "BE", "to": "QA" }
+      ]
+    }
+  },
+  {
+    "id": 3,
+    "level": "simple",
+    "request": "README 문서 작성",
+    "expected": {
+      "jobs": [
+        { "role": "PO", "description": "README 문서 작성" }
+      ],
+      "dependencies": []
+    }
+  },
+  {
+    "id": 4,
+    "level": "medium",
+    "request": "사용자 관리 기능",
+    "expected": {
+      "jobs": [
+        { "role": "PO", "description": "사용자 관리 요구사항 정의" },
+        { "role": "Architect", "description": "사용자 관리 설계" },
+        { "role": "FE", "description": "사용자 CRUD UI 구현" },
+        { "role": "BE", "description": "사용자 CRUD API 구현" },
+        { "role": "QA", "description": "사용자 관리 통합 테스트" }
+      ],
+      "dependencies": [
+        { "from": "PO", "to": "Architect" },
+        { "from": "Architect", "to": "FE" },
+        { "from": "Architect", "to": "BE" },
+        { "from": "FE", "to": "QA" },
+        { "from": "BE", "to": "QA" }
+      ]
+    }
+  },
+  {
+    "id": 5,
+    "level": "medium",
+    "request": "결제 시스템 연동",
+    "expected": {
+      "jobs": [
+        { "role": "Architect", "description": "결제 게이트웨이 선택 및 설계" },
+        { "role": "BE", "description": "결제 연동 구현" },
+        { "role": "FE", "description": "결제 UI 구현" },
+        { "role": "QA", "description": "결제 플로우 테스트" }
+      ],
+      "dependencies": [
+        { "from": "Architect", "to": "BE" },
+        { "from": "BE", "to": "FE" },
+        { "from": "FE", "to": "QA" }
+      ]
+    }
+  },
+  {
+    "id": 6,
+    "level": "medium",
+    "request": "성능 최적화",
+    "expected": {
+      "jobs": [
+        { "role": "Architect", "description": "성능 병목 분석" },
+        { "role": "FE", "description": "프론트엔드 최적화" },
+        { "role": "BE", "description": "백엔드 최적화" },
+        { "role": "DevOps", "description": "인프라 튜닝" }
+      ],
+      "dependencies": [
+        { "from": "Architect", "to": "FE" },
+        { "from": "Architect", "to": "BE" },
+        { "from": "Architect", "to": "DevOps" }
+      ]
+    }
+  },
+  {
+    "id": 7,
+    "level": "complex",
+    "request": "커뮤니티 기능 추가",
+    "expected": {
+      "jobs": [
+        { "role": "PO", "description": "커뮤니티 기능 요구사항 명확화" },
+        { "role": "Architect", "description": "커뮤니티 아키텍처 설계" },
+        { "role": "FE", "description": "게시판 및 댓글 UI 구현" },
+        { "role": "BE", "description": "게시판 API 구현" },
+        { "role": "DevOps", "description": "파일 업로드 인프라 구축" },
+        { "role": "QA", "description": "커뮤니티 기능 테스트" }
+      ],
+      "dependencies": [
+        { "from": "PO", "to": "Architect" },
+        { "from": "Architect", "to": "FE" },
+        { "from": "Architect", "to": "BE" },
+        { "from": "Architect", "to": "DevOps" },
+        { "from": "FE", "to": "QA" },
+        { "from": "BE", "to": "QA" },
+        { "from": "DevOps", "to": "QA" }
+      ]
+    }
+  },
+  {
+    "id": 8,
+    "level": "complex",
+    "request": "서비스 리팩토링",
+    "expected": {
+      "jobs": [
+        { "role": "Architect", "description": "리팩토링 전략 수립" },
+        { "role": "FE", "description": "프론트엔드 컴포넌트 리팩토링" },
+        { "role": "BE", "description": "백엔드 서비스 레이어 리팩토링" },
+        { "role": "QA", "description": "회귀 테스트" }
+      ],
+      "dependencies": [
+        { "from": "Architect", "to": "FE" },
+        { "from": "Architect", "to": "BE" },
+        { "from": "FE", "to": "QA" },
+        { "from": "BE", "to": "QA" }
+      ]
+    }
+  },
+  {
+    "id": 9,
+    "level": "complex",
+    "request": "실시간 알림 시스템",
+    "expected": {
+      "jobs": [
+        { "role": "Architect", "description": "실시간 알림 아키텍처 설계 (WebSocket vs SSE)" },
+        { "role": "BE", "description": "알림 서버 구현" },
+        { "role": "DevOps", "description": "알림 인프라 구축" },
+        { "role": "FE", "description": "알림 UI 구현" },
+        { "role": "QA", "description": "실시간 알림 테스트" }
+      ],
+      "dependencies": [
+        { "from": "Architect", "to": "BE" },
+        { "from": "Architect", "to": "DevOps" },
+        { "from": "BE", "to": "FE" },
+        { "from": "DevOps", "to": "FE" },
+        { "from": "FE", "to": "QA" }
+      ]
+    }
+  },
+  {
+    "id": 10,
+    "level": "complex",
+    "request": "모바일 앱 개발",
+    "expected": {
+      "jobs": [
+        { "role": "PO", "description": "모바일 앱 기획" },
+        { "role": "Architect", "description": "모바일 앱 아키텍처 설계" },
+        { "role": "FE", "description": "React Native 앱 구현" },
+        { "role": "BE", "description": "모바일 API 조정" },
+        { "role": "DevOps", "description": "앱 배포 파이프라인 구축" },
+        { "role": "QA", "description": "모바일 앱 테스트" }
+      ],
+      "dependencies": [
+        { "from": "PO", "to": "Architect" },
+        { "from": "Architect", "to": "FE" },
+        { "from": "Architect", "to": "BE" },
+        { "from": "Architect", "to": "DevOps" },
+        { "from": "FE", "to": "QA" },
+        { "from": "BE", "to": "QA" },
+        { "from": "DevOps", "to": "QA" }
+      ]
+    }
+  }
+]

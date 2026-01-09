@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { AgentStatus } from '@/types/game';
 
 export interface Agent {
   id: string;
@@ -6,9 +7,10 @@ export interface Agent {
   name: string;
   x: number;
   y: number;
-  status: 'idle' | 'working' | 'blocked';
+  status: AgentStatus;
   currentTask?: string;
   lastMessage?: string;
+  message?: string; // Alias for lastMessage (used in canvas)
 }
 
 export interface Job {
@@ -39,10 +41,13 @@ interface OfficeState {
   setOfficeId: (id: string) => void;
   setAgents: (agents: Agent[]) => void;
   updateAgent: (id: string, updates: Partial<Agent>) => void;
+  addAgent: (agent: Agent) => void;
   setJobs: (jobs: Job[]) => void;
+  addJobs: (jobs: Job[]) => void;
   updateJob: (id: string, updates: Partial<Job>) => void;
   addMessage: (message: Message) => void;
   selectAgent: (id: string | null) => void;
+  clearJobs: () => void;
 }
 
 export const useOfficeStore = create<OfficeState>((set) => ({
@@ -63,7 +68,17 @@ export const useOfficeStore = create<OfficeState>((set) => ({
       ),
     })),
 
+  addAgent: (agent) =>
+    set((state) => ({
+      agents: [...state.agents, agent],
+    })),
+
   setJobs: (jobs) => set({ jobs }),
+
+  addJobs: (jobs) =>
+    set((state) => ({
+      jobs: [...state.jobs, ...jobs],
+    })),
 
   updateJob: (id, updates) =>
     set((state) => ({
@@ -78,4 +93,6 @@ export const useOfficeStore = create<OfficeState>((set) => ({
     })),
 
   selectAgent: (id) => set({ selectedAgentId: id }),
+
+  clearJobs: () => set({ jobs: [] }),
 }));

@@ -16,46 +16,10 @@ import type {
   JobStatus,
 } from '../types.js';
 
-export interface Database {
-  public: {
-    Tables: {
-      offices: {
-        Row: Office;
-        Insert: Omit<Office, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Omit<Office, 'id'>>;
-      };
-      agent_personas: {
-        Row: AgentPersona;
-        Insert: Omit<AgentPersona, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Omit<AgentPersona, 'id'>>;
-      };
-      worktrees: {
-        Row: Worktree;
-        Insert: Omit<Worktree, 'id' | 'created_at' | 'updated_at'>;
-        Update: Partial<Omit<Worktree, 'id'>>;
-      };
-      office_agents: {
-        Row: OfficeAgent;
-        Insert: Omit<OfficeAgent, 'id' | 'updated_at'>;
-        Update: Partial<Omit<OfficeAgent, 'id'>>;
-      };
-      job_queue: {
-        Row: Job;
-        Insert: Omit<Job, 'id' | 'created_at'>;
-        Update: Partial<Omit<Job, 'id'>>;
-      };
-      agent_messages: {
-        Row: AgentMessage;
-        Insert: Omit<AgentMessage, 'id' | 'created_at'>;
-        Update: Partial<Omit<AgentMessage, 'id'>>;
-      };
-    };
-  };
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let supabaseClient: SupabaseClient | null = null;
 
-let supabaseClient: SupabaseClient<Database> | null = null;
-
-export function getSupabaseClient(): SupabaseClient<Database> {
+export function getSupabaseClient(): SupabaseClient {
   if (!supabaseClient) {
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY;
@@ -64,7 +28,7 @@ export function getSupabaseClient(): SupabaseClient<Database> {
       throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY environment variables');
     }
 
-    supabaseClient = createClient<Database>(supabaseUrl, supabaseKey);
+    supabaseClient = createClient(supabaseUrl, supabaseKey);
   }
 
   return supabaseClient;
@@ -232,10 +196,10 @@ export async function createAgent(
   return agent;
 }
 
-export async function getAgents(officeId: string): Promise<OfficeAgent[]> {
+export async function getAgents(officeId: string): Promise<(OfficeAgent & { persona?: AgentPersona })[]> {
   const { data, error } = await getSupabaseClient()
     .from('office_agents')
-    .select()
+    .select('*, persona:agent_personas(*)')
     .eq('office_id', officeId);
 
   if (error) throw error;

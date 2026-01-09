@@ -4,9 +4,9 @@
   "description": "Semo Office Web - GatherTown-style multi-agent collaboration UI",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3002",
+    "dev": "source .env && next dev -p $PORT",
     "build": "next build",
-    "start": "next start -p 3002",
+    "start": "source .env && next start -p $PORT",
     "lint": "next lint"
   },
   "keywords": [
@@ -21,6 +21,9 @@
   "dependencies": {
     "@pixi/react": "^7.1.1",
     "@supabase/supabase-js": "^2.39.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
     "next": "^14.0.4",
     "pixi.js": "^7.3.2",
     "react": "^18.2.0",

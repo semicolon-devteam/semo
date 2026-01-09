@@ -40,3 +40,4 @@ coverage/
 
 # === 민감한 디렉토리 ===
 core-db/
+.next/

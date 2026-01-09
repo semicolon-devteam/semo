@@ -10,8 +10,40 @@ import { TaskDecomposer } from '../decomposer/index.js';
 import { JobScheduler } from '../scheduler/index.js';
 import { WorktreeManager } from '../worktree/manager.js';
 import { RealtimeHandler } from '../realtime/broadcast.js';
+import { LocalSessionExecutor } from '../session/local-executor.js';
+import { CommandHandler, AgentCommand } from '../session/command-handler.js';
+import { ChatRouter } from '../chat/router.js';
 import * as db from '../db/supabase.js';
-import type { DecompositionRequest, AgentRole } from '../types.js';
+import type { DecompositionRequest, AgentRole, AgentPersona, ChatMessage, ChatType } from '../types.js';
+import type { AutoResponseConfig } from '../session/auto-responder.js';
+
+// UUID validation regex (relaxed to accept any 8-4-4-4-12 hex pattern)
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function isValidUUID(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
+
+// Global executor reference for WebSocket handler
+let globalLocalExecutor: LocalSessionExecutor | null = null;
+
+export function getLocalExecutor(): LocalSessionExecutor | null {
+  return globalLocalExecutor;
+}
+
+// Middleware to validate UUID parameters
+function validateUUID(...paramNames: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    for (const paramName of paramNames) {
+      const value = req.params[paramName];
+      if (value && !isValidUUID(value)) {
+        res.status(400).json({ error: `Invalid ${paramName}: must be a valid UUID` });
+        return;
+      }
+    }
+    next();
+  };
+}
 
 export function createApp(): Express {
   const app = express();
@@ -21,6 +53,40 @@ export function createApp(): Express {
   const decomposer = new TaskDecomposer();
   const scheduler = new JobScheduler();
   const worktreeManager = new WorktreeManager();
+  // Create LocalSessionExecutor with auto-response enabled by default
+  const localExecutor = new LocalSessionExecutor(
+    { verbose: true },
+    {
+      enabled: true,
+      defaultBehavior: 'allow',
+      preferSessionAllow: true,  // Prefer "Yes, allow for session" to reduce prompts
+    }
+  );
+  const commandHandler = new CommandHandler(localExecutor);
+
+  // Store reference for WebSocket handler
+  globalLocalExecutor = localExecutor;
+
+  // Chat routers by office (lazy initialized)
+  const chatRouters = new Map<string, ChatRouter>();
+
+  function getChatRouter(officeId: string): ChatRouter {
+    let router = chatRouters.get(officeId);
+    if (!router) {
+      router = new ChatRouter(decomposer, scheduler, commandHandler, {
+        officeId,
+        autoSchedule: true,
+        verbose: true,
+      });
+      chatRouters.set(officeId, router);
+    }
+    return router;
+  }
+
+  // Initialize executor
+  localExecutor.initialize().catch((err) => {
+    console.error('Failed to initialize LocalSessionExecutor:', err);
+  });
 
   // Error handler
   const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<void>) =>
@@ -62,7 +128,7 @@ export function createApp(): Express {
   }));
 
   // Get office
-  app.get('/api/offices/:id', asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/offices/:id', validateUUID('id'), asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     const office = await db.getOffice(id);
 
@@ -75,7 +141,7 @@ export function createApp(): Express {
   }));
 
   // Delete office
-  app.delete('/api/offices/:id', asyncHandler(async (req: Request, res: Response) => {
+  app.delete('/api/offices/:id', validateUUID('id'), asyncHandler(async (req: Request, res: Response) => {
     const { id } = req.params;
     await db.deleteOffice(id);
     res.status(204).send();
@@ -84,7 +150,7 @@ export function createApp(): Express {
   // === Task Management ===
 
   // Submit task (natural language)
-  app.post('/api/offices/:id/tasks', asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/offices/:id/tasks', validateUUID('id'), asyncHandler(async (req: Request, res: Response) => {
     const { id: office_id } = req.params;
     const { task, context } = req.body;
 
@@ -109,22 +175,42 @@ export function createApp(): Express {
     // Decompose task into jobs
     const result = await decomposer.decompose(request);
 
-    // Create jobs in database
+    // Create jobs in database with proper UUID mapping
     const createdJobs = [];
-    for (const job of result.jobs) {
-      // Get default persona for role
-      const persona = await db.getDefaultPersona(job.role);
+    const idMapping = new Map<string, string>(); // decomposer ID -> DB UUID
 
+    // First pass: create all jobs without dependencies
+    for (const job of result.jobs) {
       const createdJob = await db.createJob({
         office_id,
         description: job.description,
-        status: job.depends_on.length === 0 ? 'ready' : 'pending',
-        depends_on: job.depends_on,
+        status: 'pending', // Will update after dependency mapping
+        depends_on: [],
         priority: job.priority,
         branch_name: `feature/${job.role.toLowerCase()}-${Date.now()}`,
       });
 
+      idMapping.set(job.id, createdJob.id);
       createdJobs.push(createdJob);
+    }
+
+    // Second pass: update dependencies with actual UUIDs
+    for (let i = 0; i < result.jobs.length; i++) {
+      const job = result.jobs[i];
+      const createdJob = createdJobs[i];
+
+      // Map decomposer IDs to database UUIDs
+      const mappedDeps = job.depends_on
+        .map((depId) => idMapping.get(depId))
+        .filter((id): id is string => id !== undefined);
+
+      // Update job with mapped dependencies and correct status
+      const updatedJob = await db.updateJob(createdJob.id, {
+        depends_on: mappedDeps,
+        status: mappedDeps.length === 0 ? 'ready' : 'pending',
+      });
+
+      createdJobs[i] = updatedJob;
 
       // Also enqueue in memory scheduler
       scheduler.enqueue([job], office_id);
@@ -140,7 +226,7 @@ export function createApp(): Express {
   }));
 
   // Get jobs for office
-  app.get('/api/offices/:id/jobs', asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/offices/:id/jobs', validateUUID('id'), asyncHandler(async (req: Request, res: Response) => {
     const { id: office_id } = req.params;
     const { status } = req.query;
 
@@ -149,7 +235,7 @@ export function createApp(): Express {
   }));
 
   // Get job details
-  app.get('/api/offices/:id/jobs/:jobId', asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/offices/:id/jobs/:jobId', validateUUID('id', 'jobId'), asyncHandler(async (req: Request, res: Response) => {
     const { jobId } = req.params;
     const job = await db.getJob(jobId);
 
@@ -162,7 +248,7 @@ export function createApp(): Express {
   }));
 
   // Update job status
-  app.patch('/api/offices/:id/jobs/:jobId', asyncHandler(async (req: Request, res: Response) => {
+  app.patch('/api/offices/:id/jobs/:jobId', validateUUID('id', 'jobId'), asyncHandler(async (req: Request, res: Response) => {
     const { id: office_id, jobId } = req.params;
     const { status, pr_number } = req.body;
 
@@ -179,14 +265,14 @@ export function createApp(): Express {
   // === Agent Management ===
 
   // Get agents in office
-  app.get('/api/offices/:id/agents', asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/offices/:id/agents', validateUUID('id'), asyncHandler(async (req: Request, res: Response) => {
     const { id: office_id } = req.params;
     const agents = await db.getAgents(office_id);
     res.json({ office_id, agents, total: agents.length });
   }));
 
   // Create agent in office
-  app.post('/api/offices/:id/agents', asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/offices/:id/agents', validateUUID('id'), asyncHandler(async (req: Request, res: Response) => {
     const { id: office_id } = req.params;
     const { persona_id, position_x, position_y } = req.body;
 
@@ -207,7 +293,7 @@ export function createApp(): Express {
   }));
 
   // Update agent
-  app.patch('/api/offices/:id/agents/:agentId', asyncHandler(async (req: Request, res: Response) => {
+  app.patch('/api/offices/:id/agents/:agentId', validateUUID('id', 'agentId'), asyncHandler(async (req: Request, res: Response) => {
     const { agentId } = req.params;
     const updates = req.body;
 
@@ -216,7 +302,7 @@ export function createApp(): Express {
   }));
 
   // Send message to agent
-  app.post('/api/offices/:id/agents/:agentId/message', asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/offices/:id/agents/:agentId/message', validateUUID('id', 'agentId'), asyncHandler(async (req: Request, res: Response) => {
     const { id: office_id, agentId } = req.params;
     const { content, message_type } = req.body;
 
@@ -239,7 +325,7 @@ export function createApp(): Express {
   // === Worktree Management ===
 
   // Create worktree for agent
-  app.post('/api/offices/:id/worktrees', asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/offices/:id/worktrees', validateUUID('id'), asyncHandler(async (req: Request, res: Response) => {
     const { id: office_id } = req.params;
     const { agent_role, branch_name } = req.body;
 
@@ -275,7 +361,7 @@ export function createApp(): Express {
   }));
 
   // Get worktrees
-  app.get('/api/offices/:id/worktrees', asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/offices/:id/worktrees', validateUUID('id'), asyncHandler(async (req: Request, res: Response) => {
     const { id: office_id } = req.params;
 
     const office = await db.getOffice(office_id);
@@ -289,7 +375,7 @@ export function createApp(): Express {
   }));
 
   // Delete worktree
-  app.delete('/api/offices/:id/worktrees/:worktreeId', asyncHandler(async (req: Request, res: Response) => {
+  app.delete('/api/offices/:id/worktrees/:worktreeId', validateUUID('id', 'worktreeId'), asyncHandler(async (req: Request, res: Response) => {
     const { worktreeId } = req.params;
     const { force } = req.query;
 
@@ -338,7 +424,7 @@ export function createApp(): Express {
   // === Message Management ===
 
   // Get messages
-  app.get('/api/offices/:id/messages', asyncHandler(async (req: Request, res: Response) => {
+  app.get('/api/offices/:id/messages', validateUUID('id'), asyncHandler(async (req: Request, res: Response) => {
     const { id: office_id } = req.params;
     const { limit } = req.query;
 
@@ -347,7 +433,7 @@ export function createApp(): Express {
   }));
 
   // Create message
-  app.post('/api/offices/:id/messages', asyncHandler(async (req: Request, res: Response) => {
+  app.post('/api/offices/:id/messages', validateUUID('id'), asyncHandler(async (req: Request, res: Response) => {
     const { id: office_id } = req.params;
     const { from_agent_id, to_agent_id, message_type, content, context } = req.body;
 
@@ -366,6 +452,368 @@ export function createApp(): Express {
     });
 
     res.status(201).json(message);
+  }));
+
+  // === Chat (PM 조율 워크플로우) ===
+
+  // Send chat message (task_submit or proximity_chat)
+  app.post('/api/offices/:id/chat', validateUUID('id'), asyncHandler(async (req: Request, res: Response) => {
+    const { id: office_id } = req.params;
+    const { type, content, target_agent_id, sender_type } = req.body;
+
+    if (!content) {
+      res.status(400).json({ error: 'content is required' });
+      return;
+    }
+
+    if (!type || !['task_submit', 'proximity_chat'].includes(type)) {
+      res.status(400).json({ error: 'type must be "task_submit" or "proximity_chat"' });
+      return;
+    }
+
+    if (type === 'proximity_chat' && !target_agent_id) {
+      res.status(400).json({ error: 'target_agent_id is required for proximity_chat' });
+      return;
+    }
+
+    // Construct chat message
+    const chatMessage: ChatMessage = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      office_id,
+      type: type as ChatType,
+      content,
+      sender_type: sender_type || 'user',
+      target_agent_id,
+      created_at: new Date().toISOString(),
+    };
+
+    // Route through ChatRouter
+    const router = getChatRouter(office_id);
+    const result = await router.route(chatMessage);
+
+    // Also save as agent message for history
+    await db.createMessage({
+      office_id,
+      to_agent_id: target_agent_id || undefined,
+      message_type: type === 'task_submit' ? 'request' : 'notification',
+      content,
+      context: {
+        chat_type: type,
+        chat_message_id: chatMessage.id,
+        ...(result.jobs ? { jobs: result.jobs.map(j => j.id) } : {}),
+      },
+    });
+
+    res.status(result.success ? 200 : 400).json(result);
+  }));
+
+  // Get chat router stats
+  app.get('/api/offices/:id/chat/stats', validateUUID('id'), (req: Request, res: Response) => {
+    const { id: office_id } = req.params;
+    const router = getChatRouter(office_id);
+    res.json(router.getStats());
+  });
+
+  // Register agent session for proximity chat
+  app.post('/api/offices/:id/chat/sessions', validateUUID('id'), asyncHandler(async (req: Request, res: Response) => {
+    const { id: office_id } = req.params;
+    const { agent_id, session_id, role, worktree_path } = req.body;
+
+    if (!agent_id || !session_id || !role) {
+      res.status(400).json({ error: 'agent_id, session_id, and role are required' });
+      return;
+    }
+
+    const router = getChatRouter(office_id);
+    router.registerAgentSession({
+      agentId: agent_id,
+      sessionId: session_id,
+      role: role as AgentRole,
+      worktreePath: worktree_path,
+    });
+
+    res.json({ success: true, message: 'Agent session registered' });
+  }));
+
+  // Unregister agent session
+  app.delete('/api/offices/:id/chat/sessions/:agentId', validateUUID('id', 'agentId'), (req: Request, res: Response) => {
+    const { id: office_id, agentId } = req.params;
+
+    const router = getChatRouter(office_id);
+    router.unregisterAgentSession(agentId);
+
+    res.json({ success: true, message: 'Agent session unregistered' });
+  });
+
+  // Get registered sessions
+  app.get('/api/offices/:id/chat/sessions', validateUUID('id'), (req: Request, res: Response) => {
+    const { id: office_id } = req.params;
+    const router = getChatRouter(office_id);
+    const sessions = router.getAgentSessions();
+    res.json({ sessions, total: sessions.length });
+  });
+
+  // === Session Execution ===
+
+  // Execute job with local session
+  app.post('/api/offices/:id/jobs/:jobId/execute', validateUUID('id', 'jobId'), asyncHandler(async (req: Request, res: Response) => {
+    const { id: office_id, jobId } = req.params;
+    const { agent_id, create_worktree } = req.body;
+
+    // Get job
+    const job = await db.getJob(jobId);
+    if (!job) {
+      res.status(404).json({ error: 'Job not found' });
+      return;
+    }
+
+    // Get agent if specified
+    let persona: AgentPersona | null = null;
+    let agentRole: AgentRole = 'FE';
+    if (agent_id) {
+      const agents = await db.getAgents(office_id);
+      const agent = agents.find(a => a.id === agent_id);
+      if (agent && agent.persona) {
+        persona = agent.persona;
+        agentRole = persona.role as AgentRole;
+      }
+    }
+
+    // Get default persona if not specified
+    if (!persona) {
+      const personas = await db.getPersonas();
+      const defaultPersona = personas.find(p => p.is_default) || personas[0];
+      if (defaultPersona) {
+        persona = defaultPersona;
+        agentRole = persona.role as AgentRole;
+      }
+    }
+
+    if (!persona) {
+      res.status(400).json({ error: 'No persona available' });
+      return;
+    }
+
+    // Get office for repo path
+    const office = await db.getOffice(office_id);
+    if (!office || !office.repo_path) {
+      res.status(400).json({ error: 'Office repo_path not configured' });
+      return;
+    }
+
+    // Determine worktree path
+    let worktreePath = office.repo_path;
+    let worktreeRecord = null;
+
+    if (create_worktree !== false) {
+      try {
+        // Create worktree for isolated execution
+        const worktree = await worktreeManager.createWorktree({
+          officeId: office_id,
+          repoPath: office.repo_path,
+          agentRole,
+          branchName: job.branch_name,
+        });
+        worktreePath = worktree.path;
+
+        // Save worktree record
+        worktreeRecord = await db.createWorktreeRecord({
+          office_id,
+          agent_role: agentRole,
+          path: worktree.path,
+          branch: worktree.branch,
+          status: 'active',
+        });
+
+        console.log(`[API] Created worktree for ${agentRole}: ${worktreePath}`);
+      } catch (worktreeError) {
+        // Fall back to using main repo if worktree creation fails
+        console.warn('Failed to create worktree, using main repo:', worktreeError);
+      }
+    }
+
+    // Update job status
+    await db.updateJob(jobId, { status: 'processing' });
+
+    // Execute asynchronously
+    localExecutor.execute({
+      job,
+      persona,
+      worktreePath,
+      officeId: office_id,
+      agentId: agent_id,
+    }).then(async (result) => {
+      // Update job status based on result
+      if (result.success) {
+        await db.updateJob(jobId, {
+          status: 'done',
+          pr_number: result.prNumber,
+        });
+        // Update dependent jobs
+        await db.updateDependentJobs(office_id, jobId);
+      } else {
+        await db.updateJob(jobId, { status: 'failed' });
+      }
+
+      // Update worktree status
+      if (worktreeRecord) {
+        try {
+          const wtStatus = await worktreeManager.getWorktreeStatus(worktreePath);
+          await db.updateWorktree(worktreeRecord.id, {
+            status: wtStatus.isClean ? 'idle' : 'dirty',
+          });
+        } catch (wtError) {
+          console.warn('Failed to update worktree status:', wtError);
+        }
+      }
+    }).catch(async (err) => {
+      console.error(`Job ${jobId} execution failed:`, err);
+      await db.updateJob(jobId, { status: 'failed' });
+
+      // Mark worktree as failed
+      if (worktreeRecord) {
+        await db.updateWorktree(worktreeRecord.id, { status: 'failed' });
+      }
+    });
+
+    res.json({
+      message: 'Job execution started',
+      job_id: jobId,
+      status: 'processing',
+    });
+  }));
+
+  // Get session stats
+  app.get('/api/sessions/stats', (_req: Request, res: Response) => {
+    const stats = commandHandler.getStats();
+    res.json(stats);
+  });
+
+  // Execute command (semo-remote compatible)
+  app.post('/api/sessions/command', asyncHandler(async (req: Request, res: Response) => {
+    const command = req.body as AgentCommand;
+
+    if (!command.command_type) {
+      res.status(400).json({ error: 'command_type is required' });
+      return;
+    }
+
+    if (!command.office_id) {
+      res.status(400).json({ error: 'office_id is required' });
+      return;
+    }
+
+    // Generate command ID if not provided
+    if (!command.id) {
+      command.id = `cmd-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+    }
+
+    const result = await commandHandler.handleCommand(command);
+    res.json(result);
+  }));
+
+  // List sessions
+  app.get('/api/sessions', (_req: Request, res: Response) => {
+    const sessions = localExecutor.getSessions().map(s => ({
+      id: s.id,
+      agentId: s.agentId,
+      jobId: s.jobId,
+      worktreePath: s.worktreePath,
+      status: s.status,
+      createdAt: s.createdAt,
+      lastActivityAt: s.lastActivityAt,
+    }));
+    res.json({ sessions, total: sessions.length });
+  });
+
+  // Cancel session
+  app.post('/api/sessions/:sessionId/cancel', (req: Request, res: Response) => {
+    const { sessionId } = req.params;
+    const success = localExecutor.cancel(sessionId);
+    res.json({ success });
+  });
+
+  // Terminate session
+  app.delete('/api/sessions/:sessionId', asyncHandler(async (req: Request, res: Response) => {
+    const { sessionId } = req.params;
+    await localExecutor.terminateSession(sessionId);
+    res.status(204).send();
+  }));
+
+  // === Test Endpoints (Development Only) ===
+
+  // Get test config
+  app.get('/api/test/config', (_req: Request, res: Response) => {
+    const playgroundPath = process.env.TEST_PLAYGROUND_PATH || '/tmp/semo-playground';
+    res.json({
+      playgroundPath,
+      configured: !!process.env.TEST_PLAYGROUND_PATH,
+    });
+  });
+
+  // Quick test: Create session and send simple prompt
+  app.post('/api/test/session', asyncHandler(async (req: Request, res: Response) => {
+    const playgroundPath = process.env.TEST_PLAYGROUND_PATH || '/tmp/semo-playground';
+    const { prompt = 'echo "Hello from Semo Office!"', autoResponse } = req.body;
+
+    // Create session with optional auto-response config
+    const createResult = await commandHandler.handleCommand({
+      id: `test-create-${Date.now()}`,
+      office_id: 'test-office',
+      command_type: 'create_session',
+      payload: {
+        worktree_path: playgroundPath,
+        persona_name: 'Test Agent',
+        initial_prompt: prompt,
+        auto_response_config: autoResponse as Partial<AutoResponseConfig> | undefined,
+      },
+    });
+
+    res.json({
+      success: createResult.success,
+      sessionId: createResult.sessionId,
+      playgroundPath,
+      autoResponseEnabled: autoResponse?.enabled !== false,
+      message: createResult.success
+        ? 'Session created! Claude Code is starting...'
+        : createResult.error,
+    });
+  }));
+
+  // Quick test: Send prompt to existing session
+  app.post('/api/test/prompt', asyncHandler(async (req: Request, res: Response) => {
+    const { sessionId, prompt } = req.body;
+
+    if (!sessionId || !prompt) {
+      res.status(400).json({ error: 'sessionId and prompt are required' });
+      return;
+    }
+
+    const result = await commandHandler.handleCommand({
+      id: `test-prompt-${Date.now()}`,
+      office_id: 'test-office',
+      session_id: sessionId,
+      command_type: 'send_prompt',
+      payload: { prompt },
+    });
+
+    res.json(result);
+  }));
+
+  // Quick test: Get session output
+  app.get('/api/test/output/:sessionId', asyncHandler(async (req: Request, res: Response) => {
+    const { sessionId } = req.params;
+    const lines = parseInt(req.query.lines as string) || 50;
+
+    const result = await commandHandler.handleCommand({
+      id: `test-output-${Date.now()}`,
+      office_id: 'test-office',
+      session_id: sessionId,
+      command_type: 'get_output',
+      payload: { lines },
+    });
+
+    res.json(result);
   }));
 
   // Global error handler

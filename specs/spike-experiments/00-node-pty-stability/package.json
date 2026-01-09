@@ -1,0 +1,26 @@
+{
+  "name": "spike-node-pty-stability",
+  "version": "1.0.0",
+  "description": "node-pty stability and performance testing",
+  "scripts": {
+    "test:all": "node src/run-all.js",
+    "test:long-running": "node src/test-long-running.js",
+    "test:concurrent": "node src/test-concurrent.js",
+    "test:output-buffering": "node src/test-output-buffering.js",
+    "test:crash-recovery": "node src/test-crash-recovery.js",
+    "monitor": "node src/monitor.js",
+    "report": "node src/generate-report.js",
+    "analyze:memory": "node src/analyze-memory.js",
+    "analyze:logs": "node src/analyze-logs.js"
+  },
+  "dependencies": {
+    "node-pty": "^1.0.0",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1",
+    "blessed": "^0.1.81",
+    "blessed-contrib": "^4.11.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0"
+  }
+}

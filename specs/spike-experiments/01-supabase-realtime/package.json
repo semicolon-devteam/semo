@@ -1,0 +1,22 @@
+{
+  "name": "spike-supabase-realtime",
+  "version": "1.0.0",
+  "description": "Supabase Realtime performance and reliability testing",
+  "scripts": {
+    "test:all": "node src/run-all.js",
+    "test:throughput": "node src/test-throughput.js",
+    "test:presence": "node src/test-presence.js",
+    "test:postgres-changes": "node src/test-postgres-changes.js",
+    "test:reconnection": "node src/test-reconnection.js",
+    "report": "node src/generate-report.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.38.0",
+    "chalk": "^4.1.2",
+    "ora": "^5.4.1",
+    "dotenv": "^16.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0"
+  }
+}
