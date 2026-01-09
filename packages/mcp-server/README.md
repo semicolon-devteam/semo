@@ -94,6 +94,69 @@ npx @team-semicolon/semo-mcp
 
 ## 트러블슈팅
 
+### Windows 환경에서 MCP 도구를 찾을 수 없음 (`No such tool available` 에러)
+
+**증상**:
+
+```text
+Error: No such tool available: mcp__semo-integrations__semo_get_slack_token
+```
+
+**원인**:
+
+- Windows에서 npx 경로 문제
+- VSCode Extension에서 MCP 서버 자동 시작 실패
+- settings.json 설정 문제
+
+**해결 방법**:
+
+1. **VSCode/Claude Code 완전 재시작**
+   - VSCode 완전 종료 후 재시작
+   - 또는 `Developer: Reload Window` 실행
+
+2. **MCP 서버 수동 확인**
+
+   ```bash
+   # 터미널에서 MCP 서버 테스트
+   npx -y @team-semicolon/semo-mcp
+
+   # 정상이면 다음 출력:
+   # [SEMO MCP] Server v3.0.1 started
+   ```
+
+3. **settings.json 확인** (`.claude/settings.json`)
+
+   ```json
+   {
+     "mcpServers": {
+       "semo-integrations": {
+         "command": "npx",
+         "args": ["-y", "@team-semicolon/semo-mcp"]
+       }
+     }
+   }
+   ```
+
+4. **Windows 전용: npx 경로 명시**
+
+   ```json
+   {
+     "mcpServers": {
+       "semo-integrations": {
+         "command": "npx.cmd",
+         "args": ["-y", "@team-semicolon/semo-mcp"]
+       }
+     }
+   }
+   ```
+
+5. **npm 캐시 정리**
+
+   ```bash
+   npm cache clean --force
+   npx -y @team-semicolon/semo-mcp
+   ```
+
 ### MCP 연결 끊김 (`Not connected` 에러)
 
 장시간 세션 사용 시 MCP 서버 연결이 끊어질 수 있습니다.
