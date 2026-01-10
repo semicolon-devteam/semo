@@ -30,9 +30,9 @@ model: inherit
 ```text
 1. MCP에서 Slack Token 조회
    ↓
-2. 채널 ID 확인 (기본: C09KNL91QBZ = #_협업)
+2. 채널 이름으로 채널 ID 동적 조회 (Slack API)
    ↓
-3. (필요시) 사용자 ID 조회 (curl로 Slack API 호출)
+3. (필요시) 사용자 ID 조회 (Slack API)
    ↓
 4. 메시지 전송 (curl + heredoc)
 ```
@@ -45,7 +45,39 @@ mcp__semo-integrations__semo_get_slack_token()
 
 응답에서 `token:` 접두사 뒤의 토큰 값을 추출합니다.
 
-### Step 2: 사용자 ID 조회 (필요시)
+### Step 2: 채널 ID 동적 조회 (필수)
+
+> **🔴 NON-NEGOTIABLE**: 채널 ID를 하드코딩하지 마세요. 항상 API로 조회합니다.
+
+#### 채널 이름으로 ID 조회
+
+```bash
+TOKEN="xoxb-..."
+CHANNEL_NAME="_협업"  # 기본 채널
+
+# 채널 ID 조회
+CHANNEL_ID=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  "https://slack.com/api/conversations.list?types=public_channel&limit=200" | \
+  python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for ch in data.get('channels', []):
+    if ch['name'] == '$CHANNEL_NAME':
+        print(ch['id'])
+        break
+")
+
+echo "Channel ID: $CHANNEL_ID"
+```
+
+#### 기본 채널 설정
+
+| 용도 | 채널 이름 | 비고 |
+|------|----------|------|
+| 기본 알림 | `_협업` | Primary |
+| 대체 채널 | `_일반` | Fallback |
+
+### Step 3: 사용자 ID 조회 (필요시)
 
 > **⚠️ 중요**: 모든 사용자 멘션은 반드시 `<@SLACK_ID>` 형식 사용
 > **🔴 NON-NEGOTIABLE**: curl 직접 호출 시 토큰 파싱 문제 발생 가능. **반드시 스크립트 파일로 실행**
@@ -94,73 +126,66 @@ chmod +x /tmp/slack_users.sh
 > `curl: option : blank argument` 에러가 발생할 수 있습니다.
 > 항상 스크립트 파일 방식을 사용하세요.
 
-### Step 3: 메시지 전송 (스크립트 + heredoc 방식)
+### Step 4: 메시지 전송
 
 > **🔴 권장**: 복잡한 JSON 메시지는 스크립트 파일로 전송
 
-#### 방법 1: 스크립트 파일 + heredoc (권장)
+#### 전체 플로우 예시 (권장)
 
 ```bash
-# 토큰을 변수에 저장 후 heredoc 사용
+# 1. 토큰 획득 (MCP에서)
 TOKEN="xoxb-..."
+
+# 2. 채널 ID 동적 조회
+CHANNEL_NAME="_협업"
+CHANNEL_ID=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  "https://slack.com/api/conversations.list?types=public_channel&limit=200" | \
+  python3 -c "
+import json, sys
+data = json.load(sys.stdin)
+for ch in data.get('channels', []):
+    if ch['name'] == '$CHANNEL_NAME':
+        print(ch['id'])
+        break
+")
+
+# 3. 메시지 전송
 curl -s -X POST 'https://slack.com/api/chat.postMessage' \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json; charset=utf-8' \
-  -d @- << 'EOF'
+  -d @- << EOF
 {
-  "channel": "C09KNL91QBZ",
+  "channel": "$CHANNEL_ID",
   "text": "{fallback_text}",
   "blocks": [...]
 }
 EOF
 ```
 
-#### 방법 2: 메시지 전송 스크립트 생성
+#### 간단한 메시지 전송
 
 ```bash
-# 1. 전송 스크립트 생성
-cat << 'SCRIPT' > /tmp/slack_send.sh
-#!/bin/bash
-TOKEN="$1"
-CHANNEL="$2"
-MESSAGE="$3"
+TOKEN="xoxb-..."
+CHANNEL_NAME="_협업"
+
+# 채널 ID 조회 + 메시지 전송을 한 번에
+CHANNEL_ID=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  "https://slack.com/api/conversations.list?types=public_channel&limit=200" | \
+  python3 -c "import json,sys;[print(c['id']) for c in json.load(sys.stdin).get('channels',[]) if c['name']=='$CHANNEL_NAME']" | head -1)
+
 curl -s -X POST "https://slack.com/api/chat.postMessage" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json; charset=utf-8" \
-  -d "$MESSAGE"
-SCRIPT
-chmod +x /tmp/slack_send.sh
-
-# 2. JSON 메시지 파일 생성
-cat << 'EOF' > /tmp/slack_message.json
-{
-  "channel": "C09KNL91QBZ",
-  "text": "메시지 내용",
-  "blocks": [...]
-}
-EOF
-
-# 3. 전송
-/tmp/slack_send.sh "{TOKEN}" "C09KNL91QBZ" "$(cat /tmp/slack_message.json)"
+  -d "{\"channel\":\"$CHANNEL_ID\",\"text\":\"메시지 내용\"}"
 ```
 
-> **⚠️ 주의**: 인라인 curl 호출 시 셸 환경에 따라 헤더 파싱 오류 발생 가능.
-> `TOKEN` 변수를 먼저 선언하고 `$TOKEN` 형식으로 사용하세요.
+## 채널 이름 규칙
 
-## 채널 정보
-
-| 채널 | ID | 용도 |
-|------|-----|------|
-| #_협업 | C09KNL91QBZ | 기본 알림 채널 |
-
-### 프로젝트별 채널 동적 조회 (선택)
-
-```bash
-# 채널 목록에서 검색
-curl -s 'https://slack.com/api/conversations.list?types=public_channel&limit=1000' \
-  -H 'Authorization: Bearer {TOKEN}' | \
-  jq -r '.channels[] | select(.name | contains("{프로젝트명}")) | "\(.name) (\(.id))"'
-```
+| 알림 유형 | 기본 채널 이름 | 비고 |
+|----------|---------------|------|
+| 릴리스 알림 | `_협업` | SEMO 패키지 업데이트 |
+| 이슈 알림 | `_협업` | Draft Task, Issue 생성 |
+| 커스텀 메시지 | 지정된 채널 | /SEMO:slack 커맨드 |
 
 ## Output
 
@@ -169,11 +194,12 @@ curl -s 'https://slack.com/api/conversations.list?types=public_channel&limit=100
 
 ✅ Slack 알림 전송 완료
 
-**채널**: #_협업
+**채널**: #{channel_name}
 **유형**: {release|issue|custom}
 ```
 
 ## References
 
+- [Channel Config](references/channel-config.md)
 - [User Lookup](references/slack-id-mapping.md)
 - [Message Templates](references/message-templates.md)
