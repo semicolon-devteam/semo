@@ -43,6 +43,7 @@ model: inherit
 | 도움말 | `skill:semo-help` | "도움말" |
 | 메모리 | `skill:persist-context` | "기억해줘" |
 | 버그 목록 | `skill:list-bugs` | "버그 목록" |
+| 정기 회의록 | `skill:create-meeting-minutes` | "정기 회의록 생성해줘" |
 | 아키텍처 검증 | `skill:semo-architecture-checker` | "구조 검증" |
 | 명세 작성 | `skill:generate-spec` | "spec 작성해줘" |
 | 리뷰 | `skill:run-code-review` | "리뷰해줘" |
