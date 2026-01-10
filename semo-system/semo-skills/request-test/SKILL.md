@@ -61,6 +61,13 @@ model: inherit
 |------|-----------|-------------------|
 | QA | kokkh | Goni |
 
+## 기본 설정
+
+| 항목 | 기본값 | 설명 |
+|------|--------|------|
+| 기본 QA 담당자 | Goni (kokkh) | 테스트 요청 시 기본 Assignee |
+| 알림 채널 | 프로젝트 채널 (동적 조회) | 협업 채널은 Fallback |
+
 ## Execution Flow
 
 ```text
@@ -72,7 +79,9 @@ model: inherit
    ↓
 4. Slack Token 획득 (MCP)
    ↓
-5. Slack 사용자 ID 조회 + 알림 발송 (curl)
+5. 프로젝트 채널 동적 조회 (Slack API)
+   ↓
+6. Slack 사용자 ID 조회 + 알림 발송 (curl)
 ```
 
 ## Step-by-Step Instructions
@@ -104,7 +113,36 @@ mcp__semo-integrations__semo_get_slack_token()
 
 응답에서 `token:` 접두사 뒤의 토큰 값을 추출합니다.
 
-### Step 5: Slack 사용자 ID 조회 + 알림 발송
+### Step 5: 프로젝트 채널 동적 조회
+
+> **🔴 NON-NEGOTIABLE**: 테스트 요청은 **반드시 프로젝트 채널**로 전송합니다.
+> 프로젝트 채널을 찾지 못한 경우에만 협업 채널(#_협업)로 Fallback합니다.
+
+```bash
+# 프로젝트명(레포명)으로 채널 검색
+# 1차: #{repo} 검색
+# 2차: #_{repo} 검색
+# 3차: Fallback → #_협업 (C09KNL91QBZ)
+
+PROJECT_REPO="{프로젝트명}"  # 예: cm-labor-union
+
+# 채널 목록에서 프로젝트 채널 검색
+CHANNEL_ID=$(curl -s 'https://slack.com/api/conversations.list?types=public_channel&limit=500' \
+  -H "Authorization: Bearer $TOKEN" | \
+  jq -r --arg repo "$PROJECT_REPO" '
+    .channels[] |
+    select(.name == $repo or .name == ("_" + $repo)) |
+    .id
+  ' | head -1)
+
+# Fallback: 프로젝트 채널 없으면 협업 채널 사용
+if [ -z "$CHANNEL_ID" ]; then
+  CHANNEL_ID="C09KNL91QBZ"  # #_협업
+  echo "[SEMO] 프로젝트 채널 없음 → #_협업 사용"
+fi
+```
+
+### Step 6: Slack 사용자 ID 조회 + 알림 발송
 
 ```bash
 # 사용자 ID 조회
@@ -112,20 +150,20 @@ curl -s 'https://slack.com/api/users.list' \
   -H 'Authorization: Bearer {TOKEN}' | \
   jq -r '.members[] | select(.profile.display_name=="Goni") | .id'
 
-# 알림 발송 (heredoc 방식)
+# 알림 발송 (heredoc 방식) - 프로젝트 채널로 전송
 curl -s -X POST 'https://slack.com/api/chat.postMessage' \
   -H 'Authorization: Bearer {TOKEN}' \
   -H 'Content-Type: application/json; charset=utf-8' \
   -d @- << 'EOF'
 {
-  "channel": "C09KNL91QBZ",
+  "channel": "{CHANNEL_ID}",
   "text": "QA 테스트 요청",
   "blocks": [
     {
       "type": "section",
       "text": {
         "type": "mrkdwn",
-        "text": "🧪 *QA 테스트 요청*\n\n<@{SLACK_ID}> 님, 테스트 요청드립니다.\n\n📋 *이슈*: {이슈 제목}\n🔗 *링크*: {이슈 URL}\n📝 *요청자*: {요청자}\n\n테스트 항목을 확인하고 완료 시 체크해주세요!"
+        "text": "🧪 *QA 테스트 요청*\n\n<@{SLACK_ID}> 님, 테스트 요청드립니다.\n\n📋 *이슈*: {이슈 제목}\n🔗 *링크*: {이슈 URL}\n📝 *요청자*: {요청자}\n📁 *프로젝트*: {프로젝트명}\n\n테스트 항목을 확인하고 완료 시 체크해주세요!"
       }
     }
   ]
