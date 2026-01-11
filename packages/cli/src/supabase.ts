@@ -9,10 +9,10 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 // Supabase 연결 정보 (공개 프로젝트용)
 const SUPABASE_URL =
-  process.env.SEMO_SUPABASE_URL || "https://qjmvmxpmwtdpjorvxynt.supabase.co";
+  process.env.SEMO_SUPABASE_URL || "https://vdrllieckyeumbhyclkc.supabase.co";
 const SUPABASE_ANON_KEY =
   process.env.SEMO_SUPABASE_ANON_KEY ||
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFqbXZteHBtd3RkcGpvcnZ4eW50Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzY2MTUzMjMsImV4cCI6MjA1MjE5MTMyM30.WMT-rOlXbcN2gT8V58hN9P1SsH0sIvR4s2j5GjIrT_Q";
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZkcmxsaWVja3lldW1iaHljbGtjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc5NzgxMTEsImV4cCI6MjA4MzU1NDExMX0.SrruG4y9geH1bCWE4uLzMHiUA38UcGMQwbAxxaaa718";
 
 // 패키지 정의 타입
 export interface PackageDefinition {
