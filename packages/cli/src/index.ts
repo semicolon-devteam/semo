@@ -22,6 +22,19 @@ import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import {
+  getPackages,
+  getStandardPackages,
+  getExtensionPackages,
+  resolvePackageName,
+  getPackageVersion,
+  getPackagesByGroup,
+  getDetectablePackages,
+  buildExtensionPackagesFromDb,
+  buildShortnameMappingFromDb,
+  PackageDefinition,
+  toExtensionPackageFormat,
+} from "./supabase";
 
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 
@@ -710,8 +723,43 @@ function copyRecursive(src: string, dest: string): void {
 
 const SEMO_REPO = "https://github.com/semicolon-devteam/semo.git";
 
-// 확장 패키지 정의 (v3.0 구조)
-const EXTENSION_PACKAGES: Record<string, { name: string; desc: string; detect: string[]; layer: string }> = {
+// ============================================================
+// DB 기반 패키지 관리 (v3.10+)
+// ============================================================
+
+// 캐시된 패키지 데이터 (DB에서 조회 후 캐시)
+let cachedExtensionPackages: Record<string, { name: string; desc: string; detect: string[]; layer: string }> | null = null;
+let cachedShortnameMappings: Record<string, string> | null = null;
+let cachedPackageDefinitions: PackageDefinition[] | null = null;
+
+// 패키지 데이터 초기화 (DB에서 조회)
+async function initPackageData(): Promise<void> {
+  if (cachedExtensionPackages && cachedShortnameMappings) return;
+
+  try {
+    cachedExtensionPackages = await buildExtensionPackagesFromDb();
+    cachedShortnameMappings = await buildShortnameMappingFromDb();
+    cachedPackageDefinitions = await getExtensionPackages();
+  } catch {
+    // 폴백: 하드코딩된 데이터 사용
+    cachedExtensionPackages = EXTENSION_PACKAGES_FALLBACK;
+    cachedShortnameMappings = SHORTNAME_MAPPING_FALLBACK;
+    cachedPackageDefinitions = null;
+  }
+}
+
+// EXTENSION_PACKAGES 동기 접근용 (초기화 후 사용)
+function getExtensionPackagesSync(): Record<string, { name: string; desc: string; detect: string[]; layer: string }> {
+  return cachedExtensionPackages || EXTENSION_PACKAGES_FALLBACK;
+}
+
+// SHORTNAME_MAPPING 동기 접근용
+function getShortnameMappingSync(): Record<string, string> {
+  return cachedShortnameMappings || SHORTNAME_MAPPING_FALLBACK;
+}
+
+// 폴백용 하드코딩 데이터 (DB 연결 실패 시 사용)
+const EXTENSION_PACKAGES_FALLBACK: Record<string, { name: string; desc: string; detect: string[]; layer: string }> = {
   // Business Layer
   "biz/discovery": { name: "Discovery", desc: "아이템 발굴, 시장 조사, Epic/Task", layer: "biz", detect: [] },
   "biz/design": { name: "Design", desc: "컨셉 설계, 목업, UX", layer: "biz", detect: [] },
@@ -737,8 +785,8 @@ const EXTENSION_PACKAGES: Record<string, { name: string; desc: string; detect: s
   "semo-remote": { name: "Remote", desc: "Claude Code 원격 제어 (모바일 PWA)", layer: "system", detect: [] },
 };
 
-// 단축명 → 전체 패키지 경로 매핑
-const SHORTNAME_MAPPING: Record<string, string> = {
+// 단축명 → 전체 패키지 경로 매핑 (폴백)
+const SHORTNAME_MAPPING_FALLBACK: Record<string, string> = {
   // 하위 패키지명 단축 (discovery → biz/discovery)
   discovery: "biz/discovery",
   design: "biz/design",
@@ -760,13 +808,24 @@ const SHORTNAME_MAPPING: Record<string, string> = {
   remote: "semo-remote",
 };
 
+// 호환성을 위한 상수 별칭 (기존 코드에서 사용)
+const EXTENSION_PACKAGES = EXTENSION_PACKAGES_FALLBACK;
+const SHORTNAME_MAPPING = SHORTNAME_MAPPING_FALLBACK;
+
 // 그룹 이름 목록 (biz, eng, ops, meta, system)
 const PACKAGE_GROUPS = ["biz", "eng", "ops", "meta", "system"] as const;
 type PackageGroup = typeof PACKAGE_GROUPS[number];
 
-// 그룹명 → 해당 그룹의 모든 패키지 반환
-function getPackagesByGroup(group: PackageGroup): string[] {
-  return Object.entries(EXTENSION_PACKAGES)
+// 그룹명 → 해당 그룹의 모든 패키지 반환 (DB 기반)
+async function getPackagesByGroupAsync(group: PackageGroup): Promise<string[]> {
+  const packages = await getPackagesByGroup(group);
+  return packages.map(p => p.name);
+}
+
+// 그룹명 → 해당 그룹의 모든 패키지 반환 (동기, 폴백)
+function getPackagesByGroupSync(group: PackageGroup): string[] {
+  const extPkgs = getExtensionPackagesSync();
+  return Object.entries(extPkgs)
     .filter(([, pkg]) => pkg.layer === group)
     .map(([key]) => key);
 }
@@ -779,10 +838,14 @@ function resolvePackageInput(input: string): { packages: string[]; isGroup: bool
   let isGroup = false;
   let groupName: string | undefined;
 
+  // DB에서 로드된 데이터 또는 폴백 사용
+  const extPkgs = getExtensionPackagesSync();
+  const shortnames = getShortnameMappingSync();
+
   for (const part of parts) {
     // 1. 그룹명인지 확인 (biz, eng, ops, meta)
     if (PACKAGE_GROUPS.includes(part as PackageGroup)) {
-      const groupPackages = getPackagesByGroup(part as PackageGroup);
+      const groupPackages = getPackagesByGroupSync(part as PackageGroup);
       resolvedPackages.push(...groupPackages);
       isGroup = true;
       groupName = part;
@@ -790,13 +853,13 @@ function resolvePackageInput(input: string): { packages: string[]; isGroup: bool
     }
 
     // 2. 단축명 매핑 확인 (discovery → biz/discovery 등)
-    if (part in SHORTNAME_MAPPING) {
-      resolvedPackages.push(SHORTNAME_MAPPING[part]);
+    if (part in shortnames) {
+      resolvedPackages.push(shortnames[part]);
       continue;
     }
 
     // 3. 직접 패키지명 확인
-    if (part in EXTENSION_PACKAGES) {
+    if (part in extPkgs) {
       resolvedPackages.push(part);
       continue;
     }
@@ -1255,9 +1318,12 @@ program
     console.log(chalk.cyan.bold("\n🚀 SEMO 설치 시작\n"));
     console.log(chalk.gray("Gemini 하이브리드 전략: White Box + Black Box\n"));
 
+    // 0. 패키지 데이터 초기화 (DB에서 조회)
+    await initPackageData();
+
     const cwd = process.cwd();
 
-    // 0. 버전 비교
+    // 0.1. 버전 비교
     await showVersionComparison(cwd);
 
     // 0.5. 레거시 환경 감지 및 마이그레이션
@@ -1288,12 +1354,14 @@ program
 
     // 2. Extension 패키지 처리 (--with 옵션만 지원, 인터랙션 없음)
     let extensionsToInstall: string[] = [];
+    const extPkgs = getExtensionPackagesSync();
+    const shortnames = getShortnameMappingSync();
 
     if (options.with) {
       // --with 옵션으로 명시적 패키지 지정 시에만 Extension 설치
-      extensionsToInstall = options.with.split(",").map((p: string) => p.trim()).filter((p: string) => p in EXTENSION_PACKAGES || p in SHORTNAME_MAPPING);
+      extensionsToInstall = options.with.split(",").map((p: string) => p.trim()).filter((p: string) => p in extPkgs || p in shortnames);
       // 별칭 처리
-      extensionsToInstall = extensionsToInstall.map((p: string) => SHORTNAME_MAPPING[p] || p);
+      extensionsToInstall = extensionsToInstall.map((p: string) => shortnames[p] || p);
     }
 
     // 프로젝트 유형 감지는 정보 제공용으로만 사용 (자동 설치 안 함)
@@ -1301,7 +1369,10 @@ program
     if (detected.length > 0 && !options.with) {
       console.log(chalk.cyan("\n💡 감지된 프로젝트 유형:"));
       detected.forEach(pkg => {
-        console.log(chalk.gray(`   - ${EXTENSION_PACKAGES[pkg].name}: ${EXTENSION_PACKAGES[pkg].desc}`));
+        const pkgInfo = extPkgs[pkg];
+        if (pkgInfo) {
+          console.log(chalk.gray(`   - ${pkgInfo.name}: ${pkgInfo.desc}`));
+        }
       });
       console.log(chalk.gray(`\n   추가 패키지가 필요하면: semo add ${detected[0].split("/")[1] || detected[0]}`));
     }
@@ -3088,6 +3159,9 @@ program
   .description("Extension 패키지를 추가로 설치합니다 (그룹: biz, eng, ops, system / 개별: biz/discovery, eng/nextjs, semo-hooks)")
   .option("-f, --force", "기존 설정 덮어쓰기")
   .action(async (packagesInput: string, options) => {
+    // 패키지 데이터 초기화 (DB에서 조회)
+    await initPackageData();
+
     const cwd = process.cwd();
     const semoSystemDir = path.join(cwd, "semo-system");
 
@@ -3098,12 +3172,14 @@ program
 
     // 패키지 입력 해석 (그룹, 레거시, 쉼표 구분 모두 처리)
     const { packages, isGroup, groupName } = resolvePackageInput(packagesInput);
+    const extPkgs = getExtensionPackagesSync();
+    const shortnames = getShortnameMappingSync();
 
     if (packages.length === 0) {
       console.log(chalk.red(`\n알 수 없는 패키지: ${packagesInput}`));
       console.log(chalk.gray(`사용 가능한 그룹: ${PACKAGE_GROUPS.join(", ")}`));
-      console.log(chalk.gray(`사용 가능한 패키지: ${Object.keys(EXTENSION_PACKAGES).join(", ")}`));
-      console.log(chalk.gray(`단축명: ${Object.keys(SHORTNAME_MAPPING).join(", ")}\n`));
+      console.log(chalk.gray(`사용 가능한 패키지: ${Object.keys(extPkgs).join(", ")}`));
+      console.log(chalk.gray(`단축명: ${Object.keys(shortnames).join(", ")}\n`));
       process.exit(1);
     }
 
@@ -3112,19 +3188,22 @@ program
       console.log(chalk.cyan.bold(`\n📦 ${groupName?.toUpperCase()} 그룹 패키지 일괄 설치\n`));
       console.log(chalk.gray("   포함된 패키지:"));
       for (const pkg of packages) {
-        console.log(chalk.gray(`   - ${pkg} (${EXTENSION_PACKAGES[pkg].name})`));
+        const pkgInfo = extPkgs[pkg];
+        console.log(chalk.gray(`   - ${pkg} (${pkgInfo?.name || pkg})`));
       }
       console.log();
     } else if (packages.length === 1) {
       // 단일 패키지
       const pkg = packages[0];
-      console.log(chalk.cyan(`\n📦 ${EXTENSION_PACKAGES[pkg].name} 패키지 설치\n`));
-      console.log(chalk.gray(`   ${EXTENSION_PACKAGES[pkg].desc}\n`));
+      const pkgInfo = extPkgs[pkg];
+      console.log(chalk.cyan(`\n📦 ${pkgInfo?.name || pkg} 패키지 설치\n`));
+      console.log(chalk.gray(`   ${pkgInfo?.desc || ""}\n`));
     } else {
       // 여러 패키지 (쉼표 구분)
       console.log(chalk.cyan.bold(`\n📦 ${packages.length}개 패키지 설치\n`));
       for (const pkg of packages) {
-        console.log(chalk.gray(`   - ${pkg} (${EXTENSION_PACKAGES[pkg].name})`));
+        const pkgInfo = extPkgs[pkg];
+        console.log(chalk.gray(`   - ${pkg} (${pkgInfo?.name || pkg})`));
       }
       console.log();
     }
@@ -3172,11 +3251,13 @@ program
     await setupClaudeMd(cwd, allInstalledPackages, options.force);
 
     if (toInstall.length === 1) {
-      console.log(chalk.green.bold(`\n✅ ${EXTENSION_PACKAGES[toInstall[0]].name} 패키지 설치 완료!\n`));
+      const pkgInfo = extPkgs[toInstall[0]];
+      console.log(chalk.green.bold(`\n✅ ${pkgInfo?.name || toInstall[0]} 패키지 설치 완료!\n`));
     } else {
       console.log(chalk.green.bold(`\n✅ ${toInstall.length}개 패키지 설치 완료!`));
       for (const pkg of toInstall) {
-        console.log(chalk.green(`   ✓ ${EXTENSION_PACKAGES[pkg].name}`));
+        const pkgInfo = extPkgs[pkg];
+        console.log(chalk.green(`   ✓ ${pkgInfo?.name || pkg}`));
       }
       console.log();
     }
@@ -3186,11 +3267,15 @@ program
 program
   .command("list")
   .description("사용 가능한 모든 패키지를 표시합니다")
-  .action(() => {
+  .action(async () => {
+    // 패키지 데이터 초기화 (DB에서 조회)
+    await initPackageData();
+
     const cwd = process.cwd();
     const semoSystemDir = path.join(cwd, "semo-system");
+    const extPkgs = getExtensionPackagesSync();
 
-    console.log(chalk.cyan.bold("\n📦 SEMO 패키지 목록 (v3.0)\n"));
+    console.log(chalk.cyan.bold("\n📦 SEMO 패키지 목록 (v3.10 - DB 기반)\n"));
 
     // Standard
     console.log(chalk.white.bold("Standard (필수)"));
@@ -3211,7 +3296,7 @@ program
     };
 
     for (const [layerKey, layerInfo] of Object.entries(layers)) {
-      const layerPackages = Object.entries(EXTENSION_PACKAGES).filter(
+      const layerPackages = Object.entries(extPkgs).filter(
         ([, pkg]) => pkg.layer === layerKey
       );
 
@@ -3321,6 +3406,9 @@ program
   .action(async (options) => {
     console.log(chalk.cyan.bold("\n🔄 SEMO 업데이트\n"));
 
+    // 패키지 데이터 초기화 (DB에서 조회)
+    await initPackageData();
+
     const cwd = process.cwd();
     const semoSystemDir = path.join(cwd, "semo-system");
     const claudeDir = path.join(cwd, ".claude");
@@ -3379,7 +3467,8 @@ program
 
     // 설치된 Extensions 확인
     const installedExtensions: string[] = [];
-    for (const key of Object.keys(EXTENSION_PACKAGES)) {
+    const extPkgs = getExtensionPackagesSync();
+    for (const key of Object.keys(extPkgs)) {
       if (fs.existsSync(path.join(semoSystemDir, key))) {
         installedExtensions.push(key);
       }
