@@ -1,86 +1,191 @@
 ---
 name: project-status
 description: |
-  GitHub Projects Status 변경. Use when (1) "상태 변경해줘", "Status 바꿔줘",
+  이슈 Status 변경 (Supabase DB 기반). Use when (1) "상태 변경해줘", "Status 바꿔줘",
   (2) "작업중으로 변경", "완료 처리", (3) Epic/태스크 상태 일괄 변경.
-tools: [Bash, Read]
+tools: [Supabase, Bash, Read]
 model: inherit
 ---
 
-> **🔔 호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: project-status` 시스템 메시지를 첫 줄에 출력하세요.
+> **호출 시 메시지**: 이 Skill이 호출되면 반드시 `[SEMO] Skill: project-status` 시스템 메시지를 첫 줄에 출력하세요.
 
 # project-status Skill
 
-> GitHub Projects Status 필드 변경
+> 이슈 Status 필드 변경 (Supabase DB 기반)
 
-## 🔴 필수 참조 파일
+## 🔴 데이터 소스 변경 (v2.0.0)
 
-**반드시 먼저 읽을 파일**: `.claude/memory/projects.md`
+| 버전 | 데이터 소스 | 방식 |
+|------|------------|------|
+| v1.x | GitHub Projects | GraphQL mutation |
+| **v2.0** | **Supabase** | `issues.status` UPDATE |
 
-이 파일에서 다음 정보를 확인합니다:
-- GitHub Projects 설정 (Project ID, Number)
-- Status 옵션 및 Option ID
-- **상태값 Alias** (사용자 입력 → Status 값 매핑)
+---
 
-## 권한 요구사항
+## Purpose
 
-```bash
-# project scope 필요 (최초 1회)
-gh auth refresh -s project
-```
+Supabase `issues` 테이블의 `status` 컬럼을 업데이트합니다.
+상태 변경 이력은 `issue_status_history` 테이블에 자동 기록됩니다.
+
+---
+
+## Status 옵션
+
+| Status | 설명 |
+|--------|------|
+| backlog | 초기 상태 |
+| todo | 할 일 목록 |
+| in_progress | 개발 진행 중 |
+| review | 코드 리뷰 대기 |
+| testing | QA 테스트 단계 |
+| done | 작업 완료 |
 
 ## Workflow
 
-### 1. Status 필드 정보 조회
+### 1. Supabase로 Status 변경
 
-```bash
-# Status 필드 ID와 옵션 목록 조회
-gh api graphql -f query='
-query {
-  organization(login: "semicolon-devteam") {
-    projectV2(number: 1) {
-      field(name: "Status") {
-        ... on ProjectV2SingleSelectField {
-          id
-          options { id name }
-        }
-      }
-    }
-  }
-}' --jq '.data.organization.projectV2.field'
+```typescript
+// Supabase 클라이언트를 사용한 상태 변경
+const { data, error } = await supabase
+  .from('issues')
+  .update({ status: 'in_progress' })
+  .eq('number', 123)
+  .eq('office_id', officeId)
+  .select('number, title, status')
+  .single();
 ```
 
-### 2. Issue의 Project Item ID 조회
+### 2. SQL 직접 사용 (MCP Server)
 
-```bash
-REPO="semicolon-devteam/docs"
-ISSUE_NUMBER=123
-
-# Issue node_id 조회
-ISSUE_NODE_ID=$(gh api repos/$REPO/issues/$ISSUE_NUMBER --jq '.node_id')
-
-# Project Item ID 조회
-ITEM_ID=$(gh api graphql -f query='
-  query($nodeId: ID!) {
-    node(id: $nodeId) {
-      ... on Issue {
-        projectItems(first: 10) {
-          nodes {
-            id
-            project { id }
-          }
-        }
-      }
-    }
-  }
-' -f nodeId="$ISSUE_NODE_ID" \
-  --jq '.data.node.projectItems.nodes[] | select(.project.id == "PVT_kwDOC01-Rc4AtDz2") | .id')
+```sql
+-- 단일 이슈 상태 변경
+UPDATE issues
+SET status = 'in_progress',
+    updated_at = NOW()
+WHERE number = 123
+  AND office_id = '{office_uuid}'
+RETURNING number, title, status;
 ```
 
-### 3. Status 변경 실행
+### 3. update_issue_status 함수 사용 (권장)
+
+마이그레이션에 포함된 헬퍼 함수를 사용하면 히스토리 자동 기록:
+
+```sql
+-- 상태 변경 함수 호출 (히스토리 자동 기록)
+SELECT * FROM update_issue_status(
+  123,                    -- issue_number
+  '{office_uuid}'::uuid,  -- office_id
+  'in_progress',          -- new_status
+  '{actor_uuid}'::uuid    -- changed_by (optional)
+);
+```
+
+### 4. 이전 상태 확인
+
+```sql
+-- 현재 상태 확인
+SELECT number, title, status
+FROM issues
+WHERE number = 123
+  AND office_id = '{office_uuid}';
+
+-- 상태 변경 이력 확인
+SELECT *
+FROM issue_status_history
+WHERE issue_id = (
+  SELECT id FROM issues WHERE number = 123
+)
+ORDER BY changed_at DESC;
+```
+
+## 상태값 Alias
+
+사용자가 한글/영문 키워드를 사용하면 실제 status 값으로 매핑:
+
+| 입력 | status 값 |
+|------|-----------|
+| 백로그, backlog | backlog |
+| 할일, 작업대기, todo | todo |
+| 작업중, 진행중, in_progress | in_progress |
+| 리뷰요청, 리뷰, review | review |
+| 테스트중, 테스트, testing | testing |
+| 완료, 닫기, done | done |
+
+## 일괄 변경 지원
+
+```sql
+-- 특정 라벨의 이슈들 일괄 상태 변경
+UPDATE issues
+SET status = 'in_progress',
+    updated_at = NOW()
+WHERE 'project:차곡' = ANY(labels)
+  AND state = 'open'
+  AND office_id = '{office_uuid}'
+RETURNING number, title, status;
+```
+
+```typescript
+// Supabase로 일괄 변경
+const { data, error } = await supabase
+  .from('issues')
+  .update({ status: 'in_progress' })
+  .contains('labels', ['project:차곡'])
+  .eq('state', 'open')
+  .eq('office_id', officeId)
+  .select('number, title, status');
+```
+
+## 출력 포맷
+
+```markdown
+[SEMO] project-status: 상태 변경 완료
+
+✅ Status 변경 완료
+
+**Issue**: #123
+**이전 상태**: todo
+**변경 상태**: in_progress
+```
+
+## 에러 처리
+
+### 이슈 미발견
+
+```markdown
+⚠️ **이슈 미발견**
+
+Issue #123을 찾을 수 없습니다.
+- 이슈 번호를 확인해주세요.
+- Office ID가 올바른지 확인해주세요.
+```
+
+### 잘못된 상태값
+
+```markdown
+⚠️ **잘못된 상태값**
+
+'{status}'는 유효하지 않은 상태값입니다.
+
+사용 가능한 상태:
+- backlog, todo, in_progress, review, testing, done
+```
+
+### Supabase 연결 오류
+
+```markdown
+⚠️ **Supabase 연결 오류**
+
+상태를 변경할 수 없습니다.
+- MCP 서버 설정을 확인해주세요.
+```
+
+## GitHub GraphQL Fallback
+
+Supabase 연결이 불가능한 경우 GitHub GraphQL로 폴백:
 
 ```bash
-# Status 변경
+# Fallback: GitHub Projects GraphQL
 gh api graphql -f query='
   mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
     updateProjectV2ItemFieldValue(input: {
@@ -92,98 +197,14 @@ gh api graphql -f query='
       projectV2Item { id }
     }
   }
-' -f projectId="PVT_kwDOC01-Rc4AtDz2" \
+' -f projectId="$PROJECT_ID" \
   -f itemId="$ITEM_ID" \
   -f fieldId="$STATUS_FIELD_ID" \
   -f optionId="$STATUS_OPTION_ID"
 ```
 
-## Status 옵션
-
-| Status | 설명 |
-|--------|------|
-| 백로그 | 초기 상태 |
-| 검수대기 | Epic 생성 시 기본값 |
-| 작업중 | 개발 진행 중 |
-| 리뷰요청 | 코드 리뷰 대기 |
-| 테스트중 | QA 테스트 단계 |
-| 완료 | 작업 완료 |
-
-> **Note**: Status Option ID는 동적으로 조회합니다.
-
-## 출력 포맷
-
-```
-[SEMO] project-status: 상태 변경 완료
-
-✅ Status 변경 완료
-
-**Issue**: #123
-**이전 상태**: 검수대기
-**변경 상태**: 작업중
-```
-
-## 에러 처리
-
-### 권한 오류
-
-```
-⚠️ project scope 권한이 필요합니다.
-
-다음 명령을 실행해주세요:
-gh auth refresh -s project
-```
-
-### Item 미발견
-
-```
-⚠️ Issue #123이 '이슈관리' Project에 없습니다.
-
-먼저 Issue를 Project에 추가해주세요.
-```
-
-## 일괄 변경 지원
-
-여러 Issue의 Status를 한 번에 변경:
-
-```bash
-# 라벨로 필터링하여 일괄 변경
-ISSUES=$(gh issue list --repo semicolon-devteam/docs \
-  --label "project:차곡" --json number --jq '.[].number')
-
-for ISSUE in $ISSUES; do
-  # Status 변경 로직 실행
-done
-```
-
-## Configuration
-
-> **⚠️ 아래 값은 예시입니다. 실제 값은 `.claude/memory/projects.md`에서 확인하세요.**
-
-```
-Project ID: .claude/memory/projects.md 참조
-Organization: .claude/memory/projects.md 참조
-Project Number: .claude/memory/projects.md 참조
-```
-
-## 상태값 Alias 사용
-
-사용자가 "리뷰요청", "테스트중" 등의 한글/영문 키워드를 사용하면,
-`.claude/memory/projects.md`의 **상태값 Alias** 테이블을 참조하여
-실제 Status 필드값으로 매핑합니다.
-
-**예시:**
-```
-입력: "리뷰요청 이슈들 테스트중으로 바꿔줘"
-
-1. projects.md 읽기
-2. "리뷰요청" → Status "리뷰요청" 매핑
-3. "테스트중" → Status "테스트중" 매핑
-4. 해당 Status의 이슈들 조회
-5. Status 변경 실행
-```
-
 ## References
 
-- [set-project-field Skill](../../packages/core/skills/set-project-field/SKILL.md)
-- [GitHub Projects GraphQL API](https://docs.github.com/en/graphql/reference/mutations#updateprojectv2itemfieldvalue)
+- [issues 테이블 마이그레이션](../../../semo-repository/supabase/migrations/20260113003_issues_discussions.sql)
+- [assign-task Skill](../assign-task/SKILL.md)
+- [task-progress Skill](../task-progress/SKILL.md)

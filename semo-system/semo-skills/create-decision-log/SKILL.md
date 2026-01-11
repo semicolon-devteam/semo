@@ -1,9 +1,10 @@
 ---
 name: create-decision-log
 description: |
-  의사결정 로그 Discussion 생성. 회의/Slack/PR 등에서 결정된 사항을 command-center에 기록.
+  의사결정 로그 Supabase discussions 테이블에 생성.
+  회의/Slack/PR 등에서 결정된 사항을 기록.
   Use when (1) 의사결정 기록 요청, (2) 회의 결정사항 문서화, (3) summarize-meeting 스킬에서 호출.
-tools: [Bash, Read, AskUserQuestion]
+tools: [Supabase, Bash, Read, AskUserQuestion]
 model: inherit
 ---
 
@@ -11,11 +12,20 @@ model: inherit
 
 # create-decision-log Skill
 
-> 팀의 중요한 의사결정을 GitHub Discussion으로 문서화
+> 팀의 중요한 의사결정을 Supabase discussions 테이블에 문서화
+
+## 🔴 데이터 소스 변경 (v2.0.0)
+
+| 버전 | 데이터 소스 | 방식 |
+|------|------------|------|
+| v1.x | GitHub Discussions | GraphQL API |
+| **v2.0** | **Supabase** | `discussions` 테이블 INSERT |
+
+---
 
 ## Purpose
 
-회의, Slack, GitHub 등 모든 채널에서 발생한 의사결정을 `command-center` 레포지토리의 Discussion으로 투명하게 기록합니다.
+회의, Slack, GitHub 등 모든 채널에서 발생한 의사결정을 **Supabase discussions 테이블 (category: 'decision-log')**에 투명하게 기록합니다.
 
 ## Input
 
@@ -63,18 +73,46 @@ model: inherit
     ↓
 2. Discussion 본문 생성 (템플릿 기반)
     ↓
-3. gh discussion create 실행
+3. Supabase discussions 테이블에 INSERT
     ↓
-4. 생성된 Discussion URL 반환
+4. 생성된 Discussion ID 반환
 ```
 
 ## Execution
 
-### Step 1: Discussion 생성
+### Supabase로 저장
 
-```bash
-# 본문 파일 생성
-cat > /tmp/decision-log-body.md << 'EOF'
+```sql
+-- 의사결정 로그 생성
+INSERT INTO discussions (office_id, category, title, body, created_by)
+VALUES (
+  '{office_uuid}',
+  'decision-log',
+  '[2025-01-15] API 버전 관리 전략 결정',
+  E'## 🏷️ 의사결정 분류\n기술/아키텍처\n\n## 📍 결정 출처\n정기 회의\n\n## 👥 참여자\n@reus-jeon, @garden92, @kyago\n\n## 🔍 의사결정 배경\n{배경}\n\n## ✅ 의사결정 내용\n{결정 내용}\n\n## 📎 추가 메모\n{메모}',
+  '{creator_uuid}'
+)
+RETURNING id, title;
+```
+
+```typescript
+// Supabase 클라이언트
+const { data, error } = await supabase
+  .from('discussions')
+  .insert({
+    office_id: officeId,
+    category: 'decision-log',
+    title: `[${date}] ${title}`,
+    body: decisionBody,
+    created_by: creatorId
+  })
+  .select('id, title')
+  .single();
+```
+
+### 본문 템플릿
+
+```markdown
 ## 🏷️ 의사결정 분류
 {category}
 
@@ -92,14 +130,6 @@ cat > /tmp/decision-log-body.md << 'EOF'
 
 ## 📎 추가 메모
 {notes}
-EOF
-
-# Discussion 생성
-gh discussion create \
-  --repo semicolon-devteam/command-center \
-  --category "Decision-Log" \
-  --title "[$(date +%Y-%m-%d)] {title}" \
-  --body-file /tmp/decision-log-body.md
 ```
 
 ## Output
@@ -116,7 +146,7 @@ gh discussion create \
 | 제목 | [2025-01-15] API 버전 관리 전략 결정 |
 | 분류 | 기술/아키텍처 |
 | 출처 | 정기 회의 |
-| Discussion | https://github.com/semicolon-devteam/command-center/discussions/XXX |
+| Supabase ID | {discussion_uuid} |
 ```
 
 ### 실패
@@ -127,7 +157,7 @@ gh discussion create \
 ❌ Discussion 생성 실패
 
 **원인**: {error_message}
-**해결**: Discussion 카테고리 'Decision-Log' 존재 여부 확인
+**해결**: Supabase 연결 및 권한 확인
 ```
 
 ## Quick Start
@@ -148,7 +178,25 @@ decision: |
   - 기존 REST API는 3개월 내 점진적 마이그레이션
 ```
 
+## GitHub Discussion Fallback
+
+Supabase 연결이 불가능한 경우:
+
+```bash
+# Fallback: GitHub Discussion API
+gh discussion create \
+  --repo semicolon-devteam/command-center \
+  --category "Decision-Log" \
+  --title "[$(date +%Y-%m-%d)] {title}" \
+  --body-file /tmp/decision-log-body.md
+```
+
+## References
+
+- [discussions 테이블 마이그레이션](../../../semo-repository/supabase/migrations/20260113003_issues_discussions.sql)
+
 ## Related
 
 - [summarize-meeting](../summarize-meeting/SKILL.md) - 회의록 정리 (이 스킬 호출)
-- [notify-slack](../../../../semo-skills/notify-slack/SKILL.md) - Slack 알림
+- [create-meeting-minutes](../create-meeting-minutes/SKILL.md) - 정기 회의록 생성
+- [notify-slack](../notify-slack/SKILL.md) - Slack 알림

@@ -1,10 +1,10 @@
 ---
 name: summarize-meeting
 description: |
-  회의 녹취록을 분석하여 GitHub Discussion에 회의록/의사결정 로그 생성.
+  회의 녹취록을 분석하여 Supabase discussions 테이블에 회의록/의사결정 로그 생성.
   Use when (1) 회의 녹취록 요약 요청, (2) /summarize-meeting 커맨드,
   (3) 의사결정 사항 정리 요청, (4) Action Items 추출 요청.
-tools: [Bash, Read, Write, GitHub CLI]
+tools: [Supabase, Bash, Read, Write]
 model: inherit
 ---
 
@@ -12,22 +12,31 @@ model: inherit
 
 # summarize-meeting Skill
 
-> 회의 녹취록 → GitHub Discussion (회의록/의사결정 로그) 자동 생성
+> 회의 녹취록 → Supabase discussions 테이블 (회의록/의사결정 로그) 자동 생성
+
+## 🔴 데이터 소스 변경 (v2.0.0)
+
+| 버전 | 데이터 소스 | 방식 |
+|------|------------|------|
+| v1.x | GitHub Discussions | GraphQL API |
+| **v2.0** | **Supabase** | `discussions` 테이블 INSERT |
+
+---
 
 ## Purpose
 
-회의 녹취록 텍스트를 분석하여 구조화된 회의록과 의사결정 로그를 **command-center 레포의 GitHub Discussions**에 생성합니다.
+회의 녹취록 텍스트를 분석하여 구조화된 회의록과 의사결정 로그를 **Supabase discussions 테이블**에 저장합니다.
 
 ## 🔴 NON-NEGOTIABLE RULES
 
 ### 출력 위치
 
-| 유형 | 저장소 | 카테고리 |
-|------|--------|----------|
-| 회의록 | `semicolon-devteam/command-center` | Meeting-Minutes |
-| 의사결정 로그 | `semicolon-devteam/command-center` | Decision-Log |
+| 유형 | discussions.category | 설명 |
+|------|----------------------|------|
+| 회의록 | `meeting-minutes` | 회의 전체 내용 정리 |
+| 의사결정 로그 | `decision-log` | 결정사항 별도 문서화 |
 
-**로컬 파일 생성 금지** - 반드시 GitHub Discussions에 생성
+**로컬 파일 생성 금지** - 반드시 Supabase discussions 테이블에 저장
 
 ### 필수 생성물 (Dual Output)
 
@@ -38,45 +47,6 @@ model: inherit
 | 회의록 | **필수** | 회의 전체 내용 정리 |
 | 의사결정 로그 | **필수** | 결정사항 별도 문서화 (결정이 없어도 "결정사항 없음" 명시) |
 
-**단일 출력 금지** - 회의록만 생성하거나 의사결정 로그만 생성 금지
-
-### Discussion Template 준수 (MANDATORY)
-
-> **반드시 아래 템플릿 파일의 구조를 따라 작성해야 합니다.**
-
-| 템플릿 | 경로 | 용도 |
-|--------|------|------|
-| 회의록 | `.github/DISCUSSION_TEMPLATE/meeting-minutes.yml` | 회의록 구조 정의 |
-| 의사결정 로그 | `.github/DISCUSSION_TEMPLATE/decision-log.yml` | 의사결정 로그 구조 정의 |
-
-**템플릿 무시 금지** - 임의의 형식으로 작성하지 않고 반드시 템플릿 구조 준수
-
-#### 회의록 필수 필드 (meeting-minutes.yml 기반)
-
-**제목 형식**: `[월/일] 정기 회고 & 회의`
-
-| 필드 | 필수 | 설명 |
-|------|------|------|
-| 회의 일시 | ✅ | 날짜 및 시간 |
-| 회의 유형 | ✅ | 정기 회고&회의 / 비정기 회의 / 긴급 회의 |
-| 참석자 | ✅ | @멘션 형식 |
-| 회의 안건 | ✅ | 체크리스트 형태 |
-| Clova Note 링크 | ⬜ | 선택 |
-| 추가 메모 | ⬜ | 선택 |
-
-#### 의사결정 로그 필수 필드 (decision-log.yml 기반)
-
-**제목 형식**: `[YYYY-MM-DD] 결정 내용 요약`
-
-| 필드 | 필수 | 설명 |
-|------|------|------|
-| 의사결정 분류 | ✅ | 기술/아키텍처, 제품/기획, 운영/프로세스, 인사/조직, 비즈니스/전략 |
-| 결정 출처 | ✅ | 정기 회의, 긴급 회의, Slack 논의, GitHub Discussion 등 |
-| 참여자 | ✅ | @멘션 형식 |
-| 의사결정 배경 | ✅ | 결정이 필요했던 배경 |
-| 의사결정 내용 | ✅ | 최종 결정 사항 |
-| 추가 메모 | ⬜ | 선택 |
-
 ## Execution Flow
 
 ```text
@@ -85,69 +55,76 @@ model: inherit
 2. 회의 내용 분석
    - 참석자 식별
    - 안건별 논의 내용 정리
-   - 의사결정 사항 추출 (DEC-XXX)
+   - 의사결정 사항 추출
    - Action Items 추출
    ↓
-3. GitHub Discussion 생성
-   - Meeting-Minutes 카테고리: 회의록
-   - Decision-Log 카테고리: 주요 의사결정 (있는 경우)
+3. Supabase discussions 테이블에 INSERT
+   - category: 'meeting-minutes' → 회의록
+   - category: 'decision-log' → 주요 의사결정
    ↓
 4. Slack 알림 전송 (#개발사업팀)
 ```
 
-## GitHub Discussion 생성
+## Supabase 저장
 
-### 카테고리 ID
+### 회의록 저장
 
-| 카테고리 | ID | 용도 |
-|----------|-----|------|
-| Meeting-Minutes | `DIC_kwDOOdzh984Cw9Lp` | 회의록 |
-| Decision-Log | `DIC_kwDOOdzh984Cw9Lq` | 의사결정 로그 |
-
-### 회의록 생성
-
-```bash
-gh api graphql -f query='
-mutation($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
-  createDiscussion(input: {
-    repositoryId: $repoId
-    categoryId: $categoryId
-    title: $title
-    body: $body
-  }) {
-    discussion {
-      number
-      url
-    }
-  }
-}' \
-  -f repoId="R_kgDOOdzh9w" \
-  -f categoryId="DIC_kwDOOdzh984Cw9Lp" \
-  -f title="[회의록] {날짜} - {회의명}" \
-  -f body="$MEETING_BODY"
+```sql
+-- 회의록 생성
+INSERT INTO discussions (office_id, category, title, body, created_by)
+VALUES (
+  '{office_uuid}',
+  'meeting-minutes',
+  '[{날짜}] 정기 회고 & 회의',
+  E'# 정기 회의록\n\n> **일시**: {날짜} {시간}\n> **참석자**: {참석자}\n\n---\n\n## 📋 안건\n\n### 1. {안건1}\n\n**논의 내용**:\n- ...\n\n---\n\n## ✅ Action Items\n\n| 담당자 | 할 일 | 기한 |\n|--------|-------|------|\n| @담당자 | 할 일 | 기한 |',
+  '{creator_uuid}'
+)
+RETURNING id, title;
 ```
 
-### 의사결정 로그 생성
+```typescript
+// Supabase 클라이언트
+const { data: meetingMinutes, error } = await supabase
+  .from('discussions')
+  .insert({
+    office_id: officeId,
+    category: 'meeting-minutes',
+    title: `[${date}] 정기 회고 & 회의`,
+    body: meetingBody,
+    created_by: creatorId
+  })
+  .select()
+  .single();
+```
 
-```bash
-gh api graphql -f query='
-mutation($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
-  createDiscussion(input: {
-    repositoryId: $repoId
-    categoryId: $categoryId
-    title: $title
-    body: $body
-  }) {
-    discussion {
-      number
-      url
-    }
-  }
-}' \
-  -f repoId="R_kgDOOdzh9w" \
-  -f categoryId="DIC_kwDOOdzh984Cw9Lq" \
-  -f title="[{날짜}] {의사결정 제목}" \
-  -f body="$DECISION_BODY"
+### 의사결정 로그 저장
+
+```sql
+-- 의사결정 로그 생성
+INSERT INTO discussions (office_id, category, title, body, created_by)
+VALUES (
+  '{office_uuid}',
+  'decision-log',
+  '[{날짜}] {의사결정 제목}',
+  E'# {의사결정 제목}\n\n> **결정일**: {날짜}\n> **결정자**: {참여자}\n\n---\n\n## 📋 배경\n\n{배경}\n\n## 🎯 결정 사항\n\n{결정 내용}',
+  '{creator_uuid}'
+)
+RETURNING id, title;
+```
+
+```typescript
+// Supabase 클라이언트
+const { data: decisionLog, error } = await supabase
+  .from('discussions')
+  .insert({
+    office_id: officeId,
+    category: 'decision-log',
+    title: `[${date}] ${decisionTitle}`,
+    body: decisionBody,
+    created_by: creatorId
+  })
+  .select()
+  .single();
 ```
 
 ## 템플릿
@@ -173,9 +150,6 @@ mutation($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
 
 **결론**: {결론 또는 다음 단계}
 
-### 2. {안건2 제목}
-...
-
 ---
 
 ## ✅ Action Items
@@ -188,7 +162,7 @@ mutation($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
 
 ## 🔗 관련 의사결정
 
-- [{DEC-XXX}](discussion_url) - {의사결정 제목}
+- {의사결정 제목}
 ```
 
 ### 의사결정 로그 템플릿
@@ -198,7 +172,6 @@ mutation($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
 
 > **결정일**: {날짜}
 > **결정자**: {결정 참여자}
-> **ID**: DEC-{번호}
 
 ---
 
@@ -216,11 +189,6 @@ mutation($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
 |------|------|------|------|
 | {대안1} | {장점} | {단점} | ❌ |
 | {대안2} | {장점} | {단점} | ✅ |
-
-## 📎 관련 문서
-
-- 관련 회의록: [링크]
-- 관련 이슈: #번호
 ```
 
 ## Slack 알림
@@ -240,21 +208,10 @@ mutation($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
 **일시**: {날짜}
 
 **생성된 문서**:
-- 회의록: {discussion_url}
-- 의사결정: {decision_url} (있는 경우)
+- 회의록: #{meeting_id}
+- 의사결정: #{decision_id} (있는 경우)
 
 **Action Items**: {N}개
-```
-
-## 사용 예시
-
-```bash
-# 파일 경로 지정
-/summarize-meeting docs/meetings/녹취록_251228.txt
-
-# 직접 텍스트 입력
-/summarize-meeting
-> 회의 내용을 여기에 붙여넣으세요...
 ```
 
 ## Output
@@ -265,20 +222,47 @@ mutation($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
 ✅ 회의록 생성 완료
 
 **회의**: {회의명}
-**GitHub Discussion**:
-- 회의록: https://github.com/semicolon-devteam/command-center/discussions/{N}
-- 의사결정: https://github.com/semicolon-devteam/command-center/discussions/{M}
+**Supabase discussions**:
+- 회의록: #{meeting_id} (category: meeting-minutes)
+- 의사결정: #{decision_id} (category: decision-log)
 
 **Slack 알림**: #개발사업팀 전송 완료
 ```
 
+## GitHub Discussion Fallback
+
+Supabase 연결이 불가능한 경우 GitHub Discussion으로 폴백:
+
+```bash
+# Fallback: GitHub Discussion API
+gh api graphql -f query='
+mutation($repoId: ID!, $categoryId: ID!, $title: String!, $body: String!) {
+  createDiscussion(input: {
+    repositoryId: $repoId
+    categoryId: $categoryId
+    title: $title
+    body: $body
+  }) {
+    discussion {
+      number
+      url
+    }
+  }
+}' \
+  -f repoId="R_kgDOOdzh9w" \
+  -f categoryId="DIC_kwDOOdzh984Cw9Lp" \
+  -f title="[회의록] {날짜} - {회의명}" \
+  -f body="$MEETING_BODY"
+```
+
 ## References
 
+- [discussions 테이블 마이그레이션](../../../semo-repository/supabase/migrations/20260113003_issues_discussions.sql)
 - [Meeting Template](references/meeting-template.md)
 - [Decision Template](references/decision-template.md)
-- [GitHub Discussions API](references/discussions-api.md)
 
 ## Related
 
 - `notify-slack` - Slack 알림 전송
-- `persist-context` - 컨텍스트 저장 (decisions.md 연동 시)
+- `create-meeting-minutes` - 정기 회의록 생성
+- `create-decision-log` - 의사결정 로그 생성

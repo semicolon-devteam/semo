@@ -414,6 +414,36 @@ User: "중앙 DB 구조 알려줘"
 
 ---
 
+## 🔵 데이터 소스 분리 (v2.0)
+
+> **GitHub**와 **Supabase**의 역할이 분리되었습니다.
+
+| 기능 | 데이터 소스 | 스킬 |
+|------|------------|------|
+| 코드 저장소 | **GitHub** | `git-workflow` |
+| Pull Request | **GitHub** | `git-workflow` |
+| GitHub Actions | **GitHub** | `trigger-deploy` |
+| Issue 관리 | **Supabase** | `assign-task`, `start-task`, `list-bugs` |
+| 상태 관리 | **Supabase** | `project-status`, `task-progress` |
+| Discussion | **Supabase** | `summarize-meeting`, `create-decision-log` |
+
+### Supabase 기반 스킬 (v2.0)
+
+| 스킬 | 테이블 | 용도 |
+|------|--------|------|
+| `list-bugs` | `bug_list` (view) | 버그 이슈 조회 |
+| `create-feedback-issue` | `issues` | 피드백 이슈 생성 |
+| `check-feedback` | `issues` | 피드백 이슈 확인 |
+| `project-status` | `issues` | 상태 변경 |
+| `assign-task` | `issues` | 업무 할당 |
+| `start-task` | `issues` | 작업 시작 |
+| `task-progress` | `issues`, `issue_status_history` | 진행도 추적 |
+| `summarize-meeting` | `discussions` | 회의록 생성 |
+| `create-meeting-minutes` | `discussions` | 정기 회의록 |
+| `create-decision-log` | `discussions` | 의사결정 로그 |
+
+---
+
 ## 🔵 GitHub 조직 기본값
 
 > **GitHub 조직이 명시되지 않은 요청은 기본값(`semicolon-devteam`)을 사용합니다.**
@@ -427,7 +457,5 @@ User: "중앙 DB 구조 알려줘"
 
 ### 적용 스킬
 
-- `assign-task` - Issue 할당 시 owner 기본값
-- `create-feedback-issue` - 피드백 이슈 생성 시
-- `request-test` - QA 테스트 요청 시
 - `git-workflow` - PR 생성 시 (명시 없으면)
+- `trigger-deploy` - GitHub Actions 실행 시

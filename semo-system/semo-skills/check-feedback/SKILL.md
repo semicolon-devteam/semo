@@ -1,56 +1,91 @@
 ---
 name: check-feedback
 description: |
-  SEMO 피드백 이슈 수집, 분석 및 우선순위 추천.
+  SEMO 피드백 이슈 수집, 분석 및 우선순위 추천 (Supabase DB 기반).
   Use when (1) "피드백 확인", "피드백 있는지",
   (2) "유저 피드백 체크", (3) SEMO 관련 open 이슈 조회.
-tools: [Bash, Read, Grep, Glob]
+tools: [Supabase, Bash, Read, Grep, Glob]
 ---
 
-> **🔔 시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: check-feedback 호출` 시스템 메시지를 첫 줄에 출력하세요.
+> **시스템 메시지**: 이 Skill이 호출되면 `[SEMO] Skill: check-feedback 호출` 시스템 메시지를 첫 줄에 출력하세요.
 
 # check-feedback Skill
 
-> SEMO 패키지 피드백 이슈 수집, 분석 및 우선순위 추천
+> SEMO 패키지 피드백 이슈 수집, 분석 및 우선순위 추천 (Supabase DB 기반)
+
+---
+
+## 🔴 데이터 소스 변경 (v2.0.0)
+
+| 버전 | 데이터 소스 | 방식 |
+|------|------------|------|
+| v1.x | GitHub Issues | `gh api` CLI |
+| **v2.0** | **Supabase** | `issues` 테이블 조회 |
 
 ---
 
 ## Purpose
 
-`semicolon-devteam/semo` 레포지토리에서 open 상태인 이슈를 수집하고,
+Supabase `issues` 테이블에서 `labels`에 `feedback`이 포함된 open 상태 이슈를 수집하고,
 **각 피드백을 분석하여 처리 우선순위를 추천**합니다.
 
 ---
 
 ## 🔴 Phase 1: 이슈 수집
 
-### 1.1 Open 이슈 조회
+### 1.1 Supabase로 피드백 이슈 조회
 
-```bash
-gh api repos/semicolon-devteam/semo/issues \
-  --jq '.[] | select(.state == "open") | {
-    number: .number,
-    title: .title,
-    labels: [.labels[].name],
-    created_at: (.created_at | split("T")[0]),
-    author: .user.login,
-    body: .body
-  }'
+```typescript
+// Supabase 클라이언트를 사용한 피드백 조회
+const { data: feedbacks, error } = await supabase
+  .from('issues')
+  .select(`
+    number,
+    title,
+    body,
+    type,
+    status,
+    labels,
+    created_at,
+    assignee:agent_personas(name)
+  `)
+  .eq('state', 'open')
+  .contains('labels', ['feedback'])
+  .order('created_at', { ascending: false });
 ```
 
-### 1.2 리스트 출력
+### 1.2 SQL 직접 조회 (MCP Server)
+
+```sql
+-- feedback 라벨이 포함된 open 이슈 조회
+SELECT
+  i.number,
+  i.title,
+  i.type,
+  i.status,
+  i.labels,
+  TO_CHAR(i.created_at, 'YYYY-MM-DD') AS created_at,
+  ap.name AS assignee_name
+FROM issues i
+LEFT JOIN agent_personas ap ON i.assignee_id = ap.id
+WHERE i.state = 'open'
+  AND 'feedback' = ANY(i.labels)
+ORDER BY i.created_at DESC;
+```
+
+### 1.3 리스트 출력
 
 ```markdown
 ## 📋 SEMO 피드백 현황
 
-| # | 제목 | 라벨 | 작성자 | 생성일 |
-|---|------|------|--------|--------|
-| #104 | [Feature] 기능 요청 | enhancement | reus-jeon | 2024-12-29 |
+| # | 제목 | 유형 | 상태 | 생성일 |
+|---|------|------|------|--------|
+| #104 | [Feature] 기능 요청 | feature | backlog | 2024-12-29 |
 ```
 
 ---
 
-## 🔴 Phase 2: 피드백 분석 (NEW)
+## 🔴 Phase 2: 피드백 분석
 
 > **각 이슈를 분석하여 유효성, 중복 여부, 반영 위치를 파악합니다.**
 
@@ -70,25 +105,30 @@ gh api repos/semicolon-devteam/semo/issues \
 semo/
 ├── semo-system/
 │   ├── semo-core/          # 원칙, 오케스트레이터, 커맨드
-│   ├── semo-skills/        # 통합 스킬 (13개)
-│   ├── semo-agents/        # 페르소나 Agent (14개)
-│   ├── semo-scripts/       # 자동화 스크립트
+│   ├── semo-skills/        # 통합 스킬
 │   ├── semo-hooks/         # Claude Code Hooks
 │   └── meta/               # Meta 패키지
 ├── packages/
 │   ├── cli/                # semo CLI
 │   └── mcp-server/         # MCP 서버
-└── .claude/                # 심볼릭 링크
+└── semo-repository/        # Supabase 스키마
 ```
 
 ### 2.3 중복/무효 판별
 
+```sql
+-- 유사 제목의 closed 이슈 확인
+SELECT number, title, state
+FROM issues
+WHERE title ILIKE '%{keyword}%'
+  AND state = 'closed'
+ORDER BY created_at DESC
+LIMIT 5;
+```
+
 ```bash
 # 기존 스킬에서 유사 기능 검색
 grep -r "{keyword}" --include="*.md" semo-system/semo-skills/
-
-# 최근 커밋에서 관련 변경 확인
-git log --oneline --all --grep="{keyword}" -10
 ```
 
 ### 2.4 분석 결과 형식
@@ -114,7 +154,7 @@ git log --oneline --all --grep="{keyword}" -10
 
 ---
 
-## 🔴 Phase 3: 우선순위 추천 (NEW)
+## 🔴 Phase 3: 우선순위 추천
 
 ### 3.1 우선순위 기준
 
@@ -151,7 +191,7 @@ git log --oneline --all --grep="{keyword}" -10
 
 ---
 
-## 🔴 Phase 4: 처리 권유 (NEW)
+## 🔴 Phase 4: 처리 권유
 
 > **분석 완료 후 사용자에게 처리 여부를 확인합니다.**
 
@@ -197,12 +237,12 @@ git log --oneline --all --grep="{keyword}" -10
 
 ## 📋 SEMO 피드백 현황
 
-| # | 제목 | 라벨 | 작성자 | 생성일 |
-|---|------|------|--------|--------|
-| #104 | [Feature] draft-task-creator 스킬이 프로젝트 레포에 Task 생성 | enhancement | reus-jeon | 2024-12-29 |
-| #103 | [Feature] Supabase 작업 시 CLI 우선 사용 가이드 추가 | enhancement | reus-jeon | 2024-12-29 |
-| #102 | [Feature] semo-remote 패키지에 remote-summary 스킬 추가 | enhancement | reus-jeon | 2024-12-29 |
-| #101 | [Feature] request-test 스킬: 협업채널 대신 프로젝트 채널로 요청 | enhancement | reus-jeon | 2024-12-29 |
+| # | 제목 | 유형 | 상태 | 생성일 |
+|---|------|------|------|--------|
+| #104 | [Feature] draft-task-creator 스킬이 프로젝트 레포에 Task 생성 | feature | backlog | 2024-12-29 |
+| #103 | [Feature] Supabase 작업 시 CLI 우선 사용 가이드 추가 | feature | backlog | 2024-12-29 |
+| #102 | [Feature] semo-remote 패키지에 remote-summary 스킬 추가 | feature | backlog | 2024-12-29 |
+| #101 | [Feature] request-test 스킬: 협업채널 대신 프로젝트 채널로 요청 | feature | backlog | 2024-12-29 |
 
 ---
 
@@ -211,22 +251,10 @@ git log --oneline --all --grep="{keyword}" -10
 #### #104 draft-task-creator 프로젝트 레포 생성
 - **유효성**: ✅ | **중복**: ❌ | **난이도**: 🟡 중간
 - **반영 위치**: `semo-skills/draft-task-creator/`
-- **구현 방향**: project-channels.md 레포 매핑 활용
-
-#### #103 Supabase CLI 우선 가이드
-- **유효성**: ✅ | **중복**: ❌ | **난이도**: 🟢 낮음
-- **반영 위치**: `semo-skills/supabase-*/`, `semo-core/references/`
-- **구현 방향**: 문서에 CLI 우선 사용 권장 추가
-
-#### #102 semo-remote remote-summary 스킬
-- **유효성**: ✅ | **중복**: ❌ | **난이도**: 🔴 높음
-- **반영 위치**: `semo-system/semo-remote/` (신규 패키지)
-- **구현 방향**: 새 패키지 및 스킬 생성 필요
 
 #### #101 request-test 프로젝트 채널 전송
 - **유효성**: ✅ | **중복**: ❌ | **난이도**: 🟢 낮음
-- **반영 위치**: `semo-skills/request-test/`, `notify-slack/`
-- **구현 방향**: project-channels.md 참조하여 채널 결정
+- **반영 위치**: `semo-skills/request-test/`
 
 ---
 
@@ -247,9 +275,8 @@ git log --oneline --all --grep="{keyword}" -10
 
 - `"전체 처리해줘"` - 우선순위대로 전체 처리
 - `"#101 처리해줘"` - 특정 이슈만 처리
-- `"1순위부터 2개 처리해줘"` - 상위 N개 처리
 
-**총 4개의 Open 이슈** | 처리 예상 버전: semo-skills 1.14.0
+**총 4개의 Open 피드백 이슈**
 ```
 
 ### 이슈 없음
@@ -259,16 +286,28 @@ git log --oneline --all --grep="{keyword}" -10
 
 ## 📋 SEMO 피드백 현황
 
-✅ semo 레포에 open 이슈가 없습니다.
+✅ Open 상태의 피드백 이슈가 없습니다.
 
 모든 피드백이 처리되었습니다! 🎉
 ```
 
 ---
 
+## GitHub CLI Fallback
+
+Supabase 연결이 불가능한 경우 GitHub CLI로 폴백:
+
+```bash
+# Fallback: GitHub API로 이슈 조회
+gh api repos/semicolon-devteam/semo/issues \
+  --jq '.[] | select(.state == "open") | select(.labels | any(.name == "feedback"))'
+```
+
+---
+
 ## 🔴 피드백 수정 완료 후 슬랙 알림 (NON-NEGOTIABLE)
 
-> **⚠️ 피드백 이슈 수정 완료 후, 문의자에게 반드시 슬랙 알림을 전송합니다.**
+> **피드백 이슈 수정 완료 후, 문의자에게 반드시 슬랙 알림을 전송합니다.**
 >
 > 상세 프로세스는 [process-feedback Skill](../process-feedback/SKILL.md#phase-6-이슈-종료-및-알림) 참조
 
@@ -276,7 +315,6 @@ git log --oneline --all --grep="{keyword}" -10
 
 ## References
 
+- [issues 테이블 마이그레이션](../../../semo-repository/supabase/migrations/20260113003_issues_discussions.sql)
 - [process-feedback Skill](../process-feedback/SKILL.md) - 피드백 처리 (체이닝 대상)
 - [Slack 설정](../../semo-core/_shared/slack-config.md)
-- [팀원 정보](../../semo-core/_shared/team-members.md)
-- [프로젝트 채널](../../semo-core/_shared/project-channels.md)
