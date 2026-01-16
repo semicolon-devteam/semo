@@ -77,5 +77,18 @@
       "Bash(gh api:*)"
     ],
     "deny": []
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/reus/Desktop/Sources/semicolon/semo-remote/semo-remote-client/src/hooks/semo-hook-stop.sh",
+            "timeout": 10000
+          }
+        ]
+      }
+    ]
   }
 }
