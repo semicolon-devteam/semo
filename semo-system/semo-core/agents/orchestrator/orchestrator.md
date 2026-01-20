@@ -28,6 +28,9 @@ model: inherit
 
 | 키워드 | Route To | 예시 |
 |--------|----------|------|
+| 워크플로우, workflow, greenfield | `skill:workflow-start` | "/SEMO:workflow:greenfield", "프로젝트 시작" |
+| 워크플로우 진행, 진행 상황 | `skill:workflow-progress` | "진행 상황 알려줘", "워크플로우 현황" |
+| 워크플로우 재개, 이어서 | `skill:workflow-resume` | "워크플로우 계속해줘", "이어서 진행" |
 | 구현, implement, 코드 작성 | `skill:write-code` (Extension 우선) | "기능 구현해줘", "함수 만들어줘" |
 | 커밋, 푸시, PR | `skill:git-workflow` (Extension 우선) | "커밋해줘", "PR 만들어줘" |
 | 테스트 작성 | `skill:write-test` | "테스트 작성해줘" |
@@ -45,6 +48,8 @@ model: inherit
 | 버그 목록 | `skill:list-bugs` | "버그 목록" |
 | 정기 회의록 | `skill:create-meeting-minutes` | "정기 회의록 생성해줘" |
 | 아키텍처 검증 | `skill:semo-architecture-checker` | "구조 검증" |
+| 사용자 흐름, UX 설계 | `skill:design-user-flow` | "사용자 흐름 설계해줘" |
+| 테스트 설계, TDD | `skill:design-tests` | "테스트 케이스 설계해줘" |
 | 명세 작성 | `skill:generate-spec` | "spec 작성해줘" |
 | 리뷰 | `skill:run-code-review` | "리뷰해줘" |
 | PR 검증 | `skill:validate-pr-ready` | "PR 전 검증해줘" |
@@ -58,6 +63,8 @@ model: inherit
 
 | 키워드/상황 | Route To | 에이전트 역할 |
 |------------|----------|-------------|
+| 아이디어, 리서치, 분석, 브리프 | `agent:analyst` | Analyst - Discovery/분석 |
+| UX 설계, 사용자 흐름, 목업 | `agent:ux-designer` | UX Designer - UX/UI 설계 |
 | Epic 생성, 태스크 생성, 요구사항 | `agent:po` | Product Owner - 백로그/요구사항 관리 |
 | 스프린트 관리, 진행 추적, 회의록 | `agent:sm` | Scrum Master - 스프린트/프로세스 관리 |
 | 아키텍처 설계, 도메인 설계, ADR | `agent:architect` | Architect - 설계/기술 검토 |
@@ -270,6 +277,8 @@ fi
 
 | Agent | 역할 | 주요 스킬 |
 |-------|------|----------|
+| `analyst` | Analyst | ideate, explore-approach |
+| `ux-designer` | UX Designer | design-user-flow, generate-mockup, design-handoff |
 | `po` | Product Owner | create-epic, create-issues, spec, project-kickoff |
 | `sm` | Scrum Master | task-progress, project-board, close-sprint, summarize-meeting |
 | `architect` | Architect | scaffold-domain, validate-architecture, spike, create-decision-log |
@@ -286,6 +295,11 @@ fi
 
 | Skill | 역할 |
 |-------|------|
+| `workflow-start` | 워크플로우 인스턴스 생성 및 시작 |
+| `workflow-progress` | 워크플로우 진행 상황 조회 |
+| `workflow-resume` | 중단된 워크플로우 재개 |
+| `design-user-flow` | UX 사용자 흐름 설계 |
+| `design-tests` | 구현 전 테스트 케이스 설계 |
 | `write-code` | 코드 작성/수정/구현 |
 | `git-workflow` | 커밋/푸시/PR |
 | `write-test` | 테스트 작성 |
