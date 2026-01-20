@@ -34,6 +34,9 @@ import {
   buildShortnameMappingFromDb,
   PackageDefinition,
   toExtensionPackageFormat,
+  getActiveSkills,
+  getActiveSkillNames,
+  SkillDefinition,
 } from "./supabase";
 
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
@@ -1536,7 +1539,7 @@ async function createStandardSymlinks(cwd: string) {
     console.log(chalk.green(`  ✓ .claude/agents/ (${agents.length}개 agent 링크됨)`));
   }
 
-  // skills 디렉토리 생성 및 개별 링크 (Extension 병합 지원)
+  // skills 디렉토리 생성 및 개별 링크 (DB 기반 - 활성 스킬만)
   const claudeSkillsDir = path.join(claudeDir, "skills");
   const coreSkillsDir = path.join(semoSystemDir, "semo-skills");
 
@@ -1547,17 +1550,21 @@ async function createStandardSymlinks(cwd: string) {
     }
     fs.mkdirSync(claudeSkillsDir, { recursive: true });
 
-    const skills = fs.readdirSync(coreSkillsDir).filter(f =>
-      fs.statSync(path.join(coreSkillsDir, f)).isDirectory()
-    );
-    for (const skill of skills) {
-      const skillLink = path.join(claudeSkillsDir, skill);
-      const skillTarget = path.join(coreSkillsDir, skill);
-      if (!fs.existsSync(skillLink)) {
+    // DB에서 활성 스킬 목록 조회 (19개 핵심 스킬만)
+    const activeSkillNames = await getActiveSkillNames();
+    let linkedCount = 0;
+
+    for (const skillName of activeSkillNames) {
+      const skillLink = path.join(claudeSkillsDir, skillName);
+      const skillTarget = path.join(coreSkillsDir, skillName);
+
+      // 스킬 폴더가 존재하는 경우에만 링크
+      if (fs.existsSync(skillTarget) && !fs.existsSync(skillLink)) {
         createSymlinkOrJunction(skillTarget, skillLink);
+        linkedCount++;
       }
     }
-    console.log(chalk.green(`  ✓ .claude/skills/ (${skills.length}개 skill 링크됨)`));
+    console.log(chalk.green(`  ✓ .claude/skills/ (${linkedCount}개 skill 링크됨 - DB 기반)`));
   }
 
   // commands 링크

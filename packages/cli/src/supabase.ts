@@ -610,3 +610,103 @@ export async function buildExtensionPackagesFromDb(): Promise<
 
   return result;
 }
+
+// ============================================================
+// Skill Definitions (스킬 설치 제어)
+// ============================================================
+
+// 스킬 정의 타입
+export interface SkillDefinition {
+  id: string;
+  name: string;
+  display_name: string;
+  description: string | null;
+  category: "workflow" | "discovery" | "planning" | "solutioning" | "implementation" | "supporting";
+  source_path: string;
+  is_active: boolean;
+  is_required: boolean;
+  install_order: number;
+  version: string;
+}
+
+// 폴백 스킬 목록 (DB 연결 실패 시 사용)
+const FALLBACK_SKILLS: SkillDefinition[] = [
+  // Workflow Management (3개)
+  { id: "sk-1", name: "workflow-start", display_name: "워크플로우 시작", description: "워크플로우 인스턴스 생성 및 시작", category: "workflow", source_path: "semo-skills/workflow-start", is_active: true, is_required: true, install_order: 1, version: "1.0.0" },
+  { id: "sk-2", name: "workflow-progress", display_name: "워크플로우 진행", description: "워크플로우 진행 상황 조회", category: "workflow", source_path: "semo-skills/workflow-progress", is_active: true, is_required: true, install_order: 2, version: "1.0.0" },
+  { id: "sk-3", name: "workflow-resume", display_name: "워크플로우 재개", description: "중단된 워크플로우 재개", category: "workflow", source_path: "semo-skills/workflow-resume", is_active: true, is_required: true, install_order: 3, version: "1.0.0" },
+
+  // Discovery (1개)
+  { id: "sk-10", name: "ideate", display_name: "아이디에이션", description: "아이디어 발굴 및 분석", category: "discovery", source_path: "semo-skills/ideate", is_active: true, is_required: true, install_order: 10, version: "1.0.0" },
+
+  // Planning (3개)
+  { id: "sk-20", name: "create-epic", display_name: "Epic 생성", description: "Epic 이슈 생성", category: "planning", source_path: "semo-skills/create-epic", is_active: true, is_required: true, install_order: 20, version: "1.0.0" },
+  { id: "sk-21", name: "design-user-flow", display_name: "사용자 흐름 설계", description: "UX 사용자 흐름 다이어그램 설계", category: "planning", source_path: "semo-skills/design-user-flow", is_active: true, is_required: true, install_order: 21, version: "1.0.0" },
+  { id: "sk-22", name: "generate-mockup", display_name: "목업 생성", description: "UI 목업 생성", category: "planning", source_path: "semo-skills/generate-mockup", is_active: true, is_required: true, install_order: 22, version: "1.0.0" },
+
+  // Solutioning (4개)
+  { id: "sk-30", name: "scaffold-domain", display_name: "도메인 스캐폴딩", description: "DDD 4-layer 도메인 구조 생성", category: "solutioning", source_path: "semo-skills/scaffold-domain", is_active: true, is_required: true, install_order: 30, version: "1.0.0" },
+  { id: "sk-31", name: "validate-architecture", display_name: "아키텍처 검증", description: "DDD 4-layer 아키텍처 준수 검증", category: "solutioning", source_path: "semo-skills/validate-architecture", is_active: true, is_required: true, install_order: 31, version: "1.0.0" },
+  { id: "sk-32", name: "generate-spec", display_name: "명세 생성", description: "Speckit 워크플로우 통합 실행", category: "solutioning", source_path: "semo-skills/generate-spec", is_active: true, is_required: true, install_order: 32, version: "1.0.0" },
+  { id: "sk-33", name: "design-tests", display_name: "테스트 설계", description: "구현 전 테스트 케이스 설계 (TDD)", category: "solutioning", source_path: "semo-skills/design-tests", is_active: true, is_required: true, install_order: 33, version: "1.0.0" },
+
+  // Implementation (6개)
+  { id: "sk-40", name: "create-sprint", display_name: "스프린트 생성", description: "Sprint 목표 설정 및 시작", category: "implementation", source_path: "semo-skills/create-sprint", is_active: true, is_required: true, install_order: 40, version: "1.0.0" },
+  { id: "sk-41", name: "start-task", display_name: "태스크 시작", description: "작업 시작 (이슈 상태 변경, 브랜치 생성)", category: "implementation", source_path: "semo-skills/start-task", is_active: true, is_required: true, install_order: 41, version: "1.0.0" },
+  { id: "sk-42", name: "review-task", display_name: "태스크 리뷰", description: "태스크 이슈 기반 구현 완료 리뷰", category: "implementation", source_path: "semo-skills/review-task", is_active: true, is_required: true, install_order: 42, version: "1.0.0" },
+  { id: "sk-43", name: "write-code", display_name: "코드 작성", description: "코드 작성, 수정, 구현", category: "implementation", source_path: "semo-skills/write-code", is_active: true, is_required: true, install_order: 43, version: "1.0.0" },
+  { id: "sk-44", name: "run-code-review", display_name: "코드 리뷰", description: "프로젝트 통합 코드 리뷰", category: "implementation", source_path: "semo-skills/run-code-review", is_active: true, is_required: true, install_order: 44, version: "1.0.0" },
+  { id: "sk-45", name: "close-sprint", display_name: "스프린트 종료", description: "Sprint 종료 및 회고 정리", category: "implementation", source_path: "semo-skills/close-sprint", is_active: true, is_required: true, install_order: 45, version: "1.0.0" },
+
+  // Supporting (2개)
+  { id: "sk-50", name: "git-workflow", display_name: "Git 워크플로우", description: "Git 커밋/푸시/PR 자동화", category: "supporting", source_path: "semo-skills/git-workflow", is_active: true, is_required: true, install_order: 50, version: "1.0.0" },
+  { id: "sk-51", name: "notify-slack", display_name: "Slack 알림", description: "Slack 채널에 메시지 전송", category: "supporting", source_path: "semo-skills/notify-slack", is_active: true, is_required: true, install_order: 51, version: "1.0.0" },
+];
+
+/**
+ * 활성 스킬 목록 조회 (설치할 스킬)
+ */
+export async function getActiveSkills(): Promise<SkillDefinition[]> {
+  const isConnected = await checkDbConnection();
+
+  if (!isConnected) {
+    console.warn("⚠️ DB 연결 실패, 폴백 스킬 목록 사용 (19개)");
+    return FALLBACK_SKILLS.filter(s => s.is_active);
+  }
+
+  const supabase = getSupabaseClient();
+  const { data, error } = await supabase
+    .from("skill_definitions")
+    .select("*")
+    .eq("is_active", true)
+    .order("install_order");
+
+  if (error) {
+    console.warn("⚠️ 스킬 조회 실패, 폴백 데이터 사용");
+    return FALLBACK_SKILLS.filter(s => s.is_active);
+  }
+
+  return data || FALLBACK_SKILLS.filter(s => s.is_active);
+}
+
+/**
+ * 스킬 이름 목록만 조회
+ */
+export async function getActiveSkillNames(): Promise<string[]> {
+  const skills = await getActiveSkills();
+  return skills.map(s => s.name);
+}
+
+/**
+ * 카테고리별 스킬 개수 조회
+ */
+export async function getSkillCountByCategory(): Promise<Record<string, number>> {
+  const skills = await getActiveSkills();
+  const counts: Record<string, number> = {};
+
+  for (const skill of skills) {
+    counts[skill.category] = (counts[skill.category] || 0) + 1;
+  }
+
+  return counts;
+}
