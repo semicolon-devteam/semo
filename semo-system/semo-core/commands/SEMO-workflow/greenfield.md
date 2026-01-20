@@ -1,4 +1,4 @@
-# /SEMO:workflow:greenfield
+# /SEMO-workflow:greenfield
 
 BMad Method Greenfield Workflow를 시작합니다.
 
@@ -16,7 +16,7 @@ Phase 4: Implementation (Required) - 스프린트 기반 개발
 ## Usage
 
 ```
-/SEMO:workflow:greenfield
+/SEMO-workflow:greenfield
 ```
 
 ## Workflow Nodes
@@ -87,8 +87,8 @@ Phase 4: Implementation (Required) - 스프린트 기반 개발
 
 ## Related Commands
 
-- `/SEMO:workflow:brownfield` - 레거시 개선 워크플로우 (TODO)
-- `/SEMO:workflow:project-audit` - 프로젝트 감사 워크플로우 (TODO)
+- `/SEMO-workflow:brownfield` - 레거시 개선 워크플로우 (TODO)
+- `/SEMO-workflow:project-audit` - 프로젝트 감사 워크플로우 (TODO)
 
 ## Related Skills
 

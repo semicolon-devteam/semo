@@ -1587,6 +1587,23 @@ async function createStandardSymlinks(cwd: string) {
     createSymlinkOrJunction(commandsTarget, semoCommandsLink);
     console.log(chalk.green("  ✓ .claude/commands/SEMO → semo-system/semo-core/commands/SEMO"));
   }
+
+  // SEMO-workflow 커맨드 링크 (워크플로우 커맨드)
+  const workflowCommandsLink = path.join(commandsDir, "SEMO-workflow");
+  const workflowCommandsTarget = path.join(semoSystemDir, "semo-core", "commands", "SEMO-workflow");
+
+  if (fs.existsSync(workflowCommandsLink)) {
+    if (fs.lstatSync(workflowCommandsLink).isSymbolicLink()) {
+      fs.unlinkSync(workflowCommandsLink);
+    } else {
+      removeRecursive(workflowCommandsLink);
+    }
+  }
+
+  if (fs.existsSync(workflowCommandsTarget)) {
+    createSymlinkOrJunction(workflowCommandsTarget, workflowCommandsLink);
+    console.log(chalk.green("  ✓ .claude/commands/SEMO-workflow → semo-system/semo-core/commands/SEMO-workflow"));
+  }
 }
 
 // === 설치 검증 ===

@@ -28,7 +28,7 @@ model: inherit
 
 | 키워드 | Route To | 예시 |
 |--------|----------|------|
-| 워크플로우, workflow, greenfield | `skill:workflow-start` | "/SEMO:workflow:greenfield", "프로젝트 시작" |
+| 워크플로우, workflow, greenfield | `skill:workflow-start` | "/SEMO-workflow:greenfield", "프로젝트 시작" |
 | 워크플로우 진행, 진행 상황 | `skill:workflow-progress` | "진행 상황 알려줘", "워크플로우 현황" |
 | 워크플로우 재개, 이어서 | `skill:workflow-resume` | "워크플로우 계속해줘", "이어서 진행" |
 | 구현, implement, 코드 작성 | `skill:write-code` (Extension 우선) | "기능 구현해줘", "함수 만들어줘" |
