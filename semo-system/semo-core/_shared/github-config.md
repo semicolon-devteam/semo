@@ -89,9 +89,26 @@ gh run list --workflow deploy.yml
 
 ### 참조 테이블
 
-- `issues` - 이슈 관리
-- `issue_status_history` - 상태 변경 이력
-- `discussions` - 회의록, 의사결정 로그
+| 테이블 | 용도 |
+| ------ | ---- |
+| `semo.issues` | 이슈 관리 |
+| `semo.issue_status_history` | 상태 변경 이력 |
+| `semo.discussions` | 회의록, 의사결정 로그 |
+| `semo.workflow_definitions` | 워크플로우 정의 |
+| `semo.workflow_nodes` | 워크플로우 노드 (FK 기반) |
+| `semo.workflow_instances` | 워크플로우 실행 인스턴스 |
+| `semo.workflow_node_executions` | 노드 실행 기록 |
+| `semo.skills` | 스킬 정의 |
+| `semo.agents` | 에이전트 정의 |
+| `semo.packages` | 패키지 정의 |
+
+### 참조 Views
+
+| View | 용도 |
+| ---- | ---- |
+| `semo.v_workflow_nodes` | skill/agent 이름 자동 JOIN |
+| `semo.v_skills` | package 정보 포함 |
+| `semo.v_agents` | package 정보 포함 |
 
 ---
 

@@ -68,8 +68,8 @@ SELECT
   wi.current_node_id,
   wi.context,
   wd.name AS workflow_name
-FROM workflow_instances wi
-JOIN workflow_definitions wd ON wd.id = wi.workflow_definition_id
+FROM semo.workflow_instances wi
+JOIN semo.workflow_definitions wd ON wd.id = wi.workflow_definition_id
 WHERE wi.id = '{instance_id}'
    OR wi.instance_name ILIKE '%{instance_name}%';
 ```
@@ -87,26 +87,49 @@ WHERE wi.id = '{instance_id}'
 ### Step 3: 현재 노드 정보 조회
 
 ```sql
+-- View 사용 (권장)
+SELECT
+  vwn.node_key,
+  vwn.name,
+  vwn.node_type,
+  vwn.skill_name,
+  vwn.agent_name,
+  vwn.decision_config,
+  vwn.phase,
+  wne.status AS execution_status,
+  wne.id AS execution_id
+FROM semo.v_workflow_nodes vwn
+LEFT JOIN semo.workflow_node_executions wne ON wne.node_id = vwn.id
+  AND wne.workflow_instance_id = '{instance_id}'
+  AND wne.status IN ('running', 'pending')
+WHERE vwn.id = '{current_node_id}';
+
+-- 또는 직접 JOIN
 SELECT
   wn.node_key,
   wn.name,
   wn.node_type,
-  wn.skill_name,
+  s.name AS skill_name,
+  a.name AS agent_name,
   wn.decision_config,
   wn.phase,
   wne.status AS execution_status,
   wne.id AS execution_id
-FROM workflow_nodes wn
-LEFT JOIN workflow_node_executions wne ON wne.node_id = wn.id
+FROM semo.workflow_nodes wn
+LEFT JOIN semo.skills s ON s.id = wn.skill_id
+LEFT JOIN semo.agents a ON a.id = wn.agent_id
+LEFT JOIN semo.workflow_node_executions wne ON wne.node_id = wn.id
   AND wne.workflow_instance_id = '{instance_id}'
   AND wne.status IN ('running', 'pending')
 WHERE wn.id = '{current_node_id}';
 ```
 
+> **Note**: `workflow_nodes` 테이블은 `skill_id`, `agent_id` UUID FK를 사용합니다.
+
 ### Step 4: 상태 업데이트 (paused인 경우)
 
 ```sql
-UPDATE workflow_instances
+UPDATE semo.workflow_instances
 SET status = 'active',
     started_at = COALESCE(started_at, now())
 WHERE id = '{instance_id}'
@@ -126,7 +149,7 @@ skill:{skill_name}
 
 새로 실행 시작:
 ```sql
-SELECT start_workflow_node(
+SELECT semo.start_workflow_node(
   '{instance_id}',
   '{current_node_id}',
   '{context}'::jsonb
@@ -138,10 +161,11 @@ SELECT start_workflow_node(
 ```sql
 -- 이전 노드들의 output_data를 컨텍스트로 수집
 SELECT
-  wn.node_key,
+  vwn.node_key,
+  vwn.skill_name,
   wne.output_data
-FROM workflow_node_executions wne
-JOIN workflow_nodes wn ON wn.id = wne.node_id
+FROM semo.workflow_node_executions wne
+JOIN semo.v_workflow_nodes vwn ON vwn.id = wne.node_id
 WHERE wne.workflow_instance_id = '{instance_id}'
   AND wne.status = 'completed'
 ORDER BY wne.completed_at;
@@ -185,6 +209,27 @@ questions:
 | 인스턴스 없음 | "워크플로우를 찾을 수 없습니다" |
 | 이미 완료됨 | "이미 완료된 워크플로우입니다" |
 | 노드 없음 | "현재 노드 정보가 없습니다. 워크플로우를 새로 시작해주세요" |
+
+## DB Schema
+
+### FK 관계
+
+```text
+workflow_instances.workflow_definition_id → workflow_definitions.id
+workflow_instances.current_node_id → workflow_nodes.id
+workflow_node_executions.workflow_instance_id → workflow_instances.id
+workflow_node_executions.node_id → workflow_nodes.id
+workflow_nodes.skill_id → skills.id
+workflow_nodes.agent_id → agents.id
+```
+
+### RPC 함수
+
+| 함수 | 설명 |
+| ---- | ---- |
+| `semo.start_workflow_node()` | 노드 실행 시작 |
+| `semo.complete_workflow_node()` | 노드 실행 완료 |
+| `semo.get_workflow_progress()` | 진행 상황 조회 |
 
 ## Related Skills
 

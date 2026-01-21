@@ -85,6 +85,39 @@ Phase 4: Implementation (Required) - 스프린트 기반 개발
    - `current_node_id` 업데이트
    - `workflow-progress` 스킬로 진행 현황 확인 가능
 
+## DB Schema
+
+### 테이블 구조
+
+```text
+semo.workflow_definitions
+  └── greenfield 워크플로우 정의 (command_name='greenfield')
+
+semo.workflow_nodes (24개 노드)
+  ├── skill_id (UUID FK → skills.id)
+  ├── agent_id (UUID FK → agents.id)
+  └── decision_config (JSONB)
+
+semo.workflow_instances
+  └── 실행 중인 워크플로우 인스턴스
+
+semo.workflow_node_executions
+  └── 노드별 실행 기록
+```
+
+### FK 기반 조회
+
+```sql
+-- 노드 정보 조회 시 View 사용 권장
+SELECT node_key, name, skill_name, agent_name, phase
+FROM semo.v_workflow_nodes
+WHERE workflow_definition_id = (
+  SELECT id FROM semo.workflow_definitions
+  WHERE command_name = 'greenfield'
+)
+ORDER BY install_order;
+```
+
 ## Related Commands
 
 - `/SEMO-workflow:brownfield` - 레거시 개선 워크플로우 (TODO)

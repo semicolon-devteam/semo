@@ -75,12 +75,58 @@
 
 ---
 
+## SEMO DB (semo 스키마)
+
+> SEMO 워크플로우 및 패키지 관리용 데이터베이스
+
+### 연결 정보
+
+| 항목 | 값 |
+| ---- | --- |
+| Host | `3.38.162.21` |
+| Port | `5432` |
+| Database | `appdb` |
+| Schema | `semo` |
+
+### 테이블 구조
+
+| 테이블 | 용도 | FK 관계 |
+| ------ | ---- | ------- |
+| `packages` | 패키지 정의 | - |
+| `skills` | 스킬 정의 | `package_id → packages.id` |
+| `agents` | 에이전트 정의 | `package_id → packages.id` |
+| `commands` | 커맨드 정의 | - |
+| `workflow_definitions` | 워크플로우 정의 | - |
+| `workflow_nodes` | 워크플로우 노드 | `skill_id → skills.id`, `agent_id → agents.id` |
+| `workflow_instances` | 실행 인스턴스 | `workflow_definition_id`, `current_node_id` |
+| `workflow_node_executions` | 노드 실행 기록 | `workflow_instance_id`, `node_id` |
+
+### Views
+
+| View | 용도 |
+| ---- | ---- |
+| `v_workflow_nodes` | skill/agent 이름 자동 JOIN |
+| `v_skills` | package 정보 포함 |
+| `v_agents` | package 정보 포함 |
+
+### RPC 함수
+
+| 함수 | 용도 |
+| ---- | ---- |
+| `start_workflow()` | 워크플로우 시작 |
+| `start_workflow_node()` | 노드 실행 시작 |
+| `complete_workflow_node()` | 노드 실행 완료 |
+| `get_workflow_progress()` | 진행 상황 조회 |
+
+---
+
 ## 라우팅 가이드
 
 | 사용자 요청 | 참조 시스템 |
-|------------|------------|
+| ----------- | ----------- |
 | "커뮤니티 DB 스키마" | core-supabase |
 | "중앙 DB", "팀 데이터베이스" | core-central-db |
 | "마이크로서비스 DB" | core-central-db |
 | "게이머 서비스 DB" | core-central-db (gm_ prefix) |
 | "크롤러 데이터" | core-central-db (gt_ prefix) |
+| "SEMO 워크플로우", "스킬/에이전트 DB" | SEMO DB (semo 스키마) |

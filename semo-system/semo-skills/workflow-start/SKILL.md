@@ -106,15 +106,33 @@ SELECT start_workflow_node(
 ### Step 5: 노드 정보 조회 및 실행
 
 ```sql
+-- View 사용 (권장)
 SELECT
   node_key,
   name,
   node_type,
   skill_name,
+  agent_name,
   decision_config
-FROM workflow_nodes
+FROM semo.v_workflow_nodes
 WHERE id = '{start_node_id}';
+
+-- 또는 직접 JOIN
+SELECT
+  wn.node_key,
+  wn.name,
+  wn.node_type,
+  s.name AS skill_name,
+  a.name AS agent_name,
+  wn.decision_config
+FROM semo.workflow_nodes wn
+LEFT JOIN semo.skills s ON s.id = wn.skill_id
+LEFT JOIN semo.agents a ON a.id = wn.agent_id
+WHERE wn.id = '{start_node_id}';
 ```
+
+> **Note**: `workflow_nodes` 테이블은 `skill_id`, `agent_id` UUID FK를 사용합니다.
+> `v_workflow_nodes` 뷰를 사용하면 skill/agent 이름을 자동으로 JOIN합니다.
 
 ## Node Type 분기 처리
 
@@ -183,6 +201,36 @@ SELECT complete_workflow_node(
 | 워크플로우 없음 | "'{command_name}' 워크플로우를 찾을 수 없습니다" |
 | 이미 실행 중 | "동일한 이름의 워크플로우가 이미 실행 중입니다" |
 | 스킬 없음 | "'{skill_name}' 스킬을 찾을 수 없습니다" |
+
+## DB Schema
+
+### 테이블 구조
+
+```text
+semo.workflow_definitions
+  ├── id (UUID PK)
+  ├── command_name (VARCHAR)
+  ├── name (VARCHAR)
+  └── start_node_id (UUID FK → workflow_nodes.id)
+
+semo.workflow_nodes
+  ├── id (UUID PK)
+  ├── workflow_definition_id (UUID FK)
+  ├── node_key (VARCHAR)
+  ├── skill_id (UUID FK → skills.id)     -- FK 기반
+  ├── agent_id (UUID FK → agents.id)     -- FK 기반
+  └── decision_config (JSONB)
+
+semo.workflow_instances
+  ├── id (UUID PK)
+  ├── workflow_definition_id (UUID FK)
+  ├── current_node_id (UUID FK → workflow_nodes.id)
+  └── status (VARCHAR)
+```
+
+### Views
+
+- `semo.v_workflow_nodes` - skill/agent 이름 자동 JOIN
 
 ## Related Skills
 

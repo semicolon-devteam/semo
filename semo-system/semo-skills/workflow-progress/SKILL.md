@@ -96,22 +96,27 @@ instance_id: "uuid"  # 또는 instance_name으로 검색
 
 ## SQL Queries
 
+> **Note**: 모든 쿼리는 `semo` 스키마를 사용합니다. `workflow_nodes`는 FK 기반 (`skill_id`, `agent_id`)입니다.
+
 ### 목록 조회
 
 ```sql
+-- View 사용 (권장)
 SELECT
   wi.id,
   wi.instance_name,
   wd.name AS workflow_name,
   wd.command_name,
-  wn.node_key,
-  wn.name AS current_step,
-  wn.phase,
+  vwn.node_key,
+  vwn.name AS current_step,
+  vwn.skill_name,
+  vwn.agent_name,
+  vwn.phase,
   wi.status,
   wi.created_at
-FROM workflow_instances wi
-JOIN workflow_definitions wd ON wd.id = wi.workflow_definition_id
-LEFT JOIN workflow_nodes wn ON wn.id = wi.current_node_id
+FROM semo.workflow_instances wi
+JOIN semo.workflow_definitions wd ON wd.id = wi.workflow_definition_id
+LEFT JOIN semo.v_workflow_nodes vwn ON vwn.id = wi.current_node_id
 WHERE wi.status IN ('active', 'paused')
 ORDER BY wi.created_at DESC
 LIMIT 20;
@@ -121,14 +126,16 @@ LIMIT 20;
 
 ```sql
 SELECT
-  wn.node_key,
-  wn.name,
-  wn.phase,
+  vwn.node_key,
+  vwn.name,
+  vwn.skill_name,
+  vwn.agent_name,
+  vwn.phase,
   wne.status,
   wne.decision_result,
   wne.completed_at
-FROM workflow_node_executions wne
-JOIN workflow_nodes wn ON wn.id = wne.node_id
+FROM semo.workflow_node_executions wne
+JOIN semo.v_workflow_nodes vwn ON vwn.id = wne.node_id
 WHERE wne.workflow_instance_id = '{instance_id}'
 ORDER BY wne.created_at;
 ```
@@ -137,19 +144,25 @@ ORDER BY wne.created_at;
 
 ```sql
 SELECT
-  (SELECT COUNT(*) FROM workflow_node_executions
+  (SELECT COUNT(*) FROM semo.workflow_node_executions
    WHERE workflow_instance_id = '{instance_id}'
      AND status = 'completed') AS completed_nodes,
-  (SELECT COUNT(*) FROM workflow_nodes
-   WHERE workflow_id = '{workflow_id}') AS total_nodes;
+  (SELECT COUNT(*) FROM semo.workflow_nodes
+   WHERE workflow_definition_id = '{workflow_id}') AS total_nodes;
 ```
 
 ## View 활용
 
 ```sql
--- workflow_instance_status 뷰 사용
-SELECT * FROM workflow_instance_status
-WHERE status = 'active';
+-- v_workflow_nodes 뷰: skill/agent 이름 자동 JOIN
+SELECT * FROM semo.v_workflow_nodes
+WHERE workflow_definition_id = '{workflow_id}';
+
+-- v_skills 뷰: package 정보 포함
+SELECT * FROM semo.v_skills WHERE is_active = true;
+
+-- v_agents 뷰: package 정보 포함
+SELECT * FROM semo.v_agents WHERE is_active = true;
 ```
 
 ## 완료 메시지
@@ -161,6 +174,27 @@ WHERE status = 'active';
 
 💡 워크플로우 재개: `skill:workflow-resume {instance_id}`
 ```
+
+## DB Schema
+
+### FK 관계
+
+```text
+workflow_instances.workflow_definition_id → workflow_definitions.id
+workflow_instances.current_node_id → workflow_nodes.id
+workflow_node_executions.workflow_instance_id → workflow_instances.id
+workflow_node_executions.node_id → workflow_nodes.id
+workflow_nodes.skill_id → skills.id
+workflow_nodes.agent_id → agents.id
+```
+
+### Views
+
+| View | 설명 |
+| ---- | ---- |
+| `semo.v_workflow_nodes` | skill/agent 이름 자동 JOIN |
+| `semo.v_skills` | package 정보 포함 |
+| `semo.v_agents` | package 정보 포함 |
 
 ## Related Skills
 
