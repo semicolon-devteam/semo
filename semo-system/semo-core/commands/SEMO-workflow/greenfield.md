@@ -6,6 +6,19 @@ BMad Method Greenfield Workflow를 시작합니다.
 
 새로운 프로젝트를 처음부터 구축하는 4-Phase 워크플로우입니다.
 
+## Tech Stack
+
+이 워크플로우는 **Vercel + Supabase** 기반 프로젝트 개발을 위해 설계되었습니다.
+
+| 항목 | 기술 |
+| ---- | ---- |
+| **Frontend** | Next.js 14+ (App Router) |
+| **Backend** | Supabase (PostgreSQL + RPC) |
+| **Hosting** | Vercel |
+| **State** | TanStack Query |
+| **Styling** | Tailwind CSS |
+| **Testing** | Vitest + React Testing Library |
+
 ```
 Phase 1: Discovery (Optional) - 아이디어 발굴 및 분석
 Phase 2: Planning (Required) - PRD/Epic 생성 및 UX 설계
@@ -27,6 +40,23 @@ Phase 4: Implementation (Required) - 스프린트 기반 개발
 |------|------|-------|-------|
 | D0 | Include Discovery? | - | (decision) |
 | D1 | Ideate | Analyst | `ideate` |
+
+### Phase 1.5: Setup (Required)
+
+| Node | Name | Agent | Skill |
+|------|------|-------|-------|
+| P0 | Setup Environment | DevOps | `setup-environment` |
+
+> **P0 노드는 Discovery 완료 후 자동 실행됩니다.**
+>
+> 이 단계에서 Vercel/Supabase CLI 설정 및 환경변수를 구성합니다:
+>
+> - Vercel CLI 로그인 및 프로젝트 연결
+> - Supabase CLI 로그인 및 프로젝트 연결
+> - `.env.local` 환경변수 설정
+>   - `NEXT_PUBLIC_SUPABASE_URL`
+>   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+>   - `SUPABASE_SERVICE_ROLE_KEY`
 
 ### Phase 2: Planning
 
