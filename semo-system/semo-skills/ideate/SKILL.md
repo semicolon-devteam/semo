@@ -98,7 +98,58 @@ Phase 3: Epic Issue 직접 생성
 어떤 방향으로 진행할까요? (A/B/C)
 ```
 
-### Step 3: 디자인 합의
+### Step 3: 플랫폼 전략 결정
+
+타겟 플랫폼에 따라 **기술 스택과 배포 전략**이 결정됩니다:
+
+```markdown
+📱 어떤 플랫폼을 지원할 예정인가요?
+
+**A) 데스크탑 웹 전용**
+- 가장 단순, 빠른 출시
+- 모바일 미지원
+- 스택: Next.js + Vercel
+
+**B) 반응형 웹 (PWA)** ← 권장
+- 데스크탑 + 모바일 반응형
+- 홈 화면 설치, 오프라인 지원
+- 스택: Next.js + PWA + Vercel
+
+**C) 웹 + 네이티브 앱**
+- 웹: Next.js / 앱: Expo (React Native)
+- 앱스토어 배포 필요
+- 스택: Next.js + Expo + Vercel + EAS
+
+**D) 네이티브 앱 전용**
+- iOS/Android 앱만 (웹 미지원)
+- 스택: Expo + EAS Build
+
+어떤 플랫폼으로 진행할까요? (A/B/C/D)
+```
+
+**플랫폼별 기술 스택 매핑**:
+
+| 선택 | Frontend | Backend | 배포 | 추가 설정 |
+|------|----------|---------|------|----------|
+| A) 웹 전용 | Next.js 14+ | Supabase | Vercel | - |
+| B) PWA | Next.js 14+ | Supabase | Vercel | next-pwa, manifest.json |
+| C) 웹+앱 | Next.js + Expo | Supabase | Vercel + EAS | 공유 타입/로직 패키지 |
+| D) 앱 전용 | Expo | Supabase | EAS Build | - |
+
+**PWA vs 네이티브 트레이드오프**:
+
+| 기능 | PWA | 네이티브 (Expo) |
+|------|-----|-----------------|
+| 푸시 알림 | iOS 제한적 | 완전 지원 |
+| 카메라 커스텀 | 제한적 | 완전 지원 |
+| 오프라인 | Service Worker | 완전 지원 |
+| 앱스토어 배포 | 불필요 | 필요 (심사 대기) |
+| 설치 허들 | 낮음 | 높음 |
+| 업데이트 | 즉시 | 스토어 심사 필요 |
+
+> **💡 추천**: 대부분의 B2C 서비스는 **B) PWA**로 시작 후, 사용자 피드백에 따라 네이티브 확장
+
+### Step 4: 디자인 합의
 
 > **📌 Design Brief는 별도 파일로 저장하지 않고, Epic 본문에 직접 포함됩니다.**
 
@@ -112,7 +163,7 @@ Brainstorming 결과를 바탕으로 다음 정보를 수집:
 | Constraints | 기술적/비즈니스/사용자 제약 |
 | Success Metrics | 측정 가능한 지표 |
 
-이 정보는 Phase 3에서 Epic 본문으로 직접 변환됩니다.
+이 정보는 Epic 생성 단계에서 Epic 본문으로 직접 변환됩니다.
 
 ## Phase 2: 기술 검증 (선택)
 

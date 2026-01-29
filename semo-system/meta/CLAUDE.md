@@ -267,6 +267,79 @@ REMOTE_EXT=$(gh api repos/semicolon-devteam/semo/contents/packages/biz/managemen
 
 ---
 
+## 🔴 SEMO 시스템 수정 시 DB 반영 (NON-NEGOTIABLE)
+
+> **⚠️ Agent/Skill/Workflow 수정 시 반드시 DB 마이그레이션을 함께 생성해야 합니다.**
+
+### Source of Truth 구조
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    Supabase DB (Source of Truth)            │
+├─────────────────────────────────────────────────────────────┤
+│  skill_definitions     │ 스킬 정의 (prompt, triggers 등)    │
+│  agent_definitions     │ 에이전트 정의 (persona, skills 등) │
+│  workflow_definitions  │ 워크플로우 정의                     │
+│  workflow_nodes        │ 워크플로우 노드 (greenfield 등)     │
+│  workflow_edges        │ 노드 간 연결                        │
+└─────────────────────────────────────────────────────────────┘
+                              ↑
+                         DB 마이그레이션
+                              ↑
+┌─────────────────────────────────────────────────────────────┐
+│               semo-system/ (문서/참조용)                     │
+├─────────────────────────────────────────────────────────────┤
+│  semo-skills/*/SKILL.md    │ 스킬 문서 (개발자 참조용)       │
+│  semo-core/agents/*.md     │ 에이전트 문서                   │
+│  semo-core/commands/*.md   │ 커맨드 문서                     │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 수정 유형별 작업
+
+| 수정 유형 | 마이그레이션 위치 | 테이블 |
+|----------|------------------|--------|
+| 스킬 추가/수정 | `supabase/migrations/` | `skill_definitions` |
+| 에이전트 추가/수정 | `supabase/migrations/` | `agent_definitions` |
+| 워크플로우 노드 추가 | `supabase/migrations/` | `workflow_nodes`, `workflow_edges` |
+| 워크플로우 정의 수정 | `supabase/migrations/` | `workflow_definitions` |
+
+### 마이그레이션 파일 네이밍
+
+```bash
+# 형식: YYYYMMDDNNN_description.sql
+supabase/migrations/20260129000_ideate_skill_platform_strategy.sql
+supabase/migrations/20260129001_add_new_agent.sql
+```
+
+### 필수 동작 순서
+
+```text
+1. SKILL.md / Agent.md 파일 수정
+   ↓
+2. DB 마이그레이션 파일 생성 (supabase/migrations/)
+   ↓
+3. Supabase에 마이그레이션 적용
+   ↓
+4. 버저닝 → 배포 (meta-workflow)
+```
+
+### 예시: 스킬 수정
+
+```sql
+-- supabase/migrations/20260129000_update_ideate_skill.sql
+INSERT INTO skill_definitions (name, description, prompt, ...)
+VALUES ('ideate', '...', '...')
+ON CONFLICT (name, office_id) DO UPDATE SET
+  prompt = EXCLUDED.prompt,
+  version = EXCLUDED.version,
+  updated_at = now();
+```
+
+> 🔴 **SKILL.md만 수정하고 DB 마이그레이션 없이 종료 금지**
+
+---
+
 ## 필수 원칙
 
 ### 1. 세션 컨텍스트 비의존
