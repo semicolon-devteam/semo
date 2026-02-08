@@ -23,29 +23,19 @@ import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
 import {
+  getActiveSkills,
+  getActiveSkillNames,
+  getCommands,
+  getAgents,
   getPackages,
-  getStandardPackages,
-  getExtensionPackages,
-  resolvePackageName,
-  getPackageVersion,
-  getPackagesByGroup,
-  getDetectablePackages,
-  buildExtensionPackagesFromDb,
-  buildShortnameMappingFromDb,
-  PackageDefinition,
-  toExtensionPackageFormat,
-  // PostgreSQL 직접 연결 (DB 기반 설치용)
-  connectPostgres,
-  disconnectPostgres,
-  checkPostgresConnection,
-  getSkillsFromDb,
-  getAgentsFromDb,
-  getCommandsFromDb,
-  getContentCounts,
-  SkillDefinition,
-  AgentDefinition,
-  CommandDefinition,
-} from "./supabase";
+  Skill,
+  SemoCommand,
+  Agent,
+  Package as SemoPackage,
+  closeConnection,
+  isDbConnected,
+  getSkillCountByCategory,
+} from "./database";
 
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 
@@ -249,7 +239,7 @@ async function showVersionComparison(cwd: string): Promise<void> {
       });
     }
 
-    // Extension 패키지 (meta, system) - semo-system 내부
+    // 그룹 패키지 (eng, biz, ops) 및 하위 Extension - semo-system 내부
     // 그룹별로 묶어서 계층 구조로 출력
     if (hasSemoSystem) {
       for (const group of PACKAGE_GROUPS) {
@@ -325,6 +315,32 @@ async function showVersionComparison(cwd: string): Promise<void> {
       const packageGroups: Record<string, { level: number; packages: Array<{ name: string; path: string }> }> = {
         "packages/core": { level: 0, packages: [{ name: "packages/core", path: "core" }] },
         "packages/meta": { level: 0, packages: [{ name: "packages/meta", path: "meta" }] },
+        "packages/eng": {
+          level: 1,
+          packages: [
+            { name: "packages/eng/nextjs", path: "eng/nextjs" },
+            { name: "packages/eng/spring", path: "eng/spring" },
+            { name: "packages/eng/ms", path: "eng/ms" },
+            { name: "packages/eng/infra", path: "eng/infra" },
+          ],
+        },
+        "packages/biz": {
+          level: 1,
+          packages: [
+            { name: "packages/biz/discovery", path: "biz/discovery" },
+            { name: "packages/biz/management", path: "biz/management" },
+            { name: "packages/biz/design", path: "biz/design" },
+            { name: "packages/biz/poc", path: "biz/poc" },
+          ],
+        },
+        "packages/ops": {
+          level: 1,
+          packages: [
+            { name: "packages/ops/qa", path: "ops/qa" },
+            { name: "packages/ops/monitor", path: "ops/monitor" },
+            { name: "packages/ops/improve", path: "ops/improve" },
+          ],
+        },
       };
 
       for (const [groupKey, groupData] of Object.entries(packageGroups)) {
@@ -363,11 +379,12 @@ async function showVersionComparison(cwd: string): Promise<void> {
       let displayName = info.name;
 
       if (info.level === 1) {
-        // 그룹 패키지
+        // 그룹 패키지 (eng, biz, ops)
         prefix = "📦 ";
       } else if (info.level === 2) {
         // 하위 패키지
         prefix = "  └─ ";
+        // 그룹명 제거하고 하위 이름만 표시 (예: biz/discovery → discovery)
         displayName = info.name.includes("/") ? info.name.split("/").pop() || info.name : info.name;
       }
 
@@ -526,8 +543,23 @@ function detectLegacyEnvironment(cwd: string): LegacyDetectionResult {
     }
   }
 
-  // semo-system/ 내부의 Extension 구조 확인
+  // semo-system/ 내부의 레거시 Extension 구조 확인
+  // 구버전: semo-system/biz/, semo-system/eng/, semo-system/ops/ (그룹 디렉토리)
+  // 신버전: semo-system/biz/design/, semo-system/eng/nextjs/ 등 (개별 패키지)
   const semoSystemDir = path.join(cwd, "semo-system");
+  if (fs.existsSync(semoSystemDir)) {
+    const legacyExtGroups = ["biz", "eng", "ops"];
+    for (const group of legacyExtGroups) {
+      const groupDir = path.join(semoSystemDir, group);
+      if (fs.existsSync(groupDir) && fs.statSync(groupDir).isDirectory()) {
+        // VERSION 파일이 그룹 디렉토리에 직접 있으면 레거시 구조
+        const groupVersionFile = path.join(groupDir, "VERSION");
+        if (fs.existsSync(groupVersionFile)) {
+          legacyPaths.push(`semo-system/${group} (레거시 그룹 구조)`);
+        }
+      }
+    }
+  }
 
   // .claude/ 내부의 레거시 구조 확인
   const claudeDir = path.join(cwd, ".claude");
@@ -620,8 +652,22 @@ async function migrateLegacyEnvironment(cwd: string): Promise<boolean> {
       }
     }
 
-    // 3. 기존 semo-system이 완전히 레거시인 경우에만 삭제
+    // 3. semo-system/ 내부의 레거시 Extension 그룹 삭제
     const semoSystemDir = path.join(cwd, "semo-system");
+    if (fs.existsSync(semoSystemDir)) {
+      const legacyExtGroups = ["biz", "eng", "ops"];
+      for (const group of legacyExtGroups) {
+        const groupDir = path.join(semoSystemDir, group);
+        const groupVersionFile = path.join(groupDir, "VERSION");
+        // VERSION 파일이 그룹 디렉토리에 직접 있으면 레거시 구조이므로 삭제
+        if (fs.existsSync(groupVersionFile)) {
+          removeRecursive(groupDir);
+          console.log(chalk.gray(`     ✓ semo-system/${group}/ 삭제됨 (레거시 그룹 구조)`));
+        }
+      }
+    }
+
+    // 4. 기존 semo-system이 완전히 레거시인 경우에만 삭제
     // (Standard 패키지가 없는 경우)
     if (fs.existsSync(semoSystemDir)) {
       const hasStandard = fs.existsSync(path.join(semoSystemDir, "semo-core"));
@@ -679,28 +725,23 @@ function copyRecursive(src: string, dest: string): void {
 const SEMO_REPO = "https://github.com/semicolon-devteam/semo.git";
 
 // ============================================================
-// DB 기반 패키지 관리 (v3.10+)
+// 패키지 관리 (v3.14.0 - 폴백 데이터 사용)
 // ============================================================
 
-// 캐시된 패키지 데이터 (DB에서 조회 후 캐시)
+// v3.14.0: Extensions는 아직 git 기반이므로 폴백 데이터 직접 사용
+// 향후 Extensions도 DB 기반으로 전환 예정
+
+// 캐시된 패키지 데이터
 let cachedExtensionPackages: Record<string, { name: string; desc: string; detect: string[]; layer: string }> | null = null;
 let cachedShortnameMappings: Record<string, string> | null = null;
-let cachedPackageDefinitions: PackageDefinition[] | null = null;
 
-// 패키지 데이터 초기화 (DB에서 조회)
+// 패키지 데이터 초기화 (폴백 데이터 사용)
 async function initPackageData(): Promise<void> {
   if (cachedExtensionPackages && cachedShortnameMappings) return;
 
-  try {
-    cachedExtensionPackages = await buildExtensionPackagesFromDb();
-    cachedShortnameMappings = await buildShortnameMappingFromDb();
-    cachedPackageDefinitions = await getExtensionPackages();
-  } catch {
-    // 폴백: 하드코딩된 데이터 사용
-    cachedExtensionPackages = EXTENSION_PACKAGES_FALLBACK;
-    cachedShortnameMappings = SHORTNAME_MAPPING_FALLBACK;
-    cachedPackageDefinitions = null;
-  }
+  // v3.14.0: Extensions는 아직 git 기반이므로 폴백 데이터 사용
+  cachedExtensionPackages = EXTENSION_PACKAGES_FALLBACK;
+  cachedShortnameMappings = SHORTNAME_MAPPING_FALLBACK;
 }
 
 // EXTENSION_PACKAGES 동기 접근용 (초기화 후 사용)
@@ -715,6 +756,23 @@ function getShortnameMappingSync(): Record<string, string> {
 
 // 폴백용 하드코딩 데이터 (DB 연결 실패 시 사용)
 const EXTENSION_PACKAGES_FALLBACK: Record<string, { name: string; desc: string; detect: string[]; layer: string }> = {
+  // Business Layer
+  "biz/discovery": { name: "Discovery", desc: "아이템 발굴, 시장 조사, Epic/Task", layer: "biz", detect: [] },
+  "biz/design": { name: "Design", desc: "컨셉 설계, 목업, UX", layer: "biz", detect: [] },
+  "biz/management": { name: "Management", desc: "일정/인력/스프린트 관리", layer: "biz", detect: [] },
+  "biz/poc": { name: "PoC", desc: "빠른 PoC, 패스트트랙", layer: "biz", detect: [] },
+
+  // Engineering Layer
+  "eng/nextjs": { name: "Next.js", desc: "Next.js 프론트엔드 개발", layer: "eng", detect: ["next.config.js", "next.config.mjs", "next.config.ts"] },
+  "eng/spring": { name: "Spring", desc: "Spring Boot 백엔드 개발", layer: "eng", detect: ["pom.xml", "build.gradle"] },
+  "eng/ms": { name: "Microservice", desc: "마이크로서비스 아키텍처", layer: "eng", detect: [] },
+  "eng/infra": { name: "Infra", desc: "인프라/배포 관리", layer: "eng", detect: ["docker-compose.yml", "Dockerfile"] },
+
+  // Operations Layer
+  "ops/qa": { name: "QA", desc: "테스트/품질 관리", layer: "ops", detect: [] },
+  "ops/monitor": { name: "Monitor", desc: "서비스 현황 모니터링", layer: "ops", detect: [] },
+  "ops/improve": { name: "Improve", desc: "개선 제안", layer: "ops", detect: [] },
+
   // Meta
   meta: { name: "Meta", desc: "SEMO 프레임워크 자체 개발/관리", layer: "meta", detect: ["semo-core", "semo-skills"] },
 
@@ -725,6 +783,22 @@ const EXTENSION_PACKAGES_FALLBACK: Record<string, { name: string; desc: string; 
 
 // 단축명 → 전체 패키지 경로 매핑 (폴백)
 const SHORTNAME_MAPPING_FALLBACK: Record<string, string> = {
+  // 하위 패키지명 단축 (discovery → biz/discovery)
+  discovery: "biz/discovery",
+  design: "biz/design",
+  management: "biz/management",
+  poc: "biz/poc",
+  nextjs: "eng/nextjs",
+  spring: "eng/spring",
+  ms: "eng/ms",
+  infra: "eng/infra",
+  qa: "ops/qa",
+  monitor: "ops/monitor",
+  improve: "ops/improve",
+  // 추가 별칭
+  next: "eng/nextjs",
+  backend: "eng/spring",
+  mvp: "biz/poc",
   // System 패키지 단축명
   hooks: "semo-hooks",
   remote: "semo-remote",
@@ -734,14 +808,14 @@ const SHORTNAME_MAPPING_FALLBACK: Record<string, string> = {
 const EXTENSION_PACKAGES = EXTENSION_PACKAGES_FALLBACK;
 const SHORTNAME_MAPPING = SHORTNAME_MAPPING_FALLBACK;
 
-// 그룹 이름 목록 (meta, system)
-const PACKAGE_GROUPS = ["meta", "system"] as const;
+// 그룹 이름 목록 (biz, eng, ops, meta, system)
+const PACKAGE_GROUPS = ["biz", "eng", "ops", "meta", "system"] as const;
 type PackageGroup = typeof PACKAGE_GROUPS[number];
 
-// 그룹명 → 해당 그룹의 모든 패키지 반환 (DB 기반)
+// 그룹명 → 해당 그룹의 모든 패키지 반환
 async function getPackagesByGroupAsync(group: PackageGroup): Promise<string[]> {
-  const packages = await getPackagesByGroup(group);
-  return packages.map(p => p.name);
+  // v3.14.0: 동기 함수와 동일하게 폴백 데이터 사용
+  return getPackagesByGroupSync(group);
 }
 
 // 그룹명 → 해당 그룹의 모든 패키지 반환 (동기, 폴백)
@@ -765,7 +839,7 @@ function resolvePackageInput(input: string): { packages: string[]; isGroup: bool
   const shortnames = getShortnameMappingSync();
 
   for (const part of parts) {
-    // 1. 그룹명인지 확인 (meta, system)
+    // 1. 그룹명인지 확인 (biz, eng, ops, meta)
     if (PACKAGE_GROUPS.includes(part as PackageGroup)) {
       const groupPackages = getPackagesByGroupSync(part as PackageGroup);
       resolvedPackages.push(...groupPackages);
@@ -774,7 +848,7 @@ function resolvePackageInput(input: string): { packages: string[]; isGroup: bool
       continue;
     }
 
-    // 2. 단축명 매핑 확인 (hooks → semo-hooks 등)
+    // 2. 단축명 매핑 확인 (discovery → biz/discovery 등)
     if (part in shortnames) {
       resolvedPackages.push(shortnames[part]);
       continue;
@@ -877,7 +951,7 @@ async function showVersionInfo(): Promise<void> {
     });
   }
 
-  // 4. Extension 패키지 (meta, system) - semo-system 내부
+  // 4. 그룹 패키지 (eng, biz, ops) 및 하위 Extension - semo-system 내부
   const semoSystemDir = path.join(cwd, "semo-system");
   if (fs.existsSync(semoSystemDir)) {
     for (const group of PACKAGE_GROUPS) {
@@ -948,6 +1022,32 @@ async function showVersionInfo(): Promise<void> {
     const packageGroups: Record<string, { level: number; packages: Array<{ name: string; path: string }> }> = {
       "packages/core": { level: 0, packages: [{ name: "packages/core", path: "core" }] },
       "packages/meta": { level: 0, packages: [{ name: "packages/meta", path: "meta" }] },
+      "packages/eng": {
+        level: 1,
+        packages: [
+          { name: "packages/eng/nextjs", path: "eng/nextjs" },
+          { name: "packages/eng/spring", path: "eng/spring" },
+          { name: "packages/eng/ms", path: "eng/ms" },
+          { name: "packages/eng/infra", path: "eng/infra" },
+        ],
+      },
+      "packages/biz": {
+        level: 1,
+        packages: [
+          { name: "packages/biz/discovery", path: "biz/discovery" },
+          { name: "packages/biz/management", path: "biz/management" },
+          { name: "packages/biz/design", path: "biz/design" },
+          { name: "packages/biz/poc", path: "biz/poc" },
+        ],
+      },
+      "packages/ops": {
+        level: 1,
+        packages: [
+          { name: "packages/ops/qa", path: "ops/qa" },
+          { name: "packages/ops/monitor", path: "ops/monitor" },
+          { name: "packages/ops/improve", path: "ops/improve" },
+        ],
+      },
     };
 
     for (const [, groupData] of Object.entries(packageGroups)) {
@@ -1001,11 +1101,12 @@ async function showVersionInfo(): Promise<void> {
       let displayName = info.name;
 
       if (info.level === 1) {
-        // Extension 패키지
+        // 그룹 패키지 (eng, biz, ops)
         prefix = "📦 ";
       } else if (info.level === 2) {
         // 하위 패키지
         prefix = "  └─ ";
+        // 그룹명 제거하고 하위 이름만 표시
         displayName = info.name.includes("/") ? info.name.split("/").pop() || info.name : info.name;
       }
 
@@ -1347,259 +1448,195 @@ program
     console.log();
   });
 
-// === DB 기반 스킬 파일 생성 ===
-async function generateSkillsFromDb(
-  cwd: string,
-  packageName: string
-): Promise<{ success: boolean; count: number; errors: string[] }> {
-  const errors: string[] = [];
-  let count = 0;
+// === Standard 설치 (DB 기반) ===
+async function setupStandard(cwd: string, force: boolean) {
+  const claudeDir = path.join(cwd, ".claude");
 
-  const skills = await getSkillsFromDb(packageName);
-  if (skills.length === 0) {
-    return { success: false, count: 0, errors: ["스킬 조회 결과 없음"] };
-  }
+  console.log(chalk.cyan("\n📚 Standard 설치 (DB 기반)"));
+  console.log(chalk.gray("   스킬: DB에서 조회하여 파일 생성"));
+  console.log(chalk.gray("   커맨드: DB에서 조회하여 파일 생성"));
+  console.log(chalk.gray("   에이전트: DB에서 조회하여 파일 생성\n"));
 
-  const skillsDir = path.join(cwd, "semo-system", packageName);
-  fs.mkdirSync(skillsDir, { recursive: true });
-
-  for (const skill of skills) {
-    try {
-      const skillDir = path.join(skillsDir, skill.name);
-      fs.mkdirSync(skillDir, { recursive: true });
-
-      // 1. SKILL.md 생성 (content 컬럼)
-      fs.writeFileSync(path.join(skillDir, "SKILL.md"), skill.content);
-
-      // 2. references/ 폴더 생성 (reference_docs JSONB)
-      if (skill.reference_docs && Object.keys(skill.reference_docs).length > 0) {
-        const refsDir = path.join(skillDir, "references");
-        fs.mkdirSync(refsDir, { recursive: true });
-
-        for (const [filename, content] of Object.entries(skill.reference_docs)) {
-          fs.writeFileSync(path.join(refsDir, filename), content);
-        }
-      }
-
-      count++;
-    } catch (error) {
-      errors.push(`${skill.name}: ${error}`);
-    }
-  }
-
-  return { success: errors.length === 0, count, errors };
-}
-
-// === DB 기반 에이전트 파일 생성 ===
-async function generateAgentsFromDb(
-  cwd: string,
-  packageName: string
-): Promise<{ success: boolean; count: number; errors: string[] }> {
-  const errors: string[] = [];
-  let count = 0;
-
-  const agents = await getAgentsFromDb(packageName);
-  if (agents.length === 0) {
-    return { success: false, count: 0, errors: ["에이전트 조회 결과 없음"] };
-  }
-
-  const agentsDir = path.join(cwd, "semo-system", "semo-core", "agents");
-  fs.mkdirSync(agentsDir, { recursive: true });
-
-  for (const agent of agents) {
-    try {
-      const agentDir = path.join(agentsDir, agent.name);
-      fs.mkdirSync(agentDir, { recursive: true });
-
-      // 1. {name}.md 생성 (content 컬럼)
-      fs.writeFileSync(path.join(agentDir, `${agent.name}.md`), agent.content);
-
-      // 2. references/ 폴더 생성 (있는 경우)
-      if (agent.reference_docs && Object.keys(agent.reference_docs).length > 0) {
-        const refsDir = path.join(agentDir, "references");
-        fs.mkdirSync(refsDir, { recursive: true });
-
-        for (const [filename, content] of Object.entries(agent.reference_docs)) {
-          fs.writeFileSync(path.join(refsDir, filename), content);
-        }
-      }
-
-      count++;
-    } catch (error) {
-      errors.push(`${agent.name}: ${error}`);
-    }
-  }
-
-  return { success: errors.length === 0, count, errors };
-}
-
-// === DB 기반 커맨드 파일 생성 ===
-async function generateCommandsFromDb(
-  cwd: string
-): Promise<{ success: boolean; count: number; errors: string[] }> {
-  const errors: string[] = [];
-  let count = 0;
-
-  const commands = await getCommandsFromDb("SEMO");
-  if (commands.length === 0) {
-    return { success: false, count: 0, errors: ["커맨드 조회 결과 없음"] };
-  }
-
-  const commandsDir = path.join(cwd, "semo-system", "semo-core", "commands", "SEMO");
-  fs.mkdirSync(commandsDir, { recursive: true });
-
-  for (const command of commands) {
-    try {
-      // {name}.md 생성 (content 컬럼)
-      fs.writeFileSync(path.join(commandsDir, `${command.name}.md`), command.content);
-      count++;
-    } catch (error) {
-      errors.push(`${command.name}: ${error}`);
-    }
-  }
-
-  return { success: errors.length === 0, count, errors };
-}
-
-// === DB 기반 Standard 설치 ===
-async function setupStandardFromDb(cwd: string): Promise<boolean> {
-  const semoSystemDir = path.join(cwd, "semo-system");
-  fs.mkdirSync(semoSystemDir, { recursive: true });
-
-  // semo-core 디렉토리 생성
-  fs.mkdirSync(path.join(semoSystemDir, "semo-core"), { recursive: true });
-
-  let totalSkills = 0;
-  let totalAgents = 0;
-  let totalCommands = 0;
-
-  // 1. semo-skills 스킬 생성
-  const skillsResult = await generateSkillsFromDb(cwd, "semo-skills");
-  if (skillsResult.success) {
-    totalSkills += skillsResult.count;
-  }
-
-  // 2. meta 스킬 생성 (meta 패키지가 있는 경우)
-  const metaSkillsResult = await generateSkillsFromDb(cwd, "meta");
-  if (metaSkillsResult.count > 0) {
-    // meta 스킬은 semo-system/meta/skills/에 저장
-    // 하지만 심링크는 동일하게 .claude/skills/에 생성됨
-    totalSkills += metaSkillsResult.count;
-  }
-
-  // 3. semo-core 에이전트 생성
-  const agentsResult = await generateAgentsFromDb(cwd, "semo-core");
-  if (agentsResult.success) {
-    totalAgents += agentsResult.count;
-  }
-
-  // 4. meta 에이전트 생성
-  const metaAgentsResult = await generateAgentsFromDb(cwd, "meta");
-  if (metaAgentsResult.count > 0) {
-    totalAgents += metaAgentsResult.count;
-  }
-
-  // 5. SEMO 커맨드 생성
-  const commandsResult = await generateCommandsFromDb(cwd);
-  if (commandsResult.success) {
-    totalCommands += commandsResult.count;
-  }
-
-  // 결과 출력
-  console.log(chalk.green(`  ✓ DB에서 스킬 ${totalSkills}개 로드`));
-  console.log(chalk.green(`  ✓ DB에서 에이전트 ${totalAgents}개 로드`));
-  console.log(chalk.green(`  ✓ DB에서 커맨드 ${totalCommands}개 로드`));
-
-  return totalSkills > 0 || totalAgents > 0;
-}
-
-// === GitHub 기반 Standard 설치 (폴백) ===
-async function setupStandardFromGitHub(cwd: string, force: boolean): Promise<void> {
-  const semoSystemDir = path.join(cwd, "semo-system");
-
-  const spinner = ora("GitHub에서 semo-core, semo-skills, semo-agents, semo-scripts 다운로드 중...").start();
+  const spinner = ora("DB에서 스킬/커맨드/에이전트 조회 중...").start();
 
   try {
-    const tempDir = path.join(cwd, ".semo-temp");
-    removeRecursive(tempDir);
-    execSync(`git clone --depth 1 ${SEMO_REPO} "${tempDir}"`, { stdio: "pipe" });
-
-    fs.mkdirSync(semoSystemDir, { recursive: true });
-
-    // Standard 패키지 목록 (semo-system/ 하위에 있는 것들)
-    const standardPackages = ["semo-core", "semo-skills", "semo-agents", "semo-scripts"];
-
-    for (const pkg of standardPackages) {
-      const srcPath = path.join(tempDir, "semo-system", pkg);
-      const destPath = path.join(semoSystemDir, pkg);
-
-      if (fs.existsSync(srcPath)) {
-        copyRecursive(srcPath, destPath);
-      }
+    // DB 연결 확인
+    const connected = await isDbConnected();
+    if (connected) {
+      spinner.text = "DB 연결 성공, 데이터 조회 중...";
+    } else {
+      spinner.text = "DB 연결 실패, 폴백 데이터 사용 중...";
     }
 
-    removeRecursive(tempDir);
+    // .claude 디렉토리 생성
+    fs.mkdirSync(claudeDir, { recursive: true });
 
-    spinner.succeed("GitHub에서 Standard 설치 완료");
+    // 1. 스킬 설치
+    const skillsDir = path.join(claudeDir, "skills");
+    if (force && fs.existsSync(skillsDir)) {
+      removeRecursive(skillsDir);
+    }
+    fs.mkdirSync(skillsDir, { recursive: true });
+
+    const skills = await getActiveSkills();
+    for (const skill of skills) {
+      const skillFolder = path.join(skillsDir, skill.name);
+      fs.mkdirSync(skillFolder, { recursive: true });
+      fs.writeFileSync(path.join(skillFolder, "SKILL.md"), skill.content);
+    }
+    console.log(chalk.green(`  ✓ skills 설치 완료 (${skills.length}개)`));
+
+    // 2. 커맨드 설치
+    const commandsDir = path.join(claudeDir, "commands");
+    if (force && fs.existsSync(commandsDir)) {
+      removeRecursive(commandsDir);
+    }
+    fs.mkdirSync(commandsDir, { recursive: true });
+
+    const commands = await getCommands();
+
+    // 폴더별로 그룹핑
+    const commandsByFolder: Record<string, SemoCommand[]> = {};
+    for (const cmd of commands) {
+      if (!commandsByFolder[cmd.folder]) {
+        commandsByFolder[cmd.folder] = [];
+      }
+      commandsByFolder[cmd.folder].push(cmd);
+    }
+
+    let cmdCount = 0;
+    for (const [folder, cmds] of Object.entries(commandsByFolder)) {
+      const folderPath = path.join(commandsDir, folder);
+      fs.mkdirSync(folderPath, { recursive: true });
+      for (const cmd of cmds) {
+        fs.writeFileSync(path.join(folderPath, `${cmd.name}.md`), cmd.content);
+        cmdCount++;
+      }
+    }
+    console.log(chalk.green(`  ✓ commands 설치 완료 (${cmdCount}개)`));
+
+    // 3. 에이전트 설치
+    const agentsDir = path.join(claudeDir, "agents");
+    if (force && fs.existsSync(agentsDir)) {
+      removeRecursive(agentsDir);
+    }
+    fs.mkdirSync(agentsDir, { recursive: true });
+
+    const agents = await getAgents();
+    for (const agent of agents) {
+      const agentFolder = path.join(agentsDir, agent.name);
+      fs.mkdirSync(agentFolder, { recursive: true });
+      fs.writeFileSync(path.join(agentFolder, `${agent.name}.md`), agent.content);
+    }
+    console.log(chalk.green(`  ✓ agents 설치 완료 (${agents.length}개)`));
+
+    spinner.succeed("Standard 설치 완료 (DB 기반)");
+
+    // CLAUDE.md 생성
+    await generateClaudeMd(cwd);
+
   } catch (error) {
-    spinner.fail("GitHub Standard 설치 실패");
-    throw error;
+    spinner.fail("Standard 설치 실패");
+    console.error(chalk.red(`   ${error}`));
   }
 }
 
-// === Standard 설치 (semo-core + semo-skills) ===
-async function setupStandard(cwd: string, force: boolean) {
-  const semoSystemDir = path.join(cwd, "semo-system");
+// === CLAUDE.md 생성 (DB 기반) ===
+async function generateClaudeMd(cwd: string) {
+  console.log(chalk.cyan("\n📄 CLAUDE.md 생성"));
 
-  console.log(chalk.cyan("\n📚 Standard 설치 (White Box)"));
-  console.log(chalk.gray("   semo-core: 원칙, 오케스트레이터"));
-  console.log(chalk.gray("   semo-skills: 통합 스킬"));
-  console.log(chalk.gray("   semo-agents: 페르소나 Agent\n"));
+  const claudeMdPath = path.join(cwd, ".claude", "CLAUDE.md");
+  const skills = await getActiveSkills();
+  const skillCategories = await getSkillCountByCategory();
 
-  // 기존 디렉토리 확인
-  if (fs.existsSync(semoSystemDir) && !force) {
-    const shouldOverwrite = await confirmOverwrite("semo-system/", semoSystemDir);
-    if (!shouldOverwrite) {
-      console.log(chalk.gray("  → semo-system/ 건너뜀"));
-      return;
-    }
-    removeRecursive(semoSystemDir);
-    console.log(chalk.green("  ✓ 기존 semo-system/ 삭제됨"));
-  }
+  const skillList = Object.entries(skillCategories)
+    .map(([cat, count]) => `  - ${cat}: ${count}개`)
+    .join("\n");
 
-  // DB 연결 시도
-  const spinner = ora("DB 연결 확인 중...").start();
-  const pgClient = await connectPostgres();
+  const claudeMdContent = `# SEMO Project Configuration
 
-  if (pgClient) {
-    spinner.text = "DB에서 스킬/에이전트/커맨드 로드 중...";
+> SEMO (Semicolon Orchestrate) - AI Agent Orchestration Framework v3.14.0
 
-    try {
-      const success = await setupStandardFromDb(cwd);
+---
 
-      if (success) {
-        spinner.succeed("Standard 설치 완료 (DB 기반)");
-      } else {
-        spinner.warn("DB에 데이터 없음, GitHub 폴백");
-        await setupStandardFromGitHub(cwd, force);
-      }
+## 🔴 MANDATORY: Orchestrator-First Execution
 
-      await disconnectPostgres();
-    } catch (error) {
-      spinner.warn("DB 설치 실패, GitHub 폴백");
-      await disconnectPostgres();
-      await setupStandardFromGitHub(cwd, force);
-    }
-  } else {
-    spinner.warn("DB 연결 실패, GitHub 폴백");
-    await setupStandardFromGitHub(cwd, force);
-  }
+> **⚠️ 이 규칙은 모든 사용자 요청에 적용됩니다. 예외 없음.**
 
-  // 심볼릭 링크 생성 (공통)
-  await createStandardSymlinks(cwd);
+### 실행 흐름 (필수)
+
+\`\`\`
+1. 사용자 요청 수신
+2. Orchestrator가 의도 분석 후 적절한 Agent/Skill 라우팅
+3. Agent/Skill이 작업 수행
+4. 실행 결과 반환
+\`\`\`
+
+### Orchestrator 참조
+
+**Primary Orchestrator**: \`.claude/agents/orchestrator/orchestrator.md\`
+
+이 파일에서 라우팅 테이블, 의도 분류, 메시지 포맷을 확인하세요.
+
+---
+
+## 🔴 NON-NEGOTIABLE RULES
+
+### 1. Orchestrator-First Policy
+
+> **모든 요청은 반드시 Orchestrator를 통해 라우팅됩니다. 직접 처리 금지.**
+
+**직접 처리 금지 항목**:
+- 코드 작성/수정 → \`write-code\` 스킬
+- Git 커밋/푸시 → \`git-workflow\` 스킬
+- 품질 검증 → \`quality-gate\` 스킬
+
+### 2. Pre-Commit Quality Gate
+
+> **코드 변경이 포함된 커밋 전 반드시 Quality Gate를 통과해야 합니다.**
+
+\`\`\`bash
+# 필수 검증 순서
+npm run lint           # 1. ESLint 검사
+npx tsc --noEmit       # 2. TypeScript 타입 체크
+npm run build          # 3. 빌드 검증
+\`\`\`
+
+---
+
+## 설치된 구성
+
+### 스킬 (${skills.length}개)
+${skillList}
+
+## 구조
+
+\`\`\`
+.claude/
+├── settings.json      # MCP 서버 설정
+├── agents/            # 에이전트 (DB 기반 설치)
+├── skills/            # 스킬 (DB 기반 설치)
+└── commands/          # 커맨드 (DB 기반 설치)
+\`\`\`
+
+## 사용 가능한 커맨드
+
+| 커맨드 | 설명 |
+|--------|------|
+| \`/SEMO:help\` | 도움말 |
+| \`/SEMO:dry-run {프롬프트}\` | 명령 검증 (라우팅 시뮬레이션) |
+| \`/SEMO-workflow:greenfield\` | Greenfield 워크플로우 시작 |
+
+---
+
+> Generated by SEMO CLI v3.14.0 (DB-based installation)
+`;
+
+  fs.writeFileSync(claudeMdPath, claudeMdContent);
+  console.log(chalk.green("✓ .claude/CLAUDE.md 생성됨"));
 }
 
-// === Standard 심볼릭 링크 ===
+// === Standard 심볼릭 링크 (레거시 호환) ===
 async function createStandardSymlinks(cwd: string) {
   const claudeDir = path.join(cwd, ".claude");
   const semoSystemDir = path.join(cwd, "semo-system");
@@ -1628,7 +1665,7 @@ async function createStandardSymlinks(cwd: string) {
     console.log(chalk.green(`  ✓ .claude/agents/ (${agents.length}개 agent 링크됨)`));
   }
 
-  // skills 디렉토리 생성 및 개별 링크 (Extension 병합 지원)
+  // skills 디렉토리 생성 및 개별 링크 (DB 기반 - 활성 스킬만)
   const claudeSkillsDir = path.join(claudeDir, "skills");
   const coreSkillsDir = path.join(semoSystemDir, "semo-skills");
 
@@ -1639,17 +1676,21 @@ async function createStandardSymlinks(cwd: string) {
     }
     fs.mkdirSync(claudeSkillsDir, { recursive: true });
 
-    const skills = fs.readdirSync(coreSkillsDir).filter(f =>
-      fs.statSync(path.join(coreSkillsDir, f)).isDirectory()
-    );
-    for (const skill of skills) {
-      const skillLink = path.join(claudeSkillsDir, skill);
-      const skillTarget = path.join(coreSkillsDir, skill);
-      if (!fs.existsSync(skillLink)) {
+    // DB에서 활성 스킬 목록 조회 (19개 핵심 스킬만)
+    const activeSkillNames = await getActiveSkillNames();
+    let linkedCount = 0;
+
+    for (const skillName of activeSkillNames) {
+      const skillLink = path.join(claudeSkillsDir, skillName);
+      const skillTarget = path.join(coreSkillsDir, skillName);
+
+      // 스킬 폴더가 존재하는 경우에만 링크
+      if (fs.existsSync(skillTarget) && !fs.existsSync(skillLink)) {
         createSymlinkOrJunction(skillTarget, skillLink);
+        linkedCount++;
       }
     }
-    console.log(chalk.green(`  ✓ .claude/skills/ (${skills.length}개 skill 링크됨)`));
+    console.log(chalk.green(`  ✓ .claude/skills/ (${linkedCount}개 skill 링크됨 - DB 기반)`));
   }
 
   // commands 링크
@@ -1672,6 +1713,23 @@ async function createStandardSymlinks(cwd: string) {
     createSymlinkOrJunction(commandsTarget, semoCommandsLink);
     console.log(chalk.green("  ✓ .claude/commands/SEMO → semo-system/semo-core/commands/SEMO"));
   }
+
+  // SEMO-workflow 커맨드 링크 (워크플로우 커맨드)
+  const workflowCommandsLink = path.join(commandsDir, "SEMO-workflow");
+  const workflowCommandsTarget = path.join(semoSystemDir, "semo-core", "commands", "SEMO-workflow");
+
+  if (fs.existsSync(workflowCommandsLink)) {
+    if (fs.lstatSync(workflowCommandsLink).isSymbolicLink()) {
+      fs.unlinkSync(workflowCommandsLink);
+    } else {
+      removeRecursive(workflowCommandsLink);
+    }
+  }
+
+  if (fs.existsSync(workflowCommandsTarget)) {
+    createSymlinkOrJunction(workflowCommandsTarget, workflowCommandsLink);
+    console.log(chalk.green("  ✓ .claude/commands/SEMO-workflow → semo-system/semo-core/commands/SEMO-workflow"));
+  }
 }
 
 // === 설치 검증 ===
@@ -1689,10 +1747,12 @@ interface VerificationResult {
 
 /**
  * 설치 상태를 검증하고 문제점을 리포트
+ * v3.14.0: DB 기반 설치 지원 (semo-system 없이도 검증 가능)
  */
 function verifyInstallation(cwd: string, installedExtensions: string[] = []): VerificationResult {
   const claudeDir = path.join(cwd, ".claude");
   const semoSystemDir = path.join(cwd, "semo-system");
+  const hasSemoSystem = fs.existsSync(semoSystemDir);
 
   const result: VerificationResult = {
     success: true,
@@ -1706,13 +1766,47 @@ function verifyInstallation(cwd: string, installedExtensions: string[] = []): Ve
     },
   };
 
-  // 1. semo-system 기본 구조 검증
-  if (!fs.existsSync(semoSystemDir)) {
-    result.errors.push("semo-system 디렉토리가 없습니다");
+  // v3.14.0: DB 기반 설치 시 semo-system이 없어도 됨
+  // .claude/ 디렉토리가 있으면 DB 기반으로 설치된 것으로 간주
+  if (!hasSemoSystem && !fs.existsSync(claudeDir)) {
+    result.errors.push(".claude 디렉토리가 없습니다");
     result.success = false;
     return result;
   }
 
+  // DB 기반 설치 검증 (semo-system 없음)
+  if (!hasSemoSystem) {
+    // agents 검증 (실제 파일 존재 여부)
+    const claudeAgentsDir = path.join(claudeDir, "agents");
+    if (fs.existsSync(claudeAgentsDir)) {
+      const agents = fs.readdirSync(claudeAgentsDir).filter(f => {
+        const p = path.join(claudeAgentsDir, f);
+        return fs.existsSync(p) && fs.statSync(p).isDirectory();
+      });
+      result.stats.agents.expected = agents.length;
+      result.stats.agents.linked = agents.length;  // DB 기반이므로 실제 파일
+    }
+
+    // skills 검증 (실제 파일 존재 여부)
+    const claudeSkillsDir = path.join(claudeDir, "skills");
+    if (fs.existsSync(claudeSkillsDir)) {
+      const skills = fs.readdirSync(claudeSkillsDir).filter(f => {
+        const p = path.join(claudeSkillsDir, f);
+        return fs.existsSync(p) && fs.statSync(p).isDirectory();
+      });
+      result.stats.skills.expected = skills.length;
+      result.stats.skills.linked = skills.length;  // DB 기반이므로 실제 파일
+    }
+
+    // commands 검증 (실제 폴더 존재 여부)
+    const semoCommandsDir = path.join(claudeDir, "commands", "SEMO");
+    result.stats.commands.exists = fs.existsSync(semoCommandsDir);
+    result.stats.commands.valid = result.stats.commands.exists;
+
+    return result;
+  }
+
+  // === 레거시: semo-system 기반 설치 검증 ===
   const coreDir = path.join(semoSystemDir, "semo-core");
   const skillsDir = path.join(semoSystemDir, "semo-skills");
 
@@ -1936,6 +2030,31 @@ async function downloadExtensions(cwd: string, packages: string[], force: boolea
 
     const semoSystemDir = path.join(cwd, "semo-system");
 
+    // 그룹 추출 (중복 제거) - 그룹 레벨 CLAUDE.md 복사용
+    const groups = [...new Set(
+      packages.map(pkg => pkg.split("/")[0]).filter(g => ["biz", "eng", "ops"].includes(g))
+    )];
+
+    // 그룹 레벨 파일 복사 (CLAUDE.md, VERSION 등)
+    for (const group of groups) {
+      const groupSrcDir = path.join(tempDir, "packages", group);
+      const groupDestDir = path.join(semoSystemDir, group);
+
+      // 그룹 디렉토리의 루트 파일만 복사 (CLAUDE.md, VERSION)
+      if (fs.existsSync(groupSrcDir)) {
+        fs.mkdirSync(groupDestDir, { recursive: true });
+        const groupFiles = fs.readdirSync(groupSrcDir);
+        for (const file of groupFiles) {
+          const srcFile = path.join(groupSrcDir, file);
+          const destFile = path.join(groupDestDir, file);
+          if (fs.statSync(srcFile).isFile()) {
+            fs.copyFileSync(srcFile, destFile);
+          }
+        }
+        console.log(chalk.green(`  ✓ ${group}/ 그룹 파일 복사 (CLAUDE.md 등)`));
+      }
+    }
+
     // 개별 패키지 복사
     for (const pkg of packages) {
       const srcPath = path.join(tempDir, "packages", pkg);
@@ -1947,7 +2066,7 @@ async function downloadExtensions(cwd: string, packages: string[], force: boolea
           continue;
         }
         removeRecursive(destPath);
-        // 상위 디렉토리 생성
+        // 상위 디렉토리 생성 (biz/discovery -> biz/ 먼저 생성)
         fs.mkdirSync(path.dirname(destPath), { recursive: true });
         copyRecursive(srcPath, destPath);
       }
@@ -2961,7 +3080,7 @@ async function setupClaudeMd(cwd: string, extensions: string[], force: boolean) 
     extensions.map(pkg => pkg.split("/")[0]).filter(g => PACKAGE_GROUPS.includes(g as PackageGroup))
   )] as PackageGroup[];
 
-  // 2. 그룹 레벨 CLAUDE.md 먼저 병합 - 중복 제거 적용
+  // 2. 그룹 레벨 CLAUDE.md 먼저 병합 (biz, eng, ops) - 중복 제거 적용
   for (const group of installedGroups) {
     const groupClaudeMdPath = path.join(semoSystemDir, group, "CLAUDE.md");
     if (fs.existsSync(groupClaudeMdPath)) {
@@ -3065,24 +3184,6 @@ ${orchestratorPaths.map(p => `- \`${p}\``).join("\n")}
 
 ---
 
-## 🔴 MANDATORY: Memory Context (항시 참조)
-
-> **⚠️ 세션 시작 시 반드시 \`.claude/memory/\` 폴더의 파일들을 먼저 읽으세요. 예외 없음.**
-
-### 필수 참조 파일
-
-\`\`\`
-.claude/memory/
-├── context.md     # 프로젝트 상태, 기술 스택, 진행 중 작업
-├── decisions.md   # 아키텍처 결정 기록 (ADR)
-├── projects.md    # GitHub Projects 설정
-└── rules/         # 프로젝트별 커스텀 규칙
-\`\`\`
-
-**이 파일들은 세션의 컨텍스트를 유지하는 장기 기억입니다. 매 세션마다 반드시 읽고 시작하세요.**
-
----
-
 ## 🔴 MANDATORY: Orchestrator-First Execution
 
 > **⚠️ 이 규칙은 모든 사용자 요청에 적용됩니다. 예외 없음.**
@@ -3115,29 +3216,7 @@ ${orchestratorRefSection}
 - 명세 작성 → \`spec-master\`
 - 일반 작업 → Orchestrator 분석 후 라우팅
 
-### 2. Memory Context 참조 (필수)
-
-> **세션 시작 시 반드시 \`.claude/memory/\` 폴더의 파일들을 참조하세요.**
-
-\`\`\`bash
-# 세션 시작 시 필수 참조 파일
-ls .claude/memory/     # 파일 목록 확인
-\`\`\`
-
-**필수 참조 시점**:
-| 상황 | 참조 파일 |
-|------|----------|
-| 세션 시작 | \`context.md\` - 현재 프로젝트 상태 파악 |
-| 아키텍처 결정 | \`decisions.md\` - 기존 결정사항 검토 |
-| 코딩 규칙 확인 | \`rules/\` - 프로젝트별 커스텀 규칙 |
-| 프로젝트 관리 | \`projects.md\` - GitHub Projects 설정 |
-
-**자동 업데이트 트리거**:
-- 중요한 결정사항 발생 시 → \`decisions.md\` 업데이트
-- 작업 상태 변경 시 → \`context.md\` 업데이트
-- 새로운 규칙 필요 시 → \`rules/\` 추가
-
-### 3. Pre-Commit Quality Gate
+### 2. Pre-Commit Quality Gate
 
 > **코드 변경이 포함된 커밋 전 반드시 Quality Gate를 통과해야 합니다.**
 
@@ -3153,7 +3232,7 @@ npm run build          # 3. 빌드 검증 (Next.js/TypeScript 프로젝트)
 - Quality Gate 우회 시도 거부
 - "그냥 커밋해줘", "빌드 생략해줘" 등 거부
 ${isMetaInstalled ? `
-### 4. Meta 환경 자동 워크플로우 (NON-NEGOTIABLE)
+### 3. Meta 환경 자동 워크플로우 (NON-NEGOTIABLE)
 
 > **⚠️ Meta 패키지가 설치된 환경에서는 반드시 아래 규칙이 적용됩니다.**
 > **이 규칙을 우회하거나 무시하는 것은 금지됩니다.**
@@ -3234,30 +3313,15 @@ ${extensionsList}
 | \`/SEMO:onboarding\` | 온보딩 가이드 |
 | \`/SEMO:dry-run {프롬프트}\` | 명령 검증 (라우팅 시뮬레이션) |
 
-## Context Mesh (장기 기억)
+## Context Mesh 사용
 
-> **⚠️ 세션 시작 시 반드시 \`.claude/memory/\` 폴더를 확인하세요.**
+SEMO는 \`.claude/memory/\`를 통해 세션 간 컨텍스트를 유지합니다:
 
-SEMO는 \`.claude/memory/\`를 통해 세션 간 컨텍스트를 영속화합니다.
+- **context.md**: 프로젝트 상태, 진행 중인 작업
+- **decisions.md**: 아키텍처 결정 기록 (ADR)
+- **rules/**: 프로젝트별 커스텀 규칙
 
-### 필수 참조 파일
-
-| 파일 | 용도 | 참조 시점 |
-|------|------|----------|
-| \`context.md\` | 프로젝트 상태, 기술 스택, 진행 중 작업 | **매 세션 시작** |
-| \`decisions.md\` | 아키텍처 결정 기록 (ADR) | 설계/구조 변경 전 |
-| \`projects.md\` | GitHub Projects 설정, 상태 매핑 | 이슈/PR 작업 시 |
-| \`rules/\` | 프로젝트별 커스텀 규칙, 예외 사항 | 코드 작성 전 |
-
-### 업데이트 트리거
-
-다음 상황에서 memory 파일을 **반드시** 업데이트하세요:
-
-1. **context.md**: 작업 완료, 기술 스택 변경, 중요 마일스톤
-2. **decisions.md**: 아키텍처 결정, 기술 선택, 트레이드오프 결정
-3. **rules/**: 새로운 코딩 규칙, 예외 사항 발생
-
-memory 스킬이 이 파일들을 자동으로 관리합니다.
+memory 스킬이 자동으로 이 파일들을 관리합니다.
 
 ## References
 
@@ -3278,7 +3342,7 @@ ${packageClaudeMdSections}
 // === add 명령어 ===
 program
   .command("add <packages>")
-  .description("Extension 패키지를 추가로 설치합니다 (meta, semo-hooks, semo-remote)")
+  .description("Extension 패키지를 추가로 설치합니다 (그룹: biz, eng, ops, system / 개별: biz/discovery, eng/nextjs, semo-hooks)")
   .option("-f, --force", "기존 설정 덮어쓰기")
   .action(async (packagesInput: string, options) => {
     // 패키지 데이터 초기화 (DB에서 조회)
@@ -3410,6 +3474,9 @@ program
 
     // Extensions - 레이어별 그룹화
     const layers: Record<string, { title: string; emoji: string }> = {
+      biz: { title: "Business Layer", emoji: "💼" },
+      eng: { title: "Engineering Layer", emoji: "⚙️" },
+      ops: { title: "Operations Layer", emoji: "📊" },
       meta: { title: "Meta", emoji: "🔧" },
       system: { title: "System", emoji: "🔩" },
     };
@@ -3432,11 +3499,21 @@ program
       console.log();
     }
 
+    // 그룹 설치 안내
+    console.log(chalk.gray("─".repeat(50)));
+    console.log(chalk.white.bold("📦 그룹 일괄 설치"));
+    console.log(chalk.gray("  semo add biz      → Business 전체 (discovery, design, management, poc)"));
+    console.log(chalk.gray("  semo add eng      → Engineering 전체 (nextjs, spring, ms, infra)"));
+    console.log(chalk.gray("  semo add ops      → Operations 전체 (qa, monitor, improve)"));
+    console.log(chalk.gray("  semo add system   → System 전체 (hooks, remote)"));
+    console.log();
+
     // 단축명 안내
     console.log(chalk.gray("─".repeat(50)));
     console.log(chalk.white.bold("⚡ 단축명 지원"));
-    console.log(chalk.gray("  semo add hooks   → semo-hooks"));
-    console.log(chalk.gray("  semo add remote  → semo-remote\n"));
+    console.log(chalk.gray("  semo add discovery  → biz/discovery"));
+    console.log(chalk.gray("  semo add qa         → ops/qa"));
+    console.log(chalk.gray("  semo add nextjs     → eng/nextjs\n"));
   });
 
 // === status 명령어 ===
@@ -3510,7 +3587,7 @@ program
   .option("--self", "CLI만 업데이트")
   .option("--system", "semo-system만 업데이트")
   .option("--skip-cli", "CLI 업데이트 건너뛰기")
-  .option("--only <packages>", "특정 패키지만 업데이트 (쉼표 구분: semo-core,semo-skills,meta)")
+  .option("--only <packages>", "특정 패키지만 업데이트 (쉼표 구분: semo-core,semo-skills,biz/management)")
   .option("--migrate", "레거시 환경 강제 마이그레이션")
   .action(async (options) => {
     console.log(chalk.cyan.bold("\n🔄 SEMO 업데이트\n"));
