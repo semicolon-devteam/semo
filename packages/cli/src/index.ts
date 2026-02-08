@@ -1559,6 +1559,24 @@ async function generateClaudeMd(cwd: string) {
 
 ---
 
+## 🔴 MANDATORY: Memory Context (항시 참조)
+
+> **⚠️ 세션 시작 시 반드시 \`.claude/memory/\` 폴더의 파일들을 먼저 읽으세요. 예외 없음.**
+
+### 필수 참조 파일
+
+\`\`\`
+.claude/memory/
+├── context.md     # 프로젝트 상태, 기술 스택, 진행 중 작업
+├── decisions.md   # 아키텍처 결정 기록 (ADR)
+├── projects.md    # GitHub Projects 설정
+└── rules/         # 프로젝트별 커스텀 규칙
+\`\`\`
+
+**이 파일들은 세션의 컨텍스트를 유지하는 장기 기억입니다. 매 세션마다 반드시 읽고 시작하세요.**
+
+---
+
 ## 🔴 MANDATORY: Orchestrator-First Execution
 
 > **⚠️ 이 규칙은 모든 사용자 요청에 적용됩니다. 예외 없음.**
@@ -3181,6 +3199,24 @@ ${orchestratorPaths.map(p => `- \`${p}\``).join("\n")}
   const claudeMdContent = `# SEMO Project Configuration
 
 > SEMO (Semicolon Orchestrate) - AI Agent Orchestration Framework v${VERSION}
+
+---
+
+## 🔴 MANDATORY: Memory Context (항시 참조)
+
+> **⚠️ 세션 시작 시 반드시 \`.claude/memory/\` 폴더의 파일들을 먼저 읽으세요. 예외 없음.**
+
+### 필수 참조 파일
+
+\`\`\`
+.claude/memory/
+├── context.md     # 프로젝트 상태, 기술 스택, 진행 중 작업
+├── decisions.md   # 아키텍처 결정 기록 (ADR)
+├── projects.md    # GitHub Projects 설정
+└── rules/         # 프로젝트별 커스텀 규칙
+\`\`\`
+
+**이 파일들은 세션의 컨텍스트를 유지하는 장기 기억입니다. 매 세션마다 반드시 읽고 시작하세요.**
 
 ---
 
