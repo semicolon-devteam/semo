@@ -29,9 +29,12 @@ CREATE INDEX IF NOT EXISTS idx_kb_domain ON semo.knowledge_base(domain);
 CREATE INDEX IF NOT EXISTS idx_kb_created_by ON semo.knowledge_base(created_by);
 CREATE INDEX IF NOT EXISTS idx_kb_updated_at ON semo.knowledge_base(updated_at DESC);
 
--- HNSW index for vector search (create after data exists, or with small initial size)
--- CREATE INDEX IF NOT EXISTS idx_kb_embedding ON semo.knowledge_base
---     USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+-- HNSW index for vector search
+CREATE INDEX IF NOT EXISTS idx_kb_embedding ON semo.knowledge_base
+    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+
+CREATE INDEX IF NOT EXISTS idx_botk_embedding ON semo.bot_knowledge
+    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 
 -- ============================================================
 -- 2. 봇별 KB (봇 고유 지식)

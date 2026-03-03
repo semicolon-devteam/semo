@@ -4037,6 +4037,7 @@ import {
   ontoShow,
   ontoValidate,
   ontoPullToLocal,
+  generateEmbedding,
   KBEntry,
 } from "./kb";
 
@@ -4242,10 +4243,11 @@ kbCmd
 
 kbCmd
   .command("search <query>")
-  .description("KB 검색 (텍스트 매칭, Phase 2에서 시맨틱 검색 추가)")
+  .description("KB 검색 (시맨틱 + 텍스트 하이브리드)")
   .option("--bot <name>", "봇 KB도 검색", detectBotId())
   .option("--domain <name>", "도메인 필터")
   .option("--limit <n>", "최대 결과 수", "10")
+  .option("--mode <type>", "검색 모드 (hybrid|semantic|text)", "hybrid")
   .action(async (query, options) => {
     const spinner = ora(`'${query}' 검색 중...`).start();
     try {
@@ -4254,6 +4256,7 @@ kbCmd
         domain: options.domain,
         botId: options.bot,
         limit: parseInt(options.limit),
+        mode: options.mode,
       });
 
       spinner.stop();
@@ -4264,7 +4267,9 @@ kbCmd
         console.log(chalk.cyan.bold(`\n🔍 검색 결과: '${query}' (${results.length}건)\n`));
         for (const entry of results) {
           const preview = entry.content.substring(0, 80).replace(/\n/g, " ");
-          console.log(chalk.cyan(`  [${entry.domain}] `) + chalk.white(entry.key));
+          const score = (entry as any).score;
+          const scoreStr = score ? chalk.yellow(` (${(score * 100).toFixed(1)}%)`) : "";
+          console.log(chalk.cyan(`  [${entry.domain}] `) + chalk.white(entry.key) + scoreStr);
           console.log(chalk.gray(`    ${preview}${entry.content.length > 80 ? "..." : ""}`));
           console.log();
         }
@@ -4311,6 +4316,91 @@ kbCmd
       await closeConnection();
     } catch (err) {
       spinner.fail(`Diff 실패: ${err}`);
+      await closeConnection();
+      process.exit(1);
+    }
+  });
+
+kbCmd
+  .command("embed")
+  .description("기존 KB 항목에 임베딩 벡터 생성 (OPENAI_API_KEY 필요)")
+  .option("--bot <name>", "봇 KB도 임베딩", detectBotId())
+  .option("--domain <name>", "도메인 필터")
+  .option("--force", "이미 임베딩된 항목도 재생성")
+  .action(async (options) => {
+    if (!process.env.OPENAI_API_KEY) {
+      console.log(chalk.red("❌ OPENAI_API_KEY 환경변수가 설정되지 않았습니다."));
+      console.log(chalk.gray("   export OPENAI_API_KEY='sk-...'"));
+      process.exit(1);
+    }
+
+    const spinner = ora("임베딩 대상 조회 중...").start();
+    try {
+      const pool = getPool();
+      const client = await pool.connect();
+
+      // Shared KB
+      let sharedSql = "SELECT kb_id, domain, key, content FROM semo.knowledge_base WHERE 1=1";
+      const sharedParams: string[] = [];
+      let pIdx = 1;
+      if (!options.force) sharedSql += " AND embedding IS NULL";
+      if (options.domain) { sharedSql += ` AND domain = $${pIdx++}`; sharedParams.push(options.domain); }
+
+      const sharedRows = await client.query(sharedSql, sharedParams);
+
+      // Bot KB
+      let botSql = "SELECT id, domain, key, content FROM semo.bot_knowledge WHERE bot_id = $1";
+      const botParams: string[] = [options.bot];
+      let bIdx = 2;
+      if (!options.force) botSql += " AND embedding IS NULL";
+      if (options.domain) { botSql += ` AND domain = $${bIdx++}`; botParams.push(options.domain); }
+
+      const botRows = await client.query(botSql, botParams);
+
+      const total = sharedRows.rows.length + botRows.rows.length;
+      spinner.succeed(`${total}건 임베딩 대상`);
+
+      if (total === 0) {
+        console.log(chalk.green("  모든 항목이 이미 임베딩되어 있습니다."));
+        client.release();
+        await closeConnection();
+        return;
+      }
+
+      let done = 0;
+      const embedSpinner = ora(`임베딩 생성 중... 0/${total}`).start();
+
+      // Process shared KB
+      for (const row of sharedRows.rows) {
+        const embedding = await generateEmbedding(`${row.key}: ${row.content}`);
+        if (embedding) {
+          await client.query(
+            "UPDATE semo.knowledge_base SET embedding = $1::vector WHERE kb_id = $2",
+            [`[${embedding.join(",")}]`, row.kb_id]
+          );
+        }
+        done++;
+        embedSpinner.text = `임베딩 생성 중... ${done}/${total}`;
+      }
+
+      // Process bot KB
+      for (const row of botRows.rows) {
+        const embedding = await generateEmbedding(`${row.key}: ${row.content}`);
+        if (embedding) {
+          await client.query(
+            "UPDATE semo.bot_knowledge SET embedding = $1::vector WHERE id = $2",
+            [`[${embedding.join(",")}]`, row.id]
+          );
+        }
+        done++;
+        embedSpinner.text = `임베딩 생성 중... ${done}/${total}`;
+      }
+
+      embedSpinner.succeed(`${done}건 임베딩 완료`);
+      client.release();
+      await closeConnection();
+    } catch (err) {
+      spinner.fail(`임베딩 실패: ${err}`);
       await closeConnection();
       process.exit(1);
     }
