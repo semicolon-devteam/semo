@@ -26,7 +26,7 @@ const DB_CONFIG = {
 // PostgreSQL Pool (싱글톤)
 let pool: Pool | null = null;
 
-function getPool(): Pool {
+export function getPool(): Pool {
   if (!pool) {
     pool = new Pool(DB_CONFIG);
   }
