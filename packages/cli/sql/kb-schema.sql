@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS semo.knowledge_base (
     domain VARCHAR(100) NOT NULL,          -- 'team', 'project', 'infra', 'process', 'decision'
     key VARCHAR(255) NOT NULL,             -- unique identifier within domain
     content TEXT NOT NULL,                 -- actual knowledge content
-    embedding vector(1536),               -- OpenAI text-embedding-3-small
+    embedding vector(1024),               -- Voyage-3 (1024-dim)
     metadata JSONB DEFAULT '{}',          -- tags, source, etc.
     version INT DEFAULT 1,
     created_by VARCHAR(50),               -- 'semiclaw', 'workclaw', 'reus', etc.
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS semo.bot_knowledge (
     domain VARCHAR(100) NOT NULL,
     key VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
-    embedding vector(1536),
+    embedding vector(1024),               -- Voyage-3 (1024-dim)
     metadata JSONB DEFAULT '{}',
     version INT DEFAULT 1,
     synced_at TIMESTAMPTZ,                 -- last sync timestamp for this entry
