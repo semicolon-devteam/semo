@@ -5,13 +5,7 @@
  * Uses the team's core PostgreSQL database as Single Source of Truth.
  *
  * v3.15.0: Initial implementation
- */
-
-import { Pool } from "pg";
-import * as fs from "fs";
-import * as path from "path";
-
-// ============================================================
+ * v3.15.1: pgvector embedding integration
 // Types
 // ============================================================
 
@@ -200,24 +194,30 @@ export async function kbPush(
 
     for (const entry of entries) {
       try {
+        // Generate embedding for content
+        const embedding = await generateEmbedding(`${entry.key}: ${entry.content}`);
+        const embeddingStr = embedding ? `[${embedding.join(",")}]` : null;
+
         if (target === "shared") {
           await client.query(
-            `INSERT INTO semo.knowledge_base (domain, key, content, metadata, created_by)
-             VALUES ($1, $2, $3, $4, $5)
+            `INSERT INTO semo.knowledge_base (domain, key, content, metadata, created_by, embedding)
+             VALUES ($1, $2, $3, $4, $5, $6::vector)
              ON CONFLICT (domain, key) DO UPDATE SET
                content = EXCLUDED.content,
-               metadata = EXCLUDED.metadata`,
-            [entry.domain, entry.key, entry.content, JSON.stringify(entry.metadata || {}), entry.created_by || botId]
+               metadata = EXCLUDED.metadata,
+               embedding = EXCLUDED.embedding`,
+            [entry.domain, entry.key, entry.content, JSON.stringify(entry.metadata || {}), entry.created_by || botId, embeddingStr]
           );
         } else {
           await client.query(
-            `INSERT INTO semo.bot_knowledge (bot_id, domain, key, content, metadata, synced_at)
-             VALUES ($1, $2, $3, $4, $5, NOW())
+            `INSERT INTO semo.bot_knowledge (bot_id, domain, key, content, metadata, synced_at, embedding)
+             VALUES ($1, $2, $3, $4, $5, NOW(), $6::vector)
              ON CONFLICT (bot_id, domain, key) DO UPDATE SET
                content = EXCLUDED.content,
                metadata = EXCLUDED.metadata,
-               synced_at = NOW()`,
-            [botId, entry.domain, entry.key, entry.content, JSON.stringify(entry.metadata || {})]
+               synced_at = NOW(),
+               embedding = EXCLUDED.embedding`,
+            [botId, entry.domain, entry.key, entry.content, JSON.stringify(entry.metadata || {}), embeddingStr]
           );
         }
         upserted++;
@@ -400,68 +400,116 @@ export async function kbDiff(
 }
 
 /**
- * Search KB using text matching (Phase 1)
- * TODO Phase 2: pgvector semantic search with embeddings
+ * Search KB — hybrid: vector similarity (if embedding available) + text fallback
  */
 export async function kbSearch(
   pool: Pool,
   query: string,
-  options: { domain?: string; botId?: string; limit?: number }
+  options: { domain?: string; botId?: string; limit?: number; mode?: "semantic" | "text" | "hybrid" }
 ): Promise<KBEntry[]> {
   const client = await pool.connect();
   const limit = options.limit || 10;
+  const mode = options.mode || "hybrid";
 
   try {
-    // Phase 1: ILIKE text search + pg_trgm similarity
-    // Phase 2: Will add vector cosine similarity
-    let sql = `
-      SELECT domain, key, content, metadata, created_by, version, updated_at::text,
-             similarity(content, $1) as score
-      FROM semo.knowledge_base
-      WHERE content ILIKE $2
-    `;
-    const params: (string | number)[] = [query, `%${query}%`];
-    let paramIdx = 3;
+    let results: KBEntry[] = [];
 
-    if (options.domain) {
-      sql += ` AND domain = $${paramIdx++}`;
-      params.push(options.domain);
+    // Try semantic search first (if mode allows and embedding API available)
+    if (mode !== "text") {
+      const queryEmbedding = await generateEmbedding(query);
+
+      if (queryEmbedding) {
+        const embeddingStr = `[${queryEmbedding.join(",")}]`;
+
+        // Vector search on shared KB
+        let sql = `
+          SELECT domain, key, content, metadata, created_by, version, updated_at::text,
+                 1 - (embedding <=> $1::vector) as score
+          FROM semo.knowledge_base
+          WHERE embedding IS NOT NULL
+        `;
+        const params: (string | number)[] = [embeddingStr];
+        let paramIdx = 2;
+
+        if (options.domain) {
+          sql += ` AND domain = $${paramIdx++}`;
+          params.push(options.domain);
+        }
+        sql += ` ORDER BY embedding <=> $1::vector LIMIT $${paramIdx++}`;
+        params.push(limit);
+
+        const sharedResult = await client.query(sql, params);
+        results = sharedResult.rows;
+
+        // Also search bot_knowledge if botId specified
+        if (options.botId) {
+          let botSql = `
+            SELECT bot_id, domain, key, content, metadata, version, updated_at::text,
+                   1 - (embedding <=> $1::vector) as score
+            FROM semo.bot_knowledge
+            WHERE bot_id = $2 AND embedding IS NOT NULL
+          `;
+          const botParams: (string | number)[] = [embeddingStr, options.botId];
+          let bIdx = 3;
+
+          if (options.domain) {
+            botSql += ` AND domain = $${bIdx++}`;
+            botParams.push(options.domain);
+          }
+          botSql += ` ORDER BY embedding <=> $1::vector LIMIT $${bIdx++}`;
+          botParams.push(limit);
+
+          const botResult = await client.query(botSql, botParams);
+          results = [...results, ...botResult.rows]
+            .sort((a: any, b: any) => (b.score || 0) - (a.score || 0))
+            .slice(0, limit);
+        }
+
+        // If we got results from semantic search and mode is not hybrid, return
+        if (results.length > 0 && mode === "semantic") {
+          return results;
+        }
+      }
     }
 
-    sql += ` ORDER BY score DESC, updated_at DESC LIMIT $${paramIdx++}`;
-    params.push(limit);
-
-    const result = await client.query(sql, params);
-
-    // Also search bot_knowledge if botId specified
-    if (options.botId) {
-      let botSql = `
-        SELECT bot_id, domain, key, content, metadata, version, updated_at::text,
-               similarity(content, $1) as score
-        FROM semo.bot_knowledge
-        WHERE bot_id = $2 AND content ILIKE $3
+    // Text search (fallback or hybrid supplement)
+    if (mode !== "semantic" || results.length === 0) {
+      let textSql = `
+        SELECT domain, key, content, metadata, created_by, version, updated_at::text,
+               0.0 as score
+        FROM semo.knowledge_base
+        WHERE content ILIKE $1 OR key ILIKE $1
       `;
-      const botParams: (string | number)[] = [query, options.botId, `%${query}%`];
-      let bIdx = 4;
+      const textParams: (string | number)[] = [`%${query}%`];
+      let tIdx = 2;
 
       if (options.domain) {
-        botSql += ` AND domain = $${bIdx++}`;
-        botParams.push(options.domain);
+        textSql += ` AND domain = $${tIdx++}`;
+        textParams.push(options.domain);
       }
-      botSql += ` ORDER BY score DESC LIMIT $${bIdx++}`;
-      botParams.push(limit);
+      textSql += ` ORDER BY updated_at DESC LIMIT $${tIdx++}`;
+      textParams.push(limit);
 
-      const botResult = await client.query(botSql, botParams);
-      return [...result.rows, ...botResult.rows].sort((a: any, b: any) => (b.score || 0) - (a.score || 0)).slice(0, limit);
+      const textResult = await client.query(textSql, textParams);
+
+      // Merge: deduplicate by domain/key, prefer semantic results
+      const seen = new Set(results.map((r: any) => `${r.domain}/${r.key}`));
+      for (const row of textResult.rows) {
+        const k = `${row.domain}/${row.key}`;
+        if (!seen.has(k)) {
+          results.push(row);
+          seen.add(k);
+        }
+      }
     }
 
-    return result.rows;
-  } catch (err) {
-    // pg_trgm might not be available, fallback to simple ILIKE
+    return results.slice(0, limit);
+  } catch {
+    // Ultimate fallback: simple ILIKE
     let sql = `
       SELECT domain, key, content, metadata, created_by, version, updated_at::text
       FROM semo.knowledge_base
-      WHERE content ILIKE $1
+      WHERE content ILIKE $1 OR key ILIKE $1
     `;
     const params: (string | number)[] = [`%${query}%`];
     let paramIdx = 2;

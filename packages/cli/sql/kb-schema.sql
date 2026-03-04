@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS semo.knowledge_base (
     domain VARCHAR(100) NOT NULL,          -- 'team', 'project', 'infra', 'process', 'decision'
     key VARCHAR(255) NOT NULL,             -- unique identifier within domain
     content TEXT NOT NULL,                 -- actual knowledge content
-    embedding vector(1536),               -- OpenAI text-embedding-3-small
+    embedding vector(1024),               -- Voyage-3 (1024-dim)
     metadata JSONB DEFAULT '{}',          -- tags, source, etc.
     version INT DEFAULT 1,
     created_by VARCHAR(50),               -- 'semiclaw', 'workclaw', 'reus', etc.
@@ -29,9 +29,12 @@ CREATE INDEX IF NOT EXISTS idx_kb_domain ON semo.knowledge_base(domain);
 CREATE INDEX IF NOT EXISTS idx_kb_created_by ON semo.knowledge_base(created_by);
 CREATE INDEX IF NOT EXISTS idx_kb_updated_at ON semo.knowledge_base(updated_at DESC);
 
--- HNSW index for vector search (create after data exists, or with small initial size)
--- CREATE INDEX IF NOT EXISTS idx_kb_embedding ON semo.knowledge_base
---     USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+-- HNSW index for vector search
+CREATE INDEX IF NOT EXISTS idx_kb_embedding ON semo.knowledge_base
+    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
+
+CREATE INDEX IF NOT EXISTS idx_botk_embedding ON semo.bot_knowledge
+    USING hnsw (embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 
 -- ============================================================
 -- 2. 봇별 KB (봇 고유 지식)
@@ -42,7 +45,7 @@ CREATE TABLE IF NOT EXISTS semo.bot_knowledge (
     domain VARCHAR(100) NOT NULL,
     key VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
-    embedding vector(1536),
+    embedding vector(1024),               -- Voyage-3 (1024-dim)
     metadata JSONB DEFAULT '{}',
     version INT DEFAULT 1,
     synced_at TIMESTAMPTZ,                 -- last sync timestamp for this entry
