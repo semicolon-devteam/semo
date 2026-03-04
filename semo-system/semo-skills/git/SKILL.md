@@ -1,5 +1,5 @@
 ---
-name: git-workflow
+name: git
 description: |
   Git 워크플로우 자동화. Use when (1) "커밋해줘", "푸시해줘",
   (2) "PR 만들어줘", (3) "브랜치 만들어줘".
