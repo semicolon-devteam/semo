@@ -4038,6 +4038,216 @@ import {
   ontoValidate,
   ontoPullToLocal,
   generateEmbedding,
+  KBEntry,
+} from "./kb";
+
+// Re-implement readSyncState locally (simple file read)
+function readSyncState(cwd: string): { botId: string; lastPull: string | null; lastPush: string | null; sharedCount: number; botCount: number } {
+  const statePath = path.join(cwd, ".kb", ".sync-state.json");
+  if (fs.existsSync(statePath)) {
+    try { return JSON.parse(fs.readFileSync(statePath, "utf-8")); } catch { /* */ }
+  }
+  return { botId: "", lastPull: null, lastPush: null, sharedCount: 0, botCount: 0 };
+}
+
+function detectBotId(): string {
+  // 1. Env var
+  if (process.env.SEMO_BOT_ID) return process.env.SEMO_BOT_ID;
+  // 2. Detect from cwd (e.g. ~/.openclaw-workclaw → workclaw)
+  const cwd = process.cwd();
+  const match = cwd.match(/\.openclaw-(\w+)/);
+  if (match) return match[1];
+  // 3. Default
+  return "unknown";
+}
+
+const kbCmd = program
+  .command("kb")
+  .description("KB(Knowledge Base) 관리 — SEMO DB 기반 지식 저장소");
+
+kbCmd
+  .command("pull")
+  .description("DB에서 KB를 로컬 .kb/로 내려받기")
+  .option("--bot <name>", "봇 ID", detectBotId())
+  .option("--domain <name>", "특정 도메인만")
+  .action(async (options) => {
+    const spinner = ora("KB 데이터 가져오는 중...").start();
+    try {
+      const pool = getPool();
+      const result = await kbPull(pool, options.bot, options.domain, process.cwd());
+      spinner.succeed(`KB pull 완료`);
+      console.log(chalk.green(`  📦 공통 KB: ${result.shared.length}건`));
+      console.log(chalk.green(`  🤖 봇 KB (${options.bot}): ${result.bot.length}건`));
+
+      // Also pull ontology
+      const ontoCount = await ontoPullToLocal(pool, process.cwd());
+      console.log(chalk.green(`  📐 온톨로지: ${ontoCount}개 도메인`));
+
+      console.log(chalk.gray(`\n  저장 위치: .kb/`));
+      await closeConnection();
+    } catch (err) {
+      spinner.fail(`KB pull 실패: ${err}`);
+      await closeConnection();
+      process.exit(1);
+    }
+  });
+
+kbCmd
+  .command("push")
+  .description("로컬 .kb/ 데이터를 DB에 업로드")
+  .option("--bot <name>", "봇 ID", detectBotId())
+  .option("--target <type>", "대상 (shared|bot)", "bot")
+  .option("--file <path>", ".kb/ 내 특정 파일")
+  .action(async (options) => {
+    const cwd = process.cwd();
+    const kbDir = path.join(cwd, ".kb");
+
+    if (!fs.existsSync(kbDir)) {
+      console.log(chalk.red("❌ .kb/ 디렉토리가 없습니다. 먼저 semo kb pull을 실행하세요."));
+      process.exit(1);
+    }
+
+    const spinner = ora("KB 데이터 업로드 중...").start();
+    try {
+      const pool = getPool();
+      const filename = options.file || (options.target === "shared" ? "team.json" : "bot.json");
+      const filePath = path.join(kbDir, filename);
+
+      if (!fs.existsSync(filePath)) {
+        spinner.fail(`파일을 찾을 수 없습니다: .kb/${filename}`);
+        process.exit(1);
+      }
+
+      const entries: KBEntry[] = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+      const result = await kbPush(pool, options.bot, entries, options.target, cwd);
+
+      spinner.succeed(`KB push 완료`);
+      console.log(chalk.green(`  ✅ ${result.upserted}건 업서트됨`));
+      if (result.errors.length > 0) {
+        console.log(chalk.yellow(`  ⚠️ ${result.errors.length}건 오류:`));
+        result.errors.forEach(e => console.log(chalk.red(`     ${e}`)));
+      }
+      await closeConnection();
+    } catch (err) {
+      spinner.fail(`KB push 실패: ${err}`);
+      await closeConnection();
+      process.exit(1);
+    }
+  });
+
+kbCmd
+  .command("status")
+  .description("KB 동기화 상태 확인")
+  .option("--bot <name>", "봇 ID", detectBotId())
+  .action(async (options) => {
+    const spinner = ora("KB 상태 조회 중...").start();
+    try {
+      const pool = getPool();
+      const status = await kbStatus(pool, options.bot);
+      spinner.stop();
+
+      console.log(chalk.cyan.bold("\n📊 KB 상태\n"));
+
+      console.log(chalk.white("  📦 공통 KB (shared)"));
+      console.log(chalk.gray(`     총 ${status.shared.total}건`));
+      for (const [domain, count] of Object.entries(status.shared.domains)) {
+        console.log(chalk.gray(`     - ${domain}: ${count}건`));
+      }
+      if (status.shared.lastUpdated) {
+        console.log(chalk.gray(`     최종 업데이트: ${status.shared.lastUpdated}`));
+      }
+
+      console.log(chalk.white(`\n  🤖 봇 KB (${options.bot})`));
+      console.log(chalk.gray(`     총 ${status.bot.total}건`));
+      for (const [domain, count] of Object.entries(status.bot.domains)) {
+        console.log(chalk.gray(`     - ${domain}: ${count}건`));
+      }
+      if (status.bot.lastUpdated) {
+        console.log(chalk.gray(`     최종 업데이트: ${status.bot.lastUpdated}`));
+      }
+      if (status.bot.lastSynced) {
+        console.log(chalk.gray(`     최종 동기화: ${status.bot.lastSynced}`));
+      }
+
+      // Local sync state
+      const syncState = readSyncState(process.cwd());
+      if (syncState.lastPull || syncState.lastPush) {
+        console.log(chalk.white("\n  🔄 로컬 동기화"));
+        if (syncState.lastPull) console.log(chalk.gray(`     마지막 pull: ${syncState.lastPull}`));
+        if (syncState.lastPush) console.log(chalk.gray(`     마지막 push: ${syncState.lastPush}`));
+      }
+
+      console.log();
+      await closeConnection();
+    } catch (err) {
+      spinner.fail(`상태 조회 실패: ${err}`);
+      await closeConnection();
+      process.exit(1);
+    }
+  });
+
+kbCmd
+  .command("list")
+  .description("KB 항목 목록 조회")
+  .option("--bot <name>", "봇 ID", detectBotId())
+  .option("--domain <name>", "도메인 필터")
+  .option("--limit <n>", "최대 항목 수", "50")
+  .option("--format <type>", "출력 형식 (table|json)", "table")
+  .action(async (options) => {
+    try {
+      const pool = getPool();
+      const result = await kbList(pool, {
+        domain: options.domain,
+        botId: options.bot,
+        limit: parseInt(options.limit),
+      });
+
+      if (options.format === "json") {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        console.log(chalk.cyan.bold("\n📋 KB 목록\n"));
+
+        if (result.shared.length > 0) {
+          console.log(chalk.white("  📦 공통 KB"));
+          console.log(chalk.gray("  ─────────────────────────────────────────"));
+          for (const entry of result.shared) {
+            const preview = entry.content.substring(0, 60).replace(/\n/g, " ");
+            console.log(chalk.cyan(`  [${entry.domain}] `) + chalk.white(entry.key));
+            console.log(chalk.gray(`    ${preview}${entry.content.length > 60 ? "..." : ""}`));
+          }
+        }
+
+        if (result.bot.length > 0) {
+          console.log(chalk.white(`\n  🤖 봇 KB (${options.bot})`));
+          console.log(chalk.gray("  ─────────────────────────────────────────"));
+          for (const entry of result.bot) {
+            const preview = entry.content.substring(0, 60).replace(/\n/g, " ");
+            console.log(chalk.cyan(`  [${entry.domain}] `) + chalk.white(entry.key));
+            console.log(chalk.gray(`    ${preview}${entry.content.length > 60 ? "..." : ""}`));
+          }
+        }
+
+        if (result.shared.length === 0 && result.bot.length === 0) {
+          console.log(chalk.yellow("  KB가 비어있습니다."));
+        }
+
+        console.log();
+      }
+      await closeConnection();
+    } catch (err) {
+      console.error(chalk.red(`조회 실패: ${err}`));
+      await closeConnection();
+      process.exit(1);
+    }
+  });
+
+kbCmd
+  .command("search <query>")
+  .description("KB 검색 (시맨틱 + 텍스트 하이브리드)")
+  .option("--bot <name>", "봇 KB도 검색", detectBotId())
+  .option("--domain <name>", "도메인 필터")
+  .option("--limit <n>", "최대 결과 수", "10")
+  .option("--mode <type>", "검색 모드 (hybrid|semantic|text)", "hybrid")
   .action(async (query, options) => {
     const spinner = ora(`'${query}' 검색 중...`).start();
     try {
@@ -4047,6 +4257,19 @@ import {
         botId: options.bot,
         limit: parseInt(options.limit),
         mode: options.mode,
+      });
+
+      spinner.stop();
+
+      if (results.length === 0) {
+        console.log(chalk.yellow(`\n  검색 결과 없음: '${query}'`));
+      } else {
+        console.log(chalk.cyan.bold(`\n🔍 검색 결과: '${query}' (${results.length}건)\n`));
+        for (const entry of results) {
+          const preview = entry.content.substring(0, 80).replace(/\n/g, " ");
+          const score = (entry as any).score;
+          const scoreStr = score ? chalk.yellow(` (${(score * 100).toFixed(1)}%)`) : "";
+          console.log(chalk.cyan(`  [${entry.domain}] `) + chalk.white(entry.key) + scoreStr);
           console.log(chalk.gray(`    ${preview}${entry.content.length > 80 ? "..." : ""}`));
           console.log();
         }
