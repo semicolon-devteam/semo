@@ -1,5 +1,5 @@
 ---
-name: create-epic
+name: epic
 description: |
   Create Epic issue in docs repository. Use when (1) ideate 스킬에서 자동 호출,
   (2) epic-master needs to create new Epic, (3) 요구사항 → Epic 변환.

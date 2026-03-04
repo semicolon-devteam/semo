@@ -1,5 +1,5 @@
 ---
-name: list-bugs
+name: bug
 description: |
   버그 이슈 조회 (Supabase DB 기반). Use when (1) "버그 이슈 목록",
   (2) "버그 확인", (3) "버그 조회", (4) 버그 이슈 필터링.

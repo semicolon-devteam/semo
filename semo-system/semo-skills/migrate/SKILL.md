@@ -1,5 +1,5 @@
 ---
-name: migrate-db
+name: migrate
 description: |
   Prisma/SQL 마이그레이션 관리. Use when:
   (1) 스키마 변경, (2) 마이그레이션 생성/적용, (3) DB 동기화,
