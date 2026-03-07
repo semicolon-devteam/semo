@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SEMO Dashboard - AI Bot Orchestration Monitor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* Smooth transitions */
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Status indicators */
+        .status-active { 
+            background: #10b981; 
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);
+        }
+        .status-idle { 
+            background: #f59e0b; 
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+        }
+        .status-error { 
+            background: #ef4444; 
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <!-- Global Header -->
+    <header class="bg-white border-b border-gray-200 fixed top-0 left-0 right-0 z-50 h-16">
+        <div class="flex items-center justify-between h-full px-6">
+            <div class="flex items-center space-x-4">
+                <h1 class="text-2xl font-bold text-blue-600">SEMO Dashboard</h1>
+                <span class="text-sm text-gray-500">AI Bot Orchestration Monitor</span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-600">Last Update: <span class="font-medium">2026-03-07 21:30 KST</span></span>
+                <button class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                    <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                    </svg>
+                    Refresh
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="flex pt-16 h-screen">
+        <!-- Sidebar Navigation -->
+        <aside class="w-64 bg-white border-r border-gray-200 fixed left-0 top-16 bottom-0 overflow-y-auto">
+            <nav class="p-4 space-y-2">
+                <button onclick="showTab('bot-team')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors flex items-center space-x-3 bg-blue-50 text-blue-600">
+                    <span class="text-xl">🤖</span>
+                    <span class="font-medium">Bot Team Overview</span>
+                </button>
+                <button onclick="showTab('semo-core')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors flex items-center space-x-3 text-gray-700">
+                    <span class="text-xl">⚙️</span>
+                    <span class="font-medium">SEMO Core</span>
+                </button>
+                <button onclick="showTab('knowledge-base')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors flex items-center space-x-3 text-gray-700">
+                    <span class="text-xl">📚</span>
+                    <span class="font-medium">Knowledge Base</span>
+                </button>
+                <button onclick="showTab('ontology')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-blue-50 transition-colors flex items-center space-x-3 text-gray-700">
+                    <span class="text-xl">🧠</span>
+                    <span class="font-medium">Ontology & Vector DB</span>
+                </button>
+                <hr class="my-4 border-gray-200">
+                <button class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors flex items-center space-x-3 text-gray-500">
+                    <span class="text-xl">⚙️</span>
+                    <span class="font-medium">Settings</span>
+                    <span class="ml-auto text-xs bg-gray-200 px-2 py-1 rounded">Soon</span>
+                </button>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="ml-64 flex-1 overflow-y-auto p-8">
+            <!-- Bot Team Overview -->
+            <div id="bot-team" class="tab-content active">
+                <div class="mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-2">🤖 Bot Team Overview</h2>
+                    <p class="text-gray-600">Monitor all AI bots status, configurations, and activities</p>
+                </div>
+
+                <!-- Bot Status Cards Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <!-- SemiClaw Card -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="showBotDetail('SemiClaw')">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-4xl">🐾</span>
+                                <div>
+                                    <h3 class="font-bold text-lg text-gray-800">SemiClaw</h3>
+                                    <p class="text-sm text-gray-500">Project Manager</p>
+                                </div>
+                            </div>
+                            <span class="w-3 h-3 rounded-full status-active"></span>
+                        </div>
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <div class="flex justify-between">
+                                <span>Last Active:</span>
+                                <span class="font-medium">2 mins ago</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Sessions:</span>
+                                <span class="font-medium">12 active</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Workspace:</span>
+                                <span class="font-mono text-xs">bot-workspaces/semiclaw/</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PlanClaw Card -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="showBotDetail('PlanClaw')">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-4xl">📋</span>
+                                <div>
+                                    <h3 class="font-bold text-lg text-gray-800">PlanClaw</h3>
+                                    <p class="text-sm text-gray-500">Product Planning</p>
+                                </div>
+                            </div>
+                            <span class="w-3 h-3 rounded-full status-active"></span>
+                        </div>
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <div class="flex justify-between">
+                                <span>Last Active:</span>
+                                <span class="font-medium">5 mins ago</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Sessions:</span>
+                                <span class="font-medium">8 active</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Workspace:</span>
+                                <span class="font-mono text-xs">bot-workspaces/planclaw/</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- WorkClaw Card -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="showBotDetail('WorkClaw')">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-4xl">💻</span>
+                                <div>
+                                    <h3 class="font-bold text-lg text-gray-800">WorkClaw</h3>
+                                    <p class="text-sm text-gray-500">Development</p>
+                                </div>
+                            </div>
+                            <span class="w-3 h-3 rounded-full status-active"></span>
+                        </div>
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <div class="flex justify-between">
+                                <span>Last Active:</span>
+                                <span class="font-medium">1 min ago</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Sessions:</span>
+                                <span class="font-medium">15 active</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Workspace:</span>
+                                <span class="font-mono text-xs">bot-workspaces/workclaw/</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ReviewClaw Card -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="showBotDetail('ReviewClaw')">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-4xl">🔍</span>
+                                <div>
+                                    <h3 class="font-bold text-lg text-gray-800">ReviewClaw</h3>
+                                    <p class="text-sm text-gray-500">Code Review & QA</p>
+                                </div>
+                            </div>
+                            <span class="w-3 h-3 rounded-full status-idle"></span>
+                        </div>
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <div class="flex justify-between">
+                                <span>Last Active:</span>
+                                <span class="font-medium">1 hour ago</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Sessions:</span>
+                                <span class="font-medium">3 active</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Workspace:</span>
+                                <span class="font-mono text-xs">bot-workspaces/reviewclaw/</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- DesignClaw Card -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="showBotDetail('DesignClaw')">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-4xl">🎨</span>
+                                <div>
+                                    <h3 class="font-bold text-lg text-gray-800">DesignClaw</h3>
+                                    <p class="text-sm text-gray-500">UI/UX Design</p>
+                                </div>
+                            </div>
+                            <span class="w-3 h-3 rounded-full status-active"></span>
+                        </div>
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <div class="flex justify-between">
+                                <span>Last Active:</span>
+                                <span class="font-medium">Just now</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Sessions:</span>
+                                <span class="font-medium">5 active</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Workspace:</span>
+                                <span class="font-mono text-xs">bot-workspaces/designclaw/</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- InfraClaw Card -->
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-lg transition-shadow cursor-pointer" onclick="showBotDetail('InfraClaw')">
+                        <div class="flex items-start justify-between mb-4">
+                            <div class="flex items-center space-x-3">
+                                <span class="text-4xl">🛠️</span>
+                                <div>
+                                    <h3 class="font-bold text-lg text-gray-800">InfraClaw</h3>
+                                    <p class="text-sm text-gray-500">Infrastructure</p>
+                                </div>
+                            </div>
+                            <span class="w-3 h-3 rounded-full status-idle"></span>
+                        </div>
+                        <div class="space-y-2 text-sm text-gray-600">
+                            <div class="flex justify-between">
+                                <span>Last Active:</span>
+                                <span class="font-medium">30 mins ago</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Sessions:</span>
+                                <span class="font-medium">2 active</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span>Workspace:</span>
+                                <span class="font-mono text-xs">bot-workspaces/infraclaw/</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Team Stats -->
+                <div class="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div class="text-sm text-green-600 mb-1">Active Bots</div>
+                        <div class="text-3xl font-bold text-green-700">4</div>
+                    </div>
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                        <div class="text-sm text-yellow-600 mb-1">Idle Bots</div>
+                        <div class="text-3xl font-bold text-yellow-700">2</div>
+                    </div>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div class="text-sm text-blue-600 mb-1">Total Sessions</div>
+                        <div class="text-3xl font-bold text-blue-700">45</div>
+                    </div>
+                    <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                        <div class="text-sm text-purple-600 mb-1">Cron Jobs</div>
+                        <div class="text-3xl font-bold text-purple-700">18</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SEMO Core -->
+            <div id="semo-core" class="tab-content">
+                <div class="mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-2">⚙️ SEMO Core</h2>
+                    <p class="text-gray-600">Agents, Skills, and Context Managers</p>
+                </div>
+
+                <!-- Agents Registry -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">📋 Agents Registry</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Agent ID</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Name</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Role</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Owner Bot</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Registered</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3 font-mono text-xs">agent-001</td>
+                                    <td class="px-4 py-3 font-medium">SemiClaw Agent</td>
+                                    <td class="px-4 py-3">Project Management</td>
+                                    <td class="px-4 py-3">SemiClaw</td>
+                                    <td class="px-4 py-3">2026-01-15</td>
+                                    <td class="px-4 py-3"><span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">active</span></td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3 font-mono text-xs">agent-002</td>
+                                    <td class="px-4 py-3 font-medium">PlanClaw Agent</td>
+                                    <td class="px-4 py-3">Product Planning</td>
+                                    <td class="px-4 py-3">PlanClaw</td>
+                                    <td class="px-4 py-3">2026-01-15</td>
+                                    <td class="px-4 py-3"><span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">active</span></td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3 font-mono text-xs">agent-003</td>
+                                    <td class="px-4 py-3 font-medium">WorkClaw Agent</td>
+                                    <td class="px-4 py-3">Development</td>
+                                    <td class="px-4 py-3">WorkClaw</td>
+                                    <td class="px-4 py-3">2026-01-15</td>
+                                    <td class="px-4 py-3"><span class="px-2 py-1 bg-green-100 text-green-700 rounded-full text-xs">active</span></td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Skills Catalog -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">🛠️ Skills Catalog</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <!-- Skill Card -->
+                        <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-400 transition-colors cursor-pointer">
+                            <h4 class="font-bold text-gray-800 mb-2">github</h4>
+                            <p class="text-sm text-gray-600 mb-3">Interact with GitHub using gh CLI for issues, PRs, and CI runs.</p>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs">WorkClaw</span>
+                                <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs">ReviewClaw</span>
+                            </div>
+                        </div>
+
+                        <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-400 transition-colors cursor-pointer">
+                            <h4 class="font-bold text-gray-800 mb-2">coding-agent</h4>
+                            <p class="text-sm text-gray-600 mb-3">Run coding agents via background process for programmatic control.</p>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs">WorkClaw</span>
+                            </div>
+                        </div>
+
+                        <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-400 transition-colors cursor-pointer">
+                            <h4 class="font-bold text-gray-800 mb-2">slack</h4>
+                            <p class="text-sm text-gray-600 mb-3">Control Slack from OpenClaw including reactions and message management.</p>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs">All Bots</span>
+                            </div>
+                        </div>
+
+                        <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-400 transition-colors cursor-pointer">
+                            <h4 class="font-bold text-gray-800 mb-2">weather</h4>
+                            <p class="text-sm text-gray-600 mb-3">Get current weather and forecasts with no API key required.</p>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs">SemiClaw</span>
+                            </div>
+                        </div>
+
+                        <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-400 transition-colors cursor-pointer">
+                            <h4 class="font-bold text-gray-800 mb-2">video-frames</h4>
+                            <p class="text-sm text-gray-600 mb-3">Extract frames or clips from videos using ffmpeg.</p>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs">DesignClaw</span>
+                            </div>
+                        </div>
+
+                        <div class="border border-gray-200 rounded-lg p-4 hover:border-blue-400 transition-colors cursor-pointer">
+                            <h4 class="font-bold text-gray-800 mb-2">healthcheck</h4>
+                            <p class="text-sm text-gray-600 mb-3">Host security hardening and risk-tolerance configuration.</p>
+                            <div class="flex flex-wrap gap-2">
+                                <span class="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs">InfraClaw</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Knowledge Base -->
+            <div id="knowledge-base" class="tab-content">
+                <div class="mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-2">📚 Knowledge Base</h2>
+                    <p class="text-gray-600">Semantic search and CRUD operations for KB items</p>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                    <div class="flex items-center space-x-4">
+                        <input type="text" placeholder="Search knowledge base... (semantic search)" class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <button class="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                            🔍 Search
+                        </button>
+                        <button class="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors">
+                            ➕ Add Item
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Domain Filter -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm font-medium text-gray-600">Filter by Domain:</span>
+                        <button class="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg font-medium">All</button>
+                        <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">decision</button>
+                        <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">service</button>
+                        <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">infra</button>
+                        <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">team</button>
+                        <button class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200">operations</button>
+                    </div>
+                </div>
+
+                <!-- KB Items Table -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">KB Items</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Domain</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Key</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Value Summary</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Owner Bot</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Created</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3"><span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">decision</span></td>
+                                    <td class="px-4 py-3 font-mono text-xs">2026-03-07-ui-handoff</td>
+                                    <td class="px-4 py-3 text-gray-600">DesignClaw UI 프로토타입 공유 방식 변경 → GitHub Pages...</td>
+                                    <td class="px-4 py-3">SemiClaw</td>
+                                    <td class="px-4 py-3">2026-03-07</td>
+                                    <td class="px-4 py-3">
+                                        <button class="text-blue-600 hover:text-blue-800 mr-2">👁️</button>
+                                        <button class="text-green-600 hover:text-green-800 mr-2">✏️</button>
+                                        <button class="text-red-600 hover:text-red-800">🗑️</button>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3"><span class="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs">service</span></td>
+                                    <td class="px-4 py-3 font-mono text-xs">cm-land-api-endpoint</td>
+                                    <td class="px-4 py-3 text-gray-600">https://api.cm-land.com — Main API endpoint for CM Land...</td>
+                                    <td class="px-4 py-3">InfraClaw</td>
+                                    <td class="px-4 py-3">2026-02-15</td>
+                                    <td class="px-4 py-3">
+                                        <button class="text-blue-600 hover:text-blue-800 mr-2">👁️</button>
+                                        <button class="text-green-600 hover:text-green-800 mr-2">✏️</button>
+                                        <button class="text-red-600 hover:text-red-800">🗑️</button>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3"><span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">team</span></td>
+                                    <td class="px-4 py-3 font-mono text-xs">slack-bot-ids</td>
+                                    <td class="px-4 py-3 text-gray-600">SemiClaw: U0ADGB42N79, WorkClaw: U0AFECSJHK3, ReviewClaw: U...</td>
+                                    <td class="px-4 py-3">SemiClaw</td>
+                                    <td class="px-4 py-3">2026-02-01</td>
+                                    <td class="px-4 py-3">
+                                        <button class="text-blue-600 hover:text-blue-800 mr-2">👁️</button>
+                                        <button class="text-green-600 hover:text-green-800 mr-2">✏️</button>
+                                        <button class="text-red-600 hover:text-red-800">🗑️</button>
+                                    </td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3"><span class="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">infra</span></td>
+                                    <td class="px-4 py-3 font-mono text-xs">cloudflare-domains</td>
+                                    <td class="px-4 py-3 text-gray-600">jungchipan.net, semi-colon.space, site-ranking.info — Managed...</td>
+                                    <td class="px-4 py-3">InfraClaw</td>
+                                    <td class="px-4 py-3">2026-03-07</td>
+                                    <td class="px-4 py-3">
+                                        <button class="text-blue-600 hover:text-blue-800 mr-2">👁️</button>
+                                        <button class="text-green-600 hover:text-green-800 mr-2">✏️</button>
+                                        <button class="text-red-600 hover:text-red-800">🗑️</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ontology & Vector DB -->
+            <div id="ontology" class="tab-content">
+                <div class="mb-6">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-2">🧠 Ontology & Vector DB</h2>
+                    <p class="text-gray-600">Ontology structure visualization and vector similarity exploration</p>
+                </div>
+
+                <!-- Vector Stats -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-6">
+                        <div class="text-sm text-blue-600 mb-2">Total Embeddings</div>
+                        <div class="text-4xl font-bold text-blue-700">342</div>
+                        <div class="text-xs text-blue-600 mt-2">Voyage-3 vectors</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-6">
+                        <div class="text-sm text-purple-600 mb-2">Domains</div>
+                        <div class="text-4xl font-bold text-purple-700">8</div>
+                        <div class="text-xs text-purple-600 mt-2">Knowledge categories</div>
+                    </div>
+                    <div class="bg-gradient-to-br from-green-50 to-green-100 border border-green-200 rounded-xl p-6">
+                        <div class="text-sm text-green-600 mb-2">Avg. Similarity</div>
+                        <div class="text-4xl font-bold text-green-700">0.87</div>
+                        <div class="text-xs text-green-600 mt-2">Cross-domain cosine</div>
+                    </div>
+                </div>
+
+                <!-- Ontology Graph (Placeholder) -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">📊 Ontology Structure</h3>
+                    <div class="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-12 text-center border-2 border-dashed border-gray-300">
+                        <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                        <p class="text-gray-600 font-medium">Interactive Graph Visualization</p>
+                        <p class="text-sm text-gray-500 mt-2">D3.js / Cytoscape.js implementation coming soon</p>
+                        <p class="text-xs text-gray-400 mt-4">Click nodes to explore relationships • Drag to rearrange • Zoom to focus</p>
+                    </div>
+                </div>
+
+                <!-- Similarity Explorer -->
+                <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                    <h3 class="text-xl font-bold text-gray-800 mb-4">🔍 Similarity Explorer</h3>
+                    <div class="mb-4">
+                        <input type="text" placeholder="Enter KB key or text query..." class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <button class="w-full px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors mb-6">
+                        Find Similar Items
+                    </button>
+
+                    <!-- Results Table -->
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="bg-gray-50 border-b border-gray-200">
+                                <tr>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Rank</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">KB Key</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Domain</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Similarity Score</th>
+                                    <th class="px-4 py-3 text-left font-medium text-gray-600">Value Summary</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-200">
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3"><span class="w-6 h-6 bg-yellow-400 text-white rounded-full inline-flex items-center justify-center text-xs font-bold">1</span></td>
+                                    <td class="px-4 py-3 font-mono text-xs">2026-03-07-ui-handoff</td>
+                                    <td class="px-4 py-3"><span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">decision</span></td>
+                                    <td class="px-4 py-3"><span class="font-mono text-green-600 font-bold">0.94</span></td>
+                                    <td class="px-4 py-3 text-gray-600">DesignClaw UI 프로토타입 공유 방식 변경...</td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3"><span class="w-6 h-6 bg-gray-300 text-white rounded-full inline-flex items-center justify-center text-xs font-bold">2</span></td>
+                                    <td class="px-4 py-3 font-mono text-xs">design-workflow</td>
+                                    <td class="px-4 py-3"><span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">decision</span></td>
+                                    <td class="px-4 py-3"><span class="font-mono text-green-600 font-bold">0.89</span></td>
+                                    <td class="px-4 py-3 text-gray-600">인터랙티브 프리뷰 필수, 승인 후 구현...</td>
+                                </tr>
+                                <tr class="hover:bg-gray-50">
+                                    <td class="px-4 py-3"><span class="w-6 h-6 bg-orange-300 text-white rounded-full inline-flex items-center justify-center text-xs font-bold">3</span></td>
+                                    <td class="px-4 py-3 font-mono text-xs">web-share-method</td>
+                                    <td class="px-4 py-3"><span class="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs">decision</span></td>
+                                    <td class="px-4 py-3"><span class="font-mono text-green-600 font-bold">0.85</span></td>
+                                    <td class="px-4 py-3 text-gray-600">웹 URL로만 공유 (CodePen/Playwright/Canvas)...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        function showTab(tabId) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            // Show selected tab
+            document.getElementById(tabId).classList.add('active');
+            
+            // Update nav items
+            document.querySelectorAll('.nav-item').forEach(item => {
+                item.classList.remove('bg-blue-50', 'text-blue-600');
+                item.classList.add('text-gray-700');
+            });
+            
+            // Highlight active nav
+            event.currentTarget.classList.add('bg-blue-50', 'text-blue-600');
+            event.currentTarget.classList.remove('text-gray-700');
+        }
+        
+        function showBotDetail(botName) {
+            alert(`Bot Detail Panel for ${botName}\n\nThis will slide in from the right with:\n- SOUL.md content\n- AGENTS.md content\n- Workspace file tree\n- Memory files\n- Recent activity logs`);
+        }
+    </script>
+</body>
+</html>

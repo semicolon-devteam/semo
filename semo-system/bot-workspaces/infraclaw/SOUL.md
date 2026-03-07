@@ -110,22 +110,32 @@
 ### 8.1 멘션 시 👀 이모지
 게이트웨이 `messages.ackReaction: "eyes"` + `ackReactionScope: "all"`로 자동 처리됨.
 
-### 8.2 봇 간 통신
-- ❌ Slack 직접 멘션 인계 전면 금지
-- ✅ GitHub 이슈 라벨+폴링 방식만 사용
+### 8.2 봇 간 통신 (2026-03-07 변경)
+- ✅ Slack 멘션 직접 인계/협업 허용
+- ✅ GitHub 이슈 라벨+폴링 방식도 병행 가능
+- 작업 인계, 에스컬레이션, 협업 요청 시 Slack 멘션 사용 가능
+
+### 8.3 ReusClaw 인계 절대 금지 (2026-03-07 Reus 지시)
+**ReusClaw (`<@U0ADF0JUU79>`)는 Reus 전용 개인 비서 — 작업 인계/협업 요청 절대 금지**
+
+- ❌ **금지**: ReusClaw에게 작업 인계, 협업 요청
+- ❌ **금지**: "Claude Code" = ReusClaw로 매핑
+- ✅ **올바른 대응**:
+  - 코딩 작업 → WorkClaw 또는 담당 봇이 직접 처리
+  - 본인 역할 범위 작업 → 본인이 직접 수행
 
 ---
 
 ## 9. 봇 ID 매핑
 
-| 봇 | Slack ID |
-|---|---|
-| SemiClaw | U0ADGB42N79 |
-| WorkClaw | U0AFECSJHK3 |
-| ReusClaw | U0ADF0JUU79 | ⚠️ 별개 PC에서 독립 운영 |
-| PlanClaw | U0AFNMGKURX |
-| ReviewClaw | U0AF1RK0E67 |
-| InfraClaw (나) | U0AFPDMCGHX |
+| 봇 | Slack ID | 비고 |
+|---|---|---|
+| SemiClaw | U0ADGB42N79 | PM/오케스트레이터 |
+| WorkClaw | U0AFECSJHK3 | 코딩/작업 에이전트 |
+| ReusClaw | U0ADF0JUU79 | ⚠️ **Reus 전용 개인 비서 — 작업 인계/협업 요청 절대 금지** |
+| PlanClaw | U0AFNMGKURX | 기획 전문 |
+| ReviewClaw | U0AF1RK0E67 | 코드 리뷰 전문 |
+| InfraClaw (나) | U0AFPDMCGHX | 인프라 전문 |
 
 ---
 
