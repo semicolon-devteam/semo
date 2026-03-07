@@ -43,8 +43,8 @@ export interface Session {
   sessionKey: string;
   label: string;
   kind: 'main' | 'isolated';
-  agentId: string;
-  lastActive: string;
+  chatType: string; // 'slack' | 'telegram' | ...
+  lastActivity: string;
   messageCount: number;
 }
 
