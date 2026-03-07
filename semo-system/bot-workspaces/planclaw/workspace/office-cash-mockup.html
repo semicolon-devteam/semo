@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>오피스캐시 충전 & 홍보 시스템 - 목업</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .screen {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            margin-bottom: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .screen-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #1a1a1a;
+        }
+        
+        .screen-subtitle {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 24px;
+        }
+        
+        .balance-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 16px;
+            padding: 24px;
+            color: white;
+            margin-bottom: 24px;
+        }
+        
+        .balance-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+        
+        .balance-amount {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        
+        .balance-info {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+        
+        .charge-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .charge-option {
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .charge-option:hover {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        .charge-option.selected {
+            border-color: #667eea;
+            background: #f8f9ff;
+        }
+        
+        .charge-amount {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+        
+        .charge-cash {
+            font-size: 14px;
+            color: #667eea;
+        }
+        
+        .custom-input {
+            width: 100%;
+            padding: 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 16px;
+            margin-bottom: 16px;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        
+        .promotion-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+        }
+        
+        .promotion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .office-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+        
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-ending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .promotion-info {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 12px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: #667eea;
+            transition: width 0.3s;
+        }
+        
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn-small {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .btn-outline {
+            background: white;
+            border: 1px solid #667eea;
+            color: #667eea;
+        }
+        
+        .btn-outline:hover {
+            background: #f8f9ff;
+        }
+        
+        .landing-banner {
+            background: white;
+            border: 2px dashed #667eea;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        
+        .banner-label {
+            font-size: 12px;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .banner-placeholder {
+            font-size: 14px;
+            color: #999;
+        }
+        
+        .office-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 24px;
+        }
+        
+        .office-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: all 0.2s;
+        }
+        
+        .office-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .office-image {
+            width: 100%;
+            height: 160px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+        }
+        
+        .office-content {
+            padding: 16px;
+        }
+        
+        .office-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #1a1a1a;
+        }
+        
+        .office-desc {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+        
+        .promoted-tag {
+            display: inline-block;
+            background: #ffd700;
+            color: #1a1a1a;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 style="font-size: 32px; margin-bottom: 32px; color: #1a1a1a;">오피스캐시 시스템 목업</h1>
+        
+        <!-- 화면 1: 오피스캐시 충전 -->
+        <div class="screen">
+            <div class="screen-title">오피스캐시 충전</div>
+            <div class="screen-subtitle">마이페이지 &gt; 오피스캐시 충전</div>
+            
+            <div class="balance-card">
+                <div class="balance-label">보유 오피스캐시</div>
+                <div class="balance-amount">250,000 캐시</div>
+                <div class="balance-info">1 캐시 = 1원</div>
+            </div>
+            
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 16px; color: #1a1a1a;">충전 금액 선택</h3>
+            
+            <div class="charge-options">
+                <div class="charge-option">
+                    <div class="charge-amount">50,000원</div>
+                    <div class="charge-cash">50,000 캐시</div>
+                </div>
+                <div class="charge-option selected">
+                    <div class="charge-amount">100,000원</div>
+                    <div class="charge-cash">100,000 캐시</div>
+                </div>
+                <div class="charge-option">
+                    <div class="charge-amount">200,000원</div>
+                    <div class="charge-cash">200,000 캐시</div>
+                </div>
+                <div class="charge-option">
+                    <div class="charge-amount">500,000원</div>
+                    <div class="charge-cash">500,000 캐시</div>
+                </div>
+            </div>
+            
+            <input type="text" class="custom-input" placeholder="직접 입력 (최소 10,000원)">
+            
+            <button class="btn btn-primary">충전하기</button>
+        </div>
+        
+        <!-- 화면 2: 오피스 홍보 등록 -->
+        <div class="screen">
+            <div class="screen-title">오피스 홍보하기</div>
+            <div class="screen-subtitle">랜딩페이지에 내 오피스를 홍보하세요</div>
+            
+            <div style="background: #f8f9ff; border: 1px solid #e0e6ff; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+                <div style="font-size: 14px; color: #667eea; font-weight: 600; margin-bottom: 8px;">💡 홍보 안내</div>
+                <ul style="font-size: 14px; color: #666; line-height: 1.8; padding-left: 20px;">
+                    <li>홍보 비용: 50,000 오피스캐시 (30일)</li>
+                    <li>랜딩페이지 상단에 노출됩니다</li>
+                    <li>만료 3일 전 알림을 보내드립니다</li>
+                    <li>잔액이 충분하면 자동으로 연장됩니다</li>
+                </ul>
+            </div>
+            
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 16px; color: #1a1a1a;">홍보할 오피스 선택</h3>
+            
+            <div style="border: 2px solid #667eea; border-radius: 12px; padding: 20px; margin-bottom: 16px; background: #f8f9ff;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-size: 18px; font-weight: 700; color: #1a1a1a; margin-bottom: 4px;">강남 코워킹 스페이스</div>
+                        <div style="font-size: 14px; color: #666;">서울 강남구 테헤란로 123</div>
+                    </div>
+                    <div style="padding: 8px 16px; background: white; border-radius: 8px; font-weight: 600; color: #667eea;">선택됨</div>
+                </div>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px; background: #f5f5f5; border-radius: 12px; margin-bottom: 24px;">
+                <span style="font-size: 14px; color: #666;">결제 금액</span>
+                <span style="font-size: 20px; font-weight: 700; color: #1a1a1a;">50,000 캐시</span>
+            </div>
+            
+            <button class="btn btn-primary">홍보 시작하기</button>
+        </div>
+        
+        <!-- 화면 3: 홍보 관리 -->
+        <div class="screen">
+            <div class="screen-title">내 홍보 관리</div>
+            <div class="screen-subtitle">진행 중인 홍보를 관리하세요</div>
+            
+            <div class="promotion-card">
+                <div class="promotion-header">
+                    <div class="office-name">강남 코워킹 스페이스</div>
+                    <div class="status-badge status-active">진행중</div>
+                </div>
+                
+                <div class="promotion-info">
+                    <div class="info-item">
+                        <span>📅</span>
+                        <span>2026-03-01 ~ 2026-03-31</span>
+                    </div>
+                    <div class="info-item">
+                        <span>⏱️</span>
+                        <span>23일 남음</span>
+                    </div>
+                </div>
+                
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 23%;"></div>
+                </div>
+                
+                <div class="btn-group">
+                    <button class="btn-small btn-primary">연장하기</button>
+                    <button class="btn-small btn-outline">종료하기</button>
+                </div>
+            </div>
+            
+            <div class="promotion-card">
+                <div class="promotion-header">
+                    <div class="office-name">홍대 공유오피스</div>
+                    <div class="status-badge status-ending">곧 만료</div>
+                </div>
+                
+                <div class="promotion-info">
+                    <div class="info-item">
+                        <span>📅</span>
+                        <span>2026-02-05 ~ 2026-03-07</span>
+                    </div>
+                    <div class="info-item">
+                        <span>⏱️</span>
+                        <span>2일 남음</span>
+                    </div>
+                </div>
+                
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 93%;"></div>
+                </div>
+                
+                <div style="background: #fff3cd; border-radius: 8px; padding: 12px; margin-bottom: 12px;">
+                    <div style="font-size: 13px; color: #856404;">⚠️ 잔액이 부족하여 자동 연장이 불가능합니다. 오피스캐시를 충전해주세요.</div>
+                </div>
+                
+                <div class="btn-group">
+                    <button class="btn-small btn-primary">캐시 충전 후 연장</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 화면 4: 랜딩페이지 홍보 노출 -->
+        <div class="screen">
+            <div class="screen-title">랜딩페이지 (방문자 화면)</div>
+            <div class="screen-subtitle">홍보 중인 오피스가 상단에 노출됩니다</div>
+            
+            <div class="landing-banner">
+                <div class="banner-label">🌟 PROMOTED OFFICES</div>
+                <div class="banner-placeholder">홍보 중인 오피스 영역</div>
+            </div>
+            
+            <div class="office-grid">
+                <div class="office-card">
+                    <div class="office-image">강남 코워킹 스페이스</div>
+                    <div class="office-content">
+                        <div class="promoted-tag">💎 홍보중</div>
+                        <div class="office-title">강남 코워킹 스페이스</div>
+                        <div class="office-desc">강남역 도보 3분, 쾌적한 업무 환경 제공</div>
+                    </div>
+                </div>
+                
+                <div class="office-card">
+                    <div class="office-image">홍대 공유오피스</div>
+                    <div class="office-content">
+                        <div class="promoted-tag">💎 홍보중</div>
+                        <div class="office-title">홍대 공유오피스</div>
+                        <div class="office-desc">창의적인 공간, 다양한 네트워킹 기회</div>
+                    </div>
+                </div>
+                
+                <div class="office-card">
+                    <div class="office-image">판교 테크 오피스</div>
+                    <div class="office-content">
+                        <div class="office-title">판교 테크 오피스</div>
+                        <div class="office-desc">IT 기업 특화, 최신 시설 완비</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

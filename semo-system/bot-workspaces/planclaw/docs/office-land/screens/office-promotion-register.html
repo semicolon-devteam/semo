@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>화면설계서 - 오피스 홍보 등록</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 40px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .meta {
+            display: flex;
+            gap: 30px;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            padding: 40px;
+        }
+        
+        .ui-section {
+            position: sticky;
+            top: 20px;
+            height: fit-content;
+        }
+        
+        .ui-section h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+        
+        .ui-preview {
+            width: 100%;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            padding: 32px;
+            background: #fafafa;
+        }
+        
+        .info-box {
+            background: #f8f9ff;
+            border: 1px solid #e0e6ff;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .info-title {
+            font-size: 14px;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .info-list {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.8;
+            padding-left: 20px;
+        }
+        
+        .office-card {
+            border: 2px solid #667eea;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 16px;
+            background: #f8f9ff;
+        }
+        
+        .office-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .office-info {
+            flex: 1;
+        }
+        
+        .office-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 4px;
+        }
+        
+        .office-address {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .selected-badge {
+            padding: 8px 16px;
+            background: white;
+            border-radius: 8px;
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        .cost-box {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: #f5f5f5;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .cost-label {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .cost-amount {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a1a;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: #667eea;
+            color: white;
+        }
+        
+        .specs-section h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+        
+        .spec-item {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .spec-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .spec-label {
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .spec-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .spec-detail {
+            display: grid;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
+        .spec-row {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 12px;
+            padding: 8px 0;
+        }
+        
+        .spec-key {
+            font-weight: 600;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .spec-value {
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .spec-value code {
+            background: #e3e8ef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+        }
+        
+        .spec-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .spec-list li {
+            padding: 4px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .spec-list li:before {
+            content: "▸";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+        }
+        
+        .additional-sections {
+            grid-column: 1 / -1;
+            margin-top: 20px;
+            padding-top: 30px;
+            border-top: 2px solid #e0e0e0;
+        }
+        
+        .section-block {
+            margin-bottom: 30px;
+        }
+        
+        .section-block h3 {
+            font-size: 20px;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .flow-diagram {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            line-height: 1.8;
+        }
+        
+        .api-block {
+            background: #282c34;
+            color: #abb2bf;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        
+        .api-block code {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+        }
+        
+        .exception-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .exception-table th,
+        .exception-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .exception-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        @media (max-width: 1024px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+            
+            .ui-section {
+                position: relative;
+                top: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📢 오피스 홍보 등록 화면</h1>
+            <div class="meta">
+                <div class="meta-item">
+                    <span>📄 화면 ID:</span>
+                    <strong>PAY-OFFICE-CASH-002</strong>
+                </div>
+                <div class="meta-item">
+                    <span>🔗 경로:</span>
+                    <strong>/mypage/office/promote</strong>
+                </div>
+                <div class="meta-item">
+                    <span>📅 작성일:</span>
+                    <strong>2026-03-04</strong>
+                </div>
+                <div class="meta-item">
+                    <span>✍️ 작성자:</span>
+                    <strong>PlanClaw</strong>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="content">
+            <!-- UI Preview -->
+            <div class="ui-section">
+                <h2>🎨 UI 미리보기</h2>
+                <div class="ui-preview">
+                    <div style="font-size: 24px; font-weight: 700; margin-bottom: 8px; color: #1a1a1a;">오피스 홍보하기</div>
+                    <div style="font-size: 14px; color: #666; margin-bottom: 24px;">랜딩페이지에 내 오피스를 홍보하세요</div>
+                    
+                    <div class="info-box">
+                        <div class="info-title">💡 홍보 안내</div>
+                        <ul class="info-list">
+                            <li>홍보 비용: 50,000 오피스캐시 (30일)</li>
+                            <li>랜딩페이지 상단에 노출됩니다</li>
+                            <li>만료 3일 전 알림을 보내드립니다</li>
+                            <li>잔액이 충분하면 자동으로 연장됩니다</li>
+                        </ul>
+                    </div>
+                    
+                    <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 16px; color: #1a1a1a;">홍보할 오피스 선택</h3>
+                    
+                    <div class="office-card">
+                        <div class="office-header">
+                            <div class="office-info">
+                                <div class="office-name">강남 코워킹 스페이스</div>
+                                <div class="office-address">서울 강남구 테헤란로 123</div>
+                            </div>
+                            <div class="selected-badge">선택됨</div>
+                        </div>
+                    </div>
+                    
+                    <div class="cost-box">
+                        <span class="cost-label">결제 금액</span>
+                        <span class="cost-amount">50,000 캐시</span>
+                    </div>
+                    
+                    <button class="btn">홍보 시작하기</button>
+                </div>
+            </div>
+            
+            <!-- Specifications -->
+            <div class="specs-section">
+                <h2>📋 요소별 명세</h2>
+                
+                <!-- Spec Item 1 -->
+                <div class="spec-item">
+                    <div class="spec-header">
+                        <span class="spec-label">A</span>
+                        <span class="spec-name">홍보 안내 박스</span>
+                    </div>
+                    <div class="spec-detail">
+                        <div class="spec-row">
+                            <div class="spec-key">타입</div>
+                            <div class="spec-value">Info Box (Static)</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">표시 정보</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>홍보 비용: 50,000 오피스캐시 (30일)</li>
+                                    <li>노출 위치: 랜딩페이지 상단</li>
+                                    <li>만료 알림: 만료 3일 전</li>
+                                    <li>자동 연장: 잔액 충분 시</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">스타일</div>
+                            <div class="spec-value">연한 파란 배경 + 파란 테두리</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Spec Item 2 -->
+                <div class="spec-item">
+                    <div class="spec-header">
+                        <span class="spec-label">B</span>
+                        <span class="spec-name">오피스 선택 카드</span>
+                    </div>
+                    <div class="spec-detail">
+                        <div class="spec-row">
+                            <div class="spec-key">타입</div>
+                            <div class="spec-value">Single Select (Radio Group)</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">데이터 소스</div>
+                            <div class="spec-value"><code>GET /rest/v1/offices?userId={userId}&amp;role=OWNER</code></div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">표시 정보</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>오피스 이름</li>
+                                    <li>오피스 주소 (간략)</li>
+                                    <li>선택 상태 (선택됨 뱃지)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">필터링</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>본인 소유 오피스만 표시</li>
+                                    <li>이미 홍보 중인 오피스 제외</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">동작</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>클릭 시: 선택 상태 토글</li>
+                                    <li>선택 시: 파란 테두리 + 연한 파란 배경</li>
+                                    <li>다른 오피스 선택 시: 이전 선택 해제</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">예외 처리</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>소유 오피스 없음: "등록된 오피스가 없습니다" + 오피스 등록 버튼</li>
+                                    <li>모두 홍보 중: "홍보 가능한 오피스가 없습니다" + 홍보 관리 버튼</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Spec Item 3 -->
+                <div class="spec-item">
+                    <div class="spec-header">
+                        <span class="spec-label">C</span>
+                        <span class="spec-name">결제 금액 표시</span>
+                    </div>
+                    <div class="spec-detail">
+                        <div class="spec-row">
+                            <div class="spec-key">타입</div>
+                            <div class="spec-value">Info Display (Static)</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">표시 정보</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>좌측: "결제 금액" 라벨</li>
+                                    <li>우측: "50,000 캐시" (고정값)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">스타일</div>
+                            <div class="spec-value">회색 배경 박스, 큰 폰트 (금액 강조)</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Spec Item 4 -->
+                <div class="spec-item">
+                    <div class="spec-header">
+                        <span class="spec-label">D</span>
+                        <span class="spec-name">홍보 시작 버튼</span>
+                    </div>
+                    <div class="spec-detail">
+                        <div class="spec-row">
+                            <div class="spec-key">타입</div>
+                            <div class="spec-value">Primary Button (Full Width)</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">활성화 조건</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>오피스 선택됨</li>
+                                    <li>잔액 충분 (50,000 이상)</li>
+                                    <li>처리 중 아님</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">클릭 동작</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>1. 확인 모달 표시 ("홍보를 시작하시겠습니까?")</li>
+                                    <li>2. 확인 클릭 시: API 호출 (홍보 등록)</li>
+                                    <li>3. 성공 시: 홍보 관리 페이지로 이동 + 성공 토스트</li>
+                                    <li>4. 실패 시: 에러 메시지 표시</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">로딩 상태</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>버튼 텍스트: "홍보 시작하기" → "처리 중..."</li>
+                                    <li>버튼 비활성화 + 스피너 표시</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">예외 처리</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>오피스 미선택: "홍보할 오피스를 선택해주세요"</li>
+                                    <li>잔액 부족: "오피스캐시가 부족합니다" + 충전 버튼</li>
+                                    <li>중복 홍보: "이미 홍보 중인 오피스입니다"</li>
+                                    <li>API 오류: "홍보 등록에 실패했습니다"</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Additional Sections -->
+            <div class="additional-sections">
+                <!-- User Flow -->
+                <div class="section-block">
+                    <h3>🔄 사용자 플로우</h3>
+                    <div class="flow-diagram">
+1. 페이지 진입
+   ↓
+2. 데이터 로드
+   ├─ 소유 오피스 목록 조회
+   ├─ 현재 홍보 중인 오피스 조회
+   └─ 오피스캐시 잔액 조회
+   ↓
+3. 화면 표시
+   ├─ 홍보 가능한 오피스 목록 표시
+   └─ 홍보 안내 박스 표시
+   ↓
+4. 오피스 선택
+   ├─ 없음 → "등록된 오피스가 없습니다"
+   └─ 있음 → 선택 (파란 테두리 강조)
+   ↓
+5. "홍보 시작하기" 버튼 클릭
+   ↓
+6. 유효성 검사
+   ├─ 오피스 미선택 → 에러 메시지
+   ├─ 잔액 부족 → "캐시 충전" 버튼 표시
+   └─ 정상 → 다음 단계
+   ↓
+7. 확인 모달 표시
+   "강남 코워킹 스페이스를 30일간 홍보하시겠습니까? (50,000 캐시)"
+   ├─ 취소 → 모달 닫기
+   └─ 확인 → 다음 단계
+   ↓
+8. API 호출 (홍보 등록)
+   ├─ 성공 → 홍보 관리 페이지로 이동 + "홍보가 시작되었습니다"
+   └─ 실패 → 에러 메시지 표시</div>
+                </div>
+                
+                <!-- API -->
+                <div class="section-block">
+                    <h3>🔌 API 명세</h3>
+                    <div class="api-block">
+<code><strong>1. 소유 오피스 목록 조회</strong>
+GET /rest/v1/offices?userId={userId}&amp;role=OWNER
+Response: [
+  { "id": 123, "name": "강남 코워킹 스페이스", "address": "서울 강남구..." },
+  { "id": 456, "name": "홍대 공유오피스", "address": "서울 마포구..." }
+]
+
+<strong>2. 홍보 중인 오피스 조회</strong>
+GET /rest/v1/office-promotions?status=ACTIVE
+Response: [
+  { "officeId": 456, "endDate": "2026-03-31" }
+]
+
+<strong>3. 홍보 등록</strong>
+POST /rest/v1/office-promotions
+Body: { 
+  "officeId": 123, 
+  "cost": 50000,
+  "autoRenew": true 
+}
+Response: { 
+  "success": true, 
+  "promotionId": "promo_xxx",
+  "startDate": "2026-03-04T10:00:00Z",
+  "endDate": "2026-04-03T10:00:00Z"
+}</code>
+                    </div>
+                </div>
+                
+                <!-- Exception Handling -->
+                <div class="section-block">
+                    <h3>⚠️ 예외 처리</h3>
+                    <table class="exception-table">
+                        <thead>
+                            <tr>
+                                <th>상황</th>
+                                <th>에러 메시지</th>
+                                <th>후속 조치</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>일반 회원 접근</td>
+                                <td>"기업회원 전용 기능입니다"</td>
+                                <td>404 페이지로 리다이렉트</td>
+                            </tr>
+                            <tr>
+                                <td>소유 오피스 없음</td>
+                                <td>"등록된 오피스가 없습니다"</td>
+                                <td>"오피스 등록하기" 버튼 표시</td>
+                            </tr>
+                            <tr>
+                                <td>홍보 가능한 오피스 없음</td>
+                                <td>"홍보 가능한 오피스가 없습니다"</td>
+                                <td>"홍보 관리" 버튼 표시</td>
+                            </tr>
+                            <tr>
+                                <td>오피스 미선택</td>
+                                <td>"홍보할 오피스를 선택해주세요"</td>
+                                <td>오피스 카드 영역 강조</td>
+                            </tr>
+                            <tr>
+                                <td>잔액 부족 (50,000 미만)</td>
+                                <td>"오피스캐시가 부족합니다"</td>
+                                <td>"캐시 충전" 버튼 표시 (충전 페이지로 이동)</td>
+                            </tr>
+                            <tr>
+                                <td>중복 홍보 시도</td>
+                                <td>"이미 홍보 중인 오피스입니다"</td>
+                                <td>"홍보 관리" 버튼 표시</td>
+                            </tr>
+                            <tr>
+                                <td>API 오류</td>
+                                <td>"홍보 등록에 실패했습니다"</td>
+                                <td>재시도 버튼 표시</td>
+                            </tr>
+                            <tr>
+                                <td>네트워크 오류</td>
+                                <td>"네트워크 오류가 발생했습니다"</td>
+                                <td>재시도 버튼 표시</td>
+                            </tr>
+                            <tr>
+                                <td>트랜잭션 실패</td>
+                                <td>"결제 처리 중 오류가 발생했습니다"</td>
+                                <td>고객센터 안내</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Responsive & Accessibility -->
+                <div class="section-block">
+                    <h3>📱 반응형 & 접근성</h3>
+                    <ul class="spec-list" style="padding-left: 20px;">
+                        <li><strong>모바일 (~ 768px)</strong>: 오피스 카드 세로 스택, 터치 영역 최소 44x44px</li>
+                        <li><strong>태블릿 (769px ~ 1024px)</strong>: 오피스 카드 2열 그리드 (오피스 2개 이상 시)</li>
+                        <li><strong>데스크톱 (1025px ~)</strong>: 오피스 카드 2열 그리드</li>
+                        <li><strong>키보드 탐색</strong>: Tab 키로 오피스 카드 이동, Space 키로 선택</li>
+                        <li><strong>스크린 리더</strong>: "강남 코워킹 스페이스, 서울 강남구 테헤란로 123, 선택됨" 읽기</li>
+                        <li><strong>고대비 모드</strong>: 선택 상태 테두리 두께 3px</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

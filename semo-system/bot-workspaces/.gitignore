@@ -1,0 +1,39 @@
+# Python virtual environments
+.venv/
+venv/
+__pycache__/
+
+# Node
+node_modules/
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Large binaries
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.mp4
+*.mp3
+*.wav
+*.zip
+*.tar.gz
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git repos inside workspaces (managed by semo repo)
+**/.git/
+
+# Token files
+*-tokens.json
+*.token
+
+# Google Calendar tokens
+google-calendar/tokens.json
+gcal-auth.js

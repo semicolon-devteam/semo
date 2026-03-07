@@ -1,0 +1,268 @@
+{
+  "projects": [
+    {
+      "name": "PS",
+      "repo": "ps",
+      "dir": "ps",
+      "owner": "Reus",
+      "contributors": ["Reus", "Roki", "Bae(인프라)"],
+      "milestone": "2월 오픈",
+      "status": "앱스토어 심사 대기",
+      "lastCommit": "2026-02-01",
+      "notes": "3/2~3/6 커밋 없음. 심사 결과 대기 중.",
+      "url": "https://psclub.fun"
+    },
+    {
+      "name": "게임랜드",
+      "repo": "proj-game-land",
+      "dir": "land",
+      "owner": "Reus",
+      "contributors": ["Reus", "Roki", "Garden", "Bab"],
+      "milestone": "포인트 교환소 + 게임존 확장",
+      "status": "활발히 개발 중 🔥",
+      "lastCommit": "2026-03-05",
+      "url": null,
+      "notes": "v2.1.4 릴리즈. Pragmatic Play 슬롯 통합, 게임존 UI 개선, 계정 연동 + 포인트 교환소 구현."
+    },
+    {
+      "name": "플레이랜드",
+      "repo": "proj-play-land",
+      "dir": "land",
+      "owner": "Reus",
+      "contributors": ["Reus", "Roki", "Garden", "ladley"],
+      "milestone": "포인트 교환소 + 아이돌 관리",
+      "status": "활발히 개발 중 🔥",
+      "lastCommit": "2026-03-05",
+      "url": null,
+      "notes": "v2.1.2 릴리즈. 계정 연동+포인트 교환소, 아이돌 상태 변경 UI, 소셜 이미지 지원, 비로그인 접근 버그 일괄 수정."
+    },
+    {
+      "name": "오피스 커뮤니티",
+      "repo": "cm-office",
+      "dir": "land",
+      "owner": "Reus",
+      "contributors": ["Reus", "Roki", "bon", "Garden"],
+      "milestone": "캐시충전 + 포인트 교환소",
+      "status": "활발히 개발 중 🔥",
+      "lastCommit": "2026-03-05",
+      "notes": "v1.0.35 릴리즈. 계정 연동+포인트 교환소, 기업회원 캐시충전 페이지, 배너 노출 DB 설정, 게시글 목록 1-Hop 마이그레이션."
+    },
+    {
+      "name": "정치판",
+      "repo": "cm-jungchipan",
+      "dir": "jungchipan",
+      "owner": "Harry Lee",
+      "contributors": ["Harry Lee", "Yeomso", "Roki", "Bab", "Reus"],
+      "milestone": "SEO 오가닉 트래픽 성장 + AI 자동화",
+      "status": "이번 주 커밋 없음",
+      "lastCommit": "2026-02-27",
+      "notes": "3/2~3/6 커밋 없음. 이전 주 Agentic Workflows, SSR 전환, AI 자동 참여 구축 완료.",
+      "url": "https://jungchipan.net"
+    },
+    {
+      "name": "ServiceMaker",
+      "repo": null,
+      "dir": null,
+      "owner": "kyago",
+      "contributors": ["kyago"],
+      "milestone": "MVP 시연 완료",
+      "status": "✅ MVP 완료 — 현재 다른 업무 우선 배정",
+      "lastCommit": "2026-02-16",
+      "notes": "2/16 MVP 시연 문제없이 완료. kyago 현재 ms-authenticator + 포인트 환전소 작업 중."
+    },
+    {
+      "name": "노조관리",
+      "repo": "cm-labor-union",
+      "dir": "labor-union",
+      "owner": "Reus",
+      "contributors": ["Reus", "Roki", "hwanghyunjong"],
+      "milestone": "기능 개선 + 운영",
+      "status": "활발히 개발 중 🔥",
+      "lastCommit": "2026-03-05",
+      "notes": "현장상태 동적 관리(ENUM→테이블 전환), 교섭현황 UI/UX+엑셀 확장, 대기자 자동관리, 지출결의서 양식+이력서 PDF.",
+      "url": "https://mvp-labor-union.vercel.app/"
+    },
+    {
+      "name": "BebeCare",
+      "repo": "proj-bebecare",
+      "dir": "bebecare",
+      "owner": "Reus",
+      "contributors": ["Reus", "won"],
+      "milestone": "OKE 마이그레이션",
+      "status": "인프라 전환 중",
+      "lastCommit": "2026-03-02",
+      "notes": "OKE 배포용 standalone 출력 설정, dev CI/CD 워크플로우 추가.",
+      "url": "https://bebecare.vercel.app"
+    },
+    {
+      "name": "AXOracle",
+      "repo": "axoracle",
+      "dir": "axoracle",
+      "owner": "Reus",
+      "contributors": ["Reus"],
+      "milestone": "진행 중",
+      "status": "UX 개선 중",
+      "lastCommit": "2026-03-04",
+      "notes": "온보딩 검색 포커스 시 헤드라인/카테고리 칩 숨기기 UX 개선 (#65).",
+      "url": "https://axoracle.com"
+    },
+    {
+      "name": "Celeb Map",
+      "repo": "proj-celeb-map",
+      "dir": "celeb-map",
+      "owner": "Kai",
+      "contributors": ["Kai"],
+      "milestone": "Sprint 1 완료",
+      "status": "Sprint 1 완료 → 다음 스텝 대기",
+      "lastCommit": "2026-02-08",
+      "notes": "초기 구축 완료. 다음 스프린트 계획 필요."
+    },
+    {
+      "name": "SEMO",
+      "repo": "semo",
+      "dir": null,
+      "owner": "Reus",
+      "contributors": ["Reus"],
+      "milestone": null,
+      "status": "보류",
+      "lastCommit": "2026-02-08",
+      "notes": "Claude Code용 공유기억/컨텍스트 유지 npm 패키지. OpenClaw 봇 세팅으로 중단."
+    },
+    {
+      "name": "core-backend",
+      "repo": "core-backend",
+      "dir": "land",
+      "owner": "bon",
+      "contributors": ["bon", "Reus", "ladley"],
+      "milestone": "오피스 캐시 + 홍보 + 아이돌 관리",
+      "status": "활발히 개발 중 🔥",
+      "lastCommit": "2026-03-06",
+      "notes": "v1.1.2 릴리즈. 오피스 캐시+홍보 API 풀스택(#303), 배너 관리(#302), 아이돌 상태 API(#232), offices→posts 리네임, Swagger/Jackson/예외핸들러 수정, Java 21 전환. 36커밋."
+    },
+    {
+      "name": "바이바이어",
+      "repo": "mvp-car-dealer",
+      "dir": "car-dealer",
+      "owner": "Reus",
+      "contributors": ["Reus", "Roki"],
+      "milestone": "진행 중",
+      "status": "개발 중",
+      "url": "https://mvp-car-dealer.vercel.app/",
+      "lastCommit": null,
+      "notes": "중고차 수출 플랫폼."
+    },
+    {
+      "name": "차곡",
+      "repo": "mvp-chagok",
+      "dir": "chagok",
+      "owner": "Reus",
+      "contributors": ["Reus", "Roki"],
+      "milestone": null,
+      "status": "일시 중지",
+      "lastCommit": null,
+      "notes": "에스테틱 관리 플랫폼. 약손(Healing-hands)로 피벗 검토했으나 별도 서비스로 분리 합의. 일정 이유로 중단."
+    },
+    {
+      "name": "코인톡",
+      "repo": "cm-cointalk",
+      "dir": "cointalk",
+      "owner": "Reus",
+      "contributors": ["Reus"],
+      "milestone": null,
+      "status": "보류",
+      "lastCommit": null,
+      "notes": "팀 최초 커뮤니티 프로젝트. 코인 종합커뮤니티 → 코인 리딩 MVP로 축소. 타 프로젝트 우선."
+    },
+    {
+      "name": "팀 소개사이트",
+      "repo": "cm-introduction-new",
+      "dir": "introduction",
+      "owner": "Yeomso",
+      "contributors": ["Yeomso"],
+      "milestone": null,
+      "status": "유지보수",
+      "lastCommit": null,
+      "notes": "세미콜론 팀 소개 및 포트폴리오."
+    },
+    {
+      "name": "링크모음(링크타)",
+      "repo": "mvp-link-collect",
+      "dir": "link-collect",
+      "owner": "Roki",
+      "contributors": ["Roki", "Reus"],
+      "milestone": null,
+      "status": "개발 중",
+      "lastCommit": null,
+      "notes": "링크모음 사이트. 트래픽 → 광고 BM + 외부 사이트 판매 수익모델 검토 중."
+    },
+    {
+      "name": "매출지킴이",
+      "repo": "proj-sales-keeper",
+      "dir": "sales-keeper",
+      "owner": "Roki",
+      "contributors": ["Roki", "Reus", "Dwight"],
+      "milestone": null,
+      "status": "보류",
+      "lastCommit": null,
+      "notes": "Dwight과 공동개발 후 Dwight이 분리 운영. 소스 권리는 세미콜론에도 있으나 작업 안 함."
+    },
+    {
+      "name": "삼호작업복",
+      "repo": "mvp-samho-work-clothes",
+      "dir": "samho-work-clothes",
+      "owner": "Reus",
+      "contributors": ["Reus"],
+      "milestone": null,
+      "status": "완료",
+      "lastCommit": null,
+      "notes": "Reus 어머니 가게용. 외국인 노동자 대상 다국어 가게 운영 가이드 사이트."
+    },
+    {
+      "name": "서울관광앱",
+      "repo": "proj-seoul-tourist",
+      "dir": "seoul-tourist",
+      "owner": "Reus",
+      "contributors": ["Reus"],
+      "milestone": null,
+      "status": "보류 (프로토타입)",
+      "lastCommit": null,
+      "notes": "외주 수주용 프로토타입 앱. 클라이언트 연락 대기 중."
+    },
+    {
+      "name": "조선소관리",
+      "repo": "mvp-shipyard-management",
+      "dir": "shipyard-management",
+      "owner": "Reus",
+      "contributors": ["Reus"],
+      "milestone": null,
+      "status": "보류",
+      "lastCommit": null,
+      "notes": "조선소 내 인력관리 서비스. 현재 중단."
+    },
+    {
+      "name": "바이럴(오르다/그레미)",
+      "repo": null,
+      "dir": "viral",
+      "owner": "Dwight",
+      "contributors": ["Dwight"],
+      "milestone": null,
+      "status": "운영 중",
+      "lastCommit": null,
+      "notes": "Dwight이 바이럴마케팅 대표와 지분협의로 구현. 세미콜론 인프라 활용. 오르다(orda.it.kr) 운영 중, 그레미(gramii.co.kr) 중단 예정. 바이럴마케팅 대표와 Reus 2/23 미팅 예정.",
+      "url": "https://orda.it.kr/"
+    }
+  ],
+  "weeklyReport": {
+    "day": "friday",
+    "time": "14:00",
+    "target": "C020RQTNPFY",
+    "targetNote": "개발 사업팀 채널",
+    "lastSent": "2026-03-06"
+  },
+  "lastFullScan": "2026-03-06",
+  "config": {
+    "commitScanDay": "friday",
+    "contextCollectDay": "thursday",
+    "reportDay": "friday"
+  }
+}

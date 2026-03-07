@@ -1,0 +1,33 @@
+{
+  "_comment": "InfraClaw OpenClaw config 템플릿 — 실제 토큰은 onboard 시 설정",
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "anthropic/claude-sonnet-4-5",
+        "fallbacks": ["anthropic/claude-haiku-4-5"]
+      },
+      "workspace": "~/.openclaw/workspace"
+    }
+  },
+  "channels": {
+    "slack": {
+      "mode": "socket",
+      "enabled": true,
+      "allowBots": false,
+      "groupPolicy": "allowlist",
+      "channels": {
+        "#_reus": { "allowBots": true },
+        "#_bot-ops": { "allowBots": true }
+      },
+      "dm": {
+        "enabled": true,
+        "policy": "allowlist",
+        "allowFrom": ["URSQYUNQJ", "URU4UBX9R", "U0ADGB42N79"]
+      }
+    }
+  },
+  "gateway": {
+    "mode": "local",
+    "bind": "loopback"
+  }
+}
