@@ -185,6 +185,16 @@
 - **VCN**: 설정 완료
 - **DB 서브넷**: private.db (10.0.3.0/24)
 
+### DNS 관리 (2026-03-07 확정)
+**Cloudflare 관리 도메인** (이 외는 Cloudflare 아님):
+- `jungchipan.net`
+- `semi-colon.space`
+- `site-ranking.info`
+
+**기타 도메인**:
+- `axoracle.com`: whois.com에서 구매 (Cloudflare 아님)
+- 기타 도메인: 각각 별도 레지스트라 관리 가능 — 확인 필수
+
 ### DB (Central Database)
 - **스펙**: ARM 2vcpu 8GB RAM, 50GB SSD
 - **엔진**: PostgreSQL 14
@@ -529,3 +539,23 @@ DNS A 레코드 등록 (OCI Console)
 **앞으로**:
 - Terraform 작업 전 항상 "기존 리소스가 state에 있는가?" 확인
 - 없으면 import 또는 수동 변경 선택지 Garden에게 제시
+
+### DNS Hallucination — 인프라 정보 검증 의무 (2026-03-07)
+**사건**: InfraClaw(나)가 `axoracle.com` DNS를 Cloudflare에서 관리한다고 잘못 발언
+- **실제**: whois.com에서 구매한 도메인, Cloudflare에 해당 도메인 없음
+- **Cloudflare 실제 관리 도메인** (이 외는 Cloudflare 아님):
+  - `jungchipan.net`
+  - `semi-colon.space`
+  - `site-ranking.info`
+
+**교훈 (전 봇 공통 원칙)**:
+1. **인프라 정보는 반드시 CLI/콘솔로 실제 확인 후 발언**
+   - DNS, 도메인, 서버 구성 등 — 추정 금지
+2. **확인 불가능하면 "확인 필요"라고 명시**
+   - 추정을 사실처럼 기술 절대 금지
+3. **도메인별 DNS 제공자가 다를 수 있음**
+   - 하나를 보고 전체 일반화 금지
+
+**앞으로**:
+- 도메인 관련 질문 시 반드시 `whois` 또는 실제 DNS 관리 콘솔 확인
+- 확신 없으면 "확인 필요" 또는 Garden/Reus에게 질의
