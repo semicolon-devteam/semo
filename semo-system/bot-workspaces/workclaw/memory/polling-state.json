@@ -1,0 +1,16 @@
+{
+  "lastPoll": "2026-03-07T04:41:00+09:00",
+  "status": "completed",
+  "foundIssues": 1,
+  "processedIssues": [
+    {
+      "repo": "semi-colon-ops",
+      "issueNumber": 2,
+      "title": "[Infra] Authenticator API Key 발급 및 개발환경 세팅",
+      "status": "skipped",
+      "reason": "InfraClaw 스코프 이슈 (bot:infraclaw 라벨 확인). OKE/Vault/K8S 설정 작업으로 코드 구현 작업 아님",
+      "timestamp": "2026-03-07T04:41:00+09:00"
+    }
+  ],
+  "pendingIssues": []
+}

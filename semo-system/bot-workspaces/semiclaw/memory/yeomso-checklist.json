@@ -1,0 +1,68 @@
+{
+  "owner": "Yeomso",
+  "slackId": "U01KH8V6ZHP",
+  "dmChannel": "D0AF3E6BRQQ",
+  "updatedAt": "2026-02-17",
+  "version": 2,
+  "projects": {
+    "jungchipan": {
+      "name": "정치판",
+      "routines": [
+        { "id": "jp-content", "text": "컨텐츠 관리 (토론 생성 / 카드 이미지 / 더미 데이터)", "cycle": "daily" },
+        { "id": "jp-seo", "text": "SEO 작업", "cycle": "weekly" },
+        { "id": "jp-promo", "text": "홍보 (숏폼 영상 제작 → SNS 업로드)", "cycle": "daily" }
+      ],
+      "tasks": [
+        { "id": "jp-t1", "text": "로고 로딩 시 버그 수정 (텍스트 노출 + 높이값 늘어남)", "date": "2026-02-17", "done": true },
+        { "id": "jp-t2", "text": "토론 생성 작업 (3건)", "date": "2026-02-17", "done": true },
+        { "id": "jp-t3", "text": "중복 댓글 삭제 + 더미 데이터 생성 가이드 규격화", "date": "2026-02-17", "done": true },
+        { "id": "jp-t4", "text": "댓글 인피니티 스크롤 로딩 버그 수정", "date": "2026-02-17", "done": true },
+        { "id": "jp-t5", "text": "4티어 카드 이미지 제작 (분량 많음, 이미지 퀄리티 이슈)", "date": null, "done": false, "priority": "low", "note": "진행중이나 우선순위 뒤로" },
+        { "id": "jp-t6", "text": "카드 게임 홍보 영상 제작", "date": null, "done": false }
+      ]
+    },
+    "team-site": {
+      "name": "팀 소개 사이트",
+      "routines": [
+        { "id": "ts-content", "text": "홍보용 블로그 컨텐츠 제작", "cycle": "ongoing" },
+        { "id": "ts-video", "text": "팀 홍보 영상 컨텐츠 제작", "cycle": "ongoing" }
+      ],
+      "tasks": []
+    },
+    "si": {
+      "name": "SI 매니지먼트",
+      "routines": [
+        { "id": "si-platform", "text": "플랫폼 프로필/포트폴리오 관리 (위시캣, 크몽, 프리모아 등)", "cycle": "weekly" },
+        { "id": "si-bid", "text": "프로젝트 입찰 지원", "cycle": "as-needed" }
+      ],
+      "tasks": [
+        { "id": "si-t1", "text": "위시캣 프로젝트 지원 — 인플루언서 커머스 가맹 의원 통합 결제 플랫폼", "date": "2026-02-17", "done": true, "url": "https://www.wishket.com/project/152902/" }
+      ]
+    },
+    "axoracle": {
+      "name": "Axoracle",
+      "routines": [],
+      "tasks": [
+        { "id": "ax-t1", "text": "홍보용 SNS 계정 생성 (페이스북, 인스타그램)", "date": "2026-02-19", "done": true },
+        { "id": "ax-t2", "text": "프로필 이미지 제작", "date": "2026-02-19", "done": true }
+      ]
+    },
+    "cmo": {
+      "name": "CMO 마케팅",
+      "routines": [
+        { "id": "cmo-ref", "text": "프로젝트별 홍보 방안 & 레퍼런스 수집", "cycle": "weekly" },
+        { "id": "cmo-perf", "text": "퍼포먼스 마케팅 진행", "cycle": "ongoing" }
+      ],
+      "tasks": [],
+      "targets": ["BebeCare", "정치판", "링크타", "Axoracle", "세미콜론"]
+    },
+    "personal": {
+      "name": "개인",
+      "routines": [],
+      "tasks": [
+        { "id": "ps-t1", "text": "업무 체크리스트 사이트 제작", "date": "2026-02-17", "done": false }
+      ]
+    }
+  },
+  "inbox": []
+}

@@ -1,0 +1,98 @@
+{
+  "planclaw": {
+    "lastPolled": "2026-03-07T04:42:00+09:00",
+    "processed": [
+      {
+        "repo": "axoracle",
+        "issue": 21,
+        "title": "[테스트] 다크모드 지원 추가",
+        "status": "spec-ready",
+        "processedAt": "2026-02-17T08:46:00.000Z"
+      },
+      {
+        "repo": "ps",
+        "issue": 30,
+        "title": "feat: 밀담(영상통화) 중 화면 캡처/녹화 방지 구현",
+        "status": "spec-ready",
+        "processedAt": "2026-02-19T01:56:00.000Z"
+      },
+      {
+        "repo": "axoracle",
+        "issue": 5,
+        "title": "feat: S티어 직업 10개 추가 (아이돌/가수, 네일아티스트, 메이크업 아티스트 등)",
+        "status": "spec-ready",
+        "processedAt": "2026-02-19T01:56:00.000Z"
+      },
+      {
+        "repo": "axoracle",
+        "issue": 4,
+        "title": "Phase 7: 36개 신규 직업 추가",
+        "status": "spec-ready",
+        "processedAt": "2026-02-19T01:56:00.000Z"
+      },
+      {
+        "repo": "ps",
+        "issue": 32,
+        "title": "feat: 밀담 screenshotDetected 서버 사이드 relay 핸들러 구현",
+        "status": "spec-ready",
+        "processedAt": "2026-02-19T02:06:00.000Z"
+      },
+      {
+        "repo": "cm-jungchipan",
+        "issue": 133,
+        "title": "CI: Jest 자동 실행 워크플로우 추가",
+        "status": "spec-ready",
+        "processedAt": "2026-02-19T02:26:00.000Z"
+      },
+      {
+        "repo": "proj-play-land",
+        "issue": 99,
+        "title": "infra: Supabase auth 연결 불안정 조사",
+        "status": "spec-ready",
+        "processedAt": "2026-02-19T03:16:00.000Z"
+      },
+      {
+        "repo": "cm-labor-union",
+        "issue": 94,
+        "title": "[조합원] E-10: 첨부서류 유형 정리",
+        "status": "spec-ready",
+        "processedAt": "2026-02-19T07:56:00.000Z"
+      },
+      {
+        "repo": "cm-labor-union",
+        "issue": 92,
+        "title": "[조합원] E-8: 전체 조합원 엑셀 다운로드 개선",
+        "status": "spec-ready",
+        "processedAt": "2026-02-19T07:56:00.000Z"
+      },
+      {
+        "repo": "cm-labor-union",
+        "issue": 90,
+        "title": "[조합원] E-6: 조합비 납부 면제 옵션 제거",
+        "status": "spec-ready",
+        "processedAt": "2026-02-19T07:56:00.000Z"
+      },
+      {
+        "repo": "cm-labor-union",
+        "issue": 89,
+        "title": "[조합원] E-5: 현장연락처 항목 제거",
+        "status": "spec-ready",
+        "processedAt": "2026-02-19T07:56:00.000Z"
+      },
+      {
+        "repo": "cm-labor-union",
+        "issue": 95,
+        "title": "[현장관리] F-1: 사업상태(business_status) 간소화",
+        "status": "spec-ready",
+        "processedAt": "2026-02-19T08:06:00.000Z"
+      },
+      {
+        "repo": "proj-bebecare",
+        "issue": 34,
+        "title": "[UI] LoadingSpinner size prop 추가 + BottomTabBar 레이아웃 검토",
+        "status": "spec-ready",
+        "processedAt": "2026-02-19T15:56:00.000Z"
+      }
+    ]
+  }
+}

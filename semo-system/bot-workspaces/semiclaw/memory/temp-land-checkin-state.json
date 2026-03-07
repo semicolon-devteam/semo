@@ -1,0 +1,16 @@
+{
+  "date": "2026-02-27",
+  "checkInMessageId": "1772157768.430159",
+  "channelId": "C0AEFRMN0E9",
+  "sentAt": "2026-02-27T11:02:00+09:00",
+  "followUpScheduled": "2026-02-27T14:02:00+09:00",
+  "mentionedUsers": [
+    "U09LF7ZS5GR",
+    "URU4UBX9R",
+    "URSQYUNQJ",
+    "U08P11ZQY04",
+    "U02G8542V9U"
+  ],
+  "status": "pending_follow_up",
+  "note": "3시간 후 스레드 확인 필요. 미응답자는 2시간 후 리마인드 필요."
+}

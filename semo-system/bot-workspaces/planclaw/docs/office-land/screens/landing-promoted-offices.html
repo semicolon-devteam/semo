@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>화면설계서 - 랜딩페이지 홍보 노출</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f7fa;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 40px;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        
+        .meta {
+            display: flex;
+            gap: 30px;
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            padding: 40px;
+        }
+        
+        .ui-section {
+            position: sticky;
+            top: 20px;
+            height: fit-content;
+        }
+        
+        .ui-section h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+        
+        .ui-preview {
+            width: 100%;
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            padding: 32px;
+            background: #fafafa;
+        }
+        
+        .landing-banner {
+            background: white;
+            border: 2px dashed #667eea;
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        
+        .banner-label {
+            font-size: 12px;
+            color: #667eea;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .office-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+        
+        .office-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 12px;
+            overflow: hidden;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .office-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        
+        .office-image {
+            width: 100%;
+            height: 120px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 700;
+            font-size: 14px;
+        }
+        
+        .office-content {
+            padding: 16px;
+        }
+        
+        .promoted-tag {
+            display: inline-block;
+            background: #ffd700;
+            color: #1a1a1a;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .office-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: #1a1a1a;
+        }
+        
+        .office-desc {
+            font-size: 14px;
+            color: #666;
+            line-height: 1.5;
+        }
+        
+        .specs-section h2 {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+        
+        .spec-item {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .spec-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .spec-label {
+            background: #667eea;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 14px;
+        }
+        
+        .spec-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        
+        .spec-detail {
+            display: grid;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        
+        .spec-row {
+            display: grid;
+            grid-template-columns: 120px 1fr;
+            gap: 12px;
+            padding: 8px 0;
+        }
+        
+        .spec-key {
+            font-weight: 600;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .spec-value {
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .spec-value code {
+            background: #e3e8ef;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+        }
+        
+        .spec-list {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .spec-list li {
+            padding: 4px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+        
+        .spec-list li:before {
+            content: "▸";
+            position: absolute;
+            left: 0;
+            color: #667eea;
+        }
+        
+        .additional-sections {
+            grid-column: 1 / -1;
+            margin-top: 20px;
+            padding-top: 30px;
+            border-top: 2px solid #e0e0e0;
+        }
+        
+        .section-block {
+            margin-bottom: 30px;
+        }
+        
+        .section-block h3 {
+            font-size: 20px;
+            color: #667eea;
+            margin-bottom: 15px;
+        }
+        
+        .flow-diagram {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: monospace;
+            white-space: pre-wrap;
+            line-height: 1.8;
+        }
+        
+        .api-block {
+            background: #282c34;
+            color: #abb2bf;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+        
+        .api-block code {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+        }
+        
+        .exception-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .exception-table th,
+        .exception-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .exception-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #667eea;
+        }
+        
+        @media (max-width: 1024px) {
+            .content {
+                grid-template-columns: 1fr;
+            }
+            
+            .ui-section {
+                position: relative;
+                top: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🏠 랜딩페이지 - PROMOTED OFFICES 노출</h1>
+            <div class="meta">
+                <div class="meta-item">
+                    <span>📄 화면 ID:</span>
+                    <strong>PAY-OFFICE-CASH-004</strong>
+                </div>
+                <div class="meta-item">
+                    <span>🔗 경로:</span>
+                    <strong>/</strong>
+                </div>
+                <div class="meta-item">
+                    <span>📅 작성일:</span>
+                    <strong>2026-03-04</strong>
+                </div>
+                <div class="meta-item">
+                    <span>✍️ 작성자:</span>
+                    <strong>PlanClaw</strong>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="content">
+            <!-- UI Preview -->
+            <div class="ui-section">
+                <h2>🎨 UI 미리보기</h2>
+                <div class="ui-preview">
+                    <div style="font-size: 24px; font-weight: 700; margin-bottom: 8px; color: #1a1a1a;">랜딩페이지 (방문자 화면)</div>
+                    <div style="font-size: 14px; color: #666; margin-bottom: 24px;">홍보 중인 오피스가 상단에 노출됩니다</div>
+                    
+                    <div class="landing-banner">
+                        <div class="banner-label">🌟 PROMOTED OFFICES</div>
+                    </div>
+                    
+                    <div class="office-grid">
+                        <div class="office-card">
+                            <div class="office-image">강남<br/>코워킹<br/>스페이스</div>
+                            <div class="office-content">
+                                <div class="promoted-tag">💎 홍보중</div>
+                                <div class="office-title">강남 코워킹 스페이스</div>
+                                <div class="office-desc">강남역 도보 3분, 쾌적한 업무 환경 제공</div>
+                            </div>
+                        </div>
+                        
+                        <div class="office-card">
+                            <div class="office-image">홍대<br/>공유<br/>오피스</div>
+                            <div class="office-content">
+                                <div class="promoted-tag">💎 홍보중</div>
+                                <div class="office-title">홍대 공유오피스</div>
+                                <div class="office-desc">창의적인 공간, 다양한 네트워킹 기회</div>
+                            </div>
+                        </div>
+                        
+                        <div class="office-card">
+                            <div class="office-image">판교<br/>테크<br/>오피스</div>
+                            <div class="office-content">
+                                <div class="office-title">판교 테크 오피스</div>
+                                <div class="office-desc">IT 기업 특화, 최신 시설 완비</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Specifications -->
+            <div class="specs-section">
+                <h2>📋 요소별 명세</h2>
+                
+                <!-- Spec Item 1 -->
+                <div class="spec-item">
+                    <div class="spec-header">
+                        <span class="spec-label">A</span>
+                        <span class="spec-name">섹션 헤더</span>
+                    </div>
+                    <div class="spec-detail">
+                        <div class="spec-row">
+                            <div class="spec-key">타입</div>
+                            <div class="spec-value">Section Header (Static)</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">위치</div>
+                            <div class="spec-value">랜딩페이지 상단 (히어로 섹션 다음)</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">텍스트</div>
+                            <div class="spec-value">"🌟 PROMOTED OFFICES"</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">스타일</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>점선 테두리 (파란색)</li>
+                                    <li>중앙 정렬</li>
+                                    <li>작은 폰트 (12px, 파란색, 볼드)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">표시 조건</div>
+                            <div class="spec-value">홍보 중인 오피스 1개 이상 있을 때만 표시</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Spec Item 2 -->
+                <div class="spec-item">
+                    <div class="spec-header">
+                        <span class="spec-label">B</span>
+                        <span class="spec-name">오피스 카드 그리드</span>
+                    </div>
+                    <div class="spec-detail">
+                        <div class="spec-row">
+                            <div class="spec-key">타입</div>
+                            <div class="spec-value">Card Grid (Dynamic)</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">데이터 소스</div>
+                            <div class="spec-value"><code>GET /rest/v1/posts?metadataType=office-banner&amp;status=PUBLISHED</code><br/>(홍보 중인 오피스만 필터링)</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">정렬</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>Phase 1, 2: 최신 등록 순 (ID 역순)</li>
+                                    <li>Phase 3: <code>display_order</code> 순 (관리자 설정)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">노출 개수</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>Phase 1, 2: 하드코딩 (최대 10개)</li>
+                                    <li>Phase 3: DB 설정 (<code>site_info.office_banner_limit</code>)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">그리드 레이아웃</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>모바일: 1열</li>
+                                    <li>태블릿: 2열</li>
+                                    <li>데스크톱: 3열</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Spec Item 3 -->
+                <div class="spec-item">
+                    <div class="spec-header">
+                        <span class="spec-label">C</span>
+                        <span class="spec-name">오피스 카드</span>
+                    </div>
+                    <div class="spec-detail">
+                        <div class="spec-row">
+                            <div class="spec-key">타입</div>
+                            <div class="spec-value">Interactive Card</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">구성 요소</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>오피스 이미지 (썸네일 또는 그라디언트 플레이스홀더)</li>
+                                    <li>홍보 태그 (💎 홍보중 - 노란 배경)</li>
+                                    <li>오피스 이름 (볼드, 18px)</li>
+                                    <li>오피스 설명 (한 줄 간략 설명, 14px)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">클릭 동작</div>
+                            <div class="spec-value">오피스 상세 페이지로 이동 (<code>/offices/{id}</code>)</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">호버 효과</div>
+                            <div class="spec-value">그림자 강화 + 살짝 위로 이동 (transform)</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">이미지 처리</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>이미지 있음: 썸네일 표시 (aspect-ratio 16:9)</li>
+                                    <li>이미지 없음: 그라디언트 플레이스홀더 + 오피스 이름 중앙 표시</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Spec Item 4 -->
+                <div class="spec-item">
+                    <div class="spec-header">
+                        <span class="spec-label">D</span>
+                        <span class="spec-name">홍보 태그</span>
+                    </div>
+                    <div class="spec-detail">
+                        <div class="spec-row">
+                            <div class="spec-key">타입</div>
+                            <div class="spec-value">Badge (Static per card)</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">텍스트</div>
+                            <div class="spec-value">"💎 홍보중"</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">스타일</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>배경: 노란색 (#ffd700)</li>
+                                    <li>텍스트: 검은색</li>
+                                    <li>작은 폰트 (11px, 볼드)</li>
+                                    <li>둥근 모서리 (4px)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">표시 조건</div>
+                            <div class="spec-value">홍보 중인 오피스에만 표시 (일반 오피스는 태그 없음)</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Spec Item 5 -->
+                <div class="spec-item">
+                    <div class="spec-header">
+                        <span class="spec-label">E</span>
+                        <span class="spec-name">일반 오피스 카드 (비교용)</span>
+                    </div>
+                    <div class="spec-detail">
+                        <div class="spec-row">
+                            <div class="spec-key">타입</div>
+                            <div class="spec-value">Interactive Card (비홍보)</div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">차이점</div>
+                            <div class="spec-value">
+                                <ul class="spec-list">
+                                    <li>홍보 태그 없음</li>
+                                    <li>홍보 오피스 다음에 표시</li>
+                                    <li>같은 카드 스타일 (일관성 유지)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="spec-row">
+                            <div class="spec-key">데이터 소스</div>
+                            <div class="spec-value"><code>GET /rest/v1/offices?status=ACTIVE</code> (홍보 중이 아닌 오피스)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Additional Sections -->
+            <div class="additional-sections">
+                <!-- User Flow -->
+                <div class="section-block">
+                    <h3>🔄 사용자 플로우 (방문자)</h3>
+                    <div class="flow-diagram">
+1. 랜딩페이지 접속
+   ↓
+2. 데이터 로드
+   ├─ 홍보 중인 오피스 조회 (office_promotions 테이블 조인)
+   └─ 일반 오피스 조회
+   ↓
+3. 화면 렌더링
+   ├─ 홍보 오피스 있음 → "PROMOTED OFFICES" 섹션 표시
+   └─ 홍보 오피스 없음 → 섹션 숨김 (일반 오피스만 표시)
+   ↓
+4. 카드 그리드 표시
+   ├─ 홍보 오피스 (상단 배치, 노란 태그)
+   └─ 일반 오피스 (하단 배치, 태그 없음)
+   ↓
+5. 카드 클릭
+   ↓
+6. 오피스 상세 페이지로 이동 (/offices/{id})</div>
+                </div>
+                
+                <!-- API -->
+                <div class="section-block">
+                    <h3>🔌 API 명세</h3>
+                    <div class="api-block">
+<code><strong>1. 홍보 중인 오피스 조회</strong>
+GET /rest/v1/posts?metadataType=office-banner&amp;status=PUBLISHED&amp;size={limit}
+Response: [
+  {
+    "id": 123,
+    "officeName": "강남 코워킹 스페이스",
+    "officeDescription": "강남역 도보 3분, 쾌적한 업무 환경 제공",
+    "imageUrl": "https://example.com/image.jpg",
+    "promotionEndDate": "2026-03-31"
+  }
+]
+
+<strong>Note:</strong> 백엔드에서 office_promotions 테이블과 조인하여 
+ACTIVE 상태이고 end_date &gt; NOW()인 홍보만 반환.
+
+<strong>정렬 (Phase별)</strong>:
+- Phase 1, 2: ORDER BY p.id DESC (최신순)
+- Phase 3: ORDER BY p.display_order NULLS LAST, p.id DESC
+
+<strong>2. 일반 오피스 조회 (옵션)</strong>
+GET /rest/v1/offices?status=ACTIVE&amp;exclude_promoted=true
+Response: [ ... ] (홍보 중이 아닌 오피스 목록)</code>
+                    </div>
+                </div>
+                
+                <!-- Exception Handling -->
+                <div class="section-block">
+                    <h3>⚠️ 예외 처리</h3>
+                    <table class="exception-table">
+                        <thead>
+                            <tr>
+                                <th>상황</th>
+                                <th>화면 동작</th>
+                                <th>후속 조치</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>홍보 중인 오피스 없음</td>
+                                <td>"PROMOTED OFFICES" 섹션 숨김</td>
+                                <td>일반 오피스만 표시</td>
+                            </tr>
+                            <tr>
+                                <td>API 오류 (조회 실패)</td>
+                                <td>에러 메시지 없음 (조용히 실패)</td>
+                                <td>일반 오피스만 표시</td>
+                            </tr>
+                            <tr>
+                                <td>이미지 로드 실패</td>
+                                <td>그라디언트 플레이스홀더 표시</td>
+                                <td>오피스 이름 중앙 배치</td>
+                            </tr>
+                            <tr>
+                                <td>네트워크 지연</td>
+                                <td>스켈레톤 UI 표시</td>
+                                <td>데이터 로드 후 카드로 전환</td>
+                            </tr>
+                            <tr>
+                                <td>만료된 홍보 표시됨</td>
+                                <td>백엔드에서 필터링 (프론트 표시 안 함)</td>
+                                <td>로그 기록 + 데이터 정합성 검증</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Responsive & Accessibility -->
+                <div class="section-block">
+                    <h3>📱 반응형 & 접근성</h3>
+                    <ul class="spec-list" style="padding-left: 20px;">
+                        <li><strong>모바일 (~ 768px)</strong>: 1열 그리드, 카드 세로 스택</li>
+                        <li><strong>태블릿 (769px ~ 1024px)</strong>: 2열 그리드</li>
+                        <li><strong>데스크톱 (1025px ~)</strong>: 3열 그리드</li>
+                        <li><strong>키보드 탐색</strong>: Tab 키로 카드 이동, Enter 키로 상세 페이지 이동</li>
+                        <li><strong>스크린 리더</strong>: "홍보 중인 오피스, 강남 코워킹 스페이스, 강남역 도보 3분, 쾌적한 업무 환경 제공" 읽기</li>
+                        <li><strong>고대비 모드</strong>: 홍보 태그 테두리 추가 (명확한 구분)</li>
+                        <li><strong>성능 최적화</strong>: 이미지 lazy loading (Intersection Observer)</li>
+                        <li><strong>SEO</strong>: 홍보 오피스에 structured data 추가 (LocalBusiness schema)</li>
+                    </ul>
+                </div>
+                
+                <!-- Integration Notes -->
+                <div class="section-block">
+                    <h3>🔗 통합 참고사항</h3>
+                    <ul class="spec-list" style="padding-left: 20px;">
+                        <li><strong>Phase 1, 2 구현 시</strong>: 기존 랜딩페이지 오피스 카드 렌더링 로직 수정 필요</li>
+                        <li><strong>Phase 3 구현 시</strong>: <code>display_order</code> 필드 추가 + 정렬 로직 변경 (#302 이슈)</li>
+                        <li><strong>기존 섹션과의 관계</strong>: "PROMOTED OFFICES" 섹션은 기존 "추천 오피스" 섹션 상단에 배치</li>
+                        <li><strong>캐싱</strong>: 홍보 오피스 목록은 1분 캐싱 (만료 임박 시 즉시 갱신 필요)</li>
+                        <li><strong>분석 트래킹</strong>: 홍보 카드 클릭 시 Google Analytics 이벤트 발생 (<code>promoted_office_click</code>)</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

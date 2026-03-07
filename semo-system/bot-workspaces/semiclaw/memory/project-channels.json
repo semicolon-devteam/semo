@@ -1,0 +1,23 @@
+{
+  "description": "프로젝트별 Slack 채널 매핑 (Reus 제공 2026-02-13)",
+  "channels": {
+    "C0AE4N0LSKV": { "name": "proj-axoracle", "project": "AXOracle" },
+    "C0AEA1RA10A": { "name": "proj-bebecare", "project": "BebeCare (임신·출산·육아 AI 슈퍼앱)" },
+    "C0A5MLV4BL7": { "name": "proj-by-buyer", "project": "By Buyer" },
+    "C0AEJ9Y8JP2": { "name": "proj-celeb-map", "project": "셀럽 맛집 지도" },
+    "C0A9AV2UD2R": { "name": "proj-cointalk", "project": "CoinTalk" },
+    "C0A34F2TVHV": { "name": "proj-healing-hands", "project": "Healing Hands" },
+    "C09Q3TNUVN3": { "name": "proj-introduction", "project": "팀 소개 사이트" },
+    "C09AL1LUFV4": { "name": "proj-jungchipan", "project": "정치판" },
+    "C09R17D1EP2": { "name": "proj-labor-union", "project": "노조관리 서비스" },
+    "C0A2BUHP1SN": { "name": "proj-linkta", "project": "Linkta" },
+    "C09GG5RU56G": { "name": "proj-office-land", "project": "오피스/랜드 (cm-office, cm-land)" },
+    "C08P9TDK0UR": { "name": "proj-playland", "project": "플레이랜드 커뮤니티 서비스" },
+    "C0A5Q5CL2DR": { "name": "proj-ps", "project": "PS (영상통화 앱)" },
+    "C0A2VTE5P7G": { "name": "proj-sales-keeper", "project": "매출지킴이 (Sales Keeper)" },
+    "C0A5Y62BW0L": { "name": "proj-viral", "project": "Viral" },
+    "C0AFBQ209E0": { "name": "bot-ops", "project": "봇 간 통신 채널" }
+  },
+  "monitorSchedule": "주기적 체크 (하트비트/크론)",
+  "notes": "2026-02-13 Reus가 약손(healing-hands) 채널 봇 초대 완료"
+}
