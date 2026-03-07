@@ -1,5 +1,27 @@
 # MEMORY.md — InfraClaw 장기 기억
 
+## 📋 주간 메모리 감사 루틴 (2026-03-07 설정)
+
+**일정**: 매주 월요일 10:00 KST (첫 실행: 2026-03-09)
+
+**감사 대상**:
+- `memory/*.md` (전체 메모리 파일)
+- `SOUL.md`, `AGENTS.md`, `TOOLS.md` (설정 파일)
+
+**점검 항목**:
+1. **중복/충돌 데이터 찾기**
+   - 같은 프로젝트 URL이 파일마다 다른 경우
+   - 서로 모순되는 규칙/결정이 공존하는 경우
+   - 오래된 정보가 새 결정과 충돌하는 경우
+
+2. **보고 프로세스**
+   - 발견사항을 #bot-ops 스레드에 보고 (무엇이 충돌하고 왜 그런지 분석 포함)
+   - SemiClaw이 취합 → Reus에게 원인 분석 + 재발 방지 방안 보고
+
+**목적**: 메모리 품질 유지, Hallucination 재발 방지
+
+---
+
 ## 봇 간 인계 방식 (2026-03-07 변경, Reus 승인)
 
 > **봇 간 Slack 멘션 직접 인계/협업 허용 + GitHub 라벨+폴링 병행**
@@ -559,3 +581,61 @@ DNS A 레코드 등록 (OCI Console)
 **앞으로**:
 - 도메인 관련 질문 시 반드시 `whois` 또는 실제 DNS 관리 콘솔 확인
 - 확신 없으면 "확인 필요" 또는 Garden/Reus에게 질의
+
+### BebeCare 프로덕션 배포 — dev/prd 동시 운영 패턴 (2026-03-07)
+**사건**: `bebecare.semi-colon.space` (prd) 도메인 접근 불가 요청 → 인프라 전체 구성 작업
+- **문제**: dev/prd가 같은 네임스페이스 + 같은 리소스 이름 → ArgoCD 충돌
+- **해결**: `nameSuffix: -dev/-prd` 추가 → 리소스 이름 분리
+
+**교훈**:
+1. **dev/prd 동시 운영 프로젝트 패턴**:
+   - **같은 네임스페이스** 사용 OK
+   - **반드시 nameSuffix 추가** (kustomization.yaml)
+     ```yaml
+     nameSuffix: -dev  # or -prd
+     ```
+   - 결과: `proj-{service}-dev`, `proj-{service}-prd`로 자동 분리
+
+2. **기존 프로젝트 패턴과의 차이**:
+   - **cat, game, play**: dev/prd가 같은 도메인 + 같은 리소스 이름 (한 번에 하나만 운영)
+   - **bebecare**: dev/prd가 다른 도메인 (동시 운영)
+   - → 패턴이 다르면 리소스 이름도 달라야 함
+
+3. **작업 프로세스 (Reus 승인 후 실행)**:
+   ```
+   1. 문제 진단 (DNS, K8S, ArgoCD)
+   2. Garden 승인 요청 (신규 환경 구성)
+   3. Reus 승인 확인 → 즉시 실행
+   4. PR 생성 → Reus 머지
+   5. 배포 모니터링 → 완료 보고
+   ```
+
+4. **DNS A 레코드 등록**:
+   - Cloudflare 관리 도메인인지 먼저 확인 (DNS Hallucination 재발 방지)
+   - `semi-colon.space`는 Cloudflare 관리 → Reus가 직접 A 레코드 등록 완료
+   - 인프라 봇(InfraClaw)은 DNS 등록 자체는 안 함 (확인만)
+
+5. **ArgoCD ApplicationSet 패턴**:
+   - dev/prd 동시 운영 시 Application 이름 충돌 방지:
+     ```yaml
+     # dev ApplicationSet
+     name: '{{app}}'  # proj-bebecare
+     
+     # prd ApplicationSet
+     name: '{{app}}-prd'  # proj-bebecare-prd
+     ```
+
+**결과물**:
+- `semi-colon-ops/proj-bebecare/overlays/prd/` 생성
+- `semi-colon-apps/prd/applicationset-proj-bebecare.yaml` 생성
+- K8S 리소스: 
+  - Deployment: proj-bebecare-prd
+  - Service: proj-bebecare-prd
+  - Ingress: proj-bebecare-prd-ingress-prd
+  - Certificate: proj-bebecare-prd-tls (letsencrypt-prod)
+- 도메인: `bebecare.semi-colon.space` → 정상 동작
+
+**Garden에게 확인 필요** (아직 답변 없음):
+- dev/prd 동시 운영의 표준 네이밍 규칙
+- 신규 프로젝트 온보딩 시 기본 패턴 (동시 운영 vs 단일 운영)
+- 기존 프로젝트들도 BebeCare 패턴으로 전환할지 여부
