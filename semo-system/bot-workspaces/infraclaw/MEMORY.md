@@ -361,7 +361,6 @@
 |---|---|---|---|
 | 노조관리 | `cm-labor-union` | mvp-labor-union.vercel.app | 운영 전환 단계 |
 | BebeCare | `proj-bebecare` | bebecare.vercel.app | AI 슈퍼앱, 활발 개발 중 |
-| AXOracle | `axoracle` | axoracle.com | 블로그+서베이, 활발 개발 중 |
 | 바이바이어 | `mvp-car-dealer` | mvp-car-dealer.vercel.app | 중고차 수출 플랫폼 |
 | Celeb Map | `proj-celeb-map` | (미확인) | Kai 담당, Sprint 1 완료 |
 | 정치판 | `cm-jungchipan` | jungchipan.net | Harry Lee 담당 (Vercel 추정) |
@@ -374,6 +373,7 @@
 | 플레이랜드 | `proj-play-land` | `play` | play-land-dev.semi-colon.space | ArgoCD + Kustomize |
 | 오피스 커뮤니티 | `cm-office` | (미확인) | (미확인) | bon 전담, Spring API |
 | 링크타 | `mvp-link-collect` | `link-collect` | link-collect-dev.semi-colon.space | OKE 배포, linkta.site 마이그레이션 예정 |
+| **AXOracle** | `axoracle` | `axoracle` | axoracle.com | **2026-03-07 Vercel→OCI 이전 완료** (dev/prd 동시 운영) |
 | core-backend | `core-backend` | (미확인) | - | 공통 백엔드 (Kotlin/Spring) |
 | PS | `ps` | (미확인) | psclub.fun | 앱스토어 심사 대기 |
 
