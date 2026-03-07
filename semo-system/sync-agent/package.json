@@ -1,0 +1,18 @@
+{
+  "name": "semo-sync-agent",
+  "version": "1.0.0",
+  "description": "Sync OpenClaw bot status to PostgreSQL",
+  "main": "sync.js",
+  "scripts": {
+    "sync": "node sync.js",
+    "test": "echo \"No tests yet\""
+  },
+  "dependencies": {
+    "pg": "^8.11.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "author": "WorkClaw",
+  "license": "MIT"
+}

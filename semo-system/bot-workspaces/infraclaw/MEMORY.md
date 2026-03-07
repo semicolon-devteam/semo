@@ -246,8 +246,13 @@
 - **gramii**, **orda**: OCI 이관 중
 - **maju**: AWS→AWS 이전 중 (Bae)
 
-### 채널 ID
+### 채널 ID (자주 사용)
+- `#bot-ops`: C0AFBQ209E0
 - `#core-infra`: C0A5U2C268J
+- `#proj-axoracle`: C0AE4N0LSKV
+- `#개발사업팀`: C020RQTNPFY
+
+**⚠️ Cron job delivery.to 사용 시 반드시 채널 ID 사용** (채널 이름 `#proj-*` 금지)
 
 ---
 
@@ -534,6 +539,19 @@ DNS A 레코드 등록 (OCI Console)
   - 코딩 작업 → WorkClaw 또는 담당 봇이 직접 처리
   - 본인 역할 범위 작업 → 본인이 직접 수행
 
+### 7. Cron Job delivery.to 규칙 (2026-03-07 InfraClaw 실수 사례)
+**Cron job의 `delivery.to`는 채널 ID만 허용**
+
+- ❌ **금지**: 채널 이름 (`#proj-axoracle`)
+- ✅ **올바른 형식**: 채널 ID (`C0AE4N0LSKV`)
+
+**채널 ID 확인 방법**:
+1. 자기 메모리 파일에서 채널 매핑 확인
+2. 모르면 SemiClaw에게 질의
+3. Slack 채널 상세보기 하단에서 확인
+
+**배경**: InfraClaw이 AXOracle DNS 전파 체크 cron job에서 `delivery.to: "#proj-axoracle"` 사용 → 보고 메시지 누락. isolated 세션 결과가 전달되지 않아 작업 상태 파악 불가.
+
 ---
 
 ## 🎓 교훈 (Lessons Learned)
@@ -639,3 +657,27 @@ DNS A 레코드 등록 (OCI Console)
 - dev/prd 동시 운영의 표준 네이밍 규칙
 - 신규 프로젝트 온보딩 시 기본 패턴 (동시 운영 vs 단일 운영)
 - 기존 프로젝트들도 BebeCare 패턴으로 전환할지 여부
+
+### Cron Job delivery.to 채널 ID 오류 (2026-03-07)
+**사건**: AXOracle DNS 전파 체크 cron job 생성 시 `delivery.to`에 채널 이름 사용 → 보고 누락
+- **문제**: `delivery.to: "#proj-axoracle"` (채널 이름) → 작동하지 않음
+- **올바른 형식**: `delivery.to: "C0AE4N0LSKV"` (채널 ID)
+- **영향**: isolated 세션 결과가 목적 채널로 전달되지 않음 → 사용자가 작업 상태 파악 불가
+
+**교훈**:
+1. **Cron job delivery.to는 채널 ID만 허용**
+   - 채널 이름 (`#proj-axoracle`) 절대 사용 금지
+   - 반드시 채널 ID (`C0AE4N0LSKV`) 형식 사용
+
+2. **채널 ID 확인 방법**:
+   - 자기 메모리 파일에서 채널 매핑 확인
+   - 모르면 SemiClaw에게 질의
+   - Slack 채널 상세보기 하단에서 확인
+
+3. **재발 방지**:
+   - Cron job 생성 전 delivery.to 값 검증
+   - 채널 ID는 `C`로 시작하는 11자리 영문숫자 조합
+
+**앞으로**:
+- Cron job 생성 시 반드시 채널 ID 형식 확인
+- 불확실하면 SemiClaw 통해 검증
