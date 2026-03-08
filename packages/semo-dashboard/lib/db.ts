@@ -4,7 +4,7 @@
  * PostgreSQL client wrapper for SEMO Dashboard
  */
 
-import { Client, QueryResult } from 'pg';
+import { Client, QueryResult, QueryResultRow } from 'pg';
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -18,7 +18,7 @@ if (!DATABASE_URL) {
  * @param params Query parameters
  * @returns Query result
  */
-export async function query<T = any>(
+export async function query<T extends QueryResultRow = any>(
   query: string,
   params?: any[]
 ): Promise<QueryResult<T>> {
