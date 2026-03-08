@@ -6,9 +6,9 @@ FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json* ./
-RUN npm ci
+# Copy package files (monorepo workspace - no package-lock.json)
+COPY package.json ./
+RUN npm install --production=false
 
 # Stage 2: Builder
 FROM node:20-alpine AS builder
