@@ -21,6 +21,8 @@ COPY . .
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+# Dummy DATABASE_URL for build time (not used at runtime)
+ENV DATABASE_URL=postgresql://build:build@localhost:5432/build
 
 # Build Next.js app (standalone output)
 RUN npm run build
