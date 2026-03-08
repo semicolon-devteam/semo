@@ -1,0 +1,47 @@
+name: 1. 개발 CI / CD
+
+on:
+  workflow_dispatch:
+  # push:
+  #   branches: ["dev"]
+
+permissions:
+  id-token: write
+  contents: write
+  actions: read
+  security-events: write
+
+jobs:
+  build-and-deploy:
+    name: 🔨 [semo] 개발환경 CI[Build & Push]
+    permissions:
+      contents: write
+      id-token: write
+    uses: semicolon-devteam/actions-template/.github/workflows/ci-common.yml@main
+    with:
+      source_repository: semo
+      environment: dev
+      ref: dev
+      dockerfile_name: Dockerfile-next
+    secrets:
+      ACTION_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      ENV_FILE_CONTENT: ${{ secrets.DEV_ENV_FILE_CONTENT }}
+
+  kustomize-version-update:
+    name: 🔨 [semo] 개발환경 Kustomize Version Update
+    permissions:
+      contents: write
+      id-token: write
+    needs: build-and-deploy
+    uses: semicolon-devteam/actions-template/.github/workflows/update-kustomize-tag.yml@main
+    with:
+      ops_repository: semi-colon-ops
+      ref: main
+      environment: dev
+      service_name: semo
+      image_name: docker.io/semicolonmanager/semo
+      tag_value: ${{ needs.build-and-deploy.outputs.image_tag }}
+    secrets:
+      ACTION_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
