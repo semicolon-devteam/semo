@@ -23,6 +23,7 @@ jobs:
       environment: dev
       ref: dev
       dockerfile_name: Dockerfile-next
+      context_path: ./source/packages/semo-dashboard
     secrets:
       ACTION_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
