@@ -1,0 +1,66 @@
+name: "🐛 Bug Report"
+description: "버그 리포트"
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 버그 리포트
+
+  - type: textarea
+    id: description
+    attributes:
+      label: "버그 설명"
+      description: "어떤 문제가 발생하는지"
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: "재현 방법"
+      description: "버그를 재현하는 단계"
+      value: |
+        1. 
+        2. 
+        3. 
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: "기대 동작"
+      description: "정상적으로 동작했을 때 예상되는 결과"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: "실제 동작"
+      description: "현재 실제로 발생하는 결과"
+    validations:
+      required: true
+
+  - type: textarea
+    id: definition-of-done
+    attributes:
+      label: "✅ Definition of Done"
+      description: "이 버그가 '수정 완료'로 간주되기 위한 검증 가능한 조건들"
+      value: |
+        - [ ] 버그 재현 불가 확인
+        - [ ] 기존 테스트 통과
+        - [ ] 회귀 테스트 추가
+        - [ ] 타입 에러 0
+      placeholder: "검증 가능한 완료 조건을 체크리스트로 작성"
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: "환경"
+      description: "OS, 브라우저, 앱 버전 등"
+    validations:
+      required: false
