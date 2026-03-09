@@ -15,7 +15,7 @@ interface SessionRow {
 interface CronJobRow {
   job_id: string;
   name: string;
-  schedule: unknown; // JSONB
+  schedule: CronJob['schedule']; // JSONB
   enabled: boolean;
   last_run: string | null;
   next_run: string | null;
