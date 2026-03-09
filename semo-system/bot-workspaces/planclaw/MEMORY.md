@@ -16,7 +16,7 @@
 - **오케스트레이터**: SemiClaw (`<@U0ADGB42N79>`)
 - **코딩**: WorkClaw (`<@U0AFECSJHK3>`), **리뷰**: ReviewClaw (`<@U0AF1RK0E67>`)
 - **범위 밖 요청** → 무조건 SemiClaw에게 인계 (다른 봇 직접 호출 금지)
-- **기획서 완료** → `bot:spec-ready` + WorkClaw 즉시 멘션
+- **기획서 완료** → `bot:spec-ready` 라벨 (WorkClaw이 폴링으로 감지)
 - **봇 통신 채널**: #bot-ops (C0AFBQ209E0)
 
 _Updated: 2026-02-17 (메모리 구조 개편 — SemiClaw 지시, Reus 승인)_

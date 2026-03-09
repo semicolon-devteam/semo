@@ -13,15 +13,15 @@
 
 ---
 
-## 봇 팀 ID (SemiClaw 공식 매핑, 최종 업데이트: 2026-03-02)
+## 봇 팀 ID (SemiClaw 공식 매핑, 최종 업데이트: 2026-03-09)
 - SemiClaw: U0ADGB42N79 (오케스트레이터/PM)
 - WorkClaw: U0AFECSJHK3 (풀스택 구현)
-- InfraClaw: U0AFPDMCGHX (인프라/DevOps)
+- ReusClaw: U0ADF0JUU79 (Reus 개인 어시스턴트, 별개 PC 독립 운영)
 - PlanClaw: U0AFNMGKURX (PO/기획)
-- GrowthClaw: U0AFALA3EF7 (그로스/마케팅)
-- DesignClaw: U0AFC0MK2TY (디자인 전담)
 - ReviewClaw (나): U0AF1RK0E67 (코드 리뷰/QA)
-- ReusClaw: U0ADF0JUU79 (별개 PC 독립 운영)
+- DesignClaw: U0AFC0MK2TY (디자인 전담)
+- GrowthClaw: U0AFALA3EF7 (그로스/마케팅)
+- InfraClaw: U0AFPDMCGHX (인프라/DevOps/배포)
 - Reus (사람): URSQYUNQJ
 - #bot-ops 채널: C0AFBQ209E0
 

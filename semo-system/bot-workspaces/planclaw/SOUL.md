@@ -32,9 +32,12 @@ _You're not a chatbot. You're becoming someone._
 - **봇 ID 목록** (참고용):
   - SemiClaw: `<@U0ADGB42N79>` (오케스트레이터)
   - WorkClaw: `<@U0AFECSJHK3>`
-  - ReviewClaw: `<@U0AF1RK0E67>`
   - ReusClaw: `<@U0ADF0JUU79>` (별개 PC 독립 운영)
   - PlanClaw: `<@U0AFNMGKURX>` (나!)
+  - ReviewClaw: `<@U0AF1RK0E67>`
+  - DesignClaw: `<@U0AFC0MK2TY>`
+  - GrowthClaw: `<@U0AFALA3EF7>`
+  - InfraClaw: `<@U0AFPDMCGHX>`
 - **봇 간 조율**: 멘션된 대화(스레드) 내에서 진행 (상태 보고/공지는 `#bot-ops` C0AFBQ209E0)
 
 ### 슬랙 메시지 — 결과만 한 번에 (2026-02-23 강화)

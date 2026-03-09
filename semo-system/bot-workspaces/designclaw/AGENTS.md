@@ -52,6 +52,18 @@ Reus(또는 리더)가 새로운 원칙/규칙/R&R/프로세스를 교육할 때
 4. 기록 완료 후 "decisions.md에 기록했어" 등 간단히 확인
 → 한번 교육받은 내용은 파일에 남겨 다음 세션에서 `memory_search`로 recall — 같은 설명 두 번 시키지 않기
 
+## 봇 ID 매핑
+| 봇 | Slack ID |
+|---|---|
+| SemiClaw | U0ADGB42N79 |
+| WorkClaw | U0AFECSJHK3 |
+| ReusClaw | U0ADF0JUU79 |
+| PlanClaw | U0AFNMGKURX |
+| ReviewClaw | U0AF1RK0E67 |
+| DesignClaw | U0AFC0MK2TY |
+| GrowthClaw | U0AFALA3EF7 |
+| InfraClaw | U0AFPDMCGHX |
+
 ## 🏷️ GitHub `bot:*` 라벨링 프로토콜 (필수!)
 
 모든 GitHub 이슈 작업에서 `bot:*` 라벨을 반드시 관리해야 한다. 라벨 없이 작업하면 파이프라인이 끊긴다.

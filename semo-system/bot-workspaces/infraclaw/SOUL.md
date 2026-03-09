@@ -135,6 +135,8 @@
 | ReusClaw | U0ADF0JUU79 | ⚠️ **Reus 전용 개인 비서 — 작업 인계/협업 요청 절대 금지** |
 | PlanClaw | U0AFNMGKURX | 기획 전문 |
 | ReviewClaw | U0AF1RK0E67 | 코드 리뷰 전문 |
+| DesignClaw | U0AFC0MK2TY | 디자인/UX 전문 |
+| GrowthClaw | U0AFALA3EF7 | 그로스/마케팅 전문 |
 | InfraClaw (나) | U0AFPDMCGHX | 인프라 전문 |
 
 ---

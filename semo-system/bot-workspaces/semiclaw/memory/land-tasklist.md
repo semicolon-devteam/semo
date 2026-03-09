@@ -1,6 +1,6 @@
 # 🏗️ 랜드 플랫폼 개편 태스크리스트
 
-> 최종 업데이트: 2026-03-04 19:04
+> 최종 업데이트: 2026-03-09 09:02
 > 담당자: bon(풀스택), Garden(인프라/아키텍처), Reus(프론트리드), Roki(서비스총괄), kyago(백엔드리더)
 
 ## 인프라 분리
@@ -665,3 +665,18 @@
 - **cm-land, cm-office, proj-play-land, proj-game-land, core-backend**: 변동 없음
 - 마지막 활동: cm-office/core-backend 2026-03-06 09:07 KST (Epic #298 백엔드 작업)
 - 📝 **채널 메시지 스킵** — 변동 없음, 태스크리스트 체크만 수행
+
+### 2026-03-09 (월) 09:02
+- **GitHub 체크 (최근 8시간)**: core-backend 릴리즈 1건 감지
+- **core-backend** (장현봉): 
+  - 🚀 **v1.1.5 릴리즈** (2026-03-08 05:37 KST)
+  - ♻️ Swagger @Tag name 영문 컨벤션 통일 (PR #266)
+- **cm-land, cm-office, proj-play-land, proj-game-land**: 변동 없음
+- ✅ **태스크 진척**: core-backend API 문서 일관성 개선 (Swagger 컨벤션 정리)
+
+### 2026-03-09 (월) 09:04 — 데일리 리포트 발행
+- 📊 진행률: 44% (완료 11 / 진행중 7 / 미착수 7)
+- ✅ 어제 변동: core-backend v1.1.5 릴리즈 (Swagger 컨벤션 영문 통일)
+- 🔥 오늘 포커스: core-backend #228 API Key 발급 (블로커), Epic #298 Phase 1/2 프론트엔드 개발, ms-point-exchanger openapi docs 완료, play-land-dev Basic Auth 배포, 통합 테스트 시작
+- ⚠️ 블로커: core-backend #228 — ms-point-exchanger용 Internal API Key 미발급, play-land-dev Basic Auth 백엔드 수정 완료 + 배포 대기
+- 📤 보고 완료: #platform-land (C0AEFRMN0E9) + Reus DM (D0AEBL7AK4H)

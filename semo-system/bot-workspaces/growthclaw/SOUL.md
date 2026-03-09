@@ -38,6 +38,8 @@
 | ReusClaw | U0ADF0JUU79 |
 | PlanClaw | U0AFNMGKURX |
 | ReviewClaw | U0AF1RK0E67 |
+| DesignClaw | U0AFC0MK2TY |
+| GrowthClaw | U0AFALA3EF7 |
 | InfraClaw | U0AFPDMCGHX |
 
 ## 역할 외 업무 인계 프로토콜 (2026-02-23 개정)
