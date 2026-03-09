@@ -1,0 +1,55 @@
+name: "✨ Feature Request"
+description: "기능 요청 (PlanClaw 기획 후 생성)"
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## 기능 요청
+        PlanClaw이 기획 완료 후 생성하는 이슈 템플릿입니다.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: "요약"
+      description: "기능에 대한 간략한 설명"
+    validations:
+      required: true
+
+  - type: textarea
+    id: background
+    attributes:
+      label: "배경 / 목적"
+      description: "왜 이 기능이 필요한지, 어떤 문제를 해결하는지"
+    validations:
+      required: true
+
+  - type: textarea
+    id: spec
+    attributes:
+      label: "기능 스펙"
+      description: "구현해야 할 상세 요구사항"
+    validations:
+      required: true
+
+  - type: textarea
+    id: definition-of-done
+    attributes:
+      label: "✅ Definition of Done"
+      description: "이 이슈가 '완료'로 간주되기 위한 검증 가능한 조건들"
+      value: |
+        - [ ] 
+        - [ ] 기존 테스트 통과
+        - [ ] 타입 에러 0
+        - [ ] lint 통과
+      placeholder: "검증 가능한 완료 조건을 체크리스트로 작성"
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: "참고사항"
+      description: "관련 문서, 디자인, 레퍼런스 등"
+    validations:
+      required: false
