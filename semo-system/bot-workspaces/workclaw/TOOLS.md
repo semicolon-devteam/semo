@@ -105,4 +105,29 @@ Skills are shared. Your setup is yours. Keeping them apart means you can update 
 
 ---
 
+## proj-star-spot (스타스팟)
+
+### Project Info
+- **Repo**: `semicolon-devteam/proj-star-spot`
+- **Tech Stack**: Next.js 16, Supabase, next-intl, Google Maps
+- **Local Path**: `/Users/reus/Desktop/Sources/semicolon/projects/star-spot`
+- **Branch Strategy**: `main` 기반, `feat/<이슈번호>-<설명>` 패턴
+- **Port**: 3000 (Next.js default)
+
+### Current Branches
+- feat/10-user-auth
+- feat/18-legal-pages
+- feat/20-moderation-tools
+- feat/21-i18n-env-cleanup
+- feat/7-celeb-search
+- feat/9-celeb-map
+
+### Dev URLs
+- TBD (확인 필요)
+
+### Test Accounts
+- TBD (확인 필요)
+
+---
+
 Add whatever helps you do your job. This is your cheat sheet.

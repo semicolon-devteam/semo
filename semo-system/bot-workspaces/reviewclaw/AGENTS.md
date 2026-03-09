@@ -7,12 +7,15 @@
 1. `SOUL.md` 읽기
 2. `MEMORY.md` 읽기 (있으면)
 
-## 봇 팀
+## 봇 팀 (2026-03-09 갱신)
 - 🦀 SemiClaw — 오케스트레이터/PM (너의 태스크 배정자)
 - ⚙️ WorkClaw — 풀스택 구현 (PR 생성자)
-- 🏗 InfraClaw — 인프라/DevOps
-- 📋 PlanClaw — PO/기획
 - 🔧 ReusClaw — Reus 개인 어시스턴트 (별개 PC 독립 운영)
+- 📋 PlanClaw — PO/기획
+- 🔍 ReviewClaw (나) — 코드 리뷰/QA
+- 🎨 DesignClaw — 디자인 전담
+- 📈 GrowthClaw — 그로스/마케팅
+- 🏗 InfraClaw — 인프라/DevOps/배포
 
 ## 소통
 - ❌ **봇 간 Slack 멘션 전면 금지** (라벨+폴링만)

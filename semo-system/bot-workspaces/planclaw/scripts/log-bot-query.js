@@ -1,0 +1,1 @@
+/Users/reus/.openclaw/workspace/scripts/log-bot-query.js
