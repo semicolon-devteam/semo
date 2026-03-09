@@ -162,6 +162,45 @@ async function botUpsert(botId, domain, key, content) {
   }
 }
 
+async function optimize() {
+  const results = { demoted: 0, archived: 0, promoted: 0, details: { demoted: [], archived: [], promoted: [] } };
+
+  // 1. Hot 강등: hot_until이 오늘 이전인 항목 → hot_until = NULL
+  const demoted = await pool.query(
+    `UPDATE semo.knowledge_base SET hot_until = NULL, updated_at = NOW()
+     WHERE hot_until < CURRENT_DATE AND archived = false
+     RETURNING kb_id, domain, key`
+  );
+  results.demoted = demoted.rowCount;
+  results.details.demoted = demoted.rows;
+
+  // 2. Vector 아카이빙: 3개월 이상 미사용 + embedding 있는 항목 → archived=true, embedding=NULL
+  //    (last_used_at이 NULL이면 created_at 기준)
+  const archived = await pool.query(
+    `UPDATE semo.knowledge_base SET archived = true, embedding = NULL, updated_at = NOW()
+     WHERE archived = false
+       AND embedding IS NOT NULL
+       AND COALESCE(last_used_at, created_at) < NOW() - INTERVAL '3 months'
+     RETURNING kb_id, domain, key, last_used_at, created_at`
+  );
+  results.archived = archived.rowCount;
+  results.details.archived = archived.rows;
+
+  // 3. 승격: 최근 7일 내 use_count >= 3이고 hot_until이 NULL인 항목 → hot_until = today + 30일
+  const promoted = await pool.query(
+    `UPDATE semo.knowledge_base SET hot_until = CURRENT_DATE + 30, updated_at = NOW()
+     WHERE archived = false
+       AND hot_until IS NULL
+       AND last_used_at > NOW() - INTERVAL '7 days'
+       AND use_count >= 3
+     RETURNING kb_id, domain, key, use_count`
+  );
+  results.promoted = promoted.rowCount;
+  results.details.promoted = promoted.rows;
+
+  return results;
+}
+
 async function stats() {
   const kb = await pool.query("SELECT domain, count(*) as cnt, count(embedding) as emb_cnt FROM semo.knowledge_base GROUP BY domain ORDER BY domain");
   const bk = await pool.query("SELECT bot_id, count(*) as cnt, count(embedding) as emb_cnt FROM semo.bot_knowledge GROUP BY bot_id ORDER BY bot_id");
@@ -208,12 +247,15 @@ async function main() {
     case "bot-upsert":
       result = await botUpsert(args[0], args[1], args[2], args[3]);
       break;
+    case "optimize":
+      result = await optimize();
+      break;
     case "stats":
       result = await stats();
       break;
     default:
       console.error("Usage: kb-cli.js <command> [args...]");
-      console.error("Commands: search, get, list, list-domains, upsert, bot-search, bot-get, bot-list, bot-upsert, stats");
+      console.error("Commands: search, get, list, list-domains, upsert, bot-search, bot-get, bot-list, bot-upsert, stats, optimize");
       process.exit(1);
   }
 

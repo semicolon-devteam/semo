@@ -15,7 +15,7 @@ interface SessionRow {
 interface CronJobRow {
   job_id: string;
   name: string;
-  schedule: any; // JSONB
+  schedule: CronJob['schedule']; // JSONB
   enabled: boolean;
   last_run: string | null;
   next_run: string | null;
@@ -37,7 +37,7 @@ export async function GET(
       ORDER BY last_activity DESC
     `, [botId]);
 
-    const sessions: Session[] = sessionsResult.rows.map(row => ({
+    const sessions: Session[] = sessionsResult.rows.map((row: SessionRow) => ({
       sessionKey: row.session_key,
       label: row.label,
       kind: row.kind,
@@ -54,7 +54,7 @@ export async function GET(
       ORDER BY next_run NULLS LAST
     `, [botId]);
 
-    const cronJobs: CronJob[] = cronResult.rows.map(row => ({
+    const cronJobs: CronJob[] = cronResult.rows.map((row: CronJobRow) => ({
       jobId: row.job_id,
       name: row.name,
       schedule: row.schedule,

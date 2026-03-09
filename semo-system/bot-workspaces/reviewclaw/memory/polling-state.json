@@ -1,5 +1,5 @@
 {
-  "last_poll": "2026-03-06T04:15:00+09:00",
+  "last_poll": "2026-03-09T04:15:00+09:00",
   "reviewed_prs": [
     "core-backend#163",
     "core-backend#130",
@@ -113,13 +113,14 @@
     "proj-play-land#155",
     "core-backend#233",
     "proj-play-land#158",
-    "proj-office-land#306"
+    "proj-office-land#306",
+    "proj-star-spot#25"
   ],
   "stats": {
-    "total_reviews": 110,
+    "total_reviews": 111,
     "approvals": 54,
     "request_changes": 2,
-    "comments_only": 47,
+    "comments_only": 48,
     "self_merges": 7,
     "self_skipped": 1,
     "blocked_infra_issue": 2

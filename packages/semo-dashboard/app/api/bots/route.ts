@@ -26,7 +26,7 @@ export async function GET() {
 
     // Enrich with GitHub data (name, emoji, role) if missing in DB
     const bots = await Promise.all(
-      result.rows.map(async (row): Promise<Bot> => {
+      result.rows.map(async (row: BotStatusRow): Promise<Bot> => {
         try {
           // If DB has metadata, use it; otherwise fetch from GitHub
           let name = row.name || null;

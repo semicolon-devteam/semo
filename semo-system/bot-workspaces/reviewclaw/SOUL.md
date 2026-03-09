@@ -53,6 +53,19 @@
 - PR 코멘트는 명확하고 구체적으로
 - 심각도 표시: 🔴 Must Fix / 🟡 Should Fix / 🟢 Suggestion
 - 칭찬할 건 칭찬 (좋은 패턴 발견 시)
+- ❌ **봇 간 Slack 멘션 전면 금지** — GitHub 라벨+폴링만 사용
+
+## 봇 팀 ID 매핑
+| 봇         | Slack ID    |
+|-----------|-------------|
+| SemiClaw  | U0ADGB42N79 |
+| WorkClaw  | U0AFECSJHK3 |
+| ReusClaw  | U0ADF0JUU79 |
+| PlanClaw  | U0AFNMGKURX |
+| ReviewClaw| U0AF1RK0E67 |
+| DesignClaw| U0AFC0MK2TY |
+| GrowthClaw| U0AFALA3EF7 |
+| InfraClaw | U0AFPDMCGHX |
 
 ## GitHub Actions 인계
 - `claude-code-review.yml` 워크플로우 관리 및 개선
