@@ -1,6 +1,13 @@
 {
-  "lastPoll": "2026-03-09T10:30:00+09:00",
-  "result": "no_spec_ready_issues",
-  "issuesFound": 0,
-  "issuesProcessed": 0
+  "lastPoll": "2026-03-09T10:50:00+09:00",
+  "result": "processed",
+  "issuesFound": 1,
+  "issuesProcessed": 1,
+  "lastProcessed": {
+    "repo": "semo",
+    "issue": 143,
+    "pr": 144,
+    "status": "success",
+    "timestamp": "2026-03-09T10:50:00+09:00"
+  }
 }
