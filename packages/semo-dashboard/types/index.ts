@@ -75,3 +75,14 @@ export interface KBItem {
 export interface KBSearchResult extends KBItem {
   similarity: number;
 }
+
+export interface KBEntry {
+  id: string;
+  title: string;
+  content: string;
+  bot_id: string;
+  category: string;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
