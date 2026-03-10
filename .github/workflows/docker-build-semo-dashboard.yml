@@ -85,11 +85,11 @@ jobs:
           
           # Update dev overlay
           sed -i "s|newTag:.*|newTag: ${{ steps.tag.outputs.tag }}|" \
-            semo-dashboard/overlays/dev/kustomization.yaml
+            semo/overlays/dev/kustomization.yaml
           
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add semo-dashboard/overlays/dev/kustomization.yaml
+          git add semo/overlays/dev/kustomization.yaml
           git commit -m "chore: Update semo-dashboard dev image to ${{ steps.tag.outputs.tag }}"
           git push
 
