@@ -70,12 +70,18 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
+      - name: Checkout ops repo
+        if: steps.tag.outputs.env == 'dev'
+        uses: actions/checkout@v4
+        with:
+          repository: semicolon-devteam/semi-colon-ops
+          token: ${{ secrets.SOURCE_REPO_TOKEN }}
+          path: ops
+
       - name: Update Kustomize image tag
         if: steps.tag.outputs.env == 'dev'
         run: |
-          cd /tmp
-          git clone https://github.com/semicolon-devteam/semi-colon-ops.git
-          cd semi-colon-ops
+          cd ops
           
           # Update dev overlay
           sed -i "s|newTag:.*|newTag: ${{ steps.tag.outputs.tag }}|" \
@@ -85,7 +91,7 @@ jobs:
           git config user.email "actions@github.com"
           git add semo-dashboard/overlays/dev/kustomization.yaml
           git commit -m "chore: Update semo-dashboard dev image to ${{ steps.tag.outputs.tag }}"
-          git push https://${{ secrets.SOURCE_REPO_TOKEN }}@github.com/semicolon-devteam/semi-colon-ops.git main
+          git push
 
       - name: Summary
         run: |
