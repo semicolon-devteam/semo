@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getFileContent, getBotFiles } from '@/lib/github';
+import { listSessions, listCronJobs } from '@/lib/openclaw';
 import type { BotDetail, Session, CronJob, BotFile, DailyLog } from '@/types';
 
 // Force dynamic rendering to prevent build-time DB connection
@@ -32,39 +33,71 @@ export async function GET(
   try {
     const { botId } = await params;
 
-    // 1. Fetch sessions from DB
-    const sessionsResult = await query<SessionRow>(`
-      SELECT session_key, label, kind, chat_type, last_activity, message_count
-      FROM semo.bot_sessions
-      WHERE bot_id = $1
-      ORDER BY last_activity DESC
-    `, [botId]);
+    // 1. Fetch sessions from OpenClaw Gateway (with DB fallback)
+    let sessions: Session[] = [];
+    try {
+      const openclawSessions = await listSessions(20);
+      sessions = openclawSessions.map(s => ({
+        sessionKey: s.key,
+        label: s.label || s.key,
+        kind: s.kind || 'main',
+        chatType: s.channel || 'unknown',
+        lastActivity: s.lastMessageAt || new Date().toISOString(),
+        messageCount: s.messageCount || 0,
+      }));
+    } catch (error) {
+      console.warn('OpenClaw API failed, falling back to DB:', error);
+      
+      // Fallback to DB
+      const sessionsResult = await query<SessionRow>(`
+        SELECT session_key, label, kind, chat_type, last_activity, message_count
+        FROM semo.bot_sessions
+        WHERE bot_id = $1
+        ORDER BY last_activity DESC
+      `, [botId]);
 
-    const sessions: Session[] = sessionsResult.rows.map((row: SessionRow) => ({
-      sessionKey: row.session_key,
-      label: row.label,
-      kind: row.kind,
-      chatType: row.chat_type,
-      lastActivity: row.last_activity,
-      messageCount: row.message_count,
-    }));
+      sessions = sessionsResult.rows.map((row: SessionRow) => ({
+        sessionKey: row.session_key,
+        label: row.label,
+        kind: row.kind,
+        chatType: row.chat_type,
+        lastActivity: row.last_activity,
+        messageCount: row.message_count,
+      }));
+    }
 
-    // 2. Fetch cron jobs from DB
-    const cronResult = await query<CronJobRow>(`
-      SELECT job_id, name, schedule, enabled, last_run, next_run, session_target
-      FROM semo.bot_cron_jobs
-      WHERE bot_id = $1
-      ORDER BY next_run NULLS LAST
-    `, [botId]);
+    // 2. Fetch cron jobs from OpenClaw Gateway (with DB fallback)
+    let cronJobs: CronJob[] = [];
+    try {
+      const openclawCrons = await listCronJobs();
+      cronJobs = openclawCrons.map(c => ({
+        jobId: c.id,
+        name: c.name || c.id,
+        schedule: c.schedule,
+        enabled: c.enabled,
+        lastRun: c.lastRun,
+        nextRun: c.nextRun,
+      }));
+    } catch (error) {
+      console.warn('OpenClaw cron API failed, falling back to DB:', error);
+      
+      // Fallback to DB
+      const cronResult = await query<CronJobRow>(`
+        SELECT job_id, name, schedule, enabled, last_run, next_run, session_target
+        FROM semo.bot_cron_jobs
+        WHERE bot_id = $1
+        ORDER BY next_run NULLS LAST
+      `, [botId]);
 
-    const cronJobs: CronJob[] = cronResult.rows.map((row: CronJobRow) => ({
-      jobId: row.job_id,
-      name: row.name,
-      schedule: row.schedule,
-      enabled: row.enabled,
-      lastRun: row.last_run || undefined,
-      nextRun: row.next_run || undefined,
-    }));
+      cronJobs = cronResult.rows.map((row: CronJobRow) => ({
+        jobId: row.job_id,
+        name: row.name,
+        schedule: row.schedule,
+        enabled: row.enabled,
+        lastRun: row.last_run || undefined,
+        nextRun: row.next_run || undefined,
+      }));
+    }
 
     // 3. Fetch config files from GitHub
     const [soul, agents, user] = await Promise.all([
