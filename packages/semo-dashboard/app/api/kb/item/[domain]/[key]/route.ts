@@ -3,10 +3,10 @@ import { getItem } from '@/lib/kb';
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { domain: string; key: string } }
+  { params }: { params: Promise<{ domain: string; key: string }> }
 ) {
   try {
-    const { domain, key } = params;
+    const { domain, key } = await params;
     const { searchParams } = new URL(request.url);
     const bot_id = searchParams.get('bot_id') || undefined;
 
