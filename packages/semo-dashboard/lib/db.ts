@@ -6,12 +6,6 @@
 
 import { Client, QueryResult, QueryResultRow } from 'pg';
 
-const DATABASE_URL = process.env.DATABASE_URL;
-
-if (!DATABASE_URL) {
-  throw new Error('DATABASE_URL environment variable is not set');
-}
-
 /**
  * Execute a database query
  * @param query SQL query string
@@ -22,6 +16,12 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
   query: string,
   params?: unknown[]
 ): Promise<QueryResult<T>> {
+  const DATABASE_URL = process.env.DATABASE_URL;
+  
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not set');
+  }
+
   const client = new Client({
     connectionString: DATABASE_URL,
   });
@@ -43,6 +43,12 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
 export async function transaction<T>(
   callback: (client: Client) => Promise<T>
 ): Promise<T> {
+  const DATABASE_URL = process.env.DATABASE_URL;
+  
+  if (!DATABASE_URL) {
+    throw new Error('DATABASE_URL environment variable is not set');
+  }
+
   const client = new Client({
     connectionString: DATABASE_URL,
   });
