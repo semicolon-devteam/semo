@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import type { KBEntry } from '@/types';
 
+// Force dynamic rendering to prevent build-time DB connection
+export const dynamic = 'force-dynamic';
+
 interface KBEntryRow {
   id: string;
   title: string;

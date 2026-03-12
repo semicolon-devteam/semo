@@ -3,6 +3,9 @@ import { getFileContent, getBotWorkspaces } from '@/lib/github';
 import { query } from '@/lib/db';
 import type { Bot } from '@/types';
 
+// Force dynamic rendering to prevent build-time DB connection
+export const dynamic = 'force-dynamic';
+
 interface BotStatusRow {
   bot_id: string;
   name: string | null;

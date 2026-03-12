@@ -3,6 +3,9 @@ import { query } from '@/lib/db';
 import { getFileContent, getBotFiles } from '@/lib/github';
 import type { BotDetail, Session, CronJob, BotFile, DailyLog } from '@/types';
 
+// Force dynamic rendering to prevent build-time DB connection
+export const dynamic = 'force-dynamic';
+
 interface SessionRow {
   session_key: string;
   label: string;
