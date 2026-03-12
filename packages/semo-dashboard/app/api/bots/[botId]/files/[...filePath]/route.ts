@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getFileContent } from '@/lib/github';
+import { getBotWorkspacePath } from '@/lib/constants';
 import path from 'path';
 
 /**
@@ -16,11 +17,6 @@ function validatePath(basePath: string, userPath: string): string {
   // Check if resolved path starts with base path (prevents ../ traversal)
   if (!resolved.startsWith(basePath)) {
     throw new Error('Invalid path: Path traversal detected');
-  }
-  
-  // Additional check: reject paths containing '..' segments
-  if (normalized.includes('..')) {
-    throw new Error('Invalid path: ".." not allowed');
   }
   
   return resolved;
@@ -45,7 +41,7 @@ export async function GET(
     const requestedPath = filePath.join('/');
     
     // Validate path (prevent path traversal)
-    const basePath = `semo-system/bot-workspaces/${botId}`;
+    const basePath = getBotWorkspacePath(botId);
     try {
       validatePath(basePath, requestedPath);
     } catch (error) {
