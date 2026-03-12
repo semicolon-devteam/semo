@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getFileContent } from '@/lib/github';
+import { getFileContent, getBotWorkspaces } from '@/lib/github';
 import { query } from '@/lib/db';
 import type { Bot } from '@/types';
 
@@ -15,6 +15,31 @@ interface BotStatusRow {
   synced_at: string;
 }
 
+async function parseBotMetadata(botId: string): Promise<{ name: string; emoji: string; role: string }> {
+  try {
+    const [identity, user] = await Promise.all([
+      getFileContent(`semo-system/bot-workspaces/${botId}/IDENTITY.md`).catch(() => ''),
+      getFileContent(`semo-system/bot-workspaces/${botId}/USER.md`).catch(() => ''),
+    ]);
+
+    // Parse IDENTITY.md for name and emoji
+    const nameMatch = identity.match(/Name:\*\*\s*(.+)/);
+    const emojiMatch = identity.match(/Emoji:\*\*\s*(.+)/);
+    
+    const name = nameMatch ? nameMatch[1].trim() : botId;
+    const emoji = emojiMatch ? emojiMatch[1].trim() : '🤖';
+
+    // Parse USER.md for role
+    const roleMatch = user.match(/- (.+)/);
+    const role = roleMatch ? roleMatch[1].trim() : 'Bot';
+
+    return { name, emoji, role };
+  } catch (error) {
+    console.error(`Error parsing bot metadata for ${botId}:`, error);
+    return { name: botId, emoji: '🤖', role: 'Bot' };
+  }
+}
+
 export async function GET() {
   try {
     // Query bot status from PostgreSQL
@@ -23,6 +48,31 @@ export async function GET() {
       FROM semo.bot_status
       ORDER BY bot_id
     `);
+
+    // If DB is empty, fallback to GitHub
+    if (result.rows.length === 0) {
+      console.log('DB empty, falling back to GitHub...');
+      const botIds = await getBotWorkspaces();
+      
+      const bots = await Promise.all(
+        botIds.map(async (botId): Promise<Bot> => {
+          const { name, emoji, role } = await parseBotMetadata(botId);
+          
+          return {
+            id: botId,
+            name,
+            emoji,
+            role,
+            status: 'idle',
+            lastActive: new Date(0).toISOString(), // Epoch time for bots not yet in DB
+            sessionCount: 0,
+            workspacePath: `semo-system/bot-workspaces/${botId}`,
+          };
+        })
+      );
+
+      return NextResponse.json(bots);
+    }
 
     // Enrich with GitHub data (name, emoji, role) if missing in DB
     const bots = await Promise.all(
@@ -34,21 +84,10 @@ export async function GET() {
           let role = row.role || null;
 
           if (!name || !emoji || !role) {
-            const [identity, user] = await Promise.all([
-              getFileContent(`semo-system/bot-workspaces/${row.bot_id}/IDENTITY.md`).catch(() => ''),
-              getFileContent(`semo-system/bot-workspaces/${row.bot_id}/USER.md`).catch(() => ''),
-            ]);
-
-            // Parse IDENTITY.md for name and emoji
-            const nameMatch = identity.match(/Name:\*\*\s*(.+)/);
-            const emojiMatch = identity.match(/Emoji:\*\*\s*(.+)/);
-            
-            name = name || (nameMatch ? nameMatch[1].trim() : row.bot_id);
-            emoji = emoji || (emojiMatch ? emojiMatch[1].trim() : '🤖');
-
-            // Parse USER.md for role
-            const roleMatch = user.match(/- (.+)/);
-            role = role || (roleMatch ? roleMatch[1].trim() : 'Bot');
+            const metadata = await parseBotMetadata(row.bot_id);
+            name = name || metadata.name;
+            emoji = emoji || metadata.emoji;
+            role = role || metadata.role;
 
             // Update DB with fetched metadata (optional, async)
             query(`
