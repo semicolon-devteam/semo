@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import DOMPurify from 'isomorphic-dompurify';
 
 export default function OrderZone() {
   const [command, setCommand] = useState('');
@@ -10,18 +11,21 @@ export default function OrderZone() {
   const handleSubmit = async () => {
     if (!command.trim()) return;
 
+    // Sanitize command input to prevent XSS
+    const sanitizedCommand = DOMPurify.sanitize(command.trim(), { ALLOWED_TAGS: [] });
+
     setIsSubmitting(true);
     try {
       // TODO: Implement API call to /api/commands
       const response = await fetch('/api/commands', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command: command.trim() }),
+        body: JSON.stringify({ command: sanitizedCommand }),
       });
 
       if (response.ok) {
         // Add to history
-        setCommandHistory((prev) => [command.trim(), ...prev].slice(0, 5));
+        setCommandHistory((prev) => [sanitizedCommand, ...prev].slice(0, 5));
         setCommand('');
       }
     } catch (error) {

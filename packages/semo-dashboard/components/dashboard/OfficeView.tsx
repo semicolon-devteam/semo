@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import * as PIXI from 'pixi.js';
+import DOMPurify from 'isomorphic-dompurify';
 
 interface Agent {
   id: string;
@@ -12,9 +13,15 @@ interface Agent {
   last_message?: string;
 }
 
+const GRID_SIZE = 50;
+const GRID_WIDTH = 20;
+const GRID_HEIGHT = 15;
+
 export default function OfficeView() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const appRef = useRef<PIXI.Application | null>(null);
+  const gridRef = useRef<PIXI.Graphics | null>(null);
+  const agentContainerRef = useRef<PIXI.Container | null>(null);
   const [agents, setAgents] = useState<Agent[]>([]);
 
   useEffect(() => {
@@ -28,10 +35,10 @@ export default function OfficeView() {
     ]);
   }, []);
 
+  // Initialize PixiJS app once
   useEffect(() => {
     if (!canvasRef.current) return;
 
-    // Initialize PixiJS app
     const app = new PIXI.Application();
     appRef.current = app;
 
@@ -44,33 +51,47 @@ export default function OfficeView() {
 
       canvasRef.current!.appendChild(app.canvas);
 
-      // Draw grid
+      // Draw grid (once)
       const grid = new PIXI.Graphics();
-      const gridSize = 50; // pixels per grid cell
-      const gridWidth = 20;
-      const gridHeight = 15;
+      gridRef.current = grid;
 
       grid.lineStyle(1, 0xe0e0e0);
-      for (let x = 0; x <= gridWidth; x++) {
-        grid.moveTo(x * gridSize, 0);
-        grid.lineTo(x * gridSize, gridHeight * gridSize);
+      for (let x = 0; x <= GRID_WIDTH; x++) {
+        grid.moveTo(x * GRID_SIZE, 0);
+        grid.lineTo(x * GRID_SIZE, GRID_HEIGHT * GRID_SIZE);
       }
-      for (let y = 0; y <= gridHeight; y++) {
-        grid.moveTo(0, y * gridSize);
-        grid.lineTo(gridWidth * gridSize, y * gridSize);
+      for (let y = 0; y <= GRID_HEIGHT; y++) {
+        grid.moveTo(0, y * GRID_SIZE);
+        grid.lineTo(GRID_WIDTH * GRID_SIZE, y * GRID_SIZE);
       }
       app.stage.addChild(grid);
 
-      // Render agents
-      agents.forEach((agent) => {
-        const agentSprite = createAgentSprite(agent, gridSize);
-        app.stage.addChild(agentSprite);
-      });
+      // Create container for agents
+      const agentContainer = new PIXI.Container();
+      agentContainerRef.current = agentContainer;
+      app.stage.addChild(agentContainer);
     })();
 
     return () => {
       app.destroy(true, { children: true });
+      appRef.current = null;
+      gridRef.current = null;
+      agentContainerRef.current = null;
     };
+  }, []);
+
+  // Update agents when data changes
+  useEffect(() => {
+    if (!agentContainerRef.current) return;
+
+    // Clear previous agents
+    agentContainerRef.current.removeChildren();
+
+    // Render new agents
+    agents.forEach((agent) => {
+      const agentSprite = createAgentSprite(agent, GRID_SIZE);
+      agentContainerRef.current!.addChild(agentSprite);
+    });
   }, [agents]);
 
   return (
@@ -152,6 +173,9 @@ function getStatusColor(status: string): number {
 function createSpeechBubble(message: string): PIXI.Container {
   const bubble = new PIXI.Container();
 
+  // Sanitize message to prevent XSS
+  const sanitized = DOMPurify.sanitize(message, { ALLOWED_TAGS: [] });
+
   // Bubble background
   const bg = new PIXI.Graphics();
   bg.roundRect(-60, -20, 120, 30, 5);
@@ -161,7 +185,7 @@ function createSpeechBubble(message: string): PIXI.Container {
 
   // Message text
   const text = new PIXI.Text({
-    text: message.length > 15 ? message.substring(0, 15) + '...' : message,
+    text: sanitized.length > 15 ? sanitized.substring(0, 15) + '...' : sanitized,
     style: {
       fontSize: 9,
       fill: 0x333333,
