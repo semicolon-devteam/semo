@@ -1,6 +1,15 @@
 {
-  "lastPoll": "2026-03-09T10:30:00+09:00",
-  "result": "no_spec_ready_issues",
-  "issuesFound": 0,
-  "issuesProcessed": 0
+  "lastPoll": "2026-03-12T18:25:00+09:00",
+  "result": "processing",
+  "issuesFound": 5,
+  "issuesProcessed": 1,
+  "currentIssue": "semo #161",
+  "subagentSessionKey": "agent:main:subagent:95eb848a-3620-40c1-be5a-d713785ac2af",
+  "runId": "dfc194bf-c9dd-44b2-a6e2-7e7446044b21",
+  "issuesPending": [
+    "proj-by-buyer #67",
+    "proj-by-buyer #66",
+    "proj-by-buyer #65",
+    "proj-by-buyer #64"
+  ]
 }
