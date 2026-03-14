@@ -2,8 +2,8 @@ name: 1. 개발 CI / CD
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches: ["dev"]
+  push:
+    branches: ["dev"]
 
 permissions:
   id-token: write
