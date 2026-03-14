@@ -42,7 +42,7 @@ jobs:
       ref: main
       environment: dev
       service_name: semo
-      image_name: docker.io/semicolonmanager/semo-dashboard
+      image_name: docker.io/semicolonmanager/semo
       tag_value: ${{ needs.build-and-deploy.outputs.image_tag }}
     secrets:
       ACTION_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
