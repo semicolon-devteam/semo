@@ -238,6 +238,39 @@
 
 3. **OKE 내부에서 접근**: `central-db.semi-dev.internal` 도메인 사용
 
+### SSH Bastion 접근 (OCI Private VM)
+
+**기본 원칙**: OCI 내부 VM은 모두 **SSH Bastion Jump** 방식으로 접근
+
+#### Bastion 호스트
+- **Public IP**: `152.70.244.169`
+- **User**: `opc`
+- **용도**: OCI 내부 private 서브넷 VM 접근 게이트웨이
+
+#### 주요 VM 목록 (Private IP)
+| VM | IP | 용도 | 비고 |
+|---|---|---|---|
+| Central DB | `10.0.0.91` | PostgreSQL (appdb) | pg16-primary 컨테이너 |
+| office-supabase | `10.0.0.89` | Supabase (office) | Kong:8000 |
+| play-supabase | `10.0.0.74` | Supabase (play) | Kong:8000 |
+| game-supabase | `10.0.0.XX` | Supabase (game) | 확인 필요 |
+
+#### 접속 명령
+**일반 SSH 접속**:
+```bash
+ssh -o StrictHostKeyChecking=no -J opc@152.70.244.169 opc@<VM_IP>
+```
+
+**원격 명령 실행** (예: Docker 컨테이너 확인):
+```bash
+ssh -o StrictHostKeyChecking=no -J opc@152.70.244.169 opc@10.0.0.89 'docker ps'
+```
+
+**주의사항**:
+- VPN 연결 불필요 (SSH Jump로 직접 접근)
+- 모든 VM은 `opc` 유저 사용
+- Bastion 호스트 키는 자동 수락 (`StrictHostKeyChecking=no`)
+
 ### IaC
 - **레포**: semicolon-devteam/core-infra (Terraform)
 - **담당**: Bae (기본 OCI 구조), Garden (K8S 초기 세팅)

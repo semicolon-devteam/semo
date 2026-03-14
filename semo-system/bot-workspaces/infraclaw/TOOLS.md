@@ -13,17 +13,58 @@ Things like:
 - Device nicknames
 - Anything environment-specific
 
-## Examples
+## SSH Access (OCI Infrastructure)
+
+### Bastion Jump Host
+**Always use SSH Bastion Jump for OCI private VMs**
+
+Bastion: `152.70.244.169` (user: `opc`)
+
+### Quick Access Aliases
+
+**Central DB**:
+```bash
+ssh -o StrictHostKeyChecking=no -J opc@152.70.244.169 opc@10.0.0.91
+```
+
+**office-supabase**:
+```bash
+ssh -o StrictHostKeyChecking=no -J opc@152.70.244.169 opc@10.0.0.89
+```
+
+**play-supabase**:
+```bash
+ssh -o StrictHostKeyChecking=no -J opc@152.70.244.169 opc@10.0.0.74
+```
+
+### Common Tasks
+
+**Check Supabase containers**:
+```bash
+ssh -o StrictHostKeyChecking=no -J opc@152.70.244.169 opc@10.0.0.89 'docker ps | grep supabase'
+```
+
+**View Kong config**:
+```bash
+ssh -o StrictHostKeyChecking=no -J opc@152.70.244.169 opc@10.0.0.89 'cat /opt/supabase/docker/volumes/api/kong.yml'
+```
+
+**DB Query (psql)**:
+```bash
+ssh -o StrictHostKeyChecking=no -J opc@152.70.244.169 opc@10.0.0.91 << 'ENDSSH'
+docker exec -i pg16-primary psql -U app -d appdb
+ENDSSH
+```
+
+---
+
+## Examples (Template)
 
 ```markdown
 ### Cameras
 
 - living-room → Main area, 180° wide angle
 - front-door → Entrance, motion-triggered
-
-### SSH
-
-- home-server → 192.168.1.100, user: admin
 
 ### TTS
 
