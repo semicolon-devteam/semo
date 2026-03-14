@@ -232,7 +232,7 @@ async function usageReport(hours = 24) {
       bot_id,
       COUNT(*) as total_entries,
       COUNT(CASE WHEN updated_at > NOW() - $1::interval THEN 1 END) as used_recently,
-      ROUND(COUNT(*)::numeric, 1) as total_count
+      COUNT(*) as total_count
     FROM semo.bot_knowledge
     GROUP BY bot_id
     ORDER BY used_recently DESC, bot_id
@@ -320,7 +320,12 @@ async function main() {
       result = await stats();
       break;
     case "usage-report":
-      result = await usageReport(parseInt(args[0]) || 24);
+      const hours = parseInt(args[0]);
+      if (isNaN(hours) || hours <= 0) {
+        console.error("Error: hours must be a positive number");
+        process.exit(1);
+      }
+      result = await usageReport(hours);
       break;
     default:
       console.error("Usage: kb-cli.js <command> [args...]");
