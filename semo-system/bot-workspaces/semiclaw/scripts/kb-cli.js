@@ -320,7 +320,7 @@ async function main() {
       result = await stats();
       break;
     case "usage-report":
-      const hours = parseInt(args[0]);
+      const hours = args[0] ? parseInt(args[0]) : 24;
       if (isNaN(hours) || hours <= 0) {
         console.error("Error: hours must be a positive number");
         process.exit(1);
