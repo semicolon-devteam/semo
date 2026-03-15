@@ -14,29 +14,23 @@ interface BotStatusRow {
   last_active: string | null;
   session_count: number;
   workspace_path: string;
-  status: 'active' | 'idle' | 'error';
+  status: 'online' | 'offline';
   synced_at: string;
 }
 
 async function parseBotMetadata(botId: string): Promise<{ name: string; emoji: string; role: string }> {
   try {
-    const [identity, user] = await Promise.all([
-      getFileContent(`semo-system/bot-workspaces/${botId}/IDENTITY.md`).catch(() => ''),
-      getFileContent(`semo-system/bot-workspaces/${botId}/USER.md`).catch(() => ''),
-    ]);
+    const identity = await getFileContent(`semo-system/bot-workspaces/${botId}/IDENTITY.md`).catch(() => '');
 
-    // Parse IDENTITY.md for name and emoji
-    const nameMatch = identity.match(/Name:\*\*\s*(.+)/);
-    const emojiMatch = identity.match(/Emoji:\*\*\s*(.+)/);
-    
-    const name = nameMatch ? nameMatch[1].trim() : botId;
-    const emoji = emojiMatch ? emojiMatch[1].trim() : '🤖';
+    const nameMatch = identity.match(/\*\*Name:\*\*\s*(.+)/);
+    const emojiMatch = identity.match(/\*\*Emoji:\*\*\s*(\S+)/);
+    const roleMatch = identity.match(/\*\*(?:Creature|Role|직책):\*\*\s*(.+)/);
 
-    // Parse USER.md for role
-    const roleMatch = user.match(/- (.+)/);
-    const role = roleMatch ? roleMatch[1].trim() : 'Bot';
-
-    return { name, emoji, role };
+    return {
+      name: nameMatch ? nameMatch[1].trim() : botId,
+      emoji: emojiMatch ? emojiMatch[1].trim() : '🤖',
+      role: roleMatch ? roleMatch[1].trim() : 'Bot',
+    };
   } catch (error) {
     console.error(`Error parsing bot metadata for ${botId}:`, error);
     return { name: botId, emoji: '🤖', role: 'Bot' };
@@ -66,7 +60,7 @@ export async function GET() {
             name,
             emoji,
             role,
-            status: 'idle',
+            status: 'offline',
             lastActive: new Date(0).toISOString(), // Epoch time for bots not yet in DB
             sessionCount: 0,
             workspacePath: `semo-system/bot-workspaces/${botId}`,
@@ -119,7 +113,7 @@ export async function GET() {
             name: row.bot_id,
             emoji: '🤖',
             role: 'Bot',
-            status: 'error',
+            status: 'offline',
             lastActive: new Date().toISOString(),
             sessionCount: 0,
             workspacePath: row.workspace_path,

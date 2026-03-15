@@ -16,19 +16,19 @@ import * as path from "path";
 // Embedding
 // ============================================================
 
-const EMBEDDING_MODEL = "voyage-3";
-const EMBEDDING_DIMENSIONS = 1024;
+const EMBEDDING_MODEL = "text-embedding-3-small";
+const EMBEDDING_DIMENSIONS = 1024; // DB vector(1024) 유지 — OpenAI dimensions 파라미터로 축소
 
 /**
- * Generate embedding vector for text using OpenAI API
+ * Generate embedding vector for text using OpenAI Embeddings API
  * Requires OPENAI_API_KEY environment variable
  */
 export async function generateEmbedding(text: string): Promise<number[] | null> {
-  const apiKey = process.env.VOYAGE_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
 
   try {
-    const response = await fetch("https://api.voyageai.com/v1/embeddings", {
+    const response = await fetch("https://api.openai.com/v1/embeddings", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
@@ -36,7 +36,7 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
       },
       body: JSON.stringify({
         model: EMBEDDING_MODEL,
-        input: text.substring(0, 8000), // truncate to avoid token limit
+        input: text.substring(0, 8000),
         dimensions: EMBEDDING_DIMENSIONS,
       }),
     });
@@ -56,14 +56,14 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
 }
 
 /**
- * Generate embeddings for multiple texts (batched)
+ * Generate embeddings for multiple texts (OpenAI는 단건 처리, 순차 호출)
  */
 export async function generateEmbeddings(texts: string[]): Promise<(number[] | null)[]> {
-  const apiKey = process.env.VOYAGE_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return texts.map(() => null);
 
   try {
-    const response = await fetch("https://api.voyageai.com/v1/embeddings", {
+    const response = await fetch("https://api.openai.com/v1/embeddings", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
@@ -71,8 +71,8 @@ export async function generateEmbeddings(texts: string[]): Promise<(number[] | n
       },
       body: JSON.stringify({
         model: EMBEDDING_MODEL,
-        input: texts.map(t => t.substring(0, 16000)),
-        output_dimension: EMBEDDING_DIMENSIONS,
+        input: texts.map(t => t.substring(0, 8000)),
+        dimensions: EMBEDDING_DIMENSIONS,
       }),
     });
 

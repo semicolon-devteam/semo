@@ -6,15 +6,21 @@
 import { Pool } from 'pg';
 import { genEmbedding } from './voyage';
 
-const pool = new Pool({
-  host: process.env.KB_DB_HOST || '127.0.0.1',
-  port: parseInt(process.env.KB_DB_PORT || '15432'),
-  user: process.env.KB_DB_USER || 'app',
-  password: process.env.KB_DB_PASSWORD || '',
-  database: process.env.KB_DB_NAME || 'appdb',
-  ssl: false,
-  connectionTimeoutMillis: 5000,
-});
+// lib/db.ts와 동일한 DATABASE_URL을 사용하는 Pool
+// KB_DB_* 환경변수는 하위 호환성을 위해 유지하되, DATABASE_URL을 우선한다.
+const pool = new Pool(
+  process.env.DATABASE_URL
+    ? { connectionString: process.env.DATABASE_URL, max: 5, connectionTimeoutMillis: 5000 }
+    : {
+        host: process.env.KB_DB_HOST || '127.0.0.1',
+        port: parseInt(process.env.KB_DB_PORT || '5432'),
+        user: process.env.KB_DB_USER || 'app',
+        password: process.env.KB_DB_PASSWORD || '',
+        database: process.env.KB_DB_NAME || 'appdb',
+        ssl: false,
+        connectionTimeoutMillis: 5000,
+      }
+);
 
 export interface KBItem {
   kb_id: number;

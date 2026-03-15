@@ -1,60 +1,42 @@
 /**
  * Database Client Utilities
- * 
- * PostgreSQL client wrapper for SEMO Dashboard
+ *
+ * PostgreSQL connection pool wrapper for SEMO Dashboard.
+ * 싱글톤 Pool을 사용해 매 요청마다 새 커넥션을 열지 않는다.
  */
 
-import { Client, QueryResult, QueryResultRow } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 
-/**
- * Execute a database query
- * @param query SQL query string
- * @param params Query parameters
- * @returns Query result
- */
-export async function query<T extends QueryResultRow = QueryResultRow>(
-  query: string,
-  params?: unknown[]
-): Promise<QueryResult<T>> {
-  const DATABASE_URL = process.env.DATABASE_URL;
-  
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is not set');
+let _pool: Pool | null = null;
+
+function getPool(): Pool {
+  if (!_pool) {
+    const DATABASE_URL = process.env.DATABASE_URL;
+    if (!DATABASE_URL) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
+    _pool = new Pool({
+      connectionString: DATABASE_URL,
+      max: 10,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000,
+    });
   }
-
-  const client = new Client({
-    connectionString: DATABASE_URL,
-  });
-
-  try {
-    await client.connect();
-    const result = await client.query<T>(query, params);
-    return result;
-  } finally {
-    await client.end();
-  }
+  return _pool;
 }
 
-/**
- * Execute multiple queries in a transaction
- * @param callback Function that receives client and executes queries
- * @returns Result from callback
- */
+export async function query<T extends QueryResultRow = QueryResultRow>(
+  sql: string,
+  params?: unknown[]
+): Promise<QueryResult<T>> {
+  return getPool().query<T>(sql, params);
+}
+
 export async function transaction<T>(
-  callback: (client: Client) => Promise<T>
+  callback: (client: PoolClient) => Promise<T>
 ): Promise<T> {
-  const DATABASE_URL = process.env.DATABASE_URL;
-  
-  if (!DATABASE_URL) {
-    throw new Error('DATABASE_URL environment variable is not set');
-  }
-
-  const client = new Client({
-    connectionString: DATABASE_URL,
-  });
-
+  const client = await getPool().connect();
   try {
-    await client.connect();
     await client.query('BEGIN');
     const result = await callback(client);
     await client.query('COMMIT');
@@ -63,6 +45,6 @@ export async function transaction<T>(
     await client.query('ROLLBACK');
     throw error;
   } finally {
-    await client.end();
+    client.release();
   }
 }

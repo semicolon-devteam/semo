@@ -12,23 +12,39 @@
 import { Pool, PoolClient } from "pg";
 
 // PostgreSQL 연결 정보 (팀 코어)
-const DB_CONFIG = {
-  host: process.env.SEMO_DB_HOST || "3.38.162.21",
-  port: parseInt(process.env.SEMO_DB_PORT || "5432"),
-  user: process.env.SEMO_DB_USER || "app",
-  password: process.env.SEMO_DB_PASSWORD || "ProductionPassword2024!@#",
-  database: process.env.SEMO_DB_NAME || "appdb",
-  ssl: false,
-  connectionTimeoutMillis: 5000,
-  idleTimeoutMillis: 30000,
-};
+// DATABASE_URL 우선, 없으면 개별 SEMO_DB_* 변수 사용
+function buildDbConfig() {
+  if (process.env.DATABASE_URL) {
+    return {
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_URL.includes("sslmode=require") ? { rejectUnauthorized: false } : false,
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 30000,
+    };
+  }
+  if (!process.env.SEMO_DB_HOST && !process.env.DATABASE_URL) {
+    throw new Error(
+      "DB 연결 정보가 없습니다. DATABASE_URL 또는 SEMO_DB_HOST 환경변수를 설정하세요."
+    );
+  }
+  return {
+    host: process.env.SEMO_DB_HOST,
+    port: parseInt(process.env.SEMO_DB_PORT || "5432"),
+    user: process.env.SEMO_DB_USER || "app",
+    password: process.env.SEMO_DB_PASSWORD,
+    database: process.env.SEMO_DB_NAME || "appdb",
+    ssl: false,
+    connectionTimeoutMillis: 5000,
+    idleTimeoutMillis: 30000,
+  };
+}
 
-// PostgreSQL Pool (싱글톤)
+// PostgreSQL Pool (싱글톤) — 최초 getPool() 호출 시점에 config 평가
 let pool: Pool | null = null;
 
 export function getPool(): Pool {
   if (!pool) {
-    pool = new Pool(DB_CONFIG);
+    pool = new Pool(buildDbConfig());
   }
   return pool;
 }
