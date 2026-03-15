@@ -33,16 +33,25 @@ body:
       required: true
 
   - type: textarea
-    id: definition-of-done
+    id: acceptance-criteria
     attributes:
-      label: "✅ Definition of Done"
-      description: "이 이슈가 '완료'로 간주되기 위한 검증 가능한 조건들"
+      label: "✅ Acceptance Criteria"
+      description: |
+        ReviewClaw가 하나씩 체크하는 검증 항목. 각 AC는 독립적이고 기계적으로 확인 가능해야 함.
+        형식: ## AC-N: [기능/시나리오명] 아래에 체크리스트
       value: |
-        - [ ] 
+        ## AC-1: [정상 동작]
+        - [ ]
         - [ ] 기존 테스트 통과
         - [ ] 타입 에러 0
         - [ ] lint 통과
-      placeholder: "검증 가능한 완료 조건을 체크리스트로 작성"
+
+        ## AC-2: [엣지케이스]
+        - [ ]
+
+        ## AC-3: [에러 처리]
+        - [ ]
+      placeholder: "각 AC는 독립적으로 검증 가능한 조건이어야 합니다"
     validations:
       required: true
 

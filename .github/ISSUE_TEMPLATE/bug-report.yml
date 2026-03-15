@@ -44,16 +44,23 @@ body:
       required: true
 
   - type: textarea
-    id: definition-of-done
+    id: acceptance-criteria
     attributes:
-      label: "✅ Definition of Done"
-      description: "이 버그가 '수정 완료'로 간주되기 위한 검증 가능한 조건들"
+      label: "✅ Acceptance Criteria"
+      description: |
+        ReviewClaw가 하나씩 체크하는 검증 항목. 각 AC는 독립적이고 기계적으로 확인 가능해야 함.
       value: |
-        - [ ] 버그 재현 불가 확인
+        ## AC-1: 버그 수정 확인
+        - [ ] 재현 방법대로 실행 시 버그 미발생
         - [ ] 기존 테스트 통과
-        - [ ] 회귀 테스트 추가
         - [ ] 타입 에러 0
-      placeholder: "검증 가능한 완료 조건을 체크리스트로 작성"
+
+        ## AC-2: 회귀 방지
+        - [ ] 해당 케이스 커버하는 테스트 추가됨
+
+        ## AC-3: 엣지케이스
+        - [ ]
+      placeholder: "각 AC는 독립적으로 검증 가능한 조건이어야 합니다"
     validations:
       required: true
 

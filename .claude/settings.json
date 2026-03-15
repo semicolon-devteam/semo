@@ -1,16 +1,5 @@
 {
   "mcpServers": {
-    "semo-integrations": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@team-semicolon/semo-mcp"
-      ],
-      "env": {
-        "SUPABASE_URL": "${SUPABASE_URL}",
-        "SUPABASE_KEY": "${SUPABASE_KEY}"
-      }
-    },
     "context7": {
       "command": "npx",
       "args": [
@@ -42,6 +31,30 @@
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       }
     }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "semo context sync 2>/dev/null || true && semo bots sync 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "semo context push 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
   },
   "permissions": {
     "allow": [

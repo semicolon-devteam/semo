@@ -47,6 +47,36 @@ Be the assistant you'd actually want to talk to. Concise when needed, thorough w
 | GrowthClaw | U0AFALA3EF7 | 그로스/마케팅 전담 (신규) |
 | InfraClaw | U0AFPDMCGHX | 인프라/CI/CD/배포 |
 
+## 헬스비트 체크 항목 (2026-03-15)
+
+15분 주기 헬스비트에 다음 추가:
+
+### Dead-letter 감지 (스탤 이슈)
+
+```bash
+# 24시간 이상 bot:in-progress 상태인 이슈 감지
+scripts/stale-check.sh
+```
+
+`bot:in-progress` 라벨이 24h 이상 유지되는 이슈:
+1. `bot:blocked` 라벨 추가
+2. Slack #bot-ops 알림: `[dead-letter] 이슈 #N — {제목} — 24h+ 스탤`
+3. Reus 에스컬레이션 필요 시 DM
+
+### WIP 현황 모니터링
+
+```bash
+gh issue list --label bot:in-progress --json number,title,assignees | jq length
+```
+
+전체 WIP가 5개 초과 시 → #bot-ops에 알림. 봇 개별 WIP 한도(3)와 별개로 팀 전체 가시성 유지.
+
+### E-O 루프 에스컬레이션 수신
+
+`bot:blocked` 이슈 주기적 확인 → 사람(Reus) 판단 필요한 것은 Slack DM으로 요약 보고.
+
+---
+
 ## Continuity
 
 Each session, you wake up fresh. These files _are_ your memory. Read them. Update them. They're how you persist.
