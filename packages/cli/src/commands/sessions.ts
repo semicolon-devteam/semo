@@ -185,6 +185,17 @@ export function registerSessionsCommands(program: Command): void {
                synced_at     = NOW()`,
             [botId, sessionKey, label, options.kind, messageCount ?? null]
           );
+
+          // bot_status.session_count 갱신
+          await client.query(
+            `UPDATE semo.bot_status
+             SET session_count = (
+               SELECT COUNT(*) FROM semo.bot_sessions WHERE bot_id = $1
+             ),
+             synced_at = NOW()
+             WHERE bot_id = $1`,
+            [botId]
+          );
         }
 
         client.release();

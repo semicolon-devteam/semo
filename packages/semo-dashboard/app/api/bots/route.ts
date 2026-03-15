@@ -41,9 +41,14 @@ export async function GET() {
   try {
     // Query bot status from PostgreSQL
     const result = await query<BotStatusRow>(`
-      SELECT bot_id, name, emoji, role, last_active, session_count, workspace_path, status, synced_at
-      FROM semo.bot_status
-      ORDER BY bot_id
+      SELECT bs.bot_id, bs.name, bs.emoji, bs.role, bs.last_active,
+             COALESCE(s.cnt, 0)::int AS session_count,
+             bs.workspace_path, bs.status, bs.synced_at
+      FROM semo.bot_status bs
+      LEFT JOIN (
+        SELECT bot_id, COUNT(*) AS cnt FROM semo.bot_sessions GROUP BY bot_id
+      ) s ON s.bot_id = bs.bot_id
+      ORDER BY bs.bot_id
     `);
 
     // If DB is empty, fallback to GitHub
