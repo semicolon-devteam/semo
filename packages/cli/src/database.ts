@@ -10,6 +10,37 @@
  */
 
 import { Pool, PoolClient } from "pg";
+import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+
+// ~/.semo.env 자동 로드 — LaunchAgent / Claude Code 앱 / cron 등
+// 인터랙티브 쉘이 아닌 환경에서 환경변수를 공급한다.
+// 이미 설정된 환경변수는 덮어쓰지 않는다 (env var > file).
+function loadSemoEnv(): void {
+  const envFile = path.join(os.homedir(), ".semo.env");
+  if (!fs.existsSync(envFile)) return;
+  try {
+    const lines = fs.readFileSync(envFile, "utf8").split("\n");
+    for (const raw of lines) {
+      const line = raw.trim().replace(/^export\s+/, "");
+      if (!line || line.startsWith("#")) continue;
+      const eqIdx = line.indexOf("=");
+      if (eqIdx === -1) continue;
+      const key = line.slice(0, eqIdx).trim();
+      let val = line.slice(eqIdx + 1).trim();
+      if ((val.startsWith("'") && val.endsWith("'")) || (val.startsWith('"') && val.endsWith('"'))) {
+        val = val.slice(1, -1);
+      }
+      if (key && !process.env[key]) process.env[key] = val;
+    }
+  } catch {
+    // 파일 읽기 실패 시 무시 — 환경변수가 없으면 이후 buildDbConfig에서 에러
+  }
+}
+
+// 최초 import 시 즉시 실행
+loadSemoEnv();
 
 // PostgreSQL 연결 정보 (팀 코어)
 // DATABASE_URL 우선, 없으면 개별 SEMO_DB_* 변수 사용

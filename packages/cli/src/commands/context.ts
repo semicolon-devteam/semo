@@ -20,6 +20,15 @@ import { kbList, ontoList, OntologyDomain, KBEntry } from "../kb";
 
 const MEMORY_DIR = ".claude/memory";
 
+// --out-dir 로 override 가능 (OpenClaw 봇 workspace 경로 지원)
+function resolveMemoryDir(outDir?: string): string {
+  if (outDir) {
+    // 절대경로 또는 ~ 경로 처리
+    return outDir.replace(/^~/, require("os").homedir());
+  }
+  return path.join(process.cwd(), MEMORY_DIR);
+}
+
 const KB_DOMAIN_MAP: Record<string, string> = {
   team: "team.md",
   project: "projects.md",
@@ -32,10 +41,9 @@ const KB_DOMAIN_MAP: Record<string, string> = {
 // Helpers
 // ============================================================
 
-function ensureMemoryDir(cwd: string): string {
-  const memDir = path.join(cwd, MEMORY_DIR);
-  fs.mkdirSync(memDir, { recursive: true });
-  return memDir;
+function ensureMemoryDir(resolvedDir: string): string {
+  fs.mkdirSync(resolvedDir, { recursive: true });
+  return resolvedDir;
 }
 
 function kbEntriesToMarkdown(domain: string, entries: KBEntry[]): string {
@@ -178,8 +186,8 @@ export function registerContextCommands(program: Command): void {
     .option("--domain <name>", "특정 KB 도메인만")
     .option("--no-bots", "bot_status 동기화 건너뜀")
     .option("--no-ontology", "ontology 동기화 건너뜀")
+    .option("--out-dir <path>", "메모리 파일 출력 경로 (기본: .claude/memory/). OpenClaw 봇 workspace 지원용")
     .action(async (options) => {
-      const cwd = process.cwd();
       const spinner = ora("context sync 시작...").start();
 
       const connected = await isDbConnected();
@@ -190,7 +198,7 @@ export function registerContextCommands(program: Command): void {
       }
 
       const pool = getPool();
-      const memDir = ensureMemoryDir(cwd);
+      const memDir = ensureMemoryDir(resolveMemoryDir(options.outDir));
       let written = 0;
 
       try {
@@ -229,7 +237,7 @@ export function registerContextCommands(program: Command): void {
         }
 
         spinner.succeed(`context sync 완료 — ${written}개 파일 업데이트`);
-        console.log(chalk.gray(`  저장 위치: ${MEMORY_DIR}/`));
+        console.log(chalk.gray(`  저장 위치: ${memDir}`));
       } catch (err) {
         spinner.fail(`context sync 실패: ${err}`);
       } finally {
@@ -243,9 +251,9 @@ export function registerContextCommands(program: Command): void {
     .description(".claude/memory/decisions.md → Core DB (semo.knowledge_base)")
     .option("--domain <name>", "push할 도메인 (기본: decision)", "decision")
     .option("--dry-run", "실제 push 없이 변경사항만 미리보기")
+    .option("--out-dir <path>", "메모리 파일 경로 (기본: .claude/memory/). OpenClaw 봇 workspace 지원용")
     .action(async (options) => {
-      const cwd = process.cwd();
-      const memDir = path.join(cwd, MEMORY_DIR);
+      const memDir = resolveMemoryDir(options.outDir);
 
       const filename = KB_DOMAIN_MAP[options.domain] || `${options.domain}.md`;
       const filePath = path.join(memDir, filename);

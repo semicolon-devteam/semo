@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "semo context sync 2>/dev/null || true && semo bots sync 2>/dev/null || true"
+            "command": ". ~/.semo.env 2>/dev/null; semo context sync 2>/dev/null || true && semo bots sync 2>/dev/null || true"
           }
         ]
       }
@@ -50,7 +50,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "semo context push 2>/dev/null || true"
+            "command": ". ~/.semo.env 2>/dev/null; semo context push 2>/dev/null || true"
           }
         ]
       }
