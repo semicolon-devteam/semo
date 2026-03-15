@@ -42,14 +42,13 @@ if [ "$ISSUES" = "[]" ] || [ -z "$ISSUES" ]; then
 fi
 
 # 각 이슈 처리
-echo "$ISSUES" | python3 - << PYEOF
+ISSUES="$ISSUES" STALE_SECONDS="$STALE_SECONDS" python3 << 'PYEOF'
 import json, sys, subprocess, os
 from datetime import datetime, timezone
 
-issues = json.load(sys.stdin) if sys.stdin.isatty() == False else []
-issues = json.loads("""$ISSUES""")
+issues = json.loads(os.environ.get('ISSUES', '[]'))
 now = datetime.now(timezone.utc)
-stale_seconds = $STALE_SECONDS
+stale_seconds = int(os.environ.get('STALE_SECONDS', '86400'))
 
 for issue in issues:
     number = issue['number']

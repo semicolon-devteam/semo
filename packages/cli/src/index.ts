@@ -917,6 +917,9 @@ program
     // 7. Hooks 설치 (대화 로깅)
     await setupHooks(cwd, false);
 
+    // 7.5. ~/.semo.env 템플릿 생성 (없는 경우)
+    setupSemoEnvTemplate();
+
     // 8. CLAUDE.md 생성
     await setupClaudeMd(cwd, [], options.force);
 
@@ -946,9 +949,11 @@ program
     console.log(chalk.gray("    ✓ semo-scripts (자동화 스크립트)"));
 
     console.log(chalk.cyan("\n다음 단계:"));
-    console.log(chalk.gray("  1. Claude Code에서 프로젝트 열기"));
-    console.log(chalk.gray("  2. 자연어로 요청하기 (예: \"댓글 기능 구현해줘\")"));
-    console.log(chalk.gray("  3. /SEMO:help로 도움말 확인"));
+    console.log(chalk.gray("  1. ~/.semo.env에 팀 DB 접속 정보 입력 (이미 존재하면 생략)"));
+    console.log(chalk.gray("     DATABASE_URL='postgres://user:pass@host:5432/appdb'"));
+    console.log(chalk.gray("  2. Claude Code에서 프로젝트 열기 (SessionStart 훅이 자동 sync)"));
+    console.log(chalk.gray("  3. 자연어로 요청하기 (예: \"댓글 기능 구현해줘\")"));
+    console.log(chalk.gray("  4. /SEMO:help로 도움말 확인"));
     console.log();
   });
 
@@ -1546,16 +1551,6 @@ interface MCPServerConfig {
 
 const BASE_MCP_SERVERS: MCPServerConfig[] = [
   {
-    name: "semo-integrations",
-    command: "npx",
-    args: ["-y", "@team-semicolon/semo-mcp"],
-    env: {
-      // Slack/GitHub/DB 토큰은 패키지에 암호화 포함됨 (설정 불필요)
-      SUPABASE_URL: "${SUPABASE_URL}",
-      SUPABASE_KEY: "${SUPABASE_KEY}",
-    },
-  },
-  {
     name: "context7",
     command: "npx",
     args: ["-y", "@upstash/context7-mcp"],
@@ -1576,6 +1571,33 @@ const BASE_MCP_SERVERS: MCPServerConfig[] = [
     args: ["-y", "@modelcontextprotocol/server-github"],
   },
 ];
+
+// === ~/.semo.env 템플릿 생성 ===
+function setupSemoEnvTemplate(): void {
+  const envFile = path.join(os.homedir(), ".semo.env");
+  if (fs.existsSync(envFile)) return; // 이미 존재하면 건너뜀
+
+  const template = `# SEMO 환경변수 — 모든 컨텍스트에서 자동 로드됨
+# (Claude Code 앱, OpenClaw LaunchAgent, cron 등 비인터랙티브 환경 포함)
+#
+# 팀 Core DB 접속 정보를 여기에 입력하세요.
+# 설정 후 Claude Code 세션을 재시작하면 자동으로 context sync가 동작합니다.
+
+DATABASE_URL=''
+
+# Slack 알림 Webhook (선택 — bot-ops 채널 dead-letter 감지용)
+SLACK_WEBHOOK=''
+`;
+
+  try {
+    fs.writeFileSync(envFile, template, { mode: 0o600 });
+    console.log(chalk.cyan("\n📄 ~/.semo.env 템플릿 생성됨"));
+    console.log(chalk.yellow("  ⚠️  DATABASE_URL을 팀 Core DB 접속 정보로 채워주세요!"));
+    console.log(chalk.gray(`  파일: ${envFile}`));
+  } catch {
+    // silent — 권한 등으로 실패해도 무시
+  }
+}
 
 // === Claude MCP 서버 존재 여부 확인 ===
 function isMCPServerRegistered(serverName: string): boolean {
@@ -1812,7 +1834,7 @@ async function setupHooks(cwd: string, isUpdate: boolean = false) {
         hooks: [
           {
             type: "command",
-            command: "semo context sync 2>/dev/null || true",
+            command: ". ~/.semo.env 2>/dev/null; semo context sync 2>/dev/null || true",
             timeout: 30,
           },
         ],
@@ -1846,7 +1868,7 @@ async function setupHooks(cwd: string, isUpdate: boolean = false) {
         hooks: [
           {
             type: "command",
-            command: "semo context push 2>/dev/null || true",
+            command: ". ~/.semo.env 2>/dev/null; semo context push 2>/dev/null || true",
             timeout: 30,
           },
         ],
