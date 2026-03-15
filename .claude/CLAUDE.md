@@ -130,7 +130,6 @@ semicolon-devteam/semo 레포에 이슈 생성
 |----------|----------|------------|
 | `semo-system/semo-core/**` | `semo-core/VERSION` | `version-manager` |
 | `semo-system/semo-skills/**` | `semo-skills/VERSION` | `version-manager` |
-| `semo-system/semo-remote/**` | `semo-remote/VERSION` | `version-manager` |
 | `semo-system/semo-hooks/**` | `semo-hooks/VERSION` | `version-manager` |
 | `semo-system/meta/**` | `meta/VERSION` | `version-manager` |
 | `packages/cli/**` | `packages/cli/package.json` | `deploy-npm` |
@@ -246,32 +245,12 @@ memory 스킬이 자동으로 이 파일들을 관리합니다.
 
 ---
 
-#### meta
-
-> Core Rules는 semo-core/principles/를 참조합니다.
-
-#### References
-
-- [Orchestrator](agents/orchestrator/orchestrator.md) - 라우팅 규칙 및 Agent/Skill 목록
-- [SEMO Core - Principles](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md)
-- [SEMO Core - Message Rules](https://github.com/semicolon-devteam/semo-core/blob/main/MESSAGE_RULES.md)
-- [SEMO → SEMO 마이그레이션 가이드](../docs/SAX_TO_SEMO_MIGRATION.md) - 리브랜딩 전환 가이드
-- [SEMO 네이밍 규칙](../docs/SEMO_NAMING_CONVENTION.md) - SEMO → SEMO 용어 매핑
-
-
----
-
 ## Meta 패키지 컨텍스트
 
-### Meta
-
 > Core Rules는 semo-core/principles/를 참조합니다.
 
-#### References
+### References
 
-- [Orchestrator](agents/orchestrator/orchestrator.md) - 라우팅 규칙 및 Agent/Skill 목록
-- [SEMO Core - Principles](https://github.com/semicolon-devteam/semo-core/blob/main/PRINCIPLES.md)
-- [SEMO Core - Message Rules](https://github.com/semicolon-devteam/semo-core/blob/main/MESSAGE_RULES.md)
-- [SEMO → SEMO 마이그레이션 가이드](../docs/SAX_TO_SEMO_MIGRATION.md) - 리브랜딩 전환 가이드
-- [SEMO 네이밍 규칙](../docs/SEMO_NAMING_CONVENTION.md) - SEMO → SEMO 용어 매핑
+- [Orchestrator](semo-system/meta/agents/orchestrator/orchestrator.md) - 라우팅 규칙 및 Agent/Skill 목록
+- [SEMO Principles](semo-system/semo-core/principles/PRINCIPLES.md)
 
