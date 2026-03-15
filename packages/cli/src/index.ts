@@ -739,6 +739,12 @@ async function confirmOverwrite(itemName: string, itemPath: string): Promise<boo
     return true;
   }
 
+  // 비인터랙티브 환경(CI, 파이프) — 덮어쓰지 않고 기존 파일 유지
+  if (!process.stdin.isTTY) {
+    console.log(chalk.gray(`  → ${itemName} 이미 존재 (비인터랙티브 모드: 건너뜀)`));
+    return false;
+  }
+
   const { shouldOverwrite } = await inquirer.prompt([
     {
       type: "confirm",
@@ -1041,9 +1047,6 @@ async function setupStandard(cwd: string, force: boolean) {
     console.log(chalk.green(`  ✓ agents 설치 완료 (${agents.length}개)`));
 
     spinner.succeed("Standard 설치 완료 (DB 기반)");
-
-    // CLAUDE.md 생성
-    await generateClaudeMd(cwd);
 
   } catch (error) {
     spinner.fail("Standard 설치 실패");
