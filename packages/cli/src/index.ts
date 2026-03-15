@@ -37,6 +37,7 @@ import {
 import { registerContextCommands } from "./commands/context";
 import { registerBotsCommands } from "./commands/bots";
 import { registerGetCommands } from "./commands/get";
+import { registerSessionsCommands } from "./commands/sessions";
 
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 
@@ -3329,6 +3330,7 @@ ontoCmd
 registerContextCommands(program);
 registerBotsCommands(program);
 registerGetCommands(program);
+registerSessionsCommands(program);
 
 // === semo skills — DB 시딩 ===
 

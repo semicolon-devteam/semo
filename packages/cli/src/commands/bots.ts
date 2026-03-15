@@ -376,6 +376,15 @@ export function registerBotsCommands(program: Command): void {
         }
 
         await client.query("COMMIT");
+
+        // session_count를 bot_sessions 실제 집계로 갱신
+        await client.query(
+          `UPDATE semo.bot_status bs
+           SET session_count = (
+             SELECT COUNT(*) FROM semo.bot_sessions WHERE bot_id = bs.bot_id
+           )`
+        );
+
         spinner.succeed(`bots sync 완료: ${upserted}개 봇 업서트`);
         if (errors.length > 0) {
           errors.forEach(e => console.log(chalk.red(`  ❌ ${e}`)));

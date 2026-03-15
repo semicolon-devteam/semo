@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "semo context sync --out-dir ~/.openclaw-workclaw/workspace/memory 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "semo sessions push --bot-id workclaw --event start 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "semo sessions push --bot-id workclaw --event stop 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}
