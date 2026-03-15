@@ -14,11 +14,6 @@ const BATCH_SIZE = 100; // OpenAI는 배치당 더 많은 요청 허용
 const WAIT_MS = 1000; // rate limit 대기 (1초)
 
 const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
-  console.error('❌ DATABASE_URL 환경변수가 설정되지 않았습니다.');
-  console.error('   예: export DATABASE_URL=postgres://app:PASSWORD@localhost:15432/appdb');
-  process.exit(1);
-}
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -157,8 +152,28 @@ async function reEmbedBotKnowledge(client) {
   return updated;
 }
 
+function buildDbConfig() {
+  if (DATABASE_URL) {
+    return { connectionString: DATABASE_URL };
+  }
+  // Individual params fallback (avoids URL encoding issues with special chars in password)
+  const host = process.env.SEMO_DB_HOST;
+  const password = process.env.SEMO_DB_PASSWORD;
+  if (!host || !password) {
+    console.error('❌ DATABASE_URL 또는 SEMO_DB_HOST+SEMO_DB_PASSWORD 환경변수가 필요합니다.');
+    process.exit(1);
+  }
+  return {
+    host,
+    port: parseInt(process.env.SEMO_DB_PORT || '5432'),
+    user: process.env.SEMO_DB_USER || 'app',
+    password,
+    database: process.env.SEMO_DB_NAME || 'appdb',
+  };
+}
+
 async function main() {
-  const client = new Client({ connectionString: DATABASE_URL });
+  const client = new Client(buildDbConfig());
 
   try {
     console.log('Connecting to database...');

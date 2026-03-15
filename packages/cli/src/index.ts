@@ -1354,13 +1354,17 @@ function verifyInstallation(cwd: string, installedExtensions: string[] = []): Ve
     if (fs.existsSync(claudeAgentsDir)) {
       for (const agent of expectedAgents) {
         const linkPath = path.join(claudeAgentsDir, agent);
-        if (fs.existsSync(linkPath) || fs.lstatSync(linkPath).isSymbolicLink()) {
-          if (isSymlinkValid(linkPath)) {
-            result.stats.agents.linked++;
-          } else {
-            result.stats.agents.broken++;
-            result.warnings.push(`깨진 링크: .claude/agents/${agent}`);
+        try {
+          if (fs.existsSync(linkPath) || fs.lstatSync(linkPath).isSymbolicLink()) {
+            if (isSymlinkValid(linkPath)) {
+              result.stats.agents.linked++;
+            } else {
+              result.stats.agents.broken++;
+              result.warnings.push(`깨진 링크: .claude/agents/${agent}`);
+            }
           }
+        } catch {
+          // path doesn't exist at all — skip
         }
       }
     }
