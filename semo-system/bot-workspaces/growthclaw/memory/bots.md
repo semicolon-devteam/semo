@@ -23,7 +23,7 @@
 | InfraClaw | U0AFPDMCGHX | 인프라 / DB / 서버 |
 
 ## 봇 간 인계 방식 (2026-02-20, Reus 승인, 즉시 적용)
-**모든 봇 간 직접 Slack 멘션 인계 전면 폐기 → 순수 라벨+폴링 방식으로 전환**
+✅ 봇 간 Slack 멘션 허용 (2026-03-07 변경). 라벨+폴링도 병행
 
 ### 필수 규칙
 1. ❌ **작업 인계 목적으로 다른 봇을 Slack 멘션하지 말 것**
@@ -43,7 +43,7 @@
 ## 봇 간 파이프라인 (폴링 기반)
 GrowthClaw (분석) → GitHub Issue 생성 + `bot:spec-ready` 라벨 → PlanClaw (폴링 감지) → WorkClaw (폴링 감지) → ReviewClaw (폴링 감지) → SemiClaw (폴링 감지)
 
-- ❌ 직접 Slack 멘션 인계 금지
+- ✅ Slack 멘션 허용 (2026-03-07 변경)
 - ✅ GitHub 라벨+폴링으로만 인계
 - 봇 간 통신: 멘션된 대화(스레드) 내에서 진행 — `#bot-ops` (C0AFBQ209E0)는 상태 보고/공지/일일 점검 전용
 

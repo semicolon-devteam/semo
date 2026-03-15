@@ -27,7 +27,7 @@
 
 ## NON-NEGOTIABLE 규칙
 - **멘션 시 👀 이모지**: 게이트웨이 `messages.ackReaction: "eyes"` + `ackReactionScope: "all"`로 자동 처리됨
-- **봇 간 통신**: ❌ Slack 직접 멘션 인계 전면 금지. ✅ GitHub 이슈 라벨+폴링 방식만 사용.
+- **봇 간 통신**: ✅ Slack 멘션 허용 (2026-03-07 Reus 지시). GitHub 라벨+폴링도 병행.
 
 ## 봇 ID 매핑
 | 봇 | Slack ID |

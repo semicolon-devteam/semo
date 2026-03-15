@@ -1,0 +1,62 @@
+{
+  "// ═══════════════════════════════════════": "",
+  "// AI Readability 코드 표준 - VSCode 설정": "",
+  "// ═══════════════════════════════════════": "",
+  
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true,
+    "source.organizeImports": true
+  },
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  
+  "// ═══════════════════════════════════════": "",
+  "// ESLint 설정": "",
+  "// ═══════════════════════════════════════": "",
+  
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ],
+  "eslint.options": {
+    "extensions": [".js", ".jsx", ".ts", ".tsx"]
+  },
+  
+  "// ═══════════════════════════════════════": "",
+  "// TypeScript 설정": "",
+  "// ═══════════════════════════════════════": "",
+  
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  
+  "// ═══════════════════════════════════════": "",
+  "// Editor 설정": "",
+  "// ═══════════════════════════════════════": "",
+  
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": false,
+  "editor.rulers": [100],
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.eol": "\n",
+  
+  "// ═══════════════════════════════════════": "",
+  "// 경로 Intellisense": "",
+  "// ═══════════════════════════════════════": "",
+  
+  "path-intellisense.mappings": {
+    "@": "${workspaceFolder}/src"
+  },
+  
+  "// ═══════════════════════════════════════": "",
+  "// Prettier 설정": "",
+  "// ═══════════════════════════════════════": "",
+  
+  "prettier.singleQuote": true,
+  "prettier.trailingComma": "es5",
+  "prettier.printWidth": 100,
+  "prettier.semi": true
+}

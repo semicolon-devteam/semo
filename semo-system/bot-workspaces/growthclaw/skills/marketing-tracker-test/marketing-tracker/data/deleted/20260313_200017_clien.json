@@ -1,0 +1,16 @@
+{
+  "url": "https://clien.net/222",
+  "status": "deleted",
+  "added_at": "2026-03-13T20:00:02.545102+09:00",
+  "track_until": "2026-03-20T20:00:02.545102+09:00",
+  "community": "clien",
+  "day1_checks": 0,
+  "last_checked": null,
+  "consecutive_errors": 0,
+  "initial_metrics": null,
+  "current_metrics": null,
+  "comment_texts": [],
+  "deleted_at": "2026-03-13T20:00:17.557653+09:00",
+  "lifetime_hours": 0.0,
+  "deletion_reason": "HTTP 404"
+}

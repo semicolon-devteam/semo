@@ -28,9 +28,9 @@
 
 ### 라벨 전환 후 인계 방식 (2026-02-20 변경, Reus 승인)
 
-**⚠️ 모든 봇 간 직접 Slack 멘션 인계 전면 폐기. 순수 라벨+폴링 방식으로만 인계.**
+**✅ 봇 간 Slack 멘션 허용 (2026-03-07 변경). 라벨+폴링도 병행.**
 
-- 라벨만 부착하고 다음 봇이 폴링으로 감지. Slack 멘션 인계 금지.
+- 라벨 부착으로 폴링 감지 + Slack 멘션도 허용.
 - WorkClaw: `bot:needs-review` 붙이기만 → ReviewClaw이 5분 폴링으로 감지
 - PlanClaw: `bot:spec-ready` 붙이기만 → WorkClaw이 5분 폴링으로 감지
 - ReviewClaw: approve+머지 후 `bot:done` 붙이기만 → SemiClaw이 15분 폴링으로 감지

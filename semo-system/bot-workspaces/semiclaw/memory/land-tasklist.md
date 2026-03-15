@@ -49,6 +49,20 @@
   - accounts/linked, points/balance, points/history API 정상화
 - [ ] 프론트엔드 ↔ 백엔드 통합 테스트
 
+### 계정 연동 & 포인트 교환소 — 남은 작업 (3/14 Reus 등록)
+**proj-play-land**
+- [ ] #197: `/auth/link` 계정 연동 수신 페이지 구현
+- [ ] #198: 포인트 교환소 E2E 통합 테스트
+
+**proj-game-land**
+- [ ] #792: 계정 연동 탭 OAuth 방식 + 최신 UI 동기화
+- [ ] #793: 포인트 교환소 E2E 통합 테스트
+
+**proj-office-land**
+- [ ] #324: `/auth/link` 계정 연동 수신 페이지 구현
+- [ ] #325: 계정 연동 API Mock → 실제 연동 + UI 개선
+- [ ] #326: 포인트 교환 API Mock → 실제 연동 + E2E 테스트
+
 ## 플레이랜드 버그/이슈
 - [ ] play-land-dev Basic Auth 인증창 문제 (#140) — @bon 백엔드 수정 완료, 프론트 Authorization 헤더 확인 필요
   - kyago에 백엔드 배포 요청 대기 중
@@ -680,3 +694,34 @@
 - 🔥 오늘 포커스: core-backend #228 API Key 발급 (블로커), Epic #298 Phase 1/2 프론트엔드 개발, ms-point-exchanger openapi docs 완료, play-land-dev Basic Auth 배포, 통합 테스트 시작
 - ⚠️ 블로커: core-backend #228 — ms-point-exchanger용 Internal API Key 미발급, play-land-dev Basic Auth 백엔드 수정 완료 + 배포 대기
 - 📤 보고 완료: #platform-land (C0AEFRMN0E9) + Reus DM (D0AEBL7AK4H)
+
+### 2026-03-14 (토) 19:02
+- **GitHub 체크 (최근 8시간)**: proj-play-land + core-backend 활동 감지 — 포인트 교환소 버그 수정
+- **proj-play-land** (Jeon Junyeong): 커밋 2건 + 버그 이슈 2건 오픈
+  - ✅ #186 closed: 연동된 계정 목록이 항상 비어 있는 버그 수정 (#187 #190 PR 머지, 16:40~18:23 KST)
+    - 응답 unwrap 누락 수정 + 현재 서비스 제외 로직 추가
+  - 📌 #189 오픈: [버그] 마이페이지 - 내글 반응 기능 비활성화 상태
+  - 📌 #188 오픈: [버그] 게시판 1페이지 게시물 수 - 고정글 포함하여 카운트되는 문제
+- **core-backend** (Jeon Junyeong): 
+  - ✅ #272 closed: ms-authenticator 409 응답이 502로 잘못 매핑되는 버그 수정 (#273 PR 머지, 16:40 KST)
+    - AuthenticatorExceptionHandler 409/400 에러 매핑 수정
+- **cm-land, cm-office, proj-game-land**: 변동 없음
+- ✅ **태스크 진척**: 
+  - **포인트 통합 생태계 안정화** — 계정 연동 API 버그 수정, ms-authenticator 에러 매핑 개선
+  - 플레이랜드 신규 버그 2건 감지 (마이페이지 반응, 게시판 고정글)
+
+### 2026-03-15 (일) 09:00
+- **GitHub 체크 (최근 8시간)**: 5개 레포 모두 커밋/PR/릴리즈 활동 없음
+- **이슈 업데이트만 감지**:
+  - **cm-land & proj-game-land**: #792 (계정 연동 OAuth + UI 동기화), #793 (포인트 교환소 E2E 테스트) 오픈
+  - **cm-office**: #324, #325, #326 (계정 연동 수신/API 연동/E2E 테스트) 오픈
+  - **proj-play-land**: #197, #198 (계정 연동 수신/E2E 테스트) 오픈
+  - **core-backend**: 마이그레이션 이슈 5건 (#276~#280) 종료
+- 📝 **변동 없음** — 이슈는 3/14에 이미 태스크리스트에 등록된 항목들 (Reus), 실제 커밋 없음
+- 📝 **채널 메시지 스킵** — 변동 없음, 태스크리스트 체크만 수행
+
+### 2026-03-15 (일) 14:00
+- **GitHub 체크 (최근 8시간)**: 5개 레포 모두 커밋/PR/이슈/릴리즈 활동 없음
+- **cm-land, cm-office, proj-play-land, proj-game-land, core-backend**: 변동 없음
+- 마지막 활동: proj-play-land 2026-03-14 18:23 KST (포인트 교환소 계정 연동 버그 수정)
+- 📝 **채널 메시지 스킵** — 변동 없음, 태스크리스트 체크만 수행

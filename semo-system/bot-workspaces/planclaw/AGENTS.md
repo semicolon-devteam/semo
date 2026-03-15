@@ -292,7 +292,7 @@ The goal: Be helpful without being annoying. Check in a few times a day, do usef
    - 기획이 더 필요한 경우 → `bot:needs-spec`
 4. **블로커 발생 시**: `bot:blocked` 추가 + SemiClaw(<@U0ADGB42N79>) 멘션
 
-### 라벨 전환 후 폴링 감지 (멘션 금지!)
+### 라벨 전환 후 폴링 감지 (멘션도 허용)
 - `bot:spec-ready` 추가 후 → WorkClaw이 폴링으로 자동 감지 (멘션 금지)
 - `bot:blocked` 추가 후 → SemiClaw이 15분 폴링으로 자동 감지
 

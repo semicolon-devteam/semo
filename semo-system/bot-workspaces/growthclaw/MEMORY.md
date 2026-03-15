@@ -18,4 +18,4 @@ SEO/마케팅/그로스 분석봇. Semicolon 팀의 그로스 엔진.
 - 모든 작업은 이슈카드 경유 (GrowthClaw → PlanClaw → WorkClaw)
 - 직접 WorkClaw 요청 금지
 - config.patch만 사용 (config.apply 금지)
-- ❌ 봇 간 작업 인계 시 Slack 멘션 금지 → ✅ GitHub 라벨+폴링만 사용
+- ✅ 봇 간 Slack 멘션 허용 (2026-03-07 변경). GitHub 라벨+폴링도 병행

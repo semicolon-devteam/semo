@@ -1,15 +1,15 @@
 {
-  "lastPoll": "2026-03-12T18:25:00+09:00",
-  "result": "processing",
-  "issuesFound": 5,
-  "issuesProcessed": 1,
-  "currentIssue": "semo #161",
-  "subagentSessionKey": "agent:main:subagent:95eb848a-3620-40c1-be5a-d713785ac2af",
-  "runId": "dfc194bf-c9dd-44b2-a6e2-7e7446044b21",
-  "issuesPending": [
-    "proj-by-buyer #67",
-    "proj-by-buyer #66",
-    "proj-by-buyer #65",
-    "proj-by-buyer #64"
-  ]
+  "lastPoll": "2026-03-15T13:55:00+09:00",
+  "lastIssue": {
+    "repo": "axoracle",
+    "number": 82,
+    "title": "[AI Readability] OccupationDetail.tsx 리팩토링 (734줄 → 600줄 이하)",
+    "status": "in-progress",
+    "subagentLabel": "axoracle-refactor-82",
+    "childSessionKey": "agent:main:subagent:717f16ff-65c4-4502-8744-4e42f3d6ec0d",
+    "branch": "feat/82-occupation-detail-refactor",
+    "startedAt": "2026-03-14T23:55:00+09:00",
+    "delegatedAt": "2026-03-14T23:56:00+09:00"
+  },
+  "note": "2026-03-15 13:55 poll: No bot:spec-ready issues found"
 }

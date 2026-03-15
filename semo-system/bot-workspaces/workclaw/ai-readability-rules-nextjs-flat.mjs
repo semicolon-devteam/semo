@@ -1,0 +1,108 @@
+// AI Readability ESLint Rules for Next.js (Flat Config)
+export const aiReadabilityRules = {
+  rules: {
+    // File/Function Size
+    "max-lines": [
+      "warn",
+      {
+        max: 600,
+        skipBlankLines: true,
+        skipComments: true,
+      },
+    ],
+    "max-lines-per-function": [
+      "warn",
+      {
+        max: 100,
+        skipBlankLines: true,
+        skipComments: true,
+      },
+    ],
+    complexity: [
+      "warn",
+      {
+        max: 15,
+      },
+    ],
+    "max-params": [
+      "warn",
+      {
+        max: 4,
+      },
+    ],
+    "max-depth": [
+      "warn",
+      {
+        max: 5,
+      },
+    ],
+
+    // Comments
+    "no-warning-comments": [
+      "error",
+      {
+        terms: ["TODO", "FIXME", "HACK", "XXX"],
+      },
+    ],
+
+    // Imports
+    "import/order": [
+      "error",
+      {
+        groups: [
+          "builtin",
+          "external",
+          "internal",
+          "parent",
+          "sibling",
+          "index",
+        ],
+        pathGroups: [
+          {
+            pattern: "react",
+            group: "external",
+            position: "before",
+          },
+          {
+            pattern: "@/**",
+            group: "internal",
+          },
+        ],
+        pathGroupsExcludedImportTypes: ["react"],
+        "newlines-between": "never",
+        alphabetize: {
+          order: "asc",
+          caseInsensitive: true,
+        },
+      },
+    ],
+    "import/no-duplicates": "error",
+    "no-restricted-imports": [
+      "error",
+      {
+        patterns: [
+          {
+            group: ["../../../*"],
+            message: "Use @/ alias instead of deep relative imports",
+          },
+        ],
+      },
+    ],
+
+    // TypeScript
+    "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
+    "@typescript-eslint/consistent-type-imports": [
+      "error",
+      {
+        prefer: "type-imports",
+      },
+    ],
+    "@typescript-eslint/no-unused-vars": [
+      "error",
+      {
+        argsIgnorePattern: "^_",
+      },
+    ],
+    "@typescript-eslint/no-explicit-any": "warn",
+  },
+};

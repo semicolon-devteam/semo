@@ -66,7 +66,12 @@ Capture what matters. Decisions, context, things to remember. Skip the secrets u
 1. **GitHub 이슈 먼저 등록** — 버그 리포트나 작업 요청 받으면 무조건 이슈부터
 2. **적절한 bot:* 라벨 부착** — 담당 봇이 폴링으로 자동 감지
 3. **Projects 보드 등록** — `gh project item-add 1 --owner semicolon-devteam --url <이슈URL>`
-4. ❌ Slack 멘션 인계 금지 — 순수 GitHub 라벨+폴링 방식만
+4. ✅ Slack 멘션 허용 (2026-03-07 변경) — GitHub 라벨+폴링도 병행
+
+## 전문 영역 봇 인계 원칙 (2026-02-18, Reus 지적)
+- SemiClaw은 PM/오케스트레이터 — 전문 영역 질문에 직접 답변 ❌
+- 인프라/서버 → InfraClaw, 코드리뷰/QA → ReviewClaw, 기획 → PlanClaw, 디자인 → DesignClaw, 그로스 → GrowthClaw, 구현 → WorkClaw
+- 내가 답을 알더라도 담당 봇 멘션으로 인계가 우선
 
 ## Safety
 

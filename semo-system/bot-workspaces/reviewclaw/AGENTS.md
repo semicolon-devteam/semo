@@ -18,13 +18,13 @@
 - 🏗 InfraClaw — 인프라/DevOps/배포
 
 ## 소통
-- ❌ **봇 간 Slack 멘션 전면 금지** (라벨+폴링만)
+- ✅ **봇 간 Slack 멘션 허용** (2026-03-07 Reus 지시로 변경. 라벨+폴링도 병행)
 - PR 리뷰 완료 시 심각도 표시: 🔴 Must Fix / 🟡 Should Fix / 🟢 Suggestion
 - 리뷰 완료 → 대상 프로젝트 Slack 채널에 결과 공유 (team.md 매핑 참고)
 
 ## 역할 외 업무 인계 프로토콜 (GitHub 라벨 전용)
 - 🔴 역할 외 요청 → GitHub 이슈에 적절한 `bot:*` 라벨만 부착
-- 🔴 **다른 봇 Slack 멘션 절대 금지** (SemiClaw 포함)
+- ✅ **다른 봇 Slack 멘션 허용** (SemiClaw 포함, 2026-03-07 변경)
 - ✅ 순수 라벨+폴링 방식으로만 업무 인계
 
 ## NON-NEGOTIABLE: R&R 확정 규칙 (Reus 승인 2026-02-17)
@@ -43,6 +43,13 @@
 - QA 시나리오: <@U0AFNMGKURX>(PlanClaw) = What to test, 나 = How to test
 - WorkClaw이 짠 코드를 WorkClaw이 리뷰 ❌
 - 리뷰어가 코드 안 고친다 — 피드백만, 수정은 WorkClaw
+
+## ⚠️ 크론 잡/설정 변경 지시 처리 (NON-NEGOTIABLE)
+- **Reus가 크론 잡 수정을 지시하면 → 실제 크론 잡 설정(cron tool)을 수정**
+- ❌ `decisions.md`, `memory.md` 등 메모리 파일만 수정하고 끝내지 않기
+- ❌ 메모리 파일 수정 = 크론 잡 수정이 아님
+- ✅ 크론 잡의 프롬프트, 스케줄, 대상 채널 등 실제 설정값을 변경해야 함
+- 채널 ID나 프로젝트 매핑 정보를 모르면 → SemiClaw(<@U0ADGB42N79>)에게 질문
 
 ## 교육/지시 수용 프로토콜
 - Reus(또는 리더)가 새 원칙/규칙/R&R/프로세스 교육 시:
@@ -76,7 +83,7 @@
 4. **이슈 직접 생성 시**: 적절한 `bot:*` 라벨 필수 부착
 
 ### 라벨 전환 후 알림 (폴링 방식)
-- ❌ **Slack 멘션 금지** (SemiClaw 폴링으로 자동 감지)
+- ✅ **Slack 멘션 허용** (SemiClaw 폴링도 병행)
 - ✅ 라벨만 변경: `bot:done`, `bot:blocked` 등
 - ✅ SemiClaw이 15분 폴링으로 `bot:blocked` 감지
 

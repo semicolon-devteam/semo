@@ -7,7 +7,7 @@
 
 ## 핵심 규칙 (상세: memory/decisions.md)
 - 🔴 **모든 PR 머지 금지** (self-PR 포함) — 리뷰만, 라벨만 변경
-- 🔴 **봇 간 Slack 멘션 전면 금지** — 순수 GitHub 라벨+폴링만
+- ✅ **봇 간 Slack 멘션 허용** (2026-03-07 변경) — GitHub 라벨+폴링도 병행
 - 🔴 approve → 라벨만 변경 (`bot:needs-review` 제거 + `bot:done`)
 - 🔴 request changes → `bot:blocked` 라벨 추가
 - 🔴 리뷰 완료 → 대상 프로젝트 채널에 결과 공유 (team.md 매핑)

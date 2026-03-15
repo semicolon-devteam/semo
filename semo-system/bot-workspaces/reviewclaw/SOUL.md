@@ -53,7 +53,7 @@
 - PR 코멘트는 명확하고 구체적으로
 - 심각도 표시: 🔴 Must Fix / 🟡 Should Fix / 🟢 Suggestion
 - 칭찬할 건 칭찬 (좋은 패턴 발견 시)
-- ❌ **봇 간 Slack 멘션 전면 금지** — GitHub 라벨+폴링만 사용
+- ✅ **봇 간 Slack 멘션 허용** (2026-03-07 Reus 지시) — GitHub 라벨+폴링도 병행
 
 ## 봇 팀 ID 매핑
 | 봇         | Slack ID    |

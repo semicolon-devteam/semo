@@ -1,0 +1,454 @@
+{
+  "snapshots": [
+    {
+      "timestamp": "2026-03-14T15:02:22.858420+09:00",
+      "url": "https://cafe.naver.com/test/123",
+      "community": "naver_cafe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:02:22.908274+09:00",
+      "url": "https://www.fmkorea.com/111",
+      "community": "fmkorea",
+      "metrics": {
+        "views": 0,
+        "likes": 2,
+        "comments": 70
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:04:16.040561+09:00",
+      "url": "https://cafe.naver.com/test/123",
+      "community": "naver_cafe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:04:16.095677+09:00",
+      "url": "https://www.fmkorea.com/111",
+      "community": "fmkorea",
+      "metrics": {
+        "views": 0,
+        "likes": 2,
+        "comments": 70
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:04:54.959926+09:00",
+      "url": "https://cafe.naver.com/test/123",
+      "community": "naver_cafe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:06:02.598597+09:00",
+      "url": "https://cafe.naver.com/test/123",
+      "community": "naver_cafe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:06:02.708114+09:00",
+      "url": "https://www.bobaedream.co.kr/view?code=strange&No=6879169&pds=y",
+      "community": "bobaedream",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:06:03.138709+09:00",
+      "url": "https://www.ppomppu.co.kr/zboard/view.php?id=freeboard&no=9872275&page=1",
+      "community": "ppomppu",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:06:03.218706+09:00",
+      "url": "https://ygosu.com/board/yeobgi/2141194",
+      "community": "ygosu",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:06:03.247921+09:00",
+      "url": "https://bbs.ruliweb.com/community/board/300148/read/38491122",
+      "community": "ruliweb",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 4
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:06:03.524671+09:00",
+      "url": "https://www.ilbe.com/view/11610319915",
+      "community": "ilbe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 100
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:06:04.642788+09:00",
+      "url": "https://www.fomos.kr/talk/article_view?indexno=1976320&bbs_id=4",
+      "community": "fomos",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:08:49.830067+09:00",
+      "url": "https://cafe.naver.com/test/123",
+      "community": "naver_cafe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:08:50.076292+09:00",
+      "url": "https://www.bobaedream.co.kr/view?code=strange&No=6879169&pds=y",
+      "community": "bobaedream",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:08:50.131220+09:00",
+      "url": "https://www.ppomppu.co.kr/zboard/view.php?id=freeboard&no=9872275&page=1",
+      "community": "ppomppu",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:08:50.209099+09:00",
+      "url": "https://ygosu.com/board/yeobgi/2141194",
+      "community": "ygosu",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:08:50.238596+09:00",
+      "url": "https://bbs.ruliweb.com/community/board/300148/read/38491122",
+      "community": "ruliweb",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 4
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:08:50.363490+09:00",
+      "url": "https://www.ilbe.com/view/11610319915",
+      "community": "ilbe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 100
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:08:51.740029+09:00",
+      "url": "https://www.fomos.kr/talk/article_view?indexno=1976320&bbs_id=4",
+      "community": "fomos",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:14:38.704049+09:00",
+      "url": "https://cafe.naver.com/test/123",
+      "community": "naver_cafe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:14:39.347144+09:00",
+      "url": "https://bbs.ruliweb.com/community/board/300148/read/38491122",
+      "community": "ruliweb",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 4
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:14:39.476054+09:00",
+      "url": "https://www.ilbe.com/view/11610319915",
+      "community": "ilbe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 100
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:16:48.584763+09:00",
+      "url": "https://cafe.naver.com/test/123",
+      "community": "naver_cafe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:16:48.843435+09:00",
+      "url": "https://www.bobaedream.co.kr/view?code=strange&No=6879169&pds=y",
+      "community": "bobaedream",
+      "metrics": {
+        "views": 130,
+        "likes": 7,
+        "comments": 3
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:16:49.074369+09:00",
+      "url": "https://www.ppomppu.co.kr/zboard/view.php?id=freeboard&no=9872275&page=1",
+      "community": "ppomppu",
+      "metrics": {
+        "views": 524,
+        "likes": 8,
+        "comments": 105971703
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:16:49.399348+09:00",
+      "url": "https://ygosu.com/board/yeobgi/2141194",
+      "community": "ygosu",
+      "metrics": {
+        "views": 0,
+        "likes": 4,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:16:49.527036+09:00",
+      "url": "https://bbs.ruliweb.com/community/board/300148/read/38491122",
+      "community": "ruliweb",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 4
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:16:49.801012+09:00",
+      "url": "https://www.ilbe.com/view/11610319915",
+      "community": "ilbe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 100
+      }
+    },
+    {
+      "timestamp": "2026-03-14T15:16:51.091253+09:00",
+      "url": "https://www.fomos.kr/talk/article_view?indexno=1976320&bbs_id=4",
+      "community": "fomos",
+      "metrics": {
+        "views": 224,
+        "likes": 1,
+        "comments": 1976320
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:34:27.818477+09:00",
+      "url": "https://cafe.naver.com/test/123",
+      "community": "naver_cafe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:34:27.873244+09:00",
+      "url": "https://www.fmkorea.com/111",
+      "community": "fmkorea",
+      "metrics": {
+        "views": 0,
+        "likes": 2,
+        "comments": 189545458
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:34:28.031501+09:00",
+      "url": "https://www.bobaedream.co.kr/view?code=strange&No=6879169&pds=y",
+      "community": "bobaedream",
+      "metrics": {
+        "views": 140,
+        "likes": 7,
+        "comments": 3
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:34:28.430170+09:00",
+      "url": "https://www.ppomppu.co.kr/zboard/view.php?id=freeboard&no=9872275&page=1",
+      "community": "ppomppu",
+      "metrics": {
+        "views": 540,
+        "likes": 8,
+        "comments": 105971703
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:34:28.618727+09:00",
+      "url": "https://ygosu.com/board/yeobgi/2141194",
+      "community": "ygosu",
+      "metrics": {
+        "views": 0,
+        "likes": 4,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:34:28.884433+09:00",
+      "url": "https://bbs.ruliweb.com/community/board/300148/read/38491122",
+      "community": "ruliweb",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 4
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:34:29.021398+09:00",
+      "url": "https://www.ilbe.com/view/11610319915",
+      "community": "ilbe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 100
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:34:30.325981+09:00",
+      "url": "https://www.fomos.kr/talk/article_view?indexno=1976320&bbs_id=4",
+      "community": "fomos",
+      "metrics": {
+        "views": 510,
+        "likes": 1,
+        "comments": 1976320
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:38:56.026930+09:00",
+      "url": "https://cafe.naver.com/test/123",
+      "community": "naver_cafe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:38:56.183139+09:00",
+      "url": "https://www.fmkorea.com/111",
+      "community": "fmkorea",
+      "metrics": {
+        "views": 0,
+        "likes": 2,
+        "comments": 189545458
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:38:56.317793+09:00",
+      "url": "https://www.bobaedream.co.kr/view?code=strange&No=6879169&pds=y",
+      "community": "bobaedream",
+      "metrics": {
+        "views": 140,
+        "likes": 7,
+        "comments": 3
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:38:56.514915+09:00",
+      "url": "https://www.ppomppu.co.kr/zboard/view.php?id=freeboard&no=9872275&page=1",
+      "community": "ppomppu",
+      "metrics": {
+        "views": 544,
+        "likes": 8,
+        "comments": 105971703
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:38:56.845480+09:00",
+      "url": "https://ygosu.com/board/yeobgi/2141194",
+      "community": "ygosu",
+      "metrics": {
+        "views": 0,
+        "likes": 4,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:38:56.977665+09:00",
+      "url": "https://bbs.ruliweb.com/community/board/300148/read/38491122",
+      "community": "ruliweb",
+      "metrics": {
+        "views": 139,
+        "likes": 1,
+        "comments": 100
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:38:57.214219+09:00",
+      "url": "https://www.ilbe.com/view/11610319915",
+      "community": "ilbe",
+      "metrics": {
+        "views": 0,
+        "likes": 10,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-14T17:38:57.726303+09:00",
+      "url": "https://www.fomos.kr/talk/article_view?indexno=1976320&bbs_id=4",
+      "community": "fomos",
+      "metrics": {
+        "views": 545,
+        "likes": 1,
+        "comments": 1976320
+      }
+    }
+  ]
+}

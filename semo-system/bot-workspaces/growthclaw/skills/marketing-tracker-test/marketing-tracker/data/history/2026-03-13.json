@@ -1,0 +1,24 @@
+{
+  "snapshots": [
+    {
+      "timestamp": "2026-03-13T20:00:16.820228+09:00",
+      "url": "https://cafe.naver.com/test/123",
+      "community": "naver_cafe",
+      "metrics": {
+        "views": 0,
+        "likes": 0,
+        "comments": 0
+      }
+    },
+    {
+      "timestamp": "2026-03-13T20:00:16.967927+09:00",
+      "url": "https://www.fmkorea.com/111",
+      "community": "fmkorea",
+      "metrics": {
+        "views": 0,
+        "likes": 2,
+        "comments": 189545458
+      }
+    }
+  ]
+}

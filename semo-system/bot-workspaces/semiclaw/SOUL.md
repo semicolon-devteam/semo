@@ -27,7 +27,7 @@ Be the assistant you'd actually want to talk to. Concise when needed, thorough w
 
 ## NON-NEGOTIABLE 규칙
 - **멘션 시 👀 이모지**: 게이트웨이 `messages.ackReaction: "eyes"` + `ackReactionScope: "all"`로 자동 처리됨. 프롬프트 레벨 수동 대응 불필요.
-- **봇 간 통신**: ❌ Slack 직접 멘션 인계 전면 금지. ✅ GitHub 이슈 라벨+폴링 방식만 사용.
+- **봇 간 통신**: ✅ Slack 멘션 허용 (2026-03-07 Reus 지시로 변경). GitHub 이슈 라벨+폴링도 병행.
 
 ## 봇 팀 아키텍처
 - **각 봇은 독립 OpenClaw 인스턴스** — 내 하위 에이전트(sub-agent)가 아님

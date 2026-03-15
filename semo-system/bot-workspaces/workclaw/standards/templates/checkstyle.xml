@@ -1,0 +1,145 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+  "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+  "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!--
+  AI Readability 코드 표준 - Java/Spring Boot 버전
+  semicolon-devteam/core-backend용
+-->
+
+<module name="Checker">
+  <property name="charset" value="UTF-8"/>
+  <property name="severity" value="error"/>
+  <property name="fileExtensions" value="java"/>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- 파일 크기 제한 (600줄)                    -->
+  <!-- ═══════════════════════════════════════ -->
+  <module name="FileLength">
+    <property name="max" value="600"/>
+    <property name="fileExtensions" value="java"/>
+  </module>
+
+  <module name="TreeWalker">
+    <!-- ═══════════════════════════════════════ -->
+    <!-- 함수 복잡도 규칙                          -->
+    <!-- ═══════════════════════════════════════ -->
+    
+    <!-- 함수 길이 (100줄) -->
+    <module name="MethodLength">
+      <property name="max" value="100"/>
+      <property name="tokens" value="METHOD_DEF"/>
+    </module>
+
+    <!-- 사이클로매틱 복잡도 (15) -->
+    <module name="CyclomaticComplexity">
+      <property name="max" value="15"/>
+    </module>
+
+    <!-- 파라미터 개수 (4개) -->
+    <module name="ParameterNumber">
+      <property name="max" value="4"/>
+      <property name="tokens" value="METHOD_DEF"/>
+    </module>
+
+    <!-- 중첩 깊이 (5단계) -->
+    <module name="NestedIfDepth">
+      <property name="max" value="5"/>
+    </module>
+    <module name="NestedForDepth">
+      <property name="max" value="5"/>
+    </module>
+    <module name="NestedTryDepth">
+      <property name="max" value="5"/>
+    </module>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- 주석 규칙                                -->
+    <!-- ═══════════════════════════════════════ -->
+    
+    <!-- TODO/FIXME 주석 금지 -->
+    <module name="TodoComment">
+      <property name="format" value="(TODO|FIXME|HACK|XXX)"/>
+      <property name="severity" value="error"/>
+    </module>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- Import 규칙                             -->
+    <!-- ═══════════════════════════════════════ -->
+    
+    <!-- Import 순서 -->
+    <module name="ImportOrder">
+      <property name="groups" value="java,javax,org,com"/>
+      <property name="separated" value="true"/>
+      <property name="sortStaticImportsAlphabetically" value="true"/>
+    </module>
+
+    <!-- 사용하지 않는 Import 금지 -->
+    <module name="UnusedImports"/>
+
+    <!-- 중복 Import 금지 -->
+    <module name="RedundantImport"/>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- Naming Conventions                      -->
+    <!-- ═══════════════════════════════════════ -->
+    
+    <!-- Class 이름 (PascalCase) -->
+    <module name="TypeName">
+      <property name="format" value="^[A-Z][a-zA-Z0-9]*$"/>
+    </module>
+
+    <!-- Method 이름 (camelCase) -->
+    <module name="MethodName">
+      <property name="format" value="^[a-z][a-zA-Z0-9]*$"/>
+    </module>
+
+    <!-- 상수 이름 (UPPER_SNAKE_CASE) -->
+    <module name="ConstantName">
+      <property name="format" value="^[A-Z][A-Z0-9]*(_[A-Z0-9]+)*$"/>
+    </module>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- Code Quality                            -->
+    <!-- ═══════════════════════════════════════ -->
+    
+    <!-- Empty Block 금지 -->
+    <module name="EmptyBlock"/>
+
+    <!-- Magic Number 지양 -->
+    <module name="MagicNumber">
+      <property name="ignoreNumbers" value="-1, 0, 1, 2"/>
+    </module>
+
+    <!-- 불필요한 괄호 제거 -->
+    <module name="UnnecessaryParentheses"/>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- Whitespace                              -->
+    <!-- ═══════════════════════════════════════ -->
+    
+    <!-- 연산자 주변 공백 -->
+    <module name="WhitespaceAround">
+      <property name="tokens" value="ASSIGN, EQUAL, NOT_EQUAL"/>
+    </module>
+
+    <!-- 괄호 안쪽 공백 금지 -->
+    <module name="ParenPad"/>
+
+    <!-- ═══════════════════════════════════════ -->
+    <!-- Javadoc (Context Headers 대응)          -->
+    <!-- ═══════════════════════════════════════ -->
+    
+    <!-- Public Method는 Javadoc 필수 -->
+    <module name="MissingJavadocMethod">
+      <property name="scope" value="public"/>
+      <property name="allowMissingPropertyJavadoc" value="true"/>
+    </module>
+
+    <!-- Public Class는 Javadoc 필수 -->
+    <module name="MissingJavadocType">
+      <property name="scope" value="public"/>
+    </module>
+  </module>
+</module>

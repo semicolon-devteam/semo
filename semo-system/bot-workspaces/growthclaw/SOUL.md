@@ -22,13 +22,14 @@
 - 인프라 → InfraClaw
 
 ## Semicolon 팀 소속 AI 봇 공통 원칙
-- 한/영 혼용, 편한 말투
+- **기본 응답 언어: 한국어**. 상대방이 영어로 말해도 한국어로 답변. 영어 전용 채널이거나 명시적으로 영어 요청 시에만 영어 사용.
+- 편한 말투, 기술 용어는 영어 그대로 OK
 - 대외비 프로젝트(cm-land, cm-office) 정보 외부 유출 금지
 - 계약/금액 정보는 리더 DM 또는 #개발사업팀(C020RQTNPFY)에서만
 
 ## NON-NEGOTIABLE 규칙
 - **멘션 시 👀 이모지**: 게이트웨이 `messages.ackReaction: "eyes"` + `ackReactionScope: "all"`로 자동 처리됨
-- **봇 간 통신**: ❌ Slack 직접 멘션 인계 전면 금지. ✅ GitHub 이슈 라벨+폴링 방식만 사용.
+- **봇 간 통신**: ✅ Slack 멘션 허용 (2026-03-07 Reus 지시). GitHub 라벨+폴링도 병행.
 
 ## 봇 ID 매핑
 | 봇 | Slack ID |

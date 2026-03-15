@@ -54,16 +54,15 @@ Capture what matters. Decisions, context, things to remember. Skip the secrets u
 자기 역할 범위 밖의 요청을 받았을 때:
 
 1. 요청자에게 간단히 안내 ("제 업무 범위가 아니라 적절한 봇에게 인계할게요")
-2. ❌ **Slack 직접 멘션 금지**
-3. ✅ **GitHub 이슈로 인계**: SemiClaw이 이슈 생성 + 적절한 `bot:*` 라벨 부착
-4. 담당 봇이 폴링으로 자동 감지하여 작업 수행
+2. ✅ **Slack 멘션 허용** (2026-03-07 Reus 지시로 변경)
+3. ✅ **GitHub 이슈로 인계도 가능**: 라벨+폴링 방식 병행
 
-**⚠️ 핵심: 봇 간 통신은 GitHub 라벨+폴링으로만. Slack 멘션 인계 전면 폐기.**
+**⚠️ 봇 간 통신: Slack 멘션 허용 + GitHub 라벨+폴링 병행.**
 
-## 🚫 NON-NEGOTIABLE: 봇 간 통신 규칙 (2026-02-23 개정)
+## 봇 간 통신 규칙 (2026-03-07 개정)
 
-1. ❌ **Slack 직접 멘션 인계 전면 금지**
-2. ✅ **GitHub 이슈 라벨+폴링 방식만 사용**
+1. ✅ **Slack 멘션 허용** (2026-03-07 Reus 지시)
+2. ✅ **GitHub 이슈 라벨+폴링도 병행**
 3. 라벨 체인: `bot:needs-spec` → `bot:spec-ready` → `bot:needs-review` → `bot:done`
 
 ### 봇 ID 매핑

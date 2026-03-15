@@ -1,0 +1,125 @@
+{
+  "extends": [
+    "next/core-web-vitals",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:react/recommended",
+    "plugin:react-hooks/recommended"
+  ],
+  "plugins": [
+    "@typescript-eslint",
+    "import",
+    "react",
+    "react-hooks"
+  ],
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2021,
+    "sourceType": "module",
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
+  "rules": {
+    "// ═══════════════════════════════════════": "",
+    "// AI Readability Core Rules": "",
+    "// ═══════════════════════════════════════": "",
+    
+    "max-lines": ["error", {
+      "max": 600,
+      "skipBlankLines": true,
+      "skipComments": true
+    }],
+    "max-lines-per-function": ["error", {
+      "max": 100,
+      "skipBlankLines": true,
+      "skipComments": true
+    }],
+    "complexity": ["error", { "max": 15 }],
+    "max-params": ["error", { "max": 4 }],
+    "max-depth": ["error", { "max": 5 }],
+    
+    "// ═══════════════════════════════════════": "",
+    "// Comment Rules": "",
+    "// ═══════════════════════════════════════": "",
+    
+    "no-warning-comments": ["error", {
+      "terms": ["TODO", "FIXME", "HACK", "XXX"],
+      "location": "anywhere"
+    }],
+    
+    "// ═══════════════════════════════════════": "",
+    "// Import Rules": "",
+    "// ═══════════════════════════════════════": "",
+    
+    "import/order": ["error", {
+      "groups": [
+        "builtin",
+        "external",
+        "internal",
+        "parent",
+        "sibling",
+        "index",
+        "type"
+      ],
+      "pathGroups": [
+        {
+          "pattern": "react",
+          "group": "external",
+          "position": "before"
+        },
+        {
+          "pattern": "next/**",
+          "group": "external",
+          "position": "before"
+        },
+        {
+          "pattern": "@/**",
+          "group": "internal"
+        }
+      ],
+      "pathGroupsExcludedImportTypes": ["react", "next"],
+      "alphabetize": { "order": "asc" }
+    }],
+    "import/no-duplicates": "error",
+    "no-restricted-imports": ["error", {
+      "patterns": [{
+        "group": ["../../../*"],
+        "message": "3단계 이상 상대경로 금지. @/ 절대경로를 사용하세요."
+      }]
+    }],
+    
+    "// ═══════════════════════════════════════": "",
+    "// TypeScript Rules": "",
+    "// ═══════════════════════════════════════": "",
+    
+    "@typescript-eslint/consistent-type-definitions": ["error", "interface"],
+    "@typescript-eslint/consistent-type-imports": ["error", {
+      "prefer": "type-imports"
+    }],
+    "@typescript-eslint/no-unused-vars": ["error", {
+      "argsIgnorePattern": "^_"
+    }],
+    "@typescript-eslint/no-explicit-any": "error",
+    
+    "// ═══════════════════════════════════════": "",
+    "// React Rules": "",
+    "// ═══════════════════════════════════════": "",
+    
+    "react/react-in-jsx-scope": "off",
+    "react/prop-types": "off",
+    "react/jsx-curly-brace-presence": ["warn", {
+      "props": "never",
+      "children": "never"
+    }],
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "warn"
+  },
+  "overrides": [
+    {
+      "files": ["*.config.js", "*.config.ts"],
+      "rules": {
+        "@typescript-eslint/no-var-requires": "off"
+      }
+    }
+  ]
+}
