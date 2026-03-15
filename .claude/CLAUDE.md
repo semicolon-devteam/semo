@@ -45,15 +45,18 @@ semo/
 │   │   ├── designclaw/
 │   │   └── growthclaw/
 │   ├── semo-core/               # SEMO 프레임워크 원칙·오케스트레이터
-│   ├── semo-skills/             # SEMO 스킬 (v3→v5 마이그레이션 진행 중)
-│   ├── semo-agents/             # 에이전트 페르소나 (v5 신규)
-│   ├── semo-office/             # 가상 오피스 시스템 (향후 semo-office 개선 시 활용)
-│   ├── meta/                    # SEMO 메타 관리
-│   └── _archived/               # 폐기된 패키지
-│       ├── semo-remote/         # ⛔ 폐기 (OpenClaw로 대체)
+│   ├── semo-skills/             # SEMO 스킬 (active: 30개)
+│   ├── semo-office/             # 가상 오피스 시스템 (잔재, 미사용)
+│   ├── semo-scripts/            # 공용 스크립트 모음
+│   ├── meta/                    # SEMO 메타 관리 (orchestrator)
+│   └── _archived/               # ⛔ 폐기된 패키지
+│       ├── semo-remote/         # OpenClaw로 대체
 │       ├── semo-hooks/
-│       └── semo-integrations/
-├── specs/                       # semo-office 기술 스펙 (09개 문서)
+│       ├── semo-agents/         # v5 실험 종료
+│       └── semo-integrations/   # MCP 제거됨
+├── packages/
+│   └── cli/                     # semo CLI v4 (@team-semicolon/semo-cli)
+├── specs/                       # semo-office 기술 스펙
 ├── docs/                        # 아키텍처 문서
 └── infra/                       # promptfoo, RAG, litellm 등
 ```
@@ -127,27 +130,39 @@ npm run build      # 빌드 검증
 ```
 .claude/
 ├── CLAUDE.md          # 이 파일
-├── settings.json      # MCP 서버 설정
-├── memory/            # Context Mesh (세션 간 지식 유지)
-│   ├── context.md     # 현재 프로젝트 상태
-│   ├── decisions.md   # 아키텍처 결정 기록 (ADR)
-│   ├── projects.md    # 프로젝트 맵 & GitHub Projects 설정
-│   ├── microservices.md  # 마이크로서비스 컨텍스트
+├── settings.json      # MCP 서버 설정 + SessionStart/Stop 훅
+├── memory/            # Context Mesh — semo context sync로 자동 채워짐
+│   ├── decisions.md   # 아키텍처 결정 기록 (ADR) — push 허용
+│   ├── projects.md    # 프로젝트 맵
+│   ├── bots.md        # 봇 상태 (bot_status DB → 파일)
+│   ├── team.md        # 팀 KB
+│   ├── infra.md       # 인프라 KB
+│   ├── ontology.md    # 온톨로지 KB
+│   ├── process.md     # 프로세스 KB
 │   └── rules/project-specific.md  # semo 전용 규칙
-├── agents/            # → semo-system/meta/agents
-├── skills/            # → semo-system/semo-skills
+├── agents/            # → semo-system/meta/agents (심볼릭 링크)
+├── skills/            # → semo-system/semo-skills (심볼릭 링크)
 └── commands/SEMO      # → semo-system/semo-core/commands/SEMO
 ```
 
-### MCP 서버
+### MCP 서버 (현행)
 
 | 서버 | 용도 |
 |------|------|
-| `semo-integrations` | Supabase 연동 (@team-semicolon/semo-mcp) |
 | `context7` | 라이브러리 문서 조회 |
 | `sequential-thinking` | 복잡한 추론 |
 | `playwright` | E2E 테스트 |
 | `github` | GitHub API 직접 호출 |
+
+> ⛔ `semo-integrations` MCP 제거됨 (2026-03-15, 패키지 아카이빙)
+
+### SessionStart / Stop 훅
+
+세션 시작 시 자동 실행:
+```bash
+semo context sync   # Core DB → .claude/memory/*.md
+semo bots sync      # bot-workspaces → bot_status DB
+```
 
 ### 슬래시 커맨드
 
