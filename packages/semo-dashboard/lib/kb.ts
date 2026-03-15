@@ -185,6 +185,38 @@ export async function getItem(
 }
 
 /**
+ * KB 항목 upsert (domain + key 기준)
+ */
+export async function upsertItem(
+  domain: string,
+  key: string,
+  content: string,
+  createdBy?: string
+): Promise<KBItem> {
+  const sql = `
+    INSERT INTO semo.knowledge_base (domain, key, content, created_by)
+    VALUES ($1, $2, $3, $4)
+    ON CONFLICT (domain, key) DO UPDATE SET
+      content    = EXCLUDED.content,
+      updated_at = NOW()
+    RETURNING kb_id, domain, key, content, created_by, updated_at
+  `;
+  const res = await pool.query(sql, [domain, key, content, createdBy ?? 'dashboard']);
+  return res.rows[0];
+}
+
+/**
+ * KB 항목 삭제
+ */
+export async function deleteItemByKey(domain: string, key: string): Promise<boolean> {
+  const res = await pool.query(
+    'DELETE FROM semo.knowledge_base WHERE domain = $1 AND key = $2',
+    [domain, key]
+  );
+  return (res.rowCount ?? 0) > 0;
+}
+
+/**
  * 전체 KB 통계
  */
 export async function stats(): Promise<KBStats> {

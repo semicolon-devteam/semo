@@ -4,7 +4,7 @@ export interface Bot {
   name: string;
   emoji: string;
   role: string;
-  status: 'active' | 'idle' | 'error';
+  status: 'online' | 'offline';
   lastActive: string;
   sessionCount: number;
   workspacePath: string;
