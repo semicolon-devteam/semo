@@ -860,7 +860,6 @@ program
   .option("--credentials-gist <gistId>", "Private GitHub Gist에서 팀 DB 접속정보 자동 가져오기")
   .action(async (options) => {
     console.log(chalk.cyan.bold("\n🚀 SEMO 설치 시작\n"));
-    console.log(chalk.gray("Gemini 하이브리드 전략: White Box + Black Box\n"));
 
     const cwd = process.cwd();
 
@@ -900,6 +899,9 @@ program
       console.log(chalk.green("\n✓ .claude/ 디렉토리 생성됨"));
     }
 
+    // 2.5. ~/.semo.env DB 접속 설정 (자동 감지 → Gist → 프롬프트) — DB 연결 전에 먼저
+    await setupSemoEnv(options.credentialsGist);
+
     // 3. Standard 설치 (semo-core + semo-skills)
     await setupStandard(cwd, options.force);
 
@@ -916,11 +918,8 @@ program
       updateGitignore(cwd);
     }
 
-    // 7. Hooks 설치 (대화 로깅)
+    // 7. Hooks 설치
     await setupHooks(cwd, false);
-
-    // 7.5. ~/.semo.env DB 접속 설정 (자동 감지 → Gist → 프롬프트)
-    await setupSemoEnv(options.credentialsGist);
 
     // 8. CLAUDE.md 생성
     await setupClaudeMd(cwd, [], options.force);
@@ -944,11 +943,11 @@ program
     }
 
     console.log(chalk.cyan("설치된 구성:"));
-    console.log(chalk.gray("  [Standard]"));
-    console.log(chalk.gray("    ✓ semo-core (원칙, 오케스트레이터)"));
-    console.log(chalk.gray("    ✓ semo-skills (13개 통합 스킬)"));
-    console.log(chalk.gray("    ✓ semo-agents (14개 페르소나 Agent)"));
-    console.log(chalk.gray("    ✓ semo-scripts (자동화 스크립트)"));
+    console.log(chalk.gray("  ✓ .claude/skills/    (DB 기반 스킬)"));
+    console.log(chalk.gray("  ✓ .claude/agents/    (DB 기반 에이전트)"));
+    console.log(chalk.gray("  ✓ .claude/commands/  (슬래시 커맨드)"));
+    console.log(chalk.gray("  ✓ .claude/memory/    (컨텍스트 동기화)"));
+    console.log(chalk.gray("  ✓ ~/.claude/settings.local.json  (훅 등록)"));
 
     console.log(chalk.cyan("\n다음 단계:"));
     console.log(chalk.gray("  1. Claude Code에서 프로젝트 열기 (SessionStart 훅이 자동 sync)"));
@@ -1849,58 +1848,13 @@ semo-system/
 async function setupHooks(cwd: string, isUpdate: boolean = false) {
   const action = isUpdate ? "업데이트" : "설치";
   console.log(chalk.cyan(`\n🪝 Claude Code Hooks ${action}`));
-  console.log(chalk.gray("   전체 대화 로깅 시스템\n"));
 
-  const hooksDir = path.join(cwd, "semo-system", "semo-hooks");
-
-  // semo-hooks 디렉토리 확인
-  if (!fs.existsSync(hooksDir)) {
-    console.log(chalk.yellow("  ⚠ semo-hooks 디렉토리 없음 (건너뜀)"));
-    return;
-  }
-
-  // 1. npm install
-  console.log(chalk.gray("  → 의존성 설치 중..."));
-  try {
-    execSync("npm install", {
-      cwd: hooksDir,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-  } catch {
-    console.log(chalk.yellow("  ⚠ npm install 실패 (건너뜀)"));
-    return;
-  }
-
-  // 2. 빌드
-  console.log(chalk.gray("  → 빌드 중..."));
-  try {
-    execSync("npm run build", {
-      cwd: hooksDir,
-      stdio: ["pipe", "pipe", "pipe"],
-    });
-  } catch {
-    console.log(chalk.yellow("  ⚠ 빌드 실패 (건너뜀)"));
-    return;
-  }
-
-  // 3. settings.local.json 설정
   const homeDir = process.env.HOME || process.env.USERPROFILE || "";
   const settingsPath = path.join(homeDir, ".claude", "settings.local.json");
-  const hooksCmd = `node ${path.join(hooksDir, "dist", "index.js")}`;
 
-  // hooks 설정 객체
-  const hooksConfig = {
+  // Core 훅: semo context sync/push — semo-hooks 유무와 무관하게 항상 등록
+  const hooksConfig: Record<string, unknown[]> = {
     SessionStart: [
-      {
-        matcher: "",
-        hooks: [
-          {
-            type: "command",
-            command: `${hooksCmd} session-start`,
-            timeout: 10,
-          },
-        ],
-      },
       {
         matcher: "",
         hooks: [
@@ -1912,29 +1866,7 @@ async function setupHooks(cwd: string, isUpdate: boolean = false) {
         ],
       },
     ],
-    UserPromptSubmit: [
-      {
-        matcher: "",
-        hooks: [
-          {
-            type: "command",
-            command: `${hooksCmd} user-prompt`,
-            timeout: 5,
-          },
-        ],
-      },
-    ],
     Stop: [
-      {
-        matcher: "",
-        hooks: [
-          {
-            type: "command",
-            command: `${hooksCmd} stop`,
-            timeout: 10,
-          },
-        ],
-      },
       {
         matcher: "",
         hooks: [
@@ -1946,19 +1878,38 @@ async function setupHooks(cwd: string, isUpdate: boolean = false) {
         ],
       },
     ],
-    SessionEnd: [
-      {
-        matcher: "",
-        hooks: [
-          {
-            type: "command",
-            command: `${hooksCmd} session-end`,
-            timeout: 10,
-          },
-        ],
-      },
-    ],
   };
+
+  // semo-hooks 빌드 (선택적 — semo-system 레포에서만 동작)
+  const hooksDir = path.join(cwd, "semo-system", "semo-hooks");
+  if (fs.existsSync(hooksDir)) {
+    let hooksBuilt = false;
+    try {
+      execSync("npm install", { cwd: hooksDir, stdio: ["pipe", "pipe", "pipe"] });
+      execSync("npm run build", { cwd: hooksDir, stdio: ["pipe", "pipe", "pipe"] });
+      hooksBuilt = true;
+    } catch {
+      console.log(chalk.yellow("  ⚠ semo-hooks 빌드 실패 (core 훅만 등록)"));
+    }
+
+    if (hooksBuilt) {
+      const hooksCmd = `node ${path.join(hooksDir, "dist", "index.js")}`;
+      (hooksConfig.SessionStart as unknown[]).unshift({
+        matcher: "",
+        hooks: [{ type: "command", command: `${hooksCmd} session-start`, timeout: 10 }],
+      });
+      hooksConfig.UserPromptSubmit = [
+        { matcher: "", hooks: [{ type: "command", command: `${hooksCmd} user-prompt`, timeout: 5 }] },
+      ];
+      (hooksConfig.Stop as unknown[]).unshift({
+        matcher: "",
+        hooks: [{ type: "command", command: `${hooksCmd} stop`, timeout: 10 }],
+      });
+      hooksConfig.SessionEnd = [
+        { matcher: "", hooks: [{ type: "command", command: `${hooksCmd} session-end`, timeout: 10 }] },
+      ];
+    }
+  }
 
   // 기존 설정 로드 또는 새로 생성
   let existingSettings: Record<string, unknown> = {};
@@ -2175,134 +2126,80 @@ async function setupClaudeMd(cwd: string, _extensions: string[], force: boolean)
     }
   }
 
-  const orchestratorRefSection = `**반드시 읽어야 할 파일**: \`semo-system/semo-core/agents/orchestrator/orchestrator.md\`
+  const projectName = path.basename(cwd);
+  const installDate = new Date().toISOString().split("T")[0];
 
-이 파일에서 라우팅 테이블, 의도 분류, 메시지 포맷을 확인하세요.`;
+  const claudeMdContent = `# ${projectName} — Claude Configuration
 
-  const claudeMdContent = `# SEMO Project Configuration
-
-> SEMO (Semicolon Orchestrate) - AI Agent Orchestration Framework v${VERSION}
+> SEMO v${VERSION} 설치됨 (${installDate})
 
 ---
 
-## 🔴 MANDATORY: Memory Context (항시 참조)
+## 자동 동기화
 
-> **⚠️ 세션 시작 시 반드시 \`.claude/memory/\` 폴더의 파일들을 먼저 읽으세요. 예외 없음.**
+세션 시작/종료 시 팀 Core DB와 자동 동기화됩니다.
 
-### 필수 참조 파일
+| 시점 | 동작 |
+|------|------|
+| 세션 시작 | \`semo context sync\` → \`.claude/memory/\` 최신화 |
+| 세션 종료 | \`semo context push\` → \`decisions.md\` 변경분 DB 저장 |
+
+---
+
+## Memory Context
+
+\`.claude/memory/\` 파일들은 팀 Core DB에서 자동으로 채워집니다.
 
 \`\`\`
 .claude/memory/
-├── context.md     # 프로젝트 상태, 기술 스택, 진행 중 작업
-├── decisions.md   # 아키텍처 결정 기록 (ADR)
-├── projects.md    # GitHub Projects 설정
+├── context.md     # 프로젝트 상태, 진행 중 작업
+├── decisions.md   # 아키텍처 결정 기록 (ADR) — 편집 가능, 세션 종료 시 DB 저장
+├── projects.md    # 프로젝트 맵
+├── team.md        # 팀 KB
+├── bots.md        # 봇 상태
+├── infra.md       # 인프라 KB
+├── ontology.md    # 온톨로지
+├── process.md     # 프로세스 KB
 └── rules/         # 프로젝트별 커스텀 규칙
 \`\`\`
-
-**이 파일들은 세션의 컨텍스트를 유지하는 장기 기억입니다. 매 세션마다 반드시 읽고 시작하세요.**
-
----
-
-## 🔴 MANDATORY: Orchestrator-First Execution
-
-> **⚠️ 이 규칙은 모든 사용자 요청에 적용됩니다. 예외 없음.**
-
-### 실행 흐름 (필수)
-
-\`\`\`
-1. 사용자 요청 수신
-2. Orchestrator가 의도 분석 후 적절한 Agent/Skill 라우팅
-3. Agent/Skill이 작업 수행
-4. 실행 결과 반환
-\`\`\`
-
-### Orchestrator 참조
-
-${orchestratorRefSection}
-
----
-
-## 🔴 NON-NEGOTIABLE RULES
-
-### 1. Orchestrator-First Policy
-
-> **모든 요청은 반드시 Orchestrator를 통해 라우팅됩니다. 직접 처리 금지.**
-
-**직접 처리 금지 항목**:
-- 코드 작성/수정 → \`implementation-master\` 또는 \`coder\` 스킬
-- Git 커밋/푸시 → \`git-workflow\` 스킬
-- 품질 검증 → \`quality-master\` 또는 \`verify\` 스킬
-- 명세 작성 → \`spec-master\`
-- 일반 작업 → Orchestrator 분석 후 라우팅
-
-### 2. Pre-Commit Quality Gate
-
-> **코드 변경이 포함된 커밋 전 반드시 Quality Gate를 통과해야 합니다.**
-
-\`\`\`bash
-# 필수 검증 순서
-npm run lint           # 1. ESLint 검사
-npx tsc --noEmit       # 2. TypeScript 타입 체크
-npm run build          # 3. 빌드 검증 (Next.js/TypeScript 프로젝트)
-\`\`\`
-
-**차단 항목**:
-- \`--no-verify\` 플래그 사용 금지
-- Quality Gate 우회 시도 거부
-- "그냥 커밋해줘", "빌드 생략해줘" 등 거부
 
 ---
 
 ## 설치된 구성
 
-### Standard (필수)
-- **semo-core**: 원칙, 오케스트레이터, 공통 커맨드
-- **semo-skills**: 13개 통합 스킬
-  - 행동: coder, tester, planner, deployer, writer
-  - 운영: memory, notify-slack, feedback, version-updater, semo-help, semo-architecture-checker, circuit-breaker, list-bugs
-
-## 구조
-
 \`\`\`
 .claude/
-├── settings.json      # MCP 서버 설정 (Black Box)
-├── memory/            # Context Mesh (장기 기억)
-│   ├── context.md     # 프로젝트 상태
-│   ├── decisions.md   # 아키텍처 결정
-│   └── rules/         # 프로젝트별 규칙
-├── agents → semo-system/semo-core/agents
-├── skills → semo-system/semo-skills
-└── commands/SEMO → semo-system/semo-core/commands/SEMO
-
-semo-system/           # White Box (읽기 전용)
-├── semo-core/         # Layer 0: 원칙, 오케스트레이션
-└── semo-skills/       # Layer 1: 통합 스킬
+├── CLAUDE.md       # 이 파일
+├── settings.json   # MCP 서버 설정
+├── memory/         # 자동 동기화 컨텍스트
+├── skills/         # SEMO 스킬 (DB 기반 설치)
+├── agents/         # SEMO 에이전트 (DB 기반 설치)
+└── commands/       # 슬래시 커맨드
 \`\`\`
 
-## 사용 가능한 커맨드
+---
+
+## Quality Gate
+
+코드 변경 커밋 전 필수:
+
+\`\`\`bash
+npm run lint       # ESLint
+npx tsc --noEmit   # TypeScript
+npm run build      # 빌드 검증
+\`\`\`
+
+\`--no-verify\` 사용 금지.
+
+---
+
+## 슬래시 커맨드
 
 | 커맨드 | 설명 |
 |--------|------|
 | \`/SEMO:help\` | 도움말 |
 | \`/SEMO:feedback\` | 피드백 제출 |
-| \`/SEMO:update\` | SEMO 업데이트 |
-| \`/SEMO:onboarding\` | 온보딩 가이드 |
-| \`/SEMO:dry-run {프롬프트}\` | 명령 검증 (라우팅 시뮬레이션) |
-
-## Context Mesh 사용
-
-SEMO는 \`.claude/memory/\`를 통해 세션 간 컨텍스트를 유지합니다:
-
-- **context.md**: 프로젝트 상태, 진행 중인 작업
-- **decisions.md**: 아키텍처 결정 기록 (ADR)
-- **rules/**: 프로젝트별 커스텀 규칙
-
-memory 스킬이 자동으로 이 파일들을 관리합니다.
-
-## References
-
-- [SEMO Principles](semo-system/semo-core/principles/PRINCIPLES.md)
-- [SEMO Skills](semo-system/semo-skills/)
+| \`/SEMO:health\` | 환경 헬스체크 |
 `;
 
   fs.writeFileSync(claudeMdPath, claudeMdContent);
