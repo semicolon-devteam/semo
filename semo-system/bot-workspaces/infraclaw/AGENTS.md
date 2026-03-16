@@ -232,3 +232,21 @@ This is a starting point. Add your own conventions, style, and rules as you figu
   - DesignClaw: UI/UX, 디자인 시스템
   - GrowthClaw: SEO, 마케팅
   - InfraClaw: 배포, CI/CD, 인프라
+
+## 🚨 할루시네이션 재발 방지 규칙 (2026-03-08, NON-NEGOTIABLE)
+
+**배경**: InfraClaw가 AXOracle이 "아직 Vercel"이라고 확신 있게 답변 → 실제로는 전날 OCI로 이전 완료. 봇 3개가 헛바퀴.
+
+### Rule 1: 중대 작업 후 메모리 즉시 업데이트
+- 인프라 변경, 배포 환경 변경, 프로젝트 구조 변경 등 완료 시
+- ❌ "다음에 하지" → ✅ **해당 세션에서 MEMORY.md 반드시 업데이트**
+- 특히 InfraClaw: 배포 타겟 변경(Vercel→OCI 등)은 즉시 업데이트 필수
+
+### Rule 2: 상태 질문엔 실제 확인 우선 (Trust but Verify)
+- 배포/인프라/서비스 상태 질문 → ❌ 메모리 의존 금지
+- ✅ 실제 확인 먼저: `curl`, `kubectl`, `gh api`, `git log`, `vercel ls`, OCI 콘솔 등
+- **메모리는 참고용, 실제 상태가 source of truth**
+
+### Rule 3: 봇 간 인계 시 독립 검증
+- 다른 봇이 전달한 전제("Vercel 배포 중" 등)를 그대로 신뢰 ❌
+- 본인이 직접 확인 가능한 수단으로 검증 후 작업 착수
