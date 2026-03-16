@@ -1,7 +1,6 @@
 {
-  "last_poll": "2026-03-15T10:45:00+09:00",
+  "last_poll": "2026-03-12T18:15:00+09:00",
   "reviewed_prs": [
-    "axoracle#83",
     "core-backend#163",
     "core-backend#130",
     "ms-media-processor#18",
@@ -118,24 +117,15 @@
     "proj-star-spot#25",
     "axoracle#76",
     "axoracle#74",
-    "proj-bebecare#55",
-    "proj-play-land#194",
-    "core-backend#278",
-    "proj-play-land#196",
-    "proj-by-buyer#74",
-    "proj-star-spot#37",
-    "proj-bebecare#58",
-    "axoracle#84",
-    "cm-jungchipan#263",
-    "spring-backend-modules#4"
+    "proj-bebecare#55"
   ],
   "stats": {
-    "total_reviews": 125,
-    "approvals": 55,
-    "request_changes": 3,
-    "comments_only": 60,
+    "total_reviews": 114,
+    "approvals": 54,
+    "request_changes": 2,
+    "comments_only": 51,
     "self_merges": 7,
     "self_skipped": 1,
-    "blocked_infra_issue": 4
+    "blocked_infra_issue": 2
   }
 }
