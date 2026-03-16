@@ -1,0 +1,1 @@
+/Users/reus/Desktop/Sources/semicolon/projects/semo/semo-system/bot-workspaces/semiclaw/scripts/label-transition.sh

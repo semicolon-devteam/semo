@@ -1,104 +1,85 @@
-# decisions.md — 의사결정 & 원칙
+# decision
 
-## R&R 확정 (Reus 승인 2026-02-17, 2026-02-23 개정, 2026-03-04 추가, 2026-03-06 강화, 2026-03-14 보고 채널 개정)
-- ReviewClaw = PR 리뷰 전담, 코드 수정 ❌, **🔴 머지 절대 금지 (self-PR 포함, 모든 상황에서 예외 없음)**
-- **리뷰 결과는 PR 코멘트로만 남기기** — 머지는 반드시 인간에게 요청
-- approve → 라벨만 변경 (`bot:needs-review` 제거 + `bot:done` 추가), 머지 X
-- **approve 후 머지 승인 요청 프로세스 (2026-03-04 Reus 지시)**:
-  1. 리뷰 결과가 Approve여서 머지 대상인 PR이면
-  2. 해당 프로젝트|이슈 담당자(또는 작업 지시자)에게 머지 승인 요청
-  3. 담당자 정보 모르면 → SemiClaw에게 물어본 후 요청
-- request changes → `bot:blocked` 라벨
-- **🔴 PR 리뷰 완료 폴링 결과 보고 (2026-03-14 Reus 지시)**:
-  - ❌ `#bot-ops` 채널 보고 금지
-  - ✅ 각 프로젝트별 Slack 채널로 직접 보고 (memory/team.md 매핑 참고)
-  - 예: core-backend PR → `#core`, proj-play-land PR → `#play-land`
-- 폴링 조건: `label:bot:needs-review` (리뷰 완료 후 다시 안 건드림)
-- 역할 외 요청 → SemiClaw 인계 (다른 봇 직접 호출 금지)
-
-## 봇 간 통신 원칙 (2026-02-20 개정, Reus 승인)
-- ✅ **봇 간 Slack 멘션 허용** (2026-03-07 Reus 지시로 변경)
-- ✅ 순수 GitHub 이슈 라벨+폴링 방식으로만 업무 인계
-- 라벨 체인: `bot:needs-spec` → `bot:spec-ready` → `bot:needs-review` → `bot:done`
-- 리뷰 피드백: `request changes`만 (WorkClaw이 `review:changes_requested` 폴링으로 감지)
-- E2E 버그: 이슈 생성 + `bot:spec-ready` 라벨만 (멘션 X)
-- 정보 요청: GitHub 이슈 `bot:info-req` 라벨 경유, 답변 후 즉시 close
-- `bot:blocked`: SemiClaw이 15분 폴링으로 감지
-- 내 폴링 주기: 5분 (`is:pr is:open review:none`)
-
-## 보고 규칙 (Reus 지시 2026-02-26)
-- ❌ GitHub 코멘트/Slack에 상세 작업 로그 금지 (예: "🤖 작업 로그 (ReviewClaw) - 액션: ...")
-- ✅ 결과만 간결하게 보고
-- 예: "리뷰 완료 → Approve 권장" (O) / "액션: PR 리뷰, 라벨 변경: bot:done, 사유: ..." (X)
-
-## 보안 규칙
-- 프로덕션 코드 직접 수정 X
-- 계약/금액 정보 언급 금지
-- 의심스러우면 SemiClaw에 에스컬레이션
-
-## 인프라 이슈 (2026-03-02 발견, 2026-03-06 종료)
-- **ReviewClaw 독립 GitHub 계정 미구성**: 현재 `reus-jeon` 계정 공유 중 → self-PR 리뷰 불가 (코멘트만 가능)
-- 해결 방안: ① GitHub App 설정 또는 ② 독립 봇 계정 생성 + gh CLI 인증
-- 현재 임시 대응: PR 코멘트로 리뷰 내용 남기기 (정식 리뷰 기능 없음)
-- **🔴 2026-03-06 Reus 지시: 봇전용 GitHub 계정 공유 관련 질문 더 이상 하지 마** — 현재 상태로 운영
-
-## 프로젝트 디렉토리 관리 원칙 (Reus 지시 2026-02-19)
-- 모든 프로젝트 소스: `/Users/reus/Desktop/Sources/semicolon/projects/` 하위
-- 주요 매핑:
-  - `projects/ps` → PS
-  - `projects/land/` → 게임랜드, 플레이랜드, 오피스, core-backend, ms-point-exchanger
-  - `projects/jungchipan` → 정치판
-  - `projects/labor-union` → 노조관리
-  - `projects/bebecare` → BebeCare
-  - `projects/axoracle` → AXOracle
-  - `projects/celeb-map` → Celeb Map
-  - `projects/car-dealer` → 바이바이어
-  - `projects/chagok` → 차곡
-  - `projects/cointalk` → 코인톡
-  - `projects/introduction` → 팀 소개사이트
-  - `projects/link-collect` → 링크모음(링크타)
-  - `projects/sales-keeper` → 매출지킴이
-  - `projects/samho-work-clothes` → 삼호작업복
-  - `projects/seoul-tourist` → 서울관광앱
-  - `projects/shipyard-management` → 조선소관리
-  - `projects/viral` → 바이럴(오르다)
-- ❌ 디렉토리 없으면 임의 clone/생성 절대 금지 → SemiClaw에 문의
-- ❌ 프로젝트 정보 모르면 추측 금지 → 관련 봇에 문의
-- 정보 질의 순서: ① SemiClaw(현황) ② PlanClaw(기획) ③ WorkClaw(코드) ④ InfraClaw(인프라)
-
-## 정보 부족 시 처리 규칙 (SemiClaw 공지 2026-02-19, Reus 강화 2026-03-14)
-- 프로젝트 정보 모르면 **먼저 해당 스레드에서 SemiClaw에게 질의**
-- 포맷: `[bot:info-req] @SemiClaw {프로젝트명} — {질문}`
-- SemiClaw가 답변 또는 적절한 봇 라우팅
-- SemiClaw도 모르면 Reus 에스컬레이션
-- **절대 추측 답변 금지** — 확인 후 진행
-- **🔴 채널/프로젝트 정보 필요 시: Reus에게 직접 질문 금지 → SemiClaw에게 질의 (2026-03-14)**
-- 내 도메인: 코드 품질, E2E, 기술 부채
-
-## 작업 지시 해석 규칙 (Reus 지시 2026-03-14)
-- **🔴 cron job 수정 지시 받으면**: cron job만 수정, 다른 파일(`decisions.md`, `MEMORY.md` 등) 수정 금지
-- 원칙/규칙 교육은 별도로 받을 때만 memory 파일 업데이트
-- "cron job 바꿔" = cron tool만 사용
-- "규칙 추가해" = memory 파일 수정
+> 자동 생성: semo context sync (2026-03-15T09:24:59.819Z)
 
 
-## 이슈 정보 공유 시 링크 필수 (2026-03-04, Reus 지시)
-- 사용자에게 이슈 정보를 전달할 때 **GitHub 이슈 링크 반드시 포함**
-- 이슈 번호만 언급하지 말고 클릭 가능한 링크까지 제공
+## bot-infra-polling
+
+InfraClaw bot:infra 라벨 폴링 추가. 10분 간격. 쿼리: label:bot:infra -label:bot:in-progress -label:bot:blocked. 다른 봇 폴링과 동일 패턴. (2026-03-08)
 
 
-## 채널 답변은 스레드로 (2026-02-18, Reus 지시)
-- 채널에서 메시지에 답변할 때 **기본적으로 스레드(reply)로** 달 것
-- 늦게 응답해도 원본 메시지에 붙어있어 맥락 유지됨
+## bot-no-promise
+
+모든 봇: '하겠습니다' 패턴 금지. Tool call 없는 약속 금지. 한 거 보고해, 할 거 예고하지 마 (2026-02-24).
 
 
-## Slack 출력 규율 (2026-02-19, Reus 지시)
-- **최종 결과만 Slack에 보고** — 중간 과정(클론, install, 빌드, 분석) 절대 금지
-- "~하겠다", "~시작한다" 예고성 메시지 금지
-- 1 작업 = 1 메시지 원칙
-- 서브에이전트 작업 중 상태 업데이트 금지 — 완료 후 결과만
+## design-workflow
+
+디자인 산출물은 반드시 HTML 프로토타입+인터랙티브 프리뷰 먼저. Reus 승인 후에만 구현 이슈 생성. 마크다운만 작성 후 바로 이슈 생성 금지 (2026-03-01).
 
 
-## 라벨 전환 시 이전 라벨 제거 필수 (2026-03-06, Reus 지시)
-- bot:done 부착 시 bot:in-progress 반드시 제거
-- 라벨 전환 시 이전 단계 라벨 항상 제거
+## github-workflow
+
+봇 간 인계는 GitHub 이슈 라벨+폴링 방식만 사용. Slack 직접 멘션 인계 전면 금지 (2026-02-20).
+
+
+## gitops-only
+
+InfraClaw 인프라 작업은 GitOps Only. semi-colon-ops(K8S)/core-terraform(VM)/actions-template(CI/CD)/semi-colon-apps(앱배포) PR 필수. OCI/k8s 명령어는 모니터링만. 유일한 직접작업=OCI Vault 등록. (2026-03-08 Garden 지시)
+
+
+## infra-change-control
+
+인프라 변경은 Garden 승인 필수. 모니터링/진단은 자유, 변경(코드/배포/시크릿)은 승인 후. 공용 레포 단독 수정 금지 (2026-02-18).
+
+
+## infra-pr-review-flow
+
+InfraClaw PR 플로우: InfraClaw→PR생성→ReviewClaw리뷰→Garden승인요청→Merge. (2026-03-08 Garden 지시)
+
+
+## issue-rr
+
+이슈 등록: 버그/단순수정→SemiClaw 등록→WorkClaw 인계. 기획 필요→PlanClaw 기획→이슈 생성→WorkClaw. 한 기능에 한 이슈, 중복 금지.
+
+
+## kb-usage-logging
+
+KB 사용 로깅+신뢰평가 시스템. semo.kb_usage_log 테이블에 봇별 호출 이력 자동 기록 (bot_id, used_by, query, channel, trust_level). 신뢰평가 4단계: high(85%+)/medium(70-84%)/low(50-69%)/unreliable(50% 미만). 매일 09:00 KST #bot-ops 리포트 크론. 환경변수: KB_BOT_ID, KB_CHANNEL, KB_REQUESTED_BY. (2026-03-08 Garden 요청)
+
+
+## memory-arch-improvement
+
+메모리 아키텍처 4대 개선 (2026-03-08, Garden 제안 / Reus 승인): 1) 동기 승격 - Vector→Hot 즉시 승격, 크론은 누락 체크 보조용. 2) UUID 기반 중복 방지 - HTML 코멘트 형식으로 UUID 포함, [Project:][Topic:] 태그 필수. 3) Deep Search - --deep 플래그로 아카이브 포함 검색. 4) Hot 메모리 태깅 - 프로젝트/토픽 분류 필수. 적용: 전 봇 AGENTS.md, kb-cli.js, 크론. DB에 uuid 컬럼 추가.
+
+
+## oci-deploy
+
+2026-03-02: 신규 프로젝트는 Vercel 대신 OCI 환경 기반 배포로 전환.
+
+_metadata: {"scope":"infra","decided_at":"2026-03-02","decided_by":"reus"}_
+
+
+## planclaw-scope-distribution
+
+PlanClaw 스코프 분배 기준: 변경 대상 레포로 판단. projects/*→bot:spec-ready(WorkClaw), semi-colon-ops/core-terraform/actions-template/semi-colon-apps→bot:infra(InfraClaw), 양쪽→둘다 병렬. (2026-03-08)
+
+
+## reviewclaw-merge
+
+ReviewClaw는 직접 머지하지 않음. Approve 후 담당자에게 머지 승인 요청. 담당자 모르면 SemiClaw에게 확인 (2026-03-04).
+
+
+## security-contract
+
+계약/금액 정보는 업무 채널에서 절대 언급 금지. 리더 DM 또는 개발사업팀 채널에서만.
+
+
+## slack-output-rule
+
+최종 결과만 Slack에 보고. 중간 과정/예고성 메시지 금지. 1작업=1메시지. 위반 시 에스컬레이션 (2026-02-19).
+
+
+## thread-reply
+
+채널에서 메시지 답변 시 기본적으로 스레드(reply)로 달 것 (2026-02-18).

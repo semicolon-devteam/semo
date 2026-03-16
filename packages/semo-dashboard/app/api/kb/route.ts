@@ -1,3 +1,30 @@
+/**
+ * @file app/api/kb/route.ts
+ * @description Knowledge Base CRUD API. action 파라미터로 통계/도메인 조회,
+ *   search/domain/bot_id/key 파라미터로 필터링 조회를 지원한다.
+ *
+ * @api GET /api/kb
+ * @apiQuery {string} [action=stats|domains] - 통계 또는 도메인 목록 반환
+ * @apiQuery {string} [search] - 시맨틱 검색 쿼리
+ * @apiQuery {string} [domain] - 도메인 필터
+ * @apiQuery {string} [bot_id] - 봇 ID 필터
+ * @apiQuery {string} [key] - 특정 키 조회 (domain과 함께 사용)
+ * @apiSuccess {KBItem[] | KBStats | KBDomain[]} 200
+ * @apiError {object} 500 - { error: string }
+ *
+ * @api POST /api/kb
+ * @apiSuccess {KBItem} 201 - 생성된 항목
+ *
+ * @api PATCH /api/kb
+ * @apiSuccess {KBItem} 200 - 업데이트된 항목
+ *
+ * @api DELETE /api/kb
+ * @apiQuery {string} domain
+ * @apiQuery {string} key
+ * @apiSuccess {object} 200 - { ok: true }
+ * @apiError {object} 404 - { error: 'Not found' }
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
 import { list, listDomains, search, getItem, stats, upsertItem, deleteItemByKey } from '@/lib/kb';
 

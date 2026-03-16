@@ -1,15 +1,14 @@
 {
-  "lastPoll": "2026-03-15T13:55:00+09:00",
-  "lastIssue": {
-    "repo": "axoracle",
-    "number": 82,
-    "title": "[AI Readability] OccupationDetail.tsx 리팩토링 (734줄 → 600줄 이하)",
-    "status": "in-progress",
-    "subagentLabel": "axoracle-refactor-82",
-    "childSessionKey": "agent:main:subagent:717f16ff-65c4-4502-8744-4e42f3d6ec0d",
-    "branch": "feat/82-occupation-detail-refactor",
-    "startedAt": "2026-03-14T23:55:00+09:00",
-    "delegatedAt": "2026-03-14T23:56:00+09:00"
-  },
-  "note": "2026-03-15 13:55 poll: No bot:spec-ready issues found"
+  "lastPoll": "2026-03-16T11:25:00+09:00",
+  "note": "2026-03-16 11:25 poll: bot:spec-ready 이슈 없음 — 조용히 종료",
+  "completed": [
+    {
+      "repo": "proj-star-spot",
+      "number": 53,
+      "title": "[Feature] 소셜 바이럴 기반 구축 (공유 버튼, UTM 추적)",
+      "status": "done",
+      "pr": 68,
+      "completedAt": "2026-03-15T21:25:00+09:00"
+    }
+  ]
 }

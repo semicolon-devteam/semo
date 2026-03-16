@@ -68,8 +68,8 @@ async function parseCronJobs(filePath) {
       name: job.name || '',
       schedule: job.schedule || {},
       enabled: job.enabled !== false,
-      lastRun: job.lastRun || null,
-      nextRun: job.nextRun || null,
+      lastRun: job.state?.lastRunAtMs ? new Date(job.state.lastRunAtMs) : null,
+      nextRun: job.state?.nextRunAtMs ? new Date(job.state.nextRunAtMs) : null,
       sessionTarget: job.sessionTarget || 'main',
     }));
   } catch (error) {

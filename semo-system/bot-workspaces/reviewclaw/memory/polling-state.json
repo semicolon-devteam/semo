@@ -1,6 +1,9 @@
 {
-  "last_poll": "2026-03-15T10:45:00+09:00",
+  "last_poll": "2026-03-16T12:45:00+09:00",
   "reviewed_prs": [
+    "cm-jungchipan#264",
+    "axoracle#84",
+    "semo-remote-client#2",
     "axoracle#83",
     "core-backend#163",
     "core-backend#130",
@@ -127,15 +130,30 @@
     "proj-bebecare#58",
     "axoracle#84",
     "cm-jungchipan#263",
-    "spring-backend-modules#4"
+    "spring-backend-modules#4",
+    "proj-star-spot#47",
+    "proj-star-spot#48",
+    "proj-star-spot#49",
+    "proj-star-spot#51",
+    "proj-star-spot#50",
+    "semo-remote-client#2",
+    "proj-star-spot#57",
+    "proj-star-spot#56",
+    "proj-star-spot#55",
+    "proj-star-spot#59",
+    "proj-star-spot#64",
+    "proj-star-spot#68",
+    "cm-jungchipan#265",
+    "axoracle#83"
   ],
   "stats": {
-    "total_reviews": 125,
-    "approvals": 55,
-    "request_changes": 3,
-    "comments_only": 60,
+    "total_reviews": 143,
+    "approvals": 56,
+    "request_changes": 5,
+    "comments_only": 76,
     "self_merges": 7,
-    "self_skipped": 1,
-    "blocked_infra_issue": 4
+    "self_skipped": 2,
+    "blocked_infra_issue": 4,
+    "archived_repo_blocked": 1
   }
 }

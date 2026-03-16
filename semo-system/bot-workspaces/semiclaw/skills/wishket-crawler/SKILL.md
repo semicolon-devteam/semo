@@ -11,7 +11,7 @@ Automates crawling Wishket (위시캣) freelance platform for project opportunit
 
 **Daily pipeline:** Crawl → Score → Filter (≥40pts) → Slack notification
 
-- **Cron schedule:** 매일 09:00 KST
+- **Cron schedule:** 평일(월~금) 19:00 KST (`0 19 * * 1-5`)
 - **Target channel:** C0ABAE680PR (#개발사업팀-SI)
 - **Mention user:** @yeomso (U01KH8V6ZHP)
 - **Account:** reus@semi-colon.space / team-semicolon
@@ -255,7 +255,7 @@ Create a cron job using OpenClaw's cron system:
 {
   schedule: {
     kind: "cron",
-    expr: "0 0 * * *",  // Midnight UTC = 09:00 KST
+    expr: "0 19 * * 1-5",  // 19:00 KST, 평일(월~금)
     tz: "Asia/Seoul"
   },
   payload: {

@@ -1,11 +1,23 @@
+/**
+ * @file components/dashboard/Header.tsx
+ * @description 대시보드 상단 헤더. SEMO HQ 타이틀, ACTIVE 배지,
+ *   활성 에이전트 수(온라인/전체)를 표시한다.
+ * @module components/dashboard
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
 
+/**
+ * @component Header
+ * @description 대시보드 헤더 바. /api/bots 에서 봇 목록을 가져와 온라인 수를 계산한다.
+ */
 export default function Header() {
   const [totalBots, setTotalBots] = useState<number>(0);
   const [onlineBots, setOnlineBots] = useState<number>(0);
 
+  /** @sideEffect /api/bots 에서 봇 상태를 가져와 온라인 수 계산 */
   useEffect(() => {
     fetch('/api/bots')
       .then((r) => r.json())

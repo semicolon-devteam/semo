@@ -1,99 +1,90 @@
-# Architecture Decisions (ADR)
+# decision
 
-> 프로젝트 아키텍처 결정 기록
-> 마지막 업데이트: 2026-03-15
+> 자동 생성: semo context sync (2026-03-15T11:52:08.369Z)
 
----
 
-### ADR-001: semo-remote 폐기 및 아카이브
+## bot-infra-polling
 
-**날짜**: 2026-03-15
-**상태**: Accepted
+InfraClaw bot:infra 라벨 폴링 추가. 10분 간격. 쿼리: label:bot:infra -label:bot:in-progress -label:bot:blocked. 다른 봇 폴링과 동일 패턴. (2026-03-08)
 
-**배경**
-semo-remote는 Claude Code 세션을 모바일에서 원격 조작하기 위해 개발됨.
-OpenClaw 도입 후 봇들이 독립 세션을 자율 관리하며 Slack으로 결과 전달하는 방식으로 전환,
-Reus가 직접 Claude Code 세션을 장시간 켜두고 원격 조작하는 시나리오가 소멸.
 
-**결정**
-- `semo-system/semo-remote/` → `semo-system/_archived/semo-remote/`로 이동 (이력 보존)
-- GitHub 레포 `semo-remote-client`, `semo-remote-app` Archived 처리
+## bot-no-promise
 
-**근거**
-폐기하되 삭제하지 않는 이유: v0.4.0까지 완성된 세션 스트리밍 기술 자산.
-향후 semo-office에서 봇 세션 실시간 스트리밍 뷰 구현 시 재활용 가능성.
+모든 봇: '하겠습니다' 패턴 금지. Tool call 없는 약속 금지. 한 거 보고해, 할 거 예고하지 마 (2026-02-24).
 
----
 
-### ADR-002: SEMO 대시보드 목적 재정의
+## design-workflow
 
-**날짜**: 2026-03-15
-**상태**: Accepted
+디자인 산출물은 반드시 HTML 프로토타입+인터랙티브 프리뷰 먼저. Reus 승인 후에만 구현 이슈 생성. 마크다운만 작성 후 바로 이슈 생성 금지 (2026-03-01).
 
-**배경**
-OpenClaw 봇들이 컨텍스트 폭발로 인한 할루시네이션을 자주 발생시킴.
-이를 해결하기 위해 온톨로지 + Knowledge Base를 팀 중앙 DB에 구축.
-SEMO 대시보드를 이 KB와 봇 상태를 모니터링하는 도구로 활용하기로 결정.
 
-**결정**
-SEMO 대시보드의 현재 목적:
-1. 각 봇의 파일구조 탐색 (bot-workspaces)
-2. KB/온톨로지 조회·관리
-3. 봇 상태 모니터링 (online/offline, 마지막 활동)
+## github-workflow
 
-semo-office(가상 사무실 시각화)는 향후 개선 방향에 포함되지만,
-현재 대시보드의 주 기능이 아님.
+봇 간 인계는 GitHub 이슈 라벨+폴링 방식만 사용. Slack 직접 멘션 인계 전면 금지 (2026-02-20).
 
-**근거**
-현재 `/dashboard`의 PixiJS 가상 오피스 UI는 구 semo-office 비전 기반으로
-잘못 구현된 것. 실제 데이터 파이프라인 연결이 우선.
 
----
+## gitops-only
 
-### ADR-003: 작업 클론 단일화
+InfraClaw 인프라 작업은 GitOps Only. semi-colon-ops(K8S)/core-terraform(VM)/actions-template(CI/CD)/semi-colon-apps(앱배포) PR 필수. OCI/k8s 명령어는 모니터링만. 유일한 직접작업=OCI Vault 등록. (2026-03-08 Garden 지시)
 
-**날짜**: 2026-03-15
-**상태**: Accepted
 
-**배경**
-동일 레포(`semicolon-devteam/semo.git`)가 두 곳에 클론됨:
-- `/Users/reus/Desktop/Sources/semicolon/projects/semo/` (OpenClaw 봇이 클론)
-- `/Users/reus/Desktop/Sources/semicolon/semo/` (기존 작업 클론, 10커밋 뒤처짐)
+## infra-change-control
 
-**결정**
-`/projects/semo/`를 메인 작업 클론으로 확정.
-`/semo/`는 `git pull`로 동기화 완료. 향후 혼동 방지를 위해 `/semo/` 사용 자제.
+인프라 변경은 Garden 승인 필수. 모니터링/진단은 자유, 변경(코드/배포/시크릿)은 승인 후. 공용 레포 단독 수정 금지 (2026-02-18).
 
----
 
-### ADR-004: context-mode MCP OpenClaw에서 제거
+## infra-pr-review-flow
 
-**날짜**: 2026-03-15
-**상태**: Accepted
+InfraClaw PR 플로우: InfraClaw→PR생성→ReviewClaw리뷰→Garden승인요청→Merge. (2026-03-08 Garden 지시)
 
-**배경**
-`~/.claude.json`에 `context-mode` MCP 서버가 등록되어 있어
-OpenClaw 봇 7개가 각각 context-mode 프로세스를 띄움 → CPU ~570% 낭비.
-훅(PreToolUse/PostToolUse) 없는 MCP-only 설치라 실제 ctx_* 툴 사용률 0%.
 
-**결정**
-`~/.claude.json`의 `mcpServers`에서 `context-mode` 제거.
-OpenClaw 봇 재시작 후 프로세스 0개 확인.
-Claude Code(Cursor) 세션에서는 계속 사용 가능 (별도 설정).
+## issue-rr
 
----
+이슈 등록: 버그/단순수정→SemiClaw 등록→WorkClaw 인계. 기획 필요→PlanClaw 기획→이슈 생성→WorkClaw. 한 기능에 한 이슈, 중복 금지.
 
-### ADR-005: OAuth 토큰 관리 전략
 
-**날짜**: 2026-03-15
-**상태**: Accepted
+## kb-usage-logging
 
-**배경**
-OpenClaw 봇 7개가 모두 만료된 `sk-ant-oat01` 토큰 사용으로 인해 응답 불가 상태 발생.
-기존: `type: "token"` (만료 시 자동 갱신 불가)
+KB 사용 로깅+신뢰평가 시스템. semo.kb_usage_log 테이블에 봇별 호출 이력 자동 기록 (bot_id, used_by, query, channel, trust_level). 신뢰평가 4단계: high(85%+)/medium(70-84%)/low(50-69%)/unreliable(50% 미만). 매일 09:00 KST #bot-ops 리포트 크론. 환경변수: KB_BOT_ID, KB_CHANNEL, KB_REQUESTED_BY. (2026-03-08 Garden 요청)
 
-**결정**
-모든 봇의 `auth-profiles.json`을 `type: "oauth"` 형식으로 전환.
-access token + refresh token + expires 필드 포함.
-현재 로그인된 Claude Code 계정의 OAuth 토큰 사용.
-macOS Keychain `"Claude Code-credentials"` (acct=reus)에서 최신 토큰 조회.
+
+## memory-arch-improvement
+
+메모리 아키텍처 4대 개선 (2026-03-08, Garden 제안 / Reus 승인): 1) 동기 승격 - Vector→Hot 즉시 승격, 크론은 누락 체크 보조용. 2) UUID 기반 중복 방지 - HTML 코멘트 형식으로 UUID 포함, [Project:][Topic:] 태그 필수. 3) Deep Search - --deep 플래그로 아카이브 포함 검색. 4) Hot 메모리 태깅 - 프로젝트/토픽 분류 필수. 적용: 전 봇 AGENTS.md, kb-cli.js, 크론. DB에 uuid 컬럼 추가.
+
+
+## oci-deploy
+
+2026-03-02: 신규 프로젝트는 Vercel 대신 OCI 환경 기반 배포로 전환.
+
+_metadata: {"scope":"infra","decided_at":"2026-03-02","decided_by":"reus"}_
+
+
+## planclaw-scope-distribution
+
+PlanClaw 스코프 분배 기준: 변경 대상 레포로 판단. projects/*→bot:spec-ready(WorkClaw), semi-colon-ops/core-terraform/actions-template/semi-colon-apps→bot:infra(InfraClaw), 양쪽→둘다 병렬. (2026-03-08)
+
+
+## reviewclaw-merge
+
+ReviewClaw는 직접 머지하지 않음. Approve 후 담당자에게 머지 승인 요청. 담당자 모르면 SemiClaw에게 확인 (2026-03-04).
+
+
+## security-contract
+
+계약/금액 정보는 업무 채널에서 절대 언급 금지. 리더 DM 또는 개발사업팀 채널에서만.
+
+
+## semo-claude-md-test
+
+SEMO CLAUDE.md에 OpenClaw 봇팀 ↔ Core DB 동기화 목적 섹션 추가 검증 (2026-03-15). semo context push 동작 테스트용.
+
+
+## slack-output-rule
+
+최종 결과만 Slack에 보고. 중간 과정/예고성 메시지 금지. 1작업=1메시지. 위반 시 에스컬레이션 (2026-02-19).
+
+
+## thread-reply
+
+채널에서 메시지 답변 시 기본적으로 스레드(reply)로 달 것 (2026-02-18).

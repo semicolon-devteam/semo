@@ -13,6 +13,9 @@ import chalk from "chalk";
 import ora from "ora";
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
+import { spawnSync } from "child_process";
+import { Pool } from "pg";
 import { getPool, closeConnection, isDbConnected } from "../database";
 
 // ============================================================
@@ -127,6 +130,95 @@ function getAllFileMtimes(dir: string, depth = 0): Date[] {
     }
   } catch { /* skip */ }
   return times;
+}
+
+// ============================================================
+// Cron Jobs sync
+// ============================================================
+
+interface CronJobRow {
+  jobId: string;
+  name: string;
+  schedule: Record<string, unknown>;
+  enabled: boolean;
+  lastRun: Date | null;
+  nextRun: Date | null;
+  sessionTarget: string;
+}
+
+function parseCronJobsFile(content: string): CronJobRow[] {
+  const data = JSON.parse(content) as {
+    jobs?: Array<{
+      id: string;
+      name?: string;
+      enabled?: boolean;
+      schedule?: Record<string, unknown>;
+      sessionTarget?: string;
+      state?: { lastRunAtMs?: number; nextRunAtMs?: number };
+    }>;
+  };
+  return (data.jobs || []).map(job => ({
+    jobId: job.id,
+    name: job.name || "",
+    schedule: job.schedule || {},
+    enabled: job.enabled !== false,
+    lastRun: job.state?.lastRunAtMs ? new Date(job.state.lastRunAtMs) : null,
+    nextRun: job.state?.nextRunAtMs ? new Date(job.state.nextRunAtMs) : null,
+    sessionTarget: job.sessionTarget || "main",
+  }));
+}
+
+async function syncCronJobs(pool: Pool, homeDir: string): Promise<number> {
+  const entries = fs.readdirSync(homeDir, { withFileTypes: true });
+  const openclawDirs = entries
+    .filter(e => e.isDirectory() && e.name.startsWith(".openclaw"))
+    .map(e => path.join(homeDir, e.name));
+
+  let syncedCount = 0;
+
+  for (const dir of openclawDirs) {
+    const botId = path.basename(dir).replace(/^\.openclaw-?/, "") || "main";
+    const jobsPath = path.join(dir, "cron", "jobs.json");
+
+    if (!fs.existsSync(jobsPath)) continue;
+
+    let jobs: CronJobRow[];
+    try {
+      const content = fs.readFileSync(jobsPath, "utf-8");
+      jobs = parseCronJobsFile(content);
+    } catch {
+      continue;
+    }
+
+    const client = await pool.connect();
+    try {
+      await client.query("DELETE FROM semo.bot_cron_jobs WHERE bot_id = $1", [botId]);
+      for (const job of jobs) {
+        await client.query(
+          `INSERT INTO semo.bot_cron_jobs
+             (bot_id, job_id, name, schedule, enabled, last_run, next_run, session_target, synced_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+          [
+            botId,
+            job.jobId,
+            job.name,
+            JSON.stringify(job.schedule),
+            job.enabled,
+            job.lastRun?.toISOString() || null,
+            job.nextRun?.toISOString() || null,
+            job.sessionTarget,
+          ]
+        );
+      }
+      syncedCount++;
+    } catch {
+      // skip this bot silently
+    } finally {
+      client.release();
+    }
+  }
+
+  return syncedCount;
 }
 
 // ============================================================
@@ -392,9 +484,35 @@ export function registerBotsCommands(program: Command): void {
       } catch (err) {
         await client.query("ROLLBACK");
         spinner.fail(`sync 실패: ${err}`);
-        process.exit(1);
-      } finally {
         client.release();
+        await closeConnection();
+        process.exit(1);
+      }
+
+      client.release();
+      await closeConnection();
+
+      // sessions sync 연동: DB 연결 반납 후 별도 프로세스로 실행
+      console.log(chalk.gray("  → sessions sync 실행 중..."));
+      try {
+        const semoCmd = process.argv[1];
+        spawnSync(process.execPath, [semoCmd, "sessions", "sync", "--all"], {
+          stdio: "inherit",
+          timeout: 60000,
+        });
+      } catch {
+        console.log(chalk.yellow("  ⚠ sessions sync 호출 실패 (무시)"));
+      }
+
+      // cron jobs sync
+      console.log(chalk.gray("  → cron jobs sync 실행 중..."));
+      try {
+        const cronPool = getPool();
+        const cronCount = await syncCronJobs(cronPool, os.homedir());
+        console.log(chalk.gray(`  → cron jobs sync 완료: ${cronCount}개 봇`));
+      } catch (err) {
+        console.log(chalk.yellow(`  ⚠ cron jobs sync 실패 (무시): ${err}`));
+      } finally {
         await closeConnection();
       }
     });

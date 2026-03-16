@@ -1,18 +1,17 @@
+/**
+ * @file components/dashboard/BotOverview.tsx
+ * @description 대시보드 메인 콘텐츠. 봇 요약 통계, 봇 상태 카드 그리드,
+ *   KB 도메인별 현황 테이블을 표시한다.
+ * @module components/dashboard
+ */
+
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import type { Bot } from '@/types';
 
-interface BotStatus {
-  id: string;
-  name: string;
-  emoji: string;
-  role: string;
-  status: string;
-  lastActive: string;
-  sessionCount: number;
-}
-
+/** KB 통계 API 응답 형태 */
 interface KBStats {
   knowledge_base: {
     total: string;
@@ -27,14 +26,15 @@ interface KBStats {
 }
 
 export default function BotOverview() {
-  const [bots, setBots] = useState<BotStatus[]>([]);
+  const [bots, setBots] = useState<Bot[]>([]);
   const [kbStats, setKbStats] = useState<KBStats | null>(null);
   const [loading, setLoading] = useState(true);
 
+  /** @sideEffect 봇/KB 데이터 fetch */
   useEffect(() => {
     Promise.all([
       fetch('/api/bots').then(r => r.json()).catch(() => []),
-      fetch('/api/kb?action=stats').then(r => r.json()).catch(() => null),
+      fetch('/api/kb?action=stats').then(r => r.ok ? r.json() : null).catch(() => null),
     ]).then(([botsData, statsData]) => {
       setBots(Array.isArray(botsData) ? botsData : []);
       setKbStats(statsData);
@@ -42,7 +42,7 @@ export default function BotOverview() {
     });
   }, []);
 
-  const online = bots.filter(b => b.status === 'online' || b.status === 'active').length;
+  const online = bots.filter(b => b.status === 'online').length;
 
   if (loading) {
     return (
@@ -64,14 +64,14 @@ export default function BotOverview() {
         />
         <StatCard
           label="팀 KB"
-          value={kbStats?.knowledge_base.total ?? '-'}
-          sub={`임베딩 ${kbStats?.knowledge_base.emb ?? '-'}건`}
+          value={kbStats?.knowledge_base?.total ?? '-'}
+          sub={`임베딩 ${kbStats?.knowledge_base?.emb ?? '-'}건`}
           color="green"
         />
         <StatCard
           label="봇 KB"
-          value={kbStats?.bot_knowledge.total ?? '-'}
-          sub={`임베딩 ${kbStats?.bot_knowledge.emb ?? '-'}건`}
+          value={kbStats?.bot_knowledge?.total ?? '-'}
+          sub={`임베딩 ${kbStats?.bot_knowledge?.emb ?? '-'}건`}
           color="purple"
         />
       </div>
@@ -86,7 +86,7 @@ export default function BotOverview() {
         </div>
         <div className="grid grid-cols-2 gap-3">
           {bots.map(bot => (
-            <BotCard key={bot.id} bot={bot} />
+            <BotMiniCard key={bot.id} bot={bot} />
           ))}
         </div>
       </div>
@@ -110,7 +110,7 @@ export default function BotOverview() {
                 </tr>
               </thead>
               <tbody>
-                {kbStats.knowledge_base.by_domain.map(d => (
+                {(kbStats.knowledge_base?.by_domain ?? []).map(d => (
                   <tr key={d.domain} className="border-b border-gray-100 last:border-0">
                     <td className="px-4 py-2 text-gray-800">{d.domain}</td>
                     <td className="px-4 py-2 text-right text-gray-600">{d.cnt}</td>
@@ -126,15 +126,24 @@ export default function BotOverview() {
   );
 }
 
-function StatCard({
-  label, value, sub, color,
-}: {
+/** StatCard Props */
+interface StatCardProps {
+  /** 카드 레이블 */
   label: string;
+  /** 주요 수치 */
   value: string;
+  /** 보조 텍스트 */
   sub: string;
+  /** 색상 테마 */
   color: 'blue' | 'green' | 'purple';
-}) {
-  const colorMap = {
+}
+
+/**
+ * @component StatCard
+ * @description 단일 통계 수치를 색상 배경 카드로 표시한다.
+ */
+function StatCard({ label, value, sub, color }: StatCardProps) {
+  const colorMap: Record<StatCardProps['color'], string> = {
     blue: 'bg-blue-50 border-blue-200 text-blue-700',
     green: 'bg-green-50 border-green-200 text-green-700',
     purple: 'bg-purple-50 border-purple-200 text-purple-700',
@@ -148,8 +157,12 @@ function StatCard({
   );
 }
 
-function BotCard({ bot }: { bot: BotStatus }) {
-  const isOnline = bot.status === 'online' || bot.status === 'active';
+/**
+ * @component BotMiniCard
+ * @description 대시보드 봇 상태 그리드에 표시되는 소형 봇 카드.
+ */
+function BotMiniCard({ bot }: { bot: Bot }) {
+  const isOnline = bot.status === 'online';
   const lastActive = bot.lastActive
     ? new Date(bot.lastActive).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     : '-';

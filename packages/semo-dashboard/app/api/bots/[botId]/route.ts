@@ -1,3 +1,14 @@
+/**
+ * @file app/api/bots/[botId]/route.ts
+ * @description 특정 봇 단건 조회 API. DB에서 기본 정보를 가져오고,
+ *   name/emoji/role이 비어 있으면 GitHub IDENTITY.md로 보완한다.
+ *
+ * @api GET /api/bots/:botId
+ * @apiSuccess {Bot & { syncedAt: string }} 200 - 봇 정보 (syncedAt 포함)
+ * @apiError {object} 404 - { error: 'Bot not found' }
+ * @apiError {object} 500 - { error: string } DB 연결 실패 시
+ */
+
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getFileContent } from '@/lib/github';

@@ -39,7 +39,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": ". ~/.semo.env 2>/dev/null; semo context sync 2>/dev/null || true && semo bots sync 2>/dev/null || true"
+            "command": ". ~/.semo.env 2>/dev/null; semo context sync 2>/dev/null || true; semo bots sync --semo-system /Users/reus/Desktop/Sources/semicolon/projects/semo/semo-system 2>/dev/null || true; semo sessions sync --all 2>/dev/null || true"
           }
         ]
       }

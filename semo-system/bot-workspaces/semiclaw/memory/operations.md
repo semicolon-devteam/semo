@@ -6,6 +6,26 @@
 - 매주 목요일 14:00 담당자별 컨텍스트 수집 (DM)
 - GitHub 모니터링 + 팀원 체크인으로 진척 파악
 
+## Slack 채널 매핑 (프로젝트별)
+| 프로젝트 | 채널 ID | 채널명 |
+|---|---|---|
+| proj-game-land | C0AEV7QN6R0 | #proj-game-land |
+| proj-play-land | C08P9TDK0UR | #proj-play-land |
+| proj-office-land | C09GG5RU56G | #proj-office-land |
+| proj-bebecare | C0AEA1RA10A | #proj-bebecare |
+| proj-link-collect | C0A2BUHP1SN | #proj-link-collect |
+| proj-cat | C0AH1UPAUMD | #proj-cat |
+| core-backend | C09BUHATP7Z | #core-backend |
+| proj-semo | C0AKZRPKJU8 | #proj-semo |
+| proj-star-spot | C0AEJ9Y8JP2 | #proj-star-spot |
+| proj-by-buyer | C0A5MLV4BL7 | #proj-by-buyer |
+| 마이크로서비스 (ms-*) | — | 전용 채널 없음 → #bot-ops |
+
+## CI/CD Slack 알림 정책 (3/15 Reus 지시)
+- dev-ci-cd + release(prd) 양쪽 모두 알림 추가
+- InfraClaw 멘션 포함
+- 전체 프로젝트 적용
+
 ## Google Calendar
 - 팀 캘린더: "세미콜론"
 - Calendar ID: `2b3dabe6b67a16c869653de312ba2952d98901ad036cd2987e9959252bb6cd65@group.calendar.google.com`

@@ -66,6 +66,8 @@
 ## 플레이랜드 버그/이슈
 - [ ] play-land-dev Basic Auth 인증창 문제 (#140) — @bon 백엔드 수정 완료, 프론트 Authorization 헤더 확인 필요
   - kyago에 백엔드 배포 요청 대기 중
+- [ ] #200 [긴급/핫픽스] 배너가 표시되지 않음 — 신규 오픈 (3/15)
+- [ ] #199 일일미션 progress가 1에서 더 올라가지 않음 (트리거 누락) — 신규 오픈 (3/15)
 
 ## 공통
 - [x] 포인트 통합 생태계 — 랜드 간 포인트 교환 UI 완성 (3/1) ✅
@@ -725,3 +727,20 @@
 - **cm-land, cm-office, proj-play-land, proj-game-land, core-backend**: 변동 없음
 - 마지막 활동: proj-play-land 2026-03-14 18:23 KST (포인트 교환소 계정 연동 버그 수정)
 - 📝 **채널 메시지 스킵** — 변동 없음, 태스크리스트 체크만 수행
+
+### 2026-03-15 (일) 19:00
+- **GitHub 체크 (최근 8시간)**: CI/CD 개선 4건 + proj-play-land 신규 버그 2건
+- **cm-land** (장현봉/Reus): 
+  - ✨ Slack notification CI/CD 추가 (#794, a3bbc21, 09:41 KST)
+- **cm-office** (장현봉/Reus): 
+  - ✨ Slack notification CI/CD 추가 (#327, cd2bcc5, 09:46 KST)
+- **proj-play-land** (Reus): 
+  - ✨ Slack notification CI/CD 추가 (#201, f088c73, 09:44 KST)
+  - 📌 **#200 신규 오픈**: [긴급/핫픽스] 배너가 표시되지 않음
+  - 📌 **#199 신규 오픈**: 일일미션 progress가 1에서 더 올라가지 않음 (트리거 누락)
+- **proj-game-land** (장현봉/Reus): 
+  - ✨ Slack notification CI/CD 추가 (#794, a3bbc21, 09:41 KST)
+- **core-backend**: 변동 없음
+- ✅ **태스크 진척**: 
+  - **CI/CD 개선** — 4개 랜드 전부 Slack notification 통합 완료
+  - **플레이랜드 신규 버그 2건 감지** — 배너 미표시, 일일미션 progress 버그

@@ -1,0 +1,9 @@
+{
+  "supabase": {
+    "url": "https://nmawdwgrjgocyxecrsbx.supabase.co",
+    "serviceRoleKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5tYXdkd2dyamdvY3l4ZWNyc2J4Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MDQ1MjQ2NiwiZXhwIjoyMDg2MDI4NDY2fQ.hL13T3nUtwz1UI7lAmdonp47lWRFqdHw8aeWg-trSZ8"
+  },
+  "channels": {
+    "axoracle": "C0AE4N0LSKV"
+  }
+}

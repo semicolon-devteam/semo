@@ -1,3 +1,9 @@
+/**
+ * @file app/layout.tsx
+ * @description Next.js 루트 레이아웃. 전역 폰트(Geist), 네비게이션 바, 메타데이터를 설정한다.
+ * @renderMode SSR (서버 컴포넌트)
+ */
+
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";

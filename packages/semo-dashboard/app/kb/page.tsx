@@ -12,9 +12,55 @@ interface KBItem {
   similarity_pct?: number;
 }
 
+interface OntologyDomain {
+  domain: string;
+  description: string | null;
+  version: number;
+  entry_count: number;
+  schema: Record<string, unknown>;
+}
+
+type PageTab = 'kb' | 'ontology';
+
 const EMPTY_FORM = { domain: '', key: '', content: '' };
 
+function SchemaViewer({ schema }: { schema: Record<string, unknown> }) {
+  const schemaItems = schema?.properties ?? (schema?.items as Record<string, unknown> | undefined)?.properties;
+  const props = schemaItems as Record<string, { type?: string; description?: string }> | undefined;
+
+  if (!props) {
+    return (
+      <pre className="text-xs font-mono bg-gray-50 dark:bg-gray-900 p-3 rounded overflow-x-auto whitespace-pre-wrap break-all">
+        {JSON.stringify(schema, null, 2)}
+      </pre>
+    );
+  }
+
+  return (
+    <table className="w-full text-xs">
+      <thead>
+        <tr className="border-b border-gray-200 dark:border-gray-600">
+          <th className="text-left py-1 pr-3 font-medium text-gray-600 dark:text-gray-400">Property</th>
+          <th className="text-left py-1 pr-3 font-medium text-gray-600 dark:text-gray-400">Type</th>
+          <th className="text-left py-1 font-medium text-gray-600 dark:text-gray-400">Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {Object.entries(props).map(([name, def]) => (
+          <tr key={name} className="border-b border-gray-100 dark:border-gray-700/50 last:border-b-0">
+            <td className="py-1.5 pr-3 font-mono text-gray-900 dark:text-white whitespace-nowrap">{name}</td>
+            <td className="py-1.5 pr-3 text-blue-600 dark:text-blue-400 whitespace-nowrap">{def.type ?? '?'}</td>
+            <td className="py-1.5 text-gray-500 dark:text-gray-400">{def.description ?? '-'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 export default function KBPage() {
+  const [pageTab, setPageTab] = useState<PageTab>('kb');
+
   const [entries, setEntries] = useState<KBItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -28,6 +74,16 @@ export default function KBPage() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+
+  const [selectedEntry, setSelectedEntry] = useState<KBItem | null>(null);
+
+  const [ontology, setOntology] = useState<OntologyDomain[]>([]);
+  const [ontologyLoading, setOntologyLoading] = useState(false);
+  const [selectedDomain, setSelectedDomain] = useState<OntologyDomain | null>(null);
+  const [domainEntries, setDomainEntries] = useState<KBItem[]>([]);
+  const [domainEntriesLoading, setDomainEntriesLoading] = useState(false);
+  type DomainModalTab = 'schema' | 'entries';
+  const [domainModalTab, setDomainModalTab] = useState<DomainModalTab>('schema');
 
   const fetchEntries = useCallback(async () => {
     setLoading(true);
@@ -53,6 +109,27 @@ export default function KBPage() {
   useEffect(() => {
     fetchEntries();
   }, [fetchEntries]);
+
+  useEffect(() => {
+    if (pageTab !== 'ontology') return;
+    setOntologyLoading(true);
+    fetch('/api/kb/ontology')
+      .then((r) => r.json())
+      .then(setOntology)
+      .catch(() => setOntology([]))
+      .finally(() => setOntologyLoading(false));
+  }, [pageTab]);
+
+  useEffect(() => {
+    if (!selectedDomain) return;
+    setDomainModalTab('schema');
+    setDomainEntriesLoading(true);
+    fetch(`/api/kb?domain=${encodeURIComponent(selectedDomain.domain)}`)
+      .then((r) => r.json())
+      .then((data) => setDomainEntries(Array.isArray(data) ? data : []))
+      .catch(() => setDomainEntries([]))
+      .finally(() => setDomainEntriesLoading(false));
+  }, [selectedDomain]);
 
   const domains = Array.from(new Set(entries.map((e) => e.domain).filter(Boolean)));
   const recentEntries = [...entries]
@@ -127,7 +204,7 @@ export default function KBPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
-      <div className="flex items-start justify-between mb-8">
+      <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
             Knowledge Base
@@ -137,15 +214,75 @@ export default function KBPage() {
             {filterBotId && <span className="ml-2 text-blue-600">봇 KB: {filterBotId}</span>}
           </p>
         </div>
-        <button
-          onClick={openNew}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          + New Entry
-        </button>
+        {pageTab === 'kb' && (
+          <button
+            onClick={openNew}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            + New Entry
+          </button>
+        )}
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
+      {/* Tab switcher */}
+      <div className="flex gap-1 mb-6 border-b border-gray-200 dark:border-gray-700">
+        {(['kb', 'ontology'] as PageTab[]).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setPageTab(tab)}
+            className={`px-4 py-2 text-sm font-medium rounded-t-md transition-colors ${
+              pageTab === tab
+                ? 'bg-white dark:bg-gray-800 border border-b-white dark:border-gray-700 dark:border-b-gray-800 text-blue-600 dark:text-blue-400 -mb-px'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+            }`}
+          >
+            {tab === 'kb' ? 'KB' : 'Ontology'}
+          </button>
+        ))}
+      </div>
+
+      {/* Ontology Tab */}
+      {pageTab === 'ontology' && (
+        <div>
+          {ontologyLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : ontology.length === 0 ? (
+            <div className="text-center py-16 text-gray-500 dark:text-gray-400">
+              온톨로지 도메인이 없습니다.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {ontology.map((domain) => (
+                <div
+                  key={domain.domain}
+                  onClick={() => setSelectedDomain(domain)}
+                  className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:shadow-md transition-shadow"
+                >
+                  <div className="flex items-center justify-between p-4">
+                    <span className="font-semibold text-gray-900 dark:text-white">{domain.domain}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded font-mono">
+                        v{domain.version}
+                      </span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {domain.entry_count} entries
+                      </span>
+                    </div>
+                  </div>
+                  {domain.description && (
+                    <p className="text-sm text-gray-500 dark:text-gray-400 px-4 pb-3">{domain.description}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* KB Tab */}
+      {pageTab === 'kb' && <div className="flex flex-col lg:flex-row gap-6">
         {/* Main content */}
         <div className="flex-1 min-w-0">
           {/* Search & Filters */}
@@ -195,81 +332,32 @@ export default function KBPage() {
               <p className="text-sm">+ New Entry로 추가하거나 필터를 변경하세요.</p>
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Key</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300 hidden md:table-cell">Domain</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Content</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300 hidden lg:table-cell">By</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300 hidden lg:table-cell">Updated</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((entry, i) => (
-                    <tr
-                      key={entryId(entry)}
-                      className={`border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors ${i === entries.length - 1 ? 'border-b-0' : ''}`}
-                    >
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                        {entry.key}
-                        {entry.similarity_pct != null && (
-                          <span className="ml-2 text-xs text-blue-500">{entry.similarity_pct}%</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <span className="inline-block px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs">
-                          {entry.domain}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-xs">
-                        <p className="line-clamp-2 text-xs">{entry.content}</p>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs hidden lg:table-cell">
-                        {entry.created_by || '-'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs hidden lg:table-cell whitespace-nowrap">
-                        {formatDate(entry.updated_at)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => openEdit(entry)}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-xs font-medium px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                          >
-                            Edit
-                          </button>
-                          {deleteConfirm === entryId(entry) ? (
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleDelete(entry.domain, entry.key)}
-                                className="text-red-600 dark:text-red-400 text-xs font-medium px-2 py-1 rounded bg-red-50 dark:bg-red-900/20 hover:bg-red-100 transition-colors"
-                              >
-                                Confirm
-                              </button>
-                              <button
-                                onClick={() => setDeleteConfirm(null)}
-                                className="text-gray-500 text-xs px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setDeleteConfirm(entryId(entry))}
-                              className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-xs font-medium px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {entries.map((entry) => (
+                <div
+                  key={entryId(entry)}
+                  onClick={() => setSelectedEntry(entry)}
+                  className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 cursor-pointer hover:shadow-md transition-shadow p-4 flex flex-col gap-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="font-semibold text-gray-900 dark:text-white text-sm leading-snug break-all">
+                      {entry.key}
+                    </span>
+                    <span className="shrink-0 text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                      {entry.domain}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-3 flex-1">
+                    {entry.content}
+                  </p>
+                  <div className="flex items-center justify-between text-xs text-gray-400 dark:text-gray-500 mt-auto">
+                    <span>{formatDate(entry.updated_at)}</span>
+                    {entry.similarity_pct != null && (
+                      <span className="text-blue-500">{entry.similarity_pct}%</span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -288,7 +376,7 @@ export default function KBPage() {
                   <li key={entryId(entry)} className="border-b border-gray-100 dark:border-gray-700/50 pb-3 last:border-b-0 last:pb-0">
                     <p
                       className="text-xs font-medium text-gray-900 dark:text-white truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
-                      onClick={() => openEdit(entry)}
+                      onClick={() => setSelectedEntry(entry)}
                       title={entry.key}
                     >
                       {entry.key}
@@ -304,6 +392,174 @@ export default function KBPage() {
           </div>
         </div>
       </div>
+      }
+
+      {/* KB Entry Detail Modal */}
+      {selectedEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedEntry(null)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">{selectedEntry.key}</h2>
+                <span className="shrink-0 text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded">
+                  {selectedEntry.domain}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedEntry(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none ml-3 shrink-0"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Meta */}
+            <div className="px-6 py-2 border-b border-gray-200 dark:border-gray-700 shrink-0 flex gap-4 text-xs text-gray-500 dark:text-gray-400">
+              {selectedEntry.created_by && <span>by {selectedEntry.created_by}</span>}
+              <span>{formatDate(selectedEntry.updated_at)}</span>
+            </div>
+
+            {/* Full content */}
+            <div className="flex-1 overflow-y-auto px-6 py-4">
+              <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words font-sans">
+                {selectedEntry.content}
+              </pre>
+            </div>
+
+            {/* Footer: Edit / Delete */}
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-200 dark:border-gray-700 shrink-0">
+              {deleteConfirm === entryId(selectedEntry) ? (
+                <>
+                  <button
+                    onClick={() => setDeleteConfirm(null)}
+                    className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await handleDelete(selectedEntry.domain, selectedEntry.key);
+                      setSelectedEntry(null);
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 rounded-md bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                  >
+                    Confirm Delete
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setDeleteConfirm(entryId(selectedEntry))}
+                    className="px-4 py-2 text-sm font-medium text-red-500 dark:text-red-400 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    onClick={() => { openEdit(selectedEntry); setSelectedEntry(null); }}
+                    className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors"
+                  >
+                    Edit
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Domain Detail Modal */}
+      {selectedDomain && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setSelectedDomain(null)} />
+          <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{selectedDomain.domain}</h2>
+                <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded font-mono">
+                  v{selectedDomain.version}
+                </span>
+              </div>
+              <button
+                onClick={() => setSelectedDomain(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Description */}
+            {selectedDomain.description && (
+              <p className="px-6 py-2 text-sm text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 shrink-0">
+                {selectedDomain.description}
+              </p>
+            )}
+
+            {/* Tabs */}
+            <div className="flex gap-1 px-6 pt-3 border-b border-gray-200 dark:border-gray-700 shrink-0">
+              <button
+                onClick={() => setDomainModalTab('schema')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${
+                  domainModalTab === 'schema'
+                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                Schema
+              </button>
+              <button
+                onClick={() => setDomainModalTab('entries')}
+                className={`px-3 py-1.5 text-sm font-medium rounded-t transition-colors ${
+                  domainModalTab === 'entries'
+                    ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                Entries ({selectedDomain.entry_count})
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {domainModalTab === 'schema' && (
+                <SchemaViewer schema={selectedDomain.schema} />
+              )}
+              {domainModalTab === 'entries' && (
+                domainEntriesLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                ) : domainEntries.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">항목 없음</div>
+                ) : (
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-200 dark:border-gray-600">
+                        <th className="text-left py-1 pr-3 font-medium text-gray-600 dark:text-gray-400">Key</th>
+                        <th className="text-left py-1 pr-3 font-medium text-gray-600 dark:text-gray-400">Content</th>
+                        <th className="text-left py-1 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap">Updated</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {domainEntries.map((e) => (
+                        <tr key={e.key} className="border-b border-gray-100 dark:border-gray-700/50 last:border-b-0">
+                          <td className="py-1.5 pr-3 font-mono text-gray-900 dark:text-white whitespace-nowrap">{e.key}</td>
+                          <td className="py-1.5 pr-3 text-gray-500 dark:text-gray-400 max-w-xs">
+                            <p className="line-clamp-2">{e.content}</p>
+                          </td>
+                          <td className="py-1.5 text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatDate(e.updated_at)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal */}
       {modalOpen && (

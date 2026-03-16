@@ -1,38 +1,13 @@
-# bots.md — 봇 아키텍처
+# Bots
 
-## 📢 봇 운영 원칙 (Reus 지시, 2026-02-23)
-### ❌ 금지: 작업 로그 하나하나 찍기
-- "1. logger.ts 수정", "2. sessionManager.ts 수정" 같은 중간 과정 보고 금지
+> 자동 생성: semo context sync (2026-03-15T09:35:04.999Z)
 
-### ✅ 원칙: 결과만 보고
-- 작업 완료 후 **최종 결과 한 번에 보고**
-- 예: "core-backend #123 구현 완료 → PR #456 생성"
-
-### ⚠️ 예외
-- **블로커 발생 시에만** 즉시 보고 (작업 중단 상황)
-
----
-
-## 봇 팀 ID (SemiClaw 공식 매핑, 최종 업데이트: 2026-03-09)
-| 봇 | Slack ID | 비고 |
-|---|---|---|
-| SemiClaw | U0ADGB42N79 | PM/오케스트레이터 |
-| WorkClaw | U0AFECSJHK3 | 풀스택 구현 |
-| ReusClaw | U0ADF0JUU79 | Reus 개인 어시스턴트 (별개 PC 독립 운영) |
-| PlanClaw | U0AFNMGKURX | PO/기획 |
-| ReviewClaw | U0AF1RK0E67 | 코드 리뷰/QA |
-| DesignClaw | U0AFC0MK2TY | 디자인 전담 |
-| GrowthClaw | U0AFALA3EF7 | 그로스/마케팅 |
-| InfraClaw | U0AFPDMCGHX | 인프라/DevOps/배포 |
-| Reus (사람) | URSQYUNQJ | 리더 |
-| #bot-ops | C0AFBQ209E0 | 봇 간 공지 채널 |
-
-## NON-NEGOTIABLE: 봇 간 통신 규칙
-- ✅ **봇 간 Slack 멘션 허용** (2026-03-07 Reus 지시로 변경)
-- ✅ **GitHub 이슈 라벨+폴링 방식만 사용**
-- 👀 멘션 시 이모지는 게이트웨이 자동 처리 (수동 대응 불필요)
-
-### ⚠️ 정책 예외 (2026-03-07 Reus 승인)
-- **InfraClaw에 한해** Slack 멘션 직접 인계/협업 허용
-- 사유: 인프라 긴급 장애 대응 시 실시간 커뮤니케이션 필요
-- InfraClaw 외 다른 봇 간에는 여전히 GitHub 이슈 라벨+폴링만 사용
+| Bot | 이름 | 역할 | Status | Last Active | Sessions |
+|-----|------|------|--------|-------------|----------|
+| designclaw | 🎨 DesignClaw | 픽셀과 여백 사이에 사는 디자인 패밀리어 | 🔴 offline | 2026. 3. 15. 오전 9:08:57 | 0 |
+| growthclaw | 🌱 GrowthClaw | AI 그로스 해커 — 데이터를 먹고 트래픽을 만드는 존재 | 🔴 offline | 2026. 3. 15. 오전 8:50:17 | 0 |
+| infraclaw | 🏗️ InfraClaw | 서버실 깊은 곳에서 파이프를 감시하는 침묵의 수호자 | 🔴 offline | 2026. 3. 15. 오전 8:44:18 | 0 |
+| planclaw | 🗓️ PlanClaw | Planning assistant with claws (strategic AI familiar) | 🔴 offline | 2026. 3. 15. 오전 8:50:19 | 0 |
+| reviewclaw | 🔍 ReviewClaw | 코드 사이를 헤집는 품질의 탐정 | 🔴 offline | 2026. 3. 15. 오전 9:24:59 | 0 |
+| semiclaw | 🦀 세미클로 (SemiClaw) | Semicolon 개발팀의 공용 AI 봇 | 🔴 offline | 2026. 3. 15. 오전 9:27:05 | 0 |
+| workclaw | 🛠️ WorkClaw | 맥미니에서 돌아가는 개발용 AI 어시스턴트 | 🔴 offline | 2026. 3. 15. 오전 9:28:08 | 0 |

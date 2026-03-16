@@ -1,369 +1,160 @@
-# SEMO 아키텍처 개요
+# SEMO v4 아키텍처
 
-> 팀 리더 및 아키텍트를 위한 SEMO 기술 아키텍처 문서
+> **설계 원칙**: Core PostgreSQL DB를 단일 진실 공급원(Single Source of Truth)으로,
+> CLI 전용 동기화 방식으로 OpenClaw 봇팀과 로컬 Claude Code 세션 간 컨텍스트를 공유한다.
 
 ---
 
-## 1. 전체 구조
+## 전체 구조
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                     Claude Code Session                          │
-├─────────────────────────────────────────────────────────────────┤
+│                        SEMO 생태계                               │
 │                                                                  │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                    .claude/ (White Box)                   │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐   │   │
-│  │  │  CLAUDE.md  │  │  memory/    │  │  settings.json  │   │   │
-│  │  │ (진입점)     │  │ (Context    │  │  (MCP 설정)     │   │   │
-│  │  │             │  │  Mesh)      │  │                 │   │   │
-│  │  └─────────────┘  └─────────────┘  └─────────────────┘   │   │
-│  │                                                           │   │
-│  │  ┌─────────────────────────────────────────────────────┐ │   │
-│  │  │              semo-system/ (심볼릭 링크)              │ │   │
-│  │  │  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │ │   │
-│  │  │  │ semo-core   │  │ semo-skills │  │ Extensions │  │ │   │
-│  │  │  │ (Layer 0)   │  │ (Layer 1)   │  │ (선택)     │  │ │   │
-│  │  │  └─────────────┘  └─────────────┘  └────────────┘  │ │   │
-│  │  └─────────────────────────────────────────────────────┘ │   │
-│  └──────────────────────────────────────────────────────────┘   │
-│                              │                                   │
-│                              ▼                                   │
-│  ┌──────────────────────────────────────────────────────────┐   │
-│  │                 MCP Server (Black Box)                    │   │
-│  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐  │   │
-│  │  │  Slack   │  │  GitHub  │  │ Supabase │  │  Custom  │  │   │
-│  │  └──────────┘  └──────────┘  └──────────┘  └──────────┘  │   │
-│  └──────────────────────────────────────────────────────────┘   │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │              Core PostgreSQL DB (semo 스키마)              │  │
+│  │                                                            │  │
+│  │  knowledge_base  bot_status  bot_sessions  ontology        │  │
+│  │  projects        tasks       skills                        │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│          ▲                          ▲                            │
+│          │  semo CLI (v4)           │  semo CLI (v4)             │
+│          │                          │                            │
+│  ┌───────┴────────┐        ┌────────┴───────┐                   │
+│  │  로컬 Claude   │        │  OpenClaw 봇   │                   │
+│  │  Code 세션     │        │  (workclaw 등) │                   │
+│  │                │        │                │                   │
+│  │ .claude/memory/│        │  bot-workspaces│                   │
+│  │  *.md          │        │  IDENTITY.md   │                   │
+│  └────────────────┘        └────────────────┘                   │
 │                                                                  │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │              SEMO Dashboard (Next.js)                      │  │
+│  │              https://semo.semi-colon.space                 │  │
+│  └───────────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 2. Layer 구조
+## 컴포넌트별 역할
 
-### Layer 0: semo-core (필수)
+### 1. Core DB (`semo` 스키마)
 
-**역할**: 오케스트레이션, 원칙, 테스트 엔진
+팀 공용 PostgreSQL. 모든 상태 정보의 단일 진실 공급원.
 
-```
-semo-core/
-├── principles/
-│   ├── PRINCIPLES.md      # 핵심 원칙
-│   └── MESSAGE_RULES.md   # 메시지 규칙
-├── agents/
-│   └── orchestrator/      # 라우팅 담당
-├── templates/
-│   ├── CLAUDE.md          # 프로젝트 진입점 템플릿
-│   └── gitignore-semo.txt
-└── tests/
-    └── cases/             # 자동화 테스트 케이스
-```
+| 테이블 | 역할 |
+|--------|------|
+| `semo.knowledge_base` | 팀 KB (domain: team/project/decision/infra/process) |
+| `semo.bot_status` | 봇별 온라인 상태, 마지막 활동 시각 |
+| `semo.bot_sessions` | 봇별 Claude Code 세션 히스토리 |
+| `semo.ontology` | 데이터 온톨로지 스키마 정의 |
+| `semo.projects` | 프로젝트 목록 및 메타데이터 |
+| `semo.tasks` | 태스크 추적 (옵션) |
+| `semo.skills` | SEMO 스킬 레지스트리 |
 
-**핵심 원칙**:
-- **Orchestrator-First**: 모든 요청은 Orchestrator를 먼저 거침
-- **투명성**: 모든 AI 동작에 `[SEMO]` 메시지 출력
-- **Routing-Only**: Orchestrator는 라우팅만, 직접 구현 금지
+### 2. semo CLI v4 (`packages/cli`)
 
----
-
-### Layer 1: semo-skills (필수)
-
-**역할**: 기능별 통합 스킬 제공
+DB와 로컬 파일 간 동기화 수행. 세션 훅으로 자동 실행.
 
 ```
-semo-skills/
-├── coder/           # 코드 작성/수정/검증
-├── tester/          # 테스트/QA
-├── planner/         # 기획/관리
-├── writer/          # 문서/디자인
-├── deployer/        # 배포/인프라
-├── memory/          # 세션 간 기억
-├── notify-slack/    # Slack 알림
-├── feedback/        # 피드백 수집
-├── version-updater/ # 버전 관리
-├── semo-help/       # 도움말
-├── circuit-breaker/ # 안전 장치
-└── list-bugs/       # 버그 목록
+semo context sync   — DB → .claude/memory/*.md
+semo context push   — .claude/memory/decisions.md → DB
+semo bots sync      — bot-workspaces 스캔 → semo.bot_status
+semo bots status    — bot_status 조회 출력
+semo get <resource> — DB 실시간 쿼리 (프로젝트/봇/KB/태스크)
+semo skills seed    — semo-skills/ 파일 → semo.skills DB
 ```
 
-**스킬 구조**:
-```
-{skill}/
-├── SKILL.md           # 스킬 정의 (frontmatter + 설명)
-├── references/        # 참조 문서
-└── platforms/         # 플랫폼별 분기 (선택)
-```
+### 3. 로컬 Claude Code 세션
 
----
-
-### Layer 2: Extensions (선택)
-
-**역할**: 역할/플랫폼별 전문화
-
-| Extension | 대상 | 주요 기능 |
-|-----------|------|----------|
-| semo-next | 프론트엔드 | DDD, API 연동, 컴포넌트 |
-| semo-backend | 백엔드 | WebFlux, CQRS, Reactive |
-| semo-po | PO | Epic, Task, 중복 검사 |
-| semo-design | 디자이너 | 목업, 핸드오프 |
-| semo-qa | QA | 테스트 케이스, 버그 리포트 |
-| semo-pm | PM | 스프린트, 진행도 |
-| semo-infra | 인프라 | Docker, Nginx, 배포 |
-| semo-ms | MSA | 서비스 설계, 이벤트 |
-| semo-mvp | MVP | 빠른 프로토타이핑 |
-| semo-meta | 프레임워크 개발 | SEMO 자체 개발용 |
-
----
-
-## 3. White Box vs Black Box
-
-### White Box (파일시스템 기반)
-
-**특징**:
-- Git으로 버전 관리 가능
-- 코드 리뷰 가능
-- 오프라인에서도 동작
-- 커스터마이징 용이
-
-**구성요소**:
-- `CLAUDE.md`: Claude Code가 읽는 진입점
-- `memory/`: Context Mesh (장기 기억)
-- `agents/`, `skills/`: 에이전트/스킬 정의
-- `commands/`: 슬래시 커맨드
-
-### Black Box (MCP 기반)
-
-**특징**:
-- 외부 시스템 연동
-- 런타임 동적 기능
-- 보안 민감 정보 처리
-
-**구성요소**:
-- `settings.json`: MCP 서버 설정
-- Slack, GitHub, Supabase 연동
-
-```json
-// .claude/settings.json
-{
-  "mcpServers": {
-    "semo-integrations": {
-      "command": "npx",
-      "args": ["-y", "@team-semicolon/semo-mcp"],
-      "env": {
-        "SLACK_BOT_TOKEN": "${SLACK_BOT_TOKEN}",
-        "SUPABASE_URL": "${SUPABASE_URL}"
-      }
-    }
-  }
-}
-```
-
----
-
-## 4. Context Mesh
-
-### 구조
+`.claude/memory/` 파일을 컨텍스트로 로드. `semo context sync` 실행 시 갱신.
 
 ```
 .claude/memory/
-├── context.md       # 프로젝트 상태, 기술 스택
-├── decisions.md     # ADR (아키텍처 결정 기록)
-└── rules/           # 프로젝트별 커스텀 규칙
-    └── project-specific.md
+├── team.md        ← KB domain=team
+├── projects.md    ← KB domain=project
+├── decisions.md   ← KB domain=decision (양방향)
+├── infra.md       ← KB domain=infra
+├── process.md     ← KB domain=process
+├── bots.md        ← semo.bot_status
+└── ontology.md    ← semo.ontology
 ```
 
-### 동작 흐름
+### 4. OpenClaw 봇 워크스페이스
+
+7개 봇이 각자의 `bot-workspaces/{bot}/` 디렉토리에서 작업.
+`semo bots sync`로 bot_status DB에 상태 기록.
 
 ```
-[세션 시작]
-     ↓
-memory/ 로드 (skill:memory sync)
-     ↓
-컨텍스트 주입
-     ↓
-[작업 수행]
-     ↓
-결정 사항 저장 (skill:memory save)
-     ↓
-[세션 종료]
+semo-system/bot-workspaces/
+├── workclaw/       # 개발 담당
+├── reviewclaw/     # 코드 리뷰
+├── planclaw/       # 기획
+├── infraclaw/      # 인프라
+├── semiclaw/       # 메타/코디네이터
+├── designclaw/     # 디자인
+└── growthclaw/     # 성장
 ```
 
-### 활용 사례
+### 5. SEMO Dashboard
 
-| 저장 데이터 | 예시 |
-|------------|------|
-| 아키텍처 결정 | "API 응답은 JSON Envelope 패턴 사용" |
-| 선호도 | "변수명은 camelCase" |
-| 프로젝트 맥락 | "Next.js 14 + Supabase 사용" |
+`packages/semo-dashboard/` — Next.js 14 기반 모니터링 UI.
+DB에서 직접 봇 상태·KB 조회. `https://semo.semi-colon.space`에 배포.
 
 ---
 
-## 5. 데이터 흐름
+## 데이터 흐름
 
-### 요청 처리 흐름
-
-```
-사용자 요청
-     │
-     ▼
-┌─────────────────┐
-│  Orchestrator   │  ← 의도 분석, 플랫폼 감지
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   Skill 선택    │  ← 라우팅 테이블 참조
-└────────┬────────┘
-         │
-    ┌────┴────┐
-    ▼         ▼
-┌───────┐ ┌───────┐
-│Layer 1│ │Layer 2│  ← 필요 시 Extension 호출
-└───┬───┘ └───┬───┘
-    │         │
-    ▼         ▼
-┌─────────────────┐
-│   Reference     │  ← 참조 문서 로드
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   MCP Server    │  ← 외부 연동 (선택)
-└────────┬────────┘
-         │
-         ▼
-    결과 출력
-```
-
-### SEMO 메시지 예시
+### SessionStart 훅 (자동)
 
 ```
-[SEMO] Orchestrator: 의도 분석 완료 → 코드 구현 요청
+Claude Code 세션 시작
+    → semo context sync
+        → DB에서 KB domains 읽기 → .claude/memory/*.md 생성
+        → DB에서 bot_status 읽기 → .claude/memory/bots.md 생성
+        → DB에서 ontology 읽기 → .claude/memory/ontology.md 생성
+    → 세션에 최신 컨텍스트 로드됨
+```
 
-[SEMO] Skill: implement 호출 (platform: nextjs)
+### Stop 훅 (자동)
 
-[SEMO] Reference: ddd-patterns 참조
+```
+Claude Code 세션 종료
+    → semo context push
+        → .claude/memory/decisions.md 파싱 (H2 섹션별)
+        → semo.knowledge_base에 upsert (domain='decision')
+    → 세션 중 작성한 결정사항이 팀 KB에 반영됨
+```
 
-## 구현 결과
+### bot-status 동기화 (수동/크론)
 
-...
+```
+semo bots sync [--semo-system <path>]
+    → bot-workspaces/ 스캔
+    → 각 봇의 IDENTITY.md 파싱 (name/emoji/role)
+    → 파일 mtime으로 last_active 계산
+    → semo.bot_status 테이블 upsert
 ```
 
 ---
 
-## 6. 확장 포인트
+## DB 접속 구성
 
-### 새 Skill 추가
-
-```
-semo-skills/coder/my-skill/
-├── SKILL.md           # 필수: 스킬 정의
-├── references/        # 선택: 참조 문서
-└── platforms/         # 선택: 플랫폼별 분기
-```
-
-**SKILL.md 구조**:
-```markdown
----
-name: my-skill
-description: |
-  스킬 설명. Use when (1) 상황1, (2) 상황2.
-tools: [Read, Write, Edit, Bash]
-model: inherit
----
-
-# My Skill
-
-## Purpose
-...
-
-## Workflow
-...
-```
-
-### 새 Extension 추가
-
-1. `packages/{extension}/` 디렉토리 생성
-2. `CLAUDE.md` 작성
-3. `agents/`, `skills/` 구성
-4. CLI에 등록
-
-### MCP 도구 추가
-
-`semo-mcp` 서버에 새 도구 정의:
-
-```typescript
-// src/tools/my-tool.ts
-export const myTool = {
-  name: 'my_tool',
-  description: '도구 설명',
-  inputSchema: { ... },
-  handler: async (params) => { ... }
-};
-```
+| 실행 환경 | 접속 방식 | DATABASE_URL |
+|-----------|----------|--------------|
+| 로컬 (SSH 터널) | `ssh -L 15432:10.0.0.91:5432 -J opc@152.70.244.169 opc@10.0.0.91` | `postgres://app:...@localhost:15432/appdb` |
+| OKE Pod | 내부 DNS | `postgres://app:...@central-db.semi-dev.internal:5432/appdb` |
+| OpenClaw 봇 | VPN 경유 | 동일 |
 
 ---
 
-## 7. 보안 고려사항
+## 아카이빙된 구버전 컴포넌트
 
-### 민감 정보 처리
-
-| 정보 | 저장 위치 | 접근 방식 |
-|------|----------|----------|
-| API 키 | 환경변수 | `${VAR_NAME}` |
-| 토큰 | `.env` (gitignore) | MCP 서버에서 주입 |
-| 비밀번호 | Doppler | 런타임 로드 |
-
-### .gitignore 권장
-
-```gitignore
-# SEMO
-.claude/settings.local.json
-.claude/memory/cache/
-.env
-.env.local
-```
-
----
-
-## 8. 성능 최적화
-
-### 컨텍스트 크기 관리
-
-- Reference 파일은 필요한 부분만 로드
-- 대용량 파일은 summary 형태로 캐싱
-- 오래된 로그는 주기적 정리
-
-### MCP 연결
-
-- 연결 풀링 사용
-- 타임아웃 설정
-- 재시도 로직 (지수 백오프)
-
----
-
-## 9. 참조 문서
-
-| 문서 | 위치 | 설명 |
-|------|------|------|
-| PRINCIPLES.md | semo-core/principles/ | 핵심 원칙 |
-| MESSAGE_RULES.md | semo-core/principles/ | 메시지 규칙 |
-| microservice-conventions.md | packages/core/_shared/ | MS 규약 |
-| team-context.md | packages/core/_shared/ | 팀 컨텍스트 |
-
----
-
-## 10. 향후 로드맵
-
-| 단계 | 내용 | 상태 |
-|------|------|------|
-| v2.0 | 기능 기반 구조 전환 | 완료 |
-| v2.1 | Context Mesh DB 연동 | 검토 중 |
-| v2.2 | 벡터 검색 기반 Reference | 계획 |
-| v3.0 | Multi-Agent 협업 | 계획 |
-
----
-
-*이 문서는 SEMO v2.0.1 기준으로 작성되었습니다.*
+| 컴포넌트 | 위치 | 이유 |
+|----------|------|------|
+| semo-remote | `semo-system/_archived/semo-remote/` | OpenClaw로 대체 |
+| semo-hooks | `semo-system/_archived/semo-hooks/` | 내장 훅으로 대체 |
+| semo-integrations MCP | `packages/_archived/mcp-server/` | CLI 전용으로 전환 |
+| biz/eng/ops 확장 패키지 | CLI에서 완전 제거 | 미사용, AI 혼란 유발 |
+| semo-agents (페르소나) | `semo-system/_archived/semo-agents/` | meta/agents/로 통합 |

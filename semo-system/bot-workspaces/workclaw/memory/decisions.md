@@ -1,94 +1,85 @@
-# decisions.md — 의사결정/원칙/교육 내용
+# decision
 
-## GitHub 운영 규칙 → `github-rules.md` 참조 (2026-02-18, 통합 2026-02-19)
-
-이슈 체크리스트, OAT, 라벨 체인, 변경 통제, 봇 서명, 서브에이전트 머지 금지 등 모든 GitHub 관련 규칙은 `memory/github-rules.md`로 통합.
-
-## 🚨 Slack 메시지 원칙: 최종 결과만 전송 (2026-02-18, 재교육 2026-02-19, 2026-02-23 강화)
-
-**⚠️ 3회 위반 후 재교육됨. 4회 위반 시 Reus 직접 에스컬레이션.**
-
-### Slack에 보내는 것 (O)
-- PR 생성/완료 보고, 리뷰 요청 멘션, 질문/확인 요청, 최종 결과 요약
-- **예외: 블로커 발생 시에만 즉시 보고**
-
-### Slack에 절대 보내지 않는 것 (X)
-- 예고성 메시지 ("확인할게", "볼게요")
-- **중간 과정 로그** ("1. logger.ts 수정", "2. sessionManager.ts 수정" 등)
-- 내부 전략 공유, 의도 선언
-- 도구 호출 사이의 진행 상황 업데이트
-
-### 원칙 (2026-02-23 강화)
-- **한 거 보고해. 할 거 예고하지 마.**
-- **작업 완료 후 최종 결과 한 번에 전송**
-- 예: "core-backend #123 구현 완료 → PR #456 생성" (O)
-- 예: "1단계 완료, 2단계 진행 중..." (X)
-- 도구 호출 사이에 Slack reply 금지 — 완료 후 결과만 전송
-- 텍스트 응답 = Slack 전송임을 항상 인지
-
-## Lighthouse/SEO R&R (2026-02-17)
-
-- GrowthClaw 리드, WorkClaw는 코드 구현만 담당
-
-## 봇 간 인계 방식 전면 변경 (2026-02-20, Reus 승인)
-
-- ✅ 봇 간 Slack 멘션 허용 (2026-03-07 Reus 지시로 변경). GitHub 라벨+폴링도 병행
-- 상세 규칙: `memory/github-rules.md` 참조
-- WorkClaw 폴링: `bot:spec-ready` 감지(5분) + `review:changes_requested` 감지(5분)
-
-## 앱스토어 배포 관리 R&R (2026-02-17)
-
-- iOS/Android 앱스토어 배포 관리 담당 (PS 프로젝트부터)
-- Reus 승인 완료, SemiClaw 인계
-
-## 교육/지시 수용 프로토콜 (2026-02-17)
-
-- 새 규칙 → 즉시 memory/ 파일에 기록
-- MEMORY.md는 슬림 인덱스 유지
-- 다른 봇 해당 시 #bot-ops 전파
-
-## 봇 간 정보 공유 프로토콜 (2026-02-18)
-
-- 해당 스레드에서 `[bot:info-req]` @대상봇 {프로젝트명} — {질문} 형식
-- 봇별 도메인: SemiClaw(현황/일정), PlanClaw(기획/스펙), WorkClaw(코드/빌드), ReviewClaw(품질/테스트), DesignClaw(UI/UX), GrowthClaw(SEO), InfraClaw(배포/CI)
-
-## 메모리 구조 개편 (2026-02-17)
-
-- MEMORY.md는 슬림 인덱스 (50줄 이내)
-- 상세는 memory/ 주제별 파일로 분리
-
-## 2026-02-19: 프로젝트 정보 모를 때 처리 규칙 (SemiClaw 전파)
-
-- 프로젝트 관련 정보를 모르거나 컨텍스트 부족 시: **먼저 해당 스레드에서 SemiClaw에게 질문**
-- 포맷: `[bot:info-req] @SemiClaw {프로젝트명} — {질문}`
-- SemiClaw가 답변하거나 적절한 봇으로 라우팅
-- SemiClaw도 모르면 Reus에게 에스컬레이션
-- **절대 추측해서 답변하지 않는다**
-- 각 봇별 정보 도메인: SemiClaw(PM/현황/일정), PlanClaw(기획/스펙), WorkClaw(코드/기술스택), ReviewClaw(품질/E2E), DesignClaw(UI/UX), GrowthClaw(SEO/마케팅), InfraClaw(배포/인프라)
-
-## 크론 잡/설정 변경 지시 처리 (2026-03-14, Reus 지시, SemiClaw 전파)
-
-- Reus가 크론 잡 수정을 지시하면 → **실제 cron tool로 크론 잡 설정을 변경**해야 함
-- ❌ `decisions.md`, `memory.md` 등 메모리 파일만 수정하고 끝내면 안 됨
-- 채널 ID/프로젝트 매핑 등 정보를 모르면 → **SemiClaw에게 질문**
-- **요약**: 설정 변경 지시 = 실제 설정 변경. 메모리 기록 ≠ 설정 변경
+> 자동 생성: semo context sync (2026-03-15T09:35:04.977Z)
 
 
-## 이슈 정보 공유 시 링크 필수 (2026-03-04, Reus 지시)
-- 사용자에게 이슈 정보를 전달할 때 **GitHub 이슈 링크 반드시 포함**
-- 이슈 번호만 언급하지 말고 클릭 가능한 링크까지 제공
+## bot-infra-polling
+
+InfraClaw bot:infra 라벨 폴링 추가. 10분 간격. 쿼리: label:bot:infra -label:bot:in-progress -label:bot:blocked. 다른 봇 폴링과 동일 패턴. (2026-03-08)
 
 
-## 채널 답변은 스레드로 (2026-02-18, Reus 지시)
-- 채널에서 메시지에 답변할 때 **기본적으로 스레드(reply)로** 달 것
-- 늦게 응답해도 원본 메시지에 붙어있어 맥락 유지됨
+## bot-no-promise
+
+모든 봇: '하겠습니다' 패턴 금지. Tool call 없는 약속 금지. 한 거 보고해, 할 거 예고하지 마 (2026-02-24).
 
 
-## 라벨 전환 시 이전 라벨 제거 필수 (2026-03-06, Reus 지시)
-- bot:done 부착 시 bot:in-progress 반드시 제거
-- 라벨 전환 시 이전 단계 라벨 항상 제거
+## design-workflow
+
+디자인 산출물은 반드시 HTML 프로토타입+인터랙티브 프리뷰 먼저. Reus 승인 후에만 구현 이슈 생성. 마크다운만 작성 후 바로 이슈 생성 금지 (2026-03-01).
 
 
-## 정보 보안 원칙
-- **계약/금액 정보**: 업무 채널에서 절대 언급 금지. 리더 DM 또는 C020RQTNPFY(개발 사업팀) 채널에서만
-- 대외비 프로젝트: cm-land, cm-office
+## github-workflow
+
+봇 간 인계는 GitHub 이슈 라벨+폴링 방식만 사용. Slack 직접 멘션 인계 전면 금지 (2026-02-20).
+
+
+## gitops-only
+
+InfraClaw 인프라 작업은 GitOps Only. semi-colon-ops(K8S)/core-terraform(VM)/actions-template(CI/CD)/semi-colon-apps(앱배포) PR 필수. OCI/k8s 명령어는 모니터링만. 유일한 직접작업=OCI Vault 등록. (2026-03-08 Garden 지시)
+
+
+## infra-change-control
+
+인프라 변경은 Garden 승인 필수. 모니터링/진단은 자유, 변경(코드/배포/시크릿)은 승인 후. 공용 레포 단독 수정 금지 (2026-02-18).
+
+
+## infra-pr-review-flow
+
+InfraClaw PR 플로우: InfraClaw→PR생성→ReviewClaw리뷰→Garden승인요청→Merge. (2026-03-08 Garden 지시)
+
+
+## issue-rr
+
+이슈 등록: 버그/단순수정→SemiClaw 등록→WorkClaw 인계. 기획 필요→PlanClaw 기획→이슈 생성→WorkClaw. 한 기능에 한 이슈, 중복 금지.
+
+
+## kb-usage-logging
+
+KB 사용 로깅+신뢰평가 시스템. semo.kb_usage_log 테이블에 봇별 호출 이력 자동 기록 (bot_id, used_by, query, channel, trust_level). 신뢰평가 4단계: high(85%+)/medium(70-84%)/low(50-69%)/unreliable(50% 미만). 매일 09:00 KST #bot-ops 리포트 크론. 환경변수: KB_BOT_ID, KB_CHANNEL, KB_REQUESTED_BY. (2026-03-08 Garden 요청)
+
+
+## memory-arch-improvement
+
+메모리 아키텍처 4대 개선 (2026-03-08, Garden 제안 / Reus 승인): 1) 동기 승격 - Vector→Hot 즉시 승격, 크론은 누락 체크 보조용. 2) UUID 기반 중복 방지 - HTML 코멘트 형식으로 UUID 포함, [Project:][Topic:] 태그 필수. 3) Deep Search - --deep 플래그로 아카이브 포함 검색. 4) Hot 메모리 태깅 - 프로젝트/토픽 분류 필수. 적용: 전 봇 AGENTS.md, kb-cli.js, 크론. DB에 uuid 컬럼 추가.
+
+
+## oci-deploy
+
+2026-03-02: 신규 프로젝트는 Vercel 대신 OCI 환경 기반 배포로 전환.
+
+_metadata: {"scope":"infra","decided_at":"2026-03-02","decided_by":"reus"}_
+
+
+## planclaw-scope-distribution
+
+PlanClaw 스코프 분배 기준: 변경 대상 레포로 판단. projects/*→bot:spec-ready(WorkClaw), semi-colon-ops/core-terraform/actions-template/semi-colon-apps→bot:infra(InfraClaw), 양쪽→둘다 병렬. (2026-03-08)
+
+
+## reviewclaw-merge
+
+ReviewClaw는 직접 머지하지 않음. Approve 후 담당자에게 머지 승인 요청. 담당자 모르면 SemiClaw에게 확인 (2026-03-04).
+
+
+## security-contract
+
+계약/금액 정보는 업무 채널에서 절대 언급 금지. 리더 DM 또는 개발사업팀 채널에서만.
+
+
+## slack-output-rule
+
+최종 결과만 Slack에 보고. 중간 과정/예고성 메시지 금지. 1작업=1메시지. 위반 시 에스컬레이션 (2026-02-19).
+
+
+## thread-reply
+
+채널에서 메시지 답변 시 기본적으로 스레드(reply)로 달 것 (2026-02-18).
