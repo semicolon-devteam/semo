@@ -243,23 +243,28 @@ await exec(`semo sessions push --bot-id ${BOT_ID} --event stop`, { input: stdinD
 ## 구현 순서 (의존성 기준)
 
 ```
-1. P0-2  context push 도메인 가드       (30분, 즉시, 의존 없음)
-2. P0-1  bots sync status 보존          (1시간, 의존 없음)
-3. P2-1  spawnSync 제거                 (1시간, 의존 없음)
-4. P2-2  IDENTITY.md 파서 개선          (1시간, 의존 없음)
-5. P1-4  봇 훅 sessions push 추가       (2시간, 의존 없음, ×7 파일)
-6. P2-3  임베딩 배치 API 호출           (2시간, 의존 없음)
-7. P1-1  마이그레이션 시스템            (1일, 이후 DB 변경의 전제)
-8. P1-2  인덱스 추가                    (2시간, P1-1 의존)
-9. P1-3  FK 추가                        (1시간, P1-1 의존)
-10. P0-3 session_count 트리거           (4시간, P1-1 의존)
-11. P1-5 KB 변경 이력                   (4시간, P1-1 의존)
-12. P2-4 메모리 hot/cold               (1일, 의존 없음)
-13. P3-1 임베딩 backfill               (2일, P1-1 의존)
-14. P3-2 온톨로지 검증 확장            (2일, 온톨로지 완성 후)
-15. P3-3 컨텍스트 통계                 (1일, P2-4 후 효과 극대화)
-16. P4-1 패키지별 README.md 작성       (2시간, 의존 없음)
+1. ✅ P0-2  context push 도메인 가드       — 2026-03-17 완료 (83fcad4c)
+2. ✅ P0-1  bots sync status 보존          — 2026-03-17 완료 (83fcad4c)
+3. ✅ P2-1  spawnSync 제거                 — 2026-03-17 완료 (83fcad4c)
+4. ✅ P2-2  IDENTITY.md 파서 개선          — 2026-03-17 완료 (83fcad4c)
+5. ✅ P1-4  봇 훅 sessions push 추가       — 2026-03-17 완료 (83fcad4c, ×7 파일)
+6. ✅ P2-3  임베딩 배치 API 호출           — 2026-03-17 완료 (83fcad4c)
+7. ⬜ P1-1  마이그레이션 시스템            (1일, 이후 DB 변경의 전제)
+8. ⬜ P1-2  인덱스 추가                    (2시간, P1-1 의존)
+9. ⬜ P1-3  FK 추가                        (1시간, P1-1 의존)
+10. ⬜ P0-3 session_count 트리거           (4시간, P1-1 의존)
+11. ⬜ P1-5 KB 변경 이력                   (4시간, P1-1 의존)
+12. ⬜ P2-4 메모리 hot/cold               (1일, 의존 없음)
+13. ⬜ P3-1 임베딩 backfill               (2일, P1-1 의존)
+14. ⬜ P3-2 온톨로지 검증 확장            (2일, 온톨로지 완성 후)
+15. ⬜ P3-3 컨텍스트 통계                 (1일, P2-4 후 효과 극대화)
+16. ⬜ P4-1 패키지별 README.md 작성       (2시간, 의존 없음)
 ```
+
+### 추가 작업 (플랜 외)
+
+- ✅ `sessions.ts` 소스 파일 복원 (dist에만 존재하던 것 → src 복원)
+- ✅ `index.ts`에 `registerSessionsCommands` import 및 호출 추가
 
 ---
 
