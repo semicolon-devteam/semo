@@ -26,38 +26,28 @@ SEMO는 세미콜론 팀의 **OpenClaw AI 봇팀 운영 대시보드**다.
 ```
 semo/
 ├── packages/
-│   └── semo-dashboard/          # Next.js 14 대시보드 (semo.semi-colon.space)
-│       ├── app/
-│       │   ├── dashboard/       # 메인 대시보드 (현재: semo-office UI — 교체 필요)
-│       │   ├── bots/            # 봇 목록 (API 연결 구현 중)
-│       │   ├── kb/              # KB 뷰어 (구현 중)
-│       │   └── api/             # Next.js API routes (bots, kb)
-│       └── lib/
-│           ├── db.ts            # PostgreSQL 클라이언트
-│           └── github.ts        # GitHub API (bot-workspaces 파일 조회)
+│   ├── semo-dashboard/          # Next.js 14 대시보드 (semo.semi-colon.space)
+│   │   ├── app/
+│   │   │   ├── dashboard/       # 메인 대시보드 (현재: semo-office UI — 교체 필요)
+│   │   │   ├── bots/            # 봇 목록 (API 연결 구현 중)
+│   │   │   ├── kb/              # KB 뷰어 (구현 중)
+│   │   │   └── api/             # Next.js API routes (bots, kb)
+│   │   └── lib/
+│   │       ├── db.ts            # PostgreSQL 클라이언트
+│   │       └── github.ts        # GitHub API (bot-workspaces 파일 조회)
+│   └── cli/                     # semo CLI v4 (@team-semicolon/semo-cli)
 ├── semo-system/
 │   ├── bot-workspaces/          # 각 봇의 Identity/Soul/Memory 파일
-│   │   ├── workclaw/
-│   │   ├── reviewclaw/
-│   │   ├── planclaw/
-│   │   ├── infraclaw/
-│   │   ├── semiclaw/
-│   │   ├── designclaw/
-│   │   └── growthclaw/
 │   ├── semo-core/               # SEMO 프레임워크 원칙·오케스트레이터
 │   ├── semo-skills/             # SEMO 스킬 (active: 30개)
-│   ├── semo-office/             # 가상 오피스 시스템 (잔재, 미사용)
 │   ├── semo-scripts/            # 공용 스크립트 모음
 │   ├── meta/                    # SEMO 메타 관리 (orchestrator)
+│   ├── sync-agent/              # 동기화 유틸리티
 │   └── _archived/               # ⛔ 폐기된 패키지
-│       ├── semo-remote/         # OpenClaw로 대체
-│       ├── semo-hooks/
-│       ├── semo-agents/         # v5 실험 종료
-│       └── semo-integrations/   # MCP 제거됨
-├── packages/
-│   └── cli/                     # semo CLI v4 (@team-semicolon/semo-cli)
-├── specs/                       # semo-office 기술 스펙
-├── docs/                        # 아키텍처 문서
+├── docs/
+│   ├── (활성 문서)              # ARCHITECTURE, QUICKSTART, TESTING 등
+│   ├── semo-dashboard/          # 대시보드 스펙
+│   └── _archived/               # 레거시 문서·스펙·코드·블로그
 └── infra/                       # promptfoo, RAG, litellm 등
 ```
 
@@ -140,9 +130,7 @@ npm run build      # 빌드 검증
 │   ├── ontology.md    # 온톨로지 KB
 │   ├── process.md     # 프로세스 KB
 │   └── rules/project-specific.md  # semo 전용 규칙
-├── agents/            # → semo-system/meta/agents (심볼릭 링크)
-├── skills/            # → semo-system/semo-skills (심볼릭 링크)
-└── commands/SEMO      # → semo-system/semo-core/commands/SEMO
+└── rules/project-specific.md  # semo 전용 규칙
 ```
 
 ### MCP 서버 (현행)
