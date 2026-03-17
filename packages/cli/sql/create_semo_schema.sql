@@ -1,14 +1,28 @@
 -- =============================================================================
--- SEMO Schema 생성 스크립트
+-- [DEPRECATED] SEMO Schema 생성 스크립트
 --
+-- !! 이 스크립트는 더 이상 실행하지 않습니다 !!
+--
+-- 2026-03-17 스키마 통합으로 인해:
+--   - semo.skills  → VIEW (skill_definitions 참조)
+--   - semo.agents  → VIEW (agent_definitions 참조)
+--   - semo.commands → VIEW (command_definitions 참조)
+--
+-- SoT는 이제 Supabase 스키마의 *_definitions 테이블입니다.
+-- 마이그레이션: supabase/migrations/20260317_unify_skill_schema.sql
+--
+-- 아래는 참조용으로 남겨둡니다.
+-- =============================================================================
+--
+-- [원래 설명]
 -- 실행 대상: 팀 코어 PostgreSQL (3.38.162.21 / appdb)
 -- 스키마: semo
 --
--- 테이블:
---   - semo.skills: 스킬 정의 및 SKILL.md 내용
---   - semo.commands: 커맨드 정의 및 .md 내용
---   - semo.agents: 에이전트 정의 및 agent.md 내용
---   - semo.packages: 패키지 정의
+-- 테이블 (현재 뷰):
+--   - semo.skills: skill_definitions 참조 뷰
+--   - semo.commands: command_definitions 참조 뷰
+--   - semo.agents: agent_definitions 참조 뷰
+--   - semo.packages: 패키지 정의 (변경 없음)
 -- =============================================================================
 
 -- 스키마 생성
