@@ -14,6 +14,7 @@ import ora from "ora";
 import * as fs from "fs";
 import * as path from "path";
 import { getPool, closeConnection, isDbConnected } from "../database";
+import { syncBotSessions } from "./sessions";
 
 // ============================================================
 // Types (matches actual DB schema)
@@ -52,14 +53,19 @@ interface BotIdentity {
 }
 
 function parseIdentityMd(content: string): BotIdentity {
-  const nameMatch = content.match(/\*\*Name:\*\*\s*(.+)/);
-  const emojiMatch = content.match(/\*\*Emoji:\*\*\s*(\S+)/);
-  const roleMatch = content.match(/\*\*(?:Creature|Role|직책):\*\*\s*(.+)/);
+  // P2-2: 대소문자 무시, **Key:**/Key: 양쪽 지원, 100자 초과 시 잘못된 파싱으로 간주
+  const nameMatch = content.match(/(?:\*\*)?Name:(?:\*\*)?\s*(.+)/i);
+  const emojiMatch = content.match(/(?:\*\*)?Emoji:(?:\*\*)?\s*(\S+)/i);
+  const roleMatch = content.match(/(?:\*\*)?(?:Creature|Role|직책):(?:\*\*)?\s*(.+)/i);
+
+  const name = nameMatch ? nameMatch[1].trim() : null;
+  const emoji = emojiMatch ? emojiMatch[1].trim() : null;
+  const role = roleMatch ? roleMatch[1].trim() : null;
 
   return {
-    name: nameMatch ? nameMatch[1].trim() : null,
-    emoji: emojiMatch ? emojiMatch[1].trim() : null,
-    role: roleMatch ? roleMatch[1].trim() : null,
+    name: name && name.length <= 100 ? name : null,
+    emoji: emoji && emoji.length <= 10 ? emoji : null,
+    role: role && role.length <= 100 ? role : null,
   };
 }
 
@@ -351,6 +357,7 @@ export function registerBotsCommands(program: Command): void {
                  name           = COALESCE(EXCLUDED.name, semo.bot_status.name),
                  emoji          = COALESCE(EXCLUDED.emoji, semo.bot_status.emoji),
                  role           = COALESCE(EXCLUDED.role, semo.bot_status.role),
+                 status         = semo.bot_status.status,
                  last_active    = CASE
                    WHEN EXCLUDED.last_active IS NOT NULL
                      AND (semo.bot_status.last_active IS NULL
@@ -379,6 +386,20 @@ export function registerBotsCommands(program: Command): void {
         spinner.succeed(`bots sync 완료: ${upserted}개 봇 업서트`);
         if (errors.length > 0) {
           errors.forEach(e => console.log(chalk.red(`  ❌ ${e}`)));
+        }
+
+        // P2-1: sessions sync 연동 — spawnSync 대신 같은 프로세스에서 직접 호출
+        try {
+          const botIds = bots.map(b => b.botId);
+          console.log(chalk.gray("  → sessions sync 실행 중..."));
+          const sessionsClient = await pool.connect();
+          const { total } = await syncBotSessions(botIds, sessionsClient);
+          sessionsClient.release();
+          if (total > 0) {
+            console.log(chalk.green(`  → sessions sync 완료: ${total}건 upsert`));
+          }
+        } catch {
+          console.log(chalk.yellow("  ⚠ sessions sync 실패 (무시)"));
         }
       } catch (err) {
         await client.query("ROLLBACK");

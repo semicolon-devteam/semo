@@ -19,6 +19,7 @@ import { execSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { parseEnvContent } from "./env-parser";
 import {
   getActiveSkills,
   getActiveSkillNames,
@@ -37,6 +38,7 @@ import {
 import { registerContextCommands } from "./commands/context";
 import { registerBotsCommands } from "./commands/bots";
 import { registerGetCommands } from "./commands/get";
+import { registerSessionsCommands } from "./commands/sessions";
 
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 
@@ -1575,98 +1577,153 @@ const BASE_MCP_SERVERS: MCPServerConfig[] = [
 
 // === ~/.semo.env 설정 (자동 감지 → Gist → 프롬프트) ===
 
-function writeSemoEnvFile(dbUrl: string, slackWebhook: string = ""): void {
-  const envFile = path.join(os.homedir(), ".semo.env");
-  const content = `# SEMO 환경변수 — 모든 컨텍스트에서 자동 로드됨
-# (Claude Code 앱, OpenClaw LaunchAgent, cron 등 비인터랙티브 환경 포함)
-
-DATABASE_URL='${dbUrl}'
-
-# Slack 알림 Webhook (선택 — bot-ops 채널 dead-letter 감지용)
-SLACK_WEBHOOK='${slackWebhook}'
-`;
-  fs.writeFileSync(envFile, content, { mode: 0o600 });
+interface CredentialDef {
+  key: string;
+  required: boolean;
+  sensitive: boolean;
+  description: string;
+  promptMessage: string;
 }
 
-function readSemoEnvDbUrl(): string | null {
+const SEMO_CREDENTIALS: CredentialDef[] = [
+  {
+    key: "DATABASE_URL",
+    required: true,
+    sensitive: true,
+    description: "팀 코어 PostgreSQL 연결 URL",
+    promptMessage: "DATABASE_URL:",
+  },
+  {
+    key: "OPENAI_API_KEY",
+    required: false,
+    sensitive: true,
+    description: "OpenAI API 키 (KB 임베딩용)",
+    promptMessage: "OPENAI_API_KEY (없으면 Enter):",
+  },
+  {
+    key: "SLACK_WEBHOOK",
+    required: false,
+    sensitive: false,
+    description: "Slack 알림 Webhook (선택)",
+    promptMessage: "SLACK_WEBHOOK (없으면 Enter):",
+  },
+];
+
+function writeSemoEnvFile(creds: Record<string, string>): void {
   const envFile = path.join(os.homedir(), ".semo.env");
-  if (!fs.existsSync(envFile)) return null;
-  const content = fs.readFileSync(envFile, "utf-8");
-  const match = content.match(/^DATABASE_URL='([^']+)'/m) || content.match(/^DATABASE_URL="([^"]+)"/m);
-  return match ? match[1] : null;
+  const lines = [
+    "# SEMO 환경변수 — 모든 컨텍스트에서 자동 로드됨",
+    "# (Claude Code 앱, OpenClaw LaunchAgent, cron 등)",
+    "",
+  ];
+  // 레지스트리 키 먼저 (순서 보장)
+  for (const def of SEMO_CREDENTIALS) {
+    const val = creds[def.key] || "";
+    lines.push(`# ${def.description}`);
+    lines.push(`${def.key}='${val}'`);
+    lines.push("");
+  }
+  // 레지스트리 외 추가 키
+  for (const [k, v] of Object.entries(creds)) {
+    if (!SEMO_CREDENTIALS.some((d) => d.key === k)) {
+      lines.push(`${k}='${v}'`);
+    }
+  }
+  lines.push("");
+  fs.writeFileSync(envFile, lines.join("\n"), { mode: 0o600 });
 }
 
-function fetchDbUrlFromGist(gistId: string): string | null {
+function readSemoEnvCreds(): Record<string, string> {
+  const envFile = path.join(os.homedir(), ".semo.env");
+  if (!fs.existsSync(envFile)) return {};
+  try {
+    return parseEnvContent(fs.readFileSync(envFile, "utf-8"));
+  } catch {
+    return {};
+  }
+}
+
+function fetchCredsFromGist(
+  gistId: string,
+): Record<string, string> | null {
   try {
     const raw = execSync(`gh gist view ${gistId} --raw`, {
       encoding: "utf-8",
       stdio: ["pipe", "pipe", "pipe"],
       timeout: 8000,
     });
-    // Gist 파일 형식: DATABASE_URL=<url> 또는 단순 URL
-    const match = raw.match(/DATABASE_URL=['"]?([^'"\s]+)['"]?/) || raw.match(/^(postgres(?:ql)?:\/\/[^\s]+)/m);
-    return match ? match[1].trim() : null;
+    const creds = parseEnvContent(raw);
+    return Object.keys(creds).length > 0 ? creds : null;
   } catch {
     return null;
   }
 }
 
-async function setupSemoEnv(credentialsGist?: string): Promise<void> {
-  const envFile = path.join(os.homedir(), ".semo.env");
+async function setupSemoEnv(
+  credentialsGist?: string,
+  force?: boolean,
+): Promise<void> {
+  console.log(chalk.cyan("\n🔑 환경변수 설정"));
 
-  console.log(chalk.cyan("\n🔑 DB 접속 설정"));
+  // 1. 기존 파일
+  const existing = force ? {} : readSemoEnvCreds();
 
-  // 1. 이미 env var로 설정됨
-  if (process.env.DATABASE_URL) {
-    console.log(chalk.green("  ✅ DATABASE_URL (환경변수)"));
-    if (!readSemoEnvDbUrl()) {
-      writeSemoEnvFile(process.env.DATABASE_URL);
-      console.log(chalk.gray(`  → ~/.semo.env 에 저장됨 (비인터랙티브 환경용)`));
-    }
-    return;
-  }
-
-  // 2. ~/.semo.env 에 이미 있음
-  const existing = readSemoEnvDbUrl();
-  if (existing) {
-    console.log(chalk.green("  ✅ DATABASE_URL (~/.semo.env)"));
-    return;
-  }
-
-  // 3. Private GitHub Gist 자동 fetch
+  // 2. Gist
   const gistId = credentialsGist || process.env.SEMO_CREDENTIALS_GIST;
+  let gistCreds: Record<string, string> = {};
   if (gistId) {
-    console.log(chalk.gray("  GitHub Gist에서 팀 접속정보 가져오는 중..."));
-    const url = fetchDbUrlFromGist(gistId);
-    if (url) {
-      writeSemoEnvFile(url);
-      console.log(chalk.green(`  ✅ Gist (${gistId.slice(0, 8)}...)에서 DATABASE_URL 설정됨`));
-      return;
-    }
-    console.log(chalk.yellow("  ⚠️  Gist fetch 실패 — 수동 입력으로 전환"));
+    console.log(
+      chalk.gray("  GitHub Gist에서 팀 접속정보 가져오는 중..."),
+    );
+    gistCreds = fetchCredsFromGist(gistId) || {};
   }
 
-  // 4. 인터랙티브 프롬프트
-  console.log(chalk.gray("  팀 Core DB URL을 붙여넣으세요 (나중에 ~/.semo.env에서 수정 가능)"));
-  const { dbUrl } = await inquirer.prompt<{ dbUrl: string }>([
-    {
-      type: "password",
-      name: "dbUrl",
-      message: "DATABASE_URL:",
-      mask: "*",
-    },
-  ]);
+  // 3. 머지: gist(base) ← file(override) ← env(override)
+  const merged: Record<string, string> = { ...gistCreds };
+  for (const [k, v] of Object.entries(existing)) {
+    if (v) merged[k] = v;
+  }
+  for (const def of SEMO_CREDENTIALS) {
+    if (process.env[def.key]) merged[def.key] = process.env[def.key]!;
+  }
 
-  if (dbUrl && dbUrl.trim()) {
-    writeSemoEnvFile(dbUrl.trim());
-    console.log(chalk.green("  ✅ ~/.semo.env 저장됨 (권한: 600)"));
-    console.log(chalk.gray(`  파일: ${envFile}`));
-  } else {
-    // 빈 템플릿 생성
-    if (!fs.existsSync(envFile)) {
-      writeSemoEnvFile("");
+  // 4. required인데 없는 키만 프롬프트
+  let hasNewKeys = false;
+  for (const def of SEMO_CREDENTIALS) {
+    if (merged[def.key]) {
+      const label = def.sensitive ? "(설정됨)" : merged[def.key];
+      console.log(chalk.green(`  ✅ ${def.key} ${label}`));
+    } else if (def.required) {
+      const { value } = await inquirer.prompt<{ value: string }>([
+        {
+          type: "password",
+          name: "value",
+          message: def.promptMessage,
+          mask: "*",
+        },
+      ]);
+      if (value?.trim()) {
+        merged[def.key] = value.trim();
+        hasNewKeys = true;
+      }
+    } else {
+      console.log(chalk.gray(`  ⏭  ${def.key} (없음 — 선택사항)`));
     }
-    console.log(chalk.yellow("  ⚠️  건너뜀 — ~/.semo.env에서 DATABASE_URL을 직접 입력하세요"));
+  }
+
+  // 5. 변경사항이 있거나 파일이 없으면 쓰기
+  const envFile = path.join(os.homedir(), ".semo.env");
+  const needsWrite =
+    force ||
+    hasNewKeys ||
+    !fs.existsSync(envFile) ||
+    Object.keys(gistCreds).some((k) => !existing[k]);
+
+  if (needsWrite) {
+    writeSemoEnvFile(merged);
+    console.log(chalk.green("  ✅ ~/.semo.env 저장됨 (권한: 600)"));
+  } else {
+    console.log(chalk.gray("  ~/.semo.env 변경 없음"));
   }
 }
 
@@ -2654,21 +2711,24 @@ program
 const configCmd = program.command("config").description("SEMO 설정 관리");
 
 configCmd
-  .command("db")
-  .description("팀 Core DB 접속정보 설정 (DATABASE_URL → ~/.semo.env)")
+  .command("env")
+  .description("SEMO 환경변수 설정 (DATABASE_URL, OPENAI_API_KEY 등)")
   .option("--credentials-gist <gistId>", "Private GitHub Gist에서 자동 가져오기")
+  .option("--force", "기존 값도 Gist에서 덮어쓰기")
   .action(async (options) => {
-    console.log(chalk.cyan.bold("\n🔑 DB 접속정보 설정\n"));
+    console.log(chalk.cyan.bold("\n🔑 SEMO 환경변수 설정\n"));
 
-    // 기존 값 확인
-    const existing = readSemoEnvDbUrl();
-    if (existing) {
+    const existing = readSemoEnvCreds();
+    const hasExisting = Object.keys(existing).length > 0;
+
+    if (hasExisting && !options.force) {
+      const keys = Object.keys(existing).join(", ");
       const { overwrite } = await inquirer.prompt<{ overwrite: boolean }>([
         {
           type: "confirm",
           name: "overwrite",
-          message: `기존 DATABASE_URL이 있습니다. 덮어쓰시겠습니까?`,
-          default: false,
+          message: `기존 설정이 있습니다 (${keys}). Gist에서 없는 키를 보충하시겠습니까?`,
+          default: true,
         },
       ]);
       if (!overwrite) {
@@ -2677,35 +2737,8 @@ configCmd
       }
     }
 
-    // Gist 또는 프롬프트로 가져오기
-    const gistId = options.credentialsGist || process.env.SEMO_CREDENTIALS_GIST;
-    if (gistId) {
-      console.log(chalk.gray("GitHub Gist에서 접속정보 가져오는 중..."));
-      const url = fetchDbUrlFromGist(gistId);
-      if (url) {
-        writeSemoEnvFile(url);
-        console.log(chalk.green("✅ ~/.semo.env 업데이트 완료"));
-        return;
-      }
-      console.log(chalk.yellow("⚠️  Gist fetch 실패 — 수동 입력"));
-    }
-
-    const { dbUrl } = await inquirer.prompt<{ dbUrl: string }>([
-      {
-        type: "password",
-        name: "dbUrl",
-        message: "DATABASE_URL:",
-        mask: "*",
-      },
-    ]);
-
-    if (dbUrl && dbUrl.trim()) {
-      writeSemoEnvFile(dbUrl.trim());
-      console.log(chalk.green("✅ ~/.semo.env 저장됨 (권한: 600)"));
-      console.log(chalk.gray("  다음 Claude Code 세션부터 자동으로 적용됩니다."));
-    } else {
-      console.log(chalk.yellow("취소됨"));
-    }
+    await setupSemoEnv(options.credentialsGist, options.force);
+    console.log(chalk.gray("  다음 Claude Code 세션부터 자동으로 적용됩니다."));
   });
 
 // === doctor 명령어 (설치 상태 진단) ===
@@ -3329,6 +3362,7 @@ ontoCmd
 registerContextCommands(program);
 registerBotsCommands(program);
 registerGetCommands(program);
+registerSessionsCommands(program);
 
 // === semo skills — DB 시딩 ===
 

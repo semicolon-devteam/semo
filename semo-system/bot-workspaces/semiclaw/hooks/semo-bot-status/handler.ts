@@ -9,9 +9,19 @@ const handler = async (event: any) => {
   if (event.type !== "command") return;
 
   let status: string | null = null;
-  if (event.action === "new") status = "online";
-  else if (event.action === "stop") status = "offline";
-  else return;
+  let sessionEvent: string | null = null;
+
+  if (event.action === "new") {
+    status = "online";
+    sessionEvent = "start";
+  } else if (event.action === "stop") {
+    status = "offline";
+    sessionEvent = "stop";
+  } else {
+    return;
+  }
+
+  const stdinData = JSON.stringify(event);
 
   try {
     const { stdout } = await execAsync(
@@ -22,6 +32,16 @@ const handler = async (event: any) => {
   } catch (err: any) {
     // DB 연결 불가 시 조용히 실패 (SSH 터널 다운 등)
     console.error(`[semo-bot-status] Failed to set ${BOT_ID} status:`, err.message);
+  }
+
+  // P1-4: 세션 추적 — sessions push로 bot_sessions 테이블에 기록
+  try {
+    await execAsync(
+      `echo '${stdinData.replace(/'/g, "\\'")}' | semo sessions push --bot-id ${BOT_ID} --event ${sessionEvent}`,
+      { env: { ...process.env }, timeout: 10000 }
+    );
+  } catch {
+    // sessions push 실패는 무시 (훅 안전성 유지)
   }
 };
 

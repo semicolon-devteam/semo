@@ -272,10 +272,14 @@ export async function kbPush(
   try {
     await client.query("BEGIN");
 
-    for (const entry of entries) {
+    // P2-3: 배치 임베딩 — N개 항목을 1회 API 호출로 처리
+    const texts = entries.map(e => `${e.key}: ${e.content}`);
+    const embeddings = await generateEmbeddings(texts);
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
       try {
-        // Generate embedding for content
-        const embedding = await generateEmbedding(`${entry.key}: ${entry.content}`);
+        const embedding = embeddings[i];
         const embeddingStr = embedding ? `[${embedding.join(",")}]` : null;
 
         if (target === "shared") {

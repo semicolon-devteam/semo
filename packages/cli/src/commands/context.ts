@@ -253,6 +253,13 @@ export function registerContextCommands(program: Command): void {
     .option("--dry-run", "실제 push 없이 변경사항만 미리보기")
     .option("--out-dir <path>", "메모리 파일 경로 (기본: .claude/memory/). OpenClaw 봇 workspace 지원용")
     .action(async (options) => {
+      // P0-2: decision 도메인만 push 허용 (다른 도메인은 parseDecisionsMarkdown 파서와 포맷 불일치)
+      if (options.domain !== "decision") {
+        console.log(chalk.red(`\n❌ context push는 'decision' 도메인만 지원합니다. (입력: '${options.domain}')`));
+        console.log(chalk.gray("  다른 도메인의 KB는 'semo kb push'를 사용하세요."));
+        process.exit(1);
+      }
+
       const memDir = resolveMemoryDir(options.outDir);
 
       const filename = KB_DOMAIN_MAP[options.domain] || `${options.domain}.md`;
