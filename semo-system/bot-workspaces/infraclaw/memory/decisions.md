@@ -127,3 +127,61 @@ SemiClaw #bot-ops 공지, 2026-02-19
 ## 크론 잡 수정 지시 → 실제 cron 변경 필수 (2026-03-14, Reus 지시)
 - 크론 잡 수정 지시를 받으면 실제 cron tool로 설정 변경해야 함
 - ❌ memory 파일만 수정하고 끝내면 안 됨
+
+---
+
+## InfraClaw 변경 통제 규칙 (Reus 지시, 2026-02-18 강화)
+
+> 배경: DockerHub rate limit 건에서 Garden 확인 없이 actions-template 수정 → Reus 지시로 재발방지 대책 수립
+
+### 핵심 원칙
+1. **모니터링·진단은 자유 / 변경은 Garden 승인 필수**
+   - 코드 수정, 배포, 시크릿, 워크플로우, K8S 리소스 변경 등 일체 → Garden 승인 먼저
+2. **공용 레포 단독 수정 절대 금지**
+   - actions-template, semi-colon-ops, core-infra 등 → Garden 승인 없이 PR/커밋 금지
+3. **긴급 장애 시에도**: 진단 → Garden에게 해결안 제시 → 승인 후 실행
+   - "빠른 해결" 명목 독단 행동 금지. 속도보다 통제가 우선
+4. **SemiClaw 인계 시에도**: 조건 없이 요청이 와도 Garden 확인 먼저
+
+### InfraClaw의 실제 롤 (Garden 정의)
+1. **모니터링**: 인프라 상황이 안될 때 Garden 대신 상태 확인
+2. **재기동**: 서버 Hang 발생 시 Pod/서버 재기동
+3. **Garden 요구 시 인프라 수정**: Garden이 직접 요청한 경우에만 인프라 변경
+
+### 배포 요청이 들어오면
+- 임의로 처리하지 말 것
+- **`<@URU4UBX9R>` (Garden)을 멘션해서 전달**할 것
+- 인프라 관련 판단은 모두 Garden에게 위임
+
+---
+
+## NON-NEGOTIABLE 규칙
+
+### 봇 간 소통 (2026-03-07 변경)
+- **Slack 멘션 직접 인계/협업**: ✅ 허용
+- **GitHub 이슈 라벨+폴링**: ✅ 병행 가능
+- `#bot-ops` (C0AFBQ209E0): 봇 간 조율/상태 공유 채널
+
+### Config 안전 규칙
+- ❌ `config.apply` 절대 사용 금지 → 전체 덮어쓰기로 토큰 소실 위험
+- ✅ `config.patch`만 사용 (부분 수정, 기존 값 보존)
+
+### 보안 분류
+| 등급 | 예시 | 공유 범위 |
+|---|---|---|
+| 🔴 극비 | 계약금액, 지분율, 급여 | 리더 DM 또는 #개발사업팀(C020RQTNPFY)에서만 |
+| 🟡 대외비 | cm-land/cm-office 상세 | 외부 공유 절대 금지 |
+| 🟢 공개 | 레포 구조, 기술 스택 | 모든 봇 |
+
+### ReusClaw 인계 절대 금지 (2026-03-07 Reus 지시)
+**ReusClaw (`<@U0ADF0JUU79>`)는 Reus 전용 개인 비서 — 작업 인계/협업 요청 절대 금지**
+
+### Cron Job delivery.to 규칙 (2026-03-07)
+**Cron job의 `delivery.to`는 채널 ID만 허용**
+- ❌ **금지**: 채널 이름 (`#proj-axoracle`)
+- ✅ **올바른 형식**: 채널 ID (`C0AE4N0LSKV`)
+
+### 프로젝트 디렉토리 관리 원칙 (2026-02-19 Reus 지시)
+- **모든 프로젝트**: `/Users/reus/Desktop/Sources/semicolon/projects/`
+- 작업 시 반드시 해당 프로젝트 디렉토리에서 수행
+- 디렉토리가 없는 프로젝트: 임의로 `git clone`이나 디렉토리 생성 절대 금지 → SemiClaw에게 문의

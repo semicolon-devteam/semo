@@ -13,6 +13,7 @@ import * as path from "path";
 import { Pool } from "pg";
 import { getPool, closeConnection, isDbConnected } from "../database";
 import { kbList, ontoList, OntologyDomain, KBEntry } from "../kb";
+import { syncSkillsToDB } from "./skill-sync";
 
 // ============================================================
 // Memory file mapping
@@ -21,12 +22,13 @@ import { kbList, ontoList, OntologyDomain, KBEntry } from "../kb";
 const MEMORY_DIR = ".claude/memory";
 
 // --out-dir 로 override 가능 (OpenClaw 봇 workspace 경로 지원)
+// 기본값: ~/.claude/memory/ (글로벌 — 모든 프로젝트에서 공유)
 function resolveMemoryDir(outDir?: string): string {
   if (outDir) {
     // 절대경로 또는 ~ 경로 처리
     return outDir.replace(/^~/, require("os").homedir());
   }
-  return path.join(process.cwd(), MEMORY_DIR);
+  return path.join(require("os").homedir(), MEMORY_DIR);
 }
 
 const KB_DOMAIN_MAP: Record<string, string> = {
@@ -186,6 +188,7 @@ export function registerContextCommands(program: Command): void {
     .option("--domain <name>", "특정 KB 도메인만")
     .option("--no-bots", "bot_status 동기화 건너뜀")
     .option("--no-ontology", "ontology 동기화 건너뜀")
+    .option("--no-skills", "스킬 파일 → DB 동기화 건너뜀")
     .option("--out-dir <path>", "메모리 파일 출력 경로 (기본: .claude/memory/). OpenClaw 봇 workspace 지원용")
     .action(async (options) => {
       const spinner = ora("context sync 시작...").start();
@@ -234,6 +237,25 @@ export function registerContextCommands(program: Command): void {
           const ontoContent = ontologyToMarkdown(domains2);
           fs.writeFileSync(path.join(memDir, "ontology.md"), ontoContent);
           written++;
+        }
+
+        // 4. 스킬 파일 → skill_definitions DB 동기화
+        if (options.skills !== false) {
+          const semoSystemDir = path.join(process.cwd(), "semo-system");
+          if (fs.existsSync(semoSystemDir)) {
+            spinner.text = "skills 동기화...";
+            const client = await pool.connect();
+            try {
+              await client.query("BEGIN");
+              await syncSkillsToDB(client, semoSystemDir);
+              await client.query("COMMIT");
+            } catch {
+              await client.query("ROLLBACK").catch(() => {});
+              // 스킬 동기화 실패는 무시 — context sync의 핵심은 memory/ 파일
+            } finally {
+              client.release();
+            }
+          }
         }
 
         spinner.succeed(`context sync 완료 — ${written}개 파일 업데이트`);

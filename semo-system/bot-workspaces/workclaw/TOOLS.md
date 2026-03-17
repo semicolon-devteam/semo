@@ -128,6 +128,24 @@ Skills are shared. Your setup is yours. Keeping them apart means you can update 
 ### Test Accounts
 - TBD (확인 필요)
 
+### Supabase Cloud Access
+- **Project Ref**: `nxuembdjhdcmhecwjrnf`
+- **⚠️ `.env.local`의 `SUPABASE_DB_PASSWORD`는 플레이스홀더** — 직접 psql/pg 연결 불가
+- **마이그레이션**: `supabase db push` 정상 동작 (CLI Management API 사용)
+- **SQL 직접 실행**: Management API 사용:
+  ```bash
+  # 1. macOS Keychain에서 토큰 추출
+  RAW=$(security find-generic-password -s "Supabase CLI" -a "supabase" -w)
+  TOKEN=$(echo "$RAW" | sed 's/^go-keyring-base64://' | base64 -d)
+  # 2. SQL 실행
+  curl -s -X POST "https://api.supabase.com/v1/projects/nxuembdjhdcmhecwjrnf/database/query" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{"query": "SELECT count(*) FROM celebs"}'
+  ```
+- **타입 생성**: `supabase gen types` 정상 (CLI 인증 사용)
+- **seed 실행**: `scripts/execute-seed-sql.ts`는 동작 안 함 (직접 pg 연결) — Management API로 실행해야 함
+
 ---
 
 Add whatever helps you do your job. This is your cheat sheet.

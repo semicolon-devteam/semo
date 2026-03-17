@@ -227,11 +227,12 @@ export async function syncBotSessions(
       } catch { /* 개별 세션 실패 무시 */ }
     }
 
+    // session_count는 trg_session_count 트리거가 자동 관리
+    // last_active만 업데이트
     try {
       await client.query(
         `UPDATE semo.bot_status
-         SET session_count = (SELECT COUNT(*) FROM semo.bot_sessions WHERE bot_id = $1),
-             last_active   = CASE
+         SET last_active = CASE
                WHEN $2::timestamptz IS NOT NULL
                  AND (last_active IS NULL OR $2::timestamptz > last_active)
                THEN $2::timestamptz
@@ -303,15 +304,7 @@ export function registerSessionsCommands(program: Command): void {
                synced_at     = NOW()`,
             [botId, sessionKey, label, options.kind]
           );
-          await client.query(
-            `UPDATE semo.bot_status
-             SET session_count = (
-               SELECT COUNT(*) FROM semo.bot_sessions WHERE bot_id = $1
-             ),
-             synced_at = NOW()
-             WHERE bot_id = $1`,
-            [botId]
-          );
+          // session_count는 trg_session_count 트리거가 자동 관리
         } else if (event === "stop") {
           await client.query(
             `UPDATE semo.bot_sessions
@@ -333,15 +326,7 @@ export function registerSessionsCommands(program: Command): void {
                synced_at     = NOW()`,
             [botId, sessionKey, label, options.kind, messageCount ?? null]
           );
-          await client.query(
-            `UPDATE semo.bot_status
-             SET session_count = (
-               SELECT COUNT(*) FROM semo.bot_sessions WHERE bot_id = $1
-             ),
-             synced_at = NOW()
-             WHERE bot_id = $1`,
-            [botId]
-          );
+          // session_count는 trg_session_count 트리거가 자동 관리
         }
 
         client.release();
@@ -444,11 +429,12 @@ export function registerSessionsCommands(program: Command): void {
           } catch { /* 개별 세션 실패 무시 */ }
         }
 
+        // session_count는 trg_session_count 트리거가 자동 관리
+        // last_active만 업데이트
         try {
           await client.query(
             `UPDATE semo.bot_status
-             SET session_count = (SELECT COUNT(*) FROM semo.bot_sessions WHERE bot_id = $1),
-                 last_active   = CASE
+             SET last_active = CASE
                    WHEN $2::timestamptz IS NOT NULL
                      AND (last_active IS NULL OR $2::timestamptz > last_active)
                    THEN $2::timestamptz

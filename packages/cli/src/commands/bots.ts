@@ -15,6 +15,8 @@ import * as fs from "fs";
 import * as path from "path";
 import { getPool, closeConnection, isDbConnected } from "../database";
 import { syncBotSessions } from "./sessions";
+import { auditBot, auditBotDb, mergeDbChecks, fixBot, storeAuditResults, formatAuditSlack, BotAuditResult } from "./audit";
+import { syncSkillsToDB, scanSkills } from "./skill-sync";
 
 // ============================================================
 // Types (matches actual DB schema)
@@ -40,6 +42,25 @@ interface BotSession {
   chat_type: string | null;
   last_activity: string | null;
   message_count: number;
+}
+
+// ============================================================
+// Seed types
+// ============================================================
+
+interface SeedSkill {
+  name: string;
+  prompt: string;
+  package: string;
+  botId: string | null;
+}
+
+interface SeedAgent {
+  botId: string;
+  name: string;
+  emoji: string | null;
+  role: string;
+  personaPrompt: string;
 }
 
 // ============================================================
@@ -401,9 +422,311 @@ export function registerBotsCommands(program: Command): void {
         } catch {
           console.log(chalk.yellow("  ⚠ sessions sync 실패 (무시)"));
         }
+
+        // Audit piggyback — sync 후 자동 audit 실행
+        try {
+          console.log(chalk.gray("  → audit 실행 중..."));
+          const auditResults = bots.map(b => auditBot(b.workspacePath, b.botId));
+          const auditClient = await pool.connect();
+          await storeAuditResults(auditResults, auditClient);
+          auditClient.release();
+          const good = auditResults.filter(r => r.rating === "GOOD").length;
+          console.log(chalk.green(`  → audit 완료: ${auditResults.length}개 봇 (GOOD: ${good})`));
+        } catch {
+          console.log(chalk.yellow("  ⚠ audit 저장 실패 (무시)"));
+        }
+
+        // Skills piggyback — 스킬 파일 → skill_definitions 동기화
+        try {
+          console.log(chalk.gray("  → skills sync 실행 중..."));
+          const skillClient = await pool.connect();
+          try {
+            await skillClient.query("BEGIN");
+            const result = await syncSkillsToDB(skillClient, semoSystemDir);
+            await skillClient.query("COMMIT");
+            console.log(chalk.green(`  → skills sync 완료: ${result.total}개 (공유: ${result.shared}, 봇 전용: ${result.botSpecific})`));
+          } finally {
+            skillClient.release();
+          }
+        } catch {
+          console.log(chalk.yellow("  ⚠ skills sync 실패 (무시)"));
+        }
       } catch (err) {
         await client.query("ROLLBACK");
         spinner.fail(`sync 실패: ${err}`);
+        process.exit(1);
+      } finally {
+        client.release();
+        await closeConnection();
+      }
+    });
+
+  // ── semo bots audit ───────────────────────────────────────────
+  botsCmd
+    .command("audit")
+    .description("봇 워크스페이스 표준 구조 audit")
+    .option("--format <type>", "출력 형식 (table|json|slack)", "table")
+    .option("--fix", "누락 파일/디렉토리 자동 생성")
+    .option("--no-db", "DB 저장 건너뛰기")
+    .option("--semo-system <path>", "semo-system 경로 (기본: ./semo-system)")
+    .action(async (options) => {
+      const cwd = process.cwd();
+      const semoSystemDir = options.semoSystem
+        ? path.resolve(options.semoSystem)
+        : path.join(cwd, "semo-system");
+
+      const workspacesDir = path.join(semoSystemDir, "bot-workspaces");
+      if (!fs.existsSync(workspacesDir)) {
+        console.log(chalk.red(`\n❌ bot-workspaces 디렉토리를 찾을 수 없습니다: ${workspacesDir}`));
+        process.exit(1);
+      }
+
+      const spinner = ora("bot-workspaces audit 중...").start();
+
+      // Scan bot directories
+      const entries = fs.readdirSync(workspacesDir, { withFileTypes: true });
+      const botDirs = entries.filter(e => e.isDirectory());
+
+      if (botDirs.length === 0) {
+        spinner.warn("봇 워크스페이스가 없습니다.");
+        return;
+      }
+
+      // Run audit
+      const results: BotAuditResult[] = botDirs.map(e => {
+        const botDir = path.join(workspacesDir, e.name);
+        return auditBot(botDir, e.name);
+      });
+
+      spinner.stop();
+
+      // --fix
+      if (options.fix) {
+        let totalFixed = 0;
+        for (const r of results) {
+          const botDir = path.join(workspacesDir, r.botId);
+          const fixed = fixBot(botDir, r.botId, r.checks);
+          if (fixed > 0) {
+            console.log(chalk.green(`  ✔ ${r.botId}: ${fixed}개 파일/디렉토리 생성`));
+            totalFixed += fixed;
+          }
+        }
+        if (totalFixed > 0) {
+          console.log(chalk.green(`\n총 ${totalFixed}개 수정`));
+          // Re-audit after fix
+          for (let i = 0; i < results.length; i++) {
+            const botDir = path.join(workspacesDir, results[i].botId);
+            results[i] = auditBot(botDir, results[i].botId);
+          }
+        }
+      }
+
+      // DB sync checks + store
+      if (options.db !== false) {
+        const connected = await isDbConnected();
+        if (connected) {
+          const pool = getPool();
+
+          // Merge DB sync checks into results
+          try {
+            for (let i = 0; i < results.length; i++) {
+              const dbChecks = await auditBotDb(results[i].botId, pool);
+              results[i] = mergeDbChecks(results[i], dbChecks);
+            }
+          } catch (err) {
+            console.log(chalk.yellow(`  ⚠ DB sync 체크 실패: ${err}`));
+          }
+
+          // Store results (separate try — table may not exist yet)
+          try {
+            const client = await pool.connect();
+            try {
+              await storeAuditResults(results, client);
+            } finally {
+              client.release();
+            }
+          } catch {
+            // bot_workspace_audits table may not exist — silent skip
+          }
+
+          await closeConnection();
+        } else {
+          await closeConnection();
+        }
+      }
+
+      // Output
+      if (options.format === "json") {
+        console.log(JSON.stringify(results, null, 2));
+      } else if (options.format === "slack") {
+        console.log(formatAuditSlack(results));
+      } else {
+        console.log(chalk.cyan.bold("\n🔍 Bot Workspace Audit\n"));
+        console.log(chalk.gray("  봇              Score  Rating       Passed"));
+        console.log(chalk.gray("  " + "─".repeat(55)));
+
+        for (const r of results) {
+          const ratingColor =
+            r.rating === "GOOD" ? chalk.green :
+            r.rating === "NEEDS-WORK" ? chalk.yellow :
+            chalk.red;
+          const passed = r.checks.filter(c => c.passed).length;
+          console.log(
+            `  ${r.botId.padEnd(16)}${String(r.score).padStart(3)}%   ${ratingColor(r.rating.padEnd(12))} ${passed}/${r.checks.length}`
+          );
+        }
+
+        const avgScore = Math.round(results.reduce((s, r) => s + r.score, 0) / results.length);
+        const good = results.filter(r => r.rating === "GOOD").length;
+        console.log(chalk.gray(`\n  ${results.length}개 봇, 평균 ${avgScore}%, GOOD: ${good}개\n`));
+      }
+    });
+
+  // ── semo bots seed ──────────────────────────────────────────
+  botsCmd
+    .command("seed")
+    .description("semo-skills + bot-workspaces → skill_definitions / agent_definitions 시딩")
+    .option("--semo-system <path>", "semo-system 경로 (기본: ./semo-system)")
+    .option("--reset", "시딩 전 기존 데이터 삭제")
+    .option("--dry-run", "실제 DB 반영 없이 미리보기")
+    .action(async (options) => {
+      const cwd = process.cwd();
+      const semoSystemDir = options.semoSystem
+        ? path.resolve(options.semoSystem)
+        : path.join(cwd, "semo-system");
+
+      if (!fs.existsSync(semoSystemDir)) {
+        console.log(chalk.red(`\n❌ semo-system 디렉토리를 찾을 수 없습니다: ${semoSystemDir}`));
+        process.exit(1);
+      }
+
+      const spinner = ora("스킬/에이전트 스캔 중...").start();
+
+      // ─── 1+2. 스킬 스캔 (공통 모듈) ─────────────────────────
+      const { shared: sharedSkills, botSpecific: botSkills } = scanSkills(semoSystemDir);
+
+      // ─── 3. 에이전트 스캔 ─────────────────────────────────
+      const workspacesDir = path.join(semoSystemDir, "bot-workspaces");
+      const agents: SeedAgent[] = [];
+
+      if (fs.existsSync(workspacesDir)) {
+        const botEntries = fs.readdirSync(workspacesDir, { withFileTypes: true });
+        for (const botEntry of botEntries) {
+          if (!botEntry.isDirectory()) continue;
+          const botDir = path.join(workspacesDir, botEntry.name);
+          const identityPath = path.join(botDir, "IDENTITY.md");
+          if (!fs.existsSync(identityPath)) continue;
+
+          try {
+            const identity = parseIdentityMd(fs.readFileSync(identityPath, "utf-8"));
+
+            // persona_prompt = SOUL.md + \n\n---\n\n + AGENTS.md
+            const parts: string[] = [];
+            const soulPath = path.join(botDir, "SOUL.md");
+            if (fs.existsSync(soulPath)) {
+              parts.push(fs.readFileSync(soulPath, "utf-8"));
+            }
+            const agentsPath = path.join(botDir, "AGENTS.md");
+            if (fs.existsSync(agentsPath)) {
+              parts.push(fs.readFileSync(agentsPath, "utf-8"));
+            }
+            const personaPrompt = parts.join("\n\n---\n\n");
+
+            agents.push({
+              botId: botEntry.name,
+              name: identity.name || botEntry.name,
+              emoji: identity.emoji,
+              role: (identity.role || "custom").substring(0, 50),
+              personaPrompt,
+            });
+          } catch { /* skip */ }
+        }
+      }
+
+      spinner.stop();
+
+      // ─── 미리보기 출력 ─────────────────────────────────────
+      console.log(chalk.cyan.bold("\n📦 Seed 스캔 결과\n"));
+      console.log(chalk.white(`  공유 스킬 (semo-skills):  ${sharedSkills.length}개`));
+      console.log(chalk.white(`  봇 전용 스킬 (openclaw):  ${botSkills.length}개`));
+      console.log(chalk.white(`  에이전트 (봇):            ${agents.length}개`));
+
+      console.log(chalk.white(`  예상 target_agents 설정:  ${botSkills.length}개 (봇 전용)`));
+
+      if (agents.length > 0) {
+        console.log(chalk.gray("\n  에이전트:"));
+        for (const a of agents) {
+          const ownSkills = botSkills.filter(s => s.botId === a.botId);
+          console.log(
+            chalk.gray(`    ${a.emoji || "?"} ${a.botId.padEnd(14)}`) +
+            chalk.white(`${a.role}`.substring(0, 40).padEnd(42)) +
+            chalk.gray(`전용 스킬: ${ownSkills.length}`)
+          );
+        }
+      }
+
+      if (options.dryRun) {
+        console.log(chalk.yellow("\n  [dry-run] DB 반영 없이 종료\n"));
+        return;
+      }
+
+      // ─── DB 반영 ──────────────────────────────────────────
+      const spinnerDb = ora("DB 반영 중...").start();
+
+      const connected = await isDbConnected();
+      if (!connected) {
+        spinnerDb.fail("DB 연결 실패");
+        await closeConnection();
+        process.exit(1);
+      }
+
+      const pool = getPool();
+      const client = await pool.connect();
+
+      try {
+        await client.query("BEGIN");
+
+        // --reset: 기존 데이터 삭제
+        if (options.reset) {
+          spinnerDb.text = "기존 데이터 삭제 중...";
+          await client.query("DELETE FROM agent_definitions");
+          await client.query("DELETE FROM skill_definitions WHERE office_id IS NULL");
+        }
+
+        // ─── 스킬 시딩 (공통 모듈) ──────────────────────────
+        spinnerDb.text = `스킬 ${sharedSkills.length + botSkills.length}개 시딩 중...`;
+        await syncSkillsToDB(client, semoSystemDir);
+
+        // ─── 에이전트 시딩 ───────────────────────────────────
+        spinnerDb.text = `에이전트 ${agents.length}개 시딩 중...`;
+        for (const agent of agents) {
+          await client.query(
+            `INSERT INTO agent_definitions (name, role, persona_prompt, package, avatar_config, is_active, office_id)
+             VALUES ($1, $2, $3, 'openclaw', $4, true, NULL)
+             ON CONFLICT (name, office_id) DO UPDATE SET
+               role = EXCLUDED.role,
+               persona_prompt = EXCLUDED.persona_prompt,
+               avatar_config = EXCLUDED.avatar_config,
+               updated_at = NOW()`,
+            [
+              agent.botId,
+              agent.role,
+              agent.personaPrompt,
+              JSON.stringify({ emoji: agent.emoji }),
+            ]
+          );
+        }
+
+        await client.query("COMMIT");
+        spinnerDb.succeed("seed 완료");
+
+        console.log(chalk.green(`  ✔ 공유 스킬: ${sharedSkills.length}개 (target_agents: {all})`));
+        console.log(chalk.green(`  ✔ 봇 전용 스킬: ${botSkills.length}개 (target_agents: 봇명)`));
+        console.log(chalk.green(`  ✔ 에이전트: ${agents.length}개`));
+        console.log();
+      } catch (err) {
+        await client.query("ROLLBACK");
+        spinnerDb.fail(`seed 실패: ${err}`);
         process.exit(1);
       } finally {
         client.release();

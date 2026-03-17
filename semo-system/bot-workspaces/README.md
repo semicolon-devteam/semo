@@ -22,6 +22,19 @@ OpenClaw 봇들의 workspace를 GitHub 형상관리하기 위한 디렉토리.
 - `memory/` — daily logs, decisions, team notes 등
 - `scripts/` — 유틸리티 스크립트 (있는 경우)
 
+## 스킬 (`skills/`)
+
+각 봇은 `skills/` 디렉토리에 봇 전용 스킬을 가질 수 있습니다:
+
+```
+bot-workspaces/workclaw/skills/
+  └── some-skill/
+      └── SKILL.md
+```
+
+- `semo bots sync` 또는 `semo context sync` 실행 시 자동으로 DB(`skill_definitions`)에 동기화됩니다.
+- `target_agents`에 `'{봇명}'`이 설정되어 해당 봇만 해당 스킬을 사용합니다.
+
 ## 동기화
 
 각 봇의 `~/.openclaw-{bot}/workspace`는 이 디렉토리의 해당 봇 폴더로 symlink됩니다.
