@@ -26,54 +26,7 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-github"
-      ],
-      "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
-      }
+      ]
     }
-  },
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ". ~/.semo.env 2>/dev/null; semo context sync 2>/dev/null || true && semo bots sync 2>/dev/null || true"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": ". ~/.semo.env 2>/dev/null; semo context push 2>/dev/null || true"
-          }
-        ]
-      }
-    ]
-  },
-  "permissions": {
-    "allow": [
-      "Bash(git status:*)",
-      "Bash(git log:*)",
-      "Bash(git diff:*)",
-      "Bash(git branch:*)",
-      "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(git pull:*)",
-      "Bash(git mv:*)",
-      "Bash(gh auth status:*)",
-      "Bash(gh api:*)",
-      "Bash(gh issue:*)",
-      "Bash(gh pr:*)",
-      "Bash(npm run:*)",
-      "Bash(npx tsc:*)"
-    ],
-    "deny": []
   }
 }

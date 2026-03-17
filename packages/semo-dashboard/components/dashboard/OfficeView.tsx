@@ -41,6 +41,7 @@ export default function OfficeView() {
 
     const app = new PIXI.Application();
     appRef.current = app;
+    let destroyed = false;
 
     (async () => {
       await app.init({
@@ -48,6 +49,11 @@ export default function OfficeView() {
         resizeTo: canvasRef.current!,
         antialias: true,
       });
+
+      if (destroyed) {
+        app.destroy(true, { children: true });
+        return;
+      }
 
       canvasRef.current!.appendChild(app.canvas);
 
@@ -73,7 +79,10 @@ export default function OfficeView() {
     })();
 
     return () => {
-      app.destroy(true, { children: true });
+      destroyed = true;
+      if (app.renderer) {
+        app.destroy(true, { children: true });
+      }
       appRef.current = null;
       gridRef.current = null;
       agentContainerRef.current = null;

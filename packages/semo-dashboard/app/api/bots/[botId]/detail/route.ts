@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getFileContent, getBotFiles } from '@/lib/github';
 import { listSessions, listCronJobs } from '@/lib/openclaw';
 import type { BotDetail, Session, CronJob, BotFile, DailyLog } from '@/types';
+import { readFile, readdir } from 'fs/promises';
+import path from 'path';
+
+const WORKSPACES_DIR = path.resolve(process.cwd(), '../../semo-system/bot-workspaces');
+
+async function readLocalFile(filePath: string): Promise<string> {
+  return readFile(filePath, 'utf-8');
+}
 
 // Force dynamic rendering to prevent build-time DB connection
 export const dynamic = 'force-dynamic';
@@ -33,22 +40,9 @@ export async function GET(
   try {
     const { botId } = await params;
 
-    // 1. Fetch sessions from OpenClaw Gateway (with DB fallback)
+    // 1. Fetch sessions from DB (primary source)
     let sessions: Session[] = [];
     try {
-      const openclawSessions = await listSessions(20);
-      sessions = openclawSessions.map(s => ({
-        sessionKey: s.key,
-        label: s.label || s.key,
-        kind: s.kind || 'main',
-        chatType: s.channel || 'unknown',
-        lastActivity: s.lastMessageAt || new Date().toISOString(),
-        messageCount: s.messageCount || 0,
-      }));
-    } catch (error) {
-      console.warn('OpenClaw API failed, falling back to DB:', error);
-      
-      // Fallback to DB
       const sessionsResult = await query<SessionRow>(`
         SELECT session_key, label, kind, chat_type, last_activity, message_count
         FROM semo.bot_sessions
@@ -64,24 +58,22 @@ export async function GET(
         lastActivity: row.last_activity,
         messageCount: row.message_count,
       }));
+    } catch (error) {
+      console.warn('DB sessions query failed, trying OpenClaw CLI:', error);
+      const openclawSessions = await listSessions(20);
+      sessions = openclawSessions.map(s => ({
+        sessionKey: s.key,
+        label: s.label || s.key,
+        kind: s.kind || 'main',
+        chatType: s.channel || 'unknown',
+        lastActivity: s.lastMessageAt || new Date().toISOString(),
+        messageCount: s.messageCount || 0,
+      }));
     }
 
-    // 2. Fetch cron jobs from OpenClaw Gateway (with DB fallback)
+    // 2. Fetch cron jobs from DB (primary source)
     let cronJobs: CronJob[] = [];
     try {
-      const openclawCrons = await listCronJobs();
-      cronJobs = openclawCrons.map(c => ({
-        jobId: c.id,
-        name: c.name || c.id,
-        schedule: c.schedule,
-        enabled: c.enabled,
-        lastRun: c.lastRun,
-        nextRun: c.nextRun,
-      }));
-    } catch (error) {
-      console.warn('OpenClaw cron API failed, falling back to DB:', error);
-      
-      // Fallback to DB
       const cronResult = await query<CronJobRow>(`
         SELECT job_id, name, schedule, enabled, last_run, next_run, session_target
         FROM semo.bot_cron_jobs
@@ -96,43 +88,59 @@ export async function GET(
         enabled: row.enabled,
         lastRun: row.last_run || undefined,
         nextRun: row.next_run || undefined,
+        sessionTarget: row.session_target,
+      }));
+    } catch (error) {
+      console.warn('DB cron query failed, trying OpenClaw CLI:', error);
+      const openclawCrons = await listCronJobs();
+      cronJobs = openclawCrons.map(c => ({
+        jobId: c.id,
+        name: c.name || c.id,
+        schedule: c.schedule,
+        enabled: c.enabled,
+        lastRun: c.lastRun,
+        nextRun: c.nextRun,
       }));
     }
 
-    // 3. Fetch config files from GitHub
+    // 3. Fetch config files from local filesystem
+    const botDir = path.join(WORKSPACES_DIR, botId);
     const [soul, agents, user] = await Promise.all([
-      getFileContent(`semo-system/bot-workspaces/${botId}/SOUL.md`).catch(() => ''),
-      getFileContent(`semo-system/bot-workspaces/${botId}/AGENTS.md`).catch(() => ''),
-      getFileContent(`semo-system/bot-workspaces/${botId}/USER.md`).catch(() => ''),
+      readLocalFile(path.join(botDir, 'SOUL.md')).catch(() => ''),
+      readLocalFile(path.join(botDir, 'AGENTS.md')).catch(() => ''),
+      readLocalFile(path.join(botDir, 'USER.md')).catch(() => ''),
     ]);
 
     // 4. Fetch workspace files (top-level)
-    const files: BotFile[] = await getBotFiles(botId)
-      .then(gitHubFiles => gitHubFiles.map(f => ({
-        path: f.name,
-        type: f.type === 'dir' ? 'directory' : 'file' as const,
-      })))
-      .catch(() => []);
+    let files: BotFile[] = [];
+    try {
+      const entries = await readdir(botDir, { withFileTypes: true });
+      files = entries.map(e => ({
+        path: e.name,
+        type: e.isDirectory() ? 'directory' : 'file' as const,
+      }));
+    } catch { /* directory may not exist */ }
 
     // 5. Fetch memory files
+    const memDir = path.join(botDir, 'memory');
     const [decisions, team] = await Promise.all([
-      getFileContent(`semo-system/bot-workspaces/${botId}/memory/decisions.md`).catch(() => ''),
-      getFileContent(`semo-system/bot-workspaces/${botId}/memory/team.md`).catch(() => ''),
+      readLocalFile(path.join(memDir, 'decisions.md')).catch(() => ''),
+      readLocalFile(path.join(memDir, 'team.md')).catch(() => ''),
     ]);
 
     // 6. Fetch recent daily logs (last 3 days)
     const today = new Date();
     const dailyLogs: DailyLog[] = [];
-    
+
     for (let i = 0; i < 3; i++) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
-      
-      const content = await getFileContent(
-        `semo-system/bot-workspaces/${botId}/memory/${dateStr}.md`
+
+      const content = await readLocalFile(
+        path.join(memDir, `${dateStr}.md`)
       ).catch(() => null);
-      
+
       if (content) {
         dailyLogs.push({ date: dateStr, content });
       }

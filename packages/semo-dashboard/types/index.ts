@@ -33,6 +33,13 @@ export interface BotFile {
   type: 'file' | 'directory';
 }
 
+export interface FileTreeEntry {
+  name: string;
+  path: string;
+  type: 'file' | 'directory';
+  size?: number;
+}
+
 export interface DailyLog {
   date: string;
   content: string;
@@ -58,6 +65,37 @@ export interface CronJob {
   enabled: boolean;
   lastRun?: string;
   nextRun?: string;
+  sessionTarget?: string;
+}
+
+// Ontology Types
+export interface OntologyEntry {
+  kb_id: string;
+  domain: string;
+  key: string;
+  content: string;
+  created_by?: string;
+}
+
+export interface KBDomain {
+  domain: string;
+  description?: string;
+  entry_count: number;
+}
+
+// Audit Types
+export interface AuditCheck {
+  name: string;
+  passed: boolean;
+  detail: string;
+}
+
+export interface BotAudit {
+  botId: string;
+  rating: 'GOOD' | 'NEEDS-WORK' | 'POOR';
+  score: number;
+  checks: AuditCheck[];
+  createdAt: string;
 }
 
 // KB Types
@@ -85,4 +123,5 @@ export interface KBEntry {
   tags: string[];
   created_at: string;
   updated_at: string;
+  similarity_pct?: number;
 }

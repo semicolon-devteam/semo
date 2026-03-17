@@ -4,6 +4,17 @@ import { list, listDomains, search, getItem, stats, upsertItem, deleteItemByKey 
 // Force dynamic rendering to prevent build-time DB connection
 export const dynamic = 'force-dynamic';
 
+const EMPTY_STATS = {
+  knowledge_base: { total: '0', emb: '0', by_domain: [] },
+  bot_knowledge: { total: '0', emb: '0', by_bot: [] },
+};
+
+function isConnectionError(error: unknown): boolean {
+  const msg = (error as Error)?.message ?? '';
+  const code = (error as any)?.code ?? '';
+  return code === 'ECONNREFUSED' || code === 'ENOTFOUND' || msg.includes('ECONNREFUSED');
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -39,6 +50,14 @@ export async function GET(request: NextRequest) {
     const items = await list(domain || undefined, botId || undefined);
     return NextResponse.json(items);
   } catch (error) {
+    if (isConnectionError(error)) {
+      console.warn('KB DB unavailable:', (error as Error).message);
+      const { searchParams } = new URL(request.url);
+      const action = searchParams.get('action') || '';
+      if (action === 'stats') return NextResponse.json(EMPTY_STATS);
+      if (action === 'domains') return NextResponse.json([]);
+      return NextResponse.json([]);
+    }
     console.error('KB API error:', error);
     return NextResponse.json({ error: 'Failed to fetch KB entries' }, { status: 500 });
   }

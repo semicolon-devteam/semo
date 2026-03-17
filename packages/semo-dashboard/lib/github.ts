@@ -81,3 +81,55 @@ export async function getBotFiles(botId: string, path = ''): Promise<GitHubFileR
   const fullPath = `semo-system/bot-workspaces/${botId}/${path}`;
   return listDirectory(fullPath);
 }
+
+/**
+ * Get file metadata (including SHA) from GitHub
+ */
+export async function getFileMeta(path: string): Promise<GitHubFileResponse> {
+  const url = `${GITHUB_API_BASE}/repos/${GITHUB_REPO}/contents/${path}`;
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `token ${GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github.v3+json',
+    },
+    cache: 'no-store',
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to get file meta: ${path} (${response.status})`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Update file content on GitHub
+ */
+export async function updateFileContent(
+  path: string,
+  content: string,
+  sha: string,
+  message?: string,
+): Promise<void> {
+  const url = `${GITHUB_API_BASE}/repos/${GITHUB_REPO}/contents/${path}`;
+
+  const response = await fetch(url, {
+    method: 'PUT',
+    headers: {
+      Authorization: `token ${GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      message: message || `Update ${path.split('/').pop()}`,
+      content: Buffer.from(content, 'utf-8').toString('base64'),
+      sha,
+    }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.message || `Failed to update file: ${path} (${response.status})`);
+  }
+}

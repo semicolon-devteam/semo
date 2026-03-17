@@ -61,13 +61,51 @@ export interface KBStats {
 }
 
 /**
- * 시맨틱 검색 (Voyage-3 임베딩 + pgvector)
+ * 텍스트 검색 fallback (ILIKE) — 임베딩 키 없을 때 사용
+ */
+async function textSearch(
+  query: string,
+  limit: number,
+  botId?: string
+): Promise<KBItem[]> {
+  const pattern = `%${query}%`;
+
+  if (botId) {
+    const sql = `
+      SELECT id as kb_id, bot_id, domain, key, content
+      FROM semo.bot_knowledge
+      WHERE bot_id = $1 AND (key ILIKE $2 OR content ILIKE $2)
+      ORDER BY updated_at DESC NULLS LAST
+      LIMIT $3
+    `;
+    const res = await pool.query(sql, [botId, pattern, limit]);
+    return res.rows;
+  }
+
+  const sql = `
+    SELECT kb_id, domain, key, content, created_by
+    FROM semo.knowledge_base
+    WHERE key ILIKE $1 OR content ILIKE $1
+    ORDER BY updated_at DESC NULLS LAST
+    LIMIT $2
+  `;
+  const res = await pool.query(sql, [pattern, limit]);
+  return res.rows;
+}
+
+/**
+ * 시맨틱 검색 (OpenAI 임베딩 + pgvector), 키 없으면 텍스트 검색 fallback
  */
 export async function search(
   query: string,
   limit: number = 10,
   botId?: string
 ): Promise<KBItem[]> {
+  // Fallback to text search if embedding API key is not configured
+  if (!process.env.OPENAI_API_KEY) {
+    return textSearch(query, limit, botId);
+  }
+
   const embedding = await genEmbedding(query);
   const embeddingStr = '[' + embedding.join(',') + ']';
 
@@ -202,7 +240,23 @@ export async function upsertItem(
     RETURNING kb_id, domain, key, content, created_by, updated_at
   `;
   const res = await pool.query(sql, [domain, key, content, createdBy ?? 'dashboard']);
-  return res.rows[0];
+  const item = res.rows[0];
+
+  // 임베딩 자동 생성 (best-effort: 실패해도 본 upsert는 성공)
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      const embedding = await genEmbedding(content);
+      const embeddingStr = '[' + embedding.join(',') + ']';
+      await pool.query(
+        'UPDATE semo.knowledge_base SET embedding = $1::vector WHERE kb_id = $2',
+        [embeddingStr, item.kb_id]
+      );
+    } catch (e) {
+      console.warn(`[kb] embedding generation failed for ${domain}/${key}:`, e);
+    }
+  }
+
+  return item;
 }
 
 /**

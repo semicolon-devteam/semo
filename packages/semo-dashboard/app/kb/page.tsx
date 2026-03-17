@@ -1,9 +1,27 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import type { KBEntry } from '@/types';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import DomainCard from '@/components/DomainCard';
+import LayerModal from '@/components/LayerModal';
+import type { KBEntry, KBDomain } from '@/types';
 
-const EMPTY_FORM = { title: '', content: '', bot_id: '', category: '', tags: '' };
+const EMPTY_FORM = { title: '', content: '', bot_id: '', category: '' };
+
+const CATEGORY_ICONS: Record<string, string> = {
+  team: '\u{1F465}',
+  project: '\u{1F4CB}',
+  decision: '\u2696\uFE0F',
+  process: '\u{1F504}',
+  infra: '\u{1F3D7}\uFE0F',
+  kpi: '\u{1F4CA}',
+  tutorial: '\u{1F4DA}',
+  config: '\u2699\uFE0F',
+  guide: '\u{1F4D6}',
+};
+
+function getCategoryIcon(category: string): string {
+  return CATEGORY_ICONS[category] || '\u{1F4C2}';
+}
 
 export default function KBPage() {
   const [entries, setEntries] = useState<KBEntry[]>([]);
@@ -12,51 +30,107 @@ export default function KBPage() {
 
   // Filters
   const [search, setSearch] = useState('');
+  const [committedSearch, setCommittedSearch] = useState('');
   const [filterBotId, setFilterBotId] = useState('');
-  const [filterCategory, setFilterCategory] = useState('');
   const [filterTag, setFilterTag] = useState('');
 
-  // Modal state
+  // Card → LayerModal state
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<KBEntry | null>(null);
+
+  // Ontology domains & all bots
+  const [domains, setDomains] = useState<KBDomain[]>([]);
+  const [allBotIds, setAllBotIds] = useState<string[]>([]);
+
+  // CRUD modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<KBEntry | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
+  const triggerSearch = () => setCommittedSearch(search);
+
   const fetchEntries = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const params = new URLSearchParams();
-      if (search) params.set('search', search);
+      if (committedSearch) params.set('search', committedSearch);
       if (filterBotId) params.set('bot_id', filterBotId);
-      if (filterCategory) params.set('category', filterCategory);
       if (filterTag) params.set('tag', filterTag);
 
       const res = await fetch(`/api/kb?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch entries');
-      setEntries(await res.json());
+      const raw = await res.json();
+      const mapped: KBEntry[] = (Array.isArray(raw) ? raw : []).map((item: Record<string, unknown>) => ({
+        id: String(item.kb_id ?? item.id ?? ''),
+        title: String(item.key ?? item.title ?? ''),
+        content: String(item.content ?? ''),
+        bot_id: String(item.bot_id ?? item.created_by ?? ''),
+        category: String(item.domain ?? item.category ?? ''),
+        tags: Array.isArray(item.tags) ? item.tags : [],
+        created_at: String(item.created_at ?? item.updated_at ?? ''),
+        updated_at: String(item.updated_at ?? ''),
+        similarity_pct: item.similarity_pct != null ? Number(item.similarity_pct) : undefined,
+      }));
+      setEntries(mapped);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
-  }, [search, filterBotId, filterCategory, filterTag]);
+  }, [committedSearch, filterBotId, filterTag]);
 
   useEffect(() => {
     fetchEntries();
   }, [fetchEntries]);
 
-  // Derived filter options from current entries
+  useEffect(() => {
+    fetch('/api/kb?action=domains')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d: KBDomain[]) => setDomains(d))
+      .catch(() => {});
+    fetch('/api/bots')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((bots: { id: string }[]) => setAllBotIds(bots.map((b) => b.id)))
+      .catch(() => {});
+  }, []);
+
+  // Derived
   const botIds = Array.from(new Set(entries.map((e) => e.bot_id).filter(Boolean)));
-  const categories = Array.from(new Set(entries.map((e) => e.category).filter(Boolean)));
-  const allTags = Array.from(new Set(entries.flatMap((e) => e.tags)));
+  const allTags = Array.from(new Set(entries.flatMap((e) => e.tags ?? [])));
 
-  // Recent entries (last 5 by updated_at)
-  const recentEntries = [...entries]
-    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-    .slice(0, 5);
+  // Group entries by category
+  const categories = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of entries) {
+      const cat = e.category || 'uncategorized';
+      map.set(cat, (map.get(cat) || 0) + 1);
+    }
+    return Array.from(map.entries())
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [entries]);
 
+  const categoryEntries = useMemo(() => {
+    if (!selectedCategory) return [];
+    return entries.filter((e) => (e.category || 'uncategorized') === selectedCategory);
+  }, [entries, selectedCategory]);
+
+  // Search results grouped by category
+  const entriesByCategory = useMemo(() => {
+    if (!committedSearch) return new Map<string, KBEntry[]>();
+    const map = new Map<string, KBEntry[]>();
+    for (const e of entries) {
+      const cat = e.category || 'uncategorized';
+      if (!map.has(cat)) map.set(cat, []);
+      map.get(cat)!.push(e);
+    }
+    return map;
+  }, [entries, committedSearch]);
+
+  // CRUD
   function openNew() {
     setEditingEntry(null);
     setForm(EMPTY_FORM);
@@ -70,7 +144,6 @@ export default function KBPage() {
       content: entry.content,
       bot_id: entry.bot_id,
       category: entry.category,
-      tags: entry.tags.join(', '),
     });
     setModalOpen(true);
   }
@@ -85,10 +158,6 @@ export default function KBPage() {
         content: form.content.trim(),
         bot_id: form.bot_id.trim(),
         category: form.category.trim(),
-        tags: form.tags
-          .split(',')
-          .map((t) => t.trim())
-          .filter(Boolean),
       };
 
       const res = await fetch('/api/kb', {
@@ -98,6 +167,8 @@ export default function KBPage() {
       });
       if (!res.ok) throw new Error('Failed to save entry');
       setModalOpen(false);
+      setSelectedEntry(null);
+      setSelectedCategory(null);
       fetchEntries();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Save failed');
@@ -106,11 +177,14 @@ export default function KBPage() {
     }
   }
 
-  async function handleDelete(id: string) {
+  async function handleDelete(entry: KBEntry) {
     try {
-      const res = await fetch(`/api/kb?id=${id}`, { method: 'DELETE' });
+      const params = new URLSearchParams({ domain: entry.category, key: entry.title });
+      const res = await fetch(`/api/kb?${params}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Failed to delete entry');
       setDeleteConfirm(null);
+      setSelectedEntry(null);
+      setSelectedCategory(null);
       fetchEntries();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Delete failed');
@@ -125,6 +199,31 @@ export default function KBPage() {
       hour: '2-digit',
       minute: '2-digit',
     });
+  }
+
+  function handleCategoryClick(category: string) {
+    setSelectedCategory(category);
+    setSelectedEntry(null);
+  }
+
+  async function handleEntryClick(entry: KBEntry) {
+    // Fetch full content
+    try {
+      const res = await fetch(
+        `/api/kb?domain=${encodeURIComponent(entry.category)}&key=${encodeURIComponent(entry.title)}`,
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedEntry({
+          ...entry,
+          content: String(data.content ?? entry.content),
+        });
+      } else {
+        setSelectedEntry(entry);
+      }
+    } catch {
+      setSelectedEntry(entry);
+    }
   }
 
   return (
@@ -147,194 +246,260 @@ export default function KBPage() {
         </button>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Main content */}
-        <div className="flex-1 min-w-0">
-          {/* Search & Filters */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <input
-                type="text"
-                placeholder="Search title or content..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <select
-                value={filterBotId}
-                onChange={(e) => setFilterBotId(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Bots</option>
-                {botIds.map((id) => (
-                  <option key={id} value={id}>{id}</option>
-                ))}
-              </select>
-              <select
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Categories</option>
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-              <select
-                value={filterTag}
-                onChange={(e) => setFilterTag(e.target.value)}
-                className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Tags</option>
-                {allTags.map((tag) => (
-                  <option key={tag} value={tag}>{tag}</option>
-                ))}
-              </select>
-            </div>
+      {/* Filters */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 flex gap-2">
+            <input
+              type="text"
+              placeholder="Search title or content..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && triggerSearch()}
+              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={triggerSearch}
+              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors"
+            >
+              Search
+            </button>
           </div>
-
-          {/* Entry Table */}
-          {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg mb-4 text-sm">
-              {error}
-            </div>
-          )}
-
-          {loading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : entries.length === 0 ? (
-            <div className="text-center py-16 text-gray-500 dark:text-gray-400">
-              <p className="text-lg mb-2">No entries found</p>
-              <p className="text-sm">Click &quot;+ New Entry&quot; to add the first one.</p>
-            </div>
-          ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Title</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300 hidden md:table-cell">Bot</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300 hidden md:table-cell">Category</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300 hidden lg:table-cell">Tags</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300 hidden lg:table-cell">Updated</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((entry, i) => (
-                    <tr
-                      key={entry.id}
-                      className={`border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors ${i === entries.length - 1 ? 'border-b-0' : ''}`}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900 dark:text-white">{entry.title}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1 max-w-xs">
-                          {entry.content}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400 hidden md:table-cell">
-                        {entry.bot_id || <span className="text-gray-400">—</span>}
-                      </td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        {entry.category ? (
-                          <span className="inline-block px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs">
-                            {entry.category}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 hidden lg:table-cell">
-                        <div className="flex flex-wrap gap-1">
-                          {entry.tags.length > 0 ? entry.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="inline-block px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded text-xs"
-                            >
-                              {tag}
-                            </span>
-                          )) : <span className="text-gray-400">—</span>}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs hidden lg:table-cell whitespace-nowrap">
-                        {formatDate(entry.updated_at)}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => openEdit(entry)}
-                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-xs font-medium px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                          >
-                            Edit
-                          </button>
-                          {deleteConfirm === entry.id ? (
-                            <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => handleDelete(entry.id)}
-                                className="text-red-600 dark:text-red-400 text-xs font-medium px-2 py-1 rounded bg-red-50 dark:bg-red-900/20 hover:bg-red-100 transition-colors"
-                              >
-                                Confirm
-                              </button>
-                              <button
-                                onClick={() => setDeleteConfirm(null)}
-                                className="text-gray-500 text-xs px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setDeleteConfirm(entry.id)}
-                              className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-xs font-medium px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Recent Updates Sidebar */}
-        <div className="w-full lg:w-64 shrink-0">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-            <h2 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
-              Recent Updates
-            </h2>
-            {recentEntries.length === 0 ? (
-              <p className="text-xs text-gray-400">No entries yet</p>
-            ) : (
-              <ul className="space-y-3">
-                {recentEntries.map((entry) => (
-                  <li key={entry.id} className="border-b border-gray-100 dark:border-gray-700/50 pb-3 last:border-b-0 last:pb-0">
-                    <p
-                      className="text-xs font-medium text-gray-900 dark:text-white truncate cursor-pointer hover:text-blue-600 dark:hover:text-blue-400"
-                      onClick={() => openEdit(entry)}
-                      title={entry.title}
-                    >
-                      {entry.title}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      {formatDate(entry.updated_at)}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <select
+            value={filterBotId}
+            onChange={(e) => setFilterBotId(e.target.value)}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Bots</option>
+            {botIds.map((id) => (
+              <option key={id} value={id}>{id}</option>
+            ))}
+          </select>
+          <select
+            value={filterTag}
+            onChange={(e) => setFilterTag(e.target.value)}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Tags</option>
+            {allTags.map((tag) => (
+              <option key={tag} value={tag}>{tag}</option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Error */}
+      {error && (
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg mb-6 text-sm">
+          {error}
+        </div>
+      )}
+
+      {/* Content Area */}
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : categories.length === 0 ? (
+        <div className="text-center py-16 text-gray-500 dark:text-gray-400">
+          <p className="text-lg mb-2">No entries found</p>
+          <p className="text-sm">Click &quot;+ New Entry&quot; to add the first one.</p>
+        </div>
+      ) : committedSearch ? (
+        /* Search Results: grouped by domain with inline entries */
+        <div className="space-y-6">
+          {Array.from(entriesByCategory.entries()).map(([category, catEntries]) => (
+            <div key={category}>
+              {/* Domain Header */}
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-lg">{getCategoryIcon(category)}</span>
+                <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                  {category}
+                </h2>
+                <span className="text-xs text-gray-400 dark:text-gray-500">
+                  {catEntries.length} {catEntries.length === 1 ? 'result' : 'results'}
+                </span>
+              </div>
+              {/* Entry List */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700/50">
+                {catEntries.map((entry) => (
+                  <div
+                    key={entry.id}
+                    onClick={() => {
+                      setSelectedCategory(category);
+                      handleEntryClick(entry);
+                    }}
+                    className="flex items-start justify-between gap-4 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors first:rounded-t-lg last:rounded-b-lg"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                        {entry.title}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
+                        {entry.content}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {entry.similarity_pct != null && (
+                        <span
+                          className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                            entry.similarity_pct >= 70
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              : entry.similarity_pct >= 50
+                                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                          }`}
+                        >
+                          {entry.similarity_pct}%
+                        </span>
+                      )}
+                      {entry.bot_id && (
+                        <span className="text-xs text-gray-400 dark:text-gray-500">
+                          {entry.bot_id}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* Default: Domain Card Grid */
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {categories.map(({ category, count }) => (
+            <DomainCard
+              key={category}
+              domain={{ domain: category, entry_count: count }}
+              icon={getCategoryIcon(category)}
+              onClick={() => handleCategoryClick(category)}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Category → Entry LayerModal (2-layer) */}
+      <LayerModal
+        open={!!selectedCategory}
+        onClose={() => {
+          setSelectedCategory(null);
+          setSelectedEntry(null);
+          setDeleteConfirm(null);
+        }}
+        icon={selectedCategory ? getCategoryIcon(selectedCategory) : undefined}
+        title={selectedEntry ? selectedEntry.title : selectedCategory ?? ''}
+        subtitle={
+          selectedEntry
+            ? selectedEntry.bot_id
+              ? `by ${selectedEntry.bot_id}`
+              : undefined
+            : `${categoryEntries.length} entries`
+        }
+        showBack={!!selectedEntry}
+        onBack={() => {
+          setSelectedEntry(null);
+          setDeleteConfirm(null);
+        }}
+        headerActions={
+          selectedEntry ? (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => openEdit(selectedEntry)}
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-xs font-medium px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+              >
+                Edit
+              </button>
+              {deleteConfirm === selectedEntry.id ? (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => handleDelete(selectedEntry)}
+                    className="text-red-600 dark:text-red-400 text-xs font-medium px-2 py-1 rounded bg-red-50 dark:bg-red-900/20 hover:bg-red-100 transition-colors"
+                  >
+                    Confirm
+                  </button>
+                  <button
+                    onClick={() => setDeleteConfirm(null)}
+                    className="text-gray-500 text-xs px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setDeleteConfirm(selectedEntry.id)}
+                  className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-xs font-medium px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+          ) : undefined
+        }
+      >
+        {selectedEntry ? (
+          /* View B: Entry Detail */
+          <div className="space-y-4">
+            {selectedEntry.tags && selectedEntry.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {selectedEntry.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-block px-2 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded text-xs"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+            {selectedEntry.updated_at && (
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                Updated: {formatDate(selectedEntry.updated_at)}
+              </div>
+            )}
+            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+              <pre className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words font-mono">
+                {selectedEntry.content}
+              </pre>
+            </div>
+          </div>
+        ) : (
+          /* View A: Entry List */
+          categoryEntries.length === 0 ? (
+            <p className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+              No entries in this category
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {categoryEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  onClick={() => handleEntryClick(entry)}
+                  className="flex items-start justify-between gap-4 px-4 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {entry.title}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
+                      {entry.content}
+                    </p>
+                  </div>
+                  {entry.bot_id && (
+                    <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                      {entry.bot_id}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
+        )}
+      </LayerModal>
+
+      {/* CRUD Form Modal (z-60, above LayerModal) */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <div
             className="absolute inset-0 bg-black/50"
             onClick={() => setModalOpen(false)}
@@ -348,7 +513,7 @@ export default function KBPage() {
                 onClick={() => setModalOpen(false)}
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none"
               >
-                ×
+                &times;
               </button>
             </div>
 
@@ -384,40 +549,34 @@ export default function KBPage() {
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Bot ID
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={form.bot_id}
                     onChange={(e) => setForm((f) => ({ ...f, bot_id: e.target.value }))}
-                    placeholder="e.g. workclaw"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select bot</option>
+                    {allBotIds.map((id) => (
+                      <option key={id} value={id}>{id}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Category
                   </label>
-                  <input
-                    type="text"
+                  <select
                     value={form.category}
                     onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
-                    placeholder="e.g. tutorial"
-                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select domain</option>
+                    {domains.map((d) => (
+                      <option key={d.domain} value={d.domain}>
+                        {d.domain}{d.description ? ` — ${d.description}` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Tags
-                  <span className="text-gray-400 font-normal ml-1">(comma-separated)</span>
-                </label>
-                <input
-                  type="text"
-                  value={form.tags}
-                  onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
-                  placeholder="e.g. guide, setup, config"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
               </div>
             </div>
 

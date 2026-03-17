@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
-import { getFileContent } from '@/lib/github';
+import { readFile } from 'fs/promises';
+import { getFileContent, getFileMeta, updateFileContent } from '@/lib/github';
 import { getBotWorkspacePath } from '@/lib/constants';
 import path from 'path';
+
+const WORKSPACES_DIR = path.resolve(process.cwd(), '../../semo-system/bot-workspaces');
 
 /**
  * Safe path validation to prevent path traversal attacks
@@ -52,12 +55,22 @@ export async function GET(
       );
     }
     
-    // Construct full GitHub path
-    const fullPath = `${basePath}/${requestedPath}`;
-    
-    // Fetch file content from GitHub
-    const content = await getFileContent(fullPath);
-    
+    // Try local filesystem first, fallback to GitHub API
+    const localPath = path.join(WORKSPACES_DIR, botId, requestedPath);
+    // Validate local path to prevent traversal
+    if (!localPath.startsWith(path.join(WORKSPACES_DIR, botId))) {
+      return NextResponse.json({ error: 'Invalid file path' }, { status: 400 });
+    }
+
+    let content: string;
+    try {
+      content = await readFile(localPath, 'utf-8');
+    } catch {
+      // Fallback to GitHub API
+      const fullPath = `${basePath}/${requestedPath}`;
+      content = await getFileContent(fullPath);
+    }
+
     return NextResponse.json({
       path: requestedPath,
       content,
@@ -75,6 +88,55 @@ export async function GET(
     
     return NextResponse.json(
       { error: 'Failed to fetch file' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(
+  req: Request,
+  { params }: { params: Promise<{ botId: string; filePath: string[] }> }
+) {
+  try {
+    const { botId, filePath } = await params;
+
+    if (!/^[a-zA-Z0-9_-]+$/.test(botId)) {
+      return NextResponse.json({ error: 'Invalid bot ID' }, { status: 400 });
+    }
+
+    const requestedPath = filePath.join('/');
+    const basePath = getBotWorkspacePath(botId);
+
+    try {
+      validatePath(basePath, requestedPath);
+    } catch {
+      return NextResponse.json({ error: 'Invalid file path' }, { status: 400 });
+    }
+
+    const { content, message } = await req.json();
+    if (typeof content !== 'string') {
+      return NextResponse.json({ error: 'content is required' }, { status: 400 });
+    }
+
+    const fullPath = `${basePath}/${requestedPath}`;
+
+    // Get current file SHA for GitHub update
+    const meta = await getFileMeta(fullPath);
+    await updateFileContent(fullPath, content, meta.sha, message);
+
+    return NextResponse.json({ path: requestedPath, updated: true });
+  } catch (error) {
+    console.error('Error updating file:', error);
+
+    if (error instanceof Error && error.message.includes('409')) {
+      return NextResponse.json(
+        { error: 'Conflict: file was modified. Refresh and try again.' },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to update file' },
       { status: 500 }
     );
   }

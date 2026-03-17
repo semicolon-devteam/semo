@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { getFileContent, getBotWorkspaces } from '@/lib/github';
 import { query } from '@/lib/db';
 import type { Bot } from '@/types';
+import { readdir, readFile } from 'fs/promises';
+import path from 'path';
 
 // Force dynamic rendering to prevent build-time DB connection
 export const dynamic = 'force-dynamic';
@@ -18,57 +20,98 @@ interface BotStatusRow {
   synced_at: string;
 }
 
+function parseIdentityContent(content: string, botId: string): { name: string; emoji: string; role: string } {
+  const nameMatch = content.match(/\*\*Name:\*\*\s*(.+)/);
+  const emojiMatch = content.match(/\*\*Emoji:\*\*\s*(\S+)/);
+  const roleMatch = content.match(/\*\*(?:Creature|Role|직책):\*\*\s*(.+)/);
+
+  return {
+    name: nameMatch ? nameMatch[1].trim() : botId,
+    emoji: emojiMatch ? emojiMatch[1].trim() : '🤖',
+    role: roleMatch ? roleMatch[1].trim() : 'Bot',
+  };
+}
+
 async function parseBotMetadata(botId: string): Promise<{ name: string; emoji: string; role: string }> {
   try {
     const identity = await getFileContent(`semo-system/bot-workspaces/${botId}/IDENTITY.md`).catch(() => '');
-
-    const nameMatch = identity.match(/\*\*Name:\*\*\s*(.+)/);
-    const emojiMatch = identity.match(/\*\*Emoji:\*\*\s*(\S+)/);
-    const roleMatch = identity.match(/\*\*(?:Creature|Role|직책):\*\*\s*(.+)/);
-
-    return {
-      name: nameMatch ? nameMatch[1].trim() : botId,
-      emoji: emojiMatch ? emojiMatch[1].trim() : '🤖',
-      role: roleMatch ? roleMatch[1].trim() : 'Bot',
-    };
+    return parseIdentityContent(identity, botId);
   } catch (error) {
     console.error(`Error parsing bot metadata for ${botId}:`, error);
     return { name: botId, emoji: '🤖', role: 'Bot' };
   }
 }
 
+async function fallbackToLocal(): Promise<Bot[]> {
+  // Resolve bot-workspaces relative to project root
+  const workspacesDir = path.resolve(process.cwd(), '../../semo-system/bot-workspaces');
+  const entries = await readdir(workspacesDir, { withFileTypes: true });
+  const botIds = entries.filter(e => e.isDirectory()).map(e => e.name);
+
+  return Promise.all(
+    botIds.map(async (botId): Promise<Bot> => {
+      let identity = '';
+      try {
+        identity = await readFile(path.join(workspacesDir, botId, 'IDENTITY.md'), 'utf-8');
+      } catch { /* no IDENTITY.md */ }
+      const { name, emoji, role } = parseIdentityContent(identity, botId);
+      return {
+        id: botId,
+        name,
+        emoji,
+        role,
+        status: 'offline',
+        lastActive: new Date(0).toISOString(),
+        sessionCount: 0,
+        workspacePath: `semo-system/bot-workspaces/${botId}`,
+      };
+    })
+  );
+}
+
+async function fallbackToGitHub(): Promise<Bot[]> {
+  try {
+    const botIds = await getBotWorkspaces();
+    return Promise.all(
+      botIds.map(async (botId): Promise<Bot> => {
+        const { name, emoji, role } = await parseBotMetadata(botId);
+        return {
+          id: botId,
+          name,
+          emoji,
+          role,
+          status: 'offline',
+          lastActive: new Date(0).toISOString(),
+          sessionCount: 0,
+          workspacePath: `semo-system/bot-workspaces/${botId}`,
+        };
+      })
+    );
+  } catch (githubError) {
+    console.warn('GitHub API unavailable, falling back to local filesystem:', (githubError as Error).message);
+    return fallbackToLocal();
+  }
+}
+
 export async function GET() {
   try {
     // Query bot status from PostgreSQL
-    const result = await query<BotStatusRow>(`
-      SELECT bot_id, name, emoji, role, last_active, session_count, workspace_path, status, synced_at
-      FROM semo.bot_status
-      ORDER BY bot_id
-    `);
+    let result;
+    try {
+      result = await query<BotStatusRow>(`
+        SELECT bot_id, name, emoji, role, last_active, session_count, workspace_path, status, synced_at
+        FROM semo.bot_status
+        ORDER BY bot_id
+      `);
+    } catch (dbError) {
+      console.warn('DB unavailable, falling back to GitHub:', (dbError as Error).message);
+      return NextResponse.json(await fallbackToGitHub());
+    }
 
     // If DB is empty, fallback to GitHub
     if (result.rows.length === 0) {
       console.log('DB empty, falling back to GitHub...');
-      const botIds = await getBotWorkspaces();
-      
-      const bots = await Promise.all(
-        botIds.map(async (botId): Promise<Bot> => {
-          const { name, emoji, role } = await parseBotMetadata(botId);
-          
-          return {
-            id: botId,
-            name,
-            emoji,
-            role,
-            status: 'offline',
-            lastActive: new Date(0).toISOString(), // Epoch time for bots not yet in DB
-            sessionCount: 0,
-            workspacePath: `semo-system/bot-workspaces/${botId}`,
-          };
-        })
-      );
-
-      return NextResponse.json(bots);
+      return NextResponse.json(await fallbackToGitHub());
     }
 
     // Enrich with GitHub data (name, emoji, role) if missing in DB

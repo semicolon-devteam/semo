@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Image from "next/image";
 import Link from "next/link";
 
 const geistSans = Geist({
@@ -32,8 +33,9 @@ export default function RootLayout({
           <div className="container mx-auto px-4">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-8">
-                <Link href="/" className="text-xl font-bold text-gray-900 dark:text-white">
-                  🤖 SEMO Dashboard
+                <Link href="/" className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white">
+                  <Image src="/logo.png" alt="SEMO" width={28} height={28} />
+                  SEMO Dashboard
                 </Link>
                 <div className="flex gap-4">
                   <Link
@@ -47,6 +49,12 @@ export default function RootLayout({
                     className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium"
                   >
                     Knowledge Base
+                  </Link>
+                  <Link
+                    href="/ontology"
+                    className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    Ontology
                   </Link>
                 </div>
               </div>

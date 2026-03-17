@@ -3,6 +3,14 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import LayerModal from '@/components/LayerModal';
+import SessionCard from '@/components/SessionCard';
+import CronJobCard from '@/components/CronJobCard';
+import CronJobForm from '@/components/CronJobForm';
+import DomainCard from '@/components/DomainCard';
+import FilesTab from '@/components/files/FilesTab';
+import AuditChecklist from '@/components/AuditChecklist';
+import type { Session, CronJob, BotAudit } from '@/types';
 
 interface BotInfo {
   id: string;
@@ -16,15 +24,6 @@ interface BotInfo {
   syncedAt: string;
 }
 
-interface Session {
-  sessionKey: string;
-  label: string;
-  kind: string;
-  chatType: string;
-  lastActivity: string;
-  messageCount: number;
-}
-
 interface KBItem {
   kb_id: number;
   domain: string;
@@ -33,17 +32,45 @@ interface KBItem {
   updated_at?: string;
 }
 
-type Tab = 'sessions' | 'kb';
+type Tab = 'files' | 'sessions' | 'cron' | 'kb' | 'audit';
+
+const DOMAIN_ICONS: Record<string, string> = {
+  team: '\u{1F465}',
+  project: '\u{1F4CB}',
+  decision: '\u2696\uFE0F',
+  process: '\u{1F504}',
+  infra: '\u{1F3D7}\uFE0F',
+  kpi: '\u{1F4CA}',
+  'session-log': '\u{1F4DD}',
+};
+
+function getDomainIcon(domain: string): string {
+  return DOMAIN_ICONS[domain] || '\u{1F4C2}';
+}
 
 export default function BotDetailPage() {
   const { botId } = useParams<{ botId: string }>();
 
   const [bot, setBot] = useState<BotInfo | null>(null);
   const [sessions, setSessions] = useState<Session[]>([]);
+  const [cronJobs, setCronJobs] = useState<CronJob[]>([]);
   const [kbItems, setKbItems] = useState<KBItem[]>([]);
-  const [activeTab, setActiveTab] = useState<Tab>('sessions');
+  const [audit, setAudit] = useState<BotAudit | null>(null);
+  const [activeTab, setActiveTab] = useState<Tab>('files');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Session modal
+  const [selectedSession, setSelectedSession] = useState<Session | null>(null);
+
+  // Cron modal
+  const [selectedCron, setSelectedCron] = useState<CronJob | null>(null);
+  const [cronFormMode, setCronFormMode] = useState<'view' | 'create' | 'edit' | null>(null);
+  const [cronSaving, setCronSaving] = useState(false);
+
+  // KB modal (2-layer)
+  const [selectedKBDomain, setSelectedKBDomain] = useState<string | null>(null);
+  const [selectedKBItem, setSelectedKBItem] = useState<KBItem | null>(null);
 
   useEffect(() => {
     if (!botId) return;
@@ -60,11 +87,16 @@ export default function BotDetailPage() {
       fetch(`/api/kb?bot_id=${botId}`)
         .then((r) => (r.ok ? r.json() : []))
         .catch(() => []),
+      fetch(`/api/bots/${botId}/audit`)
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null),
     ])
-      .then(([botData, detail, kb]) => {
+      .then(([botData, detail, kb, auditData]) => {
         setBot(botData);
         setSessions(detail?.activity?.sessions ?? []);
+        setCronJobs(detail?.activity?.cronJobs ?? []);
         setKbItems(Array.isArray(kb) ? kb : []);
+        setAudit(auditData);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -80,6 +112,70 @@ export default function BotDetailPage() {
     });
   }
 
+  // Group KB items by domain
+  const kbByDomain = kbItems.reduce<Map<string, KBItem[]>>((acc, item) => {
+    const list = acc.get(item.domain) || [];
+    list.push(item);
+    acc.set(item.domain, list);
+    return acc;
+  }, new Map());
+
+  async function refreshCronJobs() {
+    try {
+      const res = await fetch(`/api/bots/${botId}/cron`);
+      if (res.ok) setCronJobs(await res.json());
+    } catch { /* ignore */ }
+  }
+
+  async function handleCronSave(data: {
+    jobId: string;
+    name: string;
+    schedule: CronJob['schedule'];
+    enabled: boolean;
+    sessionTarget: string;
+  }) {
+    setCronSaving(true);
+    try {
+      const isEdit = cronFormMode === 'edit';
+      const url = isEdit
+        ? `/api/bots/${botId}/cron/${data.jobId}`
+        : `/api/bots/${botId}/cron`;
+      const res = await fetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed');
+      await refreshCronJobs();
+      setCronFormMode(null);
+      setSelectedCron(null);
+    } catch (e) {
+      console.error('Cron save error:', e);
+    } finally {
+      setCronSaving(false);
+    }
+  }
+
+  async function handleCronDelete(jobId: string) {
+    if (!confirm('Delete this cron job?')) return;
+    try {
+      const res = await fetch(`/api/bots/${botId}/cron/${jobId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed');
+      await refreshCronJobs();
+      setCronFormMode(null);
+      setSelectedCron(null);
+    } catch (e) {
+      console.error('Cron delete error:', e);
+    }
+  }
+
+  const domainCards = Array.from(kbByDomain.entries()).map(([domain, items]) => ({
+    domain,
+    entry_count: items.length,
+  }));
+
+  const domainKBItems = selectedKBDomain ? kbByDomain.get(selectedKBDomain) ?? [] : [];
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -91,7 +187,7 @@ export default function BotDetailPage() {
   if (error || !bot) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Link href="/bots" className="text-sm text-blue-600 hover:underline">← Bot Team</Link>
+        <Link href="/bots" className="text-sm text-blue-600 hover:underline">&larr; Bot Team</Link>
         <div className="mt-8 text-center text-gray-500">
           <p className="text-lg">{error || 'Bot not found'}</p>
         </div>
@@ -105,7 +201,7 @@ export default function BotDetailPage() {
     <div className="container mx-auto px-4 py-8">
       {/* Back */}
       <Link href="/bots" className="text-sm text-blue-600 hover:underline">
-        ← Bot Team
+        &larr; Bot Team
       </Link>
 
       {/* Bot Header */}
@@ -151,17 +247,23 @@ export default function BotDetailPage() {
       {/* Tabs */}
       <div className="mt-6 border-b border-gray-200 dark:border-gray-700">
         <nav className="flex gap-6">
-          {(['sessions', 'kb'] as Tab[]).map((tab) => (
+          {([
+            { key: 'files' as Tab, label: 'Files' },
+            { key: 'sessions' as Tab, label: `Sessions (${sessions.length})` },
+            { key: 'cron' as Tab, label: `Cron Jobs (${cronJobs.length})` },
+            { key: 'kb' as Tab, label: `Bot KB (${kbItems.length})` },
+            { key: 'audit' as Tab, label: `Audit${audit ? ` (${audit.score}%)` : ''}` },
+          ]).map(({ key, label }) => (
             <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`pb-3 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
-                activeTab === tab
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`pb-3 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                activeTab === key
                   ? 'border-blue-600 text-blue-600'
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
-              {tab === 'sessions' ? `Sessions (${sessions.length})` : `Bot KB (${kbItems.length})`}
+              {label}
             </button>
           ))}
         </nav>
@@ -169,41 +271,69 @@ export default function BotDetailPage() {
 
       {/* Tab Content */}
       <div className="mt-6">
+        {activeTab === 'files' && (
+          <FilesTab botId={botId} />
+        )}
+
         {activeTab === 'sessions' && (
           sessions.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
-              <p>세션 기록 없음</p>
+              <p>No session records</p>
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Label</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300 hidden md:table-cell">Kind</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300 hidden md:table-cell">Channel</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Messages</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300 hidden lg:table-cell">Last Activity</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sessions.map((s, i) => (
-                    <tr
-                      key={s.sessionKey}
-                      className={`border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 ${i === sessions.length - 1 ? 'border-b-0' : ''}`}
-                    >
-                      <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900 dark:text-white">{s.label || s.sessionKey}</div>
-                        <div className="text-xs text-gray-400 font-mono">{s.sessionKey}</div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 hidden md:table-cell">{s.kind}</td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 hidden md:table-cell">{s.chatType}</td>
-                      <td className="px-4 py-3 text-right font-medium text-gray-900 dark:text-white">{s.messageCount}</td>
-                      <td className="px-4 py-3 text-right text-gray-500 dark:text-gray-400 text-xs hidden lg:table-cell whitespace-nowrap">{fmt(s.lastActivity)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {sessions.map((s) => (
+                <SessionCard
+                  key={s.sessionKey}
+                  session={s}
+                  onClick={() => setSelectedSession(s)}
+                />
+              ))}
+            </div>
+          )
+        )}
+
+        {activeTab === 'cron' && (
+          <div>
+            <div className="flex justify-end mb-4">
+              <button
+                onClick={() => {
+                  setSelectedCron(null);
+                  setCronFormMode('create');
+                }}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                + New Cron Job
+              </button>
+            </div>
+            {cronJobs.length === 0 ? (
+              <div className="text-center py-16 text-gray-400">
+                <p>No cron jobs configured</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {cronJobs.map((cj) => (
+                  <CronJobCard
+                    key={cj.jobId}
+                    cronJob={cj}
+                    onClick={() => {
+                      setSelectedCron(cj);
+                      setCronFormMode('view');
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'audit' && (
+          audit ? (
+            <AuditChecklist audit={audit} />
+          ) : (
+            <div className="text-center py-16 text-gray-400">
+              <p>No audit data available</p>
+              <p className="text-xs mt-1">Run <code className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">semo bots audit</code> to generate</p>
             </div>
           )
         )}
@@ -211,41 +341,223 @@ export default function BotDetailPage() {
         {activeTab === 'kb' && (
           kbItems.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
-              <p>봇 KB 항목 없음</p>
+              <p>No bot KB items</p>
             </div>
           ) : (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Key</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300 hidden md:table-cell">Domain</th>
-                    <th className="text-left px-4 py-3 font-medium text-gray-700 dark:text-gray-300">Content</th>
-                    <th className="text-right px-4 py-3 font-medium text-gray-700 dark:text-gray-300 hidden lg:table-cell">Updated</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {kbItems.map((item, i) => (
-                    <tr
-                      key={item.kb_id}
-                      className={`border-b border-gray-100 dark:border-gray-700/50 hover:bg-gray-50 dark:hover:bg-gray-700/30 ${i === kbItems.length - 1 ? 'border-b-0' : ''}`}
-                    >
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white whitespace-nowrap">{item.key}</td>
-                      <td className="px-4 py-3 hidden md:table-cell">
-                        <span className="inline-block px-2 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded text-xs">{item.domain}</span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400 max-w-sm">
-                        <p className="line-clamp-2 text-xs">{item.content}</p>
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-500 dark:text-gray-400 text-xs hidden lg:table-cell whitespace-nowrap">{fmt(item.updated_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {domainCards.map((d) => (
+                <DomainCard
+                  key={d.domain}
+                  domain={d}
+                  icon={getDomainIcon(d.domain)}
+                  onClick={() => {
+                    setSelectedKBDomain(d.domain);
+                    setSelectedKBItem(null);
+                  }}
+                />
+              ))}
             </div>
           )
         )}
       </div>
+
+      {/* Cron Job View Modal */}
+      <LayerModal
+        open={cronFormMode === 'view' && !!selectedCron}
+        onClose={() => { setCronFormMode(null); setSelectedCron(null); }}
+        title={selectedCron?.name || ''}
+        subtitle={selectedCron?.jobId}
+        headerActions={
+          <div className="flex gap-2">
+            <button
+              onClick={() => setCronFormMode('edit')}
+              className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => selectedCron && handleCronDelete(selectedCron.jobId)}
+              className="px-3 py-1 text-xs font-medium text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+            >
+              Delete
+            </button>
+          </div>
+        }
+      >
+        {selectedCron && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Schedule</span>
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                  {selectedCron.schedule.kind === 'cron' && `cron: ${selectedCron.schedule.expression ?? ''}`}
+                  {selectedCron.schedule.kind === 'every' && `every ${selectedCron.schedule.intervalMs ? `${Math.round(Number(selectedCron.schedule.intervalMs) / 60000)}m` : '?'}`}
+                  {selectedCron.schedule.kind === 'at' && `at ${selectedCron.schedule.datetime ?? ''}`}
+                </span>
+              </div>
+              <div>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Status</span>
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                  selectedCron.enabled
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                }`}>
+                  {selectedCron.enabled ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+              <div>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Last Run</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">{fmt(selectedCron.lastRun)}</span>
+              </div>
+              <div>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Next Run</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">{fmt(selectedCron.nextRun)}</span>
+              </div>
+              <div>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Session Target</span>
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                  selectedCron.sessionTarget === 'main'
+                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                }`}>
+                  {selectedCron.sessionTarget ?? 'main'}
+                </span>
+              </div>
+            </div>
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Job ID</span>
+              <code className="text-xs font-mono text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-lg block break-all">
+                {selectedCron.jobId}
+              </code>
+            </div>
+          </div>
+        )}
+      </LayerModal>
+
+      {/* Cron Job Create/Edit Modal */}
+      <LayerModal
+        open={cronFormMode === 'create' || cronFormMode === 'edit'}
+        onClose={() => { setCronFormMode(null); setSelectedCron(null); }}
+        title={cronFormMode === 'edit' ? 'Edit Cron Job' : 'New Cron Job'}
+      >
+        <CronJobForm
+          initial={cronFormMode === 'edit' ? (selectedCron ?? undefined) : undefined}
+          onSave={handleCronSave}
+          onCancel={() => { setCronFormMode(null); setSelectedCron(null); }}
+          saving={cronSaving}
+        />
+      </LayerModal>
+
+      {/* Session Detail Modal */}
+      <LayerModal
+        open={!!selectedSession}
+        onClose={() => setSelectedSession(null)}
+        title={selectedSession?.label || selectedSession?.sessionKey || ''}
+        subtitle={selectedSession?.sessionKey}
+      >
+        {selectedSession && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Kind</span>
+                <span
+                  className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                    selectedSession.kind === 'main'
+                      ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                  }`}
+                >
+                  {selectedSession.kind}
+                </span>
+              </div>
+              <div>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Channel</span>
+                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                  {selectedSession.chatType}
+                </span>
+              </div>
+              <div>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Messages</span>
+                <span className="text-lg font-semibold text-gray-900 dark:text-white">{selectedSession.messageCount}</span>
+              </div>
+              <div>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Last Activity</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">{fmt(selectedSession.lastActivity)}</span>
+              </div>
+            </div>
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Session Key</span>
+              <code className="text-xs font-mono text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-lg block break-all">
+                {selectedSession.sessionKey}
+              </code>
+            </div>
+          </div>
+        )}
+      </LayerModal>
+
+      {/* KB Domain Modal (2-layer) */}
+      <LayerModal
+        open={!!selectedKBDomain}
+        onClose={() => {
+          setSelectedKBDomain(null);
+          setSelectedKBItem(null);
+        }}
+        icon={selectedKBDomain ? getDomainIcon(selectedKBDomain) : undefined}
+        title={selectedKBItem ? selectedKBItem.key : selectedKBDomain ?? ''}
+        subtitle={selectedKBItem ? selectedKBItem.domain : undefined}
+        showBack={!!selectedKBItem}
+        onBack={() => setSelectedKBItem(null)}
+      >
+        {selectedKBItem ? (
+          /* View B: KB Item Detail */
+          <div className="space-y-4">
+            {selectedKBItem.updated_at && (
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <span>Updated:</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {fmt(selectedKBItem.updated_at)}
+                </span>
+              </div>
+            )}
+            <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+              <pre className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words font-mono">
+                {selectedKBItem.content}
+              </pre>
+            </div>
+          </div>
+        ) : (
+          /* View A: KB Items List */
+          domainKBItems.length === 0 ? (
+            <p className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+              No items in this domain
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {domainKBItems.map((item) => (
+                <div
+                  key={item.kb_id}
+                  onClick={() => setSelectedKBItem(item)}
+                  className="flex items-start justify-between gap-4 px-4 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {item.key}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
+                      {item.content}
+                    </p>
+                  </div>
+                  {item.updated_at && (
+                    <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                      {fmt(item.updated_at)}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
+        )}
+      </LayerModal>
     </div>
   );
 }
