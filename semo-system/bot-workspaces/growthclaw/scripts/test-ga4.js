@@ -2,7 +2,7 @@ const { BetaAnalyticsDataClient } = require('@google-analytics/data');
 const path = require('path');
 
 // 서비스 계정 키 파일 경로
-const keyFilePath = path.join(__dirname, '../credentials/growthclaw-analytics.json');
+const keyFilePath = path.join(process.env.HOME, '.openclaw-growthclaw', 'credentials', 'google-service-account.json');
 
 // GA4 클라이언트 초기화
 const analyticsDataClient = new BetaAnalyticsDataClient({

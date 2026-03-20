@@ -71,6 +71,7 @@ async function parseCronJobs(filePath) {
       lastRun: job.lastRun || null,
       nextRun: job.nextRun || null,
       sessionTarget: job.sessionTarget || 'main',
+      payload: job.payload || null,
     }));
   } catch (error) {
     if (error.code === 'ENOENT') {

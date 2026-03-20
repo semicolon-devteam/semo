@@ -22,6 +22,8 @@ const handler = async (event: any) => {
   }
 
   const stdinData = JSON.stringify(event);
+  const HOME = require("os").homedir();
+  const memDir = `${HOME}/.openclaw-${BOT_ID}/workspace/memory`;
 
   try {
     const { stdout } = await execAsync(
@@ -41,6 +43,47 @@ const handler = async (event: any) => {
     );
   } catch {
     // sessions push 실패는 무시 (훅 안전성 유지)
+  }
+
+  // 세션 시작 시 KB 동기화 + 다이제스트 + KB 규칙 복사
+  if (sessionEvent === "start") {
+    try {
+      await execAsync(
+        `semo context sync --bot ${BOT_ID} --digest --out-dir ${memDir} --no-skills --no-global-cache`,
+        { env: { ...process.env }, timeout: 30000 }
+      );
+    } catch {
+      // context sync 실패는 무시 (훅 안전성 유지)
+    }
+    // KB 저장 규칙을 봇 메모리에 복사 (SEMO 원칙 준수 강제)
+    try {
+      await execAsync(
+        `cp ~/.openclaw-shared/kb-rules.md ${memDir}/kb-rules.md`,
+        { env: { ...process.env }, timeout: 5000 }
+      );
+    } catch {
+      // kb-rules 복사 실패는 무시
+    }
+  }
+
+  // 세션 종료 시 봇이 수집한 컨텍스트를 DB로 push (decision + project)
+  if (sessionEvent === "stop") {
+    try {
+      await execAsync(
+        `semo context push --domain decision --out-dir ${memDir}`,
+        { env: { ...process.env }, timeout: 15000 }
+      );
+    } catch {
+      // context push 실패는 무시 (훅 안전성 유지)
+    }
+    try {
+      await execAsync(
+        `semo context push --domain project --out-dir ${memDir}`,
+        { env: { ...process.env }, timeout: 15000 }
+      );
+    } catch {
+      // context push 실패는 무시 (훅 안전성 유지)
+    }
   }
 };
 

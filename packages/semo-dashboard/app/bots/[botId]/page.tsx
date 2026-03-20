@@ -6,11 +6,12 @@ import Link from 'next/link';
 import LayerModal from '@/components/LayerModal';
 import SessionCard from '@/components/SessionCard';
 import CronJobCard from '@/components/CronJobCard';
-import CronJobForm from '@/components/CronJobForm';
+
 import DomainCard from '@/components/DomainCard';
 import FilesTab from '@/components/files/FilesTab';
+import SkillsTab from '@/components/skills/SkillsTab';
 import AuditChecklist from '@/components/AuditChecklist';
-import type { Session, CronJob, BotAudit } from '@/types';
+import type { Session, CronJob, BotAudit, BotSkill } from '@/types';
 
 interface BotInfo {
   id: string;
@@ -32,7 +33,7 @@ interface KBItem {
   updated_at?: string;
 }
 
-type Tab = 'files' | 'sessions' | 'cron' | 'kb' | 'audit';
+type Tab = 'files' | 'skills' | 'sessions' | 'cron' | 'kb' | 'audit';
 
 const DOMAIN_ICONS: Record<string, string> = {
   team: '\u{1F465}',
@@ -55,6 +56,7 @@ export default function BotDetailPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [cronJobs, setCronJobs] = useState<CronJob[]>([]);
   const [kbItems, setKbItems] = useState<KBItem[]>([]);
+  const [skills, setSkills] = useState<BotSkill[]>([]);
   const [audit, setAudit] = useState<BotAudit | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('files');
   const [loading, setLoading] = useState(true);
@@ -65,8 +67,7 @@ export default function BotDetailPage() {
 
   // Cron modal
   const [selectedCron, setSelectedCron] = useState<CronJob | null>(null);
-  const [cronFormMode, setCronFormMode] = useState<'view' | 'create' | 'edit' | null>(null);
-  const [cronSaving, setCronSaving] = useState(false);
+  const [cronFormMode, setCronFormMode] = useState<'view' | null>(null);
 
   // KB modal (2-layer)
   const [selectedKBDomain, setSelectedKBDomain] = useState<string | null>(null);
@@ -90,13 +91,17 @@ export default function BotDetailPage() {
       fetch(`/api/bots/${botId}/audit`)
         .then((r) => (r.ok ? r.json() : null))
         .catch(() => null),
+      fetch(`/api/bots/${botId}/skills`)
+        .then((r) => (r.ok ? r.json() : []))
+        .catch(() => []),
     ])
-      .then(([botData, detail, kb, auditData]) => {
+      .then(([botData, detail, kb, auditData, skillsData]) => {
         setBot(botData);
         setSessions(detail?.activity?.sessions ?? []);
         setCronJobs(detail?.activity?.cronJobs ?? []);
         setKbItems(Array.isArray(kb) ? kb : []);
         setAudit(auditData);
+        setSkills(Array.isArray(skillsData) ? skillsData : []);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -119,55 +124,6 @@ export default function BotDetailPage() {
     acc.set(item.domain, list);
     return acc;
   }, new Map());
-
-  async function refreshCronJobs() {
-    try {
-      const res = await fetch(`/api/bots/${botId}/cron`);
-      if (res.ok) setCronJobs(await res.json());
-    } catch { /* ignore */ }
-  }
-
-  async function handleCronSave(data: {
-    jobId: string;
-    name: string;
-    schedule: CronJob['schedule'];
-    enabled: boolean;
-    sessionTarget: string;
-  }) {
-    setCronSaving(true);
-    try {
-      const isEdit = cronFormMode === 'edit';
-      const url = isEdit
-        ? `/api/bots/${botId}/cron/${data.jobId}`
-        : `/api/bots/${botId}/cron`;
-      const res = await fetch(url, {
-        method: isEdit ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) throw new Error('Failed');
-      await refreshCronJobs();
-      setCronFormMode(null);
-      setSelectedCron(null);
-    } catch (e) {
-      console.error('Cron save error:', e);
-    } finally {
-      setCronSaving(false);
-    }
-  }
-
-  async function handleCronDelete(jobId: string) {
-    if (!confirm('Delete this cron job?')) return;
-    try {
-      const res = await fetch(`/api/bots/${botId}/cron/${jobId}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error('Failed');
-      await refreshCronJobs();
-      setCronFormMode(null);
-      setSelectedCron(null);
-    } catch (e) {
-      console.error('Cron delete error:', e);
-    }
-  }
 
   const domainCards = Array.from(kbByDomain.entries()).map(([domain, items]) => ({
     domain,
@@ -249,6 +205,7 @@ export default function BotDetailPage() {
         <nav className="flex gap-6">
           {([
             { key: 'files' as Tab, label: 'Files' },
+            { key: 'skills' as Tab, label: `Skills (${skills.length})` },
             { key: 'sessions' as Tab, label: `Sessions (${sessions.length})` },
             { key: 'cron' as Tab, label: `Cron Jobs (${cronJobs.length})` },
             { key: 'kb' as Tab, label: `Bot KB (${kbItems.length})` },
@@ -275,6 +232,10 @@ export default function BotDetailPage() {
           <FilesTab botId={botId} />
         )}
 
+        {activeTab === 'skills' && (
+          <SkillsTab botId={botId} />
+        )}
+
         {activeTab === 'sessions' && (
           sessions.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
@@ -295,17 +256,6 @@ export default function BotDetailPage() {
 
         {activeTab === 'cron' && (
           <div>
-            <div className="flex justify-end mb-4">
-              <button
-                onClick={() => {
-                  setSelectedCron(null);
-                  setCronFormMode('create');
-                }}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                + New Cron Job
-              </button>
-            </div>
             {cronJobs.length === 0 ? (
               <div className="text-center py-16 text-gray-400">
                 <p>No cron jobs configured</p>
@@ -367,22 +317,6 @@ export default function BotDetailPage() {
         onClose={() => { setCronFormMode(null); setSelectedCron(null); }}
         title={selectedCron?.name || ''}
         subtitle={selectedCron?.jobId}
-        headerActions={
-          <div className="flex gap-2">
-            <button
-              onClick={() => setCronFormMode('edit')}
-              className="px-3 py-1 text-xs font-medium text-blue-600 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-300 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => selectedCron && handleCronDelete(selectedCron.jobId)}
-              className="px-3 py-1 text-xs font-medium text-red-600 bg-red-50 dark:bg-red-900/30 dark:text-red-300 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
-            >
-              Delete
-            </button>
-          </div>
-        }
       >
         {selectedCron && (
           <div className="space-y-4">
@@ -390,8 +324,8 @@ export default function BotDetailPage() {
               <div>
                 <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Schedule</span>
                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
-                  {selectedCron.schedule.kind === 'cron' && `cron: ${selectedCron.schedule.expression ?? ''}`}
-                  {selectedCron.schedule.kind === 'every' && `every ${selectedCron.schedule.intervalMs ? `${Math.round(Number(selectedCron.schedule.intervalMs) / 60000)}m` : '?'}`}
+                  {selectedCron.schedule.kind === 'cron' && `cron: ${selectedCron.schedule.expression ?? selectedCron.schedule.expr ?? selectedCron.schedule.cron ?? ''}`}
+                  {selectedCron.schedule.kind === 'every' && `every ${(selectedCron.schedule.intervalMs ?? selectedCron.schedule.everyMs) ? `${Math.round(Number(selectedCron.schedule.intervalMs ?? selectedCron.schedule.everyMs) / 60000)}m` : '?'}`}
                   {selectedCron.schedule.kind === 'at' && `at ${selectedCron.schedule.datetime ?? ''}`}
                 </span>
               </div>
@@ -430,22 +364,18 @@ export default function BotDetailPage() {
                 {selectedCron.jobId}
               </code>
             </div>
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Execution</span>
+              {selectedCron.payload?.message ? (
+                <pre className="text-xs font-mono text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-lg whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
+                  {selectedCron.payload.message}
+                </pre>
+              ) : (
+                <span className="text-xs text-gray-400 dark:text-gray-500">No execution info</span>
+              )}
+            </div>
           </div>
         )}
-      </LayerModal>
-
-      {/* Cron Job Create/Edit Modal */}
-      <LayerModal
-        open={cronFormMode === 'create' || cronFormMode === 'edit'}
-        onClose={() => { setCronFormMode(null); setSelectedCron(null); }}
-        title={cronFormMode === 'edit' ? 'Edit Cron Job' : 'New Cron Job'}
-      >
-        <CronJobForm
-          initial={cronFormMode === 'edit' ? (selectedCron ?? undefined) : undefined}
-          onSave={handleCronSave}
-          onCancel={() => { setCronFormMode(null); setSelectedCron(null); }}
-          saving={cronSaving}
-        />
       </LayerModal>
 
       {/* Session Detail Modal */}

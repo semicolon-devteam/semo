@@ -56,6 +56,18 @@ export default function RootLayout({
                   >
                     Ontology
                   </Link>
+                  <Link
+                    href="/db"
+                    className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    DB Explorer
+                  </Link>
+                  <Link
+                    href="/sync"
+                    className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white px-3 py-2 rounded-md text-sm font-medium"
+                  >
+                    Sync
+                  </Link>
                 </div>
               </div>
             </div>

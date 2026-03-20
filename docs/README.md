@@ -1,6 +1,6 @@
 # SEMO (Semicolon Orchestrate)
 
-> AI 에이전트 오케스트레이션 프레임워크 for Claude Code v2.0
+> AI 에이전트 오케스트레이션 프레임워크 for Claude Code
 
 ---
 
@@ -42,16 +42,13 @@ bash <(curl -fsSL https://raw.githubusercontent.com/semicolon-devteam/semo-meta/
 
 ```
 SEMO Framework
-├── Standard (필수)
-│   ├── semo-core      # 원칙, 오케스트레이터
-│   └── semo-skills    # 13개 통합 스킬
-│
-└── Extensions (선택)
-    ├── semo-next      # 프론트엔드 개발자용
-    ├── semo-backend   # 백엔드 개발자용
-    ├── semo-po        # PO/기획자용
-    └── ...            # 역할별 확장
+├── semo-core           # 원칙, 오케스트레이터
+├── 공유 스킬 (DB)       # skill_definitions 테이블 (중앙 DB SoT)
+├── 커맨드 (DB)          # command_definitions 테이블
+└── 에이전트 (DB)        # agent_definitions 테이블
 ```
+
+SessionStart 시 `semo context sync`가 DB → `~/.claude/{skills,commands,agents}/`로 자동 동기화합니다.
 
 ### 동작 원리
 
@@ -70,22 +67,6 @@ SEMO Framework
 모든 AI 동작은 `[SEMO]` 접두사와 함께 **투명하게 노출**됩니다.
 
 ---
-
-## 역할별 패키지
-
-| 패키지 | 대상 | 주요 기능 |
-|--------|------|----------|
-| **semo-next** | 프론트엔드 개발자 | DDD 아키텍처, API 연동, 컴포넌트 생성 |
-| **semo-backend** | 백엔드 개발자 | Spring WebFlux, CQRS, Reactive 패턴 |
-| **semo-po** | PO/기획자 | Epic 생성, Task 동기화, 중복 검사 |
-| **semo-design** | 디자이너 | 목업 생성, 핸드오프 문서 |
-| **semo-qa** | QA/테스터 | 테스트 케이스, 버그 리포트 |
-| **semo-pm** | PM | Sprint 관리, 진행도 추적 |
-| **semo-infra** | 인프라 엔지니어 | Docker Compose, Nginx, 배포 |
-| **semo-ms** | MSA 개발자 | 마이크로서비스 설계, 이벤트 봉투 |
-| **semo-mvp** | MVP 개발자 | 빠른 프로토타이핑, 메타데이터 확장 |
-
-> 자세한 내용: [PACKAGES.md](./PACKAGES.md)
 
 ---
 
@@ -107,15 +88,9 @@ SEMO Framework
 # 1. 설치
 npx @team-semicolon/semo-cli init
 
-# 2. 역할 선택 (예: 프론트엔드 개발자)
-# 설치 중 패키지 선택 프롬프트 표시
-
-# 3. 사용 시작
-# Claude Code에서 자연어로 요청
+# 2. 사용 시작 — Claude Code에서 자연어로 요청
 "로그인 페이지 만들어줘"
 ```
-
-> 자세한 가이드: [QUICKSTART.md](./QUICKSTART.md)
 
 ---
 
@@ -123,11 +98,10 @@ npx @team-semicolon/semo-cli init
 
 | 문서 | 설명 | 대상 |
 |------|------|------|
-| [QUICKSTART.md](./QUICKSTART.md) | 5분 빠른 시작 가이드 | 신규 사용자 |
-| [PACKAGES.md](./PACKAGES.md) | 패키지별 상세 설명 | 패키지 선택 시 |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | 아키텍처 개요 | 팀 리더, 아키텍트 |
-| [USER_GUIDE.md](./USER_GUIDE.md) | 상세 사용자 가이드 | 모든 사용자 |
+| [SKILL_ARCHITECTURE.md](./SKILL_ARCHITECTURE.md) | 스킬/커맨드/에이전트 구조 | 개발자 |
 | [FAQ.md](./FAQ.md) | 자주 묻는 질문 | 문제 해결 시 |
+| [TESTING.md](./TESTING.md) | E2E 테스트 케이스 | QA/검증 |
 
 ---
 
@@ -137,7 +111,7 @@ SEMO에 기여하고 싶으시다면:
 
 1. [GitHub Issues](https://github.com/semicolon-devteam/semo/issues)에서 이슈 확인
 2. `/SEMO:feedback` 커맨드로 피드백 제출
-3. PR은 `semo-meta` 레포지토리로 제출
+3. PR은 `semo` 레포지토리로 제출
 
 ---
 

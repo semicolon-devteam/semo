@@ -66,6 +66,12 @@ export interface CronJob {
   lastRun?: string;
   nextRun?: string;
   sessionTarget?: string;
+  payload?: {
+    kind?: string;
+    message?: string;
+    timeoutSeconds?: number;
+    [key: string]: unknown;
+  };
 }
 
 // Ontology Types
@@ -124,4 +130,98 @@ export interface KBEntry {
   created_at: string;
   updated_at: string;
   similarity_pct?: number;
+}
+
+// Bot Skill Types
+export interface BotSkill {
+  name: string;           // e.g. "axoracle-blog"
+  fullName: string;       // e.g. "growthclaw/axoracle-blog"
+  source: 'synced' | 'workspace-only' | 'db-only';
+  isActive: boolean;
+  category: string | null;
+  package: string | null;
+  updatedAt: string | null;
+  hasReferences: boolean;
+}
+
+// DB Explorer Types
+export interface DBTable {
+  table_schema: string;
+  table_name: string;
+  row_count_estimate: number;
+}
+
+export interface DBColumn {
+  column_name: string;
+  data_type: string;
+  is_nullable: string;
+  column_default: string | null;
+  is_primary_key: boolean;
+}
+
+export interface DBConstraint {
+  constraint_name: string;
+  constraint_type: string;
+  columns: string[];
+  foreign_table_schema?: string;
+  foreign_table_name?: string;
+  foreign_columns?: string[];
+}
+
+export interface DBIndex {
+  indexname: string;
+  indexdef: string;
+  is_unique: boolean;
+}
+
+export interface DBTableDetail {
+  schema: string;
+  table: string;
+  columns: DBColumn[];
+  constraints: DBConstraint[];
+  indexes: DBIndex[];
+}
+
+export interface DBDataResult {
+  rows: Record<string, unknown>[];
+  columns: string[];
+  totalRows: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface DBQueryResult {
+  columns: string[];
+  rows: Record<string, unknown>[];
+  rowCount: number;
+  durationMs: number;
+}
+
+// Sync Types
+export type SyncTrigger = 'SessionStart' | 'SessionStop' | 'BotHook' | 'Manual';
+export type SyncDirection = 'DB→Local' | 'Local→DB' | 'OpenClaw→DB';
+
+export interface SyncFlow {
+  id: string;
+  name: string;
+  trigger: SyncTrigger;
+  direction: SyncDirection;
+  command: string;
+  table: string;
+  description: string;
+  filePaths?: string[];
+}
+
+export interface SyncBotStatus {
+  bot_id: string;
+  name: string;
+  status: 'online' | 'offline';
+  last_active: string;
+  synced_at: string;
+}
+
+export interface SyncStatus {
+  bots: SyncBotStatus[];
+  lastMigration: string | null;
+  serverTime: string;
 }

@@ -1,6 +1,6 @@
 # semo — Claude Configuration
 
-> SEMO v4.1.5 설치됨 (2026-03-17)
+> SEMO v4.1.5 설치됨 (2026-03-20)
 
 ---
 

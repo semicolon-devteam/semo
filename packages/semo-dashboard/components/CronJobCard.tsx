@@ -10,9 +10,11 @@ interface CronJobCardProps {
 function formatSchedule(schedule: CronJob['schedule']): string {
   switch (schedule.kind) {
     case 'cron':
-      return `cron: ${schedule.expression ?? ''}`;
-    case 'every':
-      return `every ${schedule.intervalMs ? `${Math.round(Number(schedule.intervalMs) / 60000)}m` : '?'}`;
+      return `cron: ${schedule.expression ?? schedule.expr ?? schedule.cron ?? ''}`;
+    case 'every': {
+      const ms = schedule.intervalMs ?? schedule.everyMs;
+      return `every ${ms ? `${Math.round(Number(ms) / 60000)}m` : '?'}`;
+    }
     case 'at':
       return `at ${schedule.datetime ?? ''}`;
     default:

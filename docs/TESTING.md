@@ -172,12 +172,39 @@ cat /tmp/semo-bots-sync.log
 # .claude/settings.json 훅 확인
 cat .claude/settings.json | python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps(d['hooks'], indent=2))"
 # 기대값:
-# SessionStart → "semo context sync && semo bots sync"
+# SessionStart → "semo context sync"
 # Stop → "semo context push"
 
 # 새 Claude Code 세션 시작 후 memory 파일 mtime 확인
 ls -la .claude/memory/*.md
 # 기대값: 최신 시간으로 갱신됨
+```
+
+---
+
+### TC-13: KB 변경 다이제스트 (`--digest`)
+
+```bash
+# 봇 구독 확인
+psql "$DATABASE_URL" -c "SELECT * FROM semo.bot_kb_subscriptions WHERE bot_id='workclaw';"
+# 기대값: team, project, decision, process 도메인 4건
+
+# 다이제스트 생성
+semo context sync --bot workclaw --digest --out-dir /tmp/test-digest --no-skills --no-global-cache
+# 기대값: "✔ context sync 완료" + kb-digest.md 포함
+
+# 파일 확인
+cat /tmp/test-digest/kb-digest.md
+# 기대값: "# KB Digest" 헤더 + 봇ID/since 정보 + 도메인별 변경 목록
+
+# 워터마크 갱신 확인
+psql "$DATABASE_URL" -c "SELECT domain, last_synced_at FROM semo.bot_kb_subscriptions WHERE bot_id='workclaw';"
+# 기대값: last_synced_at이 현재 시각으로 갱신됨
+
+# 2회차 실행 — 변경 0건 확인
+semo context sync --bot workclaw --digest --out-dir /tmp/test-digest --no-skills --no-global-cache
+cat /tmp/test-digest/kb-digest.md
+# 기대값: "_변경사항 없음_"
 ```
 
 ---

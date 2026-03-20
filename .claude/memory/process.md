@@ -1,6 +1,6 @@
 # process
 
-> 자동 생성: semo context sync (2026-03-17T09:42:36.577Z)
+> 자동 생성: semo context sync (2026-03-20T09:00:34.852Z)
 
 
 ## bot-info-sharing

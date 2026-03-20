@@ -2,7 +2,7 @@
  * semo context — DB ↔ .claude/memory/ 동기화
  *
  * sync: Core DB → .claude/memory/*.md (KB domains, bot_status, ontology, projects)
- * push: .claude/memory/decisions.md → DB (semo.knowledge_base WHERE domain='decision')
+ * push: .claude/memory/<domain>.md → DB (semo.knowledge_base)
  */
 
 import { Command } from "commander";
@@ -12,8 +12,9 @@ import * as fs from "fs";
 import * as path from "path";
 import { Pool } from "pg";
 import { getPool, closeConnection, isDbConnected } from "../database";
-import { kbList, ontoList, OntologyDomain, KBEntry } from "../kb";
+import { kbList, ontoList, OntologyDomain, KBEntry, kbDigest, KBDigestResult } from "../kb";
 import { syncSkillsToDB } from "./skill-sync";
+import { syncGlobalCache } from "../global-cache";
 
 // ============================================================
 // Memory file mapping
@@ -57,7 +58,8 @@ function kbEntriesToMarkdown(domain: string, entries: KBEntry[]): string {
 
   for (const entry of entries) {
     lines.push(`\n## ${entry.key}\n`);
-    lines.push(entry.content);
+    // content 내 markdown heading을 한 단계 내려 key heading(##)과 충돌 방지
+    lines.push(entry.content.replace(/^(#{2,})/gm, '#$1'));
     if (entry.metadata && Object.keys(entry.metadata).length > 0) {
       lines.push(`\n_metadata: ${JSON.stringify(entry.metadata)}_`);
     }
@@ -144,7 +146,7 @@ async function fetchBotStatus(pool: Pool): Promise<BotStatusRow[]> {
 // Markdown → KBEntry parser (for push)
 // ============================================================
 
-function parseDecisionsMarkdown(content: string): KBEntry[] {
+function parseMarkdownSections(content: string, domain: string): KBEntry[] {
   const entries: KBEntry[] = [];
 
   // Split by h2 sections
@@ -160,7 +162,7 @@ function parseDecisionsMarkdown(content: string): KBEntry[] {
 
     if (key && body) {
       entries.push({
-        domain: "decision",
+        domain,
         key,
         content: body,
         created_by: "claude-context-push",
@@ -169,6 +171,44 @@ function parseDecisionsMarkdown(content: string): KBEntry[] {
   }
 
   return entries;
+}
+
+// ============================================================
+// KB Digest → Markdown
+// ============================================================
+
+function digestToMarkdown(digest: KBDigestResult): string {
+  const lines: string[] = [
+    "# KB Digest\n",
+    `> ${digest.generatedAt} | ${digest.botId} | ${digest.changes.length}건 변경`,
+    `> since: ${digest.since}\n`,
+  ];
+
+  if (digest.changes.length === 0) {
+    lines.push("_변경사항 없음_\n");
+    return lines.join("\n");
+  }
+
+  // Group by domain
+  const byDomain = new Map<string, typeof digest.changes>();
+  for (const c of digest.changes) {
+    const arr = byDomain.get(c.domain) || [];
+    arr.push(c);
+    byDomain.set(c.domain, arr);
+  }
+
+  for (const [domain, entries] of byDomain) {
+    lines.push(`## ${domain} (${entries.length}건)\n`);
+    for (const entry of entries) {
+      const tag = entry.change_type === "new" ? "NEW" : "UPDATED";
+      lines.push(`### ${tag} ${entry.key} (v${entry.version})`);
+      const preview = entry.content.length > 500 ? entry.content.substring(0, 500) + "..." : entry.content;
+      lines.push(preview);
+      lines.push("");
+    }
+  }
+
+  return lines.join("\n");
 }
 
 // ============================================================
@@ -190,6 +230,8 @@ export function registerContextCommands(program: Command): void {
     .option("--no-ontology", "ontology 동기화 건너뜀")
     .option("--no-skills", "스킬 파일 → DB 동기화 건너뜀")
     .option("--out-dir <path>", "메모리 파일 출력 경로 (기본: .claude/memory/). OpenClaw 봇 workspace 지원용")
+    .option("--no-global-cache", "글로벌 캐시(skills/commands/agents) 동기화 건너뜀")
+    .option("--digest", "KB 변경 다이제스트 생성 (--bot 필수)")
     .action(async (options) => {
       const spinner = ora("context sync 시작...").start();
 
@@ -258,6 +300,36 @@ export function registerContextCommands(program: Command): void {
           }
         }
 
+        // 5. DB → 글로벌 캐시 (skills/commands/agents → ~/.claude/)
+        if (options.globalCache !== false) {
+          spinner.text = "글로벌 캐시 동기화 (skills/commands/agents)...";
+          try {
+            const cacheResult = await syncGlobalCache();
+            console.log(chalk.green(`  ✓ 글로벌 캐시: skills(${cacheResult.skills}) commands(${cacheResult.commands}) agents(${cacheResult.agents})`));
+          } catch (cacheErr) {
+            // DB 실패 시 기존 파일 유지 (비치명적)
+            console.log(chalk.yellow(`  ⚠ 글로벌 캐시 동기화 실패 (기존 파일 유지): ${cacheErr}`));
+          }
+        }
+
+        // 6. KB Digest (--bot + --digest 조합)
+        if (options.digest && options.bot) {
+          spinner.text = "KB 변경 다이제스트 생성...";
+          try {
+            const digest = await kbDigest(pool, options.bot);
+            const digestContent = digestToMarkdown(digest);
+            fs.writeFileSync(path.join(memDir, "kb-digest.md"), digestContent);
+            written++;
+            if (digest.changes.length > 0) {
+              console.log(chalk.green(`  ✓ KB Digest: ${digest.changes.length}건 변경`));
+            }
+          } catch (err) {
+            console.log(chalk.yellow(`  ⚠ KB Digest 생성 실패: ${err}`));
+          }
+        } else if (options.digest && !options.bot) {
+          console.log(chalk.yellow("  ⚠ --digest 옵션은 --bot과 함께 사용해야 합니다"));
+        }
+
         spinner.succeed(`context sync 완료 — ${written}개 파일 업데이트`);
         console.log(chalk.gray(`  저장 위치: ${memDir}`));
       } catch (err) {
@@ -270,41 +342,39 @@ export function registerContextCommands(program: Command): void {
   // ── semo context push ──────────────────────────────────────
   ctxCmd
     .command("push")
-    .description(".claude/memory/decisions.md → Core DB (semo.knowledge_base)")
-    .option("--domain <name>", "push할 도메인 (기본: decision)", "decision")
+    .description(".claude/memory/<domain>.md → Core DB (semo.knowledge_base)")
+    .option("--domain <name>", "push할 도메인 (쉼표 구분 가능, 기본: decision)", "decision")
     .option("--dry-run", "실제 push 없이 변경사항만 미리보기")
     .option("--out-dir <path>", "메모리 파일 경로 (기본: .claude/memory/). OpenClaw 봇 workspace 지원용")
     .action(async (options) => {
-      // P0-2: decision 도메인만 push 허용 (다른 도메인은 parseDecisionsMarkdown 파서와 포맷 불일치)
-      if (options.domain !== "decision") {
-        console.log(chalk.red(`\n❌ context push는 'decision' 도메인만 지원합니다. (입력: '${options.domain}')`));
-        console.log(chalk.gray("  다른 도메인의 KB는 'semo kb push'를 사용하세요."));
-        process.exit(1);
-      }
-
+      const domains: string[] = (options.domain as string).split(",").map((d: string) => d.trim()).filter(Boolean);
       const memDir = resolveMemoryDir(options.outDir);
 
-      const filename = KB_DOMAIN_MAP[options.domain] || `${options.domain}.md`;
-      const filePath = path.join(memDir, filename);
+      // 각 도메인별 엔트리 수집
+      const allEntries: KBEntry[] = [];
+      for (const domain of domains) {
+        const filename = KB_DOMAIN_MAP[domain] || `${domain}.md`;
+        const filePath = path.join(memDir, filename);
 
-      if (!fs.existsSync(filePath)) {
-        console.log(chalk.red(`\n❌ 파일 없음: ${MEMORY_DIR}/${filename}`));
-        console.log(chalk.gray("  semo context sync 먼저 실행하세요."));
-        process.exit(1);
+        if (!fs.existsSync(filePath)) {
+          console.log(chalk.yellow(`⚠️  파일 없음 (건너뜀): ${MEMORY_DIR}/${filename}`));
+          continue;
+        }
+
+        const content = fs.readFileSync(filePath, "utf-8");
+        const entries = parseMarkdownSections(content, domain);
+        allEntries.push(...entries);
       }
 
-      const content = fs.readFileSync(filePath, "utf-8");
-      const entries = parseDecisionsMarkdown(content);
-
-      if (entries.length === 0) {
+      if (allEntries.length === 0) {
         console.log(chalk.yellow("⚠️  push할 항목이 없습니다."));
         return;
       }
 
-      console.log(chalk.cyan(`\n📤 context push: ${options.domain} (${entries.length}건)\n`));
+      console.log(chalk.cyan(`\n📤 context push: ${domains.join(", ")} (${allEntries.length}건)\n`));
 
       if (options.dryRun) {
-        for (const e of entries) {
+        for (const e of allEntries) {
           console.log(chalk.gray(`  [dry-run] ${e.domain}/${e.key}`));
         }
         return;
@@ -325,7 +395,7 @@ export function registerContextCommands(program: Command): void {
 
       try {
         await client.query("BEGIN");
-        for (const entry of entries) {
+        for (const entry of allEntries) {
           try {
             await client.query(
               `INSERT INTO semo.knowledge_base (domain, key, content, metadata, created_by)

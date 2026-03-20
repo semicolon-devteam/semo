@@ -112,7 +112,6 @@ semo update --skip-cli   # CLI 업데이트 건너뛰기
 | 패키지 | 설명 |
 |--------|------|
 | `semo-core` | 원칙, 오케스트레이터, 공통 커맨드 |
-| `semo-skills` | 13개 통합 스킬 (coder, tester, planner, deployer 등) |
 
 ### Extensions (선택)
 
@@ -166,8 +165,8 @@ your-project/
 │   └── commands/SEMO/         # SEMO 커맨드
 │
 └── semo-system/               # White Box (읽기 전용)
-    ├── semo-core/             # Layer 0: 원칙, 오케스트레이션
-    ├── semo-skills/           # Layer 1: 통합 스킬
+    ├── semo-core/             # 원칙, 오케스트레이션
+    ├── bot-workspaces/        # 봇 전용 스킬/컨텍스트
     ├── biz/                   # Business Layer (선택)
     ├── eng/                   # Engineering Layer (선택)
     └── ops/                   # Operations Layer (선택)
@@ -203,7 +202,7 @@ MCP 연동을 위해 다음 환경변수를 설정하세요:
 | `next.config.js`, `next.config.mjs`, `next.config.ts` | `eng/nextjs` |
 | `pom.xml`, `build.gradle` | `eng/spring` |
 | `Dockerfile`, `docker-compose.yml` | `eng/infra` |
-| `semo-core`, `semo-skills` | `meta` |
+| `semo-core` | `meta` |
 
 ## 레거시 명령어 호환
 

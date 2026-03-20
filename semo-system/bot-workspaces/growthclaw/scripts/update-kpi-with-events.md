@@ -63,9 +63,11 @@ eventData.rows?.forEach(row => {
 GA4에서 이벤트 데이터가 쌓이기 시작하면 (24~48시간 후):
 
 ```bash
-# 기존 스크립트를 새 버전으로 교체
-node scripts/jungchipan-kpi-report-v2.js
+# 기존 스크립트에 위 코드 변경 적용 후 실행
+node scripts/jungchipan-kpi-report.js
 ```
+
+> **TODO**: `jungchipan-kpi-report-v2.js`는 아직 미구현. GA4 이벤트 설정 완료 후 기존 스크립트에 직접 코드 변경 적용.
 
 ---
 

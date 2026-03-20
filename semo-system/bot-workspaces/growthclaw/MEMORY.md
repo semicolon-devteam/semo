@@ -11,6 +11,7 @@ SEO/마케팅/그로스 분석봇. Semicolon 팀의 그로스 엔진.
 | memory/bots.md | 봇 ID 매핑, 파이프라인, 인계 프로토콜 |
 | memory/services.md | 서비스 운영 URL, GitHub 레포, SEO/GA4 현황, Google 연동 정보 |
 | memory/google-api.md | Google API 연동 상세 (Search Console, GA4, 서비스 계정, 자동화 스크립트) |
+| memory/kpi-tracking.md | **📊 프로젝트별 주간 KPI 추적** (GA4, Search Console 기반) |
 | memory/decisions.md | 업무 원칙, R&R, Reus 지시사항, Config 규칙 |
 | memory/YYYY-MM-DD.md | 일일 작업 로그 |
 

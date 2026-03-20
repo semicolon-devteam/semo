@@ -103,6 +103,7 @@ export interface Skill {
   display_name: string;
   description: string | null;
   content: string;
+  bot_ids: string[];
   category: string;
   package: string;
   is_active: boolean;
@@ -186,6 +187,10 @@ export async function getActiveSkills(): Promise<Skill[]> {
     const result = await getPool().query(`
       SELECT id, name, display_name, description,
              prompt AS content,
+             COALESCE(
+               ARRAY(SELECT jsonb_array_elements_text(metadata->'bot_ids')),
+               ARRAY[]::text[]
+             ) AS bot_ids,
              category, package, is_active, is_required, install_order, version
       FROM skill_definitions
       WHERE is_active = true AND office_id IS NULL
@@ -222,14 +227,18 @@ export async function getActiveSkillsForBot(botId: string): Promise<Skill[]> {
     const result = await getPool().query(
       `SELECT sd.id, sd.name, sd.display_name, sd.description,
               sd.prompt AS content,
+              COALESCE(
+                ARRAY(SELECT jsonb_array_elements_text(sd.metadata->'bot_ids')),
+                ARRAY[]::text[]
+              ) AS bot_ids,
               sd.category, sd.package, sd.is_active, sd.is_required,
               sd.install_order, sd.version
        FROM skill_definitions sd
        WHERE sd.is_active = true
          AND sd.office_id IS NULL
-         AND ('all' = ANY(sd.target_agents) OR sd.target_agents @> ARRAY[$1])
+         AND (NOT sd.metadata ? 'bot_ids' OR sd.metadata->'bot_ids' ? $1)
        ORDER BY
-         CASE WHEN sd.target_agents @> ARRAY[$1] THEN 0 ELSE 1 END,
+         CASE WHEN sd.metadata->'bot_ids' ? $1 THEN 0 ELSE 1 END,
          sd.install_order`,
       [botId]
     );

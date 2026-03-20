@@ -21,15 +21,20 @@ semo -v
 ## 주요 명령어
 
 ```bash
+# 설치
 semo init                  # SEMO 설치 (프로젝트 유형 자동 감지)
-semo add <package>         # Extension 패키지 추가
-semo add biz               # Business 레이어 전체 설치
-semo add eng               # Engineering 레이어 전체 설치
-semo add ops               # Operations 레이어 전체 설치
-semo list                  # 사용 가능한 패키지 목록
-semo status                # 설치 상태 확인
-semo update                # 최신 버전으로 업데이트
+semo onboarding            # 글로벌 설정 (~/.claude/) 초기 구성
 semo -v                    # 버전 및 업데이트 확인
+
+# DB 동기화
+semo context sync          # Core DB → .claude/memory/ 동기화
+semo context push          # decisions.md → Core DB 저장
+semo doctor                # 환경 진단 (DB 연결, 설치 상태)
+
+# 봇 관리
+semo bots status           # 봇 상태 조회
+semo bots sync             # 봇 메타데이터 + 스킬 → DB 동기화
+semo sessions sync         # OpenClaw 세션 데이터 동기화
 ```
 
 ## 3-Layer Architecture
@@ -65,7 +70,6 @@ semo -v                    # 버전 및 업데이트 확인
 | 패키지 | 설명 |
 |--------|------|
 | `semo-core` | 원칙, 오케스트레이터, 공통 커맨드 |
-| `semo-skills` | 13개 통합 스킬 (coder, tester, planner 등) |
 
 ### Extensions (선택)
 
@@ -104,19 +108,23 @@ semo -v                    # 버전 및 업데이트 확인
 ## 설치 후 구조
 
 ```
+# 글로벌 (semo onboarding)
+~/.claude/
+├── settings.json              # SessionStart/Stop 훅 + MCP 서버 설정
+├── memory/                    # Core DB → 자동 동기화 컨텍스트
+├── skills/                    # DB → 자동 동기화 (skill_definitions)
+├── commands/                  # DB → 자동 동기화 (command_definitions)
+└── agents/                    # DB → 자동 동기화 (agent_definitions)
+
+# 프로젝트 (semo init)
 your-project/
 ├── .claude/
-│   ├── CLAUDE.md              # 프로젝트 설정
-│   ├── settings.json          # MCP 서버 설정
-│   ├── memory/                # Context Mesh
-│   ├── agents/                # 에이전트 링크
-│   ├── skills/                # 스킬 링크
-│   └── commands/SEMO/         # SEMO 커맨드
+│   ├── CLAUDE.md              # 프로젝트 설정 + semo 안내
+│   └── settings.json          # 프로젝트별 MCP 설정 (선택)
 │
-└── semo-system/               # White Box
-    ├── semo-core/
-    ├── semo-skills/
-    └── {extensions}/
+└── semo-system/               # White Box (이 레포 전용)
+    ├── bot-workspaces/        # 봇별 워크스페이스 (hooks, skills, memory)
+    └── sync-agent/            # 봇 워크스페이스 Git 동기화
 ```
 
 ## 레포지토리 구조
@@ -124,7 +132,6 @@ your-project/
 ```
 semo/
 ├── semo-core/                 # 핵심 원칙, 오케스트레이터
-├── semo-skills/               # 통합 스킬 (13개)
 ├── packages/
 │   ├── cli/                   # @team-semicolon/semo-cli
 │   ├── mcp-server/            # @team-semicolon/semo-mcp

@@ -10,12 +10,14 @@
 ## 메모리 구조 가이드
 | 파일 | 내용 |
 |---|---|
-| `memory/team.md` | 팀원 정보, R&R, 안부 체크인 |
-| `memory/bots.md` | 봇 아키텍처, ID 매핑, 봇 간 R&R |
-| `memory/decisions.md` | Reus 의사결정/지시사항, 원칙 |
+| `memory/kb-rules.md` | ⚠️ KB 저장 규칙 (반드시 숙지) |
+| `memory/decisions.md` | Reus 의사결정/지시사항, ADR (**편집 가능 → DB push**) |
+| `memory/projects.md` | 프로젝트 컨텍스트 (**편집 가능 → DB push**) |
+| `memory/team.md` | 팀원 정보, R&R, 안부 체크인 (읽기 전용, DB sync) |
+| `memory/bots.md` | 봇 아키텍처, ID 매핑, 봇 간 R&R (읽기 전용, DB sync) |
 | `memory/operations.md` | 캘린더, 회의록, 포트폴리오, 위시캣, 루틴 |
 | `memory/github-rules.md` | GitHub 운영 규칙 통합 (이슈 체크리스트, Projects, OAT, 라벨, 폴링, 변경통제, CI/CD, 레포 구조 전부) |
-| `memory/projects/` | 프로젝트별 상세 컨텍스트 |
+| `memory/projects/` | _(레거시)_ 프로젝트별 상세 — projects.md 우선 |
 | `memory/bot-setup-pipeline.md` | 봇 온보딩 프로세스 |
 | `memory/project-tracker.json` | 프로젝트 현황 트래커 |
 

@@ -22,7 +22,7 @@
 │  │  ┌─────────────────────────────────────────────────────┐ │   │
 │  │  │              semo-system/ (심볼릭 링크)              │ │   │
 │  │  │  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │ │   │
-│  │  │  │ semo-core   │  │ semo-skills │  │ Extensions │  │ │   │
+│  │  │  │ semo-core   │  │ skills (DB) │  │ Extensions │  │ │   │
 │  │  │  │ (Layer 0)   │  │ (Layer 1)   │  │ (선택)     │  │ │   │
 │  │  │  └─────────────┘  └─────────────┘  └────────────┘  │ │   │
 │  │  └─────────────────────────────────────────────────────┘ │   │
@@ -68,52 +68,28 @@ semo-core/
 
 ---
 
-### Layer 1: semo-skills (필수)
+### Layer 1: 스킬/커맨드/에이전트 (DB 기반)
 
-**역할**: 기능별 통합 스킬 제공
+**역할**: 기능별 통합 스킬, 슬래시 커맨드, 에이전트 정의
 
+**저장소**: 중앙 DB (`skill_definitions`, `command_definitions`, `agent_definitions` 테이블)
+
+**동기화 흐름**:
 ```
-semo-skills/
-├── coder/           # 코드 작성/수정/검증
-├── tester/          # 테스트/QA
-├── planner/         # 기획/관리
-├── writer/          # 문서/디자인
-├── deployer/        # 배포/인프라
-├── memory/          # 세션 간 기억
-├── notify-slack/    # Slack 알림
-├── feedback/        # 피드백 수집
-├── version-updater/ # 버전 관리
-├── semo-help/       # 도움말
-├── circuit-breaker/ # 안전 장치
-└── list-bugs/       # 버그 목록
+skill_definitions (DB SoT)
+    ↓ semo context sync (SessionStart 자동)
+~/.claude/{skills,commands,agents}/  (글로벌 캐시)
+    ↓ Claude Code 세션 로드
+Claude Code에서 사용
 ```
 
-**스킬 구조**:
-```
-{skill}/
-├── SKILL.md           # 스킬 정의 (frontmatter + 설명)
-├── references/        # 참조 문서
-└── platforms/         # 플랫폼별 분기 (선택)
-```
+**공유 vs 봇 전용**:
+- 공유 스킬: `target_agents = '{all}'` → 모든 세션에서 사용
+- 봇 전용 스킬: `target_agents = '{botId}'` → 해당 봇만 사용
+
+자세한 내용은 [SKILL_ARCHITECTURE.md](./SKILL_ARCHITECTURE.md) 참조.
 
 ---
-
-### Layer 2: Extensions (선택)
-
-**역할**: 역할/플랫폼별 전문화
-
-| Extension | 대상 | 주요 기능 |
-|-----------|------|----------|
-| semo-next | 프론트엔드 | DDD, API 연동, 컴포넌트 |
-| semo-backend | 백엔드 | WebFlux, CQRS, Reactive |
-| semo-po | PO | Epic, Task, 중복 검사 |
-| semo-design | 디자이너 | 목업, 핸드오프 |
-| semo-qa | QA | 테스트 케이스, 버그 리포트 |
-| semo-pm | PM | 스프린트, 진행도 |
-| semo-infra | 인프라 | Docker, Nginx, 배포 |
-| semo-ms | MSA | 서비스 설계, 이벤트 |
-| semo-mvp | MVP | 빠른 프로토타이핑 |
-| semo-meta | 프레임워크 개발 | SEMO 자체 개발용 |
 
 ---
 
@@ -166,12 +142,18 @@ semo-skills/
 
 ### 구조
 
+Core DB(`semo.knowledge_base`)를 SoT로, 세션 시작/종료 시 자동 동기화됩니다.
+
 ```
-.claude/memory/
-├── context.md       # 프로젝트 상태, 기술 스택
-├── decisions.md     # ADR (아키텍처 결정 기록)
-└── rules/           # 프로젝트별 커스텀 규칙
-    └── project-specific.md
+~/.claude/memory/  (글로벌 — 모든 프로젝트 공유)
+├── team.md           ← DB: KB domain='team'        (읽기전용)
+├── projects.md       ← DB: KB domain='project'     (읽기전용)
+├── decisions.md      ◄► DB: KB domain='decision'   (양방향)
+├── infra.md          ← DB: KB domain='infra'       (읽기전용)
+├── process.md        ← DB: KB domain='process'     (읽기전용)
+├── bots.md           ← DB: bot_status 테이블        (읽기전용)
+├── ontology.md       ← DB: ontology 테이블           (읽기전용)
+└── kb-digest.md      ← DB: KB 변경 다이제스트         (봇 전용)
 ```
 
 ### 동작 흐름
@@ -179,24 +161,31 @@ semo-skills/
 ```
 [세션 시작]
      ↓
-memory/ 로드 (skill:memory sync)
+SessionStart 훅 → semo context sync
      ↓
-컨텍스트 주입
+DB → ~/.claude/memory/*.md (KB + bot_status + ontology)
+DB → ~/.claude/skills,commands,agents/ (글로벌 캐시)
      ↓
 [작업 수행]
      ↓
-결정 사항 저장 (skill:memory save)
+decisions.md 수정 (아키텍처 결정 기록)
      ↓
 [세션 종료]
+     ↓
+Stop 훅 → semo context push
+     ↓
+decisions.md → DB (semo.knowledge_base domain='decision')
 ```
 
-### 활용 사례
+### 동기화 방향 정리
 
-| 저장 데이터 | 예시 |
-|------------|------|
-| 아키텍처 결정 | "API 응답은 JSON Envelope 패턴 사용" |
-| 선호도 | "변수명은 camelCase" |
-| 프로젝트 맥락 | "Next.js 14 + Supabase 사용" |
+| 파일 | 로컬 Claude | OpenClaw 봇 | DB 테이블 |
+|------|------------|-------------|----------|
+| team.md | DB → 로컬 | DB → 봇 | knowledge_base |
+| projects.md | DB → 로컬 | DB → 봇 / 봇→DB | knowledge_base |
+| decisions.md | DB ◄► 로컬 | DB → 봇 | knowledge_base |
+| bots.md | DB → 로컬 | DB → 봇 | bot_status |
+| kb-digest.md | (해당없음) | DB → 봇 | KB + bot_kb_subscriptions |
 
 ---
 
@@ -257,8 +246,11 @@ memory/ 로드 (skill:memory sync)
 
 ### 새 Skill 추가
 
+공유 스킬은 중앙 DB(`skill_definitions`)에 등록합니다.
+봇 전용 스킬은 `bot-workspaces/{봇}/skills/` 하위에 파일로 생성합니다.
+
 ```
-semo-skills/coder/my-skill/
+{skill}/
 ├── SKILL.md           # 필수: 스킬 정의
 ├── references/        # 선택: 참조 문서
 └── platforms/         # 선택: 플랫폼별 분기
@@ -348,22 +340,22 @@ export const myTool = {
 
 | 문서 | 위치 | 설명 |
 |------|------|------|
-| PRINCIPLES.md | semo-core/principles/ | 핵심 원칙 |
-| MESSAGE_RULES.md | semo-core/principles/ | 메시지 규칙 |
-| microservice-conventions.md | packages/core/_shared/ | MS 규약 |
-| team-context.md | packages/core/_shared/ | 팀 컨텍스트 |
+| SKILL_ARCHITECTURE.md | docs/ | 스킬/커맨드/에이전트 DB 구조 및 동기화 |
+| FAQ.md | docs/ | 자주 묻는 질문 |
+| TESTING.md | docs/ | E2E 테스트 케이스 |
+| commands/README.md | packages/cli/src/commands/ | CLI 커맨드 모듈 설명 |
 
 ---
 
-## 10. 향후 로드맵
+## 10. 버전 히스토리
 
 | 단계 | 내용 | 상태 |
 |------|------|------|
 | v2.0 | 기능 기반 구조 전환 | 완료 |
-| v2.1 | Context Mesh DB 연동 | 검토 중 |
-| v2.2 | 벡터 검색 기반 Reference | 계획 |
-| v3.0 | Multi-Agent 협업 | 계획 |
+| v3.0 | DB SoT + Context Mesh + Multi-Agent 협업 | 완료 |
+| v4.0 | 스킬 통합 (76 → ~30), OpenClaw 봇팀 운영 | 완료 |
+| v4.1 | KB 변경 다이제스트, 봇별 구독, 워터마크 추적 | 완료 |
 
 ---
 
-*이 문서는 SEMO v2.0.1 기준으로 작성되었습니다.*
+*이 문서는 SEMO v4.1 기준으로 최종 업데이트되었습니다.*

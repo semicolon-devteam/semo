@@ -2,7 +2,7 @@ const { google } = require('googleapis');
 const path = require('path');
 
 // 서비스 계정 키 파일 경로
-const keyFilePath = path.join(__dirname, '../credentials/growthclaw-analytics.json');
+const keyFilePath = path.join(process.env.HOME, '.openclaw-growthclaw', 'credentials', 'google-service-account.json');
 
 async function getSearchConsoleData(siteUrl, startDate, endDate) {
   try {

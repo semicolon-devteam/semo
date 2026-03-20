@@ -444,7 +444,7 @@ export function registerBotsCommands(program: Command): void {
             await skillClient.query("BEGIN");
             const result = await syncSkillsToDB(skillClient, semoSystemDir);
             await skillClient.query("COMMIT");
-            console.log(chalk.green(`  → skills sync 완료: ${result.total}개 (공유: ${result.shared}, 봇 전용: ${result.botSpecific})`));
+            console.log(chalk.green(`  → skills sync 완료: ${result.total}개 (봇 전용: ${result.botSpecific})`));
           } finally {
             skillClient.release();
           }
@@ -603,7 +603,7 @@ export function registerBotsCommands(program: Command): void {
       const spinner = ora("스킬/에이전트 스캔 중...").start();
 
       // ─── 1+2. 스킬 스캔 (공통 모듈) ─────────────────────────
-      const { shared: sharedSkills, botSpecific: botSkills } = scanSkills(semoSystemDir);
+      const botSkills = scanSkills(semoSystemDir);
 
       // ─── 3. 에이전트 스캔 ─────────────────────────────────
       const workspacesDir = path.join(semoSystemDir, "bot-workspaces");
@@ -647,11 +647,8 @@ export function registerBotsCommands(program: Command): void {
 
       // ─── 미리보기 출력 ─────────────────────────────────────
       console.log(chalk.cyan.bold("\n📦 Seed 스캔 결과\n"));
-      console.log(chalk.white(`  공유 스킬 (semo-skills):  ${sharedSkills.length}개`));
       console.log(chalk.white(`  봇 전용 스킬 (openclaw):  ${botSkills.length}개`));
       console.log(chalk.white(`  에이전트 (봇):            ${agents.length}개`));
-
-      console.log(chalk.white(`  예상 target_agents 설정:  ${botSkills.length}개 (봇 전용)`));
 
       if (agents.length > 0) {
         console.log(chalk.gray("\n  에이전트:"));
@@ -694,7 +691,7 @@ export function registerBotsCommands(program: Command): void {
         }
 
         // ─── 스킬 시딩 (공통 모듈) ──────────────────────────
-        spinnerDb.text = `스킬 ${sharedSkills.length + botSkills.length}개 시딩 중...`;
+        spinnerDb.text = `스킬 ${botSkills.length}개 시딩 중...`;
         await syncSkillsToDB(client, semoSystemDir);
 
         // ─── 에이전트 시딩 ───────────────────────────────────
@@ -720,8 +717,7 @@ export function registerBotsCommands(program: Command): void {
         await client.query("COMMIT");
         spinnerDb.succeed("seed 완료");
 
-        console.log(chalk.green(`  ✔ 공유 스킬: ${sharedSkills.length}개 (target_agents: {all})`));
-        console.log(chalk.green(`  ✔ 봇 전용 스킬: ${botSkills.length}개 (target_agents: 봇명)`));
+        console.log(chalk.green(`  ✔ 봇 전용 스킬: ${botSkills.length}개 (metadata.bot_ids)`));
         console.log(chalk.green(`  ✔ 에이전트: ${agents.length}개`));
         console.log();
       } catch (err) {

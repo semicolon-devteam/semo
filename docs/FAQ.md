@@ -8,7 +8,7 @@
 
 1. [설치 관련](#1-설치-관련)
 2. [사용법 관련](#2-사용법-관련)
-3. [패키지 관련](#3-패키지-관련)
+3. [스킬/에이전트 관련](#3-스킬에이전트-관련)
 4. [MCP/연동 관련](#4-mcp연동-관련)
 5. [문제 해결](#5-문제-해결)
 6. [기타](#6-기타)
@@ -54,12 +54,11 @@ bash <(curl -fsSL https://raw.githubusercontent.com/semicolon-devteam/semo-meta/
 ```
 .claude/
 ├── CLAUDE.md           # Claude Code 진입점
-├── settings.json       # MCP 서버 설정
-├── memory/             # Context Mesh
-├── agents/             # 에이전트 (심볼릭 링크)
-├── skills/             # 스킬 (심볼릭 링크)
-├── commands/           # 커맨드
-└── semo-system/        # SEMO 코어 (서브모듈)
+├── settings.json       # MCP 서버 설정 + SessionStart/Stop 훅
+├── memory/             # Context Mesh (DB → 자동 동기화)
+├── agents/             # 에이전트 (DB → 자동 동기화)
+├── skills/             # 스킬 (DB → 자동 동기화)
+└── commands/           # 커맨드 (DB → 자동 동기화)
 ```
 
 ---
@@ -147,53 +146,20 @@ ls -la .claude/
 
 ---
 
-## 3. 패키지 관련
+## 3. 스킬/에이전트 관련
 
-### Q: 어떤 패키지를 선택해야 하나요?
+### Q: 스킬은 어디에 정의되어 있나요?
 
-**A**: 역할에 따라 선택하세요:
-
-| 역할 | 패키지 |
-|------|--------|
-| 프론트엔드 개발자 | semo-next |
-| 백엔드 개발자 | semo-backend |
-| PO/기획자 | semo-po |
-| 디자이너 | semo-design |
-| QA | semo-qa |
-| PM | semo-pm |
-| 인프라 | semo-infra |
-| MSA 개발자 | semo-ms |
+**A**: 중앙 DB(`skill_definitions` 테이블)에서 관리됩니다. SessionStart 시 `semo context sync`가 DB → `~/.claude/skills/`로 자동 동기화합니다. 자세한 구조는 [SKILL_ARCHITECTURE.md](./SKILL_ARCHITECTURE.md)를 참조하세요.
 
 ---
 
-### Q: 여러 패키지를 동시에 설치할 수 있나요?
+### Q: 스킬이 로드되지 않아요
 
-**A**: 네, 여러 역할을 수행하는 경우 복수 패키지를 설치할 수 있습니다:
-
+**A**: `semo context sync`를 수동 실행하여 DB에서 다시 동기화하세요:
 ```bash
-# 설치 시 여러 패키지 선택 가능
-npx @team-semicolon/semo-cli init
+semo context sync
 ```
-
----
-
-### Q: 패키지를 추가/제거하려면?
-
-**A**:
-```bash
-# 재설치 (패키지 선택 화면 표시)
-npx @team-semicolon/semo-cli init
-```
-
----
-
-### Q: semo-core와 semo-skills는 뭔가요?
-
-**A**: 모든 SEMO 설치에 포함되는 **Standard 패키지**입니다:
-- **semo-core**: 핵심 원칙, 오케스트레이터
-- **semo-skills**: 13개 공통 스킬
-
-Extensions(semo-next, semo-backend 등)는 선택 사항입니다.
 
 ---
 
@@ -233,6 +199,34 @@ gh auth status
 ### Q: MCP 없이도 SEMO를 사용할 수 있나요?
 
 **A**: 네, 코드 생성/수정 등 대부분의 기능은 MCP 없이도 동작합니다. Slack, Supabase 등 외부 연동만 MCP가 필요합니다.
+
+---
+
+### Q: DB 연결이 안 돼요
+
+**A**: SSH 터널과 환경변수를 확인하세요:
+```bash
+# 환경 진단
+semo doctor
+
+# DB URL 재설정
+semo config db
+```
+
+---
+
+### Q: `semo context sync`가 뭔가요?
+
+**A**: Core DB에서 팀 컨텍스트를 로컬 `~/.claude/memory/` 파일로 동기화하는 명령입니다. SessionStart 훅에 의해 세션 시작 시 자동 실행됩니다. 수동 실행도 가능합니다:
+```bash
+semo context sync
+```
+
+---
+
+### Q: KB 다이제스트(kb-digest.md)는 뭔가요?
+
+**A**: OpenClaw 봇이 세션 시작 시 마지막 동기화 이후 변경된 KB 항목의 요약을 받는 기능입니다. 봇별 구독 도메인에 대해서만 생성되며, 로컬 Claude Code 세션에서는 사용되지 않습니다.
 
 ---
 
@@ -369,5 +363,5 @@ cd .claude/semo-system && git pull
 - `/SEMO:help` - 도움말
 - `/SEMO:feedback` - 피드백 제출
 - Slack `#_협업` - 팀 채널에서 질문
-- [USER_GUIDE.md](./USER_GUIDE.md) - 상세 사용법
-- [PACKAGES.md](./PACKAGES.md) - 패키지별 안내
+- [SKILL_ARCHITECTURE.md](./SKILL_ARCHITECTURE.md) - 스킬 아키텍처
+- [ARCHITECTURE.md](./ARCHITECTURE.md) - 전체 아키텍처

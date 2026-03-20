@@ -17,7 +17,7 @@
 ## 자동화 스크립트
 
 ### 통합 리포트 스크립트 (권장)
-- **파일**: `~/.openclaw-growthclaw/workspace/report-with-insights.js`
+- **파일**: `scripts/report-with-insights.js` (워크스페이스 기준)
 - **기능**:
   - Search Console + GA4 데이터 통합
   - AI 기반 성장 인사이트 자동 생성
@@ -25,14 +25,19 @@
   - 급상승 키워드, 개선 기회, 트래픽 급변 알림
 - **사용법**:
   ```bash
-  node ~/.openclaw-growthclaw/workspace/report-with-insights.js jungchipan
-  node ~/.openclaw-growthclaw/workspace/report-with-insights.js axoracle
+  node scripts/report-with-insights.js jungchipan
+  node scripts/report-with-insights.js axoracle
   ```
 - **출력**: Slack 포맷 메시지 + JSON (channel, service)
 
-### 개별 리포트 스크립트 (레거시)
-- `report-jungchipan.js`: 정치판 전용
-- `report-axoracle.js`: axoracle 전용
+### SEO 모니터링 스킬
+- **스킬**: `skills/seo-tracker/` (seo-monitor.js + report-with-insights.js 통합)
+- **기능**: Search Console + GA4 SEO 지표 수집/분석/이상감지
+- **사용법**: SEO 리포트 생성, 색인 점검, 이상 감지 등
+
+### 개별 KPI 스크립트
+- `scripts/jungchipan-kpi-report.js`: 정치판 KPI 분석
+- `scripts/send-kpi-to-slack.js`: Slack 전송용 요약
 
 ---
 

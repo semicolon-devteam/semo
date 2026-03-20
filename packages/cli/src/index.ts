@@ -40,6 +40,7 @@ import { registerBotsCommands } from "./commands/bots";
 import { registerGetCommands } from "./commands/get";
 import { registerSessionsCommands } from "./commands/sessions";
 import { registerDbCommands } from "./commands/db";
+import { syncGlobalCache } from "./global-cache";
 
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 
@@ -118,9 +119,9 @@ async function getRemotePackageVersion(packagePath: string): Promise<string | nu
 }
 
 /**
- * semo-core/semo-skills 원격 버전 가져오기 (semo-system/ 하위 경로)
+ * semo-core 등 원격 버전 가져오기 (semo-system/ 하위 경로)
  */
-async function getRemoteCoreVersion(type: "semo-core" | "semo-skills" | "semo-agents" | "semo-scripts"): Promise<string | null> {
+async function getRemoteCoreVersion(type: "semo-core" | "semo-agents" | "semo-scripts"): Promise<string | null> {
   try {
     // v5.0: semo-system/ 하위에 Standard 패키지가 위치
     const url = `https://raw.githubusercontent.com/semicolon-devteam/semo/main/semo-system/${type}/VERSION`;
@@ -146,7 +147,7 @@ async function showVersionComparison(cwd: string): Promise<void> {
     const currentCliVersion = VERSION;
     const latestCliVersion = await getLatestVersion();
 
-    // 2. semo-core, semo-skills 버전 비교
+    // 2. semo-core 버전 비교
     const semoSystemDir = path.join(cwd, "semo-system");
     const hasSemoSystem = fs.existsSync(semoSystemDir);
 
@@ -170,15 +171,14 @@ async function showVersionComparison(cwd: string): Promise<void> {
       level: 0,
     });
 
-    // 레거시 환경 경고 (루트에 semo-core/semo-skills가 있는 경우)
+    // 레거시 환경 경고 (루트에 semo-core가 있는 경우)
     const hasLegacyCore = fs.existsSync(path.join(cwd, "semo-core"));
-    const hasLegacySkills = fs.existsSync(path.join(cwd, "semo-skills"));
-    if (hasLegacyCore || hasLegacySkills) {
+    if (hasLegacyCore) {
       spinner.warn("레거시 환경 감지됨");
       console.log(chalk.yellow("\n  ⚠️  구버전 SEMO 구조가 감지되었습니다."));
-      console.log(chalk.gray("     루트에 semo-core/ 또는 semo-skills/가 있습니다."));
+      console.log(chalk.gray("     루트에 semo-core/가 있습니다."));
       console.log(chalk.cyan("\n  💡 마이그레이션 방법:"));
-      console.log(chalk.gray("     1. 기존 semo-core/, semo-skills/ 폴더 삭제"));
+      console.log(chalk.gray("     1. 기존 semo-core/ 폴더 삭제"));
       console.log(chalk.gray("     2. .claude/ 폴더 삭제"));
       console.log(chalk.gray("     3. semo init 다시 실행\n"));
       console.log(chalk.gray("     또는: semo migrate --force\n"));
@@ -200,20 +200,7 @@ async function showVersionComparison(cwd: string): Promise<void> {
       });
     }
 
-    // semo-skills (semo-system/ 내부만 확인)
-    const skillsPathSystem = path.join(semoSystemDir, "semo-skills", "VERSION");
-
-    if (fs.existsSync(skillsPathSystem)) {
-      const localSkills = fs.readFileSync(skillsPathSystem, "utf-8").trim();
-      const remoteSkills = await getRemoteCoreVersion("semo-skills");
-      versionInfos.push({
-        name: "semo-skills",
-        local: localSkills,
-        remote: remoteSkills,
-        needsUpdate: remoteSkills ? isVersionLower(localSkills, remoteSkills) : false,
-        level: 0,
-      });
-    }
+    // semo-skills 제거됨 — 중앙 DB 단일 SoT
 
     // semo-agents (semo-system/ 내부)
     const agentsPathSystem = path.join(semoSystemDir, "semo-agents", "VERSION");
@@ -407,14 +394,14 @@ interface LegacyDetectionResult {
 
 /**
  * 레거시 SEMO 환경을 감지합니다.
- * 레거시: 프로젝트 루트에 semo-core/, semo-skills/ 가 직접 있는 경우
+ * 레거시: 프로젝트 루트에 semo-core/ 가 직접 있는 경우
  * 신규: semo-system/ 하위에 있는 경우
  */
 function detectLegacyEnvironment(cwd: string): LegacyDetectionResult {
   const legacyPaths: string[] = [];
 
   // 루트에 직접 있는 레거시 디렉토리 확인
-  const legacyDirs = ["semo-core", "semo-skills", "sax-core", "sax-skills"];
+  const legacyDirs = ["semo-core", "sax-core", "sax-skills"];
   for (const dir of legacyDirs) {
     const dirPath = path.join(cwd, dir);
     if (fs.existsSync(dirPath) && !fs.lstatSync(dirPath).isSymbolicLink()) {
@@ -482,7 +469,7 @@ async function migrateLegacyEnvironment(cwd: string): Promise<boolean> {
   if (!shouldMigrate) {
     console.log(chalk.yellow("\n마이그레이션이 취소되었습니다."));
     console.log(chalk.gray("💡 수동 마이그레이션 방법:"));
-    console.log(chalk.gray("   1. 기존 semo-core/, semo-skills/ 폴더 삭제"));
+    console.log(chalk.gray("   1. 기존 레거시 폴더 삭제"));
     console.log(chalk.gray("   2. .claude/ 폴더 삭제"));
     console.log(chalk.gray("   3. semo init 다시 실행\n"));
     return false;
@@ -492,7 +479,7 @@ async function migrateLegacyEnvironment(cwd: string): Promise<boolean> {
 
   try {
     // 1. 루트의 레거시 디렉토리 삭제
-    const legacyDirs = ["semo-core", "semo-skills", "sax-core", "sax-skills"];
+    const legacyDirs = ["semo-core", "sax-core", "sax-skills"];
     for (const dir of legacyDirs) {
       const dirPath = path.join(cwd, dir);
       if (fs.existsSync(dirPath) && !fs.lstatSync(dirPath).isSymbolicLink()) {
@@ -629,23 +616,6 @@ async function showVersionInfo(): Promise<void> {
       local: localCore,
       remote: remoteCore,
       needsUpdate: remoteCore ? isVersionLower(localCore, remoteCore) : false,
-      level: 0,
-    });
-  }
-
-  // 3. semo-skills 버전 (루트 또는 semo-system 내부)
-  const skillsPathRoot = path.join(cwd, "semo-skills", "VERSION");
-  const skillsPathSystem = path.join(cwd, "semo-system", "semo-skills", "VERSION");
-  const skillsPath = fs.existsSync(skillsPathRoot) ? skillsPathRoot : skillsPathSystem;
-
-  if (fs.existsSync(skillsPath)) {
-    const localSkills = fs.readFileSync(skillsPath, "utf-8").trim();
-    const remoteSkills = await getRemoteCoreVersion("semo-skills");
-    versionInfos.push({
-      name: "semo-skills",
-      local: localSkills,
-      remote: remoteSkills,
-      needsUpdate: remoteSkills ? isVersionLower(localSkills, remoteSkills) : false,
       level: 0,
     });
   }
@@ -996,15 +966,12 @@ program
 
 // === Standard 설치 (DB 기반, 글로벌 ~/.claude/) ===
 async function setupStandardGlobal() {
-  const claudeDir = path.join(os.homedir(), ".claude");
-
   console.log(chalk.cyan("\n📚 Standard 설치 (DB → ~/.claude/)"));
   console.log(chalk.gray("   스킬/커맨드/에이전트를 글로벌에 설치\n"));
 
   const spinner = ora("DB에서 스킬/커맨드/에이전트 조회 중...").start();
 
   try {
-    // DB 연결 확인
     const connected = await isDbConnected();
     if (connected) {
       spinner.text = "DB 연결 성공, 데이터 조회 중...";
@@ -1012,81 +979,13 @@ async function setupStandardGlobal() {
       spinner.text = "DB 연결 실패, 폴백 데이터 사용 중...";
     }
 
-    // .claude 디렉토리 생성
-    fs.mkdirSync(claudeDir, { recursive: true });
+    const result = await syncGlobalCache();
 
-    // 1. 스킬 설치 (항상 전체 교체)
-    const skillsDir = path.join(claudeDir, "skills");
-    if (fs.existsSync(skillsDir)) {
-      removeRecursive(skillsDir);
-    }
-    fs.mkdirSync(skillsDir, { recursive: true });
-
-    const skills = await getActiveSkills();
-    for (const skill of skills) {
-      const skillFolder = path.join(skillsDir, skill.name);
-      fs.mkdirSync(skillFolder, { recursive: true });
-      fs.writeFileSync(path.join(skillFolder, "SKILL.md"), skill.content);
-    }
-    console.log(chalk.green(`  ✓ skills 설치 완료 (${skills.length}개)`));
-
-    // 2. 커맨드 설치 (항상 전체 교체)
-    const commandsDir = path.join(claudeDir, "commands");
-    if (fs.existsSync(commandsDir)) {
-      removeRecursive(commandsDir);
-    }
-    fs.mkdirSync(commandsDir, { recursive: true });
-
-    const commands = await getCommands();
-
-    // 폴더별로 그룹핑
-    const commandsByFolder: Record<string, SemoCommand[]> = {};
-    for (const cmd of commands) {
-      if (!commandsByFolder[cmd.folder]) {
-        commandsByFolder[cmd.folder] = [];
-      }
-      commandsByFolder[cmd.folder].push(cmd);
-    }
-
-    let cmdCount = 0;
-    for (const [folder, cmds] of Object.entries(commandsByFolder)) {
-      const folderPath = path.join(commandsDir, folder);
-      fs.mkdirSync(folderPath, { recursive: true });
-      for (const cmd of cmds) {
-        fs.writeFileSync(path.join(folderPath, `${cmd.name}.md`), cmd.content);
-        cmdCount++;
-      }
-    }
-    console.log(chalk.green(`  ✓ commands 설치 완료 (${cmdCount}개)`));
-
-    // 3. 에이전트 설치 (항상 전체 교체, 소문자 dedup)
-    const agentsDir = path.join(claudeDir, "agents");
-    if (fs.existsSync(agentsDir)) {
-      removeRecursive(agentsDir);
-    }
-    fs.mkdirSync(agentsDir, { recursive: true });
-
-    const agents = await getAgents();
-    // 대소문자 중복 제거 (소문자 기준, 먼저 나온 것 우선)
-    const seenAgentNames = new Set<string>();
-    const dedupedAgents: Agent[] = [];
-    for (const agent of agents) {
-      const lowerName = agent.name.toLowerCase();
-      if (!seenAgentNames.has(lowerName)) {
-        seenAgentNames.add(lowerName);
-        dedupedAgents.push(agent);
-      }
-    }
-
-    for (const agent of dedupedAgents) {
-      const agentFolder = path.join(agentsDir, agent.name);
-      fs.mkdirSync(agentFolder, { recursive: true });
-      fs.writeFileSync(path.join(agentFolder, `${agent.name}.md`), agent.content);
-    }
-    console.log(chalk.green(`  ✓ agents 설치 완료 (${dedupedAgents.length}개${agents.length !== dedupedAgents.length ? `, ${agents.length - dedupedAgents.length}개 dedup` : ""})`));
+    console.log(chalk.green(`  ✓ skills 설치 완료 (${result.skills}개)`));
+    console.log(chalk.green(`  ✓ commands 설치 완료 (${result.commands}개)`));
+    console.log(chalk.green(`  ✓ agents 설치 완료 (${result.agents}개)`));
 
     spinner.succeed("Standard 설치 완료 (DB → ~/.claude/)");
-
   } catch (error) {
     spinner.fail("Standard 설치 실패");
     console.error(chalk.red(`   ${error}`));
@@ -1124,33 +1023,9 @@ async function createStandardSymlinks(cwd: string) {
     console.log(chalk.green(`  ✓ .claude/agents/ (${agents.length}개 agent 링크됨)`));
   }
 
-  // skills 디렉토리 생성 및 개별 링크 (DB 기반 - 활성 스킬만)
+  // skills — 중앙 DB 단일 SoT (semo-skills 파일시스템 제거됨)
   const claudeSkillsDir = path.join(claudeDir, "skills");
-  const coreSkillsDir = path.join(semoSystemDir, "semo-skills");
-
-  if (fs.existsSync(coreSkillsDir)) {
-    // 기존 심볼릭 링크면 삭제 (디렉토리로 변경)
-    if (fs.existsSync(claudeSkillsDir) && fs.lstatSync(claudeSkillsDir).isSymbolicLink()) {
-      removeRecursive(claudeSkillsDir);
-    }
-    fs.mkdirSync(claudeSkillsDir, { recursive: true });
-
-    // DB에서 활성 스킬 목록 조회 (19개 핵심 스킬만)
-    const activeSkillNames = await getActiveSkillNames();
-    let linkedCount = 0;
-
-    for (const skillName of activeSkillNames) {
-      const skillLink = path.join(claudeSkillsDir, skillName);
-      const skillTarget = path.join(coreSkillsDir, skillName);
-
-      // 스킬 폴더가 존재하는 경우에만 링크
-      if (fs.existsSync(skillTarget) && !fs.existsSync(skillLink)) {
-        createSymlinkOrJunction(skillTarget, skillLink);
-        linkedCount++;
-      }
-    }
-    console.log(chalk.green(`  ✓ .claude/skills/ (${linkedCount}개 skill 링크됨 - DB 기반)`));
-  }
+  fs.mkdirSync(claudeSkillsDir, { recursive: true });
 
   // commands 링크
   const commandsDir = path.join(claudeDir, "commands");
@@ -1267,14 +1142,9 @@ function verifyInstallation(cwd: string, installedExtensions: string[] = []): Ve
 
   // === 레거시: semo-system 기반 설치 검증 ===
   const coreDir = path.join(semoSystemDir, "semo-core");
-  const skillsDir = path.join(semoSystemDir, "semo-skills");
 
   if (!fs.existsSync(coreDir)) {
     result.errors.push("semo-core가 설치되지 않았습니다");
-    result.success = false;
-  }
-  if (!fs.existsSync(skillsDir)) {
-    result.errors.push("semo-skills가 설치되지 않았습니다");
     result.success = false;
   }
 
@@ -1307,32 +1177,7 @@ function verifyInstallation(cwd: string, installedExtensions: string[] = []): Ve
     }
   }
 
-  // 3. skills 링크 검증 (isSymlinkValid 사용)
-  if (fs.existsSync(skillsDir)) {
-    const expectedSkills = fs.readdirSync(skillsDir).filter(f =>
-      fs.statSync(path.join(skillsDir, f)).isDirectory()
-    );
-    result.stats.skills.expected = expectedSkills.length;
-
-    const claudeSkillsDir = path.join(claudeDir, "skills");
-    if (fs.existsSync(claudeSkillsDir)) {
-      for (const skill of expectedSkills) {
-        const linkPath = path.join(claudeSkillsDir, skill);
-        try {
-          if (fs.existsSync(linkPath) || fs.lstatSync(linkPath).isSymbolicLink()) {
-            if (isSymlinkValid(linkPath)) {
-              result.stats.skills.linked++;
-            } else {
-              result.stats.skills.broken++;
-              result.warnings.push(`깨진 링크: .claude/skills/${skill}`);
-            }
-          }
-        } catch {
-          // 링크가 존재하지 않음
-        }
-      }
-    }
-  }
+  // 3. skills — 중앙 DB 단일 SoT (파일시스템 검증 불필요)
 
   // 4. commands 검증 (isSymlinkValid 사용)
   const semoCommandsLink = path.join(claudeDir, "commands", "SEMO");
@@ -2189,7 +2034,7 @@ program
 
     // Standard 패키지 표시
     console.log(chalk.white.bold("Standard (필수)"));
-    const standardPkgs = ["semo-core", "semo-skills", "semo-agents", "semo-scripts"];
+    const standardPkgs = ["semo-core", "semo-agents", "semo-scripts"];
     for (const pkg of standardPkgs) {
       const isInstalled = fs.existsSync(path.join(semoSystemDir, pkg));
       console.log(`  ${isInstalled ? chalk.green("✓") : chalk.gray("○")} ${pkg}`);
@@ -2225,7 +2070,6 @@ program
     console.log(chalk.white.bold("Standard:"));
     const standardChecks = [
       { name: "semo-core", path: path.join(semoSystemDir, "semo-core") },
-      { name: "semo-skills", path: path.join(semoSystemDir, "semo-skills") },
     ];
 
     let standardOk = true;
@@ -2268,7 +2112,7 @@ program
   .option("--global", "글로벌 스킬/커맨드/에이전트를 DB 최신으로 갱신 (~/.claude/)")
   .option("--system", "semo-system만 업데이트")
   .option("--skip-cli", "CLI 업데이트 건너뛰기")
-  .option("--only <packages>", "특정 패키지만 업데이트 (쉼표 구분: semo-core,semo-skills,biz/management)")
+  .option("--only <packages>", "특정 패키지만 업데이트 (쉼표 구분: semo-core,biz/management)")
   .option("--migrate", "레거시 환경 강제 마이그레이션")
   .action(async (options) => {
     // === --global: 글로벌 스킬 갱신 ===
@@ -2350,20 +2194,18 @@ program
 
     // 업데이트 대상 결정
     const updateSemoCore = !isSelectiveUpdate || onlyPackages.includes("semo-core");
-    const updateSemoSkills = !isSelectiveUpdate || onlyPackages.includes("semo-skills");
     const updateSemoAgents = !isSelectiveUpdate || onlyPackages.includes("semo-agents");
     const updateSemoScripts = !isSelectiveUpdate || onlyPackages.includes("semo-scripts");
 
     console.log(chalk.cyan("\n📚 semo-system 업데이트"));
     console.log(chalk.gray("  대상:"));
     if (updateSemoCore) console.log(chalk.gray("    - semo-core"));
-    if (updateSemoSkills) console.log(chalk.gray("    - semo-skills"));
     if (updateSemoAgents) console.log(chalk.gray("    - semo-agents"));
     if (updateSemoScripts) console.log(chalk.gray("    - semo-scripts"));
 
-    if (!updateSemoCore && !updateSemoSkills && !updateSemoAgents && !updateSemoScripts) {
+    if (!updateSemoCore && !updateSemoAgents && !updateSemoScripts) {
       console.log(chalk.yellow("\n  ⚠️ 업데이트할 패키지가 없습니다."));
-      console.log(chalk.gray("     설치된 패키지: semo-core, semo-skills, semo-agents, semo-scripts"));
+      console.log(chalk.gray("     설치된 패키지: semo-core, semo-agents, semo-scripts"));
       return;
     }
 
@@ -2377,7 +2219,6 @@ program
       // Standard 업데이트 (선택적) - semo-system/ 하위에서 복사
       const standardUpdates = [
         { flag: updateSemoCore, name: "semo-core" },
-        { flag: updateSemoSkills, name: "semo-skills" },
         { flag: updateSemoAgents, name: "semo-agents" },
         { flag: updateSemoScripts, name: "semo-scripts" },
       ];
@@ -2603,7 +2444,7 @@ program
       console.log(chalk.red("   ❌ semo-system/ 없음"));
       console.log(chalk.gray("   💡 해결: semo init 실행"));
     } else {
-      const packages = ["semo-core", "semo-skills", "semo-agents", "semo-scripts"];
+      const packages = ["semo-core", "semo-agents", "semo-scripts"];
       for (const pkg of packages) {
         const pkgPath = path.join(semoSystemDir, pkg);
         if (fs.existsSync(pkgPath)) {
@@ -3226,138 +3067,14 @@ function parseSkillFrontmatter(content: string): { name: string; description: st
   const toolsMatch = fm.match(/^tools:\s*\[(.+)\]$/m);
   const tools = toolsMatch ? toolsMatch[1].split(",").map((t: string) => t.trim()) : [];
 
-  // category: 상위 디렉토리명 또는 name 자체 (semo-skills의 경우 dir = skill name)
+  // category
   const category = "core";
 
   return { name, description, category, tools };
 }
 
-/**
- * semo-system/semo-skills/ 스캔 → semo.skills 테이블 upsert
- */
-async function seedSkillsToDb(semoSystemDir: string): Promise<void> {
-  const skillsDir = path.join(semoSystemDir, "semo-skills");
-
-  if (!fs.existsSync(skillsDir)) {
-    console.log(chalk.red(`\n❌ semo-skills 디렉토리를 찾을 수 없습니다: ${skillsDir}`));
-    return;
-  }
-
-  const connected = await isDbConnected();
-  if (!connected) {
-    console.log(chalk.red("❌ DB 연결 실패 — seed-skills 건너뜀"));
-    return;
-  }
-
-  const spinner = ora("semo-skills 스캔 중...").start();
-
-  // 활성 스킬 디렉토리 수집 (_archived, CHANGELOG, VERSION 제외)
-  const excludeDirs = new Set(["_archived", "CHANGELOG"]);
-  const excludeFiles = new Set(["VERSION"]);
-
-  const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-  const skillDirs = entries.filter(e =>
-    e.isDirectory() && !excludeDirs.has(e.name)
-  );
-
-  const skills: Array<{ name: string; description: string; category: string; content: string; tools: string[] }> = [];
-
-  for (const dir of skillDirs) {
-    const skillMdPath = path.join(skillsDir, dir.name, "SKILL.md");
-    if (!fs.existsSync(skillMdPath)) continue;
-
-    const content = fs.readFileSync(skillMdPath, "utf-8");
-    const parsed = parseSkillFrontmatter(content);
-    if (!parsed) continue;
-
-    skills.push({ ...parsed, content });
-  }
-
-  spinner.text = `${skills.length}개 스킬 발견 — DB에 upsert 중...`;
-
-  const pool = getPool();
-  const client = await pool.connect();
-  let upserted = 0;
-  const errors: string[] = [];
-
-  try {
-    await client.query("BEGIN");
-
-    for (let i = 0; i < skills.length; i++) {
-      const skill = skills[i];
-      try {
-        await client.query(
-          `INSERT INTO semo.skills
-             (name, display_name, description, content, category, package,
-              is_active, is_required, install_order, version)
-           VALUES ($1, $2, $3, $4, $5, $6, true, false, $7, '1.0.0')
-           ON CONFLICT (name) DO UPDATE SET
-             display_name = EXCLUDED.display_name,
-             description  = EXCLUDED.description,
-             content      = EXCLUDED.content,
-             category     = EXCLUDED.category`,
-          [skill.name, skill.name, skill.description, skill.content, skill.category, "semo-skills", i + 1]
-        );
-        upserted++;
-      } catch (err) {
-        errors.push(`${skill.name}: ${err}`);
-      }
-    }
-
-    await client.query("COMMIT");
-    spinner.succeed(`seed-skills 완료: ${upserted}개 스킬 upsert`);
-    if (errors.length > 0) {
-      errors.forEach(e => console.log(chalk.red(`  ❌ ${e}`)));
-    }
-  } catch (err) {
-    await client.query("ROLLBACK");
-    spinner.fail(`seed-skills 실패: ${err}`);
-  } finally {
-    client.release();
-  }
-}
-
-// `semo skills` 커맨드 그룹
-const skillsCmd = program
-  .command("skills")
-  .description("스킬 관리 (DB 시딩 등)");
-
-skillsCmd
-  .command("seed")
-  .description("semo-system/semo-skills/ → semo.skills DB upsert")
-  .option("--semo-system <path>", "semo-system 경로 (기본: ./semo-system)")
-  .option("--dry-run", "실제 upsert 없이 스캔 결과만 출력")
-  .action(async (options) => {
-    const cwd = process.cwd();
-    const semoSystemDir = options.semoSystem
-      ? path.resolve(options.semoSystem)
-      : path.join(cwd, "semo-system");
-
-    if (options.dryRun) {
-      const skillsDir = path.join(semoSystemDir, "semo-skills");
-      if (!fs.existsSync(skillsDir)) {
-        console.log(chalk.red(`❌ ${skillsDir} 없음`));
-        process.exit(1);
-      }
-      const excludeDirs = new Set(["_archived", "CHANGELOG"]);
-      const entries = fs.readdirSync(skillsDir, { withFileTypes: true });
-      const skillDirs = entries.filter(e => e.isDirectory() && !excludeDirs.has(e.name));
-      console.log(chalk.cyan.bold("\n[dry-run] 발견된 스킬:\n"));
-      for (const dir of skillDirs) {
-        const mdPath = path.join(skillsDir, dir.name, "SKILL.md");
-        if (!fs.existsSync(mdPath)) continue;
-        const parsed = parseSkillFrontmatter(fs.readFileSync(mdPath, "utf-8"));
-        if (parsed) {
-          console.log(chalk.gray(`  ${parsed.name.padEnd(20)} ${parsed.description.split("\n")[0].substring(0, 60)}`));
-        }
-      }
-      console.log();
-      return;
-    }
-
-    await seedSkillsToDb(semoSystemDir);
-    await closeConnection();
-  });
+// semo skills seed — 제거됨 (중앙 DB 단일 SoT)
+// 봇 전용 스킬은 semo bots seed로 동기화
 
 // === -v 옵션 처리 (program.parse 전에 직접 처리) ===
 async function main() {

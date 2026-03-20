@@ -118,6 +118,23 @@ export interface KBStatusInfo {
   bot: { total: number; domains: Record<string, number>; lastUpdated: string | null; lastSynced: string | null };
 }
 
+export interface KBDigestEntry {
+  domain: string;
+  key: string;
+  content: string;
+  version: number;
+  change_type: 'new' | 'updated';
+  updated_at: string;
+}
+
+export interface KBDigestResult {
+  botId: string;
+  domains: string[];
+  changes: KBDigestEntry[];
+  since: string;
+  generatedAt: string;
+}
+
 export interface KBDiffResult {
   added: KBEntry[];       // in DB but not local
   removed: KBEntry[];     // in local but not DB
@@ -718,6 +735,63 @@ export async function ontoValidate(
   }
 
   return { valid, invalid };
+}
+
+// ============================================================
+// KB Digest
+// ============================================================
+
+/**
+ * Generate KB change digest for a bot based on its subscribed domains.
+ * Queries changes since last sync watermark and updates the watermark.
+ */
+export async function kbDigest(pool: Pool, botId: string): Promise<KBDigestResult> {
+  const client = await pool.connect();
+  const generatedAt = new Date().toISOString();
+
+  try {
+    // 1. Get subscribed domains + watermarks
+    const subsResult = await client.query(
+      `SELECT domain, last_synced_at::text FROM semo.bot_kb_subscriptions WHERE bot_id = $1`,
+      [botId]
+    );
+
+    if (subsResult.rows.length === 0) {
+      return { botId, domains: [], changes: [], since: generatedAt, generatedAt };
+    }
+
+    const domains = subsResult.rows.map((r: any) => r.domain);
+    const allChanges: KBDigestEntry[] = [];
+    let earliestSince = generatedAt;
+
+    // 2. Per-domain: query changes since last_synced_at
+    for (const row of subsResult.rows) {
+      const { domain, last_synced_at } = row;
+      if (last_synced_at < earliestSince) earliestSince = last_synced_at;
+
+      const changesResult = await client.query(
+        `SELECT domain, key, content, version, updated_at::text,
+                CASE WHEN created_at > $2 THEN 'new' ELSE 'updated' END as change_type
+         FROM semo.knowledge_base
+         WHERE domain = $1 AND (updated_at > $2 OR created_at > $2)
+         ORDER BY updated_at DESC
+         LIMIT 50`,
+        [domain, last_synced_at]
+      );
+
+      allChanges.push(...changesResult.rows);
+    }
+
+    // 3. Update watermarks
+    await client.query(
+      `UPDATE semo.bot_kb_subscriptions SET last_synced_at = NOW() WHERE bot_id = $1`,
+      [botId]
+    );
+
+    return { botId, domains, changes: allChanges, since: earliestSince, generatedAt };
+  } finally {
+    client.release();
+  }
 }
 
 /**

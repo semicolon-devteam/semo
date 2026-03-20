@@ -1,6 +1,6 @@
 # infra
 
-> 자동 생성: semo context sync (2026-03-17T09:42:36.570Z)
+> 자동 생성: semo context sync (2026-03-20T09:00:34.845Z)
 
 
 ## bot-architecture

@@ -1,8 +1,9 @@
 /**
- * skill-sync — 스킬 파일 스캔 + DB 동기화
+ * skill-sync — 봇 전용 스킬 파일 스캔 + DB 동기화
  *
  * semo bots sync (piggyback) 및 semo context sync (세션 훅) 양쪽에서 호출.
- * 공유 스킬은 target_agents DEFAULT '{all}', 봇 전용은 '{botId}'로 설정.
+ * 스킬 이름은 flat (예: 'kb-manager'), metadata.bot_ids 배열로 봇 매핑.
+ * 동일 스킬명이 여러 봇에 존재하면 bot_ids를 머지.
  */
 
 import * as fs from "fs";
@@ -13,112 +14,82 @@ interface ScannedSkill {
   name: string;
   prompt: string;
   package: string;
-  botId: string | null;
+  botId: string;
 }
 
 export interface SkillSyncResult {
-  shared: number;
   botSpecific: number;
   total: number;
 }
 
 /**
- * semo-system 디렉토리에서 스킬 파일 스캔
+ * semo-system/bot-workspaces 에서 봇 전용 스킬 파일 스캔
  */
-export function scanSkills(semoSystemDir: string): { shared: ScannedSkill[]; botSpecific: ScannedSkill[] } {
-  const shared: ScannedSkill[] = [];
-  const botSpecific: ScannedSkill[] = [];
+export function scanSkills(semoSystemDir: string): ScannedSkill[] {
+  const skills: ScannedSkill[] = [];
 
-  // 1. 공유 스킬: semo-skills/*/SKILL.md
-  const sharedSkillsDir = path.join(semoSystemDir, "semo-skills");
-  if (fs.existsSync(sharedSkillsDir)) {
-    const entries = fs.readdirSync(sharedSkillsDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const skillMdPath = path.join(sharedSkillsDir, entry.name, "SKILL.md");
+  const workspacesDir = path.join(semoSystemDir, "bot-workspaces");
+  if (!fs.existsSync(workspacesDir)) return skills;
+
+  const botEntries = fs.readdirSync(workspacesDir, { withFileTypes: true });
+  for (const botEntry of botEntries) {
+    if (!botEntry.isDirectory()) continue;
+    const skillsDir = path.join(workspacesDir, botEntry.name, "skills");
+    if (!fs.existsSync(skillsDir)) continue;
+
+    const skillEntries = fs.readdirSync(skillsDir, { withFileTypes: true });
+    for (const skillEntry of skillEntries) {
+      if (!skillEntry.isDirectory()) continue;
+      if (skillEntry.name.endsWith(".skill")) continue;
+      const skillMdPath = path.join(skillsDir, skillEntry.name, "SKILL.md");
       if (!fs.existsSync(skillMdPath)) continue;
       try {
-        shared.push({
-          name: entry.name,
+        skills.push({
+          name: skillEntry.name,
           prompt: fs.readFileSync(skillMdPath, "utf-8"),
-          package: "semo-skills",
-          botId: null,
+          package: "openclaw",
+          botId: botEntry.name,
         });
       } catch { /* skip unreadable */ }
     }
   }
 
-  // 2. 봇 전용 스킬: bot-workspaces/*/skills/*/SKILL.md
-  const workspacesDir = path.join(semoSystemDir, "bot-workspaces");
-  if (fs.existsSync(workspacesDir)) {
-    const botEntries = fs.readdirSync(workspacesDir, { withFileTypes: true });
-    for (const botEntry of botEntries) {
-      if (!botEntry.isDirectory()) continue;
-      const skillsDir = path.join(workspacesDir, botEntry.name, "skills");
-      if (!fs.existsSync(skillsDir)) continue;
-
-      const skillEntries = fs.readdirSync(skillsDir, { withFileTypes: true });
-      for (const skillEntry of skillEntries) {
-        if (!skillEntry.isDirectory()) continue;
-        if (skillEntry.name.endsWith(".skill")) continue;
-        const skillMdPath = path.join(skillsDir, skillEntry.name, "SKILL.md");
-        if (!fs.existsSync(skillMdPath)) continue;
-        try {
-          botSpecific.push({
-            name: `${botEntry.name}/${skillEntry.name}`,
-            prompt: fs.readFileSync(skillMdPath, "utf-8"),
-            package: "openclaw",
-            botId: botEntry.name,
-          });
-        } catch { /* skip unreadable */ }
-      }
-    }
-  }
-
-  return { shared, botSpecific };
+  return skills;
 }
 
 /**
  * 스캔된 스킬을 skill_definitions에 upsert
- * 기존 트랜잭션 내에서 호출 가능 (caller가 BEGIN/COMMIT 관리)
+ * flat name + metadata.bot_ids 배열 사용, 동일 스킬명은 bot_ids 머지
  */
 export async function syncSkillsToDB(
   client: PoolClient,
   semoSystemDir: string
 ): Promise<SkillSyncResult> {
-  const { shared, botSpecific } = scanSkills(semoSystemDir);
+  const skills = scanSkills(semoSystemDir);
 
-  // 공유 스킬 — target_agents DEFAULT '{all}'
-  for (const skill of shared) {
+  for (const skill of skills) {
     await client.query(
-      `INSERT INTO skill_definitions (name, prompt, package, is_active, office_id)
-       VALUES ($1, $2, $3, true, NULL)
+      `INSERT INTO skill_definitions (name, prompt, package, metadata, is_active, office_id)
+       VALUES ($1, $2, $3, $4, true, NULL)
        ON CONFLICT (name, office_id) DO UPDATE SET
          prompt = EXCLUDED.prompt,
          package = EXCLUDED.package,
+         metadata = jsonb_set(
+           skill_definitions.metadata,
+           '{bot_ids}',
+           (SELECT jsonb_agg(DISTINCT v)
+            FROM jsonb_array_elements(
+              COALESCE(skill_definitions.metadata->'bot_ids', '[]'::jsonb) ||
+              COALESCE(EXCLUDED.metadata->'bot_ids', '[]'::jsonb)
+            ) AS v)
+         ),
          updated_at = NOW()`,
-      [skill.name, skill.prompt, skill.package]
-    );
-  }
-
-  // 봇 전용 스킬 — target_agents = '{botId}'
-  for (const skill of botSpecific) {
-    await client.query(
-      `INSERT INTO skill_definitions (name, prompt, package, target_agents, metadata, is_active, office_id)
-       VALUES ($1, $2, $3, $4, $5, true, NULL)
-       ON CONFLICT (name, office_id) DO UPDATE SET
-         prompt = EXCLUDED.prompt,
-         package = EXCLUDED.package,
-         target_agents = EXCLUDED.target_agents,
-         metadata = EXCLUDED.metadata,
-         updated_at = NOW()`,
-      [skill.name, skill.prompt, skill.package, `{${skill.botId}}`, JSON.stringify({ bot_id: skill.botId })]
+      [skill.name, skill.prompt, skill.package, JSON.stringify({ bot_ids: [skill.botId] })]
     );
   }
 
   return {
-    shared: shared.length,
-    botSpecific: botSpecific.length,
-    total: shared.length + botSpecific.length,
+    botSpecific: skills.length,
+    total: skills.length,
   };
 }

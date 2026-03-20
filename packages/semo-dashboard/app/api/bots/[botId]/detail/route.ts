@@ -31,6 +31,7 @@ interface CronJobRow {
   last_run: string | null;
   next_run: string | null;
   session_target: string;
+  payload: Record<string, unknown> | null;
 }
 
 export async function GET(
@@ -75,7 +76,7 @@ export async function GET(
     let cronJobs: CronJob[] = [];
     try {
       const cronResult = await query<CronJobRow>(`
-        SELECT job_id, name, schedule, enabled, last_run, next_run, session_target
+        SELECT job_id, name, schedule, enabled, last_run, next_run, session_target, payload
         FROM semo.bot_cron_jobs
         WHERE bot_id = $1
         ORDER BY next_run NULLS LAST
@@ -89,6 +90,7 @@ export async function GET(
         lastRun: row.last_run || undefined,
         nextRun: row.next_run || undefined,
         sessionTarget: row.session_target,
+        payload: row.payload || undefined,
       }));
     } catch (error) {
       console.warn('DB cron query failed, trying OpenClaw CLI:', error);

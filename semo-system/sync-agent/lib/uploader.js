@@ -63,9 +63,9 @@ async function uploadToDatabase(botDataList) {
       for (const job of cronJobs) {
         await client.query(`
           INSERT INTO bot_cron_jobs (
-            bot_id, job_id, name, schedule, enabled, last_run, next_run, session_target, synced_at
+            bot_id, job_id, name, schedule, enabled, last_run, next_run, session_target, payload, synced_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
         `, [
           botId,
           job.jobId,
@@ -75,6 +75,7 @@ async function uploadToDatabase(botDataList) {
           job.lastRun,
           job.nextRun,
           job.sessionTarget,
+          job.payload ? JSON.stringify(job.payload) : null,
         ]);
       }
       

@@ -467,3 +467,8 @@ Before reporting completion, verify:
 - [ ] Issue URL saved/logged for tracking
 
 If all checked, bot will pick up automatically within polling interval.
+
+## 유틸리티 스크립트
+
+- `scripts/create-pr.sh` — 이슈 연결 PR 자동 생성 + 라벨 전환
+- `scripts/label-transition.sh` — 봇 상태 라벨 배타적 전환 관리
