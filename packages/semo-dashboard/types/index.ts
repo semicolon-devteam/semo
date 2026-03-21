@@ -197,6 +197,24 @@ export interface DBQueryResult {
   durationMs: number;
 }
 
+// Milestone / Roadmap Types
+export interface MilestoneMetadata {
+  project: string;
+  title: string;
+  start_date: string;   // ISO date: "2026-01-15"
+  end_date: string;      // ISO date: "2026-02-28"
+  status: 'planned' | 'in-progress' | 'completed';
+  order?: number;
+}
+
+export interface Milestone {
+  kb_id: string;
+  key: string;
+  content: string;
+  metadata: MilestoneMetadata;
+  updated_at: string;
+}
+
 // Sync Types
 export type SyncTrigger = 'SessionStart' | 'SessionStop' | 'BotHook' | 'Manual';
 export type SyncDirection = 'DB→Local' | 'Local→DB' | 'OpenClaw→DB';

@@ -1,6 +1,6 @@
 # semo — Claude Configuration
 
-> SEMO v4.1.5 설치됨 (2026-03-20)
+> SEMO v4.2.0 설치됨 (2026-03-21)
 
 ---
 
@@ -11,45 +11,34 @@
 
 ```
 로컬 Claude Code 세션
-    ↕ semo context sync / push
+    ↕ semo-kb MCP 서버 (실시간 벡터 검색)
 팀 Core DB (PostgreSQL, semo 스키마)
-    ↕ 봇 세션 시작/종료 훅
+    ↕ semo-kb MCP 서버
 OpenClaw 봇팀 (7개 봇)
   workclaw · reviewclaw · planclaw · designclaw
   infraclaw · growthclaw · semiclaw
 ```
 
-**이 CLAUDE.md가 설치된 프로젝트는 OpenClaw 봇팀의 컨텍스트를 실시간으로 공유받는다.**
+**이 CLAUDE.md가 설치된 프로젝트는 semo-kb MCP 서버를 통해 팀 KB에 실시간 접근한다.**
 
 ---
 
-## 자동 동기화
+## KB 접근 (semo-kb MCP 서버)
 
-세션 시작/종료 시 팀 Core DB와 자동 동기화됩니다.
+KB 데이터는 **semo-kb MCP 서버**를 통해 Core DB에서 실시간 조회합니다.
+`.claude/memory/*.md` 파일 기반 동기화는 v4.2.0에서 제거되었습니다.
 
-| 시점 | 동작 |
-|------|------|
-| 세션 시작 | `semo context sync` → `.claude/memory/` 최신화 |
-| 세션 종료 | `semo context push` → `decisions.md` 변경분 DB 저장 |
+| MCP 도구 | 설명 |
+|----------|------|
+| `kb_search` | 벡터+텍스트 하이브리드 검색 (query, domain?, limit?, mode?) |
+| `kb_get` | domain+key 정확 조회 |
+| `kb_list` | 도메인별 엔트리 목록 |
+| `kb_upsert` | KB 항목 쓰기 (OpenAI 임베딩 자동 생성) |
+| `kb_bot_status` | 봇 상태 테이블 조회 |
+| `kb_ontology` | 온톨로지 스키마 조회 |
+| `kb_digest` | 봇 구독 도메인 변경 다이제스트 |
 
----
-
-## Memory Context
-
-`.claude/memory/` 파일들은 **팀 Core DB (`semo` 스키마)에서 자동으로 채워집니다**.
-직접 편집하지 마세요 — 세션 시작 시 덮어씌워집니다.
-
-| 파일 | DB 소스 | 방향 |
-|------|---------|------|
-| `team.md` | `kb WHERE domain='team'` | DB → 로컬 (읽기 전용) |
-| `projects.md` | `kb WHERE domain='project'` | DB → 로컬 (읽기 전용) |
-| `decisions.md` | `kb WHERE domain='decision'` | **양방향** (편집 가능, Stop 시 DB 저장) |
-| `infra.md` | `kb WHERE domain='infra'` | DB → 로컬 (읽기 전용) |
-| `process.md` | `kb WHERE domain='process'` | DB → 로컬 (읽기 전용) |
-| `bots.md` | `semo.bot_status` | DB → 로컬 (봇 상태) |
-| `ontology.md` | `semo.ontology` | DB → 로컬 (읽기 전용) |
-
-**decisions.md 만 편집 가능합니다.** 아키텍처 결정(ADR)을 여기에 기록하세요.
+`semo context sync`는 스킬/에이전트/커맨드 글로벌 캐시 + 크론잡만 동기화합니다.
 
 ---
 
@@ -58,11 +47,10 @@ OpenClaw 봇팀 (7개 봇)
 ```
 .claude/
 ├── CLAUDE.md       # 이 파일
-├── settings.json   # MCP 서버 설정 + SessionStart/Stop 훅
-├── memory/         # Core DB → 로컬 자동 동기화 컨텍스트
-├── skills/         # SEMO 스킬 (semo-system/semo-skills/ 링크)
-├── agents/         # SEMO 에이전트 (semo-system/meta/agents/ 링크)
-└── commands/SEMO   # 슬래시 커맨드 (semo-system/semo-core/commands/)
+├── settings.json   # MCP 서버 설정 (semo-kb 포함) + SessionStart/Stop 훅
+├── skills/         # SEMO 스킬 (글로벌 캐시)
+├── agents/         # SEMO 에이전트 (글로벌 캐시)
+└── commands/SEMO   # 슬래시 커맨드
 ```
 
 ---
@@ -176,6 +164,33 @@ semo-dashboard (DB에서 읽기, FS 접근 없음)
 각 봇의 `openclaw.json`은 `~/.openclaw-{bot}/openclaw.json`에 있다.
 `agents.defaults.workspace` 필드가 위 SoT 경로를 가리킨다.
 
+### 봇 워크스페이스 접근 방법
+
+봇 파일을 읽거나 수정할 때는 `~/.openclaw-{bot}/workspace/`를 직접 참조한다.
+**`semo-system/bot-workspaces/`는 폐기됨** — 사용하지 말 것.
+
+```bash
+# 예: semiclaw의 SOUL.md 읽기
+cat ~/.openclaw/workspace/SOUL.md
+
+# 예: workclaw의 스킬 목록
+ls ~/.openclaw-workclaw/workspace/skills/
+
+# 예: reviewclaw의 메모리 파일
+ls ~/.openclaw-reviewclaw/workspace/memory/
+
+# 예: 봇 설정 확인
+cat ~/.openclaw-workclaw/openclaw.json | jq '.agents.defaults.workspace'
+```
+
+### 게이트웨이 Chat UI 접근
+
+```
+http://127.0.0.1:{포트}/chat?session=agent%3Amain%3Amain&token={토큰}
+```
+
+토큰은 `~/.openclaw-{bot}/openclaw.json` → `gateway.auth.token`에서 확인.
+
 ---
 
 ## 복구 명령어
@@ -183,6 +198,6 @@ semo-dashboard (DB에서 읽기, FS 접근 없음)
 ```bash
 semo doctor              # 환경 진단 (DB 연결, 설치 상태)
 semo config db           # DB URL 재설정
-semo context sync        # memory/ 수동 최신화
+semo context sync        # 스킬/에이전트/캐시 동기화 (KB는 MCP 사용)
 semo bots status         # 봇 상태 조회
 ```

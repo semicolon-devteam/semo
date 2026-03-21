@@ -27,6 +27,12 @@
         "-y",
         "@modelcontextprotocol/server-github"
       ]
+    },
+    "semo-kb": {
+      "command": "node",
+      "args": [
+        "packages/mcp-kb/dist/index.js"
+      ]
     }
   }
 }

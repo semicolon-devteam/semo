@@ -49,15 +49,6 @@ export interface KBStats {
       emb_cnt: string;
     }>;
   };
-  bot_knowledge: {
-    total: string;
-    emb: string;
-    by_bot: Array<{
-      bot_id: string;
-      cnt: string;
-      emb_cnt: string;
-    }>;
-  };
 }
 
 /**
@@ -66,30 +57,26 @@ export interface KBStats {
 async function textSearch(
   query: string,
   limit: number,
-  botId?: string
+  createdBy?: string
 ): Promise<KBItem[]> {
   const pattern = `%${query}%`;
 
-  if (botId) {
-    const sql = `
-      SELECT id as kb_id, bot_id, domain, key, content
-      FROM semo.bot_knowledge
-      WHERE bot_id = $1 AND (key ILIKE $2 OR content ILIKE $2)
-      ORDER BY updated_at DESC NULLS LAST
-      LIMIT $3
-    `;
-    const res = await pool.query(sql, [botId, pattern, limit]);
-    return res.rows;
-  }
-
-  const sql = `
+  let sql = `
     SELECT kb_id, domain, key, content, created_by
     FROM semo.knowledge_base
     WHERE key ILIKE $1 OR content ILIKE $1
-    ORDER BY updated_at DESC NULLS LAST
-    LIMIT $2
   `;
-  const res = await pool.query(sql, [pattern, limit]);
+  const params: (string | number)[] = [pattern];
+  let idx = 2;
+
+  if (createdBy) {
+    sql += ` AND created_by = $${idx++}`;
+    params.push(createdBy);
+  }
+  sql += ` ORDER BY updated_at DESC NULLS LAST LIMIT $${idx++}`;
+  params.push(limit);
+
+  const res = await pool.query(sql, params);
   return res.rows;
 }
 
@@ -99,41 +86,29 @@ async function textSearch(
 export async function search(
   query: string,
   limit: number = 10,
-  botId?: string
+  createdBy?: string
 ): Promise<KBItem[]> {
-  // Fallback to text search if embedding API key is not configured
   if (!process.env.OPENAI_API_KEY) {
-    return textSearch(query, limit, botId);
+    return textSearch(query, limit, createdBy);
   }
 
   const embedding = await genEmbedding(query);
   const embeddingStr = '[' + embedding.join(',') + ']';
 
-  let sql: string;
-  let params: any[];
+  let sql = `
+    SELECT kb_id, domain, key, content, created_by,
+           ROUND((1 - (embedding <=> $1::vector))::numeric * 100, 1) as similarity_pct
+    FROM semo.knowledge_base
+  `;
+  const params: any[] = [embeddingStr];
+  let idx = 2;
 
-  if (botId) {
-    // 봇별 KB 검색
-    sql = `
-      SELECT id as kb_id, bot_id, domain, key, content,
-             ROUND((1 - (embedding <=> $1::vector))::numeric * 100, 1) as similarity_pct
-      FROM semo.bot_knowledge
-      WHERE bot_id = $2
-      ORDER BY embedding <=> $1::vector
-      LIMIT $3
-    `;
-    params = [embeddingStr, botId, limit];
-  } else {
-    // 전체 KB 검색
-    sql = `
-      SELECT kb_id, domain, key, content,
-             ROUND((1 - (embedding <=> $1::vector))::numeric * 100, 1) as similarity_pct
-      FROM semo.knowledge_base
-      ORDER BY embedding <=> $1::vector
-      LIMIT $2
-    `;
-    params = [embeddingStr, limit];
+  if (createdBy) {
+    sql += ` WHERE created_by = $${idx++}`;
+    params.push(createdBy);
   }
+  sql += ` ORDER BY embedding <=> $1::vector LIMIT $${idx++}`;
+  params.push(limit);
 
   const res = await pool.query(sql, params);
   return res.rows;
@@ -144,38 +119,35 @@ export async function search(
  */
 export async function list(
   domain?: string,
-  botId?: string
+  createdBy?: string
 ): Promise<KBItem[]> {
-  if (botId) {
-    // 봇별 KB 목록
-    const sql = `
-      SELECT id as kb_id, bot_id, domain, key, LEFT(content, 80) as content
-      FROM semo.bot_knowledge
-      WHERE bot_id = $1
-      ORDER BY domain, key
-    `;
-    const res = await pool.query(sql, [botId]);
-    return res.rows;
-  } else if (domain) {
-    // 도메인별 KB 목록
-    const sql = `
-      SELECT kb_id, domain, key, LEFT(content, 80) as content, created_by
-      FROM semo.knowledge_base
-      WHERE domain = $1
-      ORDER BY key
-    `;
-    const res = await pool.query(sql, [domain]);
-    return res.rows;
-  } else {
-    // 전체 KB 목록
-    const sql = `
-      SELECT kb_id, domain, key, LEFT(content, 80) as content, created_by
-      FROM semo.knowledge_base
-      ORDER BY domain, key
-    `;
-    const res = await pool.query(sql);
-    return res.rows;
+  // domain 필터 시 full content + metadata 반환 (milestone 등에서 필요)
+  const cols = domain
+    ? 'kb_id, domain, key, content, metadata, created_by, updated_at'
+    : 'kb_id, domain, key, LEFT(content, 80) as content, created_by';
+  let sql = `
+    SELECT ${cols}
+    FROM semo.knowledge_base
+  `;
+  const params: string[] = [];
+  const conditions: string[] = [];
+  let idx = 1;
+
+  if (domain) {
+    conditions.push(`domain = $${idx++}`);
+    params.push(domain);
   }
+  if (createdBy) {
+    conditions.push(`created_by = $${idx++}`);
+    params.push(createdBy);
+  }
+  if (conditions.length > 0) {
+    sql += ` WHERE ${conditions.join(' AND ')}`;
+  }
+  sql += ` ORDER BY domain, key`;
+
+  const res = await pool.query(sql, params);
+  return res.rows;
 }
 
 /**
@@ -198,28 +170,15 @@ export async function listDomains(): Promise<KBDomain[]> {
  */
 export async function getItem(
   domain: string,
-  key: string,
-  botId?: string
+  key: string
 ): Promise<KBItem | null> {
-  if (botId) {
-    // 봇별 KB 항목
-    const sql = `
-      SELECT id as kb_id, bot_id, domain, key, content, metadata, updated_at
-      FROM semo.bot_knowledge
-      WHERE bot_id = $1 AND domain = $2 AND key = $3
-    `;
-    const res = await pool.query(sql, [botId, domain, key]);
-    return res.rows[0] || null;
-  } else {
-    // 전체 KB 항목
-    const sql = `
-      SELECT kb_id, domain, key, content, metadata, created_by, updated_at
-      FROM semo.knowledge_base
-      WHERE domain = $1 AND key = $2
-    `;
-    const res = await pool.query(sql, [domain, key]);
-    return res.rows[0] || null;
-  }
+  const sql = `
+    SELECT kb_id, domain, key, content, metadata, created_by, updated_at
+    FROM semo.knowledge_base
+    WHERE domain = $1 AND key = $2
+  `;
+  const res = await pool.query(sql, [domain, key]);
+  return res.rows[0] || null;
 }
 
 /**
@@ -281,19 +240,8 @@ export async function stats(): Promise<KBStats> {
      ORDER BY domain`
   );
 
-  const bkByBot = await pool.query(
-    `SELECT bot_id, count(*) as cnt, count(embedding) as emb_cnt
-     FROM semo.bot_knowledge
-     GROUP BY bot_id
-     ORDER BY bot_id`
-  );
-
   const totKb = await pool.query(
     'SELECT count(*) as total, count(embedding) as emb FROM semo.knowledge_base'
-  );
-
-  const totBk = await pool.query(
-    'SELECT count(*) as total, count(embedding) as emb FROM semo.bot_knowledge'
   );
 
   return {
@@ -301,11 +249,6 @@ export async function stats(): Promise<KBStats> {
       total: totKb.rows[0].total,
       emb: totKb.rows[0].emb,
       by_domain: kbByDomain.rows,
-    },
-    bot_knowledge: {
-      total: totBk.rows[0].total,
-      emb: totBk.rows[0].emb,
-      by_bot: bkByBot.rows,
     },
   };
 }

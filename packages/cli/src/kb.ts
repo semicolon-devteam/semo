@@ -100,11 +100,6 @@ export interface KBEntry {
   updated_at?: string;
 }
 
-export interface BotKBEntry extends KBEntry {
-  bot_id: string;
-  synced_at?: string;
-}
-
 export interface OntologyDomain {
   domain: string;
   schema: Record<string, unknown>;
@@ -115,7 +110,6 @@ export interface OntologyDomain {
 
 export interface KBStatusInfo {
   shared: { total: number; domains: Record<string, number>; lastUpdated: string | null };
-  bot: { total: number; domains: Record<string, number>; lastUpdated: string | null; lastSynced: string | null };
 }
 
 export interface KBDigestEntry {
@@ -128,26 +122,15 @@ export interface KBDigestEntry {
 }
 
 export interface KBDigestResult {
-  botId: string;
-  domains: string[];
   changes: KBDigestEntry[];
   since: string;
   generatedAt: string;
 }
 
-export interface KBDiffResult {
-  added: KBEntry[];       // in DB but not local
-  removed: KBEntry[];     // in local but not DB
-  modified: Array<{ local: KBEntry; remote: KBEntry }>;
-  unchanged: number;
-}
-
 export interface SyncState {
-  botId: string;
   lastPull: string | null;
   lastPush: string | null;
   sharedCount: number;
-  botCount: number;
 }
 
 // ============================================================
@@ -182,7 +165,7 @@ function readSyncState(cwd: string): SyncState {
       // corrupted file
     }
   }
-  return { botId: "", lastPull: null, lastPush: null, sharedCount: 0, botCount: 0 };
+  return { lastPull: null, lastPush: null, sharedCount: 0 };
 }
 
 function writeSyncState(cwd: string, state: SyncState): void {
@@ -210,76 +193,52 @@ function readKBFile(cwd: string, filename: string): KBEntry[] {
 // ============================================================
 
 /**
- * Get shared KB entries from semo.knowledge_base
+ * Pull KB entries from semo.knowledge_base to local .kb/
  */
 export async function kbPull(
   pool: Pool,
-  botId: string,
   domain?: string,
   cwd?: string
-): Promise<{ shared: KBEntry[]; bot: BotKBEntry[] }> {
+): Promise<KBEntry[]> {
   const client = await pool.connect();
   try {
-    // Shared KB
-    let sharedQuery = `
+    let query = `
       SELECT domain, key, content, metadata, created_by, version,
              created_at::text, updated_at::text
       FROM semo.knowledge_base
     `;
-    const sharedParams: string[] = [];
+    const params: string[] = [];
     if (domain) {
-      sharedQuery += " WHERE domain = $1";
-      sharedParams.push(domain);
+      query += " WHERE domain = $1";
+      params.push(domain);
     }
-    sharedQuery += " ORDER BY domain, key";
+    query += " ORDER BY domain, key";
 
-    const sharedResult = await client.query(sharedQuery, sharedParams);
-    const shared: KBEntry[] = sharedResult.rows;
+    const result = await client.query(query, params);
+    const entries: KBEntry[] = result.rows;
 
-    // Bot-specific KB
-    let botQuery = `
-      SELECT bot_id, domain, key, content, metadata, version,
-             synced_at::text, created_at::text, updated_at::text
-      FROM semo.bot_knowledge
-      WHERE bot_id = $1
-    `;
-    const botParams: string[] = [botId];
-    if (domain) {
-      botQuery += " AND domain = $2";
-      botParams.push(domain);
-    }
-    botQuery += " ORDER BY domain, key";
-
-    const botResult = await client.query(botQuery, botParams);
-    const bot: BotKBEntry[] = botResult.rows;
-
-    // Write to local files if cwd provided
     if (cwd) {
-      writeKBFile(cwd, "team.json", shared);
-      writeKBFile(cwd, "bot.json", bot);
+      writeKBFile(cwd, "team.json", entries);
 
       const state = readSyncState(cwd);
-      state.botId = botId;
       state.lastPull = new Date().toISOString();
-      state.sharedCount = shared.length;
-      state.botCount = bot.length;
+      state.sharedCount = entries.length;
       writeSyncState(cwd, state);
     }
 
-    return { shared, bot };
+    return entries;
   } finally {
     client.release();
   }
 }
 
 /**
- * Push local KB entries to database
+ * Push local KB entries to database (knowledge_base only)
  */
 export async function kbPush(
   pool: Pool,
-  botId: string,
   entries: KBEntry[],
-  target: "shared" | "bot" = "bot",
+  createdBy?: string,
   cwd?: string
 ): Promise<{ upserted: number; errors: string[] }> {
   const client = await pool.connect();
@@ -289,7 +248,6 @@ export async function kbPush(
   try {
     await client.query("BEGIN");
 
-    // P2-3: 배치 임베딩 — N개 항목을 1회 API 호출로 처리
     const texts = entries.map(e => `${e.key}: ${e.content}`);
     const embeddings = await generateEmbeddings(texts);
 
@@ -299,28 +257,15 @@ export async function kbPush(
         const embedding = embeddings[i];
         const embeddingStr = embedding ? `[${embedding.join(",")}]` : null;
 
-        if (target === "shared") {
-          await client.query(
-            `INSERT INTO semo.knowledge_base (domain, key, content, metadata, created_by, embedding)
-             VALUES ($1, $2, $3, $4, $5, $6::vector)
-             ON CONFLICT (domain, key) DO UPDATE SET
-               content = EXCLUDED.content,
-               metadata = EXCLUDED.metadata,
-               embedding = EXCLUDED.embedding`,
-            [entry.domain, entry.key, entry.content, JSON.stringify(entry.metadata || {}), entry.created_by || botId, embeddingStr]
-          );
-        } else {
-          await client.query(
-            `INSERT INTO semo.bot_knowledge (bot_id, domain, key, content, metadata, synced_at, embedding)
-             VALUES ($1, $2, $3, $4, $5, NOW(), $6::vector)
-             ON CONFLICT (bot_id, domain, key) DO UPDATE SET
-               content = EXCLUDED.content,
-               metadata = EXCLUDED.metadata,
-               synced_at = NOW(),
-               embedding = EXCLUDED.embedding`,
-            [botId, entry.domain, entry.key, entry.content, JSON.stringify(entry.metadata || {}), embeddingStr]
-          );
-        }
+        await client.query(
+          `INSERT INTO semo.knowledge_base (domain, key, content, metadata, created_by, embedding)
+           VALUES ($1, $2, $3, $4, $5, $6::vector)
+           ON CONFLICT (domain, key) DO UPDATE SET
+             content = EXCLUDED.content,
+             metadata = EXCLUDED.metadata,
+             embedding = EXCLUDED.embedding`,
+          [entry.domain, entry.key, entry.content, JSON.stringify(entry.metadata || {}), entry.created_by || createdBy || "unknown", embeddingStr]
+        );
         upserted++;
       } catch (err) {
         errors.push(`${entry.domain}/${entry.key}: ${err}`);
@@ -331,7 +276,6 @@ export async function kbPush(
 
     if (cwd) {
       const state = readSyncState(cwd);
-      state.botId = botId;
       state.lastPush = new Date().toISOString();
       writeSyncState(cwd, state);
     }
@@ -346,12 +290,11 @@ export async function kbPush(
 }
 
 /**
- * Get KB status for a bot
+ * Get KB status
  */
-export async function kbStatus(pool: Pool, botId: string): Promise<KBStatusInfo> {
+export async function kbStatus(pool: Pool): Promise<KBStatusInfo> {
   const client = await pool.connect();
   try {
-    // Shared KB stats
     const sharedStats = await client.query(`
       SELECT domain, COUNT(*)::int as count
       FROM semo.knowledge_base
@@ -365,32 +308,11 @@ export async function kbStatus(pool: Pool, botId: string): Promise<KBStatusInfo>
       sharedDomains[row.domain] = row.count;
     }
 
-    // Bot KB stats
-    const botStats = await client.query(`
-      SELECT domain, COUNT(*)::int as count
-      FROM semo.bot_knowledge WHERE bot_id = $1
-      GROUP BY domain ORDER BY domain
-    `, [botId]);
-    const botTotal = await client.query(`SELECT COUNT(*)::int as total FROM semo.bot_knowledge WHERE bot_id = $1`, [botId]);
-    const botLastUpdated = await client.query(`SELECT MAX(updated_at)::text as last FROM semo.bot_knowledge WHERE bot_id = $1`, [botId]);
-    const botLastSynced = await client.query(`SELECT MAX(synced_at)::text as last FROM semo.bot_knowledge WHERE bot_id = $1`, [botId]);
-
-    const botDomains: Record<string, number> = {};
-    for (const row of botStats.rows) {
-      botDomains[row.domain] = row.count;
-    }
-
     return {
       shared: {
         total: sharedTotal.rows[0]?.total || 0,
         domains: sharedDomains,
         lastUpdated: sharedLastUpdated.rows[0]?.last || null,
-      },
-      bot: {
-        total: botTotal.rows[0]?.total || 0,
-        domains: botDomains,
-        lastUpdated: botLastUpdated.rows[0]?.last || null,
-        lastSynced: botLastSynced.rows[0]?.last || null,
       },
     };
   } finally {
@@ -403,101 +325,29 @@ export async function kbStatus(pool: Pool, botId: string): Promise<KBStatusInfo>
  */
 export async function kbList(
   pool: Pool,
-  options: { domain?: string; botId?: string; limit?: number; offset?: number }
-): Promise<{ shared: KBEntry[]; bot: BotKBEntry[] }> {
+  options: { domain?: string; limit?: number; offset?: number }
+): Promise<KBEntry[]> {
   const client = await pool.connect();
   const limit = options.limit || 50;
   const offset = options.offset || 0;
 
   try {
-    // Shared
-    let sharedQuery = "SELECT domain, key, content, metadata, created_by, version, updated_at::text FROM semo.knowledge_base";
-    const sharedParams: (string | number)[] = [];
+    let query = "SELECT domain, key, content, metadata, created_by, version, updated_at::text FROM semo.knowledge_base";
+    const params: (string | number)[] = [];
     let paramIdx = 1;
 
     if (options.domain) {
-      sharedQuery += ` WHERE domain = $${paramIdx++}`;
-      sharedParams.push(options.domain);
+      query += ` WHERE domain = $${paramIdx++}`;
+      params.push(options.domain);
     }
-    sharedQuery += ` ORDER BY domain, key LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
-    sharedParams.push(limit, offset);
+    query += ` ORDER BY domain, key LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+    params.push(limit, offset);
 
-    const sharedResult = await client.query(sharedQuery, sharedParams);
-
-    // Bot
-    let bot: BotKBEntry[] = [];
-    if (options.botId) {
-      let botQuery = "SELECT bot_id, domain, key, content, metadata, version, synced_at::text, updated_at::text FROM semo.bot_knowledge WHERE bot_id = $1";
-      const botParams: (string | number)[] = [options.botId];
-      let bParamIdx = 2;
-
-      if (options.domain) {
-        botQuery += ` AND domain = $${bParamIdx++}`;
-        botParams.push(options.domain);
-      }
-      botQuery += ` ORDER BY domain, key LIMIT $${bParamIdx++} OFFSET $${bParamIdx++}`;
-      botParams.push(limit, offset);
-
-      const botResult = await client.query(botQuery, botParams);
-      bot = botResult.rows;
-    }
-
-    return { shared: sharedResult.rows, bot };
+    const result = await client.query(query, params);
+    return result.rows;
   } finally {
     client.release();
   }
-}
-
-/**
- * Diff local KB files against database
- */
-export async function kbDiff(
-  pool: Pool,
-  botId: string,
-  cwd: string
-): Promise<KBDiffResult> {
-  const localShared = readKBFile(cwd, "team.json");
-  const localBot = readKBFile(cwd, "bot.json");
-  const localAll = [...localShared, ...localBot];
-
-  const { shared: remoteShared, bot: remoteBot } = await kbPull(pool, botId);
-  const remoteAll = [...remoteShared, ...remoteBot];
-
-  const localMap = new Map(localAll.map(e => [`${e.domain}/${e.key}`, e]));
-  const remoteMap = new Map(remoteAll.map(e => [`${e.domain}/${e.key}`, e]));
-
-  const added: KBEntry[] = [];
-  const removed: KBEntry[] = [];
-  const modified: Array<{ local: KBEntry; remote: KBEntry }> = [];
-  let unchanged = 0;
-
-  // Remote entries not in local → added
-  for (const [k, v] of remoteMap) {
-    if (!localMap.has(k)) {
-      added.push(v);
-    }
-  }
-
-  // Local entries not in remote → removed
-  for (const [k, v] of localMap) {
-    if (!remoteMap.has(k)) {
-      removed.push(v);
-    }
-  }
-
-  // Both exist → check content
-  for (const [k, local] of localMap) {
-    const remote = remoteMap.get(k);
-    if (remote) {
-      if (local.content !== remote.content || JSON.stringify(local.metadata) !== JSON.stringify(remote.metadata)) {
-        modified.push({ local, remote });
-      } else {
-        unchanged++;
-      }
-    }
-  }
-
-  return { added, removed, modified, unchanged };
 }
 
 /**
@@ -506,7 +356,7 @@ export async function kbDiff(
 export async function kbSearch(
   pool: Pool,
   query: string,
-  options: { domain?: string; botId?: string; limit?: number; mode?: "semantic" | "text" | "hybrid" }
+  options: { domain?: string; limit?: number; mode?: "semantic" | "text" | "hybrid" }
 ): Promise<KBEntry[]> {
   const client = await pool.connect();
   const limit = options.limit || 10;
@@ -541,30 +391,6 @@ export async function kbSearch(
 
         const sharedResult = await client.query(sql, params);
         results = sharedResult.rows;
-
-        // Also search bot_knowledge if botId specified
-        if (options.botId) {
-          let botSql = `
-            SELECT bot_id, domain, key, content, metadata, version, updated_at::text,
-                   1 - (embedding <=> $1::vector) as score
-            FROM semo.bot_knowledge
-            WHERE bot_id = $2 AND embedding IS NOT NULL
-          `;
-          const botParams: (string | number)[] = [embeddingStr, options.botId];
-          let bIdx = 3;
-
-          if (options.domain) {
-            botSql += ` AND domain = $${bIdx++}`;
-            botParams.push(options.domain);
-          }
-          botSql += ` ORDER BY embedding <=> $1::vector LIMIT $${bIdx++}`;
-          botParams.push(limit);
-
-          const botResult = await client.query(botSql, botParams);
-          results = [...results, ...botResult.rows]
-            .sort((a: any, b: any) => (b.score || 0) - (a.score || 0))
-            .slice(0, limit);
-        }
 
         // If we got results from semantic search and mode is not hybrid, return
         if (results.length > 0 && mode === "semantic") {
@@ -742,53 +568,32 @@ export async function ontoValidate(
 // ============================================================
 
 /**
- * Generate KB change digest for a bot based on its subscribed domains.
- * Queries changes since last sync watermark and updates the watermark.
+ * Generate KB change digest based on a since timestamp.
+ * Returns all KB changes since the given ISO timestamp.
  */
-export async function kbDigest(pool: Pool, botId: string): Promise<KBDigestResult> {
+export async function kbDigest(pool: Pool, since: string, domain?: string): Promise<KBDigestResult> {
   const client = await pool.connect();
   const generatedAt = new Date().toISOString();
 
   try {
-    // 1. Get subscribed domains + watermarks
-    const subsResult = await client.query(
-      `SELECT domain, last_synced_at::text FROM semo.bot_kb_subscriptions WHERE bot_id = $1`,
-      [botId]
-    );
+    let sql = `
+      SELECT domain, key, content, version, updated_at::text,
+             CASE WHEN created_at > $1 THEN 'new' ELSE 'updated' END as change_type
+      FROM semo.knowledge_base
+      WHERE updated_at > $1 OR created_at > $1
+    `;
+    const params: (string | number)[] = [since];
+    let paramIdx = 2;
 
-    if (subsResult.rows.length === 0) {
-      return { botId, domains: [], changes: [], since: generatedAt, generatedAt };
+    if (domain) {
+      sql += ` AND domain = $${paramIdx++}`;
+      params.push(domain);
     }
+    sql += ` ORDER BY updated_at DESC LIMIT 100`;
 
-    const domains = subsResult.rows.map((r: any) => r.domain);
-    const allChanges: KBDigestEntry[] = [];
-    let earliestSince = generatedAt;
+    const result = await client.query(sql, params);
 
-    // 2. Per-domain: query changes since last_synced_at
-    for (const row of subsResult.rows) {
-      const { domain, last_synced_at } = row;
-      if (last_synced_at < earliestSince) earliestSince = last_synced_at;
-
-      const changesResult = await client.query(
-        `SELECT domain, key, content, version, updated_at::text,
-                CASE WHEN created_at > $2 THEN 'new' ELSE 'updated' END as change_type
-         FROM semo.knowledge_base
-         WHERE domain = $1 AND (updated_at > $2 OR created_at > $2)
-         ORDER BY updated_at DESC
-         LIMIT 50`,
-        [domain, last_synced_at]
-      );
-
-      allChanges.push(...changesResult.rows);
-    }
-
-    // 3. Update watermarks
-    await client.query(
-      `UPDATE semo.bot_kb_subscriptions SET last_synced_at = NOW() WHERE bot_id = $1`,
-      [botId]
-    );
-
-    return { botId, domains, changes: allChanges, since: earliestSince, generatedAt };
+    return { changes: result.rows, since, generatedAt };
   } finally {
     client.release();
   }

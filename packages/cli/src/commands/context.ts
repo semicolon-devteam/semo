@@ -1,8 +1,10 @@
 /**
- * semo context — DB ↔ .claude/memory/ 동기화
+ * semo context — 스킬/캐시/크론잡 동기화
  *
- * sync: Core DB → .claude/memory/*.md (KB domains, bot_status, ontology, projects)
- * push: .claude/memory/<domain>.md → DB (semo.knowledge_base)
+ * sync: DB → 글로벌 캐시 (skills/commands/agents) + 스킬 DB 동기화 + 크론잡
+ * push: .claude/memory/<domain>.md → DB (deprecated — kb_upsert MCP 도구로 대체)
+ *
+ * [v4.2.0] KB→md 파일 생성 제거 — semo-kb MCP 서버로 통일
  */
 
 import { Command } from "commander";
@@ -10,9 +12,10 @@ import chalk from "chalk";
 import ora from "ora";
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import { Pool } from "pg";
 import { getPool, closeConnection, isDbConnected } from "../database";
-import { kbList, ontoList, OntologyDomain, KBEntry, kbDigest, KBDigestResult } from "../kb";
+import { KBEntry } from "../kb";
 import { syncSkillsToDB } from "./skill-sync";
 import { syncGlobalCache } from "../global-cache";
 
@@ -49,97 +52,101 @@ function ensureMemoryDir(resolvedDir: string): string {
   return resolvedDir;
 }
 
-function kbEntriesToMarkdown(domain: string, entries: KBEntry[]): string {
-  if (entries.length === 0) {
-    return `# ${domain}\n\n_No entries._\n`;
-  }
-
-  const lines: string[] = [`# ${domain}\n`, `> 자동 생성: semo context sync (${new Date().toISOString()})\n`];
-
-  for (const entry of entries) {
-    lines.push(`\n## ${entry.key}\n`);
-    // content 내 markdown heading을 한 단계 내려 key heading(##)과 충돌 방지
-    lines.push(entry.content.replace(/^(#{2,})/gm, '#$1'));
-    if (entry.metadata && Object.keys(entry.metadata).length > 0) {
-      lines.push(`\n_metadata: ${JSON.stringify(entry.metadata)}_`);
-    }
-    lines.push("");
-  }
-
-  return lines.join("\n");
-}
-
-function botStatusToMarkdown(rows: BotStatusRow[]): string {
-  if (rows.length === 0) {
-    return "# Bots\n\n_No bot status data._\n";
-  }
-
-  const lines: string[] = [
-    "# Bots\n",
-    `> 자동 생성: semo context sync (${new Date().toISOString()})\n`,
-    "| Bot | 이름 | 역할 | Status | Last Active | Sessions |",
-    "|-----|------|------|--------|-------------|----------|",
-  ];
-
-  for (const bot of rows) {
-    const status = bot.status === "online" ? "🟢 online" : "🔴 offline";
-    const lastActive = bot.last_active ? new Date(bot.last_active).toLocaleString("ko-KR") : "-";
-    const displayName = [bot.emoji, bot.name].filter(Boolean).join(" ") || bot.bot_id;
-    lines.push(`| ${bot.bot_id} | ${displayName} | ${bot.role || "-"} | ${status} | ${lastActive} | ${bot.session_count} |`);
-  }
-
-  return lines.join("\n") + "\n";
-}
-
-function ontologyToMarkdown(domains: OntologyDomain[]): string {
-  if (domains.length === 0) {
-    return "# Ontology\n\n_No ontology domains._\n";
-  }
-
-  const lines: string[] = [
-    "# Ontology\n",
-    `> 자동 생성: semo context sync (${new Date().toISOString()})\n`,
-  ];
-
-  for (const d of domains) {
-    lines.push(`\n## ${d.domain} (v${d.version})\n`);
-    if (d.description) lines.push(`${d.description}\n`);
-    lines.push("```json");
-    lines.push(JSON.stringify(d.schema, null, 2));
-    lines.push("```\n");
-  }
-
-  return lines.join("\n");
-}
+// [v4.2.0] KB→md 헬퍼 함수 제거 — semo-kb MCP 서버로 대체
+// kbEntriesToMarkdown, botStatusToMarkdown, ontologyToMarkdown, fetchBotStatus 삭제됨
 
 // ============================================================
-// Bot Status types (for this module)
+// Cron job sync (local ~/.openclaw-*/cron/jobs.json → DB)
 // ============================================================
 
-interface BotStatusRow {
-  bot_id: string;
-  name: string | null;
-  emoji: string | null;
-  role: string | null;
-  status: string | null;
-  last_active: string | null;
-  session_count: number;
+interface CronJob {
+  jobId: string;
+  name: string;
+  schedule: Record<string, unknown>;
+  enabled: boolean;
+  lastRun: string | null;
+  nextRun: string | null;
+  sessionTarget: string;
+  payload: Record<string, unknown> | null;
 }
 
-async function fetchBotStatus(pool: Pool): Promise<BotStatusRow[]> {
-  const client = await pool.connect();
+function parseCronJobsFile(filePath: string): CronJob[] {
   try {
-    const result = await client.query(`
-      SELECT bot_id, name, emoji, role, status, last_active::text, session_count
-      FROM semo.bot_status
-      ORDER BY bot_id
-    `);
-    return result.rows;
+    const content = fs.readFileSync(filePath, "utf-8");
+    const data = JSON.parse(content);
+    const jobs: unknown[] = data.jobs || [];
+    return jobs.map((job: any) => ({
+      jobId: job.jobId || job.id,
+      name: job.name || "",
+      schedule: job.schedule || {},
+      enabled: job.enabled !== false,
+      lastRun: job.lastRun || null,
+      nextRun: job.nextRun || null,
+      sessionTarget: job.sessionTarget || "main",
+      payload: job.payload || null,
+    }));
   } catch {
     return [];
+  }
+}
+
+function getOpenClawBotIds(): string[] {
+  const homeDir = os.homedir();
+  try {
+    return fs.readdirSync(homeDir)
+      .filter(f => f.startsWith(".openclaw-"))
+      .map(f => f.replace(".openclaw-", ""));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Collect cron jobs from all ~/.openclaw-* directories and upsert to semo.bot_cron_jobs.
+ * Uses DELETE + INSERT per bot (same pattern as sync-agent).
+ */
+export async function syncCronJobs(pool: Pool): Promise<{ bots: number; jobs: number }> {
+  const homeDir = os.homedir();
+  const botIds = getOpenClawBotIds();
+  let totalJobs = 0;
+  let syncedBots = 0;
+
+  const client = await pool.connect();
+  try {
+    for (const botId of botIds) {
+      const cronPath = path.join(homeDir, `.openclaw-${botId}`, "cron", "jobs.json");
+      const jobs = parseCronJobsFile(cronPath);
+
+      // Always delete old entries (handles removed jobs)
+      await client.query("DELETE FROM semo.bot_cron_jobs WHERE bot_id = $1", [botId]);
+
+      for (const job of jobs) {
+        await client.query(
+          `INSERT INTO semo.bot_cron_jobs
+             (bot_id, job_id, name, schedule, enabled, last_run, next_run, session_target, payload, synced_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+          [
+            botId,
+            job.jobId,
+            job.name,
+            JSON.stringify(job.schedule),
+            job.enabled,
+            job.lastRun,
+            job.nextRun,
+            job.sessionTarget,
+            job.payload ? JSON.stringify(job.payload) : null,
+          ]
+        );
+      }
+
+      totalJobs += jobs.length;
+      if (jobs.length > 0) syncedBots++;
+    }
   } finally {
     client.release();
   }
+
+  return { bots: syncedBots, jobs: totalJobs };
 }
 
 // ============================================================
@@ -173,43 +180,7 @@ function parseMarkdownSections(content: string, domain: string): KBEntry[] {
   return entries;
 }
 
-// ============================================================
-// KB Digest → Markdown
-// ============================================================
-
-function digestToMarkdown(digest: KBDigestResult): string {
-  const lines: string[] = [
-    "# KB Digest\n",
-    `> ${digest.generatedAt} | ${digest.botId} | ${digest.changes.length}건 변경`,
-    `> since: ${digest.since}\n`,
-  ];
-
-  if (digest.changes.length === 0) {
-    lines.push("_변경사항 없음_\n");
-    return lines.join("\n");
-  }
-
-  // Group by domain
-  const byDomain = new Map<string, typeof digest.changes>();
-  for (const c of digest.changes) {
-    const arr = byDomain.get(c.domain) || [];
-    arr.push(c);
-    byDomain.set(c.domain, arr);
-  }
-
-  for (const [domain, entries] of byDomain) {
-    lines.push(`## ${domain} (${entries.length}건)\n`);
-    for (const entry of entries) {
-      const tag = entry.change_type === "new" ? "NEW" : "UPDATED";
-      lines.push(`### ${tag} ${entry.key} (v${entry.version})`);
-      const preview = entry.content.length > 500 ? entry.content.substring(0, 500) + "..." : entry.content;
-      lines.push(preview);
-      lines.push("");
-    }
-  }
-
-  return lines.join("\n");
-}
+// [v4.2.0] digestToMarkdown 제거 — MCP kb_digest로 대체
 
 // ============================================================
 // Commands
@@ -218,20 +189,15 @@ function digestToMarkdown(digest: KBDigestResult): string {
 export function registerContextCommands(program: Command): void {
   const ctxCmd = program
     .command("context")
-    .description("Core DB ↔ .claude/memory/ 컨텍스트 동기화");
+    .description("스킬/캐시/크론잡 동기화 (KB는 semo-kb MCP 서버)");
 
   // ── semo context sync ──────────────────────────────────────
   ctxCmd
     .command("sync")
-    .description("Core DB → .claude/memory/ 파일 생성")
-    .option("--bot <name>", "봇 ID (bot_status 필터)")
-    .option("--domain <name>", "특정 KB 도메인만")
-    .option("--no-bots", "bot_status 동기화 건너뜀")
-    .option("--no-ontology", "ontology 동기화 건너뜀")
+    .description("스킬/에이전트/캐시 동기화 + 크론잡 (KB는 semo-kb MCP 서버 사용)")
     .option("--no-skills", "스킬 파일 → DB 동기화 건너뜀")
-    .option("--out-dir <path>", "메모리 파일 출력 경로 (기본: .claude/memory/). OpenClaw 봇 workspace 지원용")
+    .option("--out-dir <path>", "캐시 파일 출력 경로 (기본: .claude/memory/)")
     .option("--no-global-cache", "글로벌 캐시(skills/commands/agents) 동기화 건너뜀")
-    .option("--digest", "KB 변경 다이제스트 생성 (--bot 필수)")
     .action(async (options) => {
       const spinner = ora("context sync 시작...").start();
 
@@ -244,44 +210,13 @@ export function registerContextCommands(program: Command): void {
 
       const pool = getPool();
       const memDir = ensureMemoryDir(resolveMemoryDir(options.outDir));
-      let written = 0;
 
       try {
-        // 1. KB domains → memory/*.md
-        const domains = options.domain ? [options.domain] : Object.keys(KB_DOMAIN_MAP);
+        // [v4.2.0] KB→md 파일 생성 제거 — MCP kb_search/kb_list/kb_bot_status/kb_ontology로 대체
+        // 기존 memory/*.md (team, projects, decisions, infra, process, bots, ontology) 파일은
+        // semo-kb MCP 서버가 실시간 DB 조회로 대체합니다.
 
-        for (const domain of domains) {
-          spinner.text = `KB 동기화: ${domain}...`;
-          try {
-            const { shared } = await kbList(pool, { domain, limit: 1000 });
-            const filename = KB_DOMAIN_MAP[domain] || `${domain}.md`;
-            const content = kbEntriesToMarkdown(domain, shared);
-            fs.writeFileSync(path.join(memDir, filename), content);
-            written++;
-          } catch {
-            // domain may not exist — skip silently
-          }
-        }
-
-        // 2. bot_status → memory/bots.md
-        if (options.bots !== false) {
-          spinner.text = "bot_status 동기화...";
-          const botRows = await fetchBotStatus(pool);
-          const botsContent = botStatusToMarkdown(botRows);
-          fs.writeFileSync(path.join(memDir, "bots.md"), botsContent);
-          written++;
-        }
-
-        // 3. ontology → memory/ontology.md
-        if (options.ontology !== false) {
-          spinner.text = "ontology 동기화...";
-          const domains2 = await ontoList(pool);
-          const ontoContent = ontologyToMarkdown(domains2);
-          fs.writeFileSync(path.join(memDir, "ontology.md"), ontoContent);
-          written++;
-        }
-
-        // 4. 스킬 파일 → skill_definitions DB 동기화
+        // 1. 스킬 파일 → skill_definitions DB 동기화
         if (options.skills !== false) {
           const semoSystemDir = path.join(process.cwd(), "semo-system");
           if (fs.existsSync(semoSystemDir)) {
@@ -300,7 +235,7 @@ export function registerContextCommands(program: Command): void {
           }
         }
 
-        // 5. DB → 글로벌 캐시 (skills/commands/agents → ~/.claude/)
+        // 2. DB → 글로벌 캐시 (skills/commands/agents → ~/.claude/)
         if (options.globalCache !== false) {
           spinner.text = "글로벌 캐시 동기화 (skills/commands/agents)...";
           try {
@@ -312,25 +247,40 @@ export function registerContextCommands(program: Command): void {
           }
         }
 
-        // 6. KB Digest (--bot + --digest 조합)
-        if (options.digest && options.bot) {
-          spinner.text = "KB 변경 다이제스트 생성...";
-          try {
-            const digest = await kbDigest(pool, options.bot);
-            const digestContent = digestToMarkdown(digest);
-            fs.writeFileSync(path.join(memDir, "kb-digest.md"), digestContent);
-            written++;
-            if (digest.changes.length > 0) {
-              console.log(chalk.green(`  ✓ KB Digest: ${digest.changes.length}건 변경`));
-            }
-          } catch (err) {
-            console.log(chalk.yellow(`  ⚠ KB Digest 생성 실패: ${err}`));
+        // 3. 크론잡 동기화 (local → DB)
+        try {
+          spinner.text = "크론잡 동기화...";
+          const cronResult = await syncCronJobs(pool);
+          if (cronResult.jobs > 0) {
+            console.log(chalk.green(`  ✓ 크론잡: ${cronResult.bots}개 봇, ${cronResult.jobs}개 잡 동기화`));
           }
-        } else if (options.digest && !options.bot) {
-          console.log(chalk.yellow("  ⚠ --digest 옵션은 --bot과 함께 사용해야 합니다"));
+        } catch {
+          // 크론잡 동기화 실패는 비치명적
         }
 
-        spinner.succeed(`context sync 완료 — ${written}개 파일 업데이트`);
+        // [v4.2.0] KB Digest 제거 — MCP kb_digest로 대체
+
+        // 4. MCP 서버 자동 등록 (.claude/settings.json)
+        try {
+          const semoRoot = process.cwd();
+          const settingsPath = path.join(memDir, "..", "settings.json");
+          if (fs.existsSync(settingsPath)) {
+            const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
+            if (!settings.mcpServers?.["semo-kb"]) {
+              settings.mcpServers = settings.mcpServers || {};
+              settings.mcpServers["semo-kb"] = {
+                command: "node",
+                args: [path.join(semoRoot, "packages/mcp-kb/dist/index.js")],
+              };
+              fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
+              console.log(chalk.green("  ✓ semo-kb MCP 서버 자동 등록"));
+            }
+          }
+        } catch {
+          // MCP 자동 등록 실패는 비치명적
+        }
+
+        spinner.succeed("context sync 완료 — 스킬/캐시/크론잡 동기화");
         console.log(chalk.gray(`  저장 위치: ${memDir}`));
       } catch (err) {
         spinner.fail(`context sync 실패: ${err}`);
@@ -347,6 +297,9 @@ export function registerContextCommands(program: Command): void {
     .option("--dry-run", "실제 push 없이 변경사항만 미리보기")
     .option("--out-dir <path>", "메모리 파일 경로 (기본: .claude/memory/). OpenClaw 봇 workspace 지원용")
     .action(async (options) => {
+      console.log(chalk.yellow("⚠️  [deprecated] context push는 kb_upsert MCP 도구로 대체 예정입니다."));
+      console.log(chalk.yellow("   봇/세션에서는 semo-kb MCP 서버의 kb_upsert 도구를 직접 사용하세요.\n"));
+
       const domains: string[] = (options.domain as string).split(",").map((d: string) => d.trim()).filter(Boolean);
       const memDir = resolveMemoryDir(options.outDir);
 

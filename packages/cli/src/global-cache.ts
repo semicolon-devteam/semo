@@ -13,9 +13,11 @@ import {
   getActiveSkills,
   getCommands,
   getAgents,
+  getDelegations,
   Skill,
   SemoCommand,
   Agent,
+  BotDelegation,
 } from "./database";
 
 export interface GlobalCacheSyncResult {
@@ -93,10 +95,11 @@ export async function syncGlobalCache(
   fs.mkdirSync(dir, { recursive: true });
 
   // 병렬 조회
-  const [skills, commands, agents] = await Promise.all([
+  const [skills, commands, agents, delegations] = await Promise.all([
     getActiveSkills(),
     getCommands(),
     getAgents(),
+    getDelegations(),
   ]);
 
   // 1. 스킬 설치 (전체 교체)
@@ -104,7 +107,13 @@ export async function syncGlobalCache(
   removeRecursive(skillsDir);
   fs.mkdirSync(skillsDir, { recursive: true });
 
+  let skippedSkills = 0;
   for (const skill of skills) {
+    if (skill.name.includes('/')) {
+      console.warn(`⚠️ 스킬 이름에 슬래시 포함 — 스킵: ${skill.name}`);
+      skippedSkills++;
+      continue;
+    }
     const skillFolder = path.join(skillsDir, skill.name);
     fs.mkdirSync(skillFolder, { recursive: true });
     const finalContent = injectAgentInfo(skill.content, skill.bot_ids);
@@ -152,14 +161,28 @@ export async function syncGlobalCache(
   for (const agent of dedupedAgents) {
     const agentFolder = path.join(agentsDir, agent.name);
     fs.mkdirSync(agentFolder, { recursive: true });
-    fs.writeFileSync(
-      path.join(agentFolder, `${agent.name}.md`),
-      agent.content
+
+    let content = agent.content;
+
+    // 위임 매트릭스 주입
+    const agentDelegations = delegations.filter(
+      (d) => d.from_bot_id === agent.name
     );
+    if (agentDelegations.length > 0) {
+      const delegationLines = agentDelegations
+        .map(
+          (d) =>
+            `- → ${d.to_bot_id}: ${d.domains.join(", ")} (via ${d.method})`
+        )
+        .join("\n");
+      content += `\n\n## 위임 매트릭스\n${delegationLines}\n`;
+    }
+
+    fs.writeFileSync(path.join(agentFolder, `${agent.name}.md`), content);
   }
 
   return {
-    skills: skills.length,
+    skills: skills.length - skippedSkills,
     commands: cmdCount,
     agents: dedupedAgents.length,
   };

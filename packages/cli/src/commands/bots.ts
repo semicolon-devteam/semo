@@ -13,10 +13,11 @@ import chalk from "chalk";
 import ora from "ora";
 import * as fs from "fs";
 import * as path from "path";
-import { getPool, closeConnection, isDbConnected } from "../database";
+import { getPool, closeConnection, isDbConnected, getDelegations } from "../database";
 import { syncBotSessions } from "./sessions";
 import { auditBot, auditBotDb, mergeDbChecks, fixBot, storeAuditResults, formatAuditSlack, BotAuditResult } from "./audit";
 import { syncSkillsToDB, scanSkills } from "./skill-sync";
+import { syncCronJobs } from "./context";
 
 // ============================================================
 // Types (matches actual DB schema)
@@ -423,6 +424,17 @@ export function registerBotsCommands(program: Command): void {
           console.log(chalk.yellow("  ⚠ sessions sync 실패 (무시)"));
         }
 
+        // Cron jobs piggyback — sync 후 크론잡 동기화
+        try {
+          console.log(chalk.gray("  → cron sync 실행 중..."));
+          const cronResult = await syncCronJobs(pool);
+          if (cronResult.jobs > 0) {
+            console.log(chalk.green(`  → cron sync 완료: ${cronResult.bots}개 봇, ${cronResult.jobs}개 잡`));
+          }
+        } catch {
+          console.log(chalk.yellow("  ⚠ cron sync 실패 (무시)"));
+        }
+
         // Audit piggyback — sync 후 자동 audit 실행
         try {
           console.log(chalk.gray("  → audit 실행 중..."));
@@ -714,11 +726,93 @@ export function registerBotsCommands(program: Command): void {
           );
         }
 
+        // ─── 위임 매트릭스 시딩 ─────────────────────────────
+        spinnerDb.text = "위임 매트릭스 시딩 중...";
+        const delegationSeeds: Array<{
+          from: string;
+          to: string;
+          type: string;
+          domains: string[];
+          method: string;
+        }> = [
+          { from: "semiclaw", to: "infraclaw", type: "task", domains: ["infra", "cicd", "deploy", "monitoring"], method: "github_issue" },
+          { from: "semiclaw", to: "designclaw", type: "task", domains: ["ui", "ux", "design", "reference"], method: "github_issue" },
+          { from: "semiclaw", to: "planclaw", type: "task", domains: ["planning", "requirements", "spec"], method: "github_issue" },
+          { from: "semiclaw", to: "reviewclaw", type: "task", domains: ["code_review", "qa", "testing"], method: "github_issue" },
+          { from: "semiclaw", to: "workclaw", type: "task", domains: ["implementation", "dev", "bugfix"], method: "github_issue" },
+          { from: "semiclaw", to: "growthclaw", type: "task", domains: ["marketing", "growth", "analytics", "content"], method: "github_issue" },
+        ];
+
+        let delegationCount = 0;
+        for (const d of delegationSeeds) {
+          await client.query(
+            `INSERT INTO semo.bot_delegation
+               (from_bot_id, to_bot_id, delegation_type, domains, method)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (from_bot_id, to_bot_id, delegation_type) DO UPDATE SET
+               domains = EXCLUDED.domains,
+               method = EXCLUDED.method,
+               updated_at = NOW()`,
+            [d.from, d.to, d.type, d.domains, d.method]
+          );
+          delegationCount++;
+        }
+
+        // ─── 프로토콜 시딩 ──────────────────────────────────
+        spinnerDb.text = "프로토콜 메타데이터 시딩 중...";
+        const protocolSeeds: Array<{
+          key: string;
+          value: Record<string, unknown>;
+          description: string;
+        }> = [
+          {
+            key: "task_request_format",
+            value: { template: "@{bot} [TASK] {desc}\n[PROJECT] {project}\n[PRIORITY] {priority}\n[ISSUE] {issue}" },
+            description: "태스크 요청 메시지 포맷",
+          },
+          {
+            key: "result_format",
+            value: { template: "@SemiClaw [DONE] {desc}\n[RESULT] {summary}\n[ARTIFACTS] {urls}" },
+            description: "결과 보고 메시지 포맷",
+          },
+          {
+            key: "blocked_format",
+            value: { template: "@SemiClaw [BLOCKED] {desc}\n[REASON] {reason}\n[NEED] {need}" },
+            description: "블로커 보고 메시지 포맷",
+          },
+          {
+            key: "channel_rules",
+            value: { "proj-*": "allowBots", "개발사업팀": "reportOnly" },
+            description: "채널별 봇 통신 규칙",
+          },
+          {
+            key: "general",
+            value: { max_roundtrips: 5, hub_bot: "semiclaw" },
+            description: "일반 프로토콜 설정",
+          },
+        ];
+
+        let protocolCount = 0;
+        for (const p of protocolSeeds) {
+          await client.query(
+            `INSERT INTO semo.bot_protocol (key, value, description)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (key) DO UPDATE SET
+               value = EXCLUDED.value,
+               description = EXCLUDED.description,
+               updated_at = NOW()`,
+            [p.key, JSON.stringify(p.value), p.description]
+          );
+          protocolCount++;
+        }
+
         await client.query("COMMIT");
         spinnerDb.succeed("seed 완료");
 
         console.log(chalk.green(`  ✔ 봇 전용 스킬: ${botSkills.length}개 (metadata.bot_ids)`));
         console.log(chalk.green(`  ✔ 에이전트: ${agents.length}개`));
+        console.log(chalk.green(`  ✔ 위임 매트릭스: ${delegationCount}개`));
+        console.log(chalk.green(`  ✔ 프로토콜: ${protocolCount}개`));
         console.log();
       } catch (err) {
         await client.query("ROLLBACK");
@@ -726,6 +820,162 @@ export function registerBotsCommands(program: Command): void {
         process.exit(1);
       } finally {
         client.release();
+        await closeConnection();
+      }
+    });
+
+  // ── semo bots cron ──────────────────────────────────────────
+  const cronCmd = botsCmd
+    .command("cron")
+    .description("봇 크론잡 조회 및 동기화");
+
+  cronCmd
+    .command("list")
+    .description("DB에서 봇 크론잡 조회")
+    .option("--bot <name>", "특정 봇만")
+    .option("--format <type>", "출력 형식 (table|json)", "table")
+    .action(async (options) => {
+      const spinner = ora("크론잡 조회 중...").start();
+
+      const connected = await isDbConnected();
+      if (!connected) {
+        spinner.fail("DB 연결 실패");
+        await closeConnection();
+        process.exit(1);
+      }
+
+      try {
+        const pool = getPool();
+        const client = await pool.connect();
+
+        let query = `
+          SELECT bot_id, job_id, name, schedule, enabled,
+                 last_run::text, next_run::text, session_target, synced_at::text
+          FROM semo.bot_cron_jobs
+        `;
+        const params: string[] = [];
+        if (options.bot) {
+          query += " WHERE bot_id = $1";
+          params.push(options.bot);
+        }
+        query += " ORDER BY bot_id, name";
+
+        const result = await client.query(query, params);
+        client.release();
+        spinner.stop();
+
+        if (options.format === "json") {
+          console.log(JSON.stringify(result.rows, null, 2));
+        } else {
+          console.log(chalk.cyan.bold("\n⏰ 봇 크론잡\n"));
+
+          if (result.rows.length === 0) {
+            console.log(chalk.yellow("  크론잡 데이터가 없습니다."));
+            console.log(chalk.gray("  'semo bots cron sync' 또는 'semo context sync'로 동기화하세요."));
+          } else {
+            let currentBot = "";
+            for (const row of result.rows) {
+              if (row.bot_id !== currentBot) {
+                currentBot = row.bot_id;
+                console.log(chalk.white.bold(`  ${currentBot}`));
+              }
+              const status = row.enabled ? chalk.green("●") : chalk.red("○");
+              const nextRun = row.next_run ? new Date(row.next_run).toLocaleString("ko-KR") : "-";
+              console.log(
+                `    ${status} ${(row.name || row.job_id).padEnd(30)} next: ${nextRun}`
+              );
+            }
+          }
+
+          console.log();
+          const enabledCount = result.rows.filter((r: any) => r.enabled).length;
+          console.log(chalk.gray(`  총 ${result.rows.length}개 잡 (활성: ${enabledCount}개)\n`));
+        }
+      } catch (err) {
+        spinner.fail(`조회 실패: ${err}`);
+        process.exit(1);
+      } finally {
+        await closeConnection();
+      }
+    });
+
+  cronCmd
+    .command("sync")
+    .description("로컬 크론잡 → DB 수동 동기화")
+    .action(async () => {
+      const spinner = ora("크론잡 동기화 중...").start();
+
+      const connected = await isDbConnected();
+      if (!connected) {
+        spinner.fail("DB 연결 실패");
+        await closeConnection();
+        process.exit(1);
+      }
+
+      try {
+        const pool = getPool();
+        const result = await syncCronJobs(pool);
+        spinner.succeed(`크론잡 동기화 완료: ${result.bots}개 봇, ${result.jobs}개 잡`);
+      } catch (err) {
+        spinner.fail(`동기화 실패: ${err}`);
+        process.exit(1);
+      } finally {
+        await closeConnection();
+      }
+    });
+
+  // ── semo bots delegation ─────────────────────────────────────
+  botsCmd
+    .command("delegation")
+    .description("봇 간 위임 매트릭스 조회")
+    .option("--bot <name>", "특정 봇의 위임 관계만")
+    .option("--format <type>", "출력 형식 (table|json)", "table")
+    .action(async (options) => {
+      const spinner = ora("위임 매트릭스 조회 중...").start();
+
+      const connected = await isDbConnected();
+      if (!connected) {
+        spinner.fail("DB 연결 실패");
+        await closeConnection();
+        process.exit(1);
+      }
+
+      try {
+        const delegations = await getDelegations(options.bot || undefined);
+        spinner.stop();
+
+        if (options.format === "json") {
+          console.log(JSON.stringify(delegations, null, 2));
+        } else {
+          console.log(chalk.cyan.bold("\n🔗 봇 위임 매트릭스\n"));
+
+          if (delegations.length === 0) {
+            console.log(chalk.yellow("  위임 데이터가 없습니다."));
+            console.log(chalk.gray("  'semo bots seed'로 위임 매트릭스를 시딩하세요."));
+          } else {
+            let currentFrom = "";
+            for (const d of delegations) {
+              if (d.from_bot_id !== currentFrom) {
+                currentFrom = d.from_bot_id;
+                console.log(chalk.white.bold(`  ${currentFrom}`));
+              }
+              const domains = d.domains.join(", ");
+              console.log(
+                chalk.gray(`    → ${d.to_bot_id.padEnd(14)}`) +
+                chalk.white(`[${d.delegation_type}] `) +
+                chalk.cyan(domains) +
+                chalk.gray(` (via ${d.method})`)
+              );
+            }
+          }
+
+          console.log();
+          console.log(chalk.gray(`  총 ${delegations.length}개 위임 관계\n`));
+        }
+      } catch (err) {
+        spinner.fail(`조회 실패: ${err}`);
+        process.exit(1);
+      } finally {
         await closeConnection();
       }
     });

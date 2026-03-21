@@ -7,10 +7,8 @@ export async function GET(
 ) {
   try {
     const { domain, key } = await params;
-    const { searchParams } = new URL(request.url);
-    const bot_id = searchParams.get('bot_id') || undefined;
 
-    const result = await getItem(domain, key, bot_id);
+    const result = await getItem(domain, key);
 
     if (!result) {
       return NextResponse.json(

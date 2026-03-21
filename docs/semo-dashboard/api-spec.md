@@ -247,9 +247,7 @@ const cronJobs = await fetch(`${OPENCLAW_GATEWAY_URL}/api/cron/list`, {
    ORDER BY embedding <=> $1::vector
    LIMIT $2
    ```
-3. `bot_id` 제공 시 `semo.bot_knowledge` 테이블 사용
-
-**참고:** `kb-cli.js` 의 `search()` / `botSearch()` 함수
+**참고:** `kb-cli.js` 의 `search()` 함수
 
 ---
 
@@ -259,7 +257,7 @@ const cronJobs = await fetch(`${OPENCLAW_GATEWAY_URL}/api/cron/list`, {
 
 **쿼리 파라미터:**
 - `domain` (옵션): 도메인 필터 (예: `team`, `decision`)
-- `bot_id` (옵션): 봇별 KB 필터
+- `created_by` (옵션): 작성자 필터
 
 **응답:**
 ```json
@@ -381,15 +379,6 @@ WHERE domain = $1 AND key = $2
       // ...
     ]
   },
-  "bot_knowledge": {
-    "total": 20,
-    "emb": 18,
-    "by_bot": [
-      { "bot_id": "semiclaw", "cnt": 10, "emb_cnt": 10 },
-      { "bot_id": "planclaw", "cnt": 5, "emb_cnt": 4 },
-      // ...
-    ]
-  }
 }
 ```
 
@@ -403,15 +392,6 @@ ORDER BY domain
 
 SELECT count(*) as total, count(embedding) as emb
 FROM semo.knowledge_base
-
--- bot_knowledge 통계
-SELECT bot_id, count(*) as cnt, count(embedding) as emb_cnt
-FROM semo.bot_knowledge
-GROUP BY bot_id
-ORDER BY bot_id
-
-SELECT count(*) as total, count(embedding) as emb
-FROM semo.bot_knowledge
 ```
 
 **참고:** `kb-cli.js` 의 `stats()` 함수

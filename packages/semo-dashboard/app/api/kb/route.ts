@@ -6,7 +6,6 @@ export const dynamic = 'force-dynamic';
 
 const EMPTY_STATS = {
   knowledge_base: { total: '0', emb: '0', by_domain: [] },
-  bot_knowledge: { total: '0', emb: '0', by_bot: [] },
 };
 
 function isConnectionError(error: unknown): boolean {
@@ -20,7 +19,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const q = searchParams.get('search') || '';
     const domain = searchParams.get('domain') || '';
-    const botId = searchParams.get('bot_id') || '';
+    const createdBy = searchParams.get('created_by') || '';
     const key = searchParams.get('key') || '';
     const action = searchParams.get('action') || '';
 
@@ -35,19 +34,19 @@ export async function GET(request: NextRequest) {
     }
 
     if (q) {
-      const results = await search(q, 20, botId || undefined);
+      const results = await search(q, 20, createdBy || undefined);
       return NextResponse.json(results);
     }
 
     if (key && domain) {
-      const item = await getItem(domain, key, botId || undefined);
+      const item = await getItem(domain, key);
       if (!item) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 });
       }
       return NextResponse.json(item);
     }
 
-    const items = await list(domain || undefined, botId || undefined);
+    const items = await list(domain || undefined, createdBy || undefined);
     return NextResponse.json(items);
   } catch (error) {
     if (isConnectionError(error)) {

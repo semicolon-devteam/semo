@@ -1,5 +1,5 @@
-import DashboardLayout from '@/components/dashboard/DashboardLayout';
+import RoadmapTimeline from '@/components/dashboard/RoadmapTimeline';
 
 export default function DashboardPage() {
-  return <DashboardLayout />;
+  return <RoadmapTimeline />;
 }

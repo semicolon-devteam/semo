@@ -144,6 +144,26 @@ export interface Package {
   install_order: number;
 }
 
+export interface BotDelegation {
+  id: number;
+  from_bot_id: string;
+  to_bot_id: string;
+  delegation_type: string;
+  domains: string[];
+  method: string;
+  channel: string | null;
+  max_roundtrips: number;
+  priority: string;
+  is_active: boolean;
+}
+
+export interface BotProtocol {
+  id: number;
+  key: string;
+  value: Record<string, unknown>;
+  description: string | null;
+}
+
 // ============================================================
 // 폴백 데이터 (DB 연결 실패 시 사용)
 // ============================================================
@@ -353,6 +373,55 @@ export async function getSkillCountByCategory(): Promise<Record<string, number>>
   }
 
   return counts;
+}
+
+/**
+ * 위임 매트릭스 조회
+ */
+export async function getDelegations(botId?: string): Promise<BotDelegation[]> {
+  const isConnected = await checkDbConnection();
+  if (!isConnected) return [];
+
+  try {
+    let query = `
+      SELECT id, from_bot_id, to_bot_id, delegation_type,
+             domains, method, channel, max_roundtrips, priority, is_active
+      FROM semo.bot_delegation
+      WHERE is_active = true
+    `;
+    const params: string[] = [];
+    if (botId) {
+      query += ` AND from_bot_id = $1`;
+      params.push(botId);
+    }
+    query += ` ORDER BY from_bot_id, to_bot_id`;
+
+    const result = await getPool().query(query, params);
+    return result.rows;
+  } catch {
+    // Table may not exist yet
+    return [];
+  }
+}
+
+/**
+ * 프로토콜 메타데이터 조회
+ */
+export async function getProtocol(): Promise<BotProtocol[]> {
+  const isConnected = await checkDbConnection();
+  if (!isConnected) return [];
+
+  try {
+    const result = await getPool().query(`
+      SELECT id, key, value, description
+      FROM semo.bot_protocol
+      ORDER BY key
+    `);
+    return result.rows;
+  } catch {
+    // Table may not exist yet
+    return [];
+  }
 }
 
 /**

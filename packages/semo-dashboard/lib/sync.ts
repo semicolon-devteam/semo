@@ -57,8 +57,8 @@ export const SYNC_FLOWS: SyncFlow[] = [
     trigger: 'BotHook',
     direction: 'DB→Local',
     command: 'semo context sync --digest',
-    table: 'knowledge_base + bot_kb_subscriptions',
-    description: '봇 세션 시작 시 구독 도메인의 KB 변경사항을 kb-digest.md로 생성',
+    table: 'knowledge_base',
+    description: '봇 세션 시작 시 최근 KB 변경사항을 kb-digest.md로 생성',
     filePaths: ['.claude/memory/kb-digest.md'],
   },
   {
@@ -131,7 +131,6 @@ export async function fetchRecentRecords(
     command_definitions: { schema: 'public', table: 'command_definitions', orderBy: 'updated_at' },
     agent_definitions: { schema: 'public', table: 'agent_definitions', orderBy: 'updated_at' },
     bot_sessions: { schema: 'semo', table: 'bot_sessions', orderBy: 'synced_at' },
-    bot_kb_subscriptions: { schema: 'semo', table: 'bot_kb_subscriptions', orderBy: 'last_synced_at' },
   };
 
   const target = allowedTables[table];

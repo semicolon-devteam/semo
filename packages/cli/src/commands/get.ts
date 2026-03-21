@@ -1,11 +1,10 @@
 /**
  * semo get <resource> — 세션 중 실시간 DB 쿼리
  *
- * semo get projects  [--active]
+ * semo get projects  [--active] [--format table|json|md]
  * semo get bots      [--status online|offline]
  * semo get kb        [--domain <d>] [--key <k>] [--search <text>]
  * semo get ontology  [--domain <d>]
- * semo get tasks     [--project <p>] [--status <s>]
  * semo get sessions  [--bot <n>]
  */
 
@@ -64,82 +63,48 @@ export function registerGetCommands(program: Command): void {
   // ── semo get projects ───────────────────────────────────────
   getCmd
     .command("projects")
-    .description("프로젝트 목록 조회")
-    .option("--active", "활성 프로젝트만")
+    .description("프로젝트 목록 조회 (KB 기반)")
+    .option("--active", "활성 프로젝트만 (metadata.status='active')")
     .option("--format <type>", "출력 형식 (table|json|md)", "table")
     .action(async (options) => {
       const spinner = ora("프로젝트 조회 중...").start();
 
       const connected = await isDbConnected();
       if (!connected) {
-        // Fallback: show KB entries with domain=project
-        try {
-          const pool = getPool();
-          const { shared } = await kbList(pool, { domain: "project", limit: 100 });
-          spinner.stop();
-
-          if (options.format === "json") {
-            console.log(JSON.stringify(shared, null, 2));
-          } else {
-            printTable(
-              ["key", "content"],
-              shared.map(e => [e.key, e.content.substring(0, 80)]),
-              "📁 프로젝트 (KB 기반)"
-            );
-          }
-        } catch {
-          spinner.fail("DB 연결 실패");
-        }
+        spinner.fail("DB 연결 실패");
         await closeConnection();
-        return;
+        process.exit(1);
       }
 
       try {
         const pool = getPool();
-        const client = await pool.connect();
+        let entries = await kbList(pool, { domain: "project", limit: 100 });
 
-        let query = `
-          SELECT id, name, display_name, status, description, updated_at::text
-          FROM semo.projects
-        `;
-        const params: string[] = [];
         if (options.active) {
-          query += " WHERE status = 'active'";
+          entries = entries.filter(e => {
+            const meta = e.metadata as Record<string, string> | undefined;
+            return meta?.status === "active";
+          });
         }
-        query += " ORDER BY updated_at DESC";
 
-        let rows: Record<string, string>[] = [];
-        try {
-          const result = await client.query(query, params);
-          rows = result.rows;
-        } catch {
-          // semo.projects table may not exist — fallback to KB
-          client.release();
-          const { shared } = await kbList(pool, { domain: "project", limit: 100 });
-          spinner.stop();
-
-          if (options.format === "json") {
-            console.log(JSON.stringify(shared, null, 2));
-          } else {
-            printTable(
-              ["key", "content"],
-              shared.map(e => [e.key, e.content.substring(0, 80)]),
-              "📁 프로젝트 (KB 기반)"
-            );
-          }
-          await closeConnection();
-          return;
-        }
-        client.release();
         spinner.stop();
 
         if (options.format === "json") {
-          console.log(JSON.stringify(rows, null, 2));
+          console.log(JSON.stringify(entries, null, 2));
+        } else if (options.format === "md") {
+          for (const e of entries) {
+            console.log(`\n## ${e.key}\n`);
+            console.log(e.content);
+          }
         } else {
           printTable(
-            ["ID", "이름", "상태", "설명"],
-            rows.map(r => [r.id, r.display_name || r.name, r.status || "-", (r.description || "").substring(0, 60)]),
-            "📁 프로젝트"
+            ["key", "content", "updated_at"],
+            entries.map(e => [
+              e.key,
+              (e.content || "").substring(0, 60),
+              e.updated_at ? new Date(e.updated_at).toLocaleString("ko-KR") : "-",
+            ]),
+            "📁 프로젝트 (KB)"
           );
         }
       } catch (err) {
@@ -254,11 +219,11 @@ export function registerGetCommands(program: Command): void {
           client.release();
           entries = result.rows;
         } else {
-          const { shared } = await kbList(pool, {
+          const kbEntries = await kbList(pool, {
             domain: options.domain,
             limit,
           });
-          entries = shared as unknown as Record<string, string>[];
+          entries = kbEntries as unknown as Record<string, string>[];
         }
 
         spinner.stop();
@@ -335,77 +300,6 @@ export function registerGetCommands(program: Command): void {
               "📐 온톨로지 도메인"
             );
           }
-        }
-      } catch (err) {
-        spinner.fail(`조회 실패: ${err}`);
-        process.exit(1);
-      } finally {
-        await closeConnection();
-      }
-    });
-
-  // ── semo get tasks ──────────────────────────────────────────
-  getCmd
-    .command("tasks")
-    .description("태스크 조회 (semo.tasks)")
-    .option("--project <name>", "프로젝트 필터")
-    .option("--status <s>", "상태 필터 (open|in_progress|done)")
-    .option("--limit <n>", "최대 결과 수", "20")
-    .option("--format <type>", "출력 형식 (table|json)", "table")
-    .action(async (options) => {
-      const spinner = ora("태스크 조회 중...").start();
-
-      const connected = await isDbConnected();
-      if (!connected) {
-        spinner.fail("DB 연결 실패");
-        await closeConnection();
-        process.exit(1);
-      }
-
-      try {
-        const pool = getPool();
-        const client = await pool.connect();
-
-        let query = "SELECT id, title, status, project_id, assignee_name, updated_at::text FROM semo.tasks";
-        const params: (string | number)[] = [];
-        const conditions: string[] = [];
-        let idx = 1;
-
-        if (options.project) {
-          conditions.push(`project_id = $${idx++}`);
-          params.push(options.project);
-        }
-        if (options.status) {
-          conditions.push(`status = $${idx++}`);
-          params.push(options.status);
-        }
-        if (conditions.length > 0) {
-          query += " WHERE " + conditions.join(" AND ");
-        }
-        query += ` ORDER BY updated_at DESC LIMIT $${idx++}`;
-        params.push(parseInt(options.limit));
-
-        let rows: Record<string, string>[] = [];
-        try {
-          const result = await client.query(query, params);
-          rows = result.rows;
-        } catch {
-          client.release();
-          spinner.warn("semo.tasks 테이블이 없거나 접근 불가");
-          await closeConnection();
-          return;
-        }
-        client.release();
-        spinner.stop();
-
-        if (options.format === "json") {
-          console.log(JSON.stringify(rows, null, 2));
-        } else {
-          printTable(
-            ["id", "title", "status", "assignee"],
-            rows.map(r => [r.id, (r.title || "").substring(0, 50), r.status, r.assignee_name || "-"]),
-            "📋 태스크"
-          );
         }
       } catch (err) {
         spinner.fail(`조회 실패: ${err}`);

@@ -19,11 +19,6 @@ interface KBStats {
     emb: string;
     by_domain: Array<{ domain: string; cnt: string; emb_cnt: string }>;
   };
-  bot_knowledge: {
-    total: string;
-    emb: string;
-    by_bot: Array<{ bot_id: string; cnt: string; emb_cnt: string }>;
-  };
 }
 
 export default function BotOverview() {
@@ -55,7 +50,7 @@ export default function BotOverview() {
   return (
     <div className="flex-1 overflow-y-auto bg-gray-50 p-6">
       {/* 요약 통계 */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-4 mb-6">
         <StatCard
           label="전체 봇"
           value={String(bots.length)}
@@ -63,16 +58,10 @@ export default function BotOverview() {
           color="blue"
         />
         <StatCard
-          label="팀 KB"
+          label="KB"
           value={kbStats?.knowledge_base.total ?? '-'}
           sub={`임베딩 ${kbStats?.knowledge_base.emb ?? '-'}건`}
           color="green"
-        />
-        <StatCard
-          label="봇 KB"
-          value={kbStats?.bot_knowledge.total ?? '-'}
-          sub={`임베딩 ${kbStats?.bot_knowledge.emb ?? '-'}건`}
-          color="purple"
         />
       </div>
 
