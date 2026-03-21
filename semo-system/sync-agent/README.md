@@ -17,8 +17,9 @@ Sync Agent (cron)              PostgreSQL (appdb)
 ```
 
 Workspace files are collected by reading each bot's `openclaw.json` → `agents.defaults.workspace`
-to find the git repo path, then recursively scanning for `.md`, `.ts`, `.json`, `.txt`, `.yaml` files.
-SHA-256 hash-based change detection ensures only modified files are uploaded.
+to find the workspace path (`~/.openclaw-{bot}/workspace/`), then recursively scanning for
+`.md`, `.ts`, `.json`, `.txt`, `.yaml` files. SHA-256 hash-based change detection ensures only
+modified files are uploaded.
 
 ## Setup
 

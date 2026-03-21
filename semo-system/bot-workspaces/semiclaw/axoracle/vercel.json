@@ -1,8 +1,0 @@
-{
-  "crons": [
-    {
-      "path": "/api/cron/exchange-rates",
-      "schedule": "0 0 * * *"
-    }
-  ]
-}

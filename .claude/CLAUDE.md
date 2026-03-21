@@ -114,6 +114,70 @@ npm run build      # 빌드 검증
 
 ---
 
+## 환경변수 (`~/.semo.env`)
+
+SEMO는 `~/.semo.env` 파일에서 팀 공통 환경변수를 로드합니다.
+SessionStart 훅과 OpenClaw 게이트웨이 래퍼에서 자동 source됩니다.
+
+| 변수 | 용도 | 필수 |
+|------|------|------|
+| `DATABASE_URL` | 팀 Core DB (PostgreSQL) 연결 | ✅ |
+| `OPENAI_API_KEY` | KB 임베딩용 (text-embedding-3-small) | 선택 |
+| `SLACK_WEBHOOK` | Slack 알림 | 선택 |
+
+키 갱신이 필요하면 `~/.semo.env`를 직접 편집하거나 `semo onboarding -f`를 실행하세요.
+
+---
+
+## OpenClaw 봇 워크스페이스 (SoT)
+
+봇 워크스페이스의 **단일 진실 공급원(SoT)은 `~/.openclaw-{bot}/workspace/`** 디렉토리다.
+이 프로젝트의 `semo-system/bot-workspaces/`는 사용하지 않는다.
+
+| 봇 | SoT 경로 | 게이트웨이 포트 |
+|----|----------|----------------|
+| semiclaw | `~/.openclaw/workspace` + `~/.openclaw-semiclaw/workspace` | 18789 |
+| workclaw | `~/.openclaw-workclaw/workspace` | 18869 |
+| reviewclaw | `~/.openclaw-reviewclaw/workspace` | 18829 |
+| planclaw | `~/.openclaw-planclaw/workspace` | 18809 |
+| designclaw | `~/.openclaw-designclaw/workspace` | — |
+| infraclaw | `~/.openclaw-infraclaw/workspace` | — |
+| growthclaw | `~/.openclaw-growthclaw/workspace` | — |
+
+### 데이터 흐름
+
+```
+~/.openclaw-{bot}/workspace/  (SoT, 봇이 직접 읽고 씀)
+        ↓ sync-agent (1분 주기)
+Core DB: semo.bot_workspace_files
+        ↓ Dashboard API
+semo-dashboard (DB에서 읽기, FS 접근 없음)
+```
+
+### 봇 워크스페이스 파일 구조
+
+```
+~/.openclaw-{bot}/workspace/
+├── SOUL.md          # 봇 성격/역할 정의
+├── AGENTS.md        # 에이전트 구성
+├── USER.md          # 사용자 환경 정보
+├── IDENTITY.md      # 봇 이름/이모지/직책
+├── TOOLS.md         # 도구 사용 가이드
+├── MEMORY.md        # 메모리 인덱스
+├── HEARTBEAT.md     # 주기 작업 정의
+├── hooks/           # OpenClaw 훅 (semo-bot-status 등)
+├── memory/          # KB 동기화 + 일일 로그
+├── skills/          # 봇 전용 스킬 (SKILL.md + scripts/ + references/)
+└── scripts/         # 유틸리티 스크립트
+```
+
+### 봇 설정 파일
+
+각 봇의 `openclaw.json`은 `~/.openclaw-{bot}/openclaw.json`에 있다.
+`agents.defaults.workspace` 필드가 위 SoT 경로를 가리킨다.
+
+---
+
 ## 복구 명령어
 
 ```bash
