@@ -246,13 +246,30 @@ export async function kbPush(
   const errors: string[] = [];
 
   try {
+    // Domain validation: check all domains against ontology before transaction
+    const ontologyResult = await client.query("SELECT domain FROM semo.ontology");
+    const knownDomains = new Set(ontologyResult.rows.map((r: { domain: string }) => r.domain));
+    const invalidEntries: string[] = [];
+    const validEntries: typeof entries = [];
+
+    for (const entry of entries) {
+      if (knownDomains.has(entry.domain)) {
+        validEntries.push(entry);
+      } else {
+        invalidEntries.push(`${entry.domain}/${entry.key}: 미등록 도메인 '${entry.domain}'`);
+      }
+    }
+    if (invalidEntries.length > 0) {
+      errors.push(...invalidEntries);
+    }
+
     await client.query("BEGIN");
 
-    const texts = entries.map(e => `${e.key}: ${e.content}`);
+    const texts = validEntries.map(e => `${e.key}: ${e.content}`);
     const embeddings = await generateEmbeddings(texts);
 
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i];
+    for (let i = 0; i < validEntries.length; i++) {
+      const entry = validEntries[i];
       try {
         const embedding = embeddings[i];
         const embeddingStr = embedding ? `[${embedding.join(",")}]` : null;

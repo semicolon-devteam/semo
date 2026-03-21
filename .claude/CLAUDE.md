@@ -42,6 +42,35 @@ KB 데이터는 **semo-kb MCP 서버**를 통해 Core DB에서 실시간 조회�
 
 ---
 
+## KB-First 행동 규칙 (NON-NEGOTIABLE)
+
+> KB는 팀의 Single Source of Truth이다. 아래 규칙은 예외 없이 적용된다.
+
+### 읽기 (Query-First)
+다음 주제 질문 → **반드시 kb_search/kb_get으로 KB 먼저 조회** 후 답변:
+- 팀원 정보 → `domain: team`
+- 프로젝트 현황 → `domain: project`
+- 의사결정 기록 → `domain: decision`
+- 업무 프로세스 → `domain: process`
+- 인프라 구성 → `domain: infra`
+- KPI → `domain: kpi`
+- 봇 설정/규격 → `domain: bot-config` (key: `{botId}/{identity|agents|rules|tools|...}`)
+- 스펙/설계 문서 → `domain: spec`
+- 스킬 정의 → `domain: skill` (key: `{botId}/{skillName}`)
+
+**금지:** 위 주제를 자체 지식/세션 기억만으로 답변하는 것.
+KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하겠습니다."
+
+### 쓰기 (Write-Back)
+다음 상황 → **반드시 kb_upsert로 KB에 즉시 기록:**
+- 사용자가 팀 정보를 정정하거나 새 사실을 알려줄 때
+- 의사결정이 내려졌을 때
+- 프로세스/규칙이 변경되었을 때
+
+**금지:** "알겠습니다/기억하겠습니다"만 하고 KB에 쓰지 않는 것.
+
+---
+
 ## 설치된 구성
 
 ```
@@ -55,26 +84,42 @@ KB 데이터는 **semo-kb MCP 서버**를 통해 Core DB에서 실시간 조회�
 
 ---
 
-## 프로젝트 규칙 (팀이 채워야 함)
+## 이 프로젝트에 대하여 (semo 개발 프로젝트)
 
-> 아래 섹션은 이 프로젝트 고유의 규칙을 기록하세요.
-> 팀 공통 규칙은 `memory/process.md`에 있습니다.
+> **이 디렉토리는 SEMO 시스템 자체를 개발·관리하는 프로젝트이다.**
+> SEMO는 여러 프로젝트에 `semo init`으로 설치되어 사용되며, 이 폴더는 그 소스코드가 있는 곳이다.
+
+### 이 프로젝트의 역할
+
+- SEMO CLI (`packages/cli`) — `semo init`, `semo context sync`, `semo doctor` 등 CLI 도구
+- semo-kb MCP 서버 (`packages/mcp-kb`) — KB 실시간 벡터 검색 MCP 서버
+- semo-dashboard (`packages/semo-dashboard`) — 팀 대시보드 웹 UI
+- OpenClaw 봇 워크스페이스 관리 — 7개 봇의 설정/스킬/메모리 관리
+
+### MCP 서버 설정 규칙
+
+- **프로젝트레벨** `.claude/settings.json` — semo-kb만 등록 (프로젝트 전용 서버)
+- **유저레벨** `~/.claude/settings.json` — 공통 서버(context7, playwright 등) 등록
+- `semo init`은 공통 서버를 `claude mcp add -s user`로 유저레벨에 등록하고, 프로젝트 settings.json에는 semo-kb만 기록
+- 공통 서버와 프로젝트 전용 서버를 같은 레벨에 넣으면 충돌 발생 가능
 
 ### 기술 스택
 
-<!-- 예: Next.js 14, PostgreSQL, TypeScript strict mode -->
+- TypeScript strict mode, Node.js (ES2022)
+- PostgreSQL (Core DB, semo 스키마) + pgvector (임베딩)
+- npm workspaces (packages/*)
+- Next.js 15 (semo-dashboard)
+- MCP SDK (@modelcontextprotocol/sdk)
 
 ### 브랜치 전략
 
-<!-- 예: main(prod) / dev(staging) / feat/* -->
+- `dev` (기본 브랜치, PR 타겟)
 
 ### 코딩 컨벤션
 
-<!-- 예: ESLint airbnb, 함수형 컴포넌트 필수, any 금지 -->
-
-### 아키텍처 특이사항
-
-<!-- 예: DB 직접 접근 금지 — 반드시 API route 통해야 함 -->
+- ESLint + TypeScript strict
+- `npm run lint && npx tsc --noEmit && npm run build` 커밋 전 필수
+- `--no-verify` 사용 금지
 
 ---
 
@@ -135,29 +180,39 @@ SessionStart 훅과 OpenClaw 게이트웨이 래퍼에서 자동 source됩니다
 ### 데이터 흐름
 
 ```
-~/.openclaw-{bot}/workspace/  (SoT, 봇이 직접 읽고 씀)
-        ↓ sync-agent (1분 주기)
-Core DB: semo.bot_workspace_files
-        ↓ Dashboard API
-semo-dashboard (DB에서 읽기, FS 접근 없음)
+~/.openclaw-{bot}/workspace/  (로컬 전용: 세션 부트 + 실행 파일)
+        ↓ sync-agent (1분 주기, 세션 부트 파일만)
+Core DB: semo.bot_workspace_files (축소됨: ~100파일)
+        ↓
+semo-dashboard (KB + bot_workspace_files 병합)
+        ↑
+Core DB: semo.knowledge_base (KB: bot-config/spec/skill 도메인 포함)
+        ↑ kb_upsert (MCP)
+봇/사용자가 직접 쓰기
 ```
 
-### 봇 워크스페이스 파일 구조
+### 봇 워크스페이스 파일 구조 (KB 전환 후)
 
+**로컬에 남는 파일 (세션 부트 + 런타임 실행):**
 ```
 ~/.openclaw-{bot}/workspace/
-├── SOUL.md          # 봇 성격/역할 정의
-├── AGENTS.md        # 에이전트 구성
-├── USER.md          # 사용자 환경 정보
-├── IDENTITY.md      # 봇 이름/이모지/직책
-├── TOOLS.md         # 도구 사용 가이드
-├── MEMORY.md        # 메모리 인덱스
-├── HEARTBEAT.md     # 주기 작업 정의
-├── hooks/           # OpenClaw 훅 (semo-bot-status 등)
-├── memory/          # KB 동기화 + 일일 로그
-├── skills/          # 봇 전용 스킬 (SKILL.md + scripts/ + references/)
-└── scripts/         # 유틸리티 스크립트
+├── SOUL.md              # 세션 부트 (첫 번째로 읽음)
+├── USER.md              # 세션 부트
+├── MEMORY.md            # 세션 부트 (main 세션만)
+├── .claude/settings.json # MCP 서버 설정
+├── hooks/               # OpenClaw 훅 (직접 실행)
+├── memory/
+│   └── 2026-*.md        # 일일 로그 (세션 부트 + 쓰기)
+├── skills/*/scripts/    # 스킬 스크립트 (직접 실행)
+└── scripts/             # 유틸리티 스크립트 (직접 실행)
 ```
+
+**KB로 전환된 파일:**
+- `IDENTITY.md`, `AGENTS.md`, `RULES.md`, `TOOLS.md`, `HEARTBEAT.md`, `BOOTSTRAP.md`, `CLAUDE.md` → `bot-config/{botId}/*`
+- `memory/{team,decisions,process,infra,...}.md` → 기존 KB 도메인
+- `skills/*/SKILL.md`, `skills/*/references/` → `skill/{botId}/{skillName}`
+- 스펙/설계 문서 → `spec/*`
+- `bot-team/` 프로토콜 → `process/*`
 
 ### 봇 설정 파일
 

@@ -1324,6 +1324,7 @@ interface MCPServerConfig {
   command: string;
   args: string[];
   env?: Record<string, string>;
+  scope?: "user" | "project";
 }
 
 const BASE_MCP_SERVERS: MCPServerConfig[] = [
@@ -1331,21 +1332,25 @@ const BASE_MCP_SERVERS: MCPServerConfig[] = [
     name: "context7",
     command: "npx",
     args: ["-y", "@upstash/context7-mcp"],
+    scope: "user",
   },
   {
     name: "sequential-thinking",
     command: "npx",
     args: ["-y", "@modelcontextprotocol/server-sequential-thinking"],
+    scope: "user",
   },
   {
     name: "playwright",
     command: "npx",
     args: ["-y", "@anthropic-ai/mcp-server-playwright"],
+    scope: "user",
   },
   {
     name: "github",
     command: "npx",
     args: ["-y", "@modelcontextprotocol/server-github"],
+    scope: "user",
   },
 ];
 
@@ -1530,6 +1535,10 @@ function registerMCPServer(server: MCPServerConfig): { success: boolean; skipped
       }
     }
 
+    // scope 지정 (기본: project)
+    const scope = server.scope || "project";
+    args.push("-s", scope);
+
     // -- 구분자 후 명령어와 인자 추가
     args.push("--", server.command, ...server.args);
 
@@ -1563,27 +1572,20 @@ async function setupMCP(cwd: string, _extensions: string[], force: boolean) {
     mcpServers: {},
   };
 
-  // MCP 서버 목록 수집
-  const allServers: MCPServerConfig[] = [...BASE_MCP_SERVERS];
-
-  // settings.json에 mcpServers 저장 (백업용)
-  for (const server of allServers) {
-    const serverConfig: Record<string, unknown> = {
-      command: server.command,
-      args: server.args,
-    };
-    if (server.env) {
-      serverConfig.env = server.env;
-    }
-    settings.mcpServers[server.name] = serverConfig;
-  }
+  // settings.json에는 프로젝트 전용 semo-kb만 기록
+  // 공통 서버(context7 등)는 유저레벨에 등록하므로 프로젝트 settings에 쓰지 않음
+  settings.mcpServers["semo-kb"] = {
+    command: "node",
+    args: ["packages/mcp-kb/dist/index.js"],
+  };
 
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-  console.log(chalk.green("✓ .claude/settings.json 생성됨 (MCP 설정 백업)"));
+  console.log(chalk.green("✓ .claude/settings.json 생성됨 (semo-kb MCP 설정)"));
 
-  // Claude Code에 MCP 서버 등록 시도
+  // Claude Code에 MCP 서버 등록 시도 (공통 서버는 유저레벨로)
   console.log(chalk.cyan("\n🔌 Claude Code에 MCP 서버 등록 중..."));
 
+  const allServers: MCPServerConfig[] = [...BASE_MCP_SERVERS];
   const successServers: string[] = [];
   const skippedServers: string[] = [];
   const failedServers: MCPServerConfig[] = [];
@@ -1935,83 +1937,59 @@ async function setupClaudeMd(cwd: string, _extensions: string[], force: boolean)
 
 ---
 
-## 🔴 MANDATORY: Memory Context (항시 참조)
+## KB 접근 (semo-kb MCP 서버)
 
-> **⚠️ 세션 시작 시 반드시 \`.claude/memory/\` 폴더의 파일들을 먼저 읽으세요. 예외 없음.**
+KB 데이터는 **semo-kb MCP 서버**를 통해 Core DB에서 실시간 조회합니다.
 
-### 필수 참조 파일
-
-\`\`\`
-.claude/memory/
-├── context.md     # 프로젝트 상태, 기술 스택, 진행 중 작업
-├── decisions.md   # 아키텍처 결정 기록 (ADR)
-├── projects.md    # GitHub Projects 설정
-└── rules/         # 프로젝트별 커스텀 규칙
-\`\`\`
-
-**이 파일들은 세션의 컨텍스트를 유지하는 장기 기억입니다. 매 세션마다 반드시 읽고 시작하세요.**
+| MCP 도구 | 설명 |
+|----------|------|
+| \`kb_search\` | 벡터+텍스트 하이브리드 검색 (query, domain?, limit?, mode?) |
+| \`kb_get\` | domain+key 정확 조회 |
+| \`kb_list\` | 도메인별 엔트리 목록 |
+| \`kb_upsert\` | KB 항목 쓰기 (OpenAI 임베딩 자동 생성) |
+| \`kb_bot_status\` | 봇 상태 테이블 조회 |
+| \`kb_ontology\` | 온톨로지 스키마 조회 |
+| \`kb_digest\` | 봇 구독 도메인 변경 다이제스트 |
 
 ---
 
-## 🔴 MANDATORY: Orchestrator-First Execution
+## KB-First 행동 규칙 (NON-NEGOTIABLE)
 
-> **⚠️ 이 규칙은 모든 사용자 요청에 적용됩니다. 예외 없음.**
+> KB는 팀의 Single Source of Truth이다. 아래 규칙은 예외 없이 적용된다.
 
-### 실행 흐름 (필수)
+### 읽기 (Query-First)
+다음 주제 질문 → **반드시 kb_search/kb_get으로 KB 먼저 조회** 후 답변:
+- 팀원 정보 → \`domain: team\`
+- 프로젝트 현황 → \`domain: project\`
+- 의사결정 기록 → \`domain: decision\`
+- 업무 프로세스 → \`domain: process\`
+- 인프라 구성 → \`domain: infra\`
+- KPI → \`domain: kpi\`
 
-\`\`\`
-1. 사용자 요청 수신
-2. Orchestrator가 의도 분석 후 적절한 Agent/Skill 라우팅
-3. Agent/Skill이 작업 수행
-4. 실행 결과 반환
-\`\`\`
+**금지:** 위 주제를 자체 지식/세션 기억만으로 답변하는 것.
+KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하겠습니다."
 
-### Orchestrator 참조
+### 쓰기 (Write-Back)
+다음 상황 → **반드시 kb_upsert로 KB에 즉시 기록:**
+- 사용자가 팀 정보를 정정하거나 새 사실을 알려줄 때
+- 의사결정이 내려졌을 때
+- 프로세스/규칙이 변경되었을 때
 
-**Primary Orchestrator**: \`.claude/agents/orchestrator/orchestrator.md\`
-
-이 파일에서 라우팅 테이블, 의도 분류, 메시지 포맷을 확인하세요.
+**금지:** "알겠습니다/기억하겠습니다"만 하고 KB에 쓰지 않는 것.
 
 ---
 
-## 🔴 NON-NEGOTIABLE RULES
-
-### 1. Orchestrator-First Policy
-
-> **모든 요청은 반드시 Orchestrator를 통해 라우팅됩니다. 직접 처리 금지.**
-
-**직접 처리 금지 항목**:
-- 코드 작성/수정 → \`implementation-master\` 또는 \`coder\` 스킬
-- Git 커밋/푸시 → \`git-workflow\` 스킬
-- 품질 검증 → \`quality-master\` 또는 \`verify\` 스킬
-- 일반 작업 → Orchestrator 분석 후 라우팅
-
-### 2. Pre-Commit Quality Gate
+## Pre-Commit Quality Gate
 
 > **코드 변경이 포함된 커밋 전 반드시 Quality Gate를 통과해야 합니다.**
 
 \`\`\`bash
-# 필수 검증 순서
-npm run lint           # 1. ESLint 검사
-npx tsc --noEmit       # 2. TypeScript 타입 체크
-npm run build          # 3. 빌드 검증 (Next.js/TypeScript 프로젝트)
+npm run lint           # ESLint 검사
+npx tsc --noEmit       # TypeScript 타입 체크
+npm run build          # 빌드 검증
 \`\`\`
 
-**차단 항목**:
-- \`--no-verify\` 플래그 사용 금지
-- Quality Gate 우회 시도 거부
-
----
-
-## Context Mesh 사용
-
-SEMO는 \`.claude/memory/\`를 통해 세션 간 컨텍스트를 유지합니다:
-
-- **context.md**: 프로젝트 상태, 진행 중인 작업
-- **decisions.md**: 아키텍처 결정 기록 (ADR)
-- **rules/**: 프로젝트별 커스텀 규칙
-
-memory 스킬이 자동으로 이 파일들을 관리합니다.
+\`--no-verify\` 플래그 사용 금지.
 
 ---
 

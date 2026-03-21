@@ -10,11 +10,11 @@ CREATE TABLE IF NOT EXISTS semo.bot_status (
   name TEXT,
   emoji TEXT,
   role TEXT,
-  last_active TIMESTAMP,
+  last_active TIMESTAMPTZ,
   session_count INTEGER DEFAULT 0,
   workspace_path TEXT,
   status TEXT, -- 'active' | 'idle' | 'error'
-  synced_at TIMESTAMP DEFAULT NOW()
+  synced_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Bot sessions table (detailed session info)
@@ -24,9 +24,9 @@ CREATE TABLE IF NOT EXISTS semo.bot_sessions (
   label TEXT,
   kind TEXT, -- 'main' | 'isolated'
   chat_type TEXT, -- 'slack' | 'telegram' | ...
-  last_activity TIMESTAMP,
+  last_activity TIMESTAMPTZ,
   message_count INTEGER DEFAULT 0,
-  synced_at TIMESTAMP DEFAULT NOW(),
+  synced_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (bot_id, session_key)
 );
 
@@ -37,10 +37,10 @@ CREATE TABLE IF NOT EXISTS semo.bot_cron_jobs (
   name TEXT,
   schedule JSONB, -- Full schedule structure (kind, expr, everyMs, etc.)
   enabled BOOLEAN DEFAULT TRUE,
-  last_run TIMESTAMP,
-  next_run TIMESTAMP,
+  last_run TIMESTAMPTZ,
+  next_run TIMESTAMPTZ,
   session_target TEXT, -- 'main' | 'isolated'
-  synced_at TIMESTAMP DEFAULT NOW(),
+  synced_at TIMESTAMPTZ DEFAULT NOW(),
   PRIMARY KEY (bot_id, job_id)
 );
 

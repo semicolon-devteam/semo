@@ -276,6 +276,62 @@ export async function kbList(
   }
 }
 
+async function validateAgainstOntology(
+  pool: Pool,
+  domain: string,
+  metadata?: Record<string, unknown>
+): Promise<string[]> {
+  const warnings: string[] = [];
+
+  const onto = await ontoShow(pool, domain);
+  if (!onto) return warnings; // 온톨로지 미등록 도메인은 무시
+
+  const schema = onto.schema as any;
+  const metaSchema = schema?.properties?.metadata?.properties;
+  if (!metaSchema) return warnings;
+
+  // metadata가 없으면 required 메타 필드 체크
+  const requiredMeta = schema?.properties?.metadata?.required as string[] | undefined;
+  if (requiredMeta && requiredMeta.length > 0 && (!metadata || Object.keys(metadata).length === 0)) {
+    warnings.push(`[hint] '${domain}' 도메인은 metadata에 ${requiredMeta.join(', ')} 필드를 권장합니다.`);
+    return warnings;
+  }
+
+  if (!metadata) return warnings;
+
+  // 각 metadata 필드 검증
+  for (const [propKey, propDef] of Object.entries(metaSchema)) {
+    const def = propDef as any;
+    const val = (metadata as any)[propKey];
+
+    if (val !== undefined) {
+      // enum 검증
+      if (def.enum && !def.enum.includes(val)) {
+        warnings.push(`[hint] metadata.${propKey}: '${val}' → 권장 값: [${def.enum.join(', ')}]`);
+      }
+      // type 검증
+      if (def.type === 'string' && typeof val !== 'string') {
+        warnings.push(`[hint] metadata.${propKey}: string 타입 권장 (현재: ${typeof val})`);
+      }
+      if (def.type === 'array' && !Array.isArray(val)) {
+        warnings.push(`[hint] metadata.${propKey}: array 타입 권장 (현재: ${typeof val})`);
+      }
+      if (def.type === 'integer' && !Number.isInteger(val)) {
+        warnings.push(`[hint] metadata.${propKey}: integer 타입 권장 (현재: ${typeof val})`);
+      }
+    }
+  }
+
+  // 온톨로지에 정의되지 않은 메타데이터 키 경고
+  for (const key of Object.keys(metadata)) {
+    if (!metaSchema[key]) {
+      warnings.push(`[hint] metadata.${key}: 이 도메인의 온톨로지에 정의되지 않은 필드입니다.`);
+    }
+  }
+
+  return warnings;
+}
+
 export async function kbUpsert(
   pool: Pool,
   entry: {
@@ -285,7 +341,18 @@ export async function kbUpsert(
     metadata?: Record<string, unknown>;
     created_by?: string;
   }
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; warnings?: string[] }> {
+  // Domain validation (pre-check before write)
+  try {
+    const { validateDomain } = await import("./validate.js");
+    const domainCheck = await validateDomain(pool, entry.domain);
+    if (!domainCheck.valid) {
+      return { success: false, error: domainCheck.error };
+    }
+  } catch {
+    // If validate module fails, proceed anyway (graceful degradation)
+  }
+
   const client = await pool.connect();
   try {
     const text = `${entry.key}: ${entry.content}`;
@@ -308,7 +375,16 @@ export async function kbUpsert(
         embeddingStr,
       ]
     );
-    return { success: true };
+
+    // Soft validation: 저장 후 온톨로지 검증 (실패해도 upsert 결과에 영향 없음)
+    let warnings: string[] = [];
+    try {
+      warnings = await validateAgainstOntology(pool, entry.domain, entry.metadata);
+    } catch {
+      // validation 에러는 무시
+    }
+
+    return { success: true, warnings: warnings.length > 0 ? warnings : undefined };
   } catch (err) {
     return { success: false, error: String(err) };
   } finally {

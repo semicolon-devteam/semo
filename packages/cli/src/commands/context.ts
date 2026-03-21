@@ -15,7 +15,7 @@ import * as path from "path";
 import * as os from "os";
 import { Pool } from "pg";
 import { getPool, closeConnection, isDbConnected } from "../database";
-import { KBEntry } from "../kb";
+import { KBEntry, generateEmbeddings } from "../kb";
 import { syncSkillsToDB } from "./skill-sync";
 import { syncGlobalCache } from "../global-cache";
 
@@ -347,16 +347,47 @@ export function registerContextCommands(program: Command): void {
       const errors: string[] = [];
 
       try {
-        await client.query("BEGIN");
+        // Domain validation: check all domains against ontology
+        const ontologyResult = await client.query("SELECT domain FROM semo.ontology");
+        const knownDomains = new Set(ontologyResult.rows.map((r: { domain: string }) => r.domain));
+
+        const validEntries: KBEntry[] = [];
         for (const entry of allEntries) {
+          if (knownDomains.has(entry.domain)) {
+            validEntries.push(entry);
+          } else {
+            errors.push(`${entry.domain}/${entry.key}: 미등록 도메인 '${entry.domain}' (등록된 도메인: ${Array.from(knownDomains).join(', ')})`);
+          }
+        }
+
+        if (validEntries.length === 0 && errors.length > 0) {
+          spinner.fail("모든 엔트리가 도메인 검증에 실패했습니다.");
+          errors.forEach(e => console.log(chalk.red(`  ❌ ${e}`)));
+          client.release();
+          await closeConnection();
+          return;
+        }
+
+        // Generate embeddings for all valid entries
+        spinner.text = "임베딩 생성 중...";
+        const texts = validEntries.map(e => `${e.key}: ${e.content}`);
+        const embeddings = await generateEmbeddings(texts);
+
+        await client.query("BEGIN");
+        for (let i = 0; i < validEntries.length; i++) {
+          const entry = validEntries[i];
           try {
+            const embedding = embeddings[i];
+            const embeddingStr = embedding ? `[${embedding.join(",")}]` : null;
+
             await client.query(
-              `INSERT INTO semo.knowledge_base (domain, key, content, metadata, created_by)
-               VALUES ($1, $2, $3, $4, $5)
+              `INSERT INTO semo.knowledge_base (domain, key, content, metadata, created_by, embedding)
+               VALUES ($1, $2, $3, $4, $5, $6::vector)
                ON CONFLICT (domain, key) DO UPDATE SET
                  content = EXCLUDED.content,
-                 metadata = EXCLUDED.metadata`,
-              [entry.domain, entry.key, entry.content, JSON.stringify(entry.metadata || {}), entry.created_by]
+                 metadata = EXCLUDED.metadata,
+                 embedding = COALESCE(EXCLUDED.embedding, semo.knowledge_base.embedding)`,
+              [entry.domain, entry.key, entry.content, JSON.stringify(entry.metadata || {}), entry.created_by, embeddingStr]
             );
             upserted++;
           } catch (err) {
@@ -365,7 +396,7 @@ export function registerContextCommands(program: Command): void {
         }
         await client.query("COMMIT");
 
-        spinner.succeed(`push 완료: ${upserted}건 업서트`);
+        spinner.succeed(`push 완료: ${upserted}건 업서트 (임베딩 ${process.env.OPENAI_API_KEY ? '생성됨' : '건너뜀'})`);
         if (errors.length > 0) {
           errors.forEach(e => console.log(chalk.red(`  ❌ ${e}`)));
         }

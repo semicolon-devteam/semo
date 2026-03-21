@@ -2,6 +2,37 @@ import { NextResponse } from 'next/server';
 import { getFileContent, getFileMeta, updateFileContent } from '@/lib/github';
 import { getBotWorkspacePath } from '@/lib/constants';
 import { query } from '@/lib/db';
+import { getItem as kbGetItem } from '@/lib/kb';
+
+/**
+ * Map workspace file paths to KB domain+key for files migrated to KB
+ */
+function getKBKey(botId: string, filePath: string): { domain: string; key: string } | null {
+  const CONFIG_MAP: Record<string, string> = {
+    'IDENTITY.md': 'identity', 'AGENTS.md': 'agents', 'RULES.md': 'rules',
+    'TOOLS.md': 'tools', 'HEARTBEAT.md': 'heartbeat', 'BOOTSTRAP.md': 'bootstrap',
+    'CLAUDE.md': 'claude',
+  };
+
+  // Root config files → bot-config domain
+  if (CONFIG_MAP[filePath]) {
+    return { domain: 'bot-config', key: `${botId}/${CONFIG_MAP[filePath]}` };
+  }
+
+  // Skill definitions → skill domain
+  const skillMatch = filePath.match(/^skills\/([^/]+)\/SKILL\.md$/);
+  if (skillMatch) {
+    return { domain: 'skill', key: `${botId}/${skillMatch[1]}` };
+  }
+
+  // Skill references → skill domain
+  const refMatch = filePath.match(/^skills\/([^/]+)\/references\/([^/]+)\.md$/);
+  if (refMatch) {
+    return { domain: 'skill', key: `${botId}/${refMatch[1]}/ref-${refMatch[2]}` };
+  }
+
+  return null;
+}
 
 export async function GET(
   req: Request,
@@ -26,9 +57,23 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid file path' }, { status: 400 });
     }
 
-    // Try DB first, fallback to GitHub API
+    // Try KB first → bot_workspace_files → GitHub fallback
     let content: string;
+    const kbRef = getKBKey(botId, requestedPath);
+
     try {
+      // 1. KB (SoT for migrated files)
+      if (kbRef) {
+        try {
+          const entry = await kbGetItem(kbRef.domain, kbRef.key);
+          if (entry?.content) {
+            content = entry.content;
+            return NextResponse.json({ path: requestedPath, content });
+          }
+        } catch { /* KB unavailable */ }
+      }
+
+      // 2. bot_workspace_files DB
       const result = await query<{ content: string }>(
         `SELECT content FROM semo.bot_workspace_files WHERE bot_id = $1 AND file_path = $2`,
         [botId, requestedPath]
@@ -36,7 +81,7 @@ export async function GET(
       if (result.rows.length > 0) {
         content = result.rows[0].content;
       } else {
-        // Fallback to GitHub API
+        // 3. Fallback to GitHub API
         const basePath = getBotWorkspacePath(botId);
         content = await getFileContent(`${basePath}/${requestedPath}`);
       }

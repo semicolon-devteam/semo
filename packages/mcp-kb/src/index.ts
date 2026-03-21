@@ -165,11 +165,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           };
         }
 
+        let msg = `upsert 완료: ${domain}/${key} (임베딩 ${process.env.OPENAI_API_KEY ? "생성됨" : "건너뜀 (OPENAI_API_KEY 없음)"})`;
+        if (result.warnings && result.warnings.length > 0) {
+          msg += `\n\n온톨로지 힌트:\n${result.warnings.join('\n')}`;
+        }
+
         return {
           content: [
             {
               type: "text",
-              text: `upsert 완료: ${domain}/${key} (임베딩 ${process.env.OPENAI_API_KEY ? "생성됨" : "건너뜀 (OPENAI_API_KEY 없음)"})`,
+              text: msg,
             },
           ],
         };

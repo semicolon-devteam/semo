@@ -43,7 +43,7 @@ export async function GET(
 
     if (!name || !emoji || !role) {
       const identity = await getFileContent(
-        `semo-system/bot-workspaces/${botId}/IDENTITY.md`
+        `~/.openclaw-${botId}/IDENTITY.md`
       ).catch(() => '');
       const nameMatch = identity.match(/\*\*Name:\*\*\s*(.+)/);
       const emojiMatch = identity.match(/\*\*Emoji:\*\*\s*(\S+)/);

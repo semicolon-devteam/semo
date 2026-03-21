@@ -9,7 +9,7 @@ export const mockBots = [
     status: 'online',
     lastActive: new Date().toISOString(),
     sessionCount: 5,
-    workspacePath: 'semo-system/bot-workspaces/semiclaw',
+    workspacePath: '~/.openclaw/workspace',
     syncedAt: new Date().toISOString(),
   },
   {
@@ -20,7 +20,7 @@ export const mockBots = [
     status: 'online',
     lastActive: new Date().toISOString(),
     sessionCount: 3,
-    workspacePath: 'semo-system/bot-workspaces/workclaw',
+    workspacePath: '~/.openclaw-workclaw/workspace',
     syncedAt: new Date().toISOString(),
   },
   {
@@ -31,7 +31,7 @@ export const mockBots = [
     status: 'online',
     lastActive: new Date().toISOString(),
     sessionCount: 2,
-    workspacePath: 'semo-system/bot-workspaces/reviewclaw',
+    workspacePath: '~/.openclaw-reviewclaw/workspace',
     syncedAt: new Date().toISOString(),
   },
 ];

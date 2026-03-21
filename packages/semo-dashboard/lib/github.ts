@@ -68,7 +68,7 @@ export async function listDirectory(path: string): Promise<GitHubFileResponse[]>
  * Get list of bot workspace directories
  */
 export async function getBotWorkspaces(): Promise<string[]> {
-  const files = await listDirectory('semo-system/bot-workspaces');
+  const files = await listDirectory('~/.openclaw-*/workspace');
   return files
     .filter(file => file.type === 'dir')
     .map(file => file.name);
@@ -78,7 +78,7 @@ export async function getBotWorkspaces(): Promise<string[]> {
  * Get bot workspace files
  */
 export async function getBotFiles(botId: string, path = ''): Promise<GitHubFileResponse[]> {
-  const fullPath = `semo-system/bot-workspaces/${botId}/${path}`;
+  const fullPath = `~/.openclaw-*/workspace/${botId}/${path}`;
   return listDirectory(fullPath);
 }
 

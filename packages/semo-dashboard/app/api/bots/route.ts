@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getFileContent, getBotWorkspaces } from '@/lib/github';
 import { query } from '@/lib/db';
+import { getItem } from '@/lib/kb';
 import type { Bot } from '@/types';
 
 // Force dynamic rendering to prevent build-time DB connection
@@ -32,6 +33,25 @@ function parseIdentityContent(content: string, botId: string): { name: string; e
 
 async function parseBotMetadata(botId: string): Promise<{ name: string; emoji: string; role: string }> {
   try {
+    // 1. Try KB first (bot-config domain — SoT after migration)
+    try {
+      const kbEntry = await getItem('bot-config', `${botId}/identity`);
+      if (kbEntry?.content) {
+        return parseIdentityContent(kbEntry.content, botId);
+      }
+    } catch { /* KB unavailable */ }
+
+    // 2. Fallback to bot_workspace_files DB
+    const dbResult = await query<{ content: string }>(`
+      SELECT content FROM semo.bot_workspace_files
+      WHERE bot_id = $1 AND file_path = 'IDENTITY.md'
+    `, [botId]).catch(() => ({ rows: [] }));
+
+    if (dbResult.rows.length > 0) {
+      return parseIdentityContent(dbResult.rows[0].content, botId);
+    }
+
+    // 3. Fallback to GitHub (legacy)
     const identity = await getFileContent(`semo-system/bot-workspaces/${botId}/IDENTITY.md`).catch(() => '');
     return parseIdentityContent(identity, botId);
   } catch (error) {
@@ -53,7 +73,7 @@ async function fallbackToGitHub(): Promise<Bot[]> {
         status: 'offline',
         lastActive: new Date(0).toISOString(),
         sessionCount: 0,
-        workspacePath: `semo-system/bot-workspaces/${botId}`,
+        workspacePath: `~/.openclaw-${botId}/workspace`,
       };
     })
   );

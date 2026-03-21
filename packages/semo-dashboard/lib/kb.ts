@@ -122,9 +122,10 @@ export async function list(
   createdBy?: string
 ): Promise<KBItem[]> {
   // domain 필터 시 full content + metadata 반환 (milestone 등에서 필요)
+  // 전체 목록: LEFT(content, N)이 일부 한글 데이터에서 UTF-8 깨짐 → JS truncate
   const cols = domain
     ? 'kb_id, domain, key, content, metadata, created_by, updated_at'
-    : 'kb_id, domain, key, LEFT(content, 80) as content, created_by';
+    : 'kb_id, domain, key, content, created_by';
   let sql = `
     SELECT ${cols}
     FROM semo.knowledge_base
@@ -147,6 +148,12 @@ export async function list(
   sql += ` ORDER BY domain, key`;
 
   const res = await pool.query(sql, params);
+  if (!domain) {
+    return res.rows.map((row: any) => ({
+      ...row,
+      content: row.content?.length > 80 ? row.content.slice(0, 80) : row.content,
+    }));
+  }
   return res.rows;
 }
 
@@ -190,6 +197,17 @@ export async function upsertItem(
   content: string,
   createdBy?: string
 ): Promise<KBItem> {
+  // Domain validation: check ontology before write
+  const domainCheck = await pool.query(
+    'SELECT 1 FROM semo.ontology WHERE domain = $1',
+    [domain]
+  );
+  if (domainCheck.rows.length === 0) {
+    const knownDomains = await pool.query('SELECT domain FROM semo.ontology ORDER BY domain');
+    const known = knownDomains.rows.map((r: { domain: string }) => r.domain);
+    throw new Error(`도메인 '${domain}'은(는) 온톨로지에 등록되지 않았습니다. 등록된 도메인: [${known.join(', ')}]`);
+  }
+
   const sql = `
     INSERT INTO semo.knowledge_base (domain, key, content, created_by)
     VALUES ($1, $2, $3, $4)

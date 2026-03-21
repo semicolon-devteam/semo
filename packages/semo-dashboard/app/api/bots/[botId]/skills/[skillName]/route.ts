@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { getItem as kbGetItem, upsertItem as kbUpsertItem } from '@/lib/kb';
 
 function validateIds(botId: string, skillName: string): string | null {
   if (!/^[a-zA-Z0-9_-]+$/.test(botId)) return 'Invalid bot ID';
@@ -16,19 +17,31 @@ export async function GET(
     const err = validateIds(botId, skillName);
     if (err) return NextResponse.json({ error: err }, { status: 400 });
 
-    // Read workspace SKILL.md from DB
+    // Read SKILL.md: KB first, then bot_workspace_files fallback
     let content: string | null = null;
+
+    // 1. KB skill domain (SoT)
     try {
-      const wsResult = await query<{ content: string }>(
-        `SELECT content FROM semo.bot_workspace_files
-         WHERE bot_id = $1 AND file_path = $2`,
-        [botId, `skills/${skillName}/SKILL.md`]
-      );
-      if (wsResult.rows.length > 0) {
-        content = wsResult.rows[0].content;
+      const kbEntry = await kbGetItem('skill', `${botId}/${skillName}`);
+      if (kbEntry?.content) {
+        content = kbEntry.content;
       }
-    } catch {
-      // DB unavailable for workspace files
+    } catch { /* KB unavailable */ }
+
+    // 2. Fallback: bot_workspace_files
+    if (content === null) {
+      try {
+        const wsResult = await query<{ content: string }>(
+          `SELECT content FROM semo.bot_workspace_files
+           WHERE bot_id = $1 AND file_path = $2`,
+          [botId, `skills/${skillName}/SKILL.md`]
+        );
+        if (wsResult.rows.length > 0) {
+          content = wsResult.rows[0].content;
+        }
+      } catch {
+        // DB unavailable for workspace files
+      }
     }
 
     // Read DB metadata
@@ -78,14 +91,19 @@ export async function PUT(
       return NextResponse.json({ error: 'content is required' }, { status: 400 });
     }
 
-    // Update in bot_workspace_files DB
+    // Update in KB skill domain (SoT)
+    try {
+      await kbUpsertItem('skill', `${botId}/${skillName}`, content, 'dashboard');
+    } catch {
+      // KB write failed, try workspace fallback
+    }
+
+    // Fallback: also update bot_workspace_files if it exists
     try {
       await query(
-        `INSERT INTO semo.bot_workspace_files (bot_id, file_path, content, file_size, synced_at)
-         VALUES ($1, $2, $3, $4, NOW())
-         ON CONFLICT (bot_id, file_path) DO UPDATE SET
-           content = EXCLUDED.content, file_size = EXCLUDED.file_size, synced_at = NOW()`,
-        [botId, `skills/${skillName}/SKILL.md`, content, Buffer.byteLength(content, 'utf-8')]
+        `UPDATE semo.bot_workspace_files SET content = $1, file_size = $2, synced_at = NOW()
+         WHERE bot_id = $3 AND file_path = $4`,
+        [content, Buffer.byteLength(content, 'utf-8'), botId, `skills/${skillName}/SKILL.md`]
       );
     } catch {
       // workspace DB write failed

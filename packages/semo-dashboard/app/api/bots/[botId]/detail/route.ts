@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { listSessions, listCronJobs } from '@/lib/openclaw';
-import { list as kbList } from '@/lib/kb';
+import { list as kbList, getItem as kbGetItem } from '@/lib/kb';
 import type { BotDetail, Session, CronJob, BotFile, DailyLog } from '@/types';
 
 // Force dynamic rendering to prevent build-time DB connection
@@ -43,6 +43,33 @@ async function readFileFromDB(botId: string, filePath: string): Promise<string> 
   );
   if (result.rows.length === 0) return '';
   return result.rows[0].content;
+}
+
+/**
+ * KB bot-config file type mapping
+ */
+const CONFIG_FILE_KB_MAP: Record<string, string> = {
+  'SOUL.md': 'soul',
+  'AGENTS.md': 'agents',
+  'USER.md': 'user',
+  'IDENTITY.md': 'identity',
+  'RULES.md': 'rules',
+  'TOOLS.md': 'tools',
+  'HEARTBEAT.md': 'heartbeat',
+};
+
+/**
+ * Read a bot config file: KB first, then bot_workspace_files fallback
+ */
+async function readConfigFile(botId: string, fileName: string): Promise<string> {
+  const kbType = CONFIG_FILE_KB_MAP[fileName];
+  if (kbType) {
+    try {
+      const entry = await kbGetItem('bot-config', `${botId}/${kbType}`);
+      if (entry?.content) return entry.content;
+    } catch { /* KB unavailable, fallback */ }
+  }
+  return readFileFromDB(botId, fileName);
 }
 
 export async function GET(
@@ -116,11 +143,11 @@ export async function GET(
       }));
     }
 
-    // 3. Fetch config files from DB (bot_workspace_files)
+    // 3. Fetch config files (KB first, bot_workspace_files fallback)
     const [soul, agents, user] = await Promise.all([
-      readFileFromDB(botId, 'SOUL.md'),
-      readFileFromDB(botId, 'AGENTS.md'),
-      readFileFromDB(botId, 'USER.md'),
+      readConfigFile(botId, 'SOUL.md'),
+      readConfigFile(botId, 'AGENTS.md'),
+      readConfigFile(botId, 'USER.md'),
     ]);
 
     // 4. Fetch workspace files list from DB
@@ -157,7 +184,7 @@ export async function GET(
     // 5. Fetch KB entries (team SoT — replaces local memory files)
     let kbEntries: { domain: string; key: string; content: string }[] = [];
     try {
-      const KB_DOMAINS = ['decision', 'team', 'process'];
+      const KB_DOMAINS = ['decision', 'team', 'process', 'bot-config', 'spec'];
       const allEntries = await Promise.all(
         KB_DOMAINS.map(d => kbList(d))
       );

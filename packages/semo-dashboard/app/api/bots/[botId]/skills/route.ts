@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { list as kbList } from '@/lib/kb';
 import type { BotSkill } from '@/types';
 
 interface SkillRow {
@@ -21,8 +22,28 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid bot ID' }, { status: 400 });
     }
 
-    // 1. Scan workspace skills from DB (bot_workspace_files)
+    // 1. Scan skills from KB (skill domain — SoT) + bot_workspace_files fallback
     const wsSkills = new Map<string, { hasReferences: boolean }>();
+
+    // 1a. KB skill domain
+    try {
+      const kbSkills = await kbList('skill');
+      for (const entry of kbSkills) {
+        // key format: {botId}/{skillName} or {botId}/{skillName}/ref-{name}
+        if (!entry.key.startsWith(`${botId}/`)) continue;
+        const parts = entry.key.split('/');
+        if (parts.length >= 2) {
+          const skillName = parts[1];
+          const existing = wsSkills.get(skillName) || { hasReferences: false };
+          if (parts.length >= 3 && parts[2].startsWith('ref-')) {
+            existing.hasReferences = true;
+          }
+          wsSkills.set(skillName, existing);
+        }
+      }
+    } catch { /* KB unavailable */ }
+
+    // 1b. Fallback: bot_workspace_files (for scripts/ detection and non-migrated skills)
     try {
       const wsResult = await query<{ file_path: string }>(
         `SELECT file_path FROM semo.bot_workspace_files
@@ -31,13 +52,14 @@ export async function GET(
       );
       for (const row of wsResult.rows) {
         const parts = row.file_path.split('/');
-        // skills/{skillName}/SKILL.md
         if (parts.length >= 3 && parts[2] === 'SKILL.md') {
           const skillName = parts[1];
-          const hasReferences = wsResult.rows.some(r =>
-            r.file_path.startsWith(`skills/${skillName}/references/`)
-          );
-          wsSkills.set(skillName, { hasReferences });
+          if (!wsSkills.has(skillName)) {
+            const hasReferences = wsResult.rows.some(r =>
+              r.file_path.startsWith(`skills/${skillName}/references/`)
+            );
+            wsSkills.set(skillName, { hasReferences });
+          }
         }
       }
     } catch {
