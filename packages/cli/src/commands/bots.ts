@@ -15,7 +15,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { getPool, closeConnection, isDbConnected, getDelegations } from "../database";
 import { syncBotSessions } from "./sessions";
-import { auditBot, auditBotDb, mergeDbChecks, fixBot, storeAuditResults, formatAuditSlack, BotAuditResult } from "./audit";
+import { auditBot, auditBotDb, auditBotKb, mergeDbChecks, fixBot, storeAuditResults, formatAuditSlack, BotAuditResult } from "./audit";
 import { syncSkillsToDB, scanSkills } from "./skill-sync";
 import { syncCronJobs } from "./context";
 
@@ -438,7 +438,10 @@ export function registerBotsCommands(program: Command): void {
         // Audit piggyback — sync 후 자동 audit 실행
         try {
           console.log(chalk.gray("  → audit 실행 중..."));
-          const auditResults = bots.map(b => auditBot(b.workspacePath, b.botId));
+          let auditResults = bots.map(b => auditBot(b.workspacePath, b.botId));
+          // KB 도메인 체크 merge (팀 레벨 — 한 번 조회 후 전체 적용)
+          const kbChecks = await auditBotKb(pool);
+          auditResults = auditResults.map(r => mergeDbChecks(r, kbChecks));
           const auditClient = await pool.connect();
           await storeAuditResults(auditResults, auditClient);
           auditClient.release();
@@ -547,6 +550,16 @@ export function registerBotsCommands(program: Command): void {
             }
           } catch (err) {
             console.log(chalk.yellow(`  ⚠ DB sync 체크 실패: ${err}`));
+          }
+
+          // Merge KB domain checks (team-level — 한 번 조회 후 전체 적용)
+          try {
+            const kbChecks = await auditBotKb(pool);
+            for (let i = 0; i < results.length; i++) {
+              results[i] = mergeDbChecks(results[i], kbChecks);
+            }
+          } catch (err) {
+            console.log(chalk.yellow(`  ⚠ KB 도메인 체크 실패: ${err}`));
           }
 
           // Store results (separate try — table may not exist yet)

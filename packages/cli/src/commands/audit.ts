@@ -1,7 +1,9 @@
 /**
  * Bot Workspace Audit — 표준 구조 compliance 감사
  *
- * 15가지 체크를 수행하고 점수/등급을 산정한다.
+ * 12가지 체크를 수행하고 점수/등급을 산정한다.
+ *   - 파일 9개 (root 7 + memory/slim + skills/)
+ *   - KB 3개 (team, process, decision 도메인 존재)
  * --fix 옵션으로 누락 파일/디렉토리 자동 생성 가능.
  */
 
@@ -101,15 +103,7 @@ const CHECK_DEFS: CheckDef[] = [
   fileExistsCheck("root/MEMORY.md", "MEMORY.md"),
   // 8: Memory slim
   memorySlimCheck(),
-  // 9-13: Memory files
-  fileExistsCheck("memory/decisions.md", "memory/decisions.md"),
-  fileExistsCheck("memory/team.md", "memory/team.md"),
-  fileExistsCheck("memory/process.md", "memory/process.md"),
-  fileExistsCheck("memory/operations.md", "memory/operations.md"),
-  fileExistsCheck("memory/cicd.md", "memory/cicd.md"),
-  // 14: memory/projects/
-  dirExistsCheck("memory/projects/", "memory/projects"),
-  // 15: skills/
+  // 9: skills/
   dirExistsCheck("skills/", "skills"),
 ];
 
@@ -150,31 +144,15 @@ const FIXABLE_FILES: Record<string, string> = {
   "root/TOOLS.md": "TOOLS.md",
   "root/RULES.md": "RULES.md",
   "root/MEMORY.md": "MEMORY.md",
-  "memory/decisions.md": "memory/decisions.md",
-  "memory/team.md": "memory/team.md",
-  "memory/process.md": "memory/process.md",
-  "memory/operations.md": "memory/operations.md",
-  "memory/cicd.md": "memory/cicd.md",
 };
 
 const FIXABLE_DIRS: Record<string, string> = {
-  "memory/projects/": "memory/projects",
   "skills/": "skills",
 };
 
 const FILE_TEMPLATES: Record<string, (botId: string) => string> = {
   "RULES.md": (botId) =>
-    `# RULES.md — ${botId} 행동 규칙\n\n> 공식 표준: semo-core/references/bot-workspace-standard.md\n\n## NON-NEGOTIABLE\n\n## 행동 원칙\n\n## 금지 사항\n`,
-  "memory/operations.md": (botId) =>
-    `# operations.md — ${botId} 운영 루틴\n\n## Weekly Routine\n\n## Monitoring\n\n## Tools\n`,
-  "memory/cicd.md": (botId) =>
-    `# cicd.md — ${botId} CI/CD & 레포\n\n## Pipelines\n\n## Repositories\n\n## Deployment\n`,
-  "memory/process.md": (botId) =>
-    `# process.md — ${botId} 워크플로우\n\n## Workflows\n\n## Protocols\n`,
-  "memory/team.md": (botId) =>
-    `# team.md — ${botId} 팀 정보\n\n## Key Collaborators\n\n## Communication\n`,
-  "memory/decisions.md": (botId) =>
-    `# decisions.md — ${botId} 의사결정 기록\n\n## Architecture Decisions\n\n## Directives\n`,
+    `# RULES.md — ${botId} 행동 규칙\n\n> 공식 표준: kb_get(domain='process', key='bot-workspace-standard')\n\n## NON-NEGOTIABLE\n\n## 행동 원칙\n\n## 금지 사항\n`,
 };
 
 export function fixBot(
@@ -221,6 +199,53 @@ export function fixBot(
 // ============================================================
 // DB storage
 // ============================================================
+
+// ============================================================
+// KB domain checks (async, requires pool)
+// ============================================================
+
+const KB_REQUIRED_DOMAINS = ["team", "process", "decision"] as const;
+
+export async function auditBotKb(
+  pool: Pool
+): Promise<AuditCheck[]> {
+  const checks: AuditCheck[] = [];
+
+  try {
+    const result = await pool.query(
+      `SELECT domain, COUNT(*)::int as cnt
+       FROM semo.knowledge_base
+       WHERE domain = ANY($1)
+       GROUP BY domain`,
+      [KB_REQUIRED_DOMAINS]
+    );
+
+    const counts = new Map<string, number>(
+      result.rows.map((r: { domain: string; cnt: number }) => [r.domain, r.cnt])
+    );
+
+    for (const domain of KB_REQUIRED_DOMAINS) {
+      const cnt = counts.get(domain) ?? 0;
+      checks.push({
+        name: `kb/${domain}`,
+        passed: cnt > 0,
+        detail: cnt > 0
+          ? `KB ${domain} 도메인: ${cnt}개 엔트리`
+          : `KB ${domain} 도메인: 엔트리 없음`,
+      });
+    }
+  } catch (err) {
+    for (const domain of KB_REQUIRED_DOMAINS) {
+      checks.push({
+        name: `kb/${domain}`,
+        passed: false,
+        detail: `KB 조회 실패: ${err}`,
+      });
+    }
+  }
+
+  return checks;
+}
 
 // ============================================================
 // DB sync checks (async, requires pool)

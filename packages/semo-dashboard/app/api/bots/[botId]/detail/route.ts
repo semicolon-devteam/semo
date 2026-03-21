@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { listSessions, listCronJobs } from '@/lib/openclaw';
+import { list as kbList } from '@/lib/kb';
 import type { BotDetail, Session, CronJob, BotFile, DailyLog } from '@/types';
 
 // Force dynamic rendering to prevent build-time DB connection
@@ -153,11 +154,19 @@ export async function GET(
       });
     } catch { /* DB may not have workspace files yet */ }
 
-    // 5. Fetch memory files from DB
-    const [decisions, team] = await Promise.all([
-      readFileFromDB(botId, 'memory/decisions.md'),
-      readFileFromDB(botId, 'memory/team.md'),
-    ]);
+    // 5. Fetch KB entries (team SoT — replaces local memory files)
+    let kbEntries: { domain: string; key: string; content: string }[] = [];
+    try {
+      const KB_DOMAINS = ['decision', 'team', 'process'];
+      const allEntries = await Promise.all(
+        KB_DOMAINS.map(d => kbList(d))
+      );
+      kbEntries = allEntries.flat().map(e => ({
+        domain: e.domain,
+        key: e.key,
+        content: e.content,
+      }));
+    } catch { /* KB may not be available */ }
 
     // 6. Fetch recent daily logs (last 3 days) from DB
     const today = new Date();
@@ -182,8 +191,7 @@ export async function GET(
       },
       files,
       memory: {
-        decisions,
-        team,
+        kbEntries,
         dailyLogs,
       },
       activity: {

@@ -18,8 +18,7 @@ export interface BotDetail {
   };
   files: BotFile[];
   memory: {
-    decisions: string;
-    team: string;
+    kbEntries: { domain: string; key: string; content: string }[];
     dailyLogs: DailyLog[];
   };
   activity: {
