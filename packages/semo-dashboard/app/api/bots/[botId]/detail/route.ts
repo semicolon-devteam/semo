@@ -2,14 +2,6 @@ import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { listSessions, listCronJobs } from '@/lib/openclaw';
 import type { BotDetail, Session, CronJob, BotFile, DailyLog } from '@/types';
-import { readFile, readdir } from 'fs/promises';
-import path from 'path';
-
-const WORKSPACES_DIR = path.resolve(process.cwd(), '../../semo-system/bot-workspaces');
-
-async function readLocalFile(filePath: string): Promise<string> {
-  return readFile(filePath, 'utf-8');
-}
 
 // Force dynamic rendering to prevent build-time DB connection
 export const dynamic = 'force-dynamic';
@@ -32,6 +24,24 @@ interface CronJobRow {
   next_run: string | null;
   session_target: string;
   payload: Record<string, unknown> | null;
+}
+
+interface WorkspaceFileRow {
+  file_path: string;
+  content: string;
+  file_size: number;
+}
+
+/**
+ * Read a bot workspace file from DB
+ */
+async function readFileFromDB(botId: string, filePath: string): Promise<string> {
+  const result = await query<WorkspaceFileRow>(
+    `SELECT content FROM semo.bot_workspace_files WHERE bot_id = $1 AND file_path = $2`,
+    [botId, filePath]
+  );
+  if (result.rows.length === 0) return '';
+  return result.rows[0].content;
 }
 
 export async function GET(
@@ -105,32 +115,51 @@ export async function GET(
       }));
     }
 
-    // 3. Fetch config files from local filesystem
-    const botDir = path.join(WORKSPACES_DIR, botId);
+    // 3. Fetch config files from DB (bot_workspace_files)
     const [soul, agents, user] = await Promise.all([
-      readLocalFile(path.join(botDir, 'SOUL.md')).catch(() => ''),
-      readLocalFile(path.join(botDir, 'AGENTS.md')).catch(() => ''),
-      readLocalFile(path.join(botDir, 'USER.md')).catch(() => ''),
+      readFileFromDB(botId, 'SOUL.md'),
+      readFileFromDB(botId, 'AGENTS.md'),
+      readFileFromDB(botId, 'USER.md'),
     ]);
 
-    // 4. Fetch workspace files (top-level)
+    // 4. Fetch workspace files list from DB
     let files: BotFile[] = [];
     try {
-      const entries = await readdir(botDir, { withFileTypes: true });
-      files = entries.map(e => ({
-        path: e.name,
-        type: e.isDirectory() ? 'directory' : 'file' as const,
-      }));
-    } catch { /* directory may not exist */ }
+      const filesResult = await query<{ file_path: string; file_size: number }>(
+        `SELECT DISTINCT split_part(file_path, '/', 1) AS file_path,
+                MAX(file_size) AS file_size
+         FROM semo.bot_workspace_files
+         WHERE bot_id = $1
+         GROUP BY split_part(file_path, '/', 1)
+         ORDER BY file_path`,
+        [botId]
+      );
 
-    // 5. Fetch memory files
-    const memDir = path.join(botDir, 'memory');
+      // Determine if top-level entry is a directory (has sub-paths) or file
+      const allPaths = await query<{ file_path: string }>(
+        `SELECT file_path FROM semo.bot_workspace_files WHERE bot_id = $1`,
+        [botId]
+      );
+      const pathSet = new Set(allPaths.rows.map(r => r.file_path));
+
+      files = filesResult.rows.map(row => {
+        const isDir = allPaths.rows.some(r =>
+          r.file_path.startsWith(row.file_path + '/') && r.file_path !== row.file_path
+        );
+        return {
+          path: row.file_path,
+          type: (isDir ? 'directory' : 'file') as 'directory' | 'file',
+        };
+      });
+    } catch { /* DB may not have workspace files yet */ }
+
+    // 5. Fetch memory files from DB
     const [decisions, team] = await Promise.all([
-      readLocalFile(path.join(memDir, 'decisions.md')).catch(() => ''),
-      readLocalFile(path.join(memDir, 'team.md')).catch(() => ''),
+      readFileFromDB(botId, 'memory/decisions.md'),
+      readFileFromDB(botId, 'memory/team.md'),
     ]);
 
-    // 6. Fetch recent daily logs (last 3 days)
+    // 6. Fetch recent daily logs (last 3 days) from DB
     const today = new Date();
     const dailyLogs: DailyLog[] = [];
 
@@ -139,10 +168,7 @@ export async function GET(
       date.setDate(date.getDate() - i);
       const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
 
-      const content = await readLocalFile(
-        path.join(memDir, `${dateStr}.md`)
-      ).catch(() => null);
-
+      const content = await readFileFromDB(botId, `memory/${dateStr}.md`);
       if (content) {
         dailyLogs.push({ date: dateStr, content });
       }

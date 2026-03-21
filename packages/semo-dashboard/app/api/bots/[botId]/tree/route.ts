@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
-import { readdir, stat } from 'fs/promises';
-import path from 'path';
 import { getBotFiles } from '@/lib/github';
+import { query } from '@/lib/db';
 import type { FileTreeEntry } from '@/types';
-
-const WORKSPACES_DIR = path.resolve(process.cwd(), '../../semo-system/bot-workspaces');
 
 export const dynamic = 'force-dynamic';
 
@@ -23,36 +20,53 @@ export async function GET(
     const subpath = searchParams.get('path') || '';
 
     // Validate path to prevent traversal
-    const botDir = path.join(WORKSPACES_DIR, botId);
-    const targetDir = path.join(botDir, path.normalize(subpath));
-    if (!targetDir.startsWith(botDir)) {
+    if (subpath.includes('..')) {
       return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
     }
 
     let entries: FileTreeEntry[] = [];
 
-    // Try local filesystem first
+    // Try DB first
     try {
-      const dirEntries = await readdir(targetDir, { withFileTypes: true });
-      entries = await Promise.all(
-        dirEntries
-          .filter(e => !e.name.startsWith('.'))
-          .map(async (e) => {
-            const entryPath = subpath ? `${subpath}/${e.name}` : e.name;
-            const entry: FileTreeEntry = {
-              name: e.name,
-              path: entryPath,
-              type: e.isDirectory() ? 'directory' : 'file',
-            };
-            if (!e.isDirectory()) {
-              try {
-                const s = await stat(path.join(targetDir, e.name));
-                entry.size = s.size;
-              } catch { /* ignore */ }
-            }
-            return entry;
-          })
+      const prefix = subpath ? `${subpath}/` : '';
+      const result = await query<{ file_path: string; file_size: number }>(
+        `SELECT file_path, file_size FROM semo.bot_workspace_files
+         WHERE bot_id = $1 AND file_path LIKE $2`,
+        [botId, `${prefix}%`]
       );
+
+      if (result.rows.length > 0) {
+        // Build tree entries from flat file paths
+        const immediateEntries = new Map<string, { type: 'file' | 'directory'; size?: number }>();
+
+        for (const row of result.rows) {
+          // Get the part after prefix
+          const relative = subpath ? row.file_path.slice(prefix.length) : row.file_path;
+          const parts = relative.split('/');
+
+          if (parts.length === 1) {
+            // Direct child file
+            if (!parts[0].startsWith('.')) {
+              immediateEntries.set(parts[0], { type: 'file', size: row.file_size });
+            }
+          } else if (parts.length > 1) {
+            // Directory (first segment)
+            if (!parts[0].startsWith('.')) {
+              immediateEntries.set(parts[0], { type: 'directory' });
+            }
+          }
+        }
+
+        entries = Array.from(immediateEntries.entries()).map(([name, info]) => ({
+          name,
+          path: subpath ? `${subpath}/${name}` : name,
+          type: info.type,
+          size: info.size,
+        }));
+      } else {
+        // No DB data, fallback to GitHub
+        throw new Error('No data in DB');
+      }
     } catch {
       // Fallback to GitHub API
       try {

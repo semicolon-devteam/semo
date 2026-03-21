@@ -4,17 +4,18 @@ OpenClaw 봇들의 workspace를 GitHub 형상관리하기 위한 디렉토리.
 
 ## 구조
 
-각 봇의 설정파일, 메모리, 스크립트를 관리합니다:
+각 봇의 `openclaw.json` → `agents.defaults.workspace`가 이 디렉토리를 직접 참조합니다.
+심링크 없이 설정 기반으로 연결됩니다.
 
-| 봇 | OpenClaw 홈 | symlink 원본 |
+| 봇 | OpenClaw 홈 | workspace 경로 (이 디렉토리) |
 |---|---|---|
-| semiclaw | `~/.openclaw` | `~/.openclaw/workspace` → 여기 `semiclaw/` |
-| workclaw | `~/.openclaw-workclaw` | workspace → `workclaw/` |
-| planclaw | `~/.openclaw-planclaw` | workspace → `planclaw/` |
-| reviewclaw | `~/.openclaw-reviewclaw` | workspace → `reviewclaw/` |
-| designclaw | `~/.openclaw-designclaw` | workspace → `designclaw/` |
-| growthclaw | `~/.openclaw-growthclaw` | workspace → `growthclaw/` |
-| infraclaw | `~/.openclaw-infraclaw` | workspace → `infraclaw/` |
+| semiclaw | `~/.openclaw` + `~/.openclaw-semiclaw` | `semiclaw/` |
+| workclaw | `~/.openclaw-workclaw` | `workclaw/` |
+| planclaw | `~/.openclaw-planclaw` | `planclaw/` |
+| reviewclaw | `~/.openclaw-reviewclaw` | `reviewclaw/` |
+| designclaw | `~/.openclaw-designclaw` | `designclaw/` |
+| growthclaw | `~/.openclaw-growthclaw` | `growthclaw/` |
+| infraclaw | `~/.openclaw-infraclaw` | `infraclaw/` |
 
 ## 관리 대상 파일
 
@@ -37,8 +38,10 @@ bot-workspaces/workclaw/skills/
 
 ## 동기화
 
-각 봇의 `~/.openclaw-{bot}/workspace`는 이 디렉토리의 해당 봇 폴더로 symlink됩니다.
-봇이 workspace에 파일을 쓰면 자동으로 이 레포에 반영됩니다.
+봇의 `openclaw.json`에서 이 디렉토리를 직접 참조하므로, 봇이 workspace에 파일을 쓰면 자동으로 이 레포에 반영됩니다.
+
+sync-agent가 1분 주기로 이 디렉토리의 파일을 Core DB(`semo.bot_workspace_files`)에 업로드합니다.
+Dashboard는 DB에서 읽으므로 로컬 FS 접근 없이도 봇 파일을 조회할 수 있습니다.
 
 ### 수동 동기화
 ```bash

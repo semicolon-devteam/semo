@@ -12,8 +12,13 @@ Bot OpenClaw files              SEMO Dashboard
 Sync Agent (cron)              PostgreSQL (appdb)
 - sessions.json    →           - bot_status
 - cron/jobs.json   →           - bot_sessions
-                               - bot_cron_jobs
+- workspace files  →           - bot_cron_jobs
+  (via openclaw.json)          - bot_workspace_files
 ```
+
+Workspace files are collected by reading each bot's `openclaw.json` → `agents.defaults.workspace`
+to find the git repo path, then recursively scanning for `.md`, `.ts`, `.json`, `.txt`, `.yaml` files.
+SHA-256 hash-based change detection ensures only modified files are uploaded.
 
 ## Setup
 
@@ -97,9 +102,10 @@ Edit `config.js`:
 ## Files
 
 - `sync.js` - Main entry point
-- `lib/collector.js` - Data collection from OpenClaw directories
+- `lib/collector.js` - Bot status data collection from OpenClaw directories
+- `lib/workspace-collector.js` - Workspace file collection (reads openclaw.json for paths)
 - `lib/parser.js` - Parse sessions.json and jobs.json
-- `lib/uploader.js` - Upload to PostgreSQL
+- `lib/uploader.js` - Upload to PostgreSQL (bot data + workspace files)
 - `config.js` - Configuration
 - `schema.sql` - Database schema
 

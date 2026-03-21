@@ -7,7 +7,8 @@
  */
 
 const { collectAllBots } = require('./lib/collector');
-const { uploadToDatabase } = require('./lib/uploader');
+const { uploadToDatabase, uploadWorkspaceFiles } = require('./lib/uploader');
+const { collectAllWorkspaceFiles } = require('./lib/workspace-collector');
 
 async function main() {
   const startTime = Date.now();
@@ -25,7 +26,18 @@ async function main() {
     
     // 2. Upload to database
     await uploadToDatabase(botDataList);
-    
+
+    // 3. Collect and upload workspace files
+    try {
+      const workspaceData = await collectAllWorkspaceFiles();
+      console.log(`[Sync Agent] Collected workspace files for ${workspaceData.length} bots`);
+      if (workspaceData.length > 0) {
+        await uploadWorkspaceFiles(workspaceData);
+      }
+    } catch (wsError) {
+      console.error(`[Sync Agent] Workspace file sync error (non-fatal):`, wsError.message);
+    }
+
     const elapsed = Date.now() - startTime;
     console.log(`[Sync Agent] Completed in ${elapsed}ms`);
   } catch (error) {

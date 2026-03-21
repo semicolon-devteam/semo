@@ -2,8 +2,6 @@ import { NextResponse } from 'next/server';
 import { getFileContent, getBotWorkspaces } from '@/lib/github';
 import { query } from '@/lib/db';
 import type { Bot } from '@/types';
-import { readdir, readFile } from 'fs/promises';
-import path from 'path';
 
 // Force dynamic rendering to prevent build-time DB connection
 export const dynamic = 'force-dynamic';
@@ -42,19 +40,11 @@ async function parseBotMetadata(botId: string): Promise<{ name: string; emoji: s
   }
 }
 
-async function fallbackToLocal(): Promise<Bot[]> {
-  // Resolve bot-workspaces relative to project root
-  const workspacesDir = path.resolve(process.cwd(), '../../semo-system/bot-workspaces');
-  const entries = await readdir(workspacesDir, { withFileTypes: true });
-  const botIds = entries.filter(e => e.isDirectory()).map(e => e.name);
-
+async function fallbackToGitHub(): Promise<Bot[]> {
+  const botIds = await getBotWorkspaces();
   return Promise.all(
     botIds.map(async (botId): Promise<Bot> => {
-      let identity = '';
-      try {
-        identity = await readFile(path.join(workspacesDir, botId, 'IDENTITY.md'), 'utf-8');
-      } catch { /* no IDENTITY.md */ }
-      const { name, emoji, role } = parseIdentityContent(identity, botId);
+      const { name, emoji, role } = await parseBotMetadata(botId);
       return {
         id: botId,
         name,
@@ -67,30 +57,6 @@ async function fallbackToLocal(): Promise<Bot[]> {
       };
     })
   );
-}
-
-async function fallbackToGitHub(): Promise<Bot[]> {
-  try {
-    const botIds = await getBotWorkspaces();
-    return Promise.all(
-      botIds.map(async (botId): Promise<Bot> => {
-        const { name, emoji, role } = await parseBotMetadata(botId);
-        return {
-          id: botId,
-          name,
-          emoji,
-          role,
-          status: 'offline',
-          lastActive: new Date(0).toISOString(),
-          sessionCount: 0,
-          workspacePath: `semo-system/bot-workspaces/${botId}`,
-        };
-      })
-    );
-  } catch (githubError) {
-    console.warn('GitHub API unavailable, falling back to local filesystem:', (githubError as Error).message);
-    return fallbackToLocal();
-  }
 }
 
 export async function GET() {

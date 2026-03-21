@@ -5,6 +5,17 @@ const execAsync = promisify(exec);
 
 const BOT_ID = "reviewclaw";
 
+function getWorkspacePath(botId: string): string {
+  const HOME = require("os").homedir();
+  try {
+    const cfgPath = require("path").join(HOME, `.openclaw-${botId}`, "openclaw.json");
+    const cfg = JSON.parse(require("fs").readFileSync(cfgPath, "utf-8"));
+    return cfg?.agents?.defaults?.workspace || `${HOME}/.openclaw-${botId}/workspace`;
+  } catch {
+    return `${HOME}/.openclaw-${botId}/workspace`;
+  }
+}
+
 const handler = async (event: any) => {
   if (event.type !== "command") return;
 
@@ -23,7 +34,7 @@ const handler = async (event: any) => {
 
   const stdinData = JSON.stringify(event);
   const HOME = require("os").homedir();
-  const memDir = `${HOME}/.openclaw-${BOT_ID}/workspace/memory`;
+  const memDir = `${getWorkspacePath(BOT_ID)}/memory`;
 
   try {
     const { stdout } = await execAsync(

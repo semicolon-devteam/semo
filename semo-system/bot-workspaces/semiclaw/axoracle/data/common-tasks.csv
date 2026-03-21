@@ -1,0 +1,51 @@
+name_en,name_kr,description,time_percentage,ai_replacement_rate,category
+Requirements Analysis,요구사항 분석,Analyzing and documenting user needs and business requirements,12,65,Planning
+User Research,사용자 조사,Conducting interviews and surveys to understand user behavior,10,50,Planning
+Roadmap Planning,로드맵 작성,Creating product roadmaps and prioritizing features,8,55,Planning
+Data Analysis,데이터 분석,Analyzing data to extract insights and inform decisions,15,70,Planning
+Market Research,시장 조사,Researching market trends and competitive landscape,8,60,Planning
+Stakeholder Management,이해관계자 관리,Coordinating with stakeholders and managing expectations,12,45,Communication
+UI/UX Design,UI/UX 디자인,Creating user interfaces and user experience flows,25,75,Design
+Prototyping,프로토타이핑,Building interactive prototypes for testing,15,80,Design
+Design System Management,디자인 시스템 관리,Maintaining design systems and component libraries,10,65,Design
+User Testing,사용자 테스트,Conducting usability tests and gathering feedback,12,55,Design
+Visual Design,비주얼 디자인,Creating graphics and visual assets,20,85,Design
+Wireframing,와이어프레임 작성,Creating low-fidelity layouts and structures,10,70,Design
+Interaction Design,인터랙션 디자인,Designing user interactions and micro-interactions,15,65,Design
+Coding/Implementation,코딩/구현,Writing code to implement features and functionality,40,88,Development
+Debugging,디버깅,Identifying and fixing bugs in code,15,75,Development
+Code Review,코드 리뷰,Reviewing team members' code for quality and standards,10,60,Development
+Refactoring,리팩토링,Improving code structure without changing functionality,12,70,Development
+Test Writing,테스트 작성,Writing unit tests and integration tests,15,80,Development
+API Development,API 개발,Designing and implementing REST/GraphQL APIs,20,82,Development
+Database Design,데이터베이스 설계,Designing database schemas and relationships,12,65,Development
+Frontend Integration,프론트엔드 통합,Integrating frontend with backend APIs,15,75,Development
+Performance Optimization,성능 최적화,Optimizing code and queries for better performance,10,60,Development
+Version Control,버전 관리,Using Git for code versioning and collaboration,8,50,Development
+Package Management,패키지 관리,Managing dependencies and package versions,6,70,Development
+Deployment,배포,Deploying applications to production environments,8,75,Operations
+Monitoring,모니터링,Setting up and monitoring application health,10,70,Operations
+Infrastructure Setup,인프라 설정,Setting up servers and cloud infrastructure,12,72,Operations
+CI/CD Configuration,CI/CD 구성,Configuring continuous integration and deployment pipelines,10,75,Operations
+Log Analysis,로그 분석,Analyzing logs to troubleshoot issues,8,68,Operations
+Incident Response,장애 대응,Responding to and resolving production incidents,15,50,Operations
+Capacity Planning,용량 계획,Planning infrastructure capacity and scaling,8,60,Operations
+Backup Management,백업 관리,Managing data backups and disaster recovery,6,70,Operations
+Container Management,컨테이너 관리,Managing Docker containers and Kubernetes clusters,12,68,Operations
+Security Audit,보안 감사,Conducting security audits and vulnerability assessments,15,62,Security
+Penetration Testing,모의 해킹,Testing systems for security vulnerabilities,18,55,Security
+Security Monitoring,보안 모니터링,Monitoring systems for security threats,12,72,Security
+Access Control,접근 제어,Managing user permissions and access controls,8,65,Security
+Compliance Management,컴플라이언스 관리,Ensuring compliance with security standards,10,58,Security
+Documentation,문서 작성,Writing technical documentation and guides,12,75,Communication
+Meeting Facilitation,회의 진행,Facilitating team meetings and discussions,10,35,Communication
+Presentation,프레젠테이션,Presenting ideas and results to stakeholders,8,40,Communication
+Technical Writing,기술 문서 작성,Writing technical specifications and proposals,10,72,Communication
+Knowledge Sharing,지식 공유,Sharing knowledge through workshops and training,8,45,Communication
+Sprint Planning,스프린트 계획,Planning sprint goals and task allocation,6,50,Planning
+Code Architecture,코드 아키텍처,Designing software architecture and system design,15,58,Development
+Technology Research,기술 조사,Researching new technologies and tools,10,55,Planning
+Load Testing,부하 테스트,Testing system performance under load,12,70,Development
+Automated Testing,자동화 테스트,Setting up automated testing frameworks,15,78,Development
+Data Migration,데이터 마이그레이션,Migrating data between systems or databases,10,68,Operations
+Incident Postmortem,장애 리뷰,Conducting postmortem analysis of incidents,6,52,Operations

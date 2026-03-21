@@ -3,9 +3,9 @@
  */
 
 /**
- * Get bot workspace path
+ * Get bot workspace path (GitHub API path format)
  * @param botId Bot identifier
- * @returns Full workspace path
+ * @returns GitHub path for bot workspace
  */
 export function getBotWorkspacePath(botId: string): string {
   return `semo-system/bot-workspaces/${botId}`;

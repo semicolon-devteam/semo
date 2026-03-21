@@ -14,16 +14,15 @@ Things like:
 - Anything environment-specific
 
 ## 봇 OpenClaw 홈 디렉토리
-| 봇 | 홈 디렉토리 |
-|---|---|
-| SemiClaw (메인) | `~/.openclaw` |
-| SemiClaw (심링크) | `~/.openclaw-semiclaw` |
-| WorkClaw | `~/.openclaw-workclaw` |
-| PlanClaw | `~/.openclaw-planclaw` |
-| ReviewClaw | `~/.openclaw-reviewclaw` |
-| DesignClaw | `~/.openclaw-designclaw` |
-| GrowthClaw | `~/.openclaw-growthclaw` |
-| InfraClaw | `~/.openclaw-infraclaw` |
+| 봇 | 홈 디렉토리 | workspace (git repo 직접 참조) |
+|---|---|---|
+| SemiClaw | `~/.openclaw` + `~/.openclaw-semiclaw` | `semo-system/bot-workspaces/semiclaw` |
+| WorkClaw | `~/.openclaw-workclaw` | `semo-system/bot-workspaces/workclaw` |
+| PlanClaw | `~/.openclaw-planclaw` | `semo-system/bot-workspaces/planclaw` |
+| ReviewClaw | `~/.openclaw-reviewclaw` | `semo-system/bot-workspaces/reviewclaw` |
+| DesignClaw | `~/.openclaw-designclaw` | `semo-system/bot-workspaces/designclaw` |
+| GrowthClaw | `~/.openclaw-growthclaw` | `semo-system/bot-workspaces/growthclaw` |
+| InfraClaw | `~/.openclaw-infraclaw` | `semo-system/bot-workspaces/infraclaw` |
 
 ## 소스코드 경로
 - Semicolon 프로젝트 루트: `/Users/reus/Desktop/Sources/semicolon`
@@ -58,7 +57,7 @@ Add whatever helps you do your job. This is your cheat sheet.
 
 ### KB (Knowledge Base) CLI
 - 터널: `bash scripts/kb-tunnel.sh start` (15432 → 10.0.0.91:5432)
-- CLI: `cd /Users/reus/Desktop/Sources/semicolon/projects/semo && NODE_PATH=./node_modules node ~/.openclaw/workspace/scripts/kb-cli.js <cmd> [args]`
+- CLI: `cd /Users/reus/Desktop/Sources/semicolon/projects/semo && NODE_PATH=./node_modules node semo-system/bot-workspaces/semiclaw/scripts/kb-cli.js <cmd> [args]`
 - 검색: `search "질문" [limit]` | 조회: `get <domain> <key>` | 목록: `list [domain]`
 - 봇별: `bot-search/bot-get/bot-list/bot-upsert <bot_id> ...`
 - 상세: `scripts/KB-USAGE.md`

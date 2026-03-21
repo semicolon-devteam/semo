@@ -7,7 +7,7 @@
 ## 사전 조건
 SSH 터널이 열려 있어야 함:
 ```bash
-bash ~/.openclaw/workspace/scripts/kb-tunnel.sh start
+bash semo-system/bot-workspaces/semiclaw/scripts/kb-tunnel.sh start
 ```
 
 ## CLI 사용법
@@ -15,7 +15,7 @@ bash ~/.openclaw/workspace/scripts/kb-tunnel.sh start
 모든 명령은 다음 형태:
 ```bash
 cd /Users/reus/Desktop/Sources/semicolon/projects/semo && \
-  NODE_PATH=./node_modules node ~/.openclaw/workspace/scripts/kb-cli.js <command> [args...]
+  NODE_PATH=./node_modules node semo-system/bot-workspaces/semiclaw/scripts/kb-cli.js <command> [args...]
 ```
 
 ### 공통 KB (knowledge_base)

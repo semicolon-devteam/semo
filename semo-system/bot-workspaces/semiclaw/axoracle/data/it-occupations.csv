@@ -1,0 +1,91 @@
+name_en,name_local,country,average_salary
+Product Manager,프로덕트 매니저,KR,75000000
+Product Manager,Product Manager,US,140000
+Product Manager,プロダクトマネージャー,JP,9000000
+Product Owner,프로덕트 오너,KR,70000000
+Product Owner,Product Owner,US,130000
+Product Owner,プロダクトオーナー,JP,8500000
+Business Analyst,비즈니스 분석가,KR,60000000
+Business Analyst,Business Analyst,US,95000
+Business Analyst,ビジネスアナリスト,JP,7000000
+Technical Planner,기획자,KR,55000000
+Technical Planner,Technical Planner,US,85000
+Technical Planner,企画者,JP,6500000
+Product Designer,프로덕트 디자이너,KR,65000000
+Product Designer,Product Designer,US,110000
+Product Designer,プロダクトデザイナー,JP,7500000
+UI/UX Designer,UI/UX 디자이너,KR,58000000
+UI/UX Designer,UI/UX Designer,US,100000
+UI/UX Designer,UI/UXデザイナー,JP,7000000
+Graphic Designer,그래픽 디자이너,KR,48000000
+Graphic Designer,Graphic Designer,US,65000
+Graphic Designer,グラフィックデザイナー,JP,5500000
+Interaction Designer,인터랙션 디자이너,KR,62000000
+Interaction Designer,Interaction Designer,US,105000
+Interaction Designer,インタラクションデザイナー,JP,7200000
+Frontend Developer,프론트엔드 개발자,KR,65000000
+Frontend Developer,Frontend Developer,US,120000
+Frontend Developer,フロントエンド開発者,JP,8000000
+Web Publisher,웹 퍼블리셔,KR,45000000
+Web Publisher,Web Publisher,US,70000
+Web Publisher,ウェブパブリッシャー,JP,5000000
+Mobile Developer (iOS),iOS 개발자,KR,70000000
+Mobile Developer (iOS),iOS Developer,US,135000
+Mobile Developer (iOS),iOSデベロッパー,JP,8500000
+Mobile Developer (Android),안드로이드 개발자,KR,68000000
+Mobile Developer (Android),Android Developer,US,130000
+Mobile Developer (Android),Androidデベロッパー,JP,8200000
+Backend Developer,백엔드 개발자,KR,70000000
+Backend Developer,Backend Developer,US,130000
+Backend Developer,バックエンド開発者,JP,8500000
+API Developer,API 개발자,KR,72000000
+API Developer,API Developer,US,135000
+API Developer,API開発者,JP,8700000
+Microservices Developer,마이크로서비스 개발자,KR,80000000
+Microservices Developer,Microservices Developer,US,145000
+Microservices Developer,マイクロサービス開発者,JP,9500000
+Fullstack Developer,풀스택 개발자,KR,75000000
+Fullstack Developer,Fullstack Developer,US,140000
+Fullstack Developer,フルスタック開発者,JP,9000000
+QA Engineer,QA 엔지니어,KR,55000000
+QA Engineer,QA Engineer,US,90000
+QA Engineer,QAエンジニア,JP,6500000
+Test Automation Engineer,테스트 자동화 엔지니어,KR,65000000
+Test Automation Engineer,Test Automation Engineer,US,110000
+Test Automation Engineer,テスト自動化エンジニア,JP,7500000
+Software Architect,소프트웨어 아키텍트,KR,95000000
+Software Architect,Software Architect,US,165000
+Software Architect,ソフトウェアアーキテクト,JP,11000000
+Solutions Architect,솔루션 아키텍트,KR,98000000
+Solutions Architect,Solutions Architect,US,170000
+Solutions Architect,ソリューションアーキテクト,JP,11500000
+Infrastructure Engineer,인프라 엔지니어,KR,68000000
+Infrastructure Engineer,Infrastructure Engineer,US,125000
+Infrastructure Engineer,インフラエンジニア,JP,8000000
+DevOps Engineer,DevOps 엔지니어,KR,75000000
+DevOps Engineer,DevOps Engineer,US,140000
+DevOps Engineer,DevOpsエンジニア,JP,9000000
+Site Reliability Engineer (SRE),SRE,KR,85000000
+Site Reliability Engineer (SRE),Site Reliability Engineer,US,155000
+Site Reliability Engineer (SRE),SRE,JP,10000000
+Cloud Engineer,클라우드 엔지니어,KR,78000000
+Cloud Engineer,Cloud Engineer,US,145000
+Cloud Engineer,クラウドエンジニア,JP,9200000
+Data Engineer,데이터 엔지니어,KR,75000000
+Data Engineer,Data Engineer,US,135000
+Data Engineer,データエンジニア,JP,8800000
+Data Analyst,데이터 분석가,KR,60000000
+Data Analyst,Data Analyst,US,100000
+Data Analyst,データアナリスト,JP,7000000
+ML Engineer,ML 엔지니어,KR,90000000
+ML Engineer,ML Engineer,US,160000
+ML Engineer,MLエンジニア,JP,10500000
+Database Administrator (DBA),DBA,KR,68000000
+Database Administrator (DBA),Database Administrator,US,120000
+Database Administrator (DBA),データベース管理者,JP,8000000
+Security Engineer,보안 엔지니어,KR,80000000
+Security Engineer,Security Engineer,US,145000
+Security Engineer,セキュリティエンジニア,JP,9500000
+Security Analyst,보안 분석가,KR,70000000
+Security Analyst,Security Analyst,US,125000
+Security Analyst,セキュリティアナリスト,JP,8200000

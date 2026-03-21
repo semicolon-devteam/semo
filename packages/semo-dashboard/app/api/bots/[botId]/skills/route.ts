@@ -1,10 +1,6 @@
 import { NextResponse } from 'next/server';
-import { readdirSync, existsSync } from 'fs';
-import path from 'path';
 import { query } from '@/lib/db';
 import type { BotSkill } from '@/types';
-
-const WORKSPACES_DIR = path.resolve(process.cwd(), '../../semo-system/bot-workspaces');
 
 interface SkillRow {
   name: string;
@@ -25,22 +21,30 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid bot ID' }, { status: 400 });
     }
 
-    // 1. Scan workspace skills
+    // 1. Scan workspace skills from DB (bot_workspace_files)
     const wsSkills = new Map<string, { hasReferences: boolean }>();
-    const skillsDir = path.join(WORKSPACES_DIR, botId, 'skills');
-    if (existsSync(skillsDir)) {
-      const entries = readdirSync(skillsDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        if (entry.name.endsWith('.skill')) continue;
-        const skillMdPath = path.join(skillsDir, entry.name, 'SKILL.md');
-        if (!existsSync(skillMdPath)) continue;
-        const hasReferences = existsSync(path.join(skillsDir, entry.name, 'references'));
-        wsSkills.set(entry.name, { hasReferences });
+    try {
+      const wsResult = await query<{ file_path: string }>(
+        `SELECT file_path FROM semo.bot_workspace_files
+         WHERE bot_id = $1 AND file_path LIKE 'skills/%'`,
+        [botId]
+      );
+      for (const row of wsResult.rows) {
+        const parts = row.file_path.split('/');
+        // skills/{skillName}/SKILL.md
+        if (parts.length >= 3 && parts[2] === 'SKILL.md') {
+          const skillName = parts[1];
+          const hasReferences = wsResult.rows.some(r =>
+            r.file_path.startsWith(`skills/${skillName}/references/`)
+          );
+          wsSkills.set(skillName, { hasReferences });
+        }
       }
+    } catch {
+      // DB unavailable for workspace files
     }
 
-    // 2. Query DB
+    // 2. Query skill_definitions DB
     const dbSkills = new Map<string, SkillRow>();
     try {
       const result = await query<SkillRow>(

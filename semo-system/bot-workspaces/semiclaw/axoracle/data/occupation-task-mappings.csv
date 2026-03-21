@@ -1,0 +1,284 @@
+occupation_name_en,task_name_en
+Product Manager,Requirements Analysis
+Product Manager,User Research
+Product Manager,Roadmap Planning
+Product Manager,Data Analysis
+Product Manager,Market Research
+Product Manager,Stakeholder Management
+Product Manager,Documentation
+Product Manager,Meeting Facilitation
+Product Manager,Presentation
+Product Manager,Sprint Planning
+Product Owner,Requirements Analysis
+Product Owner,User Research
+Product Owner,Roadmap Planning
+Product Owner,Data Analysis
+Product Owner,Stakeholder Management
+Product Owner,Documentation
+Product Owner,Meeting Facilitation
+Product Owner,Sprint Planning
+Product Owner,User Testing
+Business Analyst,Requirements Analysis
+Business Analyst,User Research
+Business Analyst,Data Analysis
+Business Analyst,Market Research
+Business Analyst,Stakeholder Management
+Business Analyst,Documentation
+Business Analyst,Technical Writing
+Business Analyst,Presentation
+Technical Planner,Requirements Analysis
+Technical Planner,Roadmap Planning
+Technical Planner,Data Analysis
+Technical Planner,Technology Research
+Technical Planner,Documentation
+Technical Planner,Technical Writing
+Technical Planner,Code Architecture
+Technical Planner,Sprint Planning
+Product Designer,Requirements Analysis
+Product Designer,User Research
+Product Designer,UI/UX Design
+Product Designer,Prototyping
+Product Designer,User Testing
+Product Designer,Wireframing
+Product Designer,Interaction Design
+Product Designer,Design System Management
+Product Designer,Presentation
+UI/UX Designer,UI/UX Design
+UI/UX Designer,Prototyping
+UI/UX Designer,Design System Management
+UI/UX Designer,User Testing
+UI/UX Designer,Visual Design
+UI/UX Designer,Wireframing
+UI/UX Designer,Interaction Design
+UI/UX Designer,Documentation
+Graphic Designer,Visual Design
+Graphic Designer,UI/UX Design
+Graphic Designer,Design System Management
+Graphic Designer,Prototyping
+Graphic Designer,Documentation
+Interaction Designer,UI/UX Design
+Interaction Designer,Prototyping
+Interaction Designer,Interaction Design
+Interaction Designer,User Testing
+Interaction Designer,Wireframing
+Interaction Designer,Design System Management
+Interaction Designer,Documentation
+Frontend Developer,Coding/Implementation
+Frontend Developer,Debugging
+Frontend Developer,Code Review
+Frontend Developer,Refactoring
+Frontend Developer,Test Writing
+Frontend Developer,Frontend Integration
+Frontend Developer,Performance Optimization
+Frontend Developer,Version Control
+Frontend Developer,UI/UX Design
+Frontend Developer,Package Management
+Frontend Developer,Documentation
+Web Publisher,Coding/Implementation
+Web Publisher,Frontend Integration
+Web Publisher,UI/UX Design
+Web Publisher,Version Control
+Web Publisher,Package Management
+Web Publisher,Documentation
+Web Publisher,Performance Optimization
+Mobile Developer (iOS),Coding/Implementation
+Mobile Developer (iOS),Debugging
+Mobile Developer (iOS),Code Review
+Mobile Developer (iOS),Refactoring
+Mobile Developer (iOS),Test Writing
+Mobile Developer (iOS),Frontend Integration
+Mobile Developer (iOS),Performance Optimization
+Mobile Developer (iOS),Version Control
+Mobile Developer (iOS),Package Management
+Mobile Developer (iOS),Documentation
+Mobile Developer (Android),Coding/Implementation
+Mobile Developer (Android),Debugging
+Mobile Developer (Android),Code Review
+Mobile Developer (Android),Refactoring
+Mobile Developer (Android),Test Writing
+Mobile Developer (Android),Frontend Integration
+Mobile Developer (Android),Performance Optimization
+Mobile Developer (Android),Version Control
+Mobile Developer (Android),Package Management
+Mobile Developer (Android),Documentation
+Backend Developer,Coding/Implementation
+Backend Developer,Debugging
+Backend Developer,Code Review
+Backend Developer,Refactoring
+Backend Developer,Test Writing
+Backend Developer,API Development
+Backend Developer,Database Design
+Backend Developer,Performance Optimization
+Backend Developer,Version Control
+Backend Developer,Package Management
+Backend Developer,Documentation
+Backend Developer,Technology Research
+API Developer,API Development
+API Developer,Coding/Implementation
+API Developer,Debugging
+API Developer,Code Review
+API Developer,Test Writing
+API Developer,Documentation
+API Developer,Technical Writing
+API Developer,Performance Optimization
+API Developer,Version Control
+API Developer,Database Design
+Microservices Developer,API Development
+Microservices Developer,Coding/Implementation
+Microservices Developer,Debugging
+Microservices Developer,Code Review
+Microservices Developer,Test Writing
+Microservices Developer,Container Management
+Microservices Developer,Monitoring
+Microservices Developer,CI/CD Configuration
+Microservices Developer,Performance Optimization
+Microservices Developer,Version Control
+Microservices Developer,Documentation
+Fullstack Developer,Coding/Implementation
+Fullstack Developer,Debugging
+Fullstack Developer,Code Review
+Fullstack Developer,Refactoring
+Fullstack Developer,Test Writing
+Fullstack Developer,API Development
+Fullstack Developer,Database Design
+Fullstack Developer,Frontend Integration
+Fullstack Developer,Performance Optimization
+Fullstack Developer,Version Control
+Fullstack Developer,Package Management
+Fullstack Developer,UI/UX Design
+Fullstack Developer,Documentation
+QA Engineer,Test Writing
+QA Engineer,Debugging
+QA Engineer,User Testing
+QA Engineer,Documentation
+QA Engineer,Technical Writing
+QA Engineer,Load Testing
+QA Engineer,Automated Testing
+QA Engineer,Meeting Facilitation
+QA Engineer,Incident Response
+Test Automation Engineer,Automated Testing
+Test Automation Engineer,Test Writing
+Test Automation Engineer,Coding/Implementation
+Test Automation Engineer,Debugging
+Test Automation Engineer,Code Review
+Test Automation Engineer,CI/CD Configuration
+Test Automation Engineer,Load Testing
+Test Automation Engineer,Documentation
+Test Automation Engineer,Version Control
+Software Architect,Code Architecture
+Software Architect,Requirements Analysis
+Software Architect,Technology Research
+Software Architect,Database Design
+Software Architect,Code Review
+Software Architect,Documentation
+Software Architect,Technical Writing
+Software Architect,Performance Optimization
+Software Architect,Security Audit
+Software Architect,Stakeholder Management
+Solutions Architect,Code Architecture
+Solutions Architect,Requirements Analysis
+Solutions Architect,Technology Research
+Solutions Architect,Infrastructure Setup
+Solutions Architect,Documentation
+Solutions Architect,Technical Writing
+Solutions Architect,Stakeholder Management
+Solutions Architect,Presentation
+Solutions Architect,Security Audit
+Infrastructure Engineer,Infrastructure Setup
+Infrastructure Engineer,Deployment
+Infrastructure Engineer,Monitoring
+Infrastructure Engineer,CI/CD Configuration
+Infrastructure Engineer,Container Management
+Infrastructure Engineer,Incident Response
+Infrastructure Engineer,Capacity Planning
+Infrastructure Engineer,Backup Management
+Infrastructure Engineer,Documentation
+Infrastructure Engineer,Version Control
+DevOps Engineer,Deployment
+DevOps Engineer,CI/CD Configuration
+DevOps Engineer,Infrastructure Setup
+DevOps Engineer,Monitoring
+DevOps Engineer,Container Management
+DevOps Engineer,Incident Response
+DevOps Engineer,Log Analysis
+DevOps Engineer,Capacity Planning
+DevOps Engineer,Backup Management
+DevOps Engineer,Automated Testing
+DevOps Engineer,Documentation
+DevOps Engineer,Version Control
+Site Reliability Engineer (SRE),Monitoring
+Site Reliability Engineer (SRE),Incident Response
+Site Reliability Engineer (SRE),Capacity Planning
+Site Reliability Engineer (SRE),Performance Optimization
+Site Reliability Engineer (SRE),Deployment
+Site Reliability Engineer (SRE),CI/CD Configuration
+Site Reliability Engineer (SRE),Log Analysis
+Site Reliability Engineer (SRE),Infrastructure Setup
+Site Reliability Engineer (SRE),Incident Postmortem
+Site Reliability Engineer (SRE),Documentation
+Site Reliability Engineer (SRE),Automated Testing
+Cloud Engineer,Infrastructure Setup
+Cloud Engineer,Deployment
+Cloud Engineer,Monitoring
+Cloud Engineer,Capacity Planning
+Cloud Engineer,Container Management
+Cloud Engineer,CI/CD Configuration
+Cloud Engineer,Backup Management
+Cloud Engineer,Security Audit
+Cloud Engineer,Performance Optimization
+Cloud Engineer,Documentation
+Cloud Engineer,Version Control
+Data Engineer,Coding/Implementation
+Data Engineer,Database Design
+Data Engineer,Data Migration
+Data Engineer,Data Analysis
+Data Engineer,Performance Optimization
+Data Engineer,Monitoring
+Data Engineer,Deployment
+Data Engineer,CI/CD Configuration
+Data Engineer,Documentation
+Data Engineer,Version Control
+Data Analyst,Data Analysis
+Data Analyst,Requirements Analysis
+Data Analyst,Market Research
+Data Analyst,Documentation
+Data Analyst,Technical Writing
+Data Analyst,Presentation
+Data Analyst,Stakeholder Management
+ML Engineer,Coding/Implementation
+ML Engineer,Data Analysis
+ML Engineer,Technology Research
+ML Engineer,Performance Optimization
+ML Engineer,Monitoring
+ML Engineer,Deployment
+ML Engineer,Documentation
+ML Engineer,Version Control
+ML Engineer,Test Writing
+ML Engineer,Debugging
+Database Administrator (DBA),Database Design
+Database Administrator (DBA),Data Migration
+Database Administrator (DBA),Backup Management
+Database Administrator (DBA),Monitoring
+Database Administrator (DBA),Performance Optimization
+Database Administrator (DBA),Security Audit
+Database Administrator (DBA),Capacity Planning
+Database Administrator (DBA),Incident Response
+Database Administrator (DBA),Documentation
+Database Administrator (DBA),Access Control
+Security Engineer,Security Audit
+Security Engineer,Penetration Testing
+Security Engineer,Security Monitoring
+Security Engineer,Access Control
+Security Engineer,Compliance Management
+Security Engineer,Incident Response
+Security Engineer,Documentation
+Security Engineer,Technical Writing
+Security Engineer,Code Review
+Security Analyst,Security Audit
+Security Analyst,Security Monitoring
+Security Analyst,Access Control
+Security Analyst,Compliance Management
+Security Analyst,Incident Response
+Security Analyst,Log Analysis
+Security Analyst,Documentation
+Security Analyst,Technical Writing

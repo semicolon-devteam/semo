@@ -1,10 +1,5 @@
 import { NextResponse } from 'next/server';
-import { readFile, writeFile } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
 import { query } from '@/lib/db';
-
-const WORKSPACES_DIR = path.resolve(process.cwd(), '../../semo-system/bot-workspaces');
 
 function validateIds(botId: string, skillName: string): string | null {
   if (!/^[a-zA-Z0-9_-]+$/.test(botId)) return 'Invalid bot ID';
@@ -21,11 +16,19 @@ export async function GET(
     const err = validateIds(botId, skillName);
     if (err) return NextResponse.json({ error: err }, { status: 400 });
 
-    // Read workspace file
+    // Read workspace SKILL.md from DB
     let content: string | null = null;
-    const skillMdPath = path.join(WORKSPACES_DIR, botId, 'skills', skillName, 'SKILL.md');
-    if (existsSync(skillMdPath)) {
-      content = await readFile(skillMdPath, 'utf-8');
+    try {
+      const wsResult = await query<{ content: string }>(
+        `SELECT content FROM semo.bot_workspace_files
+         WHERE bot_id = $1 AND file_path = $2`,
+        [botId, `skills/${skillName}/SKILL.md`]
+      );
+      if (wsResult.rows.length > 0) {
+        content = wsResult.rows[0].content;
+      }
+    } catch {
+      // DB unavailable for workspace files
     }
 
     // Read DB metadata
@@ -75,14 +78,20 @@ export async function PUT(
       return NextResponse.json({ error: 'content is required' }, { status: 400 });
     }
 
-    // Write to workspace
-    const skillMdPath = path.join(WORKSPACES_DIR, botId, 'skills', skillName, 'SKILL.md');
-    if (!skillMdPath.startsWith(path.join(WORKSPACES_DIR, botId))) {
-      return NextResponse.json({ error: 'Invalid path' }, { status: 400 });
+    // Update in bot_workspace_files DB
+    try {
+      await query(
+        `INSERT INTO semo.bot_workspace_files (bot_id, file_path, content, file_size, synced_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (bot_id, file_path) DO UPDATE SET
+           content = EXCLUDED.content, file_size = EXCLUDED.file_size, synced_at = NOW()`,
+        [botId, `skills/${skillName}/SKILL.md`, content, Buffer.byteLength(content, 'utf-8')]
+      );
+    } catch {
+      // workspace DB write failed
     }
-    await writeFile(skillMdPath, content, 'utf-8');
 
-    // Update DB prompt
+    // Update DB prompt in skill_definitions
     const fullName = `${botId}/${skillName}`;
     try {
       await query(
