@@ -42,6 +42,10 @@ export default function KBPage() {
   const [domains, setDomains] = useState<KBDomain[]>([]);
   const [allBotIds, setAllBotIds] = useState<string[]>([]);
 
+  // Tabs
+  type KBTab = 'domains' | 'entries';
+  const [activeTab, setActiveTab] = useState<KBTab>('domains');
+
   // CRUD modal state
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<KBEntry | null>(null);
@@ -288,6 +292,28 @@ export default function KBPage() {
         </div>
       </div>
 
+      {/* Tabs */}
+      <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
+        <nav className="flex gap-6">
+          {([
+            { key: 'domains' as const, label: 'Domains' },
+            { key: 'entries' as const, label: 'Entries' },
+          ]).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`pb-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === key
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
+      </div>
+
       {/* Error */}
       {error && (
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg mb-6 text-sm">
@@ -300,46 +326,129 @@ export default function KBPage() {
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : categories.length === 0 ? (
+      ) : entries.length === 0 ? (
         <div className="text-center py-16 text-gray-500 dark:text-gray-400">
           <p className="text-lg mb-2">No entries found</p>
           <p className="text-sm">Click &quot;+ New Entry&quot; to add the first one.</p>
         </div>
-      ) : committedSearch ? (
-        /* Search Results: grouped by domain with inline entries */
-        <div className="space-y-6">
-          {Array.from(entriesByCategory.entries()).map(([category, catEntries]) => (
-            <div key={category}>
-              {/* Domain Header */}
-              <div className="flex items-center gap-2 mb-3">
-                <span className="text-lg">{getCategoryIcon(category)}</span>
-                <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                  {category}
-                </h2>
-                <span className="text-xs text-gray-400 dark:text-gray-500">
-                  {catEntries.length} {catEntries.length === 1 ? 'result' : 'results'}
-                </span>
-              </div>
-              {/* Entry List */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700/50">
-                {catEntries.map((entry) => (
-                  <div
-                    key={entry.id}
-                    onClick={() => {
-                      setSelectedCategory(category);
-                      handleEntryClick(entry);
-                    }}
-                    className="flex items-start justify-between gap-4 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors first:rounded-t-lg last:rounded-b-lg"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                        {entry.title}
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
-                        {entry.content}
-                      </p>
+      ) : activeTab === 'domains' ? (
+        /* ── Domains Tab ── */
+        committedSearch ? (
+          /* Search Results: grouped by domain with inline entries */
+          <div className="space-y-6">
+            {Array.from(entriesByCategory.entries()).map(([category, catEntries]) => (
+              <div key={category}>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-lg">{getCategoryIcon(category)}</span>
+                  <h2 className="text-base font-semibold text-gray-900 dark:text-white">
+                    {category}
+                  </h2>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">
+                    {catEntries.length} {catEntries.length === 1 ? 'result' : 'results'}
+                  </span>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700/50">
+                  {catEntries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      onClick={() => {
+                        setSelectedCategory(category);
+                        handleEntryClick(entry);
+                      }}
+                      className="flex items-start justify-between gap-4 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors first:rounded-t-lg last:rounded-b-lg"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                          {entry.title}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
+                          {entry.content}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {entry.similarity_pct != null && (
+                          <span
+                            className={`text-xs font-medium px-1.5 py-0.5 rounded ${
+                              entry.similarity_pct >= 70
+                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                : entry.similarity_pct >= 50
+                                  ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                  : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+                            }`}
+                          >
+                            {entry.similarity_pct}%
+                          </span>
+                        )}
+                        {entry.bot_id && (
+                          <span className="text-xs text-gray-400 dark:text-gray-500">
+                            {entry.bot_id}
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* Default: Domain Card Grid */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {categories.map(({ category, count }) => (
+              <DomainCard
+                key={category}
+                domain={{ domain: category, entry_count: count }}
+                icon={getCategoryIcon(category)}
+                onClick={() => handleCategoryClick(category)}
+              />
+            ))}
+          </div>
+        )
+      ) : (
+        /* ── Entries Tab ── */
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Domain</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Key</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">Content</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden sm:table-cell">By</th>
+                {committedSearch && (
+                  <th className="text-right px-4 py-3 font-medium text-gray-500 dark:text-gray-400 w-16">Score</th>
+                )}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+              {entries.map((entry) => (
+                <tr
+                  key={entry.id}
+                  onClick={() => {
+                    setSelectedCategory(entry.category);
+                    handleEntryClick(entry);
+                  }}
+                  className="hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors"
+                >
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                      {getCategoryIcon(entry.category)} {entry.category}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">
+                    <p className="font-medium text-gray-900 dark:text-white truncate max-w-[200px] lg:max-w-[300px]">
+                      {entry.title}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3 hidden md:table-cell">
+                    <p className="text-gray-500 dark:text-gray-400 truncate max-w-[300px]">
+                      {entry.content}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3 hidden sm:table-cell whitespace-nowrap text-gray-400 dark:text-gray-500">
+                    {entry.bot_id || '-'}
+                  </td>
+                  {committedSearch && (
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
                       {entry.similarity_pct != null && (
                         <span
                           className={`text-xs font-medium px-1.5 py-0.5 rounded ${
@@ -353,29 +462,12 @@ export default function KBPage() {
                           {entry.similarity_pct}%
                         </span>
                       )}
-                      {entry.bot_id && (
-                        <span className="text-xs text-gray-400 dark:text-gray-500">
-                          {entry.bot_id}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        /* Default: Domain Card Grid */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {categories.map(({ category, count }) => (
-            <DomainCard
-              key={category}
-              domain={{ domain: category, entry_count: count }}
-              icon={getCategoryIcon(category)}
-              onClick={() => handleCategoryClick(category)}
-            />
-          ))}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
