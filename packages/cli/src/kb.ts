@@ -417,34 +417,67 @@ export async function kbSearch(
     }
 
     // Text search (fallback or hybrid supplement)
+    // Split query into tokens and match ANY token via ILIKE (Korean-friendly)
     if (mode !== "semantic" || results.length === 0) {
+      const tokens = query.split(/\s+/).filter(t => t.length >= 2);
+      const textParams: (string | number)[] = [];
+      let tIdx = 1;
+
+      // Build per-token ILIKE conditions + count matching tokens for scoring
+      const tokenConditions = tokens.map(token => {
+        textParams.push(`%${token}%`);
+        return `(CASE WHEN content ILIKE $${tIdx} OR key ILIKE $${tIdx++} THEN 1 ELSE 0 END)`;
+      });
+
+      // Score = 0.7 base + 0.15 * (matched_tokens / total_tokens), capped at 0.95
+      const matchCountExpr = tokenConditions.length > 0
+        ? tokenConditions.join(" + ")
+        : "0";
+      const scoreExpr = `LEAST(0.95, 0.7 + 0.15 * (${matchCountExpr})::float / ${Math.max(tokens.length, 1)})`;
+
+      // WHERE: any token matches
+      const whereTokens = tokens.map((_, i) => `(content ILIKE $${i + 1} OR key ILIKE $${i + 1})`);
+      const whereClause = whereTokens.length > 0
+        ? whereTokens.join(" OR ")
+        : "FALSE";
+
       let textSql = `
         SELECT domain, key, content, metadata, created_by, version, updated_at::text,
-               0.0 as score
+               ${scoreExpr} as score
         FROM semo.knowledge_base
-        WHERE content ILIKE $1 OR key ILIKE $1
+        WHERE ${whereClause}
       `;
-      const textParams: (string | number)[] = [`%${query}%`];
-      let tIdx = 2;
 
       if (options.domain) {
         textSql += ` AND domain = $${tIdx++}`;
         textParams.push(options.domain);
       }
-      textSql += ` ORDER BY updated_at DESC LIMIT $${tIdx++}`;
+      textSql += ` ORDER BY score DESC, updated_at DESC LIMIT $${tIdx++}`;
       textParams.push(limit);
 
       const textResult = await client.query(textSql, textParams);
 
-      // Merge: deduplicate by domain/key, prefer semantic results
-      const seen = new Set(results.map((r: any) => `${r.domain}/${r.key}`));
+      // Merge: text matches get priority score (0.85) for exact keyword hits
+      // Deduplicate by domain/key; if already in semantic results, boost its score
+      const resultMap = new Map<string, any>();
+      for (const r of results) {
+        resultMap.set(`${r.domain}/${r.key}`, r);
+      }
       for (const row of textResult.rows) {
         const k = `${row.domain}/${row.key}`;
-        if (!seen.has(k)) {
-          results.push(row);
-          seen.add(k);
+        const existing = resultMap.get(k);
+        if (existing) {
+          // Boost: semantic match + text match = highest relevance
+          existing.score = Math.max(Number(existing.score), 0.85);
+        } else {
+          resultMap.set(k, row);
         }
       }
+
+      // Sort by score descending
+      results = Array.from(resultMap.values()).sort(
+        (a: any, b: any) => Number(b.score) - Number(a.score)
+      );
     }
 
     return results.slice(0, limit);

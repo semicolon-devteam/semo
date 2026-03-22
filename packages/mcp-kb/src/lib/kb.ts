@@ -468,3 +468,62 @@ export async function kbDigest(
     client.release();
   }
 }
+
+// ============================================================
+// Query Logging
+// ============================================================
+
+const RESPONSE_MAX_LENGTH = 2000;
+
+export async function logQuery(
+  pool: Pool,
+  entry: {
+    bot_id: string;
+    query: string;
+    response?: string;
+    user_id?: string;
+    user_name?: string;
+    channel?: string;
+    channel_id?: string;
+    thread_id?: string;
+    model?: string;
+    latency_ms?: number;
+    token_input?: number;
+    token_output?: number;
+    metadata?: Record<string, unknown>;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const client = await pool.connect();
+  try {
+    const truncatedResponse = entry.response
+      ? entry.response.substring(0, RESPONSE_MAX_LENGTH)
+      : null;
+
+    await client.query(
+      `INSERT INTO semo.bot_query_logs
+         (bot_id, user_id, user_name, channel, channel_id, thread_id,
+          query, response, model, latency_ms, token_input, token_output, metadata)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [
+        entry.bot_id,
+        entry.user_id || 'unknown',
+        entry.user_name || null,
+        entry.channel || null,
+        entry.channel_id || null,
+        entry.thread_id || null,
+        entry.query,
+        truncatedResponse,
+        entry.model || null,
+        entry.latency_ms ?? null,
+        entry.token_input ?? null,
+        entry.token_output ?? null,
+        entry.metadata ? JSON.stringify(entry.metadata) : '{}',
+      ]
+    );
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  } finally {
+    client.release();
+  }
+}

@@ -183,7 +183,7 @@ const FALLBACK_AGENTS: Agent[] = [
 ];
 
 const FALLBACK_PACKAGES: Package[] = [
-  { id: "pkg-cli", name: "semo-cli", display_name: "SEMO CLI", description: "CLI 도구 (컨텍스트 동기화, 봇 관리)", layer: "standard", package_type: "standard", version: "4.1.0", is_active: true, is_required: true, install_order: 10 },
+  { id: "pkg-cli", name: "semo-cli", display_name: "SEMO CLI", description: "CLI 도구 (컨텍스트 동기화, 봇 관리)", layer: "standard", package_type: "standard", version: "4.2.0", is_active: true, is_required: true, install_order: 10 },
   { id: "pkg-dashboard", name: "semo-dashboard", display_name: "SEMO Dashboard", description: "봇 상태/KB 대시보드", layer: "standard", package_type: "standard", version: "0.1.0", is_active: true, is_required: false, install_order: 30 },
 ];
 

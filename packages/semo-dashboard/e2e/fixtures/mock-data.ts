@@ -9,7 +9,7 @@ export const mockBots = [
     status: 'online',
     lastActive: new Date().toISOString(),
     sessionCount: 5,
-    workspacePath: '~/.openclaw/workspace',
+    workspacePath: '~/.openclaw-semiclaw/workspace',
     syncedAt: new Date().toISOString(),
   },
   {

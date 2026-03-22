@@ -1,5 +1,5 @@
 /**
- * MCP KB Server — Tool definitions (7 tools)
+ * MCP KB Server — Tool definitions (8 tools)
  */
 
 export const KB_TOOLS = [
@@ -140,6 +140,30 @@ export const KB_TOOLS = [
         },
       },
       required: ["since"],
+    },
+  },
+  {
+    name: "kb_log_query",
+    description:
+      "봇 쿼리 로그 기록. Slack 사용자 질문과 봇 응답을 bot_query_logs에 저장합니다.\n\nWHEN TO USE: Slack 사용자 질문에 응답한 후 이 도구를 호출하여 로그를 기록하세요. 로깅 실패는 봇 세션에 영향을 주지 않습니다 (fire-and-forget).",
+    inputSchema: {
+      type: "object" as const,
+      properties: {
+        bot_id: { type: "string", description: "봇 ID" },
+        query: { type: "string", description: "사용자 질문 원문" },
+        response: { type: "string", description: "봇 응답 (2000자 초과 시 자동 truncate)" },
+        user_id: { type: "string", description: "Slack user ID" },
+        user_name: { type: "string", description: "Slack 사용자 이름" },
+        channel: { type: "string", description: "Slack 채널 이름" },
+        channel_id: { type: "string", description: "Slack 채널 ID" },
+        thread_id: { type: "string", description: "Slack 스레드 ID" },
+        model: { type: "string", description: "사용 모델명" },
+        latency_ms: { type: "number", description: "응답 지연 (ms)" },
+        token_input: { type: "number", description: "입력 토큰 수" },
+        token_output: { type: "number", description: "출력 토큰 수" },
+        metadata: { type: "object", description: "추가 메타데이터 (JSON)" },
+      },
+      required: ["bot_id", "query"],
     },
   },
 ];

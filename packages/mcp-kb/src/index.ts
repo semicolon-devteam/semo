@@ -27,6 +27,7 @@ import {
   ontoList,
   ontoShow,
   kbDigest,
+  logQuery,
 } from "./lib/kb.js";
 import { KB_TOOLS } from "./tools.js";
 
@@ -35,7 +36,7 @@ import { KB_TOOLS } from "./tools.js";
 // ============================================================
 
 const server = new Server(
-  { name: "semo-kb", version: "1.0.0" },
+  { name: "semo-kb", version: "1.1.0" },
   { capabilities: { tools: {} } }
 );
 
@@ -282,6 +283,41 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      // ── kb_log_query ─────────────────────────────────────────
+      case "kb_log_query": {
+        const bot_id = args?.bot_id as string;
+        const query = args?.query as string;
+        if (!bot_id || !query)
+          throw new Error("bot_id, query 파라미터가 필요합니다");
+
+        const result = await logQuery(pool, {
+          bot_id,
+          query,
+          response: args?.response as string | undefined,
+          user_id: args?.user_id as string | undefined,
+          user_name: args?.user_name as string | undefined,
+          channel: args?.channel as string | undefined,
+          channel_id: args?.channel_id as string | undefined,
+          thread_id: args?.thread_id as string | undefined,
+          model: args?.model as string | undefined,
+          latency_ms: args?.latency_ms as number | undefined,
+          token_input: args?.token_input as number | undefined,
+          token_output: args?.token_output as number | undefined,
+          metadata: args?.metadata as Record<string, unknown> | undefined,
+        });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: result.success
+                ? "query log 기록 완료"
+                : `query log 실패 (무시됨): ${result.error}`,
+            },
+          ],
+        };
+      }
+
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
@@ -305,7 +341,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("[semo-kb] MCP Server v1.0.0 started");
+  console.error("[semo-kb] MCP Server v1.1.0 started");
 }
 
 async function shutdown() {

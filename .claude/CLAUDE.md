@@ -169,7 +169,7 @@ SessionStart 훅과 OpenClaw 게이트웨이 래퍼에서 자동 source됩니다
 
 | 봇 | SoT 경로 | 게이트웨이 포트 |
 |----|----------|----------------|
-| semiclaw | `~/.openclaw/workspace` + `~/.openclaw-semiclaw/workspace` | 18789 |
+| semiclaw | `~/.openclaw-semiclaw/workspace` | 18789 |
 | workclaw | `~/.openclaw-workclaw/workspace` | 18869 |
 | reviewclaw | `~/.openclaw-reviewclaw/workspace` | 18829 |
 | planclaw | `~/.openclaw-planclaw/workspace` | 18809 |
@@ -226,7 +226,7 @@ Core DB: semo.knowledge_base (KB: bot-config/spec/skill 도메인 포함)
 
 ```bash
 # 예: semiclaw의 SOUL.md 읽기
-cat ~/.openclaw/workspace/SOUL.md
+cat ~/.openclaw-semiclaw/workspace/SOUL.md
 
 # 예: workclaw의 스킬 목록
 ls ~/.openclaw-workclaw/workspace/skills/
