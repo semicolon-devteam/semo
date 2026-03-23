@@ -8,21 +8,39 @@ import type { OntologyEntry } from '@/types';
 interface KBDomain {
   domain: string;
   description?: string;
+  service?: string | null;
+  entity_type?: string | null;
   entry_count: number;
 }
 
 const DOMAIN_ICONS: Record<string, string> = {
+  semicolon: '\u{1F3E2}',
   team: '\u{1F465}',
   project: '\u{1F4CB}',
   decision: '\u2696\uFE0F',
   process: '\u{1F504}',
   infra: '\u{1F3D7}\uFE0F',
   kpi: '\u{1F4CA}',
+  milestone: '\u{1F3AF}',
   'session-log': '\u{1F4DD}',
+  'bot-config': '\u2699\uFE0F',
+  spec: '\u{1F4D0}',
+  skill: '\u{1F9E9}',
+  memory: '\u{1F9E0}',
+  service: '\u{1F680}',
 };
 
-function getDomainIcon(domain: string): string {
-  return DOMAIN_ICONS[domain] || '\u{1F4C2}';
+function getDomainIcon(domain: string, entityType?: string | null): string {
+  // Direct match
+  if (DOMAIN_ICONS[domain]) return DOMAIN_ICONS[domain];
+  // Service instances get rocket icon
+  if (entityType === 'service') return DOMAIN_ICONS.service;
+  if (entityType === 'organization') return DOMAIN_ICONS.semicolon;
+  // Check if domain contains a known key (for scoped domains)
+  for (const [key, icon] of Object.entries(DOMAIN_ICONS)) {
+    if (domain.includes(key)) return icon;
+  }
+  return '\u{1F4C2}';
 }
 
 export default function OntologyPage() {
@@ -139,25 +157,64 @@ export default function OntologyPage() {
           <p className="text-lg mb-2">No domains found</p>
           <p className="text-sm">KB domains will appear here once data is available.</p>
         </div>
-      ) : (
-        /* Domain Card Grid */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {domains.map((domain) => (
-            <DomainCard
-              key={domain.domain}
-              domain={domain}
-              icon={getDomainIcon(domain.domain)}
-              onClick={() => handleDomainClick(domain)}
-            />
-          ))}
-        </div>
-      )}
+      ) : (() => {
+        // Group domains by service
+        const globalDomains = domains.filter((d) => !d.service || d.service === '_global');
+        const byService: Record<string, KBDomain[]> = {};
+        for (const d of domains) {
+          if (d.service && d.service !== '_global') {
+            if (!byService[d.service]) byService[d.service] = [];
+            byService[d.service].push(d);
+          }
+        }
+        const serviceEntries = Object.entries(byService).sort(([a], [b]) => a.localeCompare(b));
+
+        return (
+          <div className="space-y-8">
+            {/* Global domains */}
+            {globalDomains.length > 0 && (
+              <div>
+                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">Global</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {globalDomains.map((domain) => (
+                    <DomainCard
+                      key={domain.domain}
+                      domain={domain}
+                      icon={getDomainIcon(domain.domain, domain.entity_type)}
+                      onClick={() => handleDomainClick(domain)}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Service-scoped domains */}
+            {serviceEntries.map(([service, svcDomains]) => (
+              <div key={service}>
+                <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                  Service: {service}
+                </h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {svcDomains.map((domain) => (
+                    <DomainCard
+                      key={domain.domain}
+                      domain={domain}
+                      icon={getDomainIcon(domain.domain, domain.entity_type)}
+                      onClick={() => handleDomainClick(domain)}
+                    />
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Modal */}
       <LayerModal
         open={!!selectedDomain}
         onClose={closeModal}
-        icon={selectedDomain ? getDomainIcon(selectedDomain.domain) : undefined}
+        icon={selectedDomain ? getDomainIcon(selectedDomain.domain, selectedDomain.entity_type) : undefined}
         title={selectedEntry ? selectedEntry.key : selectedDomain?.domain ?? ''}
         subtitle={!selectedEntry ? selectedDomain?.description : undefined}
         showBack={!!selectedEntry}

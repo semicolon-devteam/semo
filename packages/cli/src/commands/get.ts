@@ -63,11 +63,11 @@ export function registerGetCommands(program: Command): void {
   // ── semo get projects ───────────────────────────────────────
   getCmd
     .command("projects")
-    .description("프로젝트 목록 조회 (KB 기반)")
-    .option("--active", "활성 프로젝트만 (metadata.status='active')")
+    .description("서비스 인스턴스 목록 조회 (온톨로지 기반)")
+    .option("--active", "활성 서비스만 (status='active')")
     .option("--format <type>", "출력 형식 (table|json|md)", "table")
     .action(async (options) => {
-      const spinner = ora("프로젝트 조회 중...").start();
+      const spinner = ora("서비스 인스턴스 조회 중...").start();
 
       const connected = await isDbConnected();
       if (!connected) {
@@ -78,33 +78,47 @@ export function registerGetCommands(program: Command): void {
 
       try {
         const pool = getPool();
-        let entries = await kbList(pool, { domain: "project", limit: 100 });
+        const client = await pool.connect();
 
+        // Query service instances from ontology + their status from KB
+        const result = await client.query(`
+          SELECT o.domain, o.description,
+                 ks.content as status,
+                 (SELECT COUNT(*)::int FROM semo.knowledge_base k WHERE k.domain = o.domain) as entry_count,
+                 (SELECT k2.content FROM semo.knowledge_base k2 WHERE k2.domain = o.domain AND k2.key = 'po' LIMIT 1) as po
+          FROM semo.ontology o
+          LEFT JOIN semo.knowledge_base ks ON ks.domain = o.domain AND ks.key = 'status'
+          WHERE o.entity_type = 'service'
+          ORDER BY o.domain
+        `);
+        client.release();
+
+        let rows = result.rows;
         if (options.active) {
-          entries = entries.filter(e => {
-            const meta = e.metadata as Record<string, string> | undefined;
-            return meta?.status === "active";
-          });
+          rows = rows.filter((r: Record<string, string>) => r.status === "active");
         }
 
         spinner.stop();
 
         if (options.format === "json") {
-          console.log(JSON.stringify(entries, null, 2));
+          console.log(JSON.stringify(rows, null, 2));
         } else if (options.format === "md") {
-          for (const e of entries) {
-            console.log(`\n## ${e.key}\n`);
-            console.log(e.content);
+          for (const r of rows) {
+            console.log(`\n## ${r.domain}\n`);
+            console.log(`상태: ${r.status || "-"} | 담당: ${r.po || "-"}`);
+            if (r.description) console.log(r.description);
           }
         } else {
           printTable(
-            ["key", "content", "updated_at"],
-            entries.map(e => [
-              e.key,
-              (e.content || "").substring(0, 60),
-              e.updated_at ? new Date(e.updated_at).toLocaleString("ko-KR") : "-",
+            ["service", "status", "po", "entries", "description"],
+            rows.map((r: Record<string, string>) => [
+              r.domain,
+              r.status || "-",
+              r.po || "-",
+              String(r.entry_count || 0),
+              (r.description || "").substring(0, 40),
             ]),
-            "📁 프로젝트 (KB)"
+            "📁 서비스 인스턴스"
           );
         }
       } catch (err) {

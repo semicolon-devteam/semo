@@ -105,7 +105,18 @@ export interface OntologyDomain {
   schema: Record<string, unknown>;
   description: string | null;
   version: number;
+  service?: string | null;
+  entity_type?: string | null;
+  parent?: string | null;
+  tags?: string[];
   updated_at?: string;
+}
+
+export interface OntologyType {
+  type_key: string;
+  schema: Record<string, unknown>;
+  description: string | null;
+  version: number;
 }
 
 export interface KBStatusInfo {
@@ -342,7 +353,7 @@ export async function kbStatus(pool: Pool): Promise<KBStatusInfo> {
  */
 export async function kbList(
   pool: Pool,
-  options: { domain?: string; limit?: number; offset?: number }
+  options: { domain?: string; service?: string; limit?: number; offset?: number }
 ): Promise<KBEntry[]> {
   const client = await pool.connect();
   const limit = options.limit || 50;
@@ -356,6 +367,13 @@ export async function kbList(
     if (options.domain) {
       query += ` WHERE domain = $${paramIdx++}`;
       params.push(options.domain);
+    } else if (options.service) {
+      // Resolve service to domain list: service name itself + dot-notation domains
+      const serviceDomains = await resolveServiceDomainsLocal(client, options.service);
+      if (serviceDomains.length > 0) {
+        query += ` WHERE domain = ANY($${paramIdx++})`;
+        params.push(serviceDomains as any);
+      }
     }
     query += ` ORDER BY domain, key LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
     params.push(limit, offset);
@@ -373,11 +391,17 @@ export async function kbList(
 export async function kbSearch(
   pool: Pool,
   query: string,
-  options: { domain?: string; limit?: number; mode?: "semantic" | "text" | "hybrid" }
+  options: { domain?: string; service?: string; limit?: number; mode?: "semantic" | "text" | "hybrid" }
 ): Promise<KBEntry[]> {
   const client = await pool.connect();
   const limit = options.limit || 10;
   const mode = options.mode || "hybrid";
+
+  // Resolve service → domain list for filtering
+  let serviceDomains: string[] | null = null;
+  if (options.service && !options.domain) {
+    serviceDomains = await resolveServiceDomainsLocal(client, options.service);
+  }
 
   try {
     let results: KBEntry[] = [];
@@ -402,6 +426,9 @@ export async function kbSearch(
         if (options.domain) {
           sql += ` AND domain = $${paramIdx++}`;
           params.push(options.domain);
+        } else if (serviceDomains && serviceDomains.length > 0) {
+          sql += ` AND domain = ANY($${paramIdx++})`;
+          params.push(serviceDomains as any);
         }
         sql += ` ORDER BY embedding <=> $1::vector LIMIT $${paramIdx++}`;
         params.push(limit);
@@ -451,6 +478,9 @@ export async function kbSearch(
       if (options.domain) {
         textSql += ` AND domain = $${tIdx++}`;
         textParams.push(options.domain);
+      } else if (serviceDomains && serviceDomains.length > 0) {
+        textSql += ` AND domain = ANY($${tIdx++})`;
+        textParams.push(serviceDomains as any);
       }
       textSql += ` ORDER BY score DESC, updated_at DESC LIMIT $${tIdx++}`;
       textParams.push(limit);
@@ -516,8 +546,10 @@ export async function ontoList(pool: Pool): Promise<OntologyDomain[]> {
   const client = await pool.connect();
   try {
     const result = await client.query(`
-      SELECT domain, schema, description, version, updated_at::text
-      FROM semo.ontology ORDER BY domain
+      SELECT domain, schema, description, version,
+             service, entity_type, parent, tags,
+             updated_at::text
+      FROM semo.ontology ORDER BY service NULLS FIRST, domain
     `);
     return result.rows;
   } finally {
@@ -532,12 +564,53 @@ export async function ontoShow(pool: Pool, domain: string): Promise<OntologyDoma
   const client = await pool.connect();
   try {
     const result = await client.query(
-      `SELECT domain, schema, description, version, updated_at::text FROM semo.ontology WHERE domain = $1`,
+      `SELECT domain, schema, description, version,
+              service, entity_type, parent, tags,
+              updated_at::text
+       FROM semo.ontology WHERE domain = $1`,
       [domain]
     );
     return result.rows[0] || null;
   } finally {
     client.release();
+  }
+}
+
+/**
+ * List all ontology types (structural templates)
+ */
+export async function ontoListTypes(pool: Pool): Promise<OntologyType[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(`
+      SELECT type_key, schema, description, version
+      FROM semo.ontology_types ORDER BY type_key
+    `);
+    return result.rows;
+  } catch {
+    return []; // Table may not exist yet (pre-016 migration)
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Resolve a service name to its associated domain list.
+ * Uses ontology.service column + dot-notation domain detection.
+ */
+async function resolveServiceDomainsLocal(client: import("pg").PoolClient, service: string): Promise<string[]> {
+  try {
+    const result = await client.query(
+      `SELECT domain FROM semo.ontology WHERE service = $1
+       UNION
+       SELECT domain FROM semo.ontology WHERE domain LIKE $2
+       UNION
+       SELECT domain FROM semo.ontology WHERE domain = $1`,
+      [service, `${service}.%`]
+    );
+    return result.rows.map((r: { domain: string }) => r.domain);
+  } catch {
+    return [];
   }
 }
 

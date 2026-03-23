@@ -15,7 +15,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { getPool, closeConnection, isDbConnected, getDelegations } from "../database";
 import { syncBotSessions } from "./sessions";
-import { auditBot, auditBotDb, auditBotKb, mergeDbChecks, fixBot, storeAuditResults, formatAuditSlack, BotAuditResult } from "./audit";
+import { auditBot, auditBotFromDb, auditBotDb, auditBotKb, mergeDbChecks, fixBot, storeAuditResults, formatAuditSlack, BotAuditResult } from "./audit";
 import { syncSkillsToDB, scanSkills } from "./skill-sync";
 import { syncCronJobs } from "./context";
 
@@ -65,7 +65,7 @@ interface SeedAgent {
 }
 
 // ============================================================
-// IDENTITY.md parser
+// SOUL.md / IDENTITY.md parser (v2.0: SOUL.md 우선)
 // ============================================================
 
 interface BotIdentity {
@@ -75,7 +75,7 @@ interface BotIdentity {
 }
 
 function parseIdentityMd(content: string): BotIdentity {
-  // P2-2: 대소문자 무시, **Key:**/Key: 양쪽 지원, 100자 초과 시 잘못된 파싱으로 간주
+  // v1 호환: IDENTITY.md 또는 SOUL.md에서 Name/Emoji/Role 파싱
   const nameMatch = content.match(/(?:\*\*)?Name:(?:\*\*)?\s*(.+)/i);
   const emojiMatch = content.match(/(?:\*\*)?Emoji:(?:\*\*)?\s*(\S+)/i);
   const roleMatch = content.match(/(?:\*\*)?(?:Creature|Role|직책):(?:\*\*)?\s*(.+)/i);
@@ -91,6 +91,23 @@ function parseIdentityMd(content: string): BotIdentity {
   };
 }
 
+function parseSoulIdentity(content: string, botId: string): BotIdentity {
+  // v2.0: SOUL.md ## Identity 섹션에서 이름/역할 추출
+  // 첫 줄 "# {name} — SOUL" 패턴 또는 ## Identity 이후 내용
+  const titleMatch = content.match(/^#\s+(.+?)(?:\s*[—–-]\s*SOUL)?$/m);
+  const name = titleMatch ? titleMatch[1].trim() : botId;
+
+  // ## R&R 또는 ## Identity 아래 첫 줄에서 역할 추출
+  const rrMatch = content.match(/##\s*R&R\s*\n+(?:>\s*)?(.+)/i);
+  const role = rrMatch ? rrMatch[1].trim().substring(0, 100) : null;
+
+  // 이모지: 제목이나 첫 줄에서 추출
+  const emojiMatch = content.match(/([\u{1F300}-\u{1FAD6}\u{2600}-\u{27BF}])/u);
+  const emoji = emojiMatch ? emojiMatch[1] : null;
+
+  return { name, emoji, role };
+}
+
 // ============================================================
 // Bot workspace scanner
 // ============================================================
@@ -104,17 +121,16 @@ interface ScannedBot {
   workspacePath: string;
 }
 
-function scanBotWorkspaces(semoSystemDir: string): ScannedBot[] {
-  const workspacesDir = path.join(semoSystemDir, "bot-workspaces");
-  if (!fs.existsSync(workspacesDir)) return [];
+const KNOWN_BOTS = ["semiclaw", "workclaw", "reviewclaw", "planclaw", "designclaw", "infraclaw", "growthclaw"];
 
+function scanBotWorkspaces(_semoSystemDir?: string): ScannedBot[] {
+  const home = process.env.HOME || "/Users/reus";
   const bots: ScannedBot[] = [];
 
-  const entries = fs.readdirSync(workspacesDir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (!entry.isDirectory()) continue;
-    const botId = entry.name;
-    const botDir = path.join(workspacesDir, botId);
+  for (const botId of KNOWN_BOTS) {
+    // v2.0 SoT: ~/.openclaw-{bot}/workspace/
+    const botDir = path.join(home, `.openclaw-${botId}`, "workspace");
+    if (!fs.existsSync(botDir)) continue;
 
     // Most recent file mtime
     let lastActive: Date | null = null;
@@ -125,10 +141,15 @@ function scanBotWorkspaces(semoSystemDir: string): ScannedBot[] {
       }
     } catch { /* skip */ }
 
-    // Parse IDENTITY.md
+    // v2.0: SOUL.md에서 Identity 파싱 (IDENTITY.md fallback)
     let identity: BotIdentity = { name: null, emoji: null, role: null };
+    const soulPath = path.join(botDir, "SOUL.md");
     const identityPath = path.join(botDir, "IDENTITY.md");
-    if (fs.existsSync(identityPath)) {
+    if (fs.existsSync(soulPath)) {
+      try {
+        identity = parseSoulIdentity(fs.readFileSync(soulPath, "utf-8"), botId);
+      } catch { /* skip */ }
+    } else if (fs.existsSync(identityPath)) {
       try {
         identity = parseIdentityMd(fs.readFileSync(identityPath, "utf-8"));
       } catch { /* skip */ }
@@ -438,7 +459,7 @@ export function registerBotsCommands(program: Command): void {
         // Audit piggyback — sync 후 자동 audit 실행
         try {
           console.log(chalk.gray("  → audit 실행 중..."));
-          let auditResults = bots.map(b => auditBot(b.workspacePath, b.botId));
+          let auditResults = await Promise.all(bots.map(b => auditBotFromDb(b.workspacePath, b.botId, pool)));
           // KB 도메인 체크 merge (팀 레벨 — 한 번 조회 후 전체 적용)
           const kbChecks = await auditBotKb(pool);
           auditResults = auditResults.map(r => mergeDbChecks(r, kbChecks));
@@ -483,35 +504,36 @@ export function registerBotsCommands(program: Command): void {
     .option("--format <type>", "출력 형식 (table|json|slack)", "table")
     .option("--fix", "누락 파일/디렉토리 자동 생성")
     .option("--no-db", "DB 저장 건너뛰기")
-    .option("--semo-system <path>", "semo-system 경로 (기본: ./semo-system)")
     .action(async (options) => {
-      const cwd = process.cwd();
-      const semoSystemDir = options.semoSystem
-        ? path.resolve(options.semoSystem)
-        : path.join(cwd, "semo-system");
+      const home = process.env.HOME || "/Users/reus";
 
-      const workspacesDir = path.join(semoSystemDir, "bot-workspaces");
-      if (!fs.existsSync(workspacesDir)) {
-        console.log(chalk.red(`\n❌ bot-workspaces 디렉토리를 찾을 수 없습니다: ${workspacesDir}`));
-        process.exit(1);
+      const spinner = ora("bot-workspaces audit 중... (v2.0 SoT: ~/.openclaw-*/workspace/)").start();
+
+      // v2.0: SoT는 ~/.openclaw-{bot}/workspace/
+      const botEntries: { botId: string; botDir: string }[] = [];
+      for (const botId of KNOWN_BOTS) {
+        const botDir = path.join(home, `.openclaw-${botId}`, "workspace");
+        if (fs.existsSync(botDir)) {
+          botEntries.push({ botId, botDir });
+        }
       }
 
-      const spinner = ora("bot-workspaces audit 중...").start();
-
-      // Scan bot directories
-      const entries = fs.readdirSync(workspacesDir, { withFileTypes: true });
-      const botDirs = entries.filter(e => e.isDirectory());
-
-      if (botDirs.length === 0) {
+      if (botEntries.length === 0) {
         spinner.warn("봇 워크스페이스가 없습니다.");
         return;
       }
 
-      // Run audit
-      const results: BotAuditResult[] = botDirs.map(e => {
-        const botDir = path.join(workspacesDir, e.name);
-        return auditBot(botDir, e.name);
-      });
+      // Run audit — try DB-based rules first, fallback to hardcoded
+      let results: BotAuditResult[];
+      const dbConnected = await isDbConnected();
+      if (dbConnected) {
+        const pool = getPool();
+        results = await Promise.all(
+          botEntries.map(({ botId, botDir }) => auditBotFromDb(botDir, botId, pool))
+        );
+      } else {
+        results = botEntries.map(({ botId, botDir }) => auditBot(botDir, botId));
+      }
 
       spinner.stop();
 
@@ -519,7 +541,7 @@ export function registerBotsCommands(program: Command): void {
       if (options.fix) {
         let totalFixed = 0;
         for (const r of results) {
-          const botDir = path.join(workspacesDir, r.botId);
+          const botDir = path.join(home, `.openclaw-${r.botId}`, "workspace");
           const fixed = fixBot(botDir, r.botId, r.checks);
           if (fixed > 0) {
             console.log(chalk.green(`  ✔ ${r.botId}: ${fixed}개 파일/디렉토리 생성`));
@@ -530,7 +552,7 @@ export function registerBotsCommands(program: Command): void {
           console.log(chalk.green(`\n총 ${totalFixed}개 수정`));
           // Re-audit after fix
           for (let i = 0; i < results.length; i++) {
-            const botDir = path.join(workspacesDir, results[i].botId);
+            const botDir = path.join(home, `.openclaw-${results[i].botId}`, "workspace");
             results[i] = auditBot(botDir, results[i].botId);
           }
         }
@@ -639,11 +661,15 @@ export function registerBotsCommands(program: Command): void {
         for (const botEntry of botEntries) {
           if (!botEntry.isDirectory()) continue;
           const botDir = path.join(workspacesDir, botEntry.name);
+          // v2.0: SOUL.md에서 Identity 파싱 (IDENTITY.md fallback)
+          const soulPath2 = path.join(botDir, "SOUL.md");
           const identityPath = path.join(botDir, "IDENTITY.md");
-          if (!fs.existsSync(identityPath)) continue;
+          if (!fs.existsSync(soulPath2) && !fs.existsSync(identityPath)) continue;
 
           try {
-            const identity = parseIdentityMd(fs.readFileSync(identityPath, "utf-8"));
+            const identity = fs.existsSync(soulPath2)
+              ? parseSoulIdentity(fs.readFileSync(soulPath2, "utf-8"), botEntry.name)
+              : parseIdentityMd(fs.readFileSync(identityPath, "utf-8"));
 
             // persona_prompt = SOUL.md + \n\n---\n\n + AGENTS.md
             const parts: string[] = [];

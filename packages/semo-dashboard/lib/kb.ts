@@ -162,11 +162,12 @@ export async function list(
  */
 export async function listDomains(): Promise<KBDomain[]> {
   const sql = `
-    SELECT o.domain, o.description, COUNT(k.kb_id) as entry_count
+    SELECT o.domain, o.description, o.service, o.entity_type,
+           COUNT(k.kb_id) as entry_count
     FROM semo.ontology o
     LEFT JOIN semo.knowledge_base k ON o.domain = k.domain
-    GROUP BY o.domain, o.description
-    ORDER BY o.domain
+    GROUP BY o.domain, o.description, o.service, o.entity_type
+    ORDER BY o.service NULLS FIRST, o.domain
   `;
   const res = await pool.query(sql);
   return res.rows;

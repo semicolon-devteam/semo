@@ -35,7 +35,9 @@ function resolveMemoryDir(outDir?: string): string {
   return path.join(require("os").homedir(), MEMORY_DIR);
 }
 
+/** @deprecated context push uses legacy flat domains — prefer semo-kb MCP kb_upsert */
 const KB_DOMAIN_MAP: Record<string, string> = {
+  semicolon: "semicolon.md",
   team: "team.md",
   project: "projects.md",
   decision: "decisions.md",

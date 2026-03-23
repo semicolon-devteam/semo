@@ -129,6 +129,7 @@ export interface Agent {
   package: string;
   is_active: boolean;
   install_order: number;
+  metadata?: Record<string, unknown>;
 }
 
 export interface Package {
@@ -312,7 +313,8 @@ export async function getAgents(): Promise<Agent[]> {
     const result = await getPool().query(`
       SELECT id, name, name AS display_name,
              persona_prompt AS content,
-             package, is_active, install_order
+             package, is_active, install_order,
+             metadata
       FROM agent_definitions
       WHERE is_active = true AND office_id IS NULL
       ORDER BY install_order

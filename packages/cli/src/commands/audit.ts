@@ -1,10 +1,15 @@
 /**
- * Bot Workspace Audit — 표준 구조 compliance 감사
+ * Bot Workspace Audit — v2.0 표준 구조 compliance 감사
  *
- * 12가지 체크를 수행하고 점수/등급을 산정한다.
- *   - 파일 9개 (root 7 + memory/slim + skills/)
- *   - KB 3개 (team, process, decision 도메인 존재)
+ * v2.0 규격 기준:
+ *   - 필수 파일: SOUL.md, AGENTS.md (심링크), USER.md, MEMORY.md
+ *   - 필수 디렉토리: .claude/, hooks/, memory/, skills/
+ *   - 레거시 파일 부재 확인: IDENTITY.md, TOOLS.md, RULES.md
+ *   - MEMORY.md slim check (< 30줄)
+ *   - KB 도메인 존재 확인
+ *
  * --fix 옵션으로 누락 파일/디렉토리 자동 생성 가능.
+ * 레거시 파일은 --fix로 생성하지 않음 (v1→v2 전환 완료).
  */
 
 import * as fs from "fs";
@@ -30,7 +35,7 @@ export interface BotAuditResult {
 }
 
 // ============================================================
-// Check definitions
+// Check definitions (v2.0)
 // ============================================================
 
 interface CheckDef {
@@ -48,6 +53,23 @@ function fileExistsCheck(name: string, relativePath: string): CheckDef {
         name,
         passed: exists,
         detail: exists ? `${relativePath} exists` : `${relativePath} missing`,
+      };
+    },
+  };
+}
+
+function fileAbsentCheck(name: string, relativePath: string): CheckDef {
+  return {
+    name,
+    check: (botDir) => {
+      const fullPath = path.join(botDir, relativePath);
+      const exists = fs.existsSync(fullPath);
+      return {
+        name,
+        passed: !exists,
+        detail: exists
+          ? `${relativePath} 레거시 파일 존재 (삭제 필요)`
+          : `${relativePath} 없음 (정상)`,
       };
     },
   };
@@ -80,44 +102,227 @@ function memorySlimCheck(): CheckDef {
         return { name: "memory/slim", passed: true, detail: "MEMORY.md not present (N/A)" };
       }
       const lines = fs.readFileSync(memoryPath, "utf-8").split("\n").length;
-      const passed = lines < 50;
+      const passed = lines <= 30;
       return {
         name: "memory/slim",
         passed,
         detail: passed
-          ? `MEMORY.md is ${lines} lines (< 50)`
-          : `MEMORY.md is ${lines} lines (>= 50, bloated)`,
+          ? `MEMORY.md is ${lines} lines (≤ 30)`
+          : `MEMORY.md is ${lines} lines (> 30, bloated)`,
       };
     },
   };
 }
 
+function symlinkCheck(name: string, relativePath: string, expectedTarget: string): CheckDef {
+  return {
+    name,
+    check: (botDir) => {
+      const fullPath = path.join(botDir, relativePath);
+      if (!fs.existsSync(fullPath)) {
+        return { name, passed: false, detail: `${relativePath} 없음` };
+      }
+      const stats = fs.lstatSync(fullPath);
+      if (!stats.isSymbolicLink()) {
+        return { name, passed: false, detail: `${relativePath} 심링크 아님 (일반 파일)` };
+      }
+      const target = fs.readlinkSync(fullPath);
+      const isCorrect = target === expectedTarget;
+      return {
+        name,
+        passed: isCorrect,
+        detail: isCorrect
+          ? `${relativePath} → ${expectedTarget} (정상)`
+          : `${relativePath} → ${target} (기대: ${expectedTarget})`,
+      };
+    },
+  };
+}
+
+const SHARED_AGENTS_PATH = path.join(
+  process.env.HOME || "/Users/reus",
+  ".openclaw-shared",
+  "AGENTS.md"
+);
+
 const CHECK_DEFS: CheckDef[] = [
-  // 1-7: Root files
+  // v2.0 필수 파일
   fileExistsCheck("root/SOUL.md", "SOUL.md"),
-  fileExistsCheck("root/IDENTITY.md", "IDENTITY.md"),
   fileExistsCheck("root/AGENTS.md", "AGENTS.md"),
+  symlinkCheck("root/AGENTS.md-symlink", "AGENTS.md", SHARED_AGENTS_PATH),
   fileExistsCheck("root/USER.md", "USER.md"),
-  fileExistsCheck("root/TOOLS.md", "TOOLS.md"),
-  fileExistsCheck("root/RULES.md", "RULES.md"),
   fileExistsCheck("root/MEMORY.md", "MEMORY.md"),
-  // 8: Memory slim
-  memorySlimCheck(),
-  // 9: skills/
+  // v2.0 필수 디렉토리
+  dirExistsCheck(".claude/", ".claude"),
+  dirExistsCheck("hooks/", "hooks"),
+  dirExistsCheck("memory/", "memory"),
   dirExistsCheck("skills/", "skills"),
+  // Memory slim
+  memorySlimCheck(),
+  // v2.0 레거시 파일 부재 확인
+  fileAbsentCheck("legacy/IDENTITY.md", "IDENTITY.md"),
+  fileAbsentCheck("legacy/TOOLS.md", "TOOLS.md"),
+  fileAbsentCheck("legacy/RULES.md", "RULES.md"),
 ];
+
+// ============================================================
+// DB-based rule loading
+// ============================================================
+
+interface WorkspaceStandardRow {
+  path_pattern: string;
+  entry_type: string;
+  level: string;
+  severity: string;
+  category: string;
+  bot_scope: string;
+  bot_ids: string[];
+  symlink_target: string | null;
+  content_rules: Record<string, unknown> | null;
+  description: string | null;
+  fix_action: string | null;
+  fix_template: string | null;
+}
+
+function buildChecksFromRow(row: WorkspaceStandardRow): CheckDef[] {
+  const defs: CheckDef[] = [];
+  const name = `${row.category}/${row.path_pattern}`;
+
+  if (row.level === "required") {
+    if (row.entry_type === "symlink") {
+      const target = row.symlink_target?.replace("$HOME", process.env.HOME || "/Users/reus") || "";
+      defs.push(symlinkCheck(`${name}-symlink`, row.path_pattern, target));
+      defs.push(fileExistsCheck(name, row.path_pattern));
+    } else if (row.entry_type === "dir") {
+      const dirPath = row.path_pattern.endsWith("/")
+        ? row.path_pattern.slice(0, -1)
+        : row.path_pattern;
+      defs.push(dirExistsCheck(name, dirPath));
+    } else {
+      defs.push(fileExistsCheck(name, row.path_pattern));
+    }
+  } else if (row.level === "forbidden") {
+    if (row.entry_type === "glob") {
+      // Glob forbidden checks require special handling — skip for basic audit
+      // (covered by hygiene checks in shell scripts)
+    } else {
+      defs.push(fileAbsentCheck(name, row.path_pattern.replace(/\/$/, "")));
+    }
+  }
+
+  // Content rules: line count check
+  if (row.content_rules && typeof row.content_rules === "object") {
+    const rules = row.content_rules as Record<string, unknown>;
+    const maxLines = rules.max_lines as number | undefined;
+    if (maxLines && row.entry_type !== "dir") {
+      defs.push({
+        name: `${name}/lines`,
+        check: (botDir) => {
+          const fullPath = path.join(botDir, row.path_pattern);
+          if (!fs.existsSync(fullPath)) {
+            return { name: `${name}/lines`, passed: true, detail: `${row.path_pattern} not present (N/A)` };
+          }
+          const lines = fs.readFileSync(fullPath, "utf-8").split("\n").length;
+          const passed = lines <= maxLines;
+          return {
+            name: `${name}/lines`,
+            passed,
+            detail: passed
+              ? `${row.path_pattern} is ${lines} lines (≤ ${maxLines})`
+              : `${row.path_pattern} is ${lines} lines (> ${maxLines}, bloated)`,
+          };
+        },
+      });
+    }
+  }
+
+  return defs;
+}
+
+function botMatchesRow(row: WorkspaceStandardRow, botId: string): boolean {
+  if (row.bot_scope === "all") return true;
+  if (row.bot_scope === "include") return row.bot_ids.includes(botId);
+  if (row.bot_scope === "exclude") return !row.bot_ids.includes(botId);
+  return true;
+}
+
+async function loadCheckDefs(pool: Pool): Promise<{ defs: CheckDef[]; rows: WorkspaceStandardRow[] }> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT path_pattern, entry_type, level, severity, category,
+              bot_scope, bot_ids, symlink_target, content_rules,
+              description, fix_action, fix_template
+       FROM semo.bot_workspace_standard
+       WHERE spec_version = '2.0'
+       ORDER BY level, path_pattern`,
+    );
+    const rows: WorkspaceStandardRow[] = result.rows;
+    const defs: CheckDef[] = [];
+    for (const row of rows) {
+      defs.push(...buildChecksFromRow(row));
+    }
+    return { defs, rows };
+  } finally {
+    client.release();
+  }
+}
+
+function buildCheckDefsForBot(
+  allDefs: CheckDef[],
+  allRows: WorkspaceStandardRow[],
+  botId: string,
+): CheckDef[] {
+  // Filter defs based on bot_scope. Map row index to defs.
+  const filtered: CheckDef[] = [];
+  let defIdx = 0;
+  for (const row of allRows) {
+    const rowDefs = buildChecksFromRow(row);
+    if (botMatchesRow(row, botId)) {
+      filtered.push(...rowDefs);
+    }
+    defIdx += rowDefs.length;
+  }
+  return filtered;
+}
 
 // ============================================================
 // Core audit function
 // ============================================================
 
+/** Sync version using fallback CHECK_DEFS (no DB) */
 export function auditBot(botDir: string, botId: string): BotAuditResult {
   const checks = CHECK_DEFS.map((def) => def.check(botDir, botId));
+  return computeRating(botId, checks);
+}
+
+/** Async version using DB-loaded rules */
+export async function auditBotFromDb(
+  botDir: string,
+  botId: string,
+  pool: Pool,
+): Promise<BotAuditResult> {
+  try {
+    const { rows } = await loadCheckDefs(pool);
+    const defs = buildCheckDefsForBot([], rows, botId);
+    if (defs.length === 0) {
+      // Fallback if DB returns nothing
+      return auditBot(botDir, botId);
+    }
+    const checks = defs.map((def) => def.check(botDir, botId));
+    return computeRating(botId, checks);
+  } catch {
+    // Offline fallback
+    return auditBot(botDir, botId);
+  }
+}
+
+function computeRating(botId: string, checks: AuditCheck[]): BotAuditResult {
   const passed = checks.filter((c) => c.passed).length;
   const total = checks.length;
-  const score = Math.round((passed / total) * 100);
+  const score = total > 0 ? Math.round((passed / total) * 100) : 100;
 
-  const memorySlim = checks.find((c) => c.name === "memory/slim");
+  const memorySlim = checks.find((c) => c.name.includes("/lines") && c.name.includes("MEMORY"));
   const isMemorySlim = memorySlim ? memorySlim.passed : true;
 
   let rating: BotAuditResult["rating"];
@@ -133,26 +338,25 @@ export function auditBot(botDir: string, botId: string): BotAuditResult {
 }
 
 // ============================================================
-// Auto-fix
+// Auto-fix (v2.0 — 레거시 파일은 생성하지 않음)
 // ============================================================
 
 const FIXABLE_FILES: Record<string, string> = {
   "root/SOUL.md": "SOUL.md",
-  "root/IDENTITY.md": "IDENTITY.md",
-  "root/AGENTS.md": "AGENTS.md",
   "root/USER.md": "USER.md",
-  "root/TOOLS.md": "TOOLS.md",
-  "root/RULES.md": "RULES.md",
   "root/MEMORY.md": "MEMORY.md",
 };
 
 const FIXABLE_DIRS: Record<string, string> = {
+  ".claude/": ".claude",
+  "hooks/": "hooks",
+  "memory/": "memory",
   "skills/": "skills",
 };
 
 const FILE_TEMPLATES: Record<string, (botId: string) => string> = {
-  "RULES.md": (botId) =>
-    `# RULES.md — ${botId} 행동 규칙\n\n> 공식 표준: kb_get(domain='process', key='bot-workspace-standard')\n\n## NON-NEGOTIABLE\n\n## 행동 원칙\n\n## 금지 사항\n`,
+  "SOUL.md": (botId) =>
+    `# ${botId} — SOUL\n\n## Identity\n\n> TODO\n\n## R&R\n\n> TODO\n\n## KB Lookup Protocol\n\n> kb_get/kb_search로 팀 정보 조회\n\n## Operating Procedures\n\n> TODO\n\n## NON-NEGOTIABLE\n\n1. TODO\n`,
 };
 
 export function fixBot(
@@ -165,7 +369,7 @@ export function fixBot(
   for (const check of checks) {
     if (check.passed) continue;
 
-    // Fix missing files
+    // Fix missing files (v2.0 허용 파일만)
     if (FIXABLE_FILES[check.name]) {
       const relPath = FIXABLE_FILES[check.name];
       const fullPath = path.join(botDir, relPath);
@@ -191,20 +395,42 @@ export function fixBot(
         fixed++;
       }
     }
+
+    // Fix AGENTS.md symlink
+    if (check.name === "root/AGENTS.md" || check.name === "root/AGENTS.md-symlink") {
+      const agentsPath = path.join(botDir, "AGENTS.md");
+      if (fs.existsSync(SHARED_AGENTS_PATH)) {
+        // 기존 일반 파일이면 삭제 후 심링크 생성
+        if (fs.existsSync(agentsPath)) {
+          const stats = fs.lstatSync(agentsPath);
+          if (!stats.isSymbolicLink()) {
+            fs.unlinkSync(agentsPath);
+          } else {
+            const target = fs.readlinkSync(agentsPath);
+            if (target !== SHARED_AGENTS_PATH) {
+              fs.unlinkSync(agentsPath);
+            } else {
+              continue; // 이미 정상 심링크
+            }
+          }
+        }
+        fs.symlinkSync(SHARED_AGENTS_PATH, agentsPath);
+        fixed++;
+      }
+    }
+
+    // 레거시 파일은 --fix로 삭제하지 않음 (수동 확인 필요)
+    // legacy/ 체크는 경고만 표시
   }
 
   return fixed;
 }
 
 // ============================================================
-// DB storage
-// ============================================================
-
-// ============================================================
 // KB domain checks (async, requires pool)
 // ============================================================
 
-const KB_REQUIRED_DOMAINS = ["team", "process", "decision"] as const;
+const KB_REQUIRED_DOMAINS = ["semicolon"] as const;
 
 export async function auditBotKb(
   pool: Pool

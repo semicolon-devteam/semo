@@ -26,8 +26,15 @@ import {
   fetchBotStatus,
   ontoList,
   ontoShow,
+  ontoListTypes,
+  ontoListServices,
+  ontoListInstances,
+  ontoListSchema,
   kbDigest,
   logQuery,
+  workspaceCheck,
+  workspaceList,
+  workspaceRules,
 } from "./lib/kb.js";
 import { KB_TOOLS } from "./tools.js";
 
@@ -36,7 +43,7 @@ import { KB_TOOLS } from "./tools.js";
 // ============================================================
 
 const server = new Server(
-  { name: "semo-kb", version: "1.1.0" },
+  { name: "semo-kb", version: "1.2.0" },
   { capabilities: { tools: {} } }
 );
 
@@ -59,6 +66,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
         const results = await kbSearch(pool, query, {
           domain: args?.domain as string | undefined,
+          service: args?.service as string | undefined,
           limit: (args?.limit as number) || 10,
           mode: (args?.mode as "semantic" | "text" | "hybrid") || "hybrid",
         });
@@ -111,6 +119,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case "kb_list": {
         const entries = await kbList(pool, {
           domain: args?.domain as string | undefined,
+          service: args?.service as string | undefined,
           limit: (args?.limit as number) || 50,
         });
 
@@ -209,44 +218,178 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
       // ── kb_ontology ────────────────────────────────────────
       case "kb_ontology": {
+        const action = (args?.action as string) || "list";
         const domain = args?.domain as string | undefined;
 
-        if (domain) {
-          const onto = await ontoShow(pool, domain);
-          if (!onto) {
+        switch (action) {
+          case "show": {
+            if (!domain) throw new Error("action='show'에는 domain 파라미터가 필요합니다");
+            const onto = await ontoShow(pool, domain);
+            if (!onto) {
+              return {
+                content: [
+                  { type: "text", text: `온톨로지 도메인 없음: ${domain}` },
+                ],
+              };
+            }
             return {
               content: [
-                { type: "text", text: `온톨로지 도메인 없음: ${domain}` },
+                { type: "text", text: JSON.stringify(onto, null, 2) },
               ],
             };
           }
-          return {
-            content: [
-              { type: "text", text: JSON.stringify(onto, null, 2) },
-            ],
-          };
-        }
 
-        const all = await ontoList(pool);
-        return {
-          content: [
-            {
-              type: "text",
-              text: JSON.stringify(
+          case "services": {
+            const services = await ontoListServices(pool);
+            return {
+              content: [
                 {
-                  count: all.length,
-                  domains: all.map((d) => ({
-                    domain: d.domain,
-                    description: d.description,
-                    version: d.version,
-                  })),
+                  type: "text",
+                  text: JSON.stringify(
+                    { count: services.length, services },
+                    null,
+                    2
+                  ),
                 },
-                null,
-                2
-              ),
-            },
-          ],
-        };
+              ],
+            };
+          }
+
+          case "types": {
+            const types = await ontoListTypes(pool);
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      count: types.length,
+                      types: types.map((t) => ({
+                        type_key: t.type_key,
+                        description: t.description,
+                        version: t.version,
+                      })),
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            };
+          }
+
+          case "instances": {
+            const instances = await ontoListInstances(pool);
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      count: instances.length,
+                      instances: instances.map((i) => ({
+                        domain: i.domain,
+                        description: i.description,
+                        scoped_domains: i.scoped_domains,
+                        entry_count: i.entry_count,
+                      })),
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            };
+          }
+
+          case "schema": {
+            const typeKey = args?.type as string;
+            if (!typeKey) throw new Error("action='schema'에는 type 파라미터가 필요합니다");
+            const schemaEntries = await ontoListSchema(pool, typeKey);
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      type: typeKey,
+                      count: schemaEntries.length,
+                      keys: schemaEntries.map((s) => ({
+                        key: s.scheme_key,
+                        description: s.scheme_description,
+                        required: s.required,
+                        hint: s.value_hint,
+                      })),
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            };
+          }
+
+          case "list":
+          default: {
+            // If domain is provided, show that domain's detail (backward compat)
+            if (domain) {
+              const onto = await ontoShow(pool, domain);
+              if (!onto) {
+                return {
+                  content: [
+                    { type: "text", text: `온톨로지 도메인 없음: ${domain}` },
+                  ],
+                };
+              }
+              return {
+                content: [
+                  { type: "text", text: JSON.stringify(onto, null, 2) },
+                ],
+              };
+            }
+
+            const all = await ontoList(pool);
+
+            // Group by service (_global treated as global)
+            const global = all.filter((d) => !d.service || d.service === "_global");
+            const byService: Record<string, typeof all> = {};
+            for (const d of all) {
+              if (d.service && d.service !== "_global") {
+                if (!byService[d.service]) byService[d.service] = [];
+                byService[d.service].push(d);
+              }
+            }
+
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      count: all.length,
+                      global: global.map((d) => ({
+                        domain: d.domain,
+                        entity_type: d.entity_type,
+                        description: d.description,
+                        version: d.version,
+                      })),
+                      services: Object.entries(byService).map(([svc, domains]) => ({
+                        service: svc,
+                        domains: domains.map((d) => ({
+                          domain: d.domain,
+                          entity_type: d.entity_type,
+                          description: d.description,
+                        })),
+                      })),
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            };
+          }
+        }
       }
 
       // ── kb_digest ──────────────────────────────────────────
@@ -318,6 +461,69 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         };
       }
 
+      // ── kb_workspace_standard ──────────────────────────────────
+      case "kb_workspace_standard": {
+        const action = (args?.action as string) || "check";
+
+        switch (action) {
+          case "check": {
+            const pathArg = args?.path as string;
+            if (!pathArg) throw new Error("action='check'에는 path 파라미터가 필요합니다");
+            const result = await workspaceCheck(pool, pathArg, args?.bot_id as string | undefined);
+            return {
+              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+            };
+          }
+
+          case "list": {
+            const rows = await workspaceList(pool, {
+              level: args?.level as string | undefined,
+              category: args?.category as string | undefined,
+            });
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      count: rows.length,
+                      rules: rows.map((r) => ({
+                        path_pattern: r.path_pattern,
+                        entry_type: r.entry_type,
+                        level: r.level,
+                        severity: r.severity,
+                        category: r.category,
+                        bot_scope: r.bot_scope,
+                        description: r.description,
+                      })),
+                    },
+                    null,
+                    2,
+                  ),
+                },
+              ],
+            };
+          }
+
+          case "rules": {
+            const pathArg = args?.path as string;
+            if (!pathArg) throw new Error("action='rules'에는 path 파라미터가 필요합니다");
+            const rules = await workspaceRules(pool, pathArg);
+            if (!rules) {
+              return {
+                content: [{ type: "text", text: `규칙 없음: ${pathArg}` }],
+              };
+            }
+            return {
+              content: [{ type: "text", text: JSON.stringify(rules, null, 2) }],
+            };
+          }
+
+          default:
+            throw new Error(`kb_workspace_standard: 알 수 없는 action '${action}'`);
+        }
+      }
+
       default:
         throw new Error(`Unknown tool: ${name}`);
     }
@@ -341,7 +547,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("[semo-kb] MCP Server v1.1.0 started");
+  console.error("[semo-kb] MCP Server v1.2.0 started");
 }
 
 async function shutdown() {

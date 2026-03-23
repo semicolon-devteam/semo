@@ -96,7 +96,24 @@ export interface OntologyDomain {
   schema: Record<string, unknown>;
   description: string | null;
   version: number;
+  service?: string | null;
+  entity_type?: string | null;
+  parent?: string | null;
+  tags?: string[];
   updated_at?: string;
+}
+
+export interface OntologyType {
+  type_key: string;
+  schema: Record<string, unknown>;
+  description: string | null;
+  version: number;
+}
+
+export interface ServiceInfo {
+  service: string;
+  domain_count: number;
+  domains: string[];
 }
 
 export interface KBDigestEntry {
@@ -133,6 +150,7 @@ export async function kbSearch(
   query: string,
   options: {
     domain?: string;
+    service?: string;
     limit?: number;
     mode?: "semantic" | "text" | "hybrid";
   }
@@ -140,6 +158,13 @@ export async function kbSearch(
   const client = await pool.connect();
   const limit = options.limit || 10;
   const mode = options.mode || "hybrid";
+
+  // Resolve service → domain list for filtering
+  let serviceDomains: string[] | null = null;
+  if (options.service && !options.domain) {
+    const { resolveServiceDomains } = await import("./validate.js");
+    serviceDomains = await resolveServiceDomains(pool, options.service);
+  }
 
   try {
     let results: KBEntry[] = [];
@@ -162,6 +187,9 @@ export async function kbSearch(
         if (options.domain) {
           sql += ` AND domain = $${paramIdx++}`;
           params.push(options.domain);
+        } else if (serviceDomains && serviceDomains.length > 0) {
+          sql += ` AND domain = ANY($${paramIdx++})`;
+          params.push(serviceDomains as any);
         }
         sql += ` ORDER BY embedding <=> $1::vector LIMIT $${paramIdx++}`;
         params.push(limit);
@@ -188,6 +216,9 @@ export async function kbSearch(
       if (options.domain) {
         textSql += ` AND domain = $${tIdx++}`;
         textParams.push(options.domain);
+      } else if (serviceDomains && serviceDomains.length > 0) {
+        textSql += ` AND domain = ANY($${tIdx++})`;
+        textParams.push(serviceDomains as any);
       }
       textSql += ` ORDER BY updated_at DESC LIMIT $${tIdx++}`;
       textParams.push(limit);
@@ -251,10 +282,17 @@ export async function kbGet(
 
 export async function kbList(
   pool: Pool,
-  options: { domain?: string; limit?: number }
+  options: { domain?: string; service?: string; limit?: number }
 ): Promise<KBEntry[]> {
   const client = await pool.connect();
   const limit = options.limit || 50;
+
+  // Resolve service → domain list for filtering
+  let serviceDomains: string[] | null = null;
+  if (options.service && !options.domain) {
+    const { resolveServiceDomains } = await import("./validate.js");
+    serviceDomains = await resolveServiceDomains(pool, options.service);
+  }
 
   try {
     let sql =
@@ -265,6 +303,9 @@ export async function kbList(
     if (options.domain) {
       sql += ` WHERE domain = $${paramIdx++}`;
       params.push(options.domain);
+    } else if (serviceDomains && serviceDomains.length > 0) {
+      sql += ` WHERE domain = ANY($${paramIdx++})`;
+      params.push(serviceDomains as any);
     }
     sql += ` ORDER BY domain, key LIMIT $${paramIdx++}`;
     params.push(limit);
@@ -384,6 +425,30 @@ export async function kbUpsert(
       // validation 에러는 무시
     }
 
+    // Type schema hint: required 키가 해당 도메인에 아직 없으면 힌트
+    try {
+      const onto = await ontoShow(pool, entry.domain);
+      if (onto?.entity_type) {
+        const schema = await ontoListSchema(pool, onto.entity_type);
+        const requiredKeys = schema.filter((s) => s.required).map((s) => s.scheme_key);
+        if (requiredKeys.length > 0) {
+          const existingKeys = await client.query(
+            "SELECT key FROM semo.knowledge_base WHERE domain = $1",
+            [entry.domain],
+          );
+          const existing = new Set(existingKeys.rows.map((r: { key: string }) => r.key));
+          const missing = requiredKeys.filter((k) => !k.includes("{") && !existing.has(k));
+          if (missing.length > 0) {
+            warnings.push(
+              `[hint] '${entry.domain}' (${onto.entity_type}) 도메인에 필수 키 미등록: ${missing.join(", ")}. kb_ontology(action='schema', type='${onto.entity_type}')로 스키마 확인`,
+            );
+          }
+        }
+      }
+    } catch {
+      // type schema 힌트 실패는 무시
+    }
+
     return { success: true, warnings: warnings.length > 0 ? warnings : undefined };
   } catch (err) {
     return { success: false, error: String(err) };
@@ -412,8 +477,10 @@ export async function ontoList(pool: Pool): Promise<OntologyDomain[]> {
   const client = await pool.connect();
   try {
     const result = await client.query(`
-      SELECT domain, schema, description, version, updated_at::text
-      FROM semo.ontology ORDER BY domain
+      SELECT domain, schema, description, version,
+             service, entity_type, parent, tags,
+             updated_at::text
+      FROM semo.ontology ORDER BY service NULLS FIRST, domain
     `);
     return result.rows;
   } finally {
@@ -428,10 +495,113 @@ export async function ontoShow(
   const client = await pool.connect();
   try {
     const result = await client.query(
-      `SELECT domain, schema, description, version, updated_at::text FROM semo.ontology WHERE domain = $1`,
+      `SELECT domain, schema, description, version,
+              service, entity_type, parent, tags,
+              updated_at::text
+       FROM semo.ontology WHERE domain = $1`,
       [domain]
     );
     return result.rows[0] || null;
+  } finally {
+    client.release();
+  }
+}
+
+export async function ontoListTypes(pool: Pool): Promise<OntologyType[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(`
+      SELECT type_key, schema, description, version
+      FROM semo.ontology_types ORDER BY type_key
+    `);
+    return result.rows;
+  } catch {
+    // Table may not exist yet (pre-016 migration)
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+export interface ServiceInstance {
+  domain: string;
+  description: string | null;
+  service: string;
+  tags: string[];
+  scoped_domains: string[];
+  entry_count: number;
+}
+
+export interface TypeSchemaEntry {
+  type_key: string;
+  scheme_key: string;
+  scheme_description: string;
+  required: boolean;
+  value_hint: string | null;
+  sort_order: number;
+}
+
+export async function ontoListInstances(pool: Pool): Promise<ServiceInstance[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(`
+      SELECT o.domain, o.description, o.service, o.tags,
+             COALESCE(
+               (SELECT ARRAY_AGG(o2.domain ORDER BY o2.domain)
+                FROM semo.ontology o2
+                WHERE o2.service = o.service AND o2.domain != o.domain),
+               '{}'
+             ) as scoped_domains,
+             (SELECT COUNT(*)::int FROM semo.knowledge_base k
+              WHERE k.domain = o.domain
+                 OR k.domain LIKE o.service || '.%') as entry_count
+      FROM semo.ontology o
+      WHERE o.entity_type = 'service'
+      ORDER BY o.domain
+    `);
+    return result.rows;
+  } catch {
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+export async function ontoListSchema(
+  pool: Pool,
+  typeKey: string,
+): Promise<TypeSchemaEntry[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT type_key, scheme_key, scheme_description, required, value_hint, sort_order
+       FROM semo.kb_type_schema
+       WHERE type_key = $1
+       ORDER BY sort_order, scheme_key`,
+      [typeKey],
+    );
+    return result.rows;
+  } catch {
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+export async function ontoListServices(pool: Pool): Promise<ServiceInfo[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(`
+      SELECT service, COUNT(*)::int as domain_count,
+             ARRAY_AGG(domain ORDER BY domain) as domains
+      FROM semo.ontology
+      WHERE service IS NOT NULL
+      GROUP BY service
+      ORDER BY service
+    `);
+    return result.rows;
+  } catch {
+    return [];
   } finally {
     client.release();
   }
@@ -467,6 +637,214 @@ export async function kbDigest(
   } finally {
     client.release();
   }
+}
+
+// ============================================================
+// Workspace Standard
+// ============================================================
+
+export interface WorkspaceStandardRow {
+  id: number;
+  path_pattern: string;
+  entry_type: string;
+  level: string;
+  severity: string;
+  category: string;
+  bot_scope: string;
+  bot_ids: string[];
+  symlink_target: string | null;
+  content_rules: Record<string, unknown> | null;
+  description: string | null;
+  fix_action: string | null;
+  fix_template: string | null;
+  spec_version: string;
+}
+
+export interface WorkspaceCheckResult {
+  path: string;
+  allowed: boolean;
+  level: string;
+  severity: string;
+  category: string;
+  reason: string;
+  content_rules?: Record<string, unknown> | null;
+}
+
+// In-memory cache (5-min TTL)
+let _wsCache: { rows: WorkspaceStandardRow[]; ts: number } | null = null;
+const WS_CACHE_TTL = 5 * 60 * 1000;
+
+async function loadStandards(pool: Pool): Promise<WorkspaceStandardRow[]> {
+  if (_wsCache && Date.now() - _wsCache.ts < WS_CACHE_TTL) return _wsCache.rows;
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT id, path_pattern, entry_type, level, severity, category,
+              bot_scope, bot_ids, symlink_target, content_rules,
+              description, fix_action, fix_template, spec_version
+       FROM semo.bot_workspace_standard
+       WHERE spec_version = '2.0'
+       ORDER BY level, path_pattern`,
+    );
+    _wsCache = { rows: result.rows, ts: Date.now() };
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
+function matchesBot(row: WorkspaceStandardRow, botId?: string): boolean {
+  if (row.bot_scope === "all") return true;
+  if (!botId) return row.bot_scope !== "include"; // if no botId, include-only rules don't apply
+  if (row.bot_scope === "include") return row.bot_ids.includes(botId);
+  if (row.bot_scope === "exclude") return !row.bot_ids.includes(botId);
+  return true;
+}
+
+function matchesPath(pattern: string, entryType: string, inputPath: string): boolean {
+  // Exact match
+  if (pattern === inputPath) return true;
+
+  // Directory: "memory/" matches "memory/2026-03-23.md"
+  if (entryType === "dir" && pattern.endsWith("/") && inputPath.startsWith(pattern)) return true;
+  // Also match "memory" (without slash) as dir
+  if (entryType === "dir" && !pattern.endsWith("/") && inputPath.startsWith(pattern + "/")) return true;
+
+  // Glob patterns
+  if (entryType === "glob" || pattern.includes("*")) {
+    // "*.ovpn" → match "foo.ovpn"
+    if (pattern.startsWith("*.")) {
+      const ext = pattern.slice(1); // ".ovpn"
+      if (inputPath.endsWith(ext)) return true;
+    }
+    // "*/.git" → match "repo/.git"
+    if (pattern.startsWith("*/")) {
+      const suffix = pattern.slice(2);
+      if (inputPath.endsWith("/" + suffix) || inputPath === suffix) return true;
+    }
+    // "*.tmp" → match "foo.tmp"
+    if (pattern.startsWith("*.")) {
+      const ext = pattern.slice(1);
+      if (inputPath.endsWith(ext)) return true;
+    }
+    // Simple name glob match (e.g., "node_modules" matches "node_modules" or "node_modules/...")
+    if (!pattern.includes("/") && !pattern.includes("*")) {
+      if (inputPath === pattern || inputPath.startsWith(pattern + "/")) return true;
+    }
+  }
+
+  return false;
+}
+
+export async function workspaceCheck(
+  pool: Pool,
+  inputPath: string,
+  botId?: string,
+): Promise<WorkspaceCheckResult> {
+  const standards = await loadStandards(pool);
+
+  // 1. Exact match or pattern match
+  for (const row of standards) {
+    if (!matchesBot(row, botId)) continue;
+    if (!matchesPath(row.path_pattern, row.entry_type, inputPath)) continue;
+
+    if (row.level === "forbidden") {
+      return {
+        path: inputPath,
+        allowed: false,
+        level: row.level,
+        severity: row.severity,
+        category: row.category,
+        reason: row.description || `금지된 경로: ${row.path_pattern}`,
+      };
+    }
+
+    return {
+      path: inputPath,
+      allowed: true,
+      level: row.level,
+      severity: row.severity,
+      category: row.category,
+      reason: row.description || `허용됨: ${row.path_pattern}`,
+      content_rules: row.content_rules,
+    };
+  }
+
+  // 2. Parent directory match — file inside an allowed dir
+  for (const row of standards) {
+    if (!matchesBot(row, botId)) continue;
+    if (row.entry_type !== "dir") continue;
+    const dirPattern = row.path_pattern.endsWith("/")
+      ? row.path_pattern
+      : row.path_pattern + "/";
+    if (inputPath.startsWith(dirPattern)) {
+      if (row.level === "forbidden") {
+        return {
+          path: inputPath,
+          allowed: false,
+          level: "forbidden",
+          severity: row.severity,
+          category: row.category,
+          reason: `금지된 디렉토리 내부: ${row.path_pattern}`,
+        };
+      }
+      return {
+        path: inputPath,
+        allowed: true,
+        level: row.level,
+        severity: "warn",
+        category: row.category,
+        reason: `${row.path_pattern} 디렉토리 내부 — 허용`,
+      };
+    }
+  }
+
+  // 3. Unmatched root file → forbidden
+  return {
+    path: inputPath,
+    allowed: false,
+    level: "forbidden",
+    severity: "warn",
+    category: "hygiene",
+    reason: "비표준 루트 파일 — memory/ 또는 scripts/에 저장할 것",
+  };
+}
+
+export async function workspaceList(
+  pool: Pool,
+  options: { level?: string; category?: string },
+): Promise<WorkspaceStandardRow[]> {
+  const standards = await loadStandards(pool);
+  let filtered = standards;
+  if (options.level) {
+    filtered = filtered.filter((r) => r.level === options.level);
+  }
+  if (options.category) {
+    filtered = filtered.filter((r) => r.category === options.category);
+  }
+  return filtered;
+}
+
+export async function workspaceRules(
+  pool: Pool,
+  inputPath: string,
+): Promise<{ path_pattern: string; content_rules: Record<string, unknown> | null; description: string | null } | null> {
+  const standards = await loadStandards(pool);
+  for (const row of standards) {
+    if (row.path_pattern === inputPath || matchesPath(row.path_pattern, row.entry_type, inputPath)) {
+      return {
+        path_pattern: row.path_pattern,
+        content_rules: row.content_rules,
+        description: row.description,
+      };
+    }
+  }
+  return null;
+}
+
+// For audit.ts — load all standards from DB
+export async function loadWorkspaceStandards(pool: Pool): Promise<WorkspaceStandardRow[]> {
+  return loadStandards(pool);
 }
 
 // ============================================================

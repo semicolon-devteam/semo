@@ -30,12 +30,12 @@ KB 데이터는 **semo-kb MCP 서버**를 통해 Core DB에서 실시간 조회�
 
 | MCP 도구 | 설명 |
 |----------|------|
-| `kb_search` | 벡터+텍스트 하이브리드 검색 (query, domain?, limit?, mode?) |
+| `kb_search` | 벡터+텍스트 하이브리드 검색 (query, domain?, service?, limit?, mode?) |
 | `kb_get` | domain+key 정확 조회 |
-| `kb_list` | 도메인별 엔트리 목록 |
+| `kb_list` | 도메인별 엔트리 목록 (domain?, service?, limit?) |
 | `kb_upsert` | KB 항목 쓰기 (OpenAI 임베딩 자동 생성) |
 | `kb_bot_status` | 봇 상태 테이블 조회 |
-| `kb_ontology` | 온톨로지 스키마 조회 |
+| `kb_ontology` | 온톨로지 조회 (action: list/show/services/types/instances/schema) |
 | `kb_digest` | 봇 구독 도메인 변경 다이제스트 |
 
 `semo context sync`는 스킬/에이전트/커맨드 글로벌 캐시 + 크론잡만 동기화합니다.
@@ -48,15 +48,26 @@ KB 데이터는 **semo-kb MCP 서버**를 통해 Core DB에서 실시간 조회�
 
 ### 읽기 (Query-First)
 다음 주제 질문 → **반드시 kb_search/kb_get으로 KB 먼저 조회** 후 답변:
-- 팀원 정보 → `domain: team`
-- 프로젝트 현황 → `domain: project`
-- 의사결정 기록 → `domain: decision`
-- 업무 프로세스 → `domain: process`
-- 인프라 구성 → `domain: infra`
-- KPI → `domain: kpi`
-- 봇 설정/규격 → `domain: bot-config` (key: `{botId}/{identity|agents|rules|tools|...}`)
-- 스펙/설계 문서 → `domain: spec`
-- 스킬 정의 → `domain: skill` (key: `{botId}/{skillName}`)
+- 팀원 정보 → `domain: semicolon`, key: `team/{name}`
+- 프로젝트/서비스 현황 → `kb_ontology(action='instances')` 또는 `domain: {serviceName}`
+- 의사결정 기록 → `domain: semicolon`, key: `decision/{date}/{slug}`
+- 업무 프로세스 → `domain: semicolon`, key: `process/{name}`
+- 인프라 구성 → `domain: semicolon`, key: `infra/{name}`
+- 서비스 KPI → `domain: {serviceName}`, key: `kpi/current`
+- 봇 설정 → `domain: semicolon`, key: `bot-config/{botId}/{type}`
+- 스펙/설계 문서 → `domain: semicolon`, key: `spec/{name}`
+- 스킬 정의 → `domain: semicolon`, key: `skill/{botId}/{skillName}`
+- 메모리 (L2) → `domain: semicolon`, key: `memory/{sourceId}/{YYYY-MM-DD}`
+- 서비스 스코프 전체 검색 → `service: {serviceName}` 파라미터
+
+#### 도메인 구조
+| 패턴 | 예시 | 용도 |
+|------|------|------|
+| `semicolon` | `semicolon` | 조직 도메인 — team/decision/process/infra/bot-config/skill/spec/memory/session-log 하위 키 |
+| `{service}` | `axoracle`, `jungchipan` | 서비스 인스턴스 — base_information/status/po/kpi/milestone 하위 키 |
+
+#### KB Sidekick 에이전트
+KB 조회가 복잡하거나 여러 도메인에 걸친 검색이 필요할 때, `kb-sidekick` 서브 에이전트에 위임할 수 있다. Haiku 모델 기반 경량 에이전트.
 
 **금지:** 위 주제를 자체 지식/세션 기억만으로 답변하는 것.
 KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하겠습니다."
@@ -191,28 +202,32 @@ Core DB: semo.knowledge_base (KB: bot-config/spec/skill 도메인 포함)
 봇/사용자가 직접 쓰기
 ```
 
-### 봇 워크스페이스 파일 구조 (KB 전환 후)
+### 봇 워크스페이스 파일 구조 (v2.0, 2026-03-23)
 
-**로컬에 남는 파일 (세션 부트 + 런타임 실행):**
 ```
 ~/.openclaw-{bot}/workspace/
-├── SOUL.md              # 세션 부트 (첫 번째로 읽음)
-├── USER.md              # 세션 부트
-├── MEMORY.md            # 세션 부트 (main 세션만)
+├── SOUL.md              # 봇 고유: 페르소나 + R&R + 행동강령 (< 120줄)
+├── AGENTS.md            # 공통: → ~/.openclaw-shared/AGENTS.md (심링크)
+├── USER.md              # 봇 고유: 사용자 컨텍스트 (< 15줄)
+├── MEMORY.md            # 봇 고유: KB 도메인 인덱스 (< 30줄, main 세션만)
+├── HEARTBEAT.md         # 선택: 크론 작업 (해당 봇만, 현재 semiclaw)
 ├── .claude/settings.json # MCP 서버 설정
 ├── hooks/               # OpenClaw 훅 (직접 실행)
-├── memory/
-│   └── 2026-*.md        # 일일 로그 (세션 부트 + 쓰기)
-├── skills/*/scripts/    # 스킬 스크립트 (직접 실행)
-└── scripts/             # 유틸리티 스크립트 (직접 실행)
+├── memory/              # 일일로그 (YYYY-MM-DD.md)
+├── shared/              # → ~/.openclaw-shared/ (심링크)
+├── skills/              # 봇 전용 스킬
+└── scripts/             # 유틸리티 스크립트
 ```
 
-**KB로 전환된 파일:**
-- `IDENTITY.md`, `AGENTS.md`, `RULES.md`, `TOOLS.md`, `HEARTBEAT.md`, `BOOTSTRAP.md`, `CLAUDE.md` → `bot-config/{botId}/*`
-- `memory/{team,decisions,process,infra,...}.md` → 기존 KB 도메인
-- `skills/*/SKILL.md`, `skills/*/references/` → `skill/{botId}/{skillName}`
-- 스펙/설계 문서 → `spec/*`
-- `bot-team/` 프로토콜 → `process/*`
+**제거된 파일 (v1 → v2):**
+- `IDENTITY.md` → SOUL.md `## Identity` 섹션으로 흡수
+- `RULES.md` → SOUL.md `## NON-NEGOTIABLE` 섹션으로 통합
+- `TOOLS.md` → KB lookup 지시로 대체 (봇 ID, 채널 ID → KB 조회)
+- `CLAUDE.md` (봇 내) → 프로젝트 .claude/CLAUDE.md에 이미 존재
+
+**봇 ID/채널 ID 조회:**
+- `kb_get("semicolon", "team/bot-ids")` — 봇 Slack ID 매핑
+- `kb_get("semicolon", "team/slack-channels")` — 채널 ID 매핑
 
 ### 봇 설정 파일
 
@@ -255,4 +270,7 @@ semo doctor              # 환경 진단 (DB 연결, 설치 상태)
 semo config db           # DB URL 재설정
 semo context sync        # 스킬/에이전트/캐시 동기화 (KB는 MCP 사용)
 semo bots status         # 봇 상태 조회
+semo memory sync         # L1(bot workspace) → L2(KB) 메모리 동기화
+semo onto types          # 온톨로지 타입 목록
+semo onto list --service # 서비스별 도메인 목록
 ```

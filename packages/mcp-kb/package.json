@@ -1,6 +1,6 @@
 {
   "name": "@team-semicolon/semo-mcp-kb",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "SEMO KB MCP Server — Knowledge Base 실시간 벡터 검색",
   "main": "dist/index.js",
   "scripts": {

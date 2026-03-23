@@ -178,6 +178,18 @@ export async function syncGlobalCache(
       content += `\n\n## 위임 매트릭스\n${delegationLines}\n`;
     }
 
+    // metadata에 model/description이 있으면 YAML frontmatter 주입
+    if (agent.metadata && (agent.metadata.model || agent.metadata.description)) {
+      const hasFrontmatter = content.trimStart().startsWith('---');
+      if (!hasFrontmatter) {
+        const fm = ['---'];
+        if (agent.metadata.description) fm.push(`description: "${agent.metadata.description}"`);
+        if (agent.metadata.model) fm.push(`model: "${agent.metadata.model}"`);
+        fm.push('---', '');
+        content = fm.join('\n') + content;
+      }
+    }
+
     fs.writeFileSync(path.join(agentFolder, `${agent.name}.md`), content);
   }
 
