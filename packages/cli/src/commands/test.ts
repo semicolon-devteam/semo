@@ -15,11 +15,16 @@ import { spawn } from "child_process";
 import { randomUUID } from "crypto";
 import * as path from "path";
 import * as os from "os";
+import { Pool } from "pg";
 import { getPool, closeConnection } from "../database";
 import {
   sendSlackNotification,
   formatTestFailureMessage,
 } from "../slack-notify";
+import {
+  runDeclarativeWorkspaceAudit,
+  TestOutputLine as DeclarativeOutput,
+} from "../test-runners/workspace-audit";
 
 // ============================================================
 // Types
@@ -30,9 +35,10 @@ interface TestSuite {
   name: string;
   layer: string;
   runner_type: string;
-  runner_path: string;
+  runner_path: string | null;
   schedule: string | null;
   enabled: boolean;
+  rule_source: string | null;
 }
 
 interface TestRunSummary {
@@ -121,7 +127,13 @@ async function executeTestSuite(
     [runId, suite.suite_id, triggeredBy, startedAt.toISOString()]
   );
 
-  const resolvedPath = resolveRunnerPath(suite.runner_path);
+  // ── Declarative runner: DB에서 규칙 로드 → 동적 TC 생성 ──
+  if (suite.runner_type === "declarative") {
+    return executeDeclarativeSuite(pool, suite, runId);
+  }
+
+  // ── Script runner: 외부 프로세스 spawn ──
+  const resolvedPath = resolveRunnerPath(suite.runner_path || "");
   const cases: TestOutputLine[] = [];
   let pass = 0;
   let fail = 0;
@@ -245,6 +257,77 @@ async function executeTestSuite(
       resolve({ runId, suiteId: suite.suite_id, status, pass, fail, warn, failedLabels });
     });
   });
+}
+
+// ============================================================
+// Declarative Runner
+// ============================================================
+
+async function executeDeclarativeSuite(
+  pool: Pool,
+  suite: TestSuite,
+  runId: string
+): Promise<RunResult> {
+  let outputs: DeclarativeOutput[] = [];
+
+  // Dispatch by rule_source
+  if (suite.rule_source === "bot_workspace_standard") {
+    outputs = await runDeclarativeWorkspaceAudit(pool);
+  } else {
+    return {
+      runId,
+      suiteId: suite.suite_id,
+      status: "error",
+      pass: 0,
+      fail: 0,
+      warn: 0,
+      failedLabels: [`unknown rule_source: ${suite.rule_source}`],
+    };
+  }
+
+  let pass = 0;
+  let fail = 0;
+  let warn = 0;
+  const failedLabels: string[] = [];
+
+  for (const o of outputs) {
+    if (o.type === "summary") {
+      pass = (o as any).pass ?? pass;
+      fail = (o as any).fail ?? fail;
+      warn = (o as any).warn ?? warn;
+      continue;
+    }
+    if (o.type !== "case") continue;
+
+    // Record to DB
+    await pool.query(
+      `INSERT INTO semo.test_results (run_id, case_id, suite_id, label, status, detail)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        runId,
+        o.id || o.label || "unknown",
+        suite.suite_id,
+        o.label || o.id || "unknown",
+        o.status || "skip",
+        o.detail || null,
+      ]
+    );
+
+    if (o.status === "fail") failedLabels.push(o.label || "");
+  }
+
+  const status = fail > 0 ? "failed" : "passed";
+  const summary = `${pass} passed, ${fail} failed, ${warn} warn`;
+
+  await pool.query(
+    `UPDATE semo.test_runs
+     SET finished_at = NOW(), total_pass = $1, total_fail = $2, total_warn = $3,
+         status = $4, summary = $5
+     WHERE run_id = $6`,
+    [pass, fail, warn, status, summary, runId]
+  );
+
+  return { runId, suiteId: suite.suite_id, status, pass, fail, warn, failedLabels };
 }
 
 // ============================================================
