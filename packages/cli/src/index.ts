@@ -40,6 +40,8 @@ import { registerBotsCommands } from "./commands/bots";
 import { registerGetCommands } from "./commands/get";
 import { registerSessionsCommands } from "./commands/sessions";
 import { registerDbCommands } from "./commands/db";
+import { registerMemoryCommands } from "./commands/memory";
+import { registerTestCommands } from "./commands/test";
 import { syncGlobalCache } from "./global-cache";
 
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
@@ -861,10 +863,18 @@ program
     // 4. Hooks 설치 (프로젝트 무관)
     await setupHooks(false);
 
-    // 5. MCP 설정 (글로벌)
+    // 5. MCP 설정 (글로벌 공통 서버)
     if (!options.skipMcp) {
       await setupMCP(os.homedir(), [], options.force || false);
     }
+
+    // 6. semo-kb MCP 유저레벨 등록
+    if (!options.skipMcp) {
+      await setupSemoKbMcp();
+    }
+
+    // 7. 글로벌 CLAUDE.md에 KB-First 규칙 주입
+    await injectKbFirstToGlobalClaudeMd();
 
     await closeConnection();
 
@@ -877,6 +887,7 @@ program
     console.log(chalk.gray("  ~/.claude/commands/      팀 커맨드 (DB 기반)"));
     console.log(chalk.gray("  ~/.claude/agents/        팀 에이전트 (DB 기반, dedup)"));
     console.log(chalk.gray("  ~/.claude/settings.local.json  SessionStart/Stop 훅"));
+    console.log(chalk.gray("  ~/.claude/settings.json  semo-kb MCP (유저레벨, KB-First SoT)"));
 
     console.log(chalk.cyan("\n다음 단계:"));
     console.log(chalk.gray("  프로젝트 디렉토리에서 'semo init'을 실행하세요."));
@@ -1549,6 +1560,106 @@ function registerMCPServer(server: MCPServerConfig): { success: boolean; skipped
   }
 }
 
+// === 글로벌 CLAUDE.md에 KB-First 규칙 주입 ===
+const KB_FIRST_SECTION_MARKER = "## SEMO KB-First 행동 규칙";
+
+async function injectKbFirstToGlobalClaudeMd() {
+  const globalClaudeMd = path.join(os.homedir(), ".claude", "CLAUDE.md");
+
+  const kbFirstBlock = `
+${KB_FIRST_SECTION_MARKER}
+
+> semo-kb MCP 서버가 유저레벨에 등록되어 있습니다. KB는 팀의 Single Source of Truth입니다.
+
+### 읽기 (Query-First)
+다음 주제 질문 → **반드시 kb_search/kb_get으로 KB 먼저 조회** 후 답변:
+- 팀원 정보 → \`domain: team\`
+- 프로젝트 현황 → \`domain: project\`
+- 의사결정 기록 → \`domain: decision\`
+- 업무 프로세스 → \`domain: process\`
+- 인프라 구성 → \`domain: infra\`
+- KPI → \`domain: kpi\`
+
+**금지:** 위 주제를 자체 지식/세션 기억만으로 답변하는 것.
+KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하겠습니다."
+
+### 쓰기 (Write-Back)
+사용자가 팀 정보를 정정/추가/변경하면, 의사결정이 내려지면 → **반드시 kb_upsert로 KB에 즉시 기록.**
+**금지:** "알겠습니다/기억하겠습니다"만 하고 KB에 쓰지 않는 것.
+`;
+
+  if (fs.existsSync(globalClaudeMd)) {
+    const content = fs.readFileSync(globalClaudeMd, "utf-8");
+    if (content.includes(KB_FIRST_SECTION_MARKER)) {
+      // 기존 섹션 교체
+      const regex = new RegExp(
+        `\\n${KB_FIRST_SECTION_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?(?=\\n## |$)`,
+        "m"
+      );
+      const updated = content.replace(regex, kbFirstBlock);
+      fs.writeFileSync(globalClaudeMd, updated);
+      console.log(chalk.gray("  ~/.claude/CLAUDE.md KB-First 규칙 업데이트됨"));
+    } else {
+      // 끝에 추가
+      fs.writeFileSync(globalClaudeMd, content.trimEnd() + "\n" + kbFirstBlock);
+      console.log(chalk.green("  ✓ ~/.claude/CLAUDE.md에 KB-First 규칙 추가됨"));
+    }
+  } else {
+    // 파일 없으면 생성
+    fs.writeFileSync(globalClaudeMd, kbFirstBlock.trim() + "\n");
+    console.log(chalk.green("  ✓ ~/.claude/CLAUDE.md 생성됨 (KB-First 규칙)"));
+  }
+}
+
+// === semo-kb MCP 유저레벨 등록 ===
+async function setupSemoKbMcp() {
+  console.log(chalk.cyan("\n📡 semo-kb MCP 유저레벨 등록"));
+  console.log(chalk.gray("   KB-First SoT — 어디서든 KB 조회/갱신 가능\n"));
+
+  // semo-kb MCP 서버 경로 탐색
+  // 1. cwd에서 packages/mcp-kb/dist/index.js 찾기
+  // 2. CLI 패키지 기준으로 monorepo 루트 탐색
+  // 3. 환경변수 SEMO_PROJECT_ROOT
+  const candidates = [
+    path.join(process.cwd(), "packages", "mcp-kb", "dist", "index.js"),
+    process.env.SEMO_PROJECT_ROOT
+      ? path.join(process.env.SEMO_PROJECT_ROOT, "packages", "mcp-kb", "dist", "index.js")
+      : "",
+    path.resolve(__dirname, "..", "..", "..", "mcp-kb", "dist", "index.js"),
+  ].filter(Boolean);
+
+  const mcpEntryPath = candidates.find((p) => fs.existsSync(p));
+
+  if (!mcpEntryPath) {
+    console.log(chalk.yellow("  ⚠ semo-kb MCP 서버를 찾을 수 없습니다."));
+    console.log(chalk.gray("    semo 프로젝트 루트에서 실행하거나 SEMO_PROJECT_ROOT 환경변수를 설정하세요."));
+    console.log(chalk.gray("    예: cd /path/to/semo && semo onboarding"));
+    return;
+  }
+
+  const absolutePath = path.resolve(mcpEntryPath);
+  console.log(chalk.gray(`  경로: ${absolutePath}`));
+
+  // claude mcp add로 유저레벨 등록
+  const result = registerMCPServer({
+    name: "semo-kb",
+    command: "node",
+    args: [absolutePath],
+    scope: "user",
+  });
+
+  if (result.success) {
+    if (result.skipped) {
+      console.log(chalk.gray("  semo-kb 이미 등록됨 (건너뜀)"));
+    } else {
+      console.log(chalk.green("  ✓ semo-kb MCP 유저레벨 등록 완료"));
+    }
+  } else {
+    console.log(chalk.yellow(`  ⚠ semo-kb 등록 실패: ${result.error}`));
+    console.log(chalk.gray("    수동 등록: claude mcp add semo-kb -s user -- node " + absolutePath));
+  }
+}
+
 // === MCP 설정 ===
 async function setupMCP(cwd: string, _extensions: string[], force: boolean) {
   console.log(chalk.cyan("\n🔧 Black Box 설정 (MCP Server)"));
@@ -1572,15 +1683,11 @@ async function setupMCP(cwd: string, _extensions: string[], force: boolean) {
     mcpServers: {},
   };
 
-  // settings.json에는 프로젝트 전용 semo-kb만 기록
-  // 공통 서버(context7 등)는 유저레벨에 등록하므로 프로젝트 settings에 쓰지 않음
-  settings.mcpServers["semo-kb"] = {
-    command: "node",
-    args: ["packages/mcp-kb/dist/index.js"],
-  };
+  // semo-kb는 유저레벨에서 등록 (semo onboarding)하므로 프로젝트 settings에 쓰지 않음
+  // 공통 서버(context7 등)도 유저레벨에 등록하므로 프로젝트 settings에 쓰지 않음
 
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-  console.log(chalk.green("✓ .claude/settings.json 생성됨 (semo-kb MCP 설정)"));
+  console.log(chalk.green("✓ .claude/settings.json 생성됨"));
 
   // Claude Code에 MCP 서버 등록 시도 (공통 서버는 유저레벨로)
   console.log(chalk.cyan("\n🔌 Claude Code에 MCP 서버 등록 중..."));
@@ -2510,6 +2617,7 @@ import {
   ontoShow,
   ontoValidate,
   ontoPullToLocal,
+  ontoListTypes,
   generateEmbedding,
   KBEntry,
 } from "./kb";
@@ -2635,6 +2743,7 @@ kbCmd
   .command("list")
   .description("KB 항목 목록 조회")
   .option("--domain <name>", "도메인 필터")
+  .option("--service <name>", "서비스(프로젝트) 필터 — 해당 서비스의 모든 도메인 항목 반환")
   .option("--limit <n>", "최대 항목 수", "50")
   .option("--format <type>", "출력 형식 (table|json)", "table")
   .action(async (options) => {
@@ -2642,6 +2751,7 @@ kbCmd
       const pool = getPool();
       const entries = await kbList(pool, {
         domain: options.domain,
+        service: options.service,
         limit: parseInt(options.limit),
       });
 
@@ -2675,6 +2785,7 @@ kbCmd
   .command("search <query>")
   .description("KB 검색 (시맨틱 + 텍스트 하이브리드)")
   .option("--domain <name>", "도메인 필터")
+  .option("--service <name>", "서비스(프로젝트) 필터")
   .option("--limit <n>", "최대 결과 수", "10")
   .option("--mode <type>", "검색 모드 (hybrid|semantic|text)", "hybrid")
   .action(async (query, options) => {
@@ -2683,6 +2794,7 @@ kbCmd
       const pool = getPool();
       const results = await kbSearch(pool, query, {
         domain: options.domain,
+        service: options.service,
         limit: parseInt(options.limit),
         mode: options.mode,
       });
@@ -2809,11 +2921,16 @@ const ontoCmd = program
 ontoCmd
   .command("list")
   .description("정의된 온톨로지 도메인 목록")
+  .option("--service <name>", "서비스별 필터")
   .option("--format <type>", "출력 형식 (table|json)", "table")
   .action(async (options) => {
     try {
       const pool = getPool();
-      const domains = await ontoList(pool);
+      let domains = await ontoList(pool);
+
+      if (options.service) {
+        domains = domains.filter(d => d.service === options.service || d.domain === options.service || d.domain.startsWith(`${options.service}.`));
+      }
 
       if (options.format === "json") {
         console.log(JSON.stringify(domains, null, 2));
@@ -2822,9 +2939,63 @@ ontoCmd
         if (domains.length === 0) {
           console.log(chalk.yellow("  온톨로지가 정의되지 않았습니다."));
         } else {
+          // Group by service (_global treated as Global)
+          const global = domains.filter(d => !d.service || d.service === '_global');
+          const byService: Record<string, typeof domains> = {};
           for (const d of domains) {
-            console.log(chalk.cyan(`  ${d.domain}`) + chalk.gray(` (v${d.version})`));
-            if (d.description) console.log(chalk.gray(`    ${d.description}`));
+            if (d.service && d.service !== '_global') {
+              if (!byService[d.service]) byService[d.service] = [];
+              byService[d.service].push(d);
+            }
+          }
+
+          if (global.length > 0) {
+            console.log(chalk.white.bold("  Global"));
+            for (const d of global) {
+              const typeStr = d.entity_type ? chalk.gray(` [${d.entity_type}]`) : "";
+              console.log(chalk.cyan(`    ${d.domain}`) + typeStr + chalk.gray(` (v${d.version})`));
+              if (d.description) console.log(chalk.gray(`      ${d.description}`));
+            }
+          }
+
+          for (const [svc, svcDomains] of Object.entries(byService)) {
+            console.log(chalk.white.bold(`\n  Service: ${svc}`));
+            for (const d of svcDomains) {
+              const typeStr = d.entity_type ? chalk.gray(` [${d.entity_type}]`) : "";
+              console.log(chalk.cyan(`    ${d.domain}`) + typeStr + chalk.gray(` (v${d.version})`));
+              if (d.description) console.log(chalk.gray(`      ${d.description}`));
+            }
+          }
+        }
+        console.log();
+      }
+      await closeConnection();
+    } catch (err) {
+      console.error(chalk.red(`조회 실패: ${err}`));
+      await closeConnection();
+      process.exit(1);
+    }
+  });
+
+ontoCmd
+  .command("types")
+  .description("온톨로지 타입 목록 (구조적 템플릿)")
+  .option("--format <type>", "출력 형식 (table|json)", "table")
+  .action(async (options) => {
+    try {
+      const pool = getPool();
+      const types = await ontoListTypes(pool);
+
+      if (options.format === "json") {
+        console.log(JSON.stringify(types, null, 2));
+      } else {
+        console.log(chalk.cyan.bold("\n📐 온톨로지 타입\n"));
+        if (types.length === 0) {
+          console.log(chalk.yellow("  타입이 정의되지 않았습니다. (016 마이그레이션 실행 필요)"));
+        } else {
+          for (const t of types) {
+            console.log(chalk.cyan(`  ${t.type_key}`) + chalk.gray(` (v${t.version})`));
+            if (t.description) console.log(chalk.gray(`    ${t.description}`));
           }
         }
         console.log();
@@ -2919,6 +3090,8 @@ registerBotsCommands(program);
 registerGetCommands(program);
 registerSessionsCommands(program);
 registerDbCommands(program);
+registerMemoryCommands(program);
+registerTestCommands(program);
 
 // === semo skills — DB 시딩 ===
 

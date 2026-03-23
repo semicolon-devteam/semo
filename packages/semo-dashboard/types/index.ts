@@ -85,6 +85,8 @@ export interface OntologyEntry {
 export interface KBDomain {
   domain: string;
   description?: string;
+  service?: string | null;
+  entity_type?: string | null;
   entry_count: number;
 }
 
@@ -241,4 +243,40 @@ export interface SyncStatus {
   bots: SyncBotStatus[];
   lastMigration: string | null;
   serverTime: string;
+}
+
+// Test Management Types
+export interface TestSuite {
+  suite_id: string;
+  name: string;
+  layer: string;
+  runner_type: string;
+  schedule: string | null;
+  enabled: boolean;
+  last_run_status: string | null;
+  last_run_at: string | null;
+  last_pass: number | null;
+  last_fail: number | null;
+  last_warn: number | null;
+}
+
+export interface TestRun {
+  run_id: string;
+  suite_id: string;
+  triggered_by: string;
+  started_at: string;
+  finished_at: string | null;
+  total_pass: number;
+  total_fail: number;
+  total_warn: number;
+  status: string;
+  summary: string | null;
+}
+
+export interface TestResult {
+  case_id: string;
+  label: string;
+  status: string;
+  detail: string | null;
+  duration_ms: number | null;
 }
