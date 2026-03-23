@@ -226,13 +226,6 @@ async function executeTestSuite(
             ]
           );
 
-          // Auto-populate test_cases
-          await pool.query(
-            `INSERT INTO semo.test_cases (suite_id, case_id, name)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (suite_id, case_id) DO NOTHING`,
-            [suite.suite_id, c.id || c.label || "unknown", c.label || c.id || "unknown"]
-          );
         }
 
         // Update run record
