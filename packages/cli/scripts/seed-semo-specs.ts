@@ -1,0 +1,217 @@
+/**
+ * seed-semo-specs.ts — CLAUDE.md 참조 데이터를 KB로 이식
+ *
+ * CLAUDE.md에 하드코딩되어 있던 아키텍처/인프라/프로세스 문서를
+ * semo 서비스 도메인의 KB 엔트리로 이식.
+ *
+ * Usage: npx tsx packages/cli/scripts/seed-semo-specs.ts
+ */
+
+import { Pool } from "pg";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+
+// ── Env ──
+const envPath = path.join(os.homedir(), ".semo.env");
+if (fs.existsSync(envPath)) {
+  for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+    if (m && !process.env[m[1]]) {
+      process.env[m[1]] = m[2].replace(/^['"]|['"]$/g, "");
+    }
+  }
+}
+
+const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
+
+async function kbUpsert(
+  domain: string,
+  key: string,
+  subKey: string,
+  content: string
+): Promise<void> {
+  await pool.query(
+    `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by)
+     VALUES ($1, $2, $3, $4, 'seed-semo-specs')
+     ON CONFLICT (domain, key, sub_key) DO UPDATE SET
+       content = EXCLUDED.content,
+       created_by = EXCLUDED.created_by,
+       updated_at = NOW(),
+       version = semo.knowledge_base.version + 1`,
+    [domain, key, subKey, content]
+  );
+}
+
+// ── KB 엔트리 정의 ──
+
+const entries: { key: string; subKey: string; content: string }[] = [
+  {
+    key: "spec",
+    subKey: "data-flow",
+    content: `# SEMO 데이터 흐름
+
+\`\`\`
+~/.openclaw-{bot}/workspace/  (로컬 전용: 세션 부트 + 실행 파일)
+        ↓ sync-agent (1분 주기, 세션 부트 파일만)
+Core DB: semo.bot_workspace_files (축소됨: ~100파일)
+        ↓
+semo-dashboard (KB + bot_workspace_files 병합)
+        ↑
+Core DB: semo.knowledge_base (KB: bot-config/spec/skill 도메인 포함)
+        ↑ kb_upsert (MCP)
+봇/사용자가 직접 쓰기
+\`\`\`
+
+## KB 접근 경로
+
+| 환경 | KB 접근 방법 |
+|------|-------------|
+| **로컬 Claude Code 세션** | semo-kb MCP 도구 — 실시간 MCP 프로토콜 |
+| **OpenClaw 봇** | kb-manager 스킬 → semo CLI (\`semo kb get/search/upsert/ontology\`) |
+
+봇은 MCP 프로토콜을 지원하지 않으므로, \`exec\` 도구로 semo CLI를 실행합니다.
+스킬은 \`skill_definitions\` 테이블에서 관리되며, \`semo context sync\`로 봇 워크스페이스에 자동 배포됩니다.`,
+  },
+  {
+    key: "spec",
+    subKey: "openclaw-config",
+    content: `# OpenClaw 봇 설정
+
+## openclaw.json
+각 봇의 \`openclaw.json\`은 \`~/.openclaw-{bot}/openclaw.json\`에 위치.
+\`agents.defaults.workspace\` 필드가 워크스페이스 SoT 경로를 가리킨다.
+
+## gateway-wrapper.sh
+게이트웨이 시작/종료 래퍼. BOT_ID 설정, 포트 바인딩, bot_status 자동 업데이트.
+
+## 게이트웨이 Chat UI 접근
+\`\`\`
+http://127.0.0.1:{포트}/chat?session=agent%3Amain%3Amain&token={토큰}
+\`\`\`
+토큰은 \`~/.openclaw-{bot}/openclaw.json\` → \`gateway.auth.token\`에서 확인.
+
+## 봇 워크스페이스 접근
+봇 파일을 읽거나 수정할 때는 \`~/.openclaw-{bot}/workspace/\`를 직접 참조.
+\`semo-system/bot-workspaces/\`는 폐기됨 — 사용하지 말 것.`,
+  },
+  {
+    key: "spec",
+    subKey: "mcp-server-config",
+    content: `# MCP 서버 설정 규칙
+
+- **프로젝트레벨** \`.claude/settings.json\` — semo-kb만 등록 (프로젝트 전용 서버)
+- **유저레벨** \`~/.claude/settings.json\` — 공통 서버 (context7, playwright 등) 등록
+- \`semo init\`은 공통 서버를 \`claude mcp add -s user\`로 유저레벨에 등록하고, 프로젝트 settings.json에는 semo-kb만 기록
+- 공통 서버와 프로젝트 전용 서버를 같은 레벨에 넣으면 충돌 발생 가능`,
+  },
+  {
+    key: "spec",
+    subKey: "workspace-v2",
+    content: `# 봇 워크스페이스 구조 (v2.0)
+
+봇 워크스페이스의 SoT는 \`~/.openclaw-{bot}/workspace/\` 디렉토리.
+
+\`\`\`
+~/.openclaw-{bot}/workspace/
+├── SOUL.md              # 봇 고유: 페르소나 + R&R + 행동강령 (< 120줄)
+├── AGENTS.md            # 공통: → ~/.openclaw-shared/AGENTS.md (심링크)
+├── USER.md              # 봇 고유: 사용자 컨텍스트 (< 15줄)
+├── MEMORY.md            # 봇 고유: KB 도메인 인덱스 (< 30줄, main 세션만)
+├── HEARTBEAT.md         # 선택: 크론 작업 (해당 봇만, 현재 semiclaw)
+├── .claude/settings.json # MCP 서버 설정
+├── hooks/               # OpenClaw 훅 (직접 실행)
+├── memory/              # 일일로그 (YYYY-MM-DD.md)
+├── shared/              # → ~/.openclaw-shared/ (심링크)
+├── skills/              # 봇 전용 스킬
+└── scripts/             # 유틸리티 스크립트
+\`\`\`
+
+## 제거된 파일 (v1 → v2)
+- IDENTITY.md → SOUL.md ## Identity 섹션으로 흡수
+- RULES.md → SOUL.md ## NON-NEGOTIABLE 섹션으로 통합
+- TOOLS.md → KB lookup 지시로 대체
+- CLAUDE.md (봇 내) → 프로젝트 .claude/CLAUDE.md에 이미 존재
+
+## 파일 규격 SoT
+\`bot_workspace_standard\` DB 테이블 (38 규칙, v2.0)에서 관리.
+\`semo test run workspace-audit\`로 검증.`,
+  },
+  {
+    key: "infra",
+    subKey: "env-config",
+    content: `# 환경변수 (~/.semo.env)
+
+SEMO는 \`~/.semo.env\` 파일에서 팀 공통 환경변수를 로드합니다.
+SessionStart 훅과 OpenClaw 게이트웨이 래퍼에서 자동 source됩니다.
+
+| 변수 | 용도 | 필수 |
+|------|------|------|
+| DATABASE_URL | 팀 Core DB (PostgreSQL) 연결 | 필수 |
+| OPENAI_API_KEY | KB 임베딩용 (text-embedding-3-small) | 선택 |
+| SLACK_WEBHOOK | Slack 알림 | 선택 |
+
+키 갱신이 필요하면 \`~/.semo.env\`를 직접 편집하거나 \`semo onboarding -f\`를 실행하세요.`,
+  },
+  {
+    key: "process",
+    subKey: "recovery",
+    content: `# SEMO 복구 명령어
+
+\`\`\`bash
+semo doctor              # 환경 진단 (DB 연결, 설치 상태)
+semo config db           # DB URL 재설정
+semo context sync        # 스킬/에이전트/캐시 동기화 (KB는 MCP 사용)
+semo bots status         # 봇 상태 조회
+semo bots audit          # 봇 워크스페이스 규격 감사
+semo memory sync         # L1(bot workspace) → L2(KB) 메모리 동기화
+semo onto types          # 온톨로지 타입 목록
+semo onto list --service # 서비스별 도메인 목록
+semo test list           # 테스트 스위트 목록
+semo test run --all      # 전체 테스트 실행
+\`\`\``,
+  },
+  {
+    key: "process",
+    subKey: "coding-convention",
+    content: `# SEMO 코딩 컨벤션
+
+## 기술 스택
+- TypeScript strict mode, Node.js (ES2022)
+- PostgreSQL (Core DB, semo 스키마) + pgvector (임베딩)
+- npm workspaces (packages/*)
+- Next.js 15 (semo-dashboard)
+- MCP SDK (@modelcontextprotocol/sdk)
+
+## 브랜치 전략
+- \`dev\` (기본 브랜치, PR 타겟)
+
+## 코딩 규칙
+- ESLint + TypeScript strict
+- \`npm run lint && npx tsc --noEmit && npm run build\` 커밋 전 필수
+- \`--no-verify\` 사용 금지
+
+## 패키지 구조
+- packages/cli — SEMO CLI 도구
+- packages/mcp-kb — KB 실시간 벡터 검색 MCP 서버
+- packages/semo-dashboard — 팀 대시보드 웹 UI`,
+  },
+];
+
+async function main() {
+  console.log("=== SEMO Specs → KB Seed ===\n");
+
+  for (const entry of entries) {
+    await kbUpsert("semo", entry.key, entry.subKey, entry.content);
+    console.log(`  ✅ semo/${entry.key}/${entry.subKey}`);
+  }
+
+  console.log(`\n${entries.length}개 엔트리 시드 완료`);
+  await pool.end();
+}
+
+main().catch((err) => {
+  console.error("Fatal:", err);
+  pool.end();
+  process.exit(1);
+});

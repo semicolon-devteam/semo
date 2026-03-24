@@ -1,31 +1,16 @@
 # semo — Claude Configuration
 
-> SEMO v4.2.0 설치됨 (2026-03-21)
+> SEMO v4.3.0 (2026-03-24)
 
 ---
 
 ## SEMO란?
 
-**SEMO (Semicolon Orchestrate)** 는 OpenClaw 봇팀과 로컬 Claude Code 세션이
-**팀 Core DB를 단일 진실 공급원(Single Source of Truth)으로 공유**하는 컨텍스트 동기화 시스템이다.
-
-```
-로컬 Claude Code 세션
-    ↕ semo CLI (kb-manager 스킬)
-팀 Core DB (PostgreSQL, semo 스키마)
-    ↕ semo CLI (kb-manager 스킬)
-OpenClaw 봇팀 (7개 봇)
-  workclaw · reviewclaw · planclaw · designclaw
-  infraclaw · growthclaw · semiclaw
-```
-
-**이 CLAUDE.md가 설치된 프로젝트는 semo CLI를 통해 팀 KB에 실시간 접근한다.**
+**SEMO (Semicolon Orchestrate)** 는 [OpenClaw 봇팀] ↔ [Core DB] ↔ [로컬 Claude Code 세션]의 3자 컨텍스트 동기화 시스템이다. 이 디렉토리는 SEMO 시스템 자체의 소스코드.
 
 ---
 
 ## KB 접근 (semo CLI)
-
-KB 데이터는 **semo CLI** (`kb-manager` 스킬)를 통해 Core DB에서 조회합니다.
 
 | 명령어 | 설명 |
 |--------|------|
@@ -35,8 +20,8 @@ KB 데이터는 **semo CLI** (`kb-manager` 스킬)를 통해 Core DB에서 조�
 | `semo kb upsert <domain> <key> [sub_key] --content "내용"` | KB 항목 쓰기 |
 | `semo kb ontology --action <action>` | 온톨로지 조회 (list/show/services/types/instances/schema/routing-table) |
 
-`semo context sync`는 스킬/에이전트/커맨드 글로벌 캐시 + 크론잡만 동기화합니다.
-스킬은 `semo.skill_definitions` 테이블에서 관리되며, `semo context sync`로 봇 워크스페이스에 자동 배포됩니다.
+**정확한 경로를 모를 때:** `semo kb search "검색어"` → 결과의 `[domain] key/sub_key` 경로 확인
+**도메인 자체를 모를 때:** `semo kb ontology --action instances` 또는 `--action routing-table`
 
 ---
 
@@ -46,34 +31,22 @@ KB 데이터는 **semo CLI** (`kb-manager` 스킬)를 통해 Core DB에서 조�
 
 ### 읽기 (Query-First)
 다음 주제 질문 → **반드시 `semo kb search`/`semo kb get`으로 KB 먼저 조회** 후 답변:
-- 팀원 정보 → `domain: semicolon`, key: `team/{name}`
+- 팀원 정보 → `domain: semicolon`, key: `team`, sub_key: `{name}`
 - 프로젝트/서비스 현황 → `semo kb ontology --action instances` 또는 `domain: {serviceName}`
-- 의사결정 기록 → `domain: semicolon`, key: `decision/{date}/{slug}`
-- 업무 프로세스 → `domain: semicolon`, key: `process/{name}`
-- 인프라 구성 → `domain: semicolon`, key: `infra/{name}`
-- 서비스 KPI → `domain: {serviceName}`, key: `kpi/current`
-- 봇 설정 → `domain: semicolon`, key: `bot-config/{botId}/{type}`
-- 스펙/설계 문서 → `domain: semicolon`, key: `spec/{name}`
-- 스킬 정의 → `semo.skill_definitions` 테이블 직접 조회 (KB가 아닌 DB SoT)
-- 메모리 (L2) → `domain: semicolon`, key: `memory/{sourceId}/{YYYY-MM-DD}`
-- 서비스 스코프 전체 검색 → `service: {serviceName}` 파라미터
+- 의사결정 기록 → `domain: semicolon`, key: `decision`, sub_key: `{date}/{slug}`
+- 업무 프로세스 → `domain: semicolon`, key: `process`, sub_key: `{name}`
+- 인프라 구성 → `domain: semicolon`, key: `infra`, sub_key: `{name}`
+- 서비스 KPI → `domain: {serviceName}`, key: `kpi`, sub_key: `current`
+- 봇 정보 → `domain: {botId}`, key: `identity` / `role` / `gateway_config`
+- SEMO 시스템 스펙 → `domain: semo`, key: `spec`, sub_key: `{name}`
+- 서비스 스코프 전체 검색 → `--service {serviceName}` 파라미터
 
 #### 도메인 구조
 | 패턴 | 예시 | 용도 |
 |------|------|------|
-| `semicolon` | `semicolon` | 조직 도메인 — team/decision/process/infra/bot-config/spec/memory/session-log 하위 키 |
-| `{service}` | `axoracle`, `jungchipan` | 서비스 인스턴스 — base_information/status/po/kpi/milestone 하위 키 |
-
-**정확한 경로를 모를 때:**
-1. `semo kb search "검색어"` → 결과의 `[domain] key/sub_key` 경로 확인
-2. `semo kb get <domain> <key> <sub_key>` 실행
-
-**도메인 자체를 모를 때:**
-- `semo kb ontology --action instances` — 서비스 도메인 목록
-- `semo kb ontology --action routing-table` — 전체 domain→key 매핑
-
-#### KB Sidekick 에이전트
-KB 조회가 복잡하거나 여러 도메인에 걸친 검색이 필요할 때, `kb-sidekick` 서브 에이전트에 위임할 수 있다. Haiku 모델 기반 경량 에이전트.
+| `semicolon` | `semicolon` | 조직 공통 — team/decision/process/infra 하위 키 |
+| `{service}` | `semo`, `axoracle` | 서비스 고유 — base_information/status/spec/kpi 하위 키 |
+| `{botId}` | `semiclaw`, `workclaw` | 봇 프로필 — identity/role/status/gateway_config 하위 키 |
 
 **금지:** 위 주제를 자체 지식/세션 기억만으로 답변하는 것.
 KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하겠습니다."
@@ -88,128 +61,58 @@ KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하
 
 ---
 
-## 설치된 구성
-
-```
-.claude/
-├── CLAUDE.md       # 이 파일
-├── settings.json   # SessionStart/Stop 훅 + 권한 설정
-├── skills/         # SEMO 스킬 (글로벌 캐시)
-├── agents/         # SEMO 에이전트 (글로벌 캐시)
-└── commands/SEMO   # 슬래시 커맨드
-```
-
----
-
-## 이 프로젝트에 대하여 (semo 개발 프로젝트)
-
-> **이 디렉토리는 SEMO 시스템 자체를 개발·관리하는 프로젝트이다.**
-> SEMO는 여러 프로젝트에 `semo init`으로 설치되어 사용되며, 이 폴더는 그 소스코드가 있는 곳이다.
-
-### 이 프로젝트의 역할
-
-- SEMO CLI (`packages/cli`) — `semo init`, `semo context sync`, `semo doctor` 등 CLI 도구
-- KB 벡터 검색 서버 (`packages/mcp-kb`) — 로컬 개발 전용
-- semo-dashboard (`packages/semo-dashboard`) — 팀 대시보드 웹 UI
-- OpenClaw 봇 워크스페이스 관리 — 7개 봇의 설정/스킬/메모리 관리
-
-### 기술 스택
-
-- TypeScript strict mode, Node.js (ES2022)
-- PostgreSQL (Core DB, semo 스키마) + pgvector (임베딩)
-- npm workspaces (packages/*)
-- Next.js 15 (semo-dashboard)
-
-### 브랜치 전략
-
-- `dev` (기본 브랜치, PR 타겟)
-
-### 코딩 컨벤션
-
-- ESLint + TypeScript strict
-- `npm run lint && npx tsc --noEmit && npm run build` 커밋 전 필수
-- `--no-verify` 사용 금지
-
----
-
 ## 3자 동기화 검증 규칙 (NON-NEGOTIABLE)
 
 > 이 프로젝트의 모든 변경은 3자 동기화 관점에서 평가되어야 한다.
 
-SEMO는 3개 주체가 Core DB를 SoT로 공유하는 시스템이다:
-
-```
-OpenClaw 봇팀 (7봇)  ↔  Core DB (semo 스키마)  ↔  로컬 Claude Code 세션
-```
-
 ### 변경 전 체크리스트
 
-코드를 수정하기 전에 반드시 아래를 자문할 것:
+1. **SoT 위치**: DB 테이블 → DB에서 읽기 (하드코딩 금지). KB → `semo kb get/search` 조회.
+2. **동기화 영향**: CLI만/CLI+봇/DB 스키마/봇 워크스페이스 규격 중 어디에 영향?
+3. **하드코딩 금지**: 봇 목록 → `bot_status` DB. 도메인 → `ontology` DB. 워크스페이스 규격 → `bot_workspace_standard` DB.
+4. **검증**: `semo test run workspace-audit` / `semo test run 018-transplant` / KB 도구 호출 테스트.
 
-1. **SoT 위치**: 이 데이터/규칙의 SoT는 어디인가?
-   - DB 테이블 → DB에서 읽어야 함 (하드코딩 금지)
-   - 봇 워크스페이스 → `~/.openclaw-{bot}/workspace/` 참조
-   - KB → `semo kb get/search` 조회
+### 위반 사례
+- 봇 이름을 배열로 하드코딩
+- 워크스페이스 규칙을 스크립트에 직접 작성 (DB `bot_workspace_standard`가 SoT)
+- 서비스 고유 정보를 `semicolon` 조직 도메인에 저장 (해당 서비스 도메인 사용)
+- DB 스키마 변경 시 마이그레이션 없이 직접 ALTER
 
-2. **동기화 영향**: 이 변경이 3자 중 누구에게 영향을 주는가?
-   - CLI만 → 로컬 변경으로 충분
-   - CLI/스킬 → 봇과 로컬 세션 모두에 영향 (하위 호환 필수)
-   - DB 스키마 → 마이그레이션 + CLI + 대시보드 전부 확인
-   - 봇 워크스페이스 규격 → `bot_workspace_standard` DB 테이블 업데이트 필수
+---
 
-3. **하드코딩 금지**: 봇 이름, 봇 목록, 워크스페이스 경로, 도메인 목록 등을 코드에 직접 넣지 말 것. 반드시 DB에서 동적으로 로드.
-   - 봇 목록 → `SELECT bot_id FROM semo.bot_status`
-   - 도메인 목록 → `SELECT domain FROM semo.ontology`
-   - 워크스페이스 규격 → `SELECT * FROM semo.bot_workspace_standard`
+## KB 참조 가이드
 
-4. **검증 범위**: 변경 후 아래 중 해당하는 항목을 검증:
-   - `semo test run workspace-audit` — 봇 워크스페이스 규격 준수
-   - `semo test run 018-transplant` — KB 데이터 무결성
-   - CLI KB 명령어 테스트 — `semo kb get`, `semo kb search` 등이 정상 동작하는지
-   - 봇 세션에서의 동작 — 변경이 봇에 영향을 주면 게이트웨이로 확인
+봇/인프라/프로세스 상세 정보는 KB에서 조회:
 
-### 위반 사례 (하지 말 것)
-
-- 봇 이름을 배열로 하드코딩: `const BOTS = ["semiclaw", "workclaw", ...]`
-- 워크스페이스 규칙을 셸 스크립트에 직접 작성 (DB `bot_workspace_standard`가 SoT)
-- CLI 명령어 파라미터를 변경하면서 하위 호환을 깨뜨림
-- DB 스키마를 변경하면서 마이그레이션 없이 직접 ALTER
-- 로컬 파일에만 설정을 저장하고 DB에 반영하지 않음
-
-### 올바른 사례
-
-- DB에서 봇 목록을 동적 조회하여 사용
-- 새 규칙 추가 시 `bot_workspace_standard`에 INSERT
-- CLI 명령어 변경 시 기존 파라미터 유지 + 새 파라미터는 optional
-- 변경 후 `semo test run` 으로 검증
+| 정보 | 조회 명령 |
+|------|-----------|
+| 봇 프로필 | `semo kb get {botId} identity` |
+| 봇 역할 | `semo kb get {botId} role` |
+| 봇 게이트웨이 | `semo kb get {botId} gateway_config` |
+| SEMO 데이터 흐름 | `semo kb get semo spec data-flow` |
+| SEMO 워크스페이스 규격 | `semo kb get semo spec workspace-v2` |
+| SEMO MCP 서버 설정 | `semo kb get semo spec mcp-server-config` |
+| OpenClaw 설정 | `semo kb get semo spec openclaw-config` |
+| 환경변수 (~/.semo.env) | `semo kb get semo infra env-config` |
+| 복구 명령어 | `semo kb get semo process recovery` |
+| 코딩 컨벤션 | `semo kb get semo process coding-convention` |
 
 ---
 
 ## Quality Gate
 
-코드 변경 커밋 전 필수:
-
 ```bash
-npm run lint       # ESLint
-npx tsc --noEmit   # TypeScript
-npm run build      # 빌드 검증
+npm run lint && npx tsc --noEmit && npm run build
 ```
 
-`--no-verify` 사용 금지.
+`--no-verify` 사용 금지. 브랜치: `dev` (기본, PR 타겟).
 
 ### CLI 배포 (팀 전파)
-
-> **로컬 빌드만으로는 다른 팀원에게 변경이 전파되지 않는다.**
 
 | 패키지 | npm 이름 | 배포 트리거 |
 |--------|----------|------------|
 | `packages/cli` | `@team-semicolon/semo-cli` | Git tag `cli-v*` |
 | `packages/mcp-kb` | `@team-semicolon/semo-mcp-kb` | Git tag `mcp-v*` |
-
-**배포 절차:**
-1. `cd packages/cli && npm version patch` (또는 minor/major)
-2. `git commit` + `git tag cli-vX.Y.Z` + `git push origin dev --tags`
-3. GitHub Actions (`publish-cli.yml`)가 자동으로 `npm publish`
 
 CLI 소스 수정 후에는 사용자에게 배포 필요 여부를 확인할 것.
 
@@ -222,122 +125,3 @@ CLI 소스 수정 후에는 사용자에게 배포 필요 여부를 확인할 �
 | `/SEMO:help` | 도움말 |
 | `/SEMO:feedback` | 피드백 제출 |
 | `/SEMO:health` | 환경 헬스체크 |
-
----
-
-## 환경변수 (`~/.semo.env`)
-
-SEMO는 `~/.semo.env` 파일에서 팀 공통 환경변수를 로드합니다.
-SessionStart 훅과 OpenClaw 게이트웨이 래퍼에서 자동 source됩니다.
-
-| 변수 | 용도 | 필수 |
-|------|------|------|
-| `DATABASE_URL` | 팀 Core DB (PostgreSQL) 연결 | ✅ |
-| `OPENAI_API_KEY` | KB 임베딩용 (text-embedding-3-small) | 선택 |
-| `SLACK_WEBHOOK` | Slack 알림 | 선택 |
-
-키 갱신이 필요하면 `~/.semo.env`를 직접 편집하거나 `semo onboarding -f`를 실행하세요.
-
----
-
-## OpenClaw 봇 워크스페이스 (SoT)
-
-봇 워크스페이스의 **단일 진실 공급원(SoT)은 `~/.openclaw-{bot}/workspace/`** 디렉토리다.
-이 프로젝트의 `semo-system/bot-workspaces/`는 사용하지 않는다.
-
-| 봇 | SoT 경로 | 게이트웨이 포트 |
-|----|----------|----------------|
-| semiclaw | `~/.openclaw-semiclaw/workspace` | 18789 |
-| workclaw | `~/.openclaw-workclaw/workspace` | 18869 |
-| reviewclaw | `~/.openclaw-reviewclaw/workspace` | 18829 |
-| planclaw | `~/.openclaw-planclaw/workspace` | 18809 |
-| designclaw | `~/.openclaw-designclaw/workspace` | — |
-| infraclaw | `~/.openclaw-infraclaw/workspace` | — |
-| growthclaw | `~/.openclaw-growthclaw/workspace` | — |
-
-### 데이터 흐름
-
-```
-~/.openclaw-{bot}/workspace/  (로컬 전용: 세션 부트 + 실행 파일)
-        ↓ sync-agent (1분 주기, 세션 부트 파일만)
-Core DB: semo.bot_workspace_files (축소됨: ~100파일)
-        ↓
-semo-dashboard (KB + bot_workspace_files 병합)
-        ↑
-Core DB: semo.knowledge_base (KB: bot-config/spec/skill 도메인 포함)
-        ↑ semo kb upsert (CLI)
-봇/사용자가 직접 쓰기
-```
-
-### 봇 워크스페이스 파일 구조 (v2.0, 2026-03-23)
-
-```
-~/.openclaw-{bot}/workspace/
-├── SOUL.md              # 봇 고유: 페르소나 + R&R + 행동강령 (< 120줄)
-├── AGENTS.md            # 공통: → ~/.openclaw-shared/AGENTS.md (심링크)
-├── USER.md              # 봇 고유: 사용자 컨텍스트 (< 15줄)
-├── MEMORY.md            # 봇 고유: KB 도메인 인덱스 (< 30줄, main 세션만)
-├── HEARTBEAT.md         # 선택: 크론 작업 (해당 봇만, 현재 semiclaw)
-├── .claude/settings.json # 훅 + 권한 설정
-├── hooks/               # OpenClaw 훅 (직접 실행)
-├── memory/              # 일일로그 (YYYY-MM-DD.md)
-├── shared/              # → ~/.openclaw-shared/ (심링크)
-├── skills/              # 봇 전용 스킬
-└── scripts/             # 유틸리티 스크립트
-```
-
-**제거된 파일 (v1 → v2):**
-- `IDENTITY.md` → SOUL.md `## Identity` 섹션으로 흡수
-- `RULES.md` → SOUL.md `## NON-NEGOTIABLE` 섹션으로 통합
-- `TOOLS.md` → KB lookup 지시로 대체 (봇 ID, 채널 ID → KB 조회)
-- `CLAUDE.md` (봇 내) → 프로젝트 .claude/CLAUDE.md에 이미 존재
-
-**봇 ID/채널 ID 조회:**
-- `semo kb get semicolon team bot-ids` — 봇 Slack ID 매핑
-- `semo kb get semicolon team slack-channels` — 채널 ID 매핑
-
-### 봇 설정 파일
-
-각 봇의 `openclaw.json`은 `~/.openclaw-{bot}/openclaw.json`에 있다.
-`agents.defaults.workspace` 필드가 위 SoT 경로를 가리킨다.
-
-### 봇 워크스페이스 접근 방법
-
-봇 파일을 읽거나 수정할 때는 `~/.openclaw-{bot}/workspace/`를 직접 참조한다.
-**`semo-system/bot-workspaces/`는 폐기됨** — 사용하지 말 것.
-
-```bash
-# 예: semiclaw의 SOUL.md 읽기
-cat ~/.openclaw-semiclaw/workspace/SOUL.md
-
-# 예: workclaw의 스킬 목록
-ls ~/.openclaw-workclaw/workspace/skills/
-
-# 예: reviewclaw의 메모리 파일
-ls ~/.openclaw-reviewclaw/workspace/memory/
-
-# 예: 봇 설정 확인
-cat ~/.openclaw-workclaw/openclaw.json | jq '.agents.defaults.workspace'
-```
-
-### 게이트웨이 Chat UI 접근
-
-```
-http://127.0.0.1:{포트}/chat?session=agent%3Amain%3Amain&token={토큰}
-```
-
-토큰은 `~/.openclaw-{bot}/openclaw.json` → `gateway.auth.token`에서 확인.
-
----
-
-## 복구 명령어
-
-```bash
-semo doctor              # 환경 진단 (DB 연결, 설치 상태)
-semo config db           # DB URL 재설정
-semo context sync        # 스킬/에이전트/캐시 동기화
-semo bots status         # 봇 상태 조회
-semo memory sync         # L1(bot workspace) → L2(KB) 메모리 동기화
-semo onto types          # 온톨로지 타입 목록
-semo onto list --service # 서비스별 도메인 목록
-```
