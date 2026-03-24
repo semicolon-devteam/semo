@@ -6,6 +6,16 @@
 import { Pool } from 'pg';
 import { genEmbedding } from './voyage';
 
+function splitKey(combinedKey: string): { key: string; subKey: string } {
+  const idx = combinedKey.indexOf('/');
+  if (idx === -1) return { key: combinedKey, subKey: '' };
+  return { key: combinedKey.substring(0, idx), subKey: combinedKey.substring(idx + 1) };
+}
+
+function combineKey(key: string, subKey: string): string {
+  return subKey ? `${key}/${subKey}` : key;
+}
+
 // lib/db.ts와 동일한 DATABASE_URL을 사용하는 Pool
 // KB_DB_* 환경변수는 하위 호환성을 위해 유지하되, DATABASE_URL을 우선한다.
 const pool = new Pool(
@@ -62,9 +72,9 @@ async function textSearch(
   const pattern = `%${query}%`;
 
   let sql = `
-    SELECT kb_id, domain, key, content, created_by
+    SELECT kb_id, domain, key, sub_key, content, created_by
     FROM semo.knowledge_base
-    WHERE key ILIKE $1 OR content ILIKE $1
+    WHERE key ILIKE $1 OR sub_key ILIKE $1 OR content ILIKE $1
   `;
   const params: (string | number)[] = [pattern];
   let idx = 2;
@@ -77,7 +87,7 @@ async function textSearch(
   params.push(limit);
 
   const res = await pool.query(sql, params);
-  return res.rows;
+  return res.rows.map((r: KBItem & { sub_key?: string }) => ({ ...r, key: combineKey(r.key, r.sub_key ?? '') }));
 }
 
 /**
@@ -96,7 +106,7 @@ export async function search(
   const embeddingStr = '[' + embedding.join(',') + ']';
 
   let sql = `
-    SELECT kb_id, domain, key, content, created_by,
+    SELECT kb_id, domain, key, sub_key, content, created_by,
            ROUND((1 - (embedding <=> $1::vector))::numeric * 100, 1) as similarity_pct
     FROM semo.knowledge_base
   `;
@@ -111,7 +121,7 @@ export async function search(
   params.push(limit);
 
   const res = await pool.query(sql, params);
-  return res.rows;
+  return res.rows.map((r: KBItem & { sub_key?: string }) => ({ ...r, key: combineKey(r.key, r.sub_key ?? '') }));
 }
 
 /**
@@ -124,8 +134,8 @@ export async function list(
   // domain 필터 시 full content + metadata 반환 (milestone 등에서 필요)
   // 전체 목록: LEFT(content, N)이 일부 한글 데이터에서 UTF-8 깨짐 → JS truncate
   const cols = domain
-    ? 'kb_id, domain, key, content, metadata, created_by, updated_at'
-    : 'kb_id, domain, key, content, created_by';
+    ? 'kb_id, domain, key, sub_key, content, metadata, created_by, updated_at'
+    : 'kb_id, domain, key, sub_key, content, created_by';
   let sql = `
     SELECT ${cols}
     FROM semo.knowledge_base
@@ -148,13 +158,17 @@ export async function list(
   sql += ` ORDER BY domain, key`;
 
   const res = await pool.query(sql, params);
+  const rows = res.rows.map((row: KBItem & { sub_key?: string }) => ({
+    ...row,
+    key: combineKey(row.key, row.sub_key ?? ''),
+  }));
   if (!domain) {
-    return res.rows.map((row: any) => ({
+    return rows.map((row) => ({
       ...row,
       content: row.content?.length > 80 ? row.content.slice(0, 80) : row.content,
     }));
   }
-  return res.rows;
+  return rows;
 }
 
 /**
@@ -178,15 +192,18 @@ export async function listDomains(): Promise<KBDomain[]> {
  */
 export async function getItem(
   domain: string,
-  key: string
+  rawKey: string
 ): Promise<KBItem | null> {
+  const { key, subKey } = splitKey(rawKey);
   const sql = `
-    SELECT kb_id, domain, key, content, metadata, created_by, updated_at
+    SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at
     FROM semo.knowledge_base
-    WHERE domain = $1 AND key = $2
+    WHERE domain = $1 AND key = $2 AND sub_key = $3
   `;
-  const res = await pool.query(sql, [domain, key]);
-  return res.rows[0] || null;
+  const res = await pool.query(sql, [domain, key, subKey]);
+  const row = res.rows[0];
+  if (!row) return null;
+  return { ...row, key: combineKey(row.key, row.sub_key) };
 }
 
 /**
@@ -194,10 +211,12 @@ export async function getItem(
  */
 export async function upsertItem(
   domain: string,
-  key: string,
+  rawKey: string,
   content: string,
   createdBy?: string
 ): Promise<KBItem> {
+  const { key, subKey } = splitKey(rawKey);
+
   // Domain validation: check ontology before write
   const domainCheck = await pool.query(
     'SELECT 1 FROM semo.ontology WHERE domain = $1',
@@ -210,14 +229,14 @@ export async function upsertItem(
   }
 
   const sql = `
-    INSERT INTO semo.knowledge_base (domain, key, content, created_by)
-    VALUES ($1, $2, $3, $4)
-    ON CONFLICT (domain, key) DO UPDATE SET
+    INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by)
+    VALUES ($1, $2, $3, $4, $5)
+    ON CONFLICT (domain, key, sub_key) DO UPDATE SET
       content    = EXCLUDED.content,
       updated_at = NOW()
-    RETURNING kb_id, domain, key, content, created_by, updated_at
+    RETURNING kb_id, domain, key, sub_key, content, created_by, updated_at
   `;
-  const res = await pool.query(sql, [domain, key, content, createdBy ?? 'dashboard']);
+  const res = await pool.query(sql, [domain, key, subKey, content, createdBy ?? 'dashboard']);
   const item = res.rows[0];
 
   // 임베딩 자동 생성 (best-effort: 실패해도 본 upsert는 성공)
@@ -230,20 +249,21 @@ export async function upsertItem(
         [embeddingStr, item.kb_id]
       );
     } catch (e) {
-      console.warn(`[kb] embedding generation failed for ${domain}/${key}:`, e);
+      console.warn(`[kb] embedding generation failed for ${domain}/${rawKey}:`, e);
     }
   }
 
-  return item;
+  return { ...item, key: combineKey(item.key, item.sub_key) };
 }
 
 /**
  * KB 항목 삭제
  */
-export async function deleteItemByKey(domain: string, key: string): Promise<boolean> {
+export async function deleteItemByKey(domain: string, rawKey: string): Promise<boolean> {
+  const { key, subKey } = splitKey(rawKey);
   const res = await pool.query(
-    'DELETE FROM semo.knowledge_base WHERE domain = $1 AND key = $2',
-    [domain, key]
+    'DELETE FROM semo.knowledge_base WHERE domain = $1 AND key = $2 AND sub_key = $3',
+    [domain, key, subKey]
   );
   return (res.rowCount ?? 0) > 0;
 }

@@ -2,9 +2,9 @@
  * semo context — 스킬/캐시/크론잡 동기화
  *
  * sync: DB → 글로벌 캐시 (skills/commands/agents) + 스킬 DB 동기화 + 크론잡
- * push: .claude/memory/<domain>.md → DB (deprecated — kb_upsert MCP 도구로 대체)
+ * push: .claude/memory/<domain>.md → DB (deprecated — semo kb upsert로 대체)
  *
- * [v4.2.0] KB→md 파일 생성 제거 — semo-kb MCP 서버로 통일
+ * [v4.2.0] KB→md 파일 생성 제거 — semo CLI kb 명령어로 통일
  */
 
 import { Command } from "commander";
@@ -35,7 +35,7 @@ function resolveMemoryDir(outDir?: string): string {
   return path.join(require("os").homedir(), MEMORY_DIR);
 }
 
-/** @deprecated context push uses legacy flat domains — prefer semo-kb MCP kb_upsert */
+/** @deprecated context push uses legacy flat domains — prefer semo kb upsert */
 const KB_DOMAIN_MAP: Record<string, string> = {
   semicolon: "semicolon.md",
   team: "team.md",
@@ -54,7 +54,7 @@ function ensureMemoryDir(resolvedDir: string): string {
   return resolvedDir;
 }
 
-// [v4.2.0] KB→md 헬퍼 함수 제거 — semo-kb MCP 서버로 대체
+// [v4.2.0] KB→md 헬퍼 함수 제거 — semo CLI로 대체
 // kbEntriesToMarkdown, botStatusToMarkdown, ontologyToMarkdown, fetchBotStatus 삭제됨
 
 // ============================================================
@@ -182,7 +182,7 @@ function parseMarkdownSections(content: string, domain: string): KBEntry[] {
   return entries;
 }
 
-// [v4.2.0] digestToMarkdown 제거 — MCP kb_digest로 대체
+// [v4.2.0] digestToMarkdown 제거 — semo CLI로 대체
 
 // ============================================================
 // Commands
@@ -191,12 +191,12 @@ function parseMarkdownSections(content: string, domain: string): KBEntry[] {
 export function registerContextCommands(program: Command): void {
   const ctxCmd = program
     .command("context")
-    .description("스킬/캐시/크론잡 동기화 (KB는 semo-kb MCP 서버)");
+    .description("스킬/캐시/크론잡 동기화 (KB는 semo CLI)");
 
   // ── semo context sync ──────────────────────────────────────
   ctxCmd
     .command("sync")
-    .description("스킬/에이전트/캐시 동기화 + 크론잡 (KB는 semo-kb MCP 서버 사용)")
+    .description("스킬/에이전트/캐시 동기화 + 크론잡 (KB는 semo CLI 사용)")
     .option("--no-skills", "스킬 파일 → DB 동기화 건너뜀")
     .option("--out-dir <path>", "캐시 파일 출력 경로 (기본: .claude/memory/)")
     .option("--no-global-cache", "글로벌 캐시(skills/commands/agents) 동기화 건너뜀")
@@ -214,9 +214,9 @@ export function registerContextCommands(program: Command): void {
       const memDir = ensureMemoryDir(resolveMemoryDir(options.outDir));
 
       try {
-        // [v4.2.0] KB→md 파일 생성 제거 — MCP kb_search/kb_list/kb_bot_status/kb_ontology로 대체
+        // [v4.2.0] KB→md 파일 생성 제거 — semo CLI kb 명령어로 대체
         // 기존 memory/*.md (team, projects, decisions, infra, process, bots, ontology) 파일은
-        // semo-kb MCP 서버가 실시간 DB 조회로 대체합니다.
+        // semo CLI가 실시간 DB 조회로 대체합니다.
 
         // 1. 스킬 파일 → skill_definitions DB 동기화
         if (options.skills !== false) {
@@ -260,28 +260,6 @@ export function registerContextCommands(program: Command): void {
           // 크론잡 동기화 실패는 비치명적
         }
 
-        // [v4.2.0] KB Digest 제거 — MCP kb_digest로 대체
-
-        // 4. MCP 서버 자동 등록 (.claude/settings.json)
-        try {
-          const semoRoot = process.cwd();
-          const settingsPath = path.join(memDir, "..", "settings.json");
-          if (fs.existsSync(settingsPath)) {
-            const settings = JSON.parse(fs.readFileSync(settingsPath, "utf-8"));
-            if (!settings.mcpServers?.["semo-kb"]) {
-              settings.mcpServers = settings.mcpServers || {};
-              settings.mcpServers["semo-kb"] = {
-                command: "node",
-                args: [path.join(semoRoot, "packages/mcp-kb/dist/index.js")],
-              };
-              fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2) + "\n");
-              console.log(chalk.green("  ✓ semo-kb MCP 서버 자동 등록"));
-            }
-          }
-        } catch {
-          // MCP 자동 등록 실패는 비치명적
-        }
-
         spinner.succeed("context sync 완료 — 스킬/캐시/크론잡 동기화");
         console.log(chalk.gray(`  저장 위치: ${memDir}`));
       } catch (err) {
@@ -299,8 +277,8 @@ export function registerContextCommands(program: Command): void {
     .option("--dry-run", "실제 push 없이 변경사항만 미리보기")
     .option("--out-dir <path>", "메모리 파일 경로 (기본: .claude/memory/). OpenClaw 봇 workspace 지원용")
     .action(async (options) => {
-      console.log(chalk.yellow("⚠️  [deprecated] context push는 kb_upsert MCP 도구로 대체 예정입니다."));
-      console.log(chalk.yellow("   봇/세션에서는 semo-kb MCP 서버의 kb_upsert 도구를 직접 사용하세요.\n"));
+      console.log(chalk.yellow("⚠️  [deprecated] context push는 semo kb upsert로 대체 예정입니다."));
+      console.log(chalk.yellow("   봇/세션에서는 semo kb upsert 명령어를 직접 사용하세요.\n"));
 
       const domains: string[] = (options.domain as string).split(",").map((d: string) => d.trim()).filter(Boolean);
       const memDir = resolveMemoryDir(options.outDir);

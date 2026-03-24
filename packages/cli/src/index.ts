@@ -868,12 +868,7 @@ program
       await setupMCP(os.homedir(), [], options.force || false);
     }
 
-    // 6. semo-kb MCP 유저레벨 등록
-    if (!options.skipMcp) {
-      await setupSemoKbMcp();
-    }
-
-    // 7. 글로벌 CLAUDE.md에 KB-First 규칙 주입
+    // 6. 글로벌 CLAUDE.md에 KB-First 규칙 주입
     await injectKbFirstToGlobalClaudeMd();
 
     await closeConnection();
@@ -887,7 +882,7 @@ program
     console.log(chalk.gray("  ~/.claude/commands/      팀 커맨드 (DB 기반)"));
     console.log(chalk.gray("  ~/.claude/agents/        팀 에이전트 (DB 기반, dedup)"));
     console.log(chalk.gray("  ~/.claude/settings.local.json  SessionStart/Stop 훅"));
-    console.log(chalk.gray("  ~/.claude/settings.json  semo-kb MCP (유저레벨, KB-First SoT)"));
+    console.log(chalk.gray("  ~/.claude/settings.json  Claude Code 설정 (유저레벨)"));
 
     console.log(chalk.cyan("\n다음 단계:"));
     console.log(chalk.gray("  프로젝트 디렉토리에서 'semo init'을 실행하세요."));
@@ -1563,30 +1558,98 @@ function registerMCPServer(server: MCPServerConfig): { success: boolean; skipped
 // === 글로벌 CLAUDE.md에 KB-First 규칙 주입 ===
 const KB_FIRST_SECTION_MARKER = "## SEMO KB-First 행동 규칙";
 
-async function injectKbFirstToGlobalClaudeMd() {
-  const globalClaudeMd = path.join(os.homedir(), ".claude", "CLAUDE.md");
+async function buildKbFirstBlock(): Promise<string> {
+  // DB에서 온톨로지 + 타입스키마를 조회해서 동적 생성
+  let domainGuide = "";
+  try {
+    const pool = getPool();
 
-  const kbFirstBlock = `
+    // 1. 타입스키마: 타입별 scheme_key 목록
+    const schemaRows = await pool.query(
+      `SELECT type_key, scheme_key, required, scheme_description
+       FROM semo.kb_type_schema ORDER BY type_key, sort_order, scheme_key`
+    );
+    const typeSchemas = new Map<string, { scheme_key: string; required: boolean; desc: string }[]>();
+    for (const r of schemaRows.rows) {
+      const entries = typeSchemas.get(r.type_key) || [];
+      entries.push({ scheme_key: r.scheme_key, required: r.required, desc: r.scheme_description || "" });
+      typeSchemas.set(r.type_key, entries);
+    }
+
+    // 2. 온톨로지: 엔티티 타입별 도메인 목록
+    const ontoRows = await pool.query(
+      `SELECT entity_type, domain, description FROM semo.ontology ORDER BY entity_type, domain`
+    );
+    const entities = new Map<string, { domain: string; desc: string }[]>();
+    for (const r of ontoRows.rows) {
+      const list = entities.get(r.entity_type) || [];
+      list.push({ domain: r.domain, desc: r.description || "" });
+      entities.set(r.entity_type, list);
+    }
+
+    // 3. 도메인 가이드 생성
+    const orgDomains = entities.get("organization") || [];
+    const svcDomains = entities.get("service") || [];
+    const orgSchema = typeSchemas.get("organization") || [];
+    const svcSchema = typeSchemas.get("service") || [];
+
+    domainGuide += "#### 도메인 구조\n";
+    domainGuide += "| 패턴 | 예시 | 용도 |\n|------|------|------|\n";
+    if (orgDomains.length > 0) {
+      const orgEx = orgDomains.map(o => o.domain).join(", ");
+      const orgKeys = orgSchema.filter(s => !s.scheme_key.includes("{")).map(s => s.scheme_key).join(", ");
+      domainGuide += `| 조직 도메인 | \`${orgEx}\` | ${orgKeys} 등 조직 정보 |\n`;
+    }
+    if (svcDomains.length > 0) {
+      const svcEx = svcDomains.slice(0, 5).map(s => s.domain).join(", ");
+      const svcKeys = svcSchema.filter(s => !s.scheme_key.includes("{")).map(s => s.scheme_key).join(", ");
+      domainGuide += `| 서비스 도메인 | \`${svcEx}\` 등 ${svcDomains.length}개 | ${svcKeys} 등 서비스 정보 |\n`;
+    }
+
+    domainGuide += "\n#### 읽기 예시 (Query-First)\n";
+    domainGuide += "다음 주제 질문 → **반드시 `semo kb search`/`semo kb get`으로 KB 먼저 조회** 후 답변:\n";
+    // 조직 도메인 키 가이드
+    for (const s of orgSchema) {
+      if (s.scheme_key.includes("{")) {
+        const label = s.desc || s.scheme_key;
+        domainGuide += `- ${label} → \`domain: ${orgDomains[0]?.domain || "semicolon"}\`, key: \`${s.scheme_key}\`\n`;
+      }
+    }
+    // 서비스 도메인 키 가이드
+    for (const s of svcSchema.filter(s => s.required && !s.scheme_key.includes("{"))) {
+      const label = s.desc || s.scheme_key;
+      domainGuide += `- 서비스 ${label} → \`domain: {서비스명}\`, key: \`${s.scheme_key}\`\n`;
+    }
+    domainGuide += `- 서비스 KPI → \`domain: {서비스명}\`, key: \`kpi/current\`\n`;
+    domainGuide += `- 서비스 마일스톤 → \`domain: {서비스명}\`, key: \`milestone/{slug}\`\n`;
+
+  } catch {
+    // DB 연결 실패 시 최소한의 가이드
+    domainGuide = `### 읽기 (Query-First)
+다음 주제 질문 → **반드시 \`semo kb search\`/\`semo kb get\`으로 KB 먼저 조회** 후 답변.
+도메인/키 구조는 \`semo kb ontology --action list\`로 확인 가능.
+`;
+  }
+
+  return `
 ${KB_FIRST_SECTION_MARKER}
 
-> semo-kb MCP 서버가 유저레벨에 등록되어 있습니다. KB는 팀의 Single Source of Truth입니다.
+> semo CLI의 kb-manager 스킬을 통해 KB에 접근합니다. KB는 팀의 Single Source of Truth입니다.
+> 도메인/키 구조가 변경될 수 있으므로 \`semo kb ontology --action list\`로 최신 구조를 확인하세요.
 
-### 읽기 (Query-First)
-다음 주제 질문 → **반드시 kb_search/kb_get으로 KB 먼저 조회** 후 답변:
-- 팀원 정보 → \`domain: team\`
-- 프로젝트 현황 → \`domain: project\`
-- 의사결정 기록 → \`domain: decision\`
-- 업무 프로세스 → \`domain: process\`
-- 인프라 구성 → \`domain: infra\`
-- KPI → \`domain: kpi\`
-
+${domainGuide}
 **금지:** 위 주제를 자체 지식/세션 기억만으로 답변하는 것.
 KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하겠습니다."
 
 ### 쓰기 (Write-Back)
-사용자가 팀 정보를 정정/추가/변경하면, 의사결정이 내려지면 → **반드시 kb_upsert로 KB에 즉시 기록.**
+사용자가 팀 정보를 정정/추가/변경하면, 의사결정이 내려지면 → **반드시 \`semo kb upsert\`로 KB에 즉시 기록.**
 **금지:** "알겠습니다/기억하겠습니다"만 하고 KB에 쓰지 않는 것.
 `;
+}
+
+async function injectKbFirstToGlobalClaudeMd() {
+  const globalClaudeMd = path.join(os.homedir(), ".claude", "CLAUDE.md");
+  const kbFirstBlock = await buildKbFirstBlock();
 
   if (fs.existsSync(globalClaudeMd)) {
     const content = fs.readFileSync(globalClaudeMd, "utf-8");
@@ -1611,54 +1674,6 @@ KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하
   }
 }
 
-// === semo-kb MCP 유저레벨 등록 ===
-async function setupSemoKbMcp() {
-  console.log(chalk.cyan("\n📡 semo-kb MCP 유저레벨 등록"));
-  console.log(chalk.gray("   KB-First SoT — 어디서든 KB 조회/갱신 가능\n"));
-
-  // semo-kb MCP 서버 경로 탐색
-  // 1. cwd에서 packages/mcp-kb/dist/index.js 찾기
-  // 2. CLI 패키지 기준으로 monorepo 루트 탐색
-  // 3. 환경변수 SEMO_PROJECT_ROOT
-  const candidates = [
-    path.join(process.cwd(), "packages", "mcp-kb", "dist", "index.js"),
-    process.env.SEMO_PROJECT_ROOT
-      ? path.join(process.env.SEMO_PROJECT_ROOT, "packages", "mcp-kb", "dist", "index.js")
-      : "",
-    path.resolve(__dirname, "..", "..", "..", "mcp-kb", "dist", "index.js"),
-  ].filter(Boolean);
-
-  const mcpEntryPath = candidates.find((p) => fs.existsSync(p));
-
-  if (!mcpEntryPath) {
-    console.log(chalk.yellow("  ⚠ semo-kb MCP 서버를 찾을 수 없습니다."));
-    console.log(chalk.gray("    semo 프로젝트 루트에서 실행하거나 SEMO_PROJECT_ROOT 환경변수를 설정하세요."));
-    console.log(chalk.gray("    예: cd /path/to/semo && semo onboarding"));
-    return;
-  }
-
-  const absolutePath = path.resolve(mcpEntryPath);
-  console.log(chalk.gray(`  경로: ${absolutePath}`));
-
-  // claude mcp add로 유저레벨 등록
-  const result = registerMCPServer({
-    name: "semo-kb",
-    command: "node",
-    args: [absolutePath],
-    scope: "user",
-  });
-
-  if (result.success) {
-    if (result.skipped) {
-      console.log(chalk.gray("  semo-kb 이미 등록됨 (건너뜀)"));
-    } else {
-      console.log(chalk.green("  ✓ semo-kb MCP 유저레벨 등록 완료"));
-    }
-  } else {
-    console.log(chalk.yellow(`  ⚠ semo-kb 등록 실패: ${result.error}`));
-    console.log(chalk.gray("    수동 등록: claude mcp add semo-kb -s user -- node " + absolutePath));
-  }
-}
 
 // === MCP 설정 ===
 async function setupMCP(cwd: string, _extensions: string[], force: boolean) {
@@ -1683,8 +1698,7 @@ async function setupMCP(cwd: string, _extensions: string[], force: boolean) {
     mcpServers: {},
   };
 
-  // semo-kb는 유저레벨에서 등록 (semo onboarding)하므로 프로젝트 settings에 쓰지 않음
-  // 공통 서버(context7 등)도 유저레벨에 등록하므로 프로젝트 settings에 쓰지 않음
+  // 공통 서버(context7 등)는 유저레벨에 등록하므로 프로젝트 settings에 쓰지 않음
 
   fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
   console.log(chalk.green("✓ .claude/settings.json 생성됨"));
@@ -2036,6 +2050,14 @@ async function setupClaudeMd(cwd: string, _extensions: string[], force: boolean)
     }
   }
 
+  // KB-First 섹션을 DB에서 동적 생성
+  const kbFirstFull = await buildKbFirstBlock();
+  // 프로젝트용: "## SEMO KB-First 행동 규칙" → "## KB-First 행동 규칙 (NON-NEGOTIABLE)"
+  const kbFirstSection = kbFirstFull
+    .replace(KB_FIRST_SECTION_MARKER, "## KB-First 행동 규칙 (NON-NEGOTIABLE)")
+    .replace(/> semo CLI의 kb-manager 스킬을 통해.*\n/, "> KB는 팀의 Single Source of Truth이다. 아래 규칙은 예외 없이 적용된다.\n")
+    .trim();
+
   // 프로젝트 규칙만 (스킬/에이전트 목록은 글로벌 ~/.claude/에 있음)
   const claudeMdContent = `# SEMO Project Configuration
 
@@ -2044,45 +2066,21 @@ async function setupClaudeMd(cwd: string, _extensions: string[], force: boolean)
 
 ---
 
-## KB 접근 (semo-kb MCP 서버)
+## KB 접근 (semo CLI)
 
-KB 데이터는 **semo-kb MCP 서버**를 통해 Core DB에서 실시간 조회합니다.
+KB 데이터는 **semo CLI** (\`kb-manager\` 스킬)를 통해 Core DB에서 조회합니다.
 
-| MCP 도구 | 설명 |
-|----------|------|
-| \`kb_search\` | 벡터+텍스트 하이브리드 검색 (query, domain?, limit?, mode?) |
-| \`kb_get\` | domain+key 정확 조회 |
-| \`kb_list\` | 도메인별 엔트리 목록 |
-| \`kb_upsert\` | KB 항목 쓰기 (OpenAI 임베딩 자동 생성) |
-| \`kb_bot_status\` | 봇 상태 테이블 조회 |
-| \`kb_ontology\` | 온톨로지 스키마 조회 |
-| \`kb_digest\` | 봇 구독 도메인 변경 다이제스트 |
+| 명령어 | 설명 |
+|--------|------|
+| \`semo kb search "쿼리"\` | 벡터+텍스트 하이브리드 검색 |
+| \`semo kb get <domain> <key> [sub_key]\` | domain+key 정확 조회 |
+| \`semo kb list --domain <domain>\` | 도메인별 엔트리 목록 |
+| \`semo kb upsert <domain> <key> [sub_key] --content "내용"\` | KB 항목 쓰기 |
+| \`semo kb ontology --action <action>\` | 온톨로지 조회 |
 
 ---
 
-## KB-First 행동 규칙 (NON-NEGOTIABLE)
-
-> KB는 팀의 Single Source of Truth이다. 아래 규칙은 예외 없이 적용된다.
-
-### 읽기 (Query-First)
-다음 주제 질문 → **반드시 kb_search/kb_get으로 KB 먼저 조회** 후 답변:
-- 팀원 정보 → \`domain: team\`
-- 프로젝트 현황 → \`domain: project\`
-- 의사결정 기록 → \`domain: decision\`
-- 업무 프로세스 → \`domain: process\`
-- 인프라 구성 → \`domain: infra\`
-- KPI → \`domain: kpi\`
-
-**금지:** 위 주제를 자체 지식/세션 기억만으로 답변하는 것.
-KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하겠습니다."
-
-### 쓰기 (Write-Back)
-다음 상황 → **반드시 kb_upsert로 KB에 즉시 기록:**
-- 사용자가 팀 정보를 정정하거나 새 사실을 알려줄 때
-- 의사결정이 내려졌을 때
-- 프로세스/규칙이 변경되었을 때
-
-**금지:** "알겠습니다/기억하겠습니다"만 하고 KB에 쓰지 않는 것.
+${kbFirstSection}
 
 ---
 
@@ -2613,11 +2611,17 @@ import {
   kbStatus,
   kbList,
   kbSearch,
+  kbGet,
+  kbUpsert,
   ontoList,
   ontoShow,
   ontoValidate,
   ontoPullToLocal,
   ontoListTypes,
+  ontoListSchema,
+  ontoRoutingTable,
+  ontoListServices,
+  ontoListInstances,
   generateEmbedding,
   KBEntry,
 } from "./kb";
@@ -2908,6 +2912,222 @@ kbCmd
       await closeConnection();
     } catch (err) {
       spinner.fail(`동기화 실패: ${err}`);
+      await closeConnection();
+      process.exit(1);
+    }
+  });
+
+kbCmd
+  .command("get <domain> <key> [sub_key]")
+  .description("KB 단일 항목 정확 조회 (domain + key + sub_key)")
+  .option("--format <type>", "출력 형식 (json|table)", "json")
+  .action(async (domain, key, subKey, options) => {
+    try {
+      const pool = getPool();
+      const entry = await kbGet(pool, domain, key, subKey);
+
+      if (!entry) {
+        console.log(chalk.yellow(`\n  항목 없음: ${domain}/${key}${subKey ? '/' + subKey : ''}\n`));
+        await closeConnection();
+        process.exit(1);
+      }
+
+      if (options.format === "json") {
+        console.log(JSON.stringify(entry, null, 2));
+      } else {
+        console.log(chalk.cyan.bold(`\n📄 [${entry.domain}] ${entry.key}${entry.sub_key ? '/' + entry.sub_key : ''}\n`));
+        console.log(entry.content);
+        if (entry.metadata && Object.keys(entry.metadata).length > 0) {
+          console.log(chalk.gray(`\n  metadata: ${JSON.stringify(entry.metadata)}`));
+        }
+        if (entry.updated_at) {
+          console.log(chalk.gray(`  updated: ${entry.updated_at}`));
+        }
+        console.log();
+      }
+      await closeConnection();
+    } catch (err) {
+      console.error(chalk.red(`조회 실패: ${err}`));
+      await closeConnection();
+      process.exit(1);
+    }
+  });
+
+kbCmd
+  .command("upsert <domain> <key> [sub_key]")
+  .description("KB 항목 쓰기 (upsert) — 임베딩 자동 생성 + 스키마 검증")
+  .requiredOption("--content <text>", "항목 본문")
+  .option("--metadata <json>", "추가 메타데이터 (JSON 문자열)")
+  .option("--created-by <name>", "작성자 식별자", "semo-cli")
+  .action(async (domain, key, subKey, options) => {
+    const spinner = ora("KB upsert 중...").start();
+    try {
+      const pool = getPool();
+      const metadata = options.metadata ? JSON.parse(options.metadata) : undefined;
+      const result = await kbUpsert(pool, {
+        domain,
+        key,
+        sub_key: subKey,
+        content: options.content,
+        metadata,
+        created_by: options.createdBy,
+      });
+
+      if (result.success) {
+        spinner.succeed(`KB upsert 완료: ${domain}/${key}${subKey ? '/' + subKey : ''}`);
+        if (result.warnings && result.warnings.length > 0) {
+          for (const w of result.warnings) {
+            console.log(chalk.yellow(`  ⚠️ ${w}`));
+          }
+        }
+      } else {
+        spinner.fail(`KB upsert 실패: ${result.error}`);
+        process.exit(1);
+      }
+      await closeConnection();
+    } catch (err) {
+      spinner.fail(`KB upsert 실패: ${err}`);
+      await closeConnection();
+      process.exit(1);
+    }
+  });
+
+kbCmd
+  .command("ontology")
+  .description("온톨로지 조회 — 도메인/타입/스키마/라우팅 테이블")
+  .option("--action <type>", "조회 동작 (list|show|services|types|instances|schema|routing-table)", "list")
+  .option("--domain <name>", "action=show 시 도메인")
+  .option("--type <name>", "action=schema 시 타입 키")
+  .option("--format <type>", "출력 형식 (json|table)", "table")
+  .action(async (options) => {
+    try {
+      const pool = getPool();
+      const action = options.action as string;
+
+      if (action === "list") {
+        const domains = await ontoList(pool);
+        if (options.format === "json") {
+          console.log(JSON.stringify(domains, null, 2));
+        } else {
+          console.log(chalk.cyan.bold("\n📐 온톨로지 도메인\n"));
+          for (const d of domains) {
+            const typeStr = d.entity_type ? chalk.gray(` [${d.entity_type}]`) : "";
+            const svcStr = d.service ? chalk.gray(` (${d.service})`) : "";
+            console.log(chalk.cyan(`  ${d.domain}`) + typeStr + svcStr);
+            if (d.description) console.log(chalk.gray(`    ${d.description}`));
+          }
+          console.log();
+        }
+      } else if (action === "show") {
+        if (!options.domain) {
+          console.log(chalk.red("--domain 옵션이 필요합니다."));
+          process.exit(1);
+        }
+        const onto = await ontoShow(pool, options.domain);
+        if (!onto) {
+          console.log(chalk.red(`온톨로지 '${options.domain}'을 찾을 수 없습니다.`));
+          process.exit(1);
+        }
+        if (options.format === "json") {
+          console.log(JSON.stringify(onto, null, 2));
+        } else {
+          console.log(chalk.cyan.bold(`\n📐 온톨로지: ${onto.domain}\n`));
+          if (onto.description) console.log(chalk.white(`  ${onto.description}`));
+          console.log(chalk.gray(`  버전: ${onto.version}`));
+          console.log(chalk.gray(`  스키마:\n`));
+          console.log(chalk.white(JSON.stringify(onto.schema, null, 2).split("\n").map(l => "    " + l).join("\n")));
+          console.log();
+        }
+      } else if (action === "services") {
+        const services = await ontoListServices(pool);
+        if (options.format === "json") {
+          console.log(JSON.stringify(services, null, 2));
+        } else {
+          console.log(chalk.cyan.bold("\n📐 서비스 목록\n"));
+          for (const s of services) {
+            console.log(chalk.cyan(`  ${s.service}`) + chalk.gray(` (${s.domain_count} domains)`));
+            console.log(chalk.gray(`    ${s.domains.join(", ")}`));
+          }
+          console.log();
+        }
+      } else if (action === "types") {
+        const types = await ontoListTypes(pool);
+        if (options.format === "json") {
+          console.log(JSON.stringify(types, null, 2));
+        } else {
+          console.log(chalk.cyan.bold("\n📐 온톨로지 타입\n"));
+          for (const t of types) {
+            console.log(chalk.cyan(`  ${t.type_key}`) + chalk.gray(` (v${t.version})`));
+            if (t.description) console.log(chalk.gray(`    ${t.description}`));
+          }
+          console.log();
+        }
+      } else if (action === "instances") {
+        const instances = await ontoListInstances(pool);
+        if (options.format === "json") {
+          console.log(JSON.stringify(instances, null, 2));
+        } else {
+          console.log(chalk.cyan.bold("\n📐 서비스 인스턴스\n"));
+          for (const inst of instances) {
+            console.log(chalk.cyan(`  ${inst.domain}`) + chalk.gray(` (${inst.entry_count} entries)`));
+            if (inst.description) console.log(chalk.gray(`    ${inst.description}`));
+            if (inst.scoped_domains.length > 0) {
+              console.log(chalk.gray(`    scoped: ${inst.scoped_domains.join(", ")}`));
+            }
+          }
+          console.log();
+        }
+      } else if (action === "schema") {
+        if (!options.type) {
+          console.log(chalk.red("--type 옵션이 필요합니다. (예: --type service)"));
+          process.exit(1);
+        }
+        const schema = await ontoListSchema(pool, options.type);
+        if (options.format === "json") {
+          console.log(JSON.stringify(schema, null, 2));
+        } else {
+          console.log(chalk.cyan.bold(`\n📐 타입 스키마: ${options.type}\n`));
+          if (schema.length === 0) {
+            console.log(chalk.yellow(`  스키마 없음: '${options.type}'`));
+          } else {
+            for (const s of schema) {
+              const reqStr = s.required ? chalk.red(" *") : "";
+              const typeStr = chalk.gray(` [${s.key_type}]`);
+              console.log(chalk.cyan(`  ${s.scheme_key}`) + typeStr + reqStr);
+              if (s.scheme_description) console.log(chalk.gray(`    ${s.scheme_description}`));
+              if (s.value_hint) console.log(chalk.gray(`    hint: ${s.value_hint}`));
+            }
+          }
+          console.log();
+        }
+      } else if (action === "routing-table") {
+        const table = await ontoRoutingTable(pool);
+        if (options.format === "json") {
+          console.log(JSON.stringify(table, null, 2));
+        } else {
+          console.log(chalk.cyan.bold("\n📐 라우팅 테이블\n"));
+          let lastDomain = "";
+          for (const r of table) {
+            if (r.domain !== lastDomain) {
+              lastDomain = r.domain;
+              const svcStr = r.service ? chalk.gray(` (${r.service})`) : "";
+              console.log(chalk.white.bold(`\n  ${r.domain}`) + chalk.gray(` [${r.entity_type}]`) + svcStr);
+              if (r.domain_description) console.log(chalk.gray(`    ${r.domain_description}`));
+            }
+            const typeStr = chalk.gray(` [${r.key_type}]`);
+            console.log(chalk.cyan(`    → ${r.scheme_key}`) + typeStr);
+            if (r.scheme_description) console.log(chalk.gray(`      ${r.scheme_description}`));
+          }
+          console.log();
+        }
+      } else {
+        console.log(chalk.red(`알 수 없는 action: '${action}'. 사용 가능: list, show, services, types, instances, schema, routing-table`));
+        process.exit(1);
+      }
+
+      await closeConnection();
+    } catch (err) {
+      console.error(chalk.red(`온톨로지 조회 실패: ${err}`));
       await closeConnection();
       process.exit(1);
     }

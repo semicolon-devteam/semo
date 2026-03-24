@@ -12,6 +12,16 @@ import { Pool } from "pg";
 import * as fs from "fs";
 import * as path from "path";
 
+function splitKey(combinedKey: string): { key: string; subKey: string } {
+  const idx = combinedKey.indexOf('/');
+  if (idx === -1) return { key: combinedKey, subKey: '' };
+  return { key: combinedKey.substring(0, idx), subKey: combinedKey.substring(idx + 1) };
+}
+
+function combineKey(key: string, subKey: string): string {
+  return subKey ? `${key}/${subKey}` : key;
+}
+
 // ============================================================
 // Embedding
 // ============================================================
@@ -92,6 +102,7 @@ export async function generateEmbeddings(texts: string[]): Promise<(number[] | n
 export interface KBEntry {
   domain: string;
   key: string;
+  sub_key?: string;
   content: string;
   metadata?: Record<string, unknown>;
   created_by?: string;
@@ -126,6 +137,7 @@ export interface KBStatusInfo {
 export interface KBDigestEntry {
   domain: string;
   key: string;
+  sub_key?: string;
   content: string;
   version: number;
   change_type: 'new' | 'updated';
@@ -214,7 +226,7 @@ export async function kbPull(
   const client = await pool.connect();
   try {
     let query = `
-      SELECT domain, key, content, metadata, created_by, version,
+      SELECT domain, key, sub_key, content, metadata, created_by, version,
              created_at::text, updated_at::text
       FROM semo.knowledge_base
     `;
@@ -285,14 +297,15 @@ export async function kbPush(
         const embedding = embeddings[i];
         const embeddingStr = embedding ? `[${embedding.join(",")}]` : null;
 
+        const { key: flatKey, subKey } = splitKey(entry.key);
         await client.query(
-          `INSERT INTO semo.knowledge_base (domain, key, content, metadata, created_by, embedding)
-           VALUES ($1, $2, $3, $4, $5, $6::vector)
-           ON CONFLICT (domain, key) DO UPDATE SET
+          `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, embedding)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::vector)
+           ON CONFLICT (domain, key, sub_key) DO UPDATE SET
              content = EXCLUDED.content,
              metadata = EXCLUDED.metadata,
              embedding = EXCLUDED.embedding`,
-          [entry.domain, entry.key, entry.content, JSON.stringify(entry.metadata || {}), entry.created_by || createdBy || "unknown", embeddingStr]
+          [entry.domain, flatKey, subKey, entry.content, JSON.stringify(entry.metadata || {}), entry.created_by || createdBy || "unknown", embeddingStr]
         );
         upserted++;
       } catch (err) {
@@ -360,7 +373,7 @@ export async function kbList(
   const offset = options.offset || 0;
 
   try {
-    let query = "SELECT domain, key, content, metadata, created_by, version, updated_at::text FROM semo.knowledge_base";
+    let query = "SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text FROM semo.knowledge_base";
     const params: (string | number)[] = [];
     let paramIdx = 1;
 
@@ -375,7 +388,7 @@ export async function kbList(
         params.push(serviceDomains as any);
       }
     }
-    query += ` ORDER BY domain, key LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+    query += ` ORDER BY domain, key, sub_key LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
     params.push(limit, offset);
 
     const result = await client.query(query, params);
@@ -415,7 +428,7 @@ export async function kbSearch(
 
         // Vector search on shared KB
         let sql = `
-          SELECT domain, key, content, metadata, created_by, version, updated_at::text,
+          SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text,
                  1 - (embedding <=> $1::vector) as score
           FROM semo.knowledge_base
           WHERE embedding IS NOT NULL
@@ -453,7 +466,7 @@ export async function kbSearch(
       // Build per-token ILIKE conditions + count matching tokens for scoring
       const tokenConditions = tokens.map(token => {
         textParams.push(`%${token}%`);
-        return `(CASE WHEN content ILIKE $${tIdx} OR key ILIKE $${tIdx++} THEN 1 ELSE 0 END)`;
+        return `(CASE WHEN content ILIKE $${tIdx} OR key ILIKE $${tIdx} OR sub_key ILIKE $${tIdx++} THEN 1 ELSE 0 END)`;
       });
 
       // Score = 0.7 base + 0.15 * (matched_tokens / total_tokens), capped at 0.95
@@ -463,13 +476,13 @@ export async function kbSearch(
       const scoreExpr = `LEAST(0.95, 0.7 + 0.15 * (${matchCountExpr})::float / ${Math.max(tokens.length, 1)})`;
 
       // WHERE: any token matches
-      const whereTokens = tokens.map((_, i) => `(content ILIKE $${i + 1} OR key ILIKE $${i + 1})`);
+      const whereTokens = tokens.map((_, i) => `(content ILIKE $${i + 1} OR key ILIKE $${i + 1} OR sub_key ILIKE $${i + 1})`);
       const whereClause = whereTokens.length > 0
         ? whereTokens.join(" OR ")
         : "FALSE";
 
       let textSql = `
-        SELECT domain, key, content, metadata, created_by, version, updated_at::text,
+        SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text,
                ${scoreExpr} as score
         FROM semo.knowledge_base
         WHERE ${whereClause}
@@ -491,10 +504,10 @@ export async function kbSearch(
       // Deduplicate by domain/key; if already in semantic results, boost its score
       const resultMap = new Map<string, any>();
       for (const r of results) {
-        resultMap.set(`${r.domain}/${r.key}`, r);
+        resultMap.set(`${r.domain}/${r.key}/${r.sub_key}`, r);
       }
       for (const row of textResult.rows) {
-        const k = `${row.domain}/${row.key}`;
+        const k = `${row.domain}/${row.key}/${row.sub_key}`;
         const existing = resultMap.get(k);
         if (existing) {
           // Boost: semantic match + text match = highest relevance
@@ -514,9 +527,9 @@ export async function kbSearch(
   } catch {
     // Ultimate fallback: simple ILIKE
     let sql = `
-      SELECT domain, key, content, metadata, created_by, version, updated_at::text
+      SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text
       FROM semo.knowledge_base
-      WHERE content ILIKE $1 OR key ILIKE $1
+      WHERE content ILIKE $1 OR key ILIKE $1 OR sub_key ILIKE $1
     `;
     const params: (string | number)[] = [`%${query}%`];
     let paramIdx = 2;
@@ -700,7 +713,7 @@ export async function kbDigest(pool: Pool, since: string, domain?: string): Prom
 
   try {
     let sql = `
-      SELECT domain, key, content, version, updated_at::text,
+      SELECT domain, key, sub_key, content, version, updated_at::text,
              CASE WHEN created_at > $1 THEN 'new' ELSE 'updated' END as change_type
       FROM semo.knowledge_base
       WHERE updated_at > $1 OR created_at > $1
@@ -717,6 +730,314 @@ export async function kbDigest(pool: Pool, since: string, domain?: string): Prom
     const result = await client.query(sql, params);
 
     return { changes: result.rows, since, generatedAt };
+  } finally {
+    client.release();
+  }
+}
+
+// ============================================================
+// KB Get / Upsert (CLI counterparts of MCP kb functions)
+// ============================================================
+
+/**
+ * Get a single KB entry by domain + key + sub_key
+ */
+export async function kbGet(
+  pool: Pool,
+  domain: string,
+  rawKey: string,
+  rawSubKey?: string
+): Promise<KBEntry | null> {
+  let key: string;
+  let subKey: string;
+  if (rawSubKey !== undefined) {
+    key = rawKey;
+    subKey = rawSubKey;
+  } else {
+    const split = splitKey(rawKey);
+    key = split.key;
+    subKey = split.subKey;
+  }
+
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT domain, key, sub_key, content, metadata, created_by, version,
+              created_at::text, updated_at::text
+       FROM semo.knowledge_base
+       WHERE domain = $1 AND key = $2 AND sub_key = $3`,
+      [domain, key, subKey]
+    );
+    return result.rows[0] || null;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Upsert a single KB entry with domain/key validation and embedding generation
+ */
+export async function kbUpsert(
+  pool: Pool,
+  entry: {
+    domain: string;
+    key: string;
+    sub_key?: string;
+    content: string;
+    metadata?: Record<string, unknown>;
+    created_by?: string;
+  }
+): Promise<{ success: boolean; error?: string; warnings?: string[] }> {
+  let key: string;
+  let subKey: string;
+  if (entry.sub_key !== undefined) {
+    key = entry.key;
+    subKey = entry.sub_key;
+  } else {
+    const split = splitKey(entry.key);
+    key = split.key;
+    subKey = split.subKey;
+  }
+
+  // Domain validation
+  const client = await pool.connect();
+  try {
+    const ontoCheck = await client.query(
+      "SELECT domain FROM semo.ontology WHERE domain = $1",
+      [entry.domain]
+    );
+    if (ontoCheck.rows.length === 0) {
+      const known = await client.query("SELECT domain FROM semo.ontology ORDER BY domain");
+      const knownDomains = known.rows.map((r: { domain: string }) => r.domain);
+      return {
+        success: false,
+        error: `도메인 '${entry.domain}'은(는) 온톨로지에 등록되지 않았습니다. 등록된 도메인: [${knownDomains.join(", ")}]`,
+      };
+    }
+  } finally {
+    client.release();
+  }
+
+  // Key validation against type schema
+  try {
+    const schemaClient = await pool.connect();
+    try {
+      const typeResult = await schemaClient.query(
+        "SELECT entity_type FROM semo.ontology WHERE domain = $1 AND entity_type IS NOT NULL",
+        [entry.domain]
+      );
+      if (typeResult.rows.length > 0) {
+        const entityType = typeResult.rows[0].entity_type;
+        const schemaResult = await schemaClient.query(
+          "SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type FROM semo.kb_type_schema WHERE type_key = $1",
+          [entityType]
+        );
+        const schemas = schemaResult.rows as Array<{ scheme_key: string; key_type: string }>;
+        if (schemas.length > 0) {
+          const match = schemas.find(s => s.scheme_key === key);
+          if (!match) {
+            const allowedKeys = schemas.map(s =>
+              s.key_type === "singleton" ? s.scheme_key : `${s.scheme_key}/{sub_key}`
+            );
+            return {
+              success: false,
+              error: `키 '${key}'은(는) '${entityType}' 타입의 스키마에 허용되지 않습니다. 허용 키: [${allowedKeys.join(", ")}]`,
+            };
+          }
+          if (match.key_type === "singleton" && subKey !== "") {
+            return { success: false, error: `키 '${key}'은(는) singleton이므로 sub_key가 비어야 합니다.` };
+          }
+          if (match.key_type === "collection" && subKey === "") {
+            return { success: false, error: `키 '${key}'은(는) collection이므로 sub_key가 필요합니다.` };
+          }
+        }
+      }
+    } finally {
+      schemaClient.release();
+    }
+  } catch {
+    // Validation failure is non-fatal
+  }
+
+  // Generate embedding (mandatory)
+  const fullKey = combineKey(key, subKey);
+  const text = `${fullKey}: ${entry.content}`;
+  const embedding = await generateEmbedding(text);
+  if (!embedding) {
+    const reason = process.env.OPENAI_API_KEY
+      ? "임베딩 생성 API 호출 실패"
+      : "OPENAI_API_KEY가 설정되지 않음";
+    return {
+      success: false,
+      error: `임베딩 생성 실패 — ${reason}. 임베딩 없이 저장하면 벡터 검색에서 누락되므로 저장이 거부됩니다.`,
+    };
+  }
+  const embeddingStr = `[${embedding.join(",")}]`;
+
+  const writeClient = await pool.connect();
+  try {
+    await writeClient.query(
+      `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, embedding)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::vector)
+       ON CONFLICT (domain, key, sub_key) DO UPDATE SET
+         content = EXCLUDED.content,
+         metadata = EXCLUDED.metadata,
+         embedding = EXCLUDED.embedding`,
+      [
+        entry.domain,
+        key,
+        subKey,
+        entry.content,
+        JSON.stringify(entry.metadata || {}),
+        entry.created_by || "semo-cli",
+        embeddingStr,
+      ]
+    );
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  } finally {
+    writeClient.release();
+  }
+}
+
+// ============================================================
+// Extended Ontology Operations (routing-table, schema, services, instances)
+// ============================================================
+
+export interface TypeSchemaEntry {
+  type_key: string;
+  scheme_key: string;
+  scheme_description: string;
+  required: boolean;
+  value_hint: string | null;
+  sort_order: number;
+  key_type: "singleton" | "collection";
+}
+
+export interface RoutingEntry {
+  domain: string;
+  entity_type: string;
+  service: string | null;
+  domain_description: string | null;
+  scheme_key: string;
+  key_type: string;
+  scheme_description: string;
+  value_hint: string | null;
+}
+
+export interface ServiceInfo {
+  service: string;
+  domain_count: number;
+  domains: string[];
+}
+
+export interface ServiceInstance {
+  domain: string;
+  description: string | null;
+  service: string;
+  tags: string[];
+  scoped_domains: string[];
+  entry_count: number;
+}
+
+/**
+ * List type schema entries for a given entity type
+ */
+export async function ontoListSchema(
+  pool: Pool,
+  typeKey: string,
+): Promise<TypeSchemaEntry[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT type_key, scheme_key, scheme_description, required, value_hint, sort_order,
+              COALESCE(key_type, 'singleton') as key_type
+       FROM semo.kb_type_schema
+       WHERE type_key = $1
+       ORDER BY sort_order, scheme_key`,
+      [typeKey],
+    );
+    return result.rows;
+  } catch {
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Full domain→key routing table for bot auto-classification
+ */
+export async function ontoRoutingTable(pool: Pool): Promise<RoutingEntry[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(`
+      SELECT
+        o.domain,
+        o.entity_type,
+        o.service,
+        o.description AS domain_description,
+        s.scheme_key,
+        s.key_type,
+        s.scheme_description,
+        s.value_hint
+      FROM semo.ontology o
+      JOIN semo.kb_type_schema s ON s.type_key = o.entity_type
+      ORDER BY o.domain, s.sort_order
+    `);
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * List services grouped with domain counts
+ */
+export async function ontoListServices(pool: Pool): Promise<ServiceInfo[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(`
+      SELECT service, COUNT(*)::int as domain_count,
+             ARRAY_AGG(domain ORDER BY domain) as domains
+      FROM semo.ontology
+      WHERE service IS NOT NULL
+      GROUP BY service
+      ORDER BY service
+    `);
+    return result.rows;
+  } catch {
+    return [];
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * List service instances (entity_type = 'service')
+ */
+export async function ontoListInstances(pool: Pool): Promise<ServiceInstance[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(`
+      SELECT o.domain, o.description, o.service, o.tags,
+             COALESCE(
+               (SELECT ARRAY_AGG(o2.domain ORDER BY o2.domain)
+                FROM semo.ontology o2
+                WHERE o2.service = o.service AND o2.domain != o.domain),
+               '{}'
+             ) as scoped_domains,
+             (SELECT COUNT(*)::int FROM semo.knowledge_base k
+              WHERE k.domain = o.domain
+                 OR k.domain LIKE o.service || '.%') as entry_count
+      FROM semo.ontology o
+      WHERE o.entity_type = 'service'
+      ORDER BY o.domain
+    `);
+    return result.rows;
+  } catch {
+    return [];
   } finally {
     client.release();
   }

@@ -11,34 +11,32 @@
 
 ```
 로컬 Claude Code 세션
-    ↕ semo-kb MCP 서버 (실시간 벡터 검색)
+    ↕ semo CLI (kb-manager 스킬)
 팀 Core DB (PostgreSQL, semo 스키마)
-    ↕ semo-kb MCP 서버
+    ↕ semo CLI (kb-manager 스킬)
 OpenClaw 봇팀 (7개 봇)
   workclaw · reviewclaw · planclaw · designclaw
   infraclaw · growthclaw · semiclaw
 ```
 
-**이 CLAUDE.md가 설치된 프로젝트는 semo-kb MCP 서버를 통해 팀 KB에 실시간 접근한다.**
+**이 CLAUDE.md가 설치된 프로젝트는 semo CLI를 통해 팀 KB에 실시간 접근한다.**
 
 ---
 
-## KB 접근 (semo-kb MCP 서버)
+## KB 접근 (semo CLI)
 
-KB 데이터는 **semo-kb MCP 서버**를 통해 Core DB에서 실시간 조회합니다.
-`.claude/memory/*.md` 파일 기반 동기화는 v4.2.0에서 제거되었습니다.
+KB 데이터는 **semo CLI** (`kb-manager` 스킬)를 통해 Core DB에서 조회합니다.
 
-| MCP 도구 | 설명 |
-|----------|------|
-| `kb_search` | 벡터+텍스트 하이브리드 검색 (query, domain?, service?, limit?, mode?) |
-| `kb_get` | domain+key 정확 조회 |
-| `kb_list` | 도메인별 엔트리 목록 (domain?, service?, limit?) |
-| `kb_upsert` | KB 항목 쓰기 (OpenAI 임베딩 자동 생성) |
-| `kb_bot_status` | 봇 상태 테이블 조회 |
-| `kb_ontology` | 온톨로지 조회 (action: list/show/services/types/instances/schema) |
-| `kb_digest` | 봇 구독 도메인 변경 다이제스트 |
+| 명령어 | 설명 |
+|--------|------|
+| `semo kb search "쿼리"` | 벡터+텍스트 하이브리드 검색 |
+| `semo kb get <domain> <key> [sub_key]` | domain+key 정확 조회 |
+| `semo kb list --domain <domain>` | 도메인별 엔트리 목록 |
+| `semo kb upsert <domain> <key> [sub_key] --content "내용"` | KB 항목 쓰기 |
+| `semo kb ontology --action <action>` | 온톨로지 조회 (list/show/services/types/instances/schema/routing-table) |
 
 `semo context sync`는 스킬/에이전트/커맨드 글로벌 캐시 + 크론잡만 동기화합니다.
+스킬은 `skill_definitions` 테이블에서 관리되며, `semo context sync`로 봇 워크스페이스에 자동 배포됩니다.
 
 ---
 
@@ -47,9 +45,9 @@ KB 데이터는 **semo-kb MCP 서버**를 통해 Core DB에서 실시간 조회�
 > KB는 팀의 Single Source of Truth이다. 아래 규칙은 예외 없이 적용된다.
 
 ### 읽기 (Query-First)
-다음 주제 질문 → **반드시 kb_search/kb_get으로 KB 먼저 조회** 후 답변:
+다음 주제 질문 → **반드시 `semo kb search`/`semo kb get`으로 KB 먼저 조회** 후 답변:
 - 팀원 정보 → `domain: semicolon`, key: `team/{name}`
-- 프로젝트/서비스 현황 → `kb_ontology(action='instances')` 또는 `domain: {serviceName}`
+- 프로젝트/서비스 현황 → `semo kb ontology --action instances` 또는 `domain: {serviceName}`
 - 의사결정 기록 → `domain: semicolon`, key: `decision/{date}/{slug}`
 - 업무 프로세스 → `domain: semicolon`, key: `process/{name}`
 - 인프라 구성 → `domain: semicolon`, key: `infra/{name}`
@@ -73,7 +71,7 @@ KB 조회가 복잡하거나 여러 도메인에 걸친 검색이 필요할 때,
 KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하겠습니다."
 
 ### 쓰기 (Write-Back)
-다음 상황 → **반드시 kb_upsert로 KB에 즉시 기록:**
+다음 상황 → **반드시 `semo kb upsert`로 KB에 즉시 기록:**
 - 사용자가 팀 정보를 정정하거나 새 사실을 알려줄 때
 - 의사결정이 내려졌을 때
 - 프로세스/규칙이 변경되었을 때
@@ -87,7 +85,7 @@ KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하
 ```
 .claude/
 ├── CLAUDE.md       # 이 파일
-├── settings.json   # MCP 서버 설정 (semo-kb 포함) + SessionStart/Stop 훅
+├── settings.json   # SessionStart/Stop 훅 + 권한 설정
 ├── skills/         # SEMO 스킬 (글로벌 캐시)
 ├── agents/         # SEMO 에이전트 (글로벌 캐시)
 └── commands/SEMO   # 슬래시 커맨드
@@ -103,16 +101,9 @@ KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하
 ### 이 프로젝트의 역할
 
 - SEMO CLI (`packages/cli`) — `semo init`, `semo context sync`, `semo doctor` 등 CLI 도구
-- semo-kb MCP 서버 (`packages/mcp-kb`) — KB 실시간 벡터 검색 MCP 서버
+- KB 벡터 검색 서버 (`packages/mcp-kb`) — 로컬 개발 전용
 - semo-dashboard (`packages/semo-dashboard`) — 팀 대시보드 웹 UI
 - OpenClaw 봇 워크스페이스 관리 — 7개 봇의 설정/스킬/메모리 관리
-
-### MCP 서버 설정 규칙
-
-- **프로젝트레벨** `.claude/settings.json` — semo-kb만 등록 (프로젝트 전용 서버)
-- **유저레벨** `~/.claude/settings.json` — 공통 서버(context7, playwright 등) 등록
-- `semo init`은 공통 서버를 `claude mcp add -s user`로 유저레벨에 등록하고, 프로젝트 settings.json에는 semo-kb만 기록
-- 공통 서버와 프로젝트 전용 서버를 같은 레벨에 넣으면 충돌 발생 가능
 
 ### 기술 스택
 
@@ -120,7 +111,6 @@ KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하
 - PostgreSQL (Core DB, semo 스키마) + pgvector (임베딩)
 - npm workspaces (packages/*)
 - Next.js 15 (semo-dashboard)
-- MCP SDK (@modelcontextprotocol/sdk)
 
 ### 브랜치 전략
 
@@ -151,12 +141,12 @@ OpenClaw 봇팀 (7봇)  ↔  Core DB (semo 스키마)  ↔  로컬 Claude Code �
 1. **SoT 위치**: 이 데이터/규칙의 SoT는 어디인가?
    - DB 테이블 → DB에서 읽어야 함 (하드코딩 금지)
    - 봇 워크스페이스 → `~/.openclaw-{bot}/workspace/` 참조
-   - KB → `kb_get/kb_search` MCP 조회
+   - KB → `semo kb get/search` 조회
 
 2. **동기화 영향**: 이 변경이 3자 중 누구에게 영향을 주는가?
    - CLI만 → 로컬 변경으로 충분
-   - MCP 서버 → 봇과 로컬 세션 모두에 영향 (하위 호환 필수)
-   - DB 스키마 → 마이그레이션 + MCP 서버 + CLI + 대시보드 전부 확인
+   - CLI/스킬 → 봇과 로컬 세션 모두에 영향 (하위 호환 필수)
+   - DB 스키마 → 마이그레이션 + CLI + 대시보드 전부 확인
    - 봇 워크스페이스 규격 → `bot_workspace_standard` DB 테이블 업데이트 필수
 
 3. **하드코딩 금지**: 봇 이름, 봇 목록, 워크스페이스 경로, 도메인 목록 등을 코드에 직접 넣지 말 것. 반드시 DB에서 동적으로 로드.
@@ -167,14 +157,14 @@ OpenClaw 봇팀 (7봇)  ↔  Core DB (semo 스키마)  ↔  로컬 Claude Code �
 4. **검증 범위**: 변경 후 아래 중 해당하는 항목을 검증:
    - `semo test run workspace-audit` — 봇 워크스페이스 규격 준수
    - `semo test run 018-transplant` — KB 데이터 무결성
-   - MCP 도구 호출 테스트 — `kb_get`, `kb_search` 등이 정상 동작하는지
+   - CLI KB 명령어 테스트 — `semo kb get`, `semo kb search` 등이 정상 동작하는지
    - 봇 세션에서의 동작 — 변경이 봇에 영향을 주면 게이트웨이로 확인
 
 ### 위반 사례 (하지 말 것)
 
 - 봇 이름을 배열로 하드코딩: `const BOTS = ["semiclaw", "workclaw", ...]`
 - 워크스페이스 규칙을 셸 스크립트에 직접 작성 (DB `bot_workspace_standard`가 SoT)
-- MCP 도구 파라미터를 변경하면서 하위 호환을 깨뜨림
+- CLI 명령어 파라미터를 변경하면서 하위 호환을 깨뜨림
 - DB 스키마를 변경하면서 마이그레이션 없이 직접 ALTER
 - 로컬 파일에만 설정을 저장하고 DB에 반영하지 않음
 
@@ -182,7 +172,7 @@ OpenClaw 봇팀 (7봇)  ↔  Core DB (semo 스키마)  ↔  로컬 Claude Code �
 
 - DB에서 봇 목록을 동적 조회하여 사용
 - 새 규칙 추가 시 `bot_workspace_standard`에 INSERT
-- MCP 도구 변경 시 기존 파라미터 유지 + 새 파라미터는 optional
+- CLI 명령어 변경 시 기존 파라미터 유지 + 새 파라미터는 optional
 - 변경 후 `semo test run` 으로 검증
 
 ---
@@ -198,6 +188,22 @@ npm run build      # 빌드 검증
 ```
 
 `--no-verify` 사용 금지.
+
+### CLI 배포 (팀 전파)
+
+> **로컬 빌드만으로는 다른 팀원에게 변경이 전파되지 않는다.**
+
+| 패키지 | npm 이름 | 배포 트리거 |
+|--------|----------|------------|
+| `packages/cli` | `@team-semicolon/semo-cli` | Git tag `cli-v*` |
+| `packages/mcp-kb` | `@team-semicolon/semo-mcp-kb` | Git tag `mcp-v*` |
+
+**배포 절차:**
+1. `cd packages/cli && npm version patch` (또는 minor/major)
+2. `git commit` + `git tag cli-vX.Y.Z` + `git push origin dev --tags`
+3. GitHub Actions (`publish-cli.yml`)가 자동으로 `npm publish`
+
+CLI 소스 수정 후에는 사용자에게 배포 필요 여부를 확인할 것.
 
 ---
 
@@ -251,7 +257,7 @@ Core DB: semo.bot_workspace_files (축소됨: ~100파일)
 semo-dashboard (KB + bot_workspace_files 병합)
         ↑
 Core DB: semo.knowledge_base (KB: bot-config/spec/skill 도메인 포함)
-        ↑ kb_upsert (MCP)
+        ↑ semo kb upsert (CLI)
 봇/사용자가 직접 쓰기
 ```
 
@@ -264,7 +270,7 @@ Core DB: semo.knowledge_base (KB: bot-config/spec/skill 도메인 포함)
 ├── USER.md              # 봇 고유: 사용자 컨텍스트 (< 15줄)
 ├── MEMORY.md            # 봇 고유: KB 도메인 인덱스 (< 30줄, main 세션만)
 ├── HEARTBEAT.md         # 선택: 크론 작업 (해당 봇만, 현재 semiclaw)
-├── .claude/settings.json # MCP 서버 설정
+├── .claude/settings.json # 훅 + 권한 설정
 ├── hooks/               # OpenClaw 훅 (직접 실행)
 ├── memory/              # 일일로그 (YYYY-MM-DD.md)
 ├── shared/              # → ~/.openclaw-shared/ (심링크)
@@ -279,8 +285,8 @@ Core DB: semo.knowledge_base (KB: bot-config/spec/skill 도메인 포함)
 - `CLAUDE.md` (봇 내) → 프로젝트 .claude/CLAUDE.md에 이미 존재
 
 **봇 ID/채널 ID 조회:**
-- `kb_get("semicolon", "team/bot-ids")` — 봇 Slack ID 매핑
-- `kb_get("semicolon", "team/slack-channels")` — 채널 ID 매핑
+- `semo kb get semicolon team bot-ids` — 봇 Slack ID 매핑
+- `semo kb get semicolon team slack-channels` — 채널 ID 매핑
 
 ### 봇 설정 파일
 
@@ -321,7 +327,7 @@ http://127.0.0.1:{포트}/chat?session=agent%3Amain%3Amain&token={토큰}
 ```bash
 semo doctor              # 환경 진단 (DB 연결, 설치 상태)
 semo config db           # DB URL 재설정
-semo context sync        # 스킬/에이전트/캐시 동기화 (KB는 MCP 사용)
+semo context sync        # 스킬/에이전트/캐시 동기화
 semo bots status         # 봇 상태 조회
 semo memory sync         # L1(bot workspace) → L2(KB) 메모리 동기화
 semo onto types          # 온톨로지 타입 목록

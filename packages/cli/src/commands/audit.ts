@@ -356,7 +356,7 @@ const FIXABLE_DIRS: Record<string, string> = {
 
 const FILE_TEMPLATES: Record<string, (botId: string) => string> = {
   "SOUL.md": (botId) =>
-    `# ${botId} — SOUL\n\n## Identity\n\n> TODO\n\n## R&R\n\n> TODO\n\n## KB Lookup Protocol\n\n> kb_get/kb_search로 팀 정보 조회\n\n## Operating Procedures\n\n> TODO\n\n## NON-NEGOTIABLE\n\n1. TODO\n`,
+    `# ${botId} — SOUL\n\n## Identity\n\n> TODO\n\n## R&R\n\n> TODO\n\n## KB Lookup Protocol\n\n> semo kb get/search로 팀 정보 조회\n\n## Operating Procedures\n\n> TODO\n\n## NON-NEGOTIABLE\n\n1. TODO\n`,
 };
 
 export function fixBot(

@@ -166,7 +166,8 @@ async function syncMemories(
 
     try {
       const domain = "memory";
-      const key = stateKey;
+      const flatKey = "memory";
+      const subKey = stateKey; // sourceId/date
       const metadata = {
         source_type: candidate.sourceType,
         source_id: candidate.sourceId,
@@ -177,22 +178,23 @@ async function syncMemories(
       };
 
       // Generate embedding
-      const text = `${key}: ${candidate.content}`;
+      const text = `memory/${stateKey}: ${candidate.content}`;
       const embedding = await generateEmbedding(text);
       const embeddingStr = embedding ? `[${embedding.join(",")}]` : null;
 
       const client = await pool.connect();
       try {
         await client.query(
-          `INSERT INTO semo.knowledge_base (domain, key, content, metadata, created_by, embedding)
-           VALUES ($1, $2, $3, $4, $5, $6::vector)
-           ON CONFLICT (domain, key) DO UPDATE SET
+          `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, embedding)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::vector)
+           ON CONFLICT (domain, key, sub_key) DO UPDATE SET
              content = EXCLUDED.content,
              metadata = EXCLUDED.metadata,
              embedding = EXCLUDED.embedding`,
           [
             domain,
-            key,
+            flatKey,
+            subKey,
             candidate.content,
             JSON.stringify(metadata),
             "semo-memory-sync",
@@ -337,8 +339,8 @@ export function registerMemoryCommands(program: Command): void {
 
       // Group by source
       const grouped: Record<string, { date: string; hash: string; syncedAt: string }[]> = {};
-      for (const [key, val] of entries) {
-        const [sourceId, date] = key.split("/");
+      for (const [stKey, val] of entries) {
+        const [sourceId, date] = stKey.split("/");
         if (specificBot && sourceId !== specificBot) continue;
         if (!grouped[sourceId]) grouped[sourceId] = [];
         grouped[sourceId].push({ date, ...val });
