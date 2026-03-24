@@ -7,6 +7,7 @@ interface FileTreeProps {
   botId: string;
   selectedFile: string | null;
   onFileSelect: (filePath: string) => void;
+  treeApiUrl?: string;
 }
 
 function getFileIcon(name: string, type: 'file' | 'directory', expanded: boolean): string {
@@ -106,7 +107,7 @@ function TreeNode({
   );
 }
 
-export default function FileTree({ botId, selectedFile, onFileSelect }: FileTreeProps) {
+export default function FileTree({ botId, selectedFile, onFileSelect, treeApiUrl }: FileTreeProps) {
   const [rootEntries, setRootEntries] = useState<FileTreeEntry[]>([]);
   const [childrenMap, setChildrenMap] = useState<Map<string, FileTreeEntry[]>>(new Map());
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
@@ -115,12 +116,15 @@ export default function FileTree({ botId, selectedFile, onFileSelect }: FileTree
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/bots/${botId}/tree`)
+    setChildrenMap(new Map());
+    setExpandedDirs(new Set());
+    const baseUrl = treeApiUrl || `/api/bots/${botId}/tree`;
+    fetch(baseUrl)
       .then(r => r.ok ? r.json() : [])
       .then(setRootEntries)
       .catch(() => setRootEntries([]))
       .finally(() => setLoading(false));
-  }, [botId]);
+  }, [botId, treeApiUrl]);
 
   const toggleDir = useCallback(async (dirPath: string) => {
     if (expandedDirs.has(dirPath)) {
@@ -139,7 +143,8 @@ export default function FileTree({ botId, selectedFile, onFileSelect }: FileTree
     if (!childrenMap.has(dirPath)) {
       setLoadingDirs(prev => new Set(prev).add(dirPath));
       try {
-        const res = await fetch(`/api/bots/${botId}/tree?path=${encodeURIComponent(dirPath)}`);
+        const baseUrl = treeApiUrl || `/api/bots/${botId}/tree`;
+        const res = await fetch(`${baseUrl}?path=${encodeURIComponent(dirPath)}`);
         const data: FileTreeEntry[] = res.ok ? await res.json() : [];
         setChildrenMap(prev => new Map(prev).set(dirPath, data));
       } catch {
@@ -152,7 +157,7 @@ export default function FileTree({ botId, selectedFile, onFileSelect }: FileTree
         });
       }
     }
-  }, [botId, expandedDirs, childrenMap]);
+  }, [botId, treeApiUrl, expandedDirs, childrenMap]);
 
   if (loading) {
     return (

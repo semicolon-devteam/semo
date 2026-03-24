@@ -8,6 +8,7 @@ import SessionCard from '@/components/SessionCard';
 import CronJobCard from '@/components/CronJobCard';
 
 import DomainCard from '@/components/DomainCard';
+import BotNav from '@/components/BotNav';
 import FilesTab from '@/components/files/FilesTab';
 import SkillsTab from '@/components/skills/SkillsTab';
 import AuditChecklist from '@/components/AuditChecklist';
@@ -160,8 +161,11 @@ export default function BotDetailPage() {
         &larr; Bot Team
       </Link>
 
+      {/* Bot Navigation */}
+      <BotNav currentBotId={botId} />
+
       {/* Bot Header */}
-      <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 flex items-start gap-5">
+      <div className="mt-4 bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 flex items-start gap-5">
         <span className="text-5xl">{bot.emoji}</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">

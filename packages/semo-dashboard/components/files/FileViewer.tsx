@@ -10,6 +10,7 @@ interface FileViewerProps {
   botId: string;
   filePath: string | null;
   onSave?: (path: string, content: string) => Promise<void>;
+  fileApiBase?: string;
 }
 
 function getExtension(filePath: string): string {
@@ -49,7 +50,7 @@ function FileStatChips({ content }: { content: string | null }) {
   );
 }
 
-export default function FileViewer({ botId, filePath, onSave }: FileViewerProps) {
+export default function FileViewer({ botId, filePath, onSave, fileApiBase }: FileViewerProps) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -68,7 +69,8 @@ export default function FileViewer({ botId, filePath, onSave }: FileViewerProps)
     setError('');
     setEditMode(false);
 
-    fetch(`/api/bots/${botId}/files/${filePath}`)
+    const base = fileApiBase || `/api/bots/${botId}/files`;
+    fetch(`${base}/${filePath}`)
       .then(r => {
         if (!r.ok) throw new Error(r.status === 404 ? 'File not found' : 'Failed to load file');
         return r.json();
@@ -79,7 +81,7 @@ export default function FileViewer({ botId, filePath, onSave }: FileViewerProps)
       })
       .catch(e => setError(e.message))
       .finally(() => setLoading(false));
-  }, [botId, filePath]);
+  }, [botId, filePath, fileApiBase]);
 
   const handleSave = async () => {
     if (!filePath || !onSave) return;

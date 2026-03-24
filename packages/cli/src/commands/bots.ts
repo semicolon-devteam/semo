@@ -202,6 +202,107 @@ async function detectGatewayStatus(botId: string): Promise<'online' | 'offline'>
 }
 
 // ============================================================
+// Workspace files sync → bot_workspace_files
+// ============================================================
+
+import * as crypto from "crypto";
+
+const BINARY_EXTS = new Set([
+  '.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.bmp', '.svg',
+  '.woff', '.woff2', '.ttf', '.eot', '.otf',
+  '.zip', '.tar', '.gz', '.bz2', '.7z', '.rar',
+  '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+  '.exe', '.dll', '.so', '.dylib', '.bin',
+  '.mp3', '.mp4', '.wav', '.avi', '.mov',
+  '.db', '.sqlite', '.sqlite3',
+]);
+const MAX_FILE_SIZE = 512 * 1024; // 512KB
+
+async function syncWorkspaceFiles(
+  client: { query(sql: string, params?: unknown[]): Promise<{ rows: unknown[]; rowCount?: number | null }> },
+  botId: string,
+  workspaceDir: string,
+): Promise<number> {
+  const files: { relPath: string; content: string; hash: string; size: number }[] = [];
+
+  function scan(dir: string, relBase: string, depth: number) {
+    if (depth > 4) return;
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch { return; }
+
+    for (const entry of entries) {
+      if (entry.name.startsWith('.')) continue;
+      const fullPath = path.join(dir, entry.name);
+      const relPath = relBase ? `${relBase}/${entry.name}` : entry.name;
+
+      // Skip symlinks
+      try {
+        if (fs.lstatSync(fullPath).isSymbolicLink()) continue;
+      } catch { continue; }
+
+      if (entry.isDirectory()) {
+        scan(fullPath, relPath, depth + 1);
+      } else if (entry.isFile()) {
+        const ext = path.extname(entry.name).toLowerCase();
+        if (BINARY_EXTS.has(ext)) continue;
+
+        let stat: fs.Stats;
+        try { stat = fs.statSync(fullPath); } catch { continue; }
+        if (stat.size > MAX_FILE_SIZE) continue;
+
+        let content: string;
+        try { content = fs.readFileSync(fullPath, 'utf-8'); } catch { continue; }
+
+        // Skip files with NULL bytes (binary masquerading as text)
+        if (content.includes('\0')) continue;
+
+        const hash = crypto.createHash('sha256').update(content).digest('hex');
+        files.push({ relPath, content, hash, size: stat.size });
+      }
+    }
+  }
+
+  scan(workspaceDir, '', 0);
+
+  let upserted = 0;
+  for (const f of files) {
+    const result = await client.query(
+      `INSERT INTO semo.bot_workspace_files (bot_id, file_path, content, file_size, file_hash, synced_at)
+       VALUES ($1, $2, $3, $4, $5, NOW())
+       ON CONFLICT (bot_id, file_path) DO UPDATE SET
+         content   = EXCLUDED.content,
+         file_size = EXCLUDED.file_size,
+         file_hash = EXCLUDED.file_hash,
+         synced_at = NOW()
+       WHERE semo.bot_workspace_files.file_hash IS DISTINCT FROM EXCLUDED.file_hash`,
+      [botId, f.relPath, f.content, f.size, f.hash]
+    );
+    if (result.rowCount && result.rowCount > 0) {
+      upserted++;
+    }
+  }
+
+  // Delete files in DB but not on disk (for this bot_id)
+  const dbFiles = await client.query(
+    `SELECT file_path FROM semo.bot_workspace_files WHERE bot_id = $1`,
+    [botId]
+  );
+  const diskPaths = new Set(files.map(f => f.relPath));
+  for (const row of dbFiles.rows as { file_path: string }[]) {
+    if (!diskPaths.has(row.file_path)) {
+      await client.query(
+        `DELETE FROM semo.bot_workspace_files WHERE bot_id = $1 AND file_path = $2`,
+        [botId, row.file_path]
+      );
+    }
+  }
+
+  return files.length;
+}
+
+// ============================================================
 // Command registration
 // ============================================================
 
@@ -526,6 +627,28 @@ export function registerBotsCommands(program: Command): void {
           }
         } catch {
           console.log(chalk.yellow("  ⚠ skills sync 실패 (무시)"));
+        }
+
+        // Files piggyback — 워크스페이스 파일 → bot_workspace_files 동기화
+        try {
+          console.log(chalk.gray("  → files sync 실행 중..."));
+          const filesClient = await pool.connect();
+          try {
+            let totalFiles = 0;
+            for (const bot of bots) {
+              totalFiles += await syncWorkspaceFiles(filesClient, bot.botId, bot.workspacePath);
+            }
+            // Shared files
+            const sharedDir = path.join(os.homedir(), '.openclaw-shared');
+            if (fs.existsSync(sharedDir)) {
+              totalFiles += await syncWorkspaceFiles(filesClient, '_shared', sharedDir);
+            }
+            console.log(chalk.green(`  → files sync 완료: ${totalFiles}개 파일`));
+          } finally {
+            filesClient.release();
+          }
+        } catch (filesErr) {
+          console.log(chalk.yellow(`  ⚠ files sync 실패 (무시): ${filesErr}`));
         }
       } catch (err) {
         await client.query("ROLLBACK");
