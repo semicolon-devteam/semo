@@ -7,23 +7,13 @@
  * 각 봇의 SOUL.md를 파싱하여 KB에 identity/role/status/delegation을 기록.
  */
 
-import { Pool } from "pg";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { getPool, closeConnection } from "../src/database";
+import { kbUpsert as kbUpsertFn } from "../src/kb";
 
-// ── Env ──
-const envPath = path.join(os.homedir(), ".semo.env");
-if (fs.existsSync(envPath)) {
-  for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
-    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
-    if (m && !process.env[m[1]]) {
-      process.env[m[1]] = m[2].replace(/^['"]|['"]$/g, "");
-    }
-  }
-}
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
+const pool = getPool();
 
 // ── SOUL.md Parser ──
 
@@ -67,24 +57,24 @@ function parseSoulMd(content: string): SoulData {
   return { identity, role, delegation };
 }
 
-// ── KB Upsert ──
+// ── KB Upsert (정식 경로: 임베딩 + 검증 포함) ──
 
-async function kbUpsert(
+async function upsert(
   domain: string,
   key: string,
   content: string,
-  createdBy: string
-): Promise<void> {
-  await pool.query(
-    `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by)
-     VALUES ($1, $2, '', $3, $4)
-     ON CONFLICT (domain, key, sub_key) DO UPDATE SET
-       content = EXCLUDED.content,
-       created_by = EXCLUDED.created_by,
-       updated_at = NOW(),
-       version = semo.knowledge_base.version + 1`,
-    [domain, key, content, createdBy]
-  );
+): Promise<boolean> {
+  const result = await kbUpsertFn(pool, {
+    domain,
+    key,
+    content,
+    created_by: "seed-bot-kb",
+  });
+  if (!result.success) {
+    console.log(`    ⚠️ ${domain}/${key}: ${result.error}`);
+    return false;
+  }
+  return true;
 }
 
 // ── Main ──
@@ -125,17 +115,14 @@ async function main() {
       `tagline: ${bot.role || "Bot"}`,
     ].join("\n");
 
-    await kbUpsert(bot.bot_id, "identity", identityContent, "seed-bot-kb");
-    console.log(`  ✅ identity`);
+    if (await upsert(bot.bot_id, "identity", identityContent)) {
+      console.log(`  ✅ identity`);
+    }
 
     // status
-    await kbUpsert(
-      bot.bot_id,
-      "status",
-      bot.status || "offline",
-      "seed-bot-kb"
-    );
-    console.log(`  ✅ status: ${bot.status || "offline"}`);
+    if (await upsert(bot.bot_id, "status", bot.status || "offline")) {
+      console.log(`  ✅ status: ${bot.status || "offline"}`);
+    }
 
     // SOUL.md 파싱
     if (fs.existsSync(soulPath)) {
@@ -143,20 +130,15 @@ async function main() {
       const soul = parseSoulMd(content);
 
       if (soul.role) {
-        await kbUpsert(bot.bot_id, "role", soul.role, "seed-bot-kb");
-        console.log(`  ✅ role (${soul.role.split("\n").length} lines)`);
+        if (await upsert(bot.bot_id, "role", soul.role)) {
+          console.log(`  ✅ role (${soul.role.split("\n").length} lines)`);
+        }
       }
 
       if (soul.delegation) {
-        await kbUpsert(
-          bot.bot_id,
-          "delegation",
-          soul.delegation,
-          "seed-bot-kb"
-        );
-        console.log(
-          `  ✅ delegation (${soul.delegation.split("\n").length} lines)`
-        );
+        if (await upsert(bot.bot_id, "delegation", soul.delegation)) {
+          console.log(`  ✅ delegation (${soul.delegation.split("\n").length} lines)`);
+        }
       }
 
       // gateway_config from openclaw.json
@@ -175,13 +157,9 @@ async function main() {
             `port: ${port || "N/A"}`,
             `model: ${model}`,
           ].join("\n");
-          await kbUpsert(
-            bot.bot_id,
-            "gateway_config",
-            gwContent,
-            "seed-bot-kb"
-          );
-          console.log(`  ✅ gateway_config (port: ${port})`);
+          if (await upsert(bot.bot_id, "gateway_config", gwContent)) {
+            console.log(`  ✅ gateway_config (port: ${port})`);
+          }
         } catch {
           console.log(`  ⚠️ gateway_config: openclaw.json 파싱 실패`);
         }
@@ -194,11 +172,11 @@ async function main() {
   }
 
   console.log("=== 완료 ===");
-  await pool.end();
+  await closeConnection();
 }
 
 main().catch((err) => {
   console.error("Fatal:", err);
-  pool.end();
+  closeConnection();
   process.exit(1);
 });

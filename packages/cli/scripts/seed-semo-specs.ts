@@ -7,41 +7,13 @@
  * Usage: npx tsx packages/cli/scripts/seed-semo-specs.ts
  */
 
-import { Pool } from "pg";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { getPool, closeConnection } from "../src/database";
+import { kbUpsert } from "../src/kb";
 
-// ── Env ──
-const envPath = path.join(os.homedir(), ".semo.env");
-if (fs.existsSync(envPath)) {
-  for (const line of fs.readFileSync(envPath, "utf-8").split("\n")) {
-    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
-    if (m && !process.env[m[1]]) {
-      process.env[m[1]] = m[2].replace(/^['"]|['"]$/g, "");
-    }
-  }
-}
-
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 3 });
-
-async function kbUpsert(
-  domain: string,
-  key: string,
-  subKey: string,
-  content: string
-): Promise<void> {
-  await pool.query(
-    `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by)
-     VALUES ($1, $2, $3, $4, 'seed-semo-specs')
-     ON CONFLICT (domain, key, sub_key) DO UPDATE SET
-       content = EXCLUDED.content,
-       created_by = EXCLUDED.created_by,
-       updated_at = NOW(),
-       version = semo.knowledge_base.version + 1`,
-    [domain, key, subKey, content]
-  );
-}
+const pool = getPool();
 
 // ── KB 엔트리 정의 ──
 
@@ -202,16 +174,26 @@ async function main() {
   console.log("=== SEMO Specs → KB Seed ===\n");
 
   for (const entry of entries) {
-    await kbUpsert("semo", entry.key, entry.subKey, entry.content);
-    console.log(`  ✅ semo/${entry.key}/${entry.subKey}`);
+    const result = await kbUpsert(pool, {
+      domain: "semo",
+      key: entry.key,
+      sub_key: entry.subKey,
+      content: entry.content,
+      created_by: "seed-semo-specs",
+    });
+    if (result.success) {
+      console.log(`  ✅ semo/${entry.key}/${entry.subKey}`);
+    } else {
+      console.log(`  ❌ semo/${entry.key}/${entry.subKey}: ${result.error}`);
+    }
   }
 
   console.log(`\n${entries.length}개 엔트리 시드 완료`);
-  await pool.end();
+  await closeConnection();
 }
 
 main().catch((err) => {
   console.error("Fatal:", err);
-  pool.end();
+  closeConnection();
   process.exit(1);
 });
