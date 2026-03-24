@@ -134,6 +134,59 @@ KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하
 
 ---
 
+## 3자 동기화 검증 규칙 (NON-NEGOTIABLE)
+
+> 이 프로젝트의 모든 변경은 3자 동기화 관점에서 평가되어야 한다.
+
+SEMO는 3개 주체가 Core DB를 SoT로 공유하는 시스템이다:
+
+```
+OpenClaw 봇팀 (7봇)  ↔  Core DB (semo 스키마)  ↔  로컬 Claude Code 세션
+```
+
+### 변경 전 체크리스트
+
+코드를 수정하기 전에 반드시 아래를 자문할 것:
+
+1. **SoT 위치**: 이 데이터/규칙의 SoT는 어디인가?
+   - DB 테이블 → DB에서 읽어야 함 (하드코딩 금지)
+   - 봇 워크스페이스 → `~/.openclaw-{bot}/workspace/` 참조
+   - KB → `kb_get/kb_search` MCP 조회
+
+2. **동기화 영향**: 이 변경이 3자 중 누구에게 영향을 주는가?
+   - CLI만 → 로컬 변경으로 충분
+   - MCP 서버 → 봇과 로컬 세션 모두에 영향 (하위 호환 필수)
+   - DB 스키마 → 마이그레이션 + MCP 서버 + CLI + 대시보드 전부 확인
+   - 봇 워크스페이스 규격 → `bot_workspace_standard` DB 테이블 업데이트 필수
+
+3. **하드코딩 금지**: 봇 이름, 봇 목록, 워크스페이스 경로, 도메인 목록 등을 코드에 직접 넣지 말 것. 반드시 DB에서 동적으로 로드.
+   - 봇 목록 → `SELECT bot_id FROM semo.bot_status`
+   - 도메인 목록 → `SELECT domain FROM semo.ontology`
+   - 워크스페이스 규격 → `SELECT * FROM semo.bot_workspace_standard`
+
+4. **검증 범위**: 변경 후 아래 중 해당하는 항목을 검증:
+   - `semo test run workspace-audit` — 봇 워크스페이스 규격 준수
+   - `semo test run 018-transplant` — KB 데이터 무결성
+   - MCP 도구 호출 테스트 — `kb_get`, `kb_search` 등이 정상 동작하는지
+   - 봇 세션에서의 동작 — 변경이 봇에 영향을 주면 게이트웨이로 확인
+
+### 위반 사례 (하지 말 것)
+
+- 봇 이름을 배열로 하드코딩: `const BOTS = ["semiclaw", "workclaw", ...]`
+- 워크스페이스 규칙을 셸 스크립트에 직접 작성 (DB `bot_workspace_standard`가 SoT)
+- MCP 도구 파라미터를 변경하면서 하위 호환을 깨뜨림
+- DB 스키마를 변경하면서 마이그레이션 없이 직접 ALTER
+- 로컬 파일에만 설정을 저장하고 DB에 반영하지 않음
+
+### 올바른 사례
+
+- DB에서 봇 목록을 동적 조회하여 사용
+- 새 규칙 추가 시 `bot_workspace_standard`에 INSERT
+- MCP 도구 변경 시 기존 파라미터 유지 + 새 파라미터는 optional
+- 변경 후 `semo test run` 으로 검증
+
+---
+
 ## Quality Gate
 
 코드 변경 커밋 전 필수:
