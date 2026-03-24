@@ -228,30 +228,22 @@ export async function upsertItem(
     throw new Error(`도메인 '${domain}'은(는) 온톨로지에 등록되지 않았습니다. 등록된 도메인: [${known.join(', ')}]`);
   }
 
+  // 임베딩 필수 생성 (CLI와 동일 — NULL 임베딩은 벡터 검색 누락 유발)
+  const embeddingText = `${combineKey(key, subKey)}: ${content}`;
+  const embedding = await genEmbedding(embeddingText);
+  const embeddingStr = '[' + embedding.join(',') + ']';
+
   const sql = `
-    INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by)
-    VALUES ($1, $2, $3, $4, $5)
+    INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by, embedding)
+    VALUES ($1, $2, $3, $4, $5, $6::vector)
     ON CONFLICT (domain, key, sub_key) DO UPDATE SET
       content    = EXCLUDED.content,
+      embedding  = EXCLUDED.embedding,
       updated_at = NOW()
     RETURNING kb_id, domain, key, sub_key, content, created_by, updated_at
   `;
-  const res = await pool.query(sql, [domain, key, subKey, content, createdBy ?? 'dashboard']);
+  const res = await pool.query(sql, [domain, key, subKey, content, createdBy ?? 'dashboard', embeddingStr]);
   const item = res.rows[0];
-
-  // 임베딩 자동 생성 (best-effort: 실패해도 본 upsert는 성공)
-  if (process.env.OPENAI_API_KEY) {
-    try {
-      const embedding = await genEmbedding(content);
-      const embeddingStr = '[' + embedding.join(',') + ']';
-      await pool.query(
-        'UPDATE semo.knowledge_base SET embedding = $1::vector WHERE kb_id = $2',
-        [embeddingStr, item.kb_id]
-      );
-    } catch (e) {
-      console.warn(`[kb] embedding generation failed for ${domain}/${rawKey}:`, e);
-    }
-  }
 
   return { ...item, key: combineKey(item.key, item.sub_key) };
 }

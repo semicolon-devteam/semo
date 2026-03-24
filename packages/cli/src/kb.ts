@@ -458,8 +458,21 @@ export async function kbSearch(
 
     // Text search (fallback or hybrid supplement)
     // Split query into tokens and match ANY token via ILIKE (Korean-friendly)
+    // For Korean tokens of 4+ chars with no spaces, add 2-char sub-tokens
+    // e.g. "노조관리" → ["노조관리", "노조", "관리"]
     if (mode !== "semantic" || results.length === 0) {
-      const tokens = query.split(/\s+/).filter(t => t.length >= 2);
+      const rawTokens = query.split(/\s+/).filter(t => t.length >= 2);
+      const tokens: string[] = [];
+      const KOREAN_RE = /[\uAC00-\uD7AF]/;
+      for (const t of rawTokens) {
+        tokens.push(t);
+        if (KOREAN_RE.test(t) && t.length >= 4) {
+          for (let i = 0; i + 2 <= t.length; i += 2) {
+            const sub = t.slice(i, i + 2);
+            if (!tokens.includes(sub)) tokens.push(sub);
+          }
+        }
+      }
       const textParams: (string | number)[] = [];
       let tIdx = 1;
 
@@ -819,7 +832,7 @@ export async function kbUpsert(
   }
 
   // Key validation against type schema
-  try {
+  {
     const schemaClient = await pool.connect();
     try {
       const typeResult = await schemaClient.query(
@@ -852,11 +865,12 @@ export async function kbUpsert(
           }
         }
       }
+    } catch (e) {
+      // DB 연결 실패 시 warning 로그 — 검증 자체는 스킵하되 사용자에게 알림
+      console.error(`[kb] ⚠️  스키마 검증 DB 오류 (검증 건너뜀): ${e}`);
     } finally {
       schemaClient.release();
     }
-  } catch {
-    // Validation failure is non-fatal
   }
 
   // Generate embedding (mandatory)
