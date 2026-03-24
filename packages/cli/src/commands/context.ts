@@ -16,7 +16,7 @@ import * as os from "os";
 import { Pool } from "pg";
 import { getPool, closeConnection, isDbConnected } from "../database";
 import { KBEntry, generateEmbeddings } from "../kb";
-import { syncSkillsToDB } from "./skill-sync";
+// [v4.4.0] syncSkillsToDB 제거 — semo-system/ 폐기됨, 스킬 SoT는 DB 직접 관리
 import { syncGlobalCache } from "../global-cache";
 
 // ============================================================
@@ -218,26 +218,10 @@ export function registerContextCommands(program: Command): void {
         // 기존 memory/*.md (team, projects, decisions, infra, process, bots, ontology) 파일은
         // semo CLI가 실시간 DB 조회로 대체합니다.
 
-        // 1. 스킬 파일 → skill_definitions DB 동기화
-        if (options.skills !== false) {
-          const semoSystemDir = path.join(process.cwd(), "semo-system");
-          if (fs.existsSync(semoSystemDir)) {
-            spinner.text = "skills 동기화...";
-            const client = await pool.connect();
-            try {
-              await client.query("BEGIN");
-              await syncSkillsToDB(client, semoSystemDir);
-              await client.query("COMMIT");
-            } catch {
-              await client.query("ROLLBACK").catch(() => {});
-              // 스킬 동기화 실패는 무시 — context sync의 핵심은 memory/ 파일
-            } finally {
-              client.release();
-            }
-          }
-        }
+        // [v4.4.0] semo-system/ → DB 스킬 동기화 제거 (semo-system 폐기됨)
+        // 스킬 SoT는 DB(skill_definitions). 수정은 직접 DB UPDATE 또는 마이그레이션.
 
-        // 2. DB → 글로벌 캐시 (skills/commands/agents → ~/.claude/)
+        // DB → 글로벌 캐시 (skills/commands/agents → ~/.claude/)
         if (options.globalCache !== false) {
           spinner.text = "글로벌 캐시 동기화 (skills/commands/agents)...";
           try {

@@ -2813,7 +2813,8 @@ kbCmd
           const preview = entry.content.substring(0, 80).replace(/\n/g, " ");
           const score = (entry as any).score;
           const scoreStr = score ? chalk.yellow(` (${(score * 100).toFixed(1)}%)`) : "";
-          console.log(chalk.cyan(`  [${entry.domain}] `) + chalk.white(entry.key) + scoreStr);
+          const fullKey = entry.sub_key ? `${entry.key}/${entry.sub_key}` : entry.key;
+          console.log(chalk.cyan(`  [${entry.domain}] `) + chalk.white(fullKey) + scoreStr);
           console.log(chalk.gray(`    ${preview}${entry.content.length > 80 ? "..." : ""}`));
           console.log();
         }
