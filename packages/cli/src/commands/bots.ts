@@ -13,6 +13,7 @@ import chalk from "chalk";
 import ora from "ora";
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import { getPool, closeConnection, isDbConnected, getDelegations } from "../database";
 import { syncBotSessions } from "./sessions";
 import { auditBot, auditBotFromDb, auditBotDb, auditBotKb, mergeDbChecks, fixBot, storeAuditResults, formatAuditSlack, BotAuditResult } from "./audit";
@@ -176,6 +177,28 @@ function getAllFileMtimes(dir: string, depth = 0): Date[] {
     }
   } catch { /* skip */ }
   return times;
+}
+
+// ============================================================
+// Gateway status detection
+// ============================================================
+
+async function detectGatewayStatus(botId: string): Promise<'online' | 'offline'> {
+  const configPath = path.join(os.homedir(), `.openclaw-${botId}`, 'openclaw.json');
+  if (!fs.existsSync(configPath)) return 'offline';
+
+  try {
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+    const port = config?.gateway?.port;
+    if (!port) return 'offline';
+
+    const res = await fetch(`http://127.0.0.1:${port}/`, {
+      signal: AbortSignal.timeout(1000),
+    });
+    return res.ok ? 'online' : 'offline';
+  } catch {
+    return 'offline';
+  }
 }
 
 // ============================================================
@@ -390,17 +413,33 @@ export function registerBotsCommands(program: Command): void {
       try {
         await client.query("BEGIN");
 
+        // Detect gateway status for all bots in parallel
+        const statusMap = new Map<string, 'online' | 'offline'>();
+        const statusResults = await Promise.all(
+          bots.map(async (bot) => ({
+            botId: bot.botId,
+            status: await detectGatewayStatus(bot.botId),
+          }))
+        );
+        for (const { botId, status } of statusResults) {
+          statusMap.set(botId, status);
+        }
+
+        const onlineCount = statusResults.filter(r => r.status === 'online').length;
+        spinner.text = `${bots.length}개 봇 DB 반영 중... (게이트웨이: ${onlineCount}개 online)`;
+
         for (const bot of bots) {
           try {
+            const detectedStatus = statusMap.get(bot.botId) || 'offline';
             await client.query(
               `INSERT INTO semo.bot_status
                  (bot_id, name, emoji, role, status, last_active, workspace_path, synced_at)
-               VALUES ($1, $2, $3, $4, 'offline', $5, $6, NOW())
+               VALUES ($1, $2, $3, $4, $7, $5, $6, NOW())
                ON CONFLICT (bot_id) DO UPDATE SET
                  name           = COALESCE(EXCLUDED.name, semo.bot_status.name),
                  emoji          = COALESCE(EXCLUDED.emoji, semo.bot_status.emoji),
                  role           = COALESCE(EXCLUDED.role, semo.bot_status.role),
-                 status         = semo.bot_status.status,
+                 status         = EXCLUDED.status,
                  last_active    = CASE
                    WHEN EXCLUDED.last_active IS NOT NULL
                      AND (semo.bot_status.last_active IS NULL
@@ -417,6 +456,7 @@ export function registerBotsCommands(program: Command): void {
                 bot.role,
                 bot.lastActive?.toISOString() || null,
                 bot.workspacePath,
+                detectedStatus,
               ]
             );
             upserted++;

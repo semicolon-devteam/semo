@@ -1,6 +1,6 @@
 {
   "name": "@team-semicolon/semo-cli",
-  "version": "4.4.2",
+  "version": "4.4.3",
   "description": "SEMO CLI - AI Agent Orchestration Framework Installer",
   "main": "dist/index.js",
   "bin": {
@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "tsc",
+    "postbuild": "xattr -cr dist/ 2>/dev/null || true",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts"
   },
