@@ -738,7 +738,7 @@ export function registerBotsCommands(program: Command): void {
         if (options.reset) {
           spinnerDb.text = "기존 데이터 삭제 중...";
           await client.query("DELETE FROM agent_definitions");
-          await client.query("DELETE FROM skill_definitions WHERE office_id IS NULL");
+          await client.query("DELETE FROM semo.skill_definitions WHERE office_id IS NULL");
         }
 
         // ─── 스킬 시딩 (공통 모듈) ──────────────────────────

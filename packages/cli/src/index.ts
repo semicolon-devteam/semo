@@ -1623,6 +1623,13 @@ async function buildKbFirstBlock(): Promise<string> {
     domainGuide += `- 서비스 KPI → \`domain: {서비스명}\`, key: \`kpi/current\`\n`;
     domainGuide += `- 서비스 마일스톤 → \`domain: {서비스명}\`, key: \`milestone/{slug}\`\n`;
 
+    domainGuide += `\n**정확한 경로를 모를 때:**\n`;
+    domainGuide += `1. \`semo kb search "검색어"\` → 결과의 \`[domain] key/sub_key\` 경로 확인\n`;
+    domainGuide += `2. \`semo kb get <domain> <key> <sub_key>\` 실행\n`;
+    domainGuide += `\n**도메인 자체를 모를 때:**\n`;
+    domainGuide += `- \`semo kb ontology --action instances\` — 서비스 도메인 목록\n`;
+    domainGuide += `- \`semo kb ontology --action routing-table\` — 전체 domain→key 매핑\n`;
+
   } catch {
     // DB 연결 실패 시 최소한의 가이드
     domainGuide = `### 읽기 (Query-First)

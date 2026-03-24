@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { getItem as kbGetItem, upsertItem as kbUpsertItem } from '@/lib/kb';
 
 function validateIds(botId: string, skillName: string): string | null {
   if (!/^[a-zA-Z0-9_-]+$/.test(botId)) return 'Invalid bot ID';
@@ -17,18 +16,10 @@ export async function GET(
     const err = validateIds(botId, skillName);
     if (err) return NextResponse.json({ error: err }, { status: 400 });
 
-    // Read SKILL.md: KB first, then bot_workspace_files fallback
+    // Read SKILL.md from bot_workspace_files
     let content: string | null = null;
 
-    // 1. KB skill domain (SoT)
-    try {
-      const kbEntry = await kbGetItem('skill', `${botId}/${skillName}`);
-      if (kbEntry?.content) {
-        content = kbEntry.content;
-      }
-    } catch { /* KB unavailable */ }
-
-    // 2. Fallback: bot_workspace_files
+    // 1. bot_workspace_files
     if (content === null) {
       try {
         const wsResult = await query<{ content: string }>(
@@ -50,7 +41,7 @@ export async function GET(
       const fullName = `${botId}/${skillName}`;
       const result = await query(
         `SELECT name, is_active, category, package, metadata, updated_at
-         FROM skill_definitions
+         FROM semo.skill_definitions
          WHERE name = $1 AND office_id IS NULL`,
         [fullName]
       );
@@ -91,14 +82,7 @@ export async function PUT(
       return NextResponse.json({ error: 'content is required' }, { status: 400 });
     }
 
-    // Update in KB skill domain (SoT)
-    try {
-      await kbUpsertItem('skill', `${botId}/${skillName}`, content, 'dashboard');
-    } catch {
-      // KB write failed, try workspace fallback
-    }
-
-    // Fallback: also update bot_workspace_files if it exists
+    // Update bot_workspace_files if it exists
     try {
       await query(
         `UPDATE semo.bot_workspace_files SET content = $1, file_size = $2, synced_at = NOW()
@@ -113,7 +97,7 @@ export async function PUT(
     const fullName = `${botId}/${skillName}`;
     try {
       await query(
-        `UPDATE skill_definitions SET prompt = $1, updated_at = NOW()
+        `UPDATE semo.skill_definitions SET prompt = $1, updated_at = NOW()
          WHERE name = $2 AND office_id IS NULL`,
         [content, fullName]
       );
@@ -144,7 +128,7 @@ export async function PATCH(
 
     const fullName = `${botId}/${skillName}`;
     const result = await query(
-      `UPDATE skill_definitions SET is_active = $1, updated_at = NOW()
+      `UPDATE semo.skill_definitions SET is_active = $1, updated_at = NOW()
        WHERE name = $2 AND office_id IS NULL
        RETURNING name, is_active`,
       [isActive, fullName]

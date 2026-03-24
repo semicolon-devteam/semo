@@ -36,7 +36,7 @@ KB 데이터는 **semo CLI** (`kb-manager` 스킬)를 통해 Core DB에서 조�
 | `semo kb ontology --action <action>` | 온톨로지 조회 (list/show/services/types/instances/schema/routing-table) |
 
 `semo context sync`는 스킬/에이전트/커맨드 글로벌 캐시 + 크론잡만 동기화합니다.
-스킬은 `skill_definitions` 테이블에서 관리되며, `semo context sync`로 봇 워크스페이스에 자동 배포됩니다.
+스킬은 `semo.skill_definitions` 테이블에서 관리되며, `semo context sync`로 봇 워크스페이스에 자동 배포됩니다.
 
 ---
 
@@ -54,15 +54,23 @@ KB 데이터는 **semo CLI** (`kb-manager` 스킬)를 통해 Core DB에서 조�
 - 서비스 KPI → `domain: {serviceName}`, key: `kpi/current`
 - 봇 설정 → `domain: semicolon`, key: `bot-config/{botId}/{type}`
 - 스펙/설계 문서 → `domain: semicolon`, key: `spec/{name}`
-- 스킬 정의 → `domain: semicolon`, key: `skill/{botId}/{skillName}`
+- 스킬 정의 → `semo.skill_definitions` 테이블 직접 조회 (KB가 아닌 DB SoT)
 - 메모리 (L2) → `domain: semicolon`, key: `memory/{sourceId}/{YYYY-MM-DD}`
 - 서비스 스코프 전체 검색 → `service: {serviceName}` 파라미터
 
 #### 도메인 구조
 | 패턴 | 예시 | 용도 |
 |------|------|------|
-| `semicolon` | `semicolon` | 조직 도메인 — team/decision/process/infra/bot-config/skill/spec/memory/session-log 하위 키 |
+| `semicolon` | `semicolon` | 조직 도메인 — team/decision/process/infra/bot-config/spec/memory/session-log 하위 키 |
 | `{service}` | `axoracle`, `jungchipan` | 서비스 인스턴스 — base_information/status/po/kpi/milestone 하위 키 |
+
+**정확한 경로를 모를 때:**
+1. `semo kb search "검색어"` → 결과의 `[domain] key/sub_key` 경로 확인
+2. `semo kb get <domain> <key> <sub_key>` 실행
+
+**도메인 자체를 모를 때:**
+- `semo kb ontology --action instances` — 서비스 도메인 목록
+- `semo kb ontology --action routing-table` — 전체 domain→key 매핑
 
 #### KB Sidekick 에이전트
 KB 조회가 복잡하거나 여러 도메인에 걸친 검색이 필요할 때, `kb-sidekick` 서브 에이전트에 위임할 수 있다. Haiku 모델 기반 경량 에이전트.

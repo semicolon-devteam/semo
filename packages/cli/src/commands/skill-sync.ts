@@ -69,7 +69,7 @@ export async function syncSkillsToDB(
 
   for (const skill of skills) {
     await client.query(
-      `INSERT INTO skill_definitions (name, prompt, package, metadata, is_active, office_id)
+      `INSERT INTO semo.skill_definitions (name, prompt, package, metadata, is_active, office_id)
        VALUES ($1, $2, $3, $4, true, NULL)
        ON CONFLICT (name, office_id) DO UPDATE SET
          prompt = EXCLUDED.prompt,

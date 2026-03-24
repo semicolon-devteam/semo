@@ -4,7 +4,7 @@ import type { DBTable, DBColumn, DBConstraint, DBIndex, DBTableDetail, DBDataRes
 const ALLOWED_SCHEMAS_TABLES = `
   (t.table_schema = 'semo'
    OR (t.table_schema = 'public' AND t.table_name IN (
-     'skill_definitions', 'command_definitions', 'agent_definitions')))
+     'command_definitions', 'agent_definitions')))
 `;
 
 export async function listTables(): Promise<DBTable[]> {

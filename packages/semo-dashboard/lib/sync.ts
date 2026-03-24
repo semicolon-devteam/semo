@@ -127,7 +127,7 @@ export async function fetchRecentRecords(
     knowledge_base: { schema: 'semo', table: 'knowledge_base', orderBy: 'updated_at' },
     bot_status: { schema: 'semo', table: 'bot_status', orderBy: 'synced_at' },
     ontology: { schema: 'semo', table: 'ontology', orderBy: 'updated_at' },
-    skill_definitions: { schema: 'public', table: 'skill_definitions', orderBy: 'updated_at' },
+    skill_definitions: { schema: 'semo', table: 'skill_definitions', orderBy: 'updated_at' },
     command_definitions: { schema: 'public', table: 'command_definitions', orderBy: 'updated_at' },
     agent_definitions: { schema: 'public', table: 'agent_definitions', orderBy: 'updated_at' },
     bot_sessions: { schema: 'semo', table: 'bot_sessions', orderBy: 'synced_at' },

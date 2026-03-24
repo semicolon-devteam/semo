@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
-import { list as kbList } from '@/lib/kb';
 import type { BotSkill } from '@/types';
 
 interface SkillRow {
@@ -22,28 +21,8 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid bot ID' }, { status: 400 });
     }
 
-    // 1. Scan skills from KB (skill domain — SoT) + bot_workspace_files fallback
+    // 1. Scan skills from bot_workspace_files
     const wsSkills = new Map<string, { hasReferences: boolean }>();
-
-    // 1a. KB skill domain
-    try {
-      const kbSkills = await kbList('skill');
-      for (const entry of kbSkills) {
-        // key format: {botId}/{skillName} or {botId}/{skillName}/ref-{name}
-        if (!entry.key.startsWith(`${botId}/`)) continue;
-        const parts = entry.key.split('/');
-        if (parts.length >= 2) {
-          const skillName = parts[1];
-          const existing = wsSkills.get(skillName) || { hasReferences: false };
-          if (parts.length >= 3 && parts[2].startsWith('ref-')) {
-            existing.hasReferences = true;
-          }
-          wsSkills.set(skillName, existing);
-        }
-      }
-    } catch { /* KB unavailable */ }
-
-    // 1b. Fallback: bot_workspace_files (for scripts/ detection and non-migrated skills)
     try {
       const wsResult = await query<{ file_path: string }>(
         `SELECT file_path FROM semo.bot_workspace_files
@@ -71,7 +50,7 @@ export async function GET(
     try {
       const result = await query<SkillRow>(
         `SELECT name, is_active, category, package, updated_at
-         FROM skill_definitions
+         FROM semo.skill_definitions
          WHERE metadata->>'bot_id' = $1 AND office_id IS NULL`,
         [botId]
       );

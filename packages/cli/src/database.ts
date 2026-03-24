@@ -213,7 +213,7 @@ export async function getActiveSkills(): Promise<Skill[]> {
                ARRAY[]::text[]
              ) AS bot_ids,
              category, package, is_active, is_required, install_order, version
-      FROM skill_definitions
+      FROM semo.skill_definitions
       WHERE is_active = true AND office_id IS NULL
       ORDER BY install_order
     `);
@@ -254,7 +254,7 @@ export async function getActiveSkillsForBot(botId: string): Promise<Skill[]> {
               ) AS bot_ids,
               sd.category, sd.package, sd.is_active, sd.is_required,
               sd.install_order, sd.version
-       FROM skill_definitions sd
+       FROM semo.skill_definitions sd
        WHERE sd.is_active = true
          AND sd.office_id IS NULL
          AND (NOT sd.metadata ? 'bot_ids' OR sd.metadata->'bot_ids' ? $1)
