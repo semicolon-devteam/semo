@@ -70,7 +70,9 @@ KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하
 1. **SoT 위치**: DB 테이블 → DB에서 읽기 (하드코딩 금지). KB → `semo kb get/search` 조회.
 2. **동기화 영향**: CLI만/CLI+봇/DB 스키마/봇 워크스페이스 규격 중 어디에 영향?
 3. **하드코딩 금지**: 봇 목록 → `bot_status` DB. 도메인 → `ontology` DB. 워크스페이스 규격 → `bot_workspace_standard` DB.
-4. **검증**: `semo test run workspace-audit` / `semo test run 018-transplant` / KB 도구 호출 테스트.
+4. **봇 워크스페이스 파일 수정 시**: SOUL.md, MEMORY.md 등 봇 파일을 수정하기 전에 반드시 `bot_workspace_standard`에서 해당 파일의 `content_rules`(max_lines, required_sections, forbidden_patterns)를 확인하고, 수정 후 규격 위반이 없는지 검증할 것.
+5. **KB 데이터 쓰기 시**: 반드시 `semo kb upsert` CLI 또는 `kbUpsert()` 함수를 사용 (임베딩 + 도메인/스키마 검증 포함). raw SQL INSERT 금지.
+6. **검증**: `semo test run workspace-audit` / `semo test run 018-transplant` / KB 도구 호출 테스트.
 
 ### 위반 사례
 - 봇 이름을 배열로 하드코딩
