@@ -247,6 +247,22 @@ export function registerMemoryCommands(program: Command): void {
     .option("--dry-run", "프리뷰만 (실제 동기화 안 함)")
     .option("--force", "워터마크 무시, 전체 재동기화")
     .action(async (options) => {
+      console.log(
+        chalk.yellow.bold(
+          "\n⚠️  [DEPRECATED] semo memory sync는 semiclaw memory-escalation 크론잡으로 대체되었습니다."
+        )
+      );
+      console.log(
+        chalk.yellow(
+          "   매일 06:00 자동 실행되며, LLM 기반 분류로 적절한 KB 도메인/키에 에스컬레이션합니다."
+        )
+      );
+      console.log(
+        chalk.yellow(
+          "   수동 실행이 필요하면 semiclaw에게 'memory-escalation 스킬 실행' 을 지시하세요.\n"
+        )
+      );
+
       const dryRun = !!options.dryRun;
       const force = !!options.force;
       const minAgeDays = parseInt(options.days) || 2;
