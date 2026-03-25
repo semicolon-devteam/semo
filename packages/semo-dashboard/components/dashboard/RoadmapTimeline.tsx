@@ -35,7 +35,7 @@ export default function RoadmapTimeline() {
             <div className="text-center">
               <p className="text-gray-400 text-sm">No milestones found</p>
               <p className="text-gray-300 text-xs mt-2">
-                Add milestones to KB with domain=&quot;milestone&quot; to see them here.
+                서비스 도메인에 key=&quot;milestone&quot;로 마일스톤을 추가하세요.
               </p>
             </div>
           </div>

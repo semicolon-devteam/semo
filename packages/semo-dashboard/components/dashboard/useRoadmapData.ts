@@ -45,6 +45,69 @@ export interface RoadmapData {
   error: string | null;
 }
 
+/**
+ * content 텍스트에서 마일스톤 메타데이터를 파싱한다.
+ * metadata가 비어있는 엔트리를 enrichment하기 위해 사용.
+ */
+function parseContentMetadata(content: string, domain: string): Partial<MilestoneMetadata> {
+  const result: Partial<MilestoneMetadata> = {};
+
+  // title: 첫 번째 # 헤딩
+  const titleMatch = content.match(/^#\s+(.+)$/m);
+  if (titleMatch) result.title = titleMatch[1].trim();
+
+  // 기간: "기간: YYYY-MM-DD ~ YYYY-MM-DD"
+  const rangeMatch = content.match(/기간\s*[:：]\s*(\d{4}-\d{2}-\d{2})\s*[~～]\s*(\d{4}-\d{2}-\d{2})/);
+  if (rangeMatch) {
+    result.start_date = rangeMatch[1];
+    result.end_date = rangeMatch[2];
+  }
+
+  // 기한: "기한: YYYY-MM-DD" (end_date만)
+  if (!result.end_date) {
+    const deadlineMatch = content.match(/기한\s*[:：]\s*(\d{4}-\d{2}-\d{2})/);
+    if (deadlineMatch) result.end_date = deadlineMatch[1];
+  }
+
+  // 상태: "상태: ..."
+  const statusMatch = content.match(/상태\s*[:：]\s*(.+)$/m);
+  if (statusMatch) {
+    const raw = statusMatch[1].trim().toLowerCase();
+    if (raw.includes('progress') || raw.includes('진행')) result.status = 'in-progress';
+    else if (raw.includes('done') || raw.includes('complete') || raw.includes('완료')) result.status = 'completed';
+    else result.status = 'planned';
+  }
+
+  // project: domain을 사용
+  result.project = domain;
+
+  return result;
+}
+
+function enrichMetadata(item: any): any {
+  const m = item.metadata;
+  const isEmpty = !m || Object.keys(m).length === 0;
+  if (!isEmpty && m.project && m.title && m.start_date && m.end_date) return item;
+
+  const parsed = parseContentMetadata(item.content || '', item.domain || '');
+  const merged = { ...parsed, ...(isEmpty ? {} : m) };
+
+  // start_date fallback: end_date - 30일
+  if (!merged.start_date && merged.end_date) {
+    const end = new Date(merged.end_date);
+    end.setDate(end.getDate() - 30);
+    merged.start_date = end.toISOString().slice(0, 10);
+  }
+
+  // title fallback: sub_key 부분
+  if (!merged.title) {
+    const keyParts = (item.key || '').split('/');
+    merged.title = keyParts.length > 1 ? keyParts.slice(1).join('/') : keyParts[0];
+  }
+
+  return { ...item, metadata: merged };
+}
+
 function isValidMilestone(item: any): item is { kb_id: string; key: string; content: string; metadata: MilestoneMetadata; updated_at: string } {
   const m = item?.metadata;
   return m && typeof m.project === 'string' && typeof m.title === 'string'
@@ -57,7 +120,7 @@ export function useRoadmapData(statusFilter?: string): RoadmapData {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/kb?domain=milestone')
+    fetch('/api/kb?key=milestone')
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -77,8 +140,9 @@ export function useRoadmapData(statusFilter?: string): RoadmapData {
       return { projects: [], timelineStart: new Date(), timelineEnd: new Date(), months: [], loading, error };
     }
 
-    // Parse and validate
-    let milestones: Milestone[] = rawItems
+    // Enrich metadata from content, then validate
+    const enriched = rawItems.map(enrichMetadata);
+    let milestones: Milestone[] = enriched
       .filter(isValidMilestone)
       .map(item => ({
         kb_id: item.kb_id,

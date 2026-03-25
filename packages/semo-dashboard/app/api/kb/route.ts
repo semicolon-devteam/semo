@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { list, listDomains, search, getItem, stats, upsertItem, deleteItemByKey } from '@/lib/kb';
+import { list, listByKey, listDomains, search, getItem, stats, upsertItem, deleteItemByKey } from '@/lib/kb';
 
 // Force dynamic rendering to prevent build-time DB connection
 export const dynamic = 'force-dynamic';
@@ -36,6 +36,11 @@ export async function GET(request: NextRequest) {
     if (q) {
       const results = await search(q, 20, createdBy || undefined);
       return NextResponse.json(results);
+    }
+
+    if (key && !domain) {
+      const items = await listByKey(key);
+      return NextResponse.json(items);
     }
 
     if (key && domain) {

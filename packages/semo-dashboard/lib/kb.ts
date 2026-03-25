@@ -188,6 +188,23 @@ export async function listDomains(): Promise<KBDomain[]> {
 }
 
 /**
+ * 전 도메인에서 특정 key를 가진 항목 조회 (예: key=milestone)
+ */
+export async function listByKey(key: string): Promise<KBItem[]> {
+  const sql = `
+    SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at
+    FROM semo.knowledge_base
+    WHERE key = $1
+    ORDER BY domain, sub_key
+  `;
+  const res = await pool.query(sql, [key]);
+  return res.rows.map((r: KBItem & { sub_key?: string }) => ({
+    ...r,
+    key: combineKey(r.key, r.sub_key ?? ''),
+  }));
+}
+
+/**
  * 특정 KB 항목 조회
  */
 export async function getItem(
