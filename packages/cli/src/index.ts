@@ -399,7 +399,16 @@ program
       spinner.succeed("DB 연결 확인됨");
     } else {
       spinner.warn("DB 연결 실패 — 스킬/봇 미러 설치를 건너뜁니다");
-      console.log(chalk.gray("  ~/.claude/semo/.env를 확인하고 다시 시도하세요: semo onboarding\n"));
+      console.log(chalk.gray([
+        "",
+        "  흔한 원인:",
+        "  1. SSH 터널 미실행 — 로컬에서는 SSH 터널이 필요합니다:",
+        "     ssh -J opc@152.70.244.169 -L 15432:localhost:5432 opc@10.0.0.91 -N -i ~/.ssh/oci_dev_rsa",
+        "  2. ~/.claude/semo/.env의 DATABASE_URL 확인",
+        "",
+        "  터널 실행 후 다시 시도: semo onboarding",
+        "",
+      ].join("\n")));
       await closeConnection();
       return;
     }
@@ -1475,7 +1484,10 @@ program
       console.log(chalk.green("   ✅ DB 연결 정상"));
     } else {
       console.log(chalk.red("   ❌ DB 연결 실패"));
-      console.log(chalk.gray("   💡 해결: semo config env 또는 semo onboarding 실행"));
+      console.log(chalk.gray("   💡 흔한 원인:"));
+      console.log(chalk.gray("      - SSH 터널 미실행 (로컬 개발 시 필수)"));
+      console.log(chalk.gray("      - ~/.claude/semo/.env의 DATABASE_URL 오류"));
+      console.log(chalk.gray("   💡 해결: SSH 터널 실행 후 semo onboarding 재시도"));
     }
 
     // 3. 글로벌 설정 확인
