@@ -17,7 +17,6 @@ import * as os from "os";
 import { getPool, closeConnection, isDbConnected, getDelegations, getActiveSkills } from "../database";
 import { syncBotSessions } from "./sessions";
 import { auditBot, auditBotFromDb, auditBotDb, auditBotKb, mergeDbChecks, fixBot, storeAuditResults, formatAuditSlack, BotAuditResult } from "./audit";
-import { syncSkillsToDB, scanSkills } from "./skill-sync";
 import { syncCronJobs } from "./context";
 
 // ============================================================
@@ -44,25 +43,6 @@ interface BotSession {
   chat_type: string | null;
   last_activity: string | null;
   message_count: number;
-}
-
-// ============================================================
-// Seed types
-// ============================================================
-
-interface SeedSkill {
-  name: string;
-  prompt: string;
-  package: string;
-  botId: string | null;
-}
-
-interface SeedAgent {
-  botId: string;
-  name: string;
-  emoji: string | null;
-  role: string;
-  personaPrompt: string;
 }
 
 // ============================================================
@@ -459,21 +439,10 @@ export function registerBotsCommands(program: Command): void {
   botsCmd
     .command("sync")
     .description("bot-workspaces/ 스캔 → semo.bot_status DB upsert")
-    .option("--semo-system <path>", "semo-system 경로 (기본: ./semo-system)")
     .option("--dry-run", "실제 upsert 없이 미리보기")
     .action(async (options) => {
-      const cwd = process.cwd();
-      const semoSystemDir = options.semoSystem
-        ? path.resolve(options.semoSystem)
-        : path.join(cwd, "semo-system");
-
-      if (!fs.existsSync(semoSystemDir)) {
-        console.log(chalk.red(`\n❌ semo-system 디렉토리를 찾을 수 없습니다: ${semoSystemDir}`));
-        process.exit(1);
-      }
-
       const spinner = ora("bot-workspaces 스캔 중...").start();
-      const bots = scanBotWorkspaces(semoSystemDir);
+      const bots = scanBotWorkspaces();
 
       if (bots.length === 0) {
         spinner.warn("봇 워크스페이스가 없습니다.");
@@ -611,22 +580,6 @@ export function registerBotsCommands(program: Command): void {
           console.log(chalk.green(`  → audit 완료: ${auditResults.length}개 봇 (GOOD: ${good})`));
         } catch {
           console.log(chalk.yellow("  ⚠ audit 저장 실패 (무시)"));
-        }
-
-        // Skills piggyback — 스킬 파일 → skill_definitions 동기화
-        try {
-          console.log(chalk.gray("  → skills sync 실행 중..."));
-          const skillClient = await pool.connect();
-          try {
-            await skillClient.query("BEGIN");
-            const result = await syncSkillsToDB(skillClient, semoSystemDir);
-            await skillClient.query("COMMIT");
-            console.log(chalk.green(`  → skills sync 완료: ${result.total}개 (봇 전용: ${result.botSpecific})`));
-          } finally {
-            skillClient.release();
-          }
-        } catch {
-          console.log(chalk.yellow("  ⚠ skills sync 실패 (무시)"));
         }
 
         // Files piggyback — 워크스페이스 파일 → bot_workspace_files 동기화
@@ -816,235 +769,11 @@ export function registerBotsCommands(program: Command): void {
   // ── semo bots seed ──────────────────────────────────────────
   botsCmd
     .command("seed")
-    .description("semo-skills + bot-workspaces → skill_definitions / agent_definitions 시딩")
-    .option("--semo-system <path>", "semo-system 경로 (기본: ./semo-system)")
-    .option("--reset", "시딩 전 기존 데이터 삭제")
-    .option("--dry-run", "실제 DB 반영 없이 미리보기")
-    .action(async (options) => {
-      const cwd = process.cwd();
-      const semoSystemDir = options.semoSystem
-        ? path.resolve(options.semoSystem)
-        : path.join(cwd, "semo-system");
-
-      if (!fs.existsSync(semoSystemDir)) {
-        console.log(chalk.red(`\n❌ semo-system 디렉토리를 찾을 수 없습니다: ${semoSystemDir}`));
-        process.exit(1);
-      }
-
-      const spinner = ora("스킬/에이전트 스캔 중...").start();
-
-      // ─── 1+2. 스킬 스캔 (공통 모듈) ─────────────────────────
-      const botSkills = scanSkills(semoSystemDir);
-
-      // ─── 3. 에이전트 스캔 ─────────────────────────────────
-      const workspacesDir = path.join(semoSystemDir, "bot-workspaces");
-      const agents: SeedAgent[] = [];
-
-      if (fs.existsSync(workspacesDir)) {
-        const botEntries = fs.readdirSync(workspacesDir, { withFileTypes: true });
-        for (const botEntry of botEntries) {
-          if (!botEntry.isDirectory()) continue;
-          const botDir = path.join(workspacesDir, botEntry.name);
-          // v2.0: SOUL.md에서 Identity 파싱 (IDENTITY.md fallback)
-          const soulPath2 = path.join(botDir, "SOUL.md");
-          const identityPath = path.join(botDir, "IDENTITY.md");
-          if (!fs.existsSync(soulPath2) && !fs.existsSync(identityPath)) continue;
-
-          try {
-            const identity = fs.existsSync(soulPath2)
-              ? parseSoulIdentity(fs.readFileSync(soulPath2, "utf-8"), botEntry.name)
-              : parseIdentityMd(fs.readFileSync(identityPath, "utf-8"));
-
-            // persona_prompt = SOUL.md + \n\n---\n\n + AGENTS.md
-            const parts: string[] = [];
-            const soulPath = path.join(botDir, "SOUL.md");
-            if (fs.existsSync(soulPath)) {
-              parts.push(fs.readFileSync(soulPath, "utf-8"));
-            }
-            const agentsPath = path.join(botDir, "AGENTS.md");
-            if (fs.existsSync(agentsPath)) {
-              parts.push(fs.readFileSync(agentsPath, "utf-8"));
-            }
-            const personaPrompt = parts.join("\n\n---\n\n");
-
-            agents.push({
-              botId: botEntry.name,
-              name: identity.name || botEntry.name,
-              emoji: identity.emoji,
-              role: (identity.role || "custom").substring(0, 50),
-              personaPrompt,
-            });
-          } catch { /* skip */ }
-        }
-      }
-
-      spinner.stop();
-
-      // ─── 미리보기 출력 ─────────────────────────────────────
-      console.log(chalk.cyan.bold("\n📦 Seed 스캔 결과\n"));
-      console.log(chalk.white(`  봇 전용 스킬 (openclaw):  ${botSkills.length}개`));
-      console.log(chalk.white(`  에이전트 (봇):            ${agents.length}개`));
-
-      if (agents.length > 0) {
-        console.log(chalk.gray("\n  에이전트:"));
-        for (const a of agents) {
-          const ownSkills = botSkills.filter(s => s.botId === a.botId);
-          console.log(
-            chalk.gray(`    ${a.emoji || "?"} ${a.botId.padEnd(14)}`) +
-            chalk.white(`${a.role}`.substring(0, 40).padEnd(42)) +
-            chalk.gray(`전용 스킬: ${ownSkills.length}`)
-          );
-        }
-      }
-
-      if (options.dryRun) {
-        console.log(chalk.yellow("\n  [dry-run] DB 반영 없이 종료\n"));
-        return;
-      }
-
-      // ─── DB 반영 ──────────────────────────────────────────
-      const spinnerDb = ora("DB 반영 중...").start();
-
-      const connected = await isDbConnected();
-      if (!connected) {
-        spinnerDb.fail("DB 연결 실패");
-        await closeConnection();
-        process.exit(1);
-      }
-
-      const pool = getPool();
-      const client = await pool.connect();
-
-      try {
-        await client.query("BEGIN");
-
-        // --reset: 기존 데이터 삭제
-        if (options.reset) {
-          spinnerDb.text = "기존 데이터 삭제 중...";
-          await client.query("DELETE FROM agent_definitions");
-          await client.query("DELETE FROM semo.skill_definitions WHERE office_id IS NULL");
-        }
-
-        // ─── 스킬 시딩 (공통 모듈) ──────────────────────────
-        spinnerDb.text = `스킬 ${botSkills.length}개 시딩 중...`;
-        await syncSkillsToDB(client, semoSystemDir);
-
-        // ─── 에이전트 시딩 ───────────────────────────────────
-        spinnerDb.text = `에이전트 ${agents.length}개 시딩 중...`;
-        for (const agent of agents) {
-          await client.query(
-            `INSERT INTO agent_definitions (name, role, persona_prompt, package, avatar_config, is_active, office_id)
-             VALUES ($1, $2, $3, 'openclaw', $4, true, NULL)
-             ON CONFLICT (name, office_id) DO UPDATE SET
-               role = EXCLUDED.role,
-               persona_prompt = EXCLUDED.persona_prompt,
-               avatar_config = EXCLUDED.avatar_config,
-               updated_at = NOW()`,
-            [
-              agent.botId,
-              agent.role,
-              agent.personaPrompt,
-              JSON.stringify({ emoji: agent.emoji }),
-            ]
-          );
-        }
-
-        // ─── 위임 매트릭스 시딩 ─────────────────────────────
-        spinnerDb.text = "위임 매트릭스 시딩 중...";
-        const delegationSeeds: Array<{
-          from: string;
-          to: string;
-          type: string;
-          domains: string[];
-          method: string;
-        }> = [
-          { from: "semiclaw", to: "infraclaw", type: "task", domains: ["infra", "cicd", "deploy", "monitoring"], method: "github_issue" },
-          { from: "semiclaw", to: "designclaw", type: "task", domains: ["ui", "ux", "design", "reference"], method: "github_issue" },
-          { from: "semiclaw", to: "planclaw", type: "task", domains: ["planning", "requirements", "spec"], method: "github_issue" },
-          { from: "semiclaw", to: "reviewclaw", type: "task", domains: ["code_review", "qa", "testing"], method: "github_issue" },
-          { from: "semiclaw", to: "workclaw", type: "task", domains: ["implementation", "dev", "bugfix"], method: "github_issue" },
-          { from: "semiclaw", to: "growthclaw", type: "task", domains: ["marketing", "growth", "analytics", "content"], method: "github_issue" },
-        ];
-
-        let delegationCount = 0;
-        for (const d of delegationSeeds) {
-          await client.query(
-            `INSERT INTO semo.bot_delegation
-               (from_bot_id, to_bot_id, delegation_type, domains, method)
-             VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT (from_bot_id, to_bot_id, delegation_type) DO UPDATE SET
-               domains = EXCLUDED.domains,
-               method = EXCLUDED.method,
-               updated_at = NOW()`,
-            [d.from, d.to, d.type, d.domains, d.method]
-          );
-          delegationCount++;
-        }
-
-        // ─── 프로토콜 시딩 ──────────────────────────────────
-        spinnerDb.text = "프로토콜 메타데이터 시딩 중...";
-        const protocolSeeds: Array<{
-          key: string;
-          value: Record<string, unknown>;
-          description: string;
-        }> = [
-          {
-            key: "task_request_format",
-            value: { template: "@{bot} [TASK] {desc}\n[PROJECT] {project}\n[PRIORITY] {priority}\n[ISSUE] {issue}" },
-            description: "태스크 요청 메시지 포맷",
-          },
-          {
-            key: "result_format",
-            value: { template: "@SemiClaw [DONE] {desc}\n[RESULT] {summary}\n[ARTIFACTS] {urls}" },
-            description: "결과 보고 메시지 포맷",
-          },
-          {
-            key: "blocked_format",
-            value: { template: "@SemiClaw [BLOCKED] {desc}\n[REASON] {reason}\n[NEED] {need}" },
-            description: "블로커 보고 메시지 포맷",
-          },
-          {
-            key: "channel_rules",
-            value: { "proj-*": "allowBots", "개발사업팀": "reportOnly" },
-            description: "채널별 봇 통신 규칙",
-          },
-          {
-            key: "general",
-            value: { max_roundtrips: 5, hub_bot: "semiclaw" },
-            description: "일반 프로토콜 설정",
-          },
-        ];
-
-        let protocolCount = 0;
-        for (const p of protocolSeeds) {
-          await client.query(
-            `INSERT INTO semo.bot_protocol (key, value, description)
-             VALUES ($1, $2, $3)
-             ON CONFLICT (key) DO UPDATE SET
-               value = EXCLUDED.value,
-               description = EXCLUDED.description,
-               updated_at = NOW()`,
-            [p.key, JSON.stringify(p.value), p.description]
-          );
-          protocolCount++;
-        }
-
-        await client.query("COMMIT");
-        spinnerDb.succeed("seed 완료");
-
-        console.log(chalk.green(`  ✔ 봇 전용 스킬: ${botSkills.length}개 (metadata.bot_ids)`));
-        console.log(chalk.green(`  ✔ 에이전트: ${agents.length}개`));
-        console.log(chalk.green(`  ✔ 위임 매트릭스: ${delegationCount}개`));
-        console.log(chalk.green(`  ✔ 프로토콜: ${protocolCount}개`));
-        console.log();
-      } catch (err) {
-        await client.query("ROLLBACK");
-        spinnerDb.fail(`seed 실패: ${err}`);
-        process.exit(1);
-      } finally {
-        client.release();
-        await closeConnection();
-      }
+    .description("[deprecated] 스킬/에이전트 SoT는 DB 직접 관리로 전환됨")
+    .action(async () => {
+      console.log(chalk.yellow("\n⚠ 'semo bots seed'는 더 이상 사용되지 않습니다."));
+      console.log(chalk.gray("  스킬/에이전트 SoT는 DB(skill_definitions, agent_definitions)로 이전되었습니다."));
+      console.log(chalk.gray("  수정은 직접 DB UPDATE 또는 마이그레이션을 사용하세요.\n"));
     });
 
   // ── semo bots cron ──────────────────────────────────────────
