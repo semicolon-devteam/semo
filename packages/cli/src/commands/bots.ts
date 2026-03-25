@@ -14,7 +14,7 @@ import ora from "ora";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { getPool, closeConnection, isDbConnected, getDelegations } from "../database";
+import { getPool, closeConnection, isDbConnected, getDelegations, getActiveSkills } from "../database";
 import { syncBotSessions } from "./sessions";
 import { auditBot, auditBotFromDb, auditBotDb, auditBotKb, mergeDbChecks, fixBot, storeAuditResults, formatAuditSlack, BotAuditResult } from "./audit";
 import { syncSkillsToDB, scanSkills } from "./skill-sync";
@@ -667,17 +667,34 @@ export function registerBotsCommands(program: Command): void {
     .option("--format <type>", "출력 형식 (table|json|slack)", "table")
     .option("--fix", "누락 파일/디렉토리 자동 생성")
     .option("--no-db", "DB 저장 건너뛰기")
+    .option("--local", "~/.claude/semo/bots/ 로컬 미러 audit")
     .action(async (options) => {
       const home = process.env.HOME || "/Users/reus";
 
-      const spinner = ora("bot-workspaces audit 중... (v2.0 SoT: ~/.openclaw-*/workspace/)").start();
+      const isLocal = options.local === true;
+      const sourceLabel = isLocal ? "~/.claude/semo/bots/" : "~/.openclaw-*/workspace/";
+      const spinner = ora(`bot-workspaces audit 중... (${sourceLabel})`).start();
 
-      // v2.0: SoT는 ~/.openclaw-{bot}/workspace/
       const botEntries: { botId: string; botDir: string }[] = [];
-      for (const botId of KNOWN_BOTS) {
-        const botDir = path.join(home, `.openclaw-${botId}`, "workspace");
-        if (fs.existsSync(botDir)) {
-          botEntries.push({ botId, botDir });
+
+      if (isLocal) {
+        // 로컬 미러: ~/.claude/semo/bots/{botId}/
+        const semoBotsDir = path.join(home, ".claude", "semo", "bots");
+        if (fs.existsSync(semoBotsDir)) {
+          const dirs = fs.readdirSync(semoBotsDir).filter(f =>
+            fs.statSync(path.join(semoBotsDir, f)).isDirectory()
+          );
+          for (const botId of dirs) {
+            botEntries.push({ botId, botDir: path.join(semoBotsDir, botId) });
+          }
+        }
+      } else {
+        // v2.0: SoT는 ~/.openclaw-{bot}/workspace/
+        for (const botId of KNOWN_BOTS) {
+          const botDir = path.join(home, `.openclaw-${botId}`, "workspace");
+          if (fs.existsSync(botDir)) {
+            botEntries.push({ botId, botDir });
+          }
         }
       }
 
@@ -704,7 +721,9 @@ export function registerBotsCommands(program: Command): void {
       if (options.fix) {
         let totalFixed = 0;
         for (const r of results) {
-          const botDir = path.join(home, `.openclaw-${r.botId}`, "workspace");
+          const botDir = isLocal
+            ? path.join(home, ".claude", "semo", "bots", r.botId)
+            : path.join(home, `.openclaw-${r.botId}`, "workspace");
           const fixed = fixBot(botDir, r.botId, r.checks);
           if (fixed > 0) {
             console.log(chalk.green(`  ✔ ${r.botId}: ${fixed}개 파일/디렉토리 생성`));
@@ -715,7 +734,9 @@ export function registerBotsCommands(program: Command): void {
           console.log(chalk.green(`\n총 ${totalFixed}개 수정`));
           // Re-audit after fix
           for (let i = 0; i < results.length; i++) {
-            const botDir = path.join(home, `.openclaw-${results[i].botId}`, "workspace");
+            const botDir = isLocal
+              ? path.join(home, ".claude", "semo", "bots", results[i].botId)
+              : path.join(home, `.openclaw-${results[i].botId}`, "workspace");
             results[i] = auditBot(botDir, results[i].botId);
           }
         }
@@ -1176,6 +1197,148 @@ export function registerBotsCommands(program: Command): void {
         }
       } catch (err) {
         spinner.fail(`조회 실패: ${err}`);
+        process.exit(1);
+      } finally {
+        await closeConnection();
+      }
+    });
+
+  // ── semo bots skill-deploy ──────────────────────────────────
+  botsCmd
+    .command("skill-deploy")
+    .description("DB skill_definitions → 봇 워크스페이스 SKILL.md 역배포")
+    .option("--bot <botId>", "특정 봇에만 배포")
+    .option("--dry-run", "파일 쓰기 없이 계획만 출력")
+    .option("--force", "기존 SKILL.md와 내용이 달라도 덮어쓰기")
+    .action(async (options) => {
+      const spinner = ora("스킬 배포 준비 중...").start();
+
+      const connected = await isDbConnected();
+      if (!connected) {
+        spinner.fail("DB 연결 실패");
+        await closeConnection();
+        process.exit(1);
+      }
+
+      try {
+        const skills = await getActiveSkills();
+        spinner.succeed(`활성 스킬 ${skills.length}개 조회 완료`);
+
+        // Filter skills that have bot_ids assigned and content
+        const deployable = skills.filter(
+          (s) => s.bot_ids && s.bot_ids.length > 0 && s.content && s.content.trim()
+        );
+
+        if (deployable.length === 0) {
+          console.log(chalk.yellow("배포 가능한 스킬이 없습니다."));
+          return;
+        }
+
+        // Build (skill, botId) pairs
+        type Action = "CREATE" | "OVERWRITE" | "SKIP_SAME" | "SKIP_EXISTS";
+        interface DeployEntry {
+          skillName: string;
+          botId: string;
+          action: Action;
+          filePath: string;
+          content: string;
+        }
+
+        const entries: DeployEntry[] = [];
+
+        for (const skill of deployable) {
+          const targetBots = options.bot
+            ? skill.bot_ids.filter((b: string) => b === options.bot)
+            : skill.bot_ids;
+
+          for (const botId of targetBots) {
+            const wsDir = path.join(os.homedir(), `.openclaw-${botId}`, "workspace");
+            const skillDir = path.join(wsDir, "skills", skill.name);
+            const filePath = path.join(skillDir, "SKILL.md");
+
+            let action: Action;
+            if (!fs.existsSync(filePath)) {
+              action = "CREATE";
+            } else {
+              const existing = fs.readFileSync(filePath, "utf-8");
+              if (existing === skill.content) {
+                action = "SKIP_SAME";
+              } else if (options.force) {
+                action = "OVERWRITE";
+              } else {
+                action = "SKIP_EXISTS";
+              }
+            }
+
+            entries.push({ skillName: skill.name, botId, action, filePath, content: skill.content });
+          }
+        }
+
+        // Summary table
+        const actionColor: Record<Action, (s: string) => string> = {
+          CREATE: chalk.green,
+          OVERWRITE: chalk.yellow,
+          SKIP_SAME: chalk.gray,
+          SKIP_EXISTS: chalk.cyan,
+        };
+
+        console.log("\n" + chalk.bold("배포 계획:"));
+        console.log("─".repeat(70));
+        for (const e of entries) {
+          const tag = actionColor[e.action](e.action.padEnd(12));
+          console.log(`  ${tag} ${e.botId}/${e.skillName}`);
+        }
+        console.log("─".repeat(70));
+
+        const creates = entries.filter((e) => e.action === "CREATE").length;
+        const overwrites = entries.filter((e) => e.action === "OVERWRITE").length;
+        const skipSame = entries.filter((e) => e.action === "SKIP_SAME").length;
+        const skipExists = entries.filter((e) => e.action === "SKIP_EXISTS").length;
+        console.log(
+          `  CREATE: ${creates}  OVERWRITE: ${overwrites}  동일: ${skipSame}  스킵(--force 필요): ${skipExists}`
+        );
+
+        if (options.dryRun) {
+          console.log(chalk.yellow("\n--dry-run: 파일 쓰기를 건너뜁니다."));
+          return;
+        }
+
+        const toWrite = entries.filter((e) => e.action === "CREATE" || e.action === "OVERWRITE");
+        if (toWrite.length === 0) {
+          console.log(chalk.green("\n변경할 파일이 없습니다."));
+          return;
+        }
+
+        // Write files
+        const writeSpinner = ora(`SKILL.md ${toWrite.length}개 배포 중...`).start();
+        for (const e of toWrite) {
+          const dir = path.dirname(e.filePath);
+          fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(e.filePath, e.content, "utf-8");
+        }
+        writeSpinner.succeed(`SKILL.md ${toWrite.length}개 배포 완료`);
+
+        // Sync workspace files for affected bots
+        const affectedBots = [...new Set(toWrite.map((e) => e.botId))];
+        const pool = getPool();
+        const client = await pool.connect();
+        try {
+          for (const botId of affectedBots) {
+            const wsDir = path.join(os.homedir(), `.openclaw-${botId}`, "workspace");
+            if (fs.existsSync(wsDir)) {
+              const syncSpinner = ora(`${botId} 워크스페이스 DB 싱크 중...`).start();
+              const count = await syncWorkspaceFiles(client, botId, wsDir);
+              syncSpinner.succeed(`${botId} 워크스페이스 싱크 완료 (${count}개 파일 갱신)`);
+            }
+          }
+        } finally {
+          client.release();
+        }
+
+        console.log(chalk.green(`\n✔ 스킬 역배포 완료`));
+      } catch (err) {
+        spinner.isSpinning && spinner.fail("스킬 배포 실패");
+        console.error(chalk.red(`❌ ${err}`));
         process.exit(1);
       } finally {
         await closeConnection();
