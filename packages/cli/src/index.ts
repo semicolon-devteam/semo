@@ -1701,6 +1701,7 @@ kbCmd
   .option("--service <name>", "서비스(프로젝트) 필터")
   .option("--limit <n>", "최대 결과 수", "10")
   .option("--mode <type>", "검색 모드 (hybrid|semantic|text)", "hybrid")
+  .option("--short", "미리보기 모드 (content를 80자로 잘라서 표시)")
   .action(async (query, options) => {
     const spinner = ora(`'${query}' 검색 중...`).start();
     try {
@@ -1719,12 +1720,16 @@ kbCmd
       } else {
         console.log(chalk.cyan.bold(`\n🔍 검색 결과: '${query}' (${results.length}건)\n`));
         for (const entry of results) {
-          const preview = entry.content.substring(0, 80).replace(/\n/g, " ");
           const score = (entry as any).score;
           const scoreStr = score ? chalk.yellow(` (${(score * 100).toFixed(1)}%)`) : "";
           const fullKey = entry.sub_key ? `${entry.key}/${entry.sub_key}` : entry.key;
           console.log(chalk.cyan(`  [${entry.domain}] `) + chalk.white(fullKey) + scoreStr);
-          console.log(chalk.gray(`    ${preview}${entry.content.length > 80 ? "..." : ""}`));
+          if (options.short) {
+            const preview = entry.content.substring(0, 80).replace(/\n/g, " ");
+            console.log(chalk.gray(`    ${preview}${entry.content.length > 80 ? "..." : ""}`));
+          } else {
+            console.log(chalk.gray(`    ${entry.content}`));
+          }
           console.log();
         }
       }
