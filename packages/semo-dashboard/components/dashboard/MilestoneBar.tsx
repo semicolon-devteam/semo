@@ -8,6 +8,7 @@ interface Props {
   color: string;
   leftPct: number;
   widthPct: number;
+  onClick?: (milestone: Milestone) => void;
 }
 
 const STATUS_OPACITY: Record<string, number> = {
@@ -16,14 +17,14 @@ const STATUS_OPACITY: Record<string, number> = {
   planned: 0.35,
 };
 
-export default function MilestoneBar({ milestone, color, leftPct, widthPct }: Props) {
+export default function MilestoneBar({ milestone, color, leftPct, widthPct, onClick }: Props) {
   const [showTooltip, setShowTooltip] = useState(false);
   const { title, status, start_date, end_date } = milestone.metadata;
   const opacity = STATUS_OPACITY[status] ?? 0.7;
 
   return (
     <div
-      className="absolute top-1 bottom-1 rounded-lg cursor-default flex items-center overflow-hidden group"
+      className="absolute top-1 bottom-1 rounded-lg cursor-pointer flex items-center overflow-hidden group"
       style={{
         left: `${leftPct}%`,
         width: `${widthPct}%`,
@@ -31,6 +32,7 @@ export default function MilestoneBar({ milestone, color, leftPct, widthPct }: Pr
         opacity,
         minWidth: '24px',
       }}
+      onClick={() => onClick?.(milestone)}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
     >

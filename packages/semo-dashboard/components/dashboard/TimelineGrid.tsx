@@ -1,5 +1,6 @@
 'use client';
 
+import type { Milestone } from '@/types';
 import type { ProjectGroup } from './useRoadmapData';
 import MilestoneBar from './MilestoneBar';
 
@@ -8,6 +9,7 @@ interface Props {
   timelineStart: Date;
   timelineEnd: Date;
   months: Date[];
+  onMilestoneClick?: (milestone: Milestone, color: string) => void;
 }
 
 const MONTH_WIDTH = 150; // px per month
@@ -19,7 +21,7 @@ function daysBetween(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export default function TimelineGrid({ projects, timelineStart, timelineEnd, months }: Props) {
+export default function TimelineGrid({ projects, timelineStart, timelineEnd, months, onMilestoneClick }: Props) {
   const totalDays = daysBetween(timelineStart, timelineEnd);
   const totalWidth = months.length * MONTH_WIDTH;
 
@@ -93,6 +95,7 @@ export default function TimelineGrid({ projects, timelineStart, timelineEnd, mon
                         color={group.color}
                         leftPct={leftPct}
                         widthPct={widthPct}
+                        onClick={(m) => onMilestoneClick?.(m, group.color)}
                       />
                     );
                   })}

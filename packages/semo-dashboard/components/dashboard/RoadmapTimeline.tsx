@@ -1,12 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import type { Milestone } from '@/types';
 import { useRoadmapData } from './useRoadmapData';
 import TimelineHeader from './TimelineHeader';
 import TimelineGrid from './TimelineGrid';
+import MilestoneDetailModal from './MilestoneDetailModal';
 
 export default function RoadmapTimeline() {
   const [statusFilter, setStatusFilter] = useState('all');
+  const [selectedMilestone, setSelectedMilestone] = useState<{ milestone: Milestone; color: string } | null>(null);
   const { projects, timelineStart, timelineEnd, months, loading, error } = useRoadmapData(statusFilter);
 
   return (
@@ -47,9 +50,16 @@ export default function RoadmapTimeline() {
             timelineStart={timelineStart}
             timelineEnd={timelineEnd}
             months={months}
+            onMilestoneClick={(m, c) => setSelectedMilestone({ milestone: m, color: c })}
           />
         )}
       </div>
+
+      <MilestoneDetailModal
+        milestone={selectedMilestone?.milestone ?? null}
+        color={selectedMilestone?.color ?? ''}
+        onClose={() => setSelectedMilestone(null)}
+      />
     </div>
   );
 }
