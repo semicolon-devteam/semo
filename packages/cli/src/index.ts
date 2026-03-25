@@ -43,6 +43,14 @@ import { registerDbCommands } from "./commands/db";
 import { registerMemoryCommands } from "./commands/memory";
 import { registerTestCommands } from "./commands/test";
 import { syncGlobalCache } from "./global-cache";
+import {
+  ensureSemoDir,
+  populateBotMirrors,
+  generateSoulMd,
+  generateMemoryMd,
+  generateUserMd,
+  generateThinRouter,
+} from "./semo-workspace";
 
 const PACKAGE_NAME = "@team-semicolon/semo-cli";
 
@@ -825,24 +833,26 @@ async function showToolsStatus(): Promise<boolean> {
 // === 글로벌 설정 체크 ===
 function isGlobalSetupDone(): boolean {
   const home = os.homedir();
-  return (
-    fs.existsSync(path.join(home, ".semo.env")) &&
-    fs.existsSync(path.join(home, ".claude", "skills"))
-  );
+  const hasEnv = fs.existsSync(path.join(home, ".claude", "semo", ".env")) ||
+                 fs.existsSync(path.join(home, ".semo.env"));  // 하위 호환
+  const hasSetup = fs.existsSync(path.join(home, ".claude", "semo", "SOUL.md")) ||
+                   fs.existsSync(path.join(home, ".claude", "skills"));  // 하위 호환
+  return hasEnv && hasSetup;
 }
 
-// === onboarding 명령어 (글로벌 1회 설정) ===
+// === onboarding 명령어 (글로벌 설정 — init 통합) ===
 program
   .command("onboarding")
-  .description("글로벌 SEMO 설정 (머신당 1회) — ~/.claude/, ~/.semo.env")
+  .description("글로벌 SEMO 설정 — ~/.claude/semo/, skills/agents/commands")
   .option("--credentials-gist <gistId>", "Private GitHub Gist에서 DB 접속정보 가져오기")
   .option("-f, --force", "기존 설정 덮어쓰기")
   .option("--skip-mcp", "MCP 설정 생략")
+  .option("--skip-bots", "봇 워크스페이스 미러 건너뛰기")
   .action(async (options) => {
-    console.log(chalk.cyan.bold("\n🏠 SEMO 글로벌 온보딩\n"));
-    console.log(chalk.gray("  대상: ~/.claude/, ~/.semo.env (머신당 1회)\n"));
+    console.log(chalk.cyan.bold("\n🏠 SEMO 온보딩\n"));
+    console.log(chalk.gray("  대상: ~/.claude/semo/ (머신당 1회)\n"));
 
-    // 1. ~/.semo.env DB 접속 설정
+    // 1. ~/.claude/semo/.env DB 접속 설정
     await setupSemoEnv(options.credentialsGist, options.force);
 
     // 2. DB health check
@@ -851,123 +861,91 @@ program
     if (connected) {
       spinner.succeed("DB 연결 확인됨");
     } else {
-      spinner.warn("DB 연결 실패 — 스킬/커맨드/에이전트 설치를 건너뜁니다");
-      console.log(chalk.gray("  ~/.semo.env를 확인하고 다시 시도하세요: semo onboarding\n"));
+      spinner.warn("DB 연결 실패 — 스킬/봇 미러 설치를 건너뜁니다");
+      console.log(chalk.gray("  ~/.claude/semo/.env를 확인하고 다시 시도하세요: semo onboarding\n"));
       await closeConnection();
       return;
     }
 
-    // 3. Standard 설치 (DB → ~/.claude/skills, commands, agents)
+    // 3. ~/.claude/semo/ 디렉토리 구조 생성
+    console.log(chalk.cyan("\n📂 SEMO 워크스페이스 구성 (~/.claude/semo/)"));
+    ensureSemoDir();
+    console.log(chalk.green("  ✓ ~/.claude/semo/ 디렉토리 생성됨"));
+
+    // 4. 봇 워크스페이스 미러 (DB → semo/bots/)
+    if (!options.skipBots) {
+      const mirrorSpinner = ora("봇 워크스페이스 미러링 (DB → semo/bots/)...").start();
+      try {
+        const result = await populateBotMirrors();
+        mirrorSpinner.succeed(`봇 미러 완료: ${result.bots}개 봇, ${result.files}개 파일`);
+      } catch (err) {
+        mirrorSpinner.warn(`봇 미러 실패 (계속 진행): ${err}`);
+      }
+    } else {
+      console.log(chalk.gray("  → 봇 미러 건너뜀 (--skip-bots)"));
+    }
+
+    // 5. SOUL.md / MEMORY.md / USER.md 생성
+    try {
+      await generateSoulMd();
+      console.log(chalk.green("  ✓ semo/SOUL.md 생성됨 (오케스트레이터 페르소나)"));
+    } catch (err) {
+      console.log(chalk.yellow(`  ⚠ SOUL.md 생성 실패: ${err}`));
+    }
+    generateMemoryMd();
+    console.log(chalk.green("  ✓ semo/MEMORY.md 생성됨 (KB 인덱스)"));
+    generateUserMd();
+    console.log(chalk.green("  ✓ semo/USER.md 확인됨 (사용자 프로필)"));
+
+    // 6. Standard 설치 (DB → ~/.claude/skills, commands, agents)
     await setupStandardGlobal();
 
-    // 4. Hooks 설치 (프로젝트 무관)
+    // 7. Hooks 설치
     await setupHooks(false);
 
-    // 5. MCP 설정 (글로벌 공통 서버)
+    // 8. MCP 설정
     if (!options.skipMcp) {
       await setupMCP(os.homedir(), [], options.force || false);
     }
 
-    // 6. 글로벌 CLAUDE.md에 KB-First 규칙 주입
-    await injectKbFirstToGlobalClaudeMd();
+    // 9. Thin Router CLAUDE.md 생성
+    console.log(chalk.cyan("\n📄 CLAUDE.md 라우터 생성"));
+    const kbFirstBlock = await buildKbFirstBlock();
+    generateThinRouter(kbFirstBlock);
+    console.log(chalk.green("  ✓ ~/.claude/CLAUDE.md (thin router) 생성됨"));
 
     await closeConnection();
 
     // 결과 요약
-    console.log(chalk.green.bold("\n✅ SEMO 글로벌 온보딩 완료!\n"));
+    console.log(chalk.green.bold("\n✅ SEMO 온보딩 완료!\n"));
 
     console.log(chalk.cyan("설치된 구성:"));
-    console.log(chalk.gray("  ~/.semo.env              DB 접속정보 (권한 600)"));
-    console.log(chalk.gray("  ~/.claude/skills/        팀 스킬 (DB 기반)"));
-    console.log(chalk.gray("  ~/.claude/commands/      팀 커맨드 (DB 기반)"));
-    console.log(chalk.gray("  ~/.claude/agents/        팀 에이전트 (DB 기반, dedup)"));
+    console.log(chalk.gray("  ~/.claude/semo/.env            DB 접속정보 (권한 600)"));
+    console.log(chalk.gray("  ~/.claude/semo/SOUL.md         오케스트레이터 페르소나"));
+    console.log(chalk.gray("  ~/.claude/semo/MEMORY.md       KB 접근 가이드"));
+    console.log(chalk.gray("  ~/.claude/semo/USER.md         사용자 프로필"));
+    console.log(chalk.gray("  ~/.claude/semo/bots/           봇 워크스페이스 미러"));
+    console.log(chalk.gray("  ~/.claude/skills/              팀 스킬 (DB 기반)"));
+    console.log(chalk.gray("  ~/.claude/commands/            팀 커맨드 (DB 기반)"));
+    console.log(chalk.gray("  ~/.claude/agents/              팀 에이전트 (DB 기반)"));
+    console.log(chalk.gray("  ~/.claude/CLAUDE.md            Thin router + KB-First"));
     console.log(chalk.gray("  ~/.claude/settings.local.json  SessionStart/Stop 훅"));
-    console.log(chalk.gray("  ~/.claude/settings.json  Claude Code 설정 (유저레벨)"));
 
     console.log(chalk.cyan("\n다음 단계:"));
-    console.log(chalk.gray("  프로젝트 디렉토리에서 'semo init'을 실행하세요."));
+    console.log(chalk.gray("  Claude Code에서 프로젝트를 열면 SessionStart 훅이 자동으로 sync합니다."));
     console.log();
   });
 
-// === init 명령어 (프로젝트별 설정) ===
+// === init 명령어 (deprecated — onboarding으로 통합됨) ===
 program
   .command("init")
-  .description("현재 프로젝트에 SEMO 프로젝트 설정을 합니다 (글로벌: semo onboarding)")
-  .option("-f, --force", "기존 설정 덮어쓰기")
-  .option("--no-gitignore", ".gitignore 수정 생략")
-  .action(async (options) => {
-    console.log(chalk.cyan.bold("\n📁 SEMO 프로젝트 설정\n"));
-
-    const cwd = process.cwd();
-
-    // 0. 글로벌 설정 확인
-    if (!isGlobalSetupDone()) {
-      console.log(chalk.yellow("⚠ 글로벌 설정이 완료되지 않았습니다."));
-      console.log(chalk.gray("  먼저 'semo onboarding'을 실행하세요.\n"));
-      console.log(chalk.gray("  이 머신에서 처음 SEMO를 사용하시나요?"));
-      console.log(chalk.cyan("  → semo onboarding --credentials-gist <GIST_ID>\n"));
-      process.exit(1);
-    }
-
-    // 1. Git 레포지토리 확인
-    const spinner = ora("Git 레포지토리 확인 중...").start();
-    try {
-      execSync("git rev-parse --git-dir", { cwd, stdio: "pipe" });
-      spinner.succeed("Git 레포지토리 확인됨");
-    } catch {
-      spinner.fail("Git 레포지토리가 아닙니다. 'git init'을 먼저 실행하세요.");
-      process.exit(1);
-    }
-
-    // 2. .claude 디렉토리 생성
-    const claudeDir = path.join(cwd, ".claude");
-    if (!fs.existsSync(claudeDir)) {
-      fs.mkdirSync(claudeDir, { recursive: true });
-      console.log(chalk.green("\n✓ .claude/ 디렉토리 생성됨"));
-    }
-
-    // 3. 로컬 스킬 경고 (기존 프로젝트 호환)
-    const localSkillsDir = path.join(claudeDir, "skills");
-    if (fs.existsSync(localSkillsDir)) {
-      try {
-        const localSkills = fs.readdirSync(localSkillsDir).filter(f =>
-          fs.statSync(path.join(localSkillsDir, f)).isDirectory()
-        );
-        if (localSkills.length > 0) {
-          console.log(chalk.yellow(`\nℹ 프로젝트 로컬 스킬이 감지되었습니다 (${localSkills.length}개).`));
-          console.log(chalk.gray("  글로벌 스킬(~/.claude/skills/)이 우선 적용됩니다."));
-          console.log(chalk.gray("  로컬 스킬을 제거하려면: rm -rf .claude/skills/ .claude/commands/ .claude/agents/\n"));
-        }
-      } catch {
-        // ignore
-      }
-    }
-
-    // 4. Context Mesh 초기화
-    await setupContextMesh(cwd);
-
-    // 5. CLAUDE.md 생성 (프로젝트 규칙만, 스킬 목록 없음)
-    await setupClaudeMd(cwd, [], options.force || false);
-
-    // 6. .gitignore 업데이트
-    if (options.gitignore !== false) {
-      updateGitignore(cwd);
-    }
-
-    // 완료 메시지
-    console.log(chalk.green.bold("\n✅ SEMO 프로젝트 설정 완료!\n"));
-
-    console.log(chalk.cyan("생성된 파일:"));
-    console.log(chalk.gray("  {cwd}/.claude/CLAUDE.md          프로젝트 규칙"));
-    console.log(chalk.gray("  {cwd}/.claude/memory/context.md   프로젝트 상태"));
-    console.log(chalk.gray("  {cwd}/.claude/memory/decisions.md ADR"));
-    console.log(chalk.gray("  {cwd}/.claude/memory/projects.md  프로젝트 맵"));
-
-    console.log(chalk.cyan("\n다음 단계:"));
-    console.log(chalk.gray("  1. Claude Code에서 프로젝트 열기 (SessionStart 훅이 자동 sync)"));
-    console.log(chalk.gray("  2. 자연어로 요청하기 (예: \"댓글 기능 구현해줘\")"));
-    console.log(chalk.gray("  3. /SEMO:help로 도움말 확인"));
-    console.log();
+  .description("[deprecated] semo onboarding으로 통합되었습니다")
+  .action(async () => {
+    console.log(chalk.yellow("\n⚠ 'semo init'은 'semo onboarding'으로 통합되었습니다.\n"));
+    console.log(chalk.cyan("  글로벌 설정이 필요하면:"));
+    console.log(chalk.gray("    semo onboarding\n"));
+    console.log(chalk.cyan("  이미 온보딩을 완료했다면:"));
+    console.log(chalk.gray("    Claude Code에서 프로젝트를 열면 SessionStart 훅이 자동으로 sync합니다.\n"));
   });
 
 // === Standard 설치 (DB 기반, 글로벌 ~/.claude/) ===
@@ -1360,7 +1338,10 @@ const BASE_MCP_SERVERS: MCPServerConfig[] = [
   },
 ];
 
-// === ~/.semo.env 설정 (자동 감지 → Gist → 프롬프트) ===
+// === ~/.claude/semo/.env 설정 (자동 감지 → Gist → 프롬프트) ===
+// v4.5.0: ~/.semo.env → ~/.claude/semo/.env 이전
+const SEMO_ENV_PATH = path.join(os.homedir(), ".claude", "semo", ".env");
+const LEGACY_ENV_PATH = path.join(os.homedir(), ".semo.env");
 
 interface CredentialDef {
   key: string;
@@ -1395,10 +1376,12 @@ const SEMO_CREDENTIALS: CredentialDef[] = [
 ];
 
 function writeSemoEnvFile(creds: Record<string, string>): void {
-  const envFile = path.join(os.homedir(), ".semo.env");
+  // 디렉토리 보장
+  fs.mkdirSync(path.dirname(SEMO_ENV_PATH), { recursive: true });
   const lines = [
     "# SEMO 환경변수 — 모든 컨텍스트에서 자동 로드됨",
     "# (Claude Code 앱, OpenClaw LaunchAgent, cron 등)",
+    "# 경로: ~/.claude/semo/.env (v4.5.0+)",
     "",
   ];
   // 레지스트리 키 먼저 (순서 보장)
@@ -1415,11 +1398,28 @@ function writeSemoEnvFile(creds: Record<string, string>): void {
     }
   }
   lines.push("");
-  fs.writeFileSync(envFile, lines.join("\n"), { mode: 0o600 });
+  fs.writeFileSync(SEMO_ENV_PATH, lines.join("\n"), { mode: 0o600 });
+
+  // 하위 호환 심링크: ~/.semo.env → ~/.claude/semo/.env
+  try {
+    if (fs.existsSync(LEGACY_ENV_PATH)) {
+      const stat = fs.lstatSync(LEGACY_ENV_PATH);
+      if (!stat.isSymbolicLink()) {
+        // 기존 실파일은 백업 후 심링크로 교체
+        fs.renameSync(LEGACY_ENV_PATH, LEGACY_ENV_PATH + ".bak");
+      } else {
+        fs.unlinkSync(LEGACY_ENV_PATH);
+      }
+    }
+    fs.symlinkSync(SEMO_ENV_PATH, LEGACY_ENV_PATH);
+  } catch {
+    // 심링크 실패 시 무시 — 새 경로가 원본
+  }
 }
 
 function readSemoEnvCreds(): Record<string, string> {
-  const envFile = path.join(os.homedir(), ".semo.env");
+  // 새 경로 우선, 없으면 레거시 폴백
+  const envFile = fs.existsSync(SEMO_ENV_PATH) ? SEMO_ENV_PATH : LEGACY_ENV_PATH;
   if (!fs.existsSync(envFile)) return {};
   try {
     return parseEnvContent(fs.readFileSync(envFile, "utf-8"));
@@ -1497,18 +1497,17 @@ async function setupSemoEnv(
   }
 
   // 5. 변경사항이 있거나 파일이 없으면 쓰기
-  const envFile = path.join(os.homedir(), ".semo.env");
   const needsWrite =
     force ||
     hasNewKeys ||
-    !fs.existsSync(envFile) ||
+    !fs.existsSync(SEMO_ENV_PATH) ||
     Object.keys(gistCreds).some((k) => !existing[k]);
 
   if (needsWrite) {
     writeSemoEnvFile(merged);
-    console.log(chalk.green("  ✅ ~/.semo.env 저장됨 (권한: 600)"));
+    console.log(chalk.green("  ✅ ~/.claude/semo/.env 저장됨 (권한: 600)"));
   } else {
-    console.log(chalk.gray("  ~/.semo.env 변경 없음"));
+    console.log(chalk.gray("  ~/.claude/semo/.env 변경 없음"));
   }
 }
 
@@ -1654,32 +1653,7 @@ KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하
 `;
 }
 
-async function injectKbFirstToGlobalClaudeMd() {
-  const globalClaudeMd = path.join(os.homedir(), ".claude", "CLAUDE.md");
-  const kbFirstBlock = await buildKbFirstBlock();
-
-  if (fs.existsSync(globalClaudeMd)) {
-    const content = fs.readFileSync(globalClaudeMd, "utf-8");
-    if (content.includes(KB_FIRST_SECTION_MARKER)) {
-      // 기존 섹션 교체
-      const regex = new RegExp(
-        `\\n${KB_FIRST_SECTION_MARKER.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\s\\S]*?(?=\\n## |$)`,
-        "m"
-      );
-      const updated = content.replace(regex, kbFirstBlock);
-      fs.writeFileSync(globalClaudeMd, updated);
-      console.log(chalk.gray("  ~/.claude/CLAUDE.md KB-First 규칙 업데이트됨"));
-    } else {
-      // 끝에 추가
-      fs.writeFileSync(globalClaudeMd, content.trimEnd() + "\n" + kbFirstBlock);
-      console.log(chalk.green("  ✓ ~/.claude/CLAUDE.md에 KB-First 규칙 추가됨"));
-    }
-  } else {
-    // 파일 없으면 생성
-    fs.writeFileSync(globalClaudeMd, kbFirstBlock.trim() + "\n");
-    console.log(chalk.green("  ✓ ~/.claude/CLAUDE.md 생성됨 (KB-First 규칙)"));
-  }
-}
+// injectKbFirstToGlobalClaudeMd 제거 — generateThinRouter()로 대체 (semo-workspace.ts)
 
 
 // === MCP 설정 ===
@@ -1761,49 +1735,7 @@ async function setupMCP(cwd: string, _extensions: string[], force: boolean) {
   }
 }
 
-// === .gitignore 업데이트 ===
-function updateGitignore(cwd: string) {
-  console.log(chalk.cyan("\n📝 .gitignore 업데이트"));
-
-  const gitignorePath = path.join(cwd, ".gitignore");
-
-  const semoIgnoreBlock = `
-# === SEMO ===
-.claude/*
-!.claude/memory/
-!.claude/memory/**
-semo-system/
-`;
-
-  if (fs.existsSync(gitignorePath)) {
-    let content = fs.readFileSync(gitignorePath, "utf-8");
-
-    // 이미 SEMO 블록이 있으면 스킵
-    if (content.includes("# === SEMO ===")) {
-      console.log(chalk.gray("  → SEMO 블록 이미 존재 (건너뜀)"));
-      return;
-    }
-
-    // 기존에 .claude/ 또는 .claude 전체 무시 항목 제거 (memory/ 접근을 위해)
-    const lines = content.split("\n");
-    const filtered = lines.filter(line => {
-      const trimmed = line.trim();
-      return trimmed !== ".claude" && trimmed !== ".claude/" && trimmed !== ".claude/**";
-    });
-    if (filtered.length !== lines.length) {
-      content = filtered.join("\n");
-      console.log(chalk.gray("  → 기존 .claude 무시 항목 제거됨 (memory/ 접근 허용)"));
-    }
-
-    // 기존 파일에 추가
-    fs.writeFileSync(gitignorePath, content + semoIgnoreBlock);
-    console.log(chalk.green("✓ .gitignore에 SEMO 규칙 추가됨"));
-  } else {
-    // 새로 생성
-    fs.writeFileSync(gitignorePath, semoIgnoreBlock.trim() + "\n");
-    console.log(chalk.green("✓ .gitignore 생성됨 (SEMO 규칙 포함)"));
-  }
-}
+// updateGitignore 제거 — init 통합으로 프로젝트별 .gitignore 수정 불필요
 
 // === Hooks 설치/업데이트 ===
 async function setupHooks(isUpdate: boolean = false) {
@@ -1822,7 +1754,7 @@ async function setupHooks(isUpdate: boolean = false) {
         hooks: [
           {
             type: "command",
-            command: ". ~/.semo.env 2>/dev/null; semo context sync 2>/dev/null || true",
+            command: ". ~/.claude/semo/.env 2>/dev/null || . ~/.semo.env 2>/dev/null; semo context sync 2>/dev/null || true",
             timeout: 30,
           },
         ],
@@ -1834,7 +1766,7 @@ async function setupHooks(isUpdate: boolean = false) {
         hooks: [
           {
             type: "command",
-            command: ". ~/.semo.env 2>/dev/null; semo context push 2>/dev/null || true",
+            command: ". ~/.claude/semo/.env 2>/dev/null || . ~/.semo.env 2>/dev/null; semo context push 2>/dev/null || true",
             timeout: 30,
           },
         ],
@@ -2227,7 +2159,7 @@ program
 
       const connected = await isDbConnected();
       if (!connected) {
-        console.log(chalk.red("  DB 연결 실패 — ~/.semo.env를 확인하세요."));
+        console.log(chalk.red("  DB 연결 실패 — ~/.claude/semo/.env를 확인하세요."));
         await closeConnection();
         process.exit(1);
       }

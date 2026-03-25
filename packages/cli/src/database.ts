@@ -18,11 +18,14 @@ import * as os from "os";
 import * as path from "path";
 import { parseEnvContent } from "./env-parser";
 
-// ~/.semo.env 자동 로드 — LaunchAgent / Claude Code 앱 / cron 등
+// ~/.claude/semo/.env 자동 로드 — LaunchAgent / Claude Code 앱 / cron 등
 // 인터랙티브 쉘이 아닌 환경에서 환경변수를 공급한다.
 // 이미 설정된 환경변수는 덮어쓰지 않는다 (env var > file).
+// v4.5.0: ~/.semo.env → ~/.claude/semo/.env 이전. 구 경로 폴백 유지.
 function loadSemoEnv(): void {
-  const envFile = path.join(os.homedir(), ".semo.env");
+  const newEnvFile = path.join(os.homedir(), ".claude", "semo", ".env");
+  const legacyEnvFile = path.join(os.homedir(), ".semo.env");
+  const envFile = fs.existsSync(newEnvFile) ? newEnvFile : legacyEnvFile;
   if (!fs.existsSync(envFile)) return;
   try {
     const creds = parseEnvContent(fs.readFileSync(envFile, "utf8"));
@@ -442,4 +445,48 @@ export async function closeConnection(): Promise<void> {
  */
 export async function isDbConnected(): Promise<boolean> {
   return checkDbConnection();
+}
+
+// ============================================================
+// 봇 워크스페이스 조회
+// ============================================================
+
+export interface BotWorkspaceFile {
+  file_path: string;
+  content: string;
+}
+
+/**
+ * 활성 봇 ID 목록 조회 (retired 제외)
+ */
+export async function getActiveBotIds(): Promise<string[]> {
+  const isConnected = await checkDbConnection();
+  if (!isConnected) return [];
+
+  try {
+    const result = await getPool().query(
+      `SELECT bot_id FROM semo.bot_status WHERE status != 'retired' ORDER BY bot_id`
+    );
+    return result.rows.map((r: { bot_id: string }) => r.bot_id);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 특정 봇의 워크스페이스 파일 목록 조회 (DB 미러)
+ */
+export async function getBotWorkspaceFiles(botId: string): Promise<BotWorkspaceFile[]> {
+  const isConnected = await checkDbConnection();
+  if (!isConnected) return [];
+
+  try {
+    const result = await getPool().query(
+      `SELECT file_path, content FROM semo.bot_workspace_files WHERE bot_id = $1 ORDER BY file_path`,
+      [botId]
+    );
+    return result.rows;
+  } catch {
+    return [];
+  }
 }

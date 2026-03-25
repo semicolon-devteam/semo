@@ -18,6 +18,7 @@ import { getPool, closeConnection, isDbConnected } from "../database";
 import { KBEntry, generateEmbeddings } from "../kb";
 // [v4.4.0] syncSkillsToDB 제거 — semo-system/ 폐기됨, 스킬 SoT는 DB 직접 관리
 import { syncGlobalCache } from "../global-cache";
+import { populateBotMirrors } from "../semo-workspace";
 
 // ============================================================
 // Memory file mapping
@@ -233,7 +234,21 @@ export function registerContextCommands(program: Command): void {
           }
         }
 
-        // 3. 크론잡 동기화 (local → DB)
+        // 3. 봇 미러 리프레시 (DB → ~/.claude/semo/bots/)
+        const semoDir = path.join(os.homedir(), ".claude", "semo");
+        if (fs.existsSync(semoDir)) {
+          try {
+            spinner.text = "봇 미러 동기화 (~/.claude/semo/bots/)...";
+            const mirrorResult = await populateBotMirrors();
+            if (mirrorResult.files > 0) {
+              console.log(chalk.green(`  ✓ 봇 미러: ${mirrorResult.bots}개 봇, ${mirrorResult.files}개 파일`));
+            }
+          } catch {
+            // 봇 미러 동기화 실패는 비치명적
+          }
+        }
+
+        // 4. 크론잡 동기화 (local → DB)
         try {
           spinner.text = "크론잡 동기화...";
           const cronResult = await syncCronJobs(pool);
@@ -244,7 +259,7 @@ export function registerContextCommands(program: Command): void {
           // 크론잡 동기화 실패는 비치명적
         }
 
-        spinner.succeed("context sync 완료 — 스킬/캐시/크론잡 동기화");
+        spinner.succeed("context sync 완료 — 스킬/캐시/봇미러/크론잡 동기화");
         console.log(chalk.gray(`  저장 위치: ${memDir}`));
       } catch (err) {
         spinner.fail(`context sync 실패: ${err}`);
