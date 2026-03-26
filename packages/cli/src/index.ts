@@ -1521,6 +1521,7 @@ import {
   kbList,
   kbSearch,
   kbGet,
+  kbDelete,
   kbUpsert,
   ontoList,
   ontoShow,
@@ -1532,6 +1533,8 @@ import {
   ontoListServices,
   ontoListInstances,
   ontoRegister,
+  ontoAddKey,
+  ontoRemoveKey,
   generateEmbedding,
   KBEntry,
 } from "./kb";
@@ -1871,7 +1874,7 @@ kbCmd
 
 kbCmd
   .command("upsert <domain> <key> [sub_key]")
-  .description("KB 항목 쓰기 (upsert) — 임베딩 자동 생성 + 스키마 검증")
+  .description("KB 항목 쓰기 (upsert) — 임베딩 자동 생성 + 스키마 검증 (key는 kebab-case만 허용)")
   .requiredOption("--content <text>", "항목 본문")
   .option("--metadata <json>", "추가 메타데이터 (JSON 문자열)")
   .option("--created-by <name>", "작성자 식별자", "semo-cli")
@@ -1909,12 +1912,69 @@ kbCmd
   });
 
 kbCmd
+  .command("delete <domain> <key> [sub_key]")
+  .description("KB 항목 삭제 (domain + key + sub_key)")
+  .option("--yes", "확인 프롬프트 건너뛰기 (크론/스크립트용)")
+  .action(async (domain, key, subKey, options) => {
+    try {
+      const pool = getPool();
+
+      // 삭제 전 항목 확인
+      const entry = await kbGet(pool, domain, key, subKey);
+      if (!entry) {
+        console.log(chalk.yellow(`\n  항목 없음: ${domain}/${key}${subKey ? '/' + subKey : ''}\n`));
+        await closeConnection();
+        process.exit(1);
+      }
+
+      // 확인 프롬프트 (--yes가 없으면)
+      if (!options.yes) {
+        const fullPath = `${domain}/${entry.key}${entry.sub_key ? '/' + entry.sub_key : ''}`;
+        console.log(chalk.cyan(`\n📄 삭제 대상: ${fullPath}`));
+        console.log(chalk.gray(`  version: ${entry.version} | created_by: ${entry.created_by} | updated: ${entry.updated_at}`));
+        console.log(chalk.gray(`  content: ${entry.content.substring(0, 120)}${entry.content.length > 120 ? '...' : ''}\n`));
+
+        const { createInterface } = await import("readline");
+        const rl = createInterface({ input: process.stdin, output: process.stdout });
+        const answer = await new Promise<string>((resolve) => {
+          rl.question(chalk.yellow("  정말 삭제하시겠습니까? (y/N): "), resolve);
+        });
+        rl.close();
+
+        if (answer.toLowerCase() !== "y") {
+          console.log(chalk.gray("  취소됨.\n"));
+          await closeConnection();
+          return;
+        }
+      }
+
+      const result = await kbDelete(pool, domain, key, subKey);
+      if (result.deleted) {
+        const fullPath = `${domain}/${result.entry!.key}${result.entry!.sub_key ? '/' + result.entry!.sub_key : ''}`;
+        console.log(chalk.green(`✔ KB 삭제 완료: ${fullPath}`));
+      } else {
+        console.log(chalk.red(`✖ KB 삭제 실패: ${result.error}`));
+        process.exit(1);
+      }
+      await closeConnection();
+    } catch (err) {
+      console.error(chalk.red(`삭제 실패: ${err}`));
+      await closeConnection();
+      process.exit(1);
+    }
+  });
+
+kbCmd
   .command("ontology")
   .description("온톨로지 조회 — 도메인/타입/스키마/라우팅 테이블")
-  .option("--action <type>", "동작 (list|show|services|types|instances|schema|routing-table|register)", "list")
+  .option("--action <type>", "동작 (list|show|services|types|instances|schema|routing-table|register|add-key|remove-key)", "list")
   .option("--domain <name>", "action=show|register 시 도메인")
-  .option("--type <name>", "action=schema|register 시 타입 키")
-  .option("--description <text>", "action=register 시 설명")
+  .option("--type <name>", "action=schema|register|add-key|remove-key 시 타입 키")
+  .option("--key <name>", "action=add-key|remove-key 시 스키마 키")
+  .option("--key-type <type>", "action=add-key 시 키 유형 (singleton|collection)", "singleton")
+  .option("--required", "action=add-key 시 필수 여부")
+  .option("--hint <text>", "action=add-key 시 값 힌트")
+  .option("--description <text>", "action=register|add-key 시 설명")
   .option("--service <name>", "action=register 시 서비스 그룹")
   .option("--tags <tags>", "action=register 시 태그 (쉼표 구분)")
   .option("--no-init", "action=register 시 필수 KB entry 자동 생성 건너뛰기")
@@ -2079,8 +2139,49 @@ kbCmd
             process.exit(1);
           }
         }
+      } else if (action === "add-key") {
+        if (!options.type) {
+          console.log(chalk.red("--type 옵션이 필요합니다. (예: --type service)"));
+          process.exit(1);
+        }
+        if (!options.key) {
+          console.log(chalk.red("--key 옵션이 필요합니다. (예: --key slack_channel)"));
+          process.exit(1);
+        }
+        const result = await ontoAddKey(pool, {
+          type_key: options.type,
+          scheme_key: options.key,
+          description: options.description,
+          key_type: options.keyType as "singleton" | "collection",
+          required: options.required || false,
+          value_hint: options.hint,
+        });
+        if (result.success) {
+          console.log(chalk.green(`\n✅ 스키마 키 추가 완료: ${options.type}.${options.key} (${options.keyType})\n`));
+        } else {
+          console.log(chalk.red(`\n❌ 스키마 키 추가 실패: ${result.error}\n`));
+          process.exit(1);
+        }
+
+      } else if (action === "remove-key") {
+        if (!options.type) {
+          console.log(chalk.red("--type 옵션이 필요합니다."));
+          process.exit(1);
+        }
+        if (!options.key) {
+          console.log(chalk.red("--key 옵션이 필요합니다."));
+          process.exit(1);
+        }
+        const result = await ontoRemoveKey(pool, options.type, options.key);
+        if (result.success) {
+          console.log(chalk.green(`\n✅ 스키마 키 삭제 완료: ${options.type}.${options.key}\n`));
+        } else {
+          console.log(chalk.red(`\n❌ 스키마 키 삭제 실패: ${result.error}\n`));
+          process.exit(1);
+        }
+
       } else {
-        console.log(chalk.red(`알 수 없는 action: '${action}'. 사용 가능: list, show, services, types, instances, schema, routing-table, register`));
+        console.log(chalk.red(`알 수 없는 action: '${action}'. 사용 가능: list, show, services, types, instances, schema, routing-table, register, add-key, remove-key`));
         process.exit(1);
       }
 

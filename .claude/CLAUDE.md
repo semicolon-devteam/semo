@@ -37,16 +37,25 @@
 - 업무 프로세스 → `domain: semicolon`, key: `process`, sub_key: `{name}`
 - 인프라 구성 → `domain: semicolon`, key: `infra`, sub_key: `{name}`
 - 서비스 KPI → `domain: {serviceName}`, key: `kpi`, sub_key: `current`
-- 봇 정보 → `domain: {botId}`, key: `identity` / `role` / `gateway_config`
+- 봇 정보 → `domain: {botId}`, key: `identity` / `role` / `gateway-config`
 - SEMO 시스템 스펙 → `domain: semo`, key: `spec`, sub_key: `{name}`
 - 서비스 스코프 전체 검색 → `--service {serviceName}` 파라미터
+
+#### 네이밍 컨벤션 (NON-NEGOTIABLE)
+- **도메인, key, sub_key 모두 kebab-case** 사용: `base-information`, `slack-channel`, `tech-stack`
+- **snake_case 금지**: `base_information` ✗ → `base-information` ✓
+- CLI가 snake_case 키를 자동 거부함 (upsert, ontology add-key 모두)
+- 단일 단어는 그대로: `status`, `po`, `bm`, `repo`, `kpi`
 
 #### 도메인 구조
 | 패턴 | 예시 | 용도 |
 |------|------|------|
-| `semicolon` | `semicolon` | 조직 공통 — team/decision/process/infra 하위 키 |
-| `{service}` | `semo`, `axoracle` | 서비스 고유 — base_information/status/spec/kpi 하위 키 |
-| `{botId}` | `semiclaw`, `workclaw` | 봇 프로필 — identity/role/status/gateway_config 하위 키 |
+| `semicolon` | `semicolon` | 조직 공통 — team/decision/process/infra/slack-channel 하위 키 |
+| `{service}` | `semo`, `axoracle` | 서비스 고유 — base-information/status/spec/kpi/slack-channel 하위 키 |
+| `{botId}` | `semiclaw`, `workclaw` | 봇 프로필 — identity/role/status/gateway-config 하위 키 |
+
+**답변근거 표기**: KB 기반 답변 첫 줄에 출처 명시 — `[답변근거: KB {domain} {key}]`
+  복수 조회 시: `[답변근거: KB semicolon team/*, axoracle base-information]`
 
 **금지:** 위 주제를 자체 지식/세션 기억만으로 답변하는 것.
 KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하겠습니다."
@@ -56,6 +65,7 @@ KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하
 - 사용자가 팀 정보를 정정하거나 새 사실을 알려줄 때
 - 의사결정이 내려졌을 때
 - 프로세스/규칙이 변경되었을 때
+- **쓰기 대상 고지**: upsert 전 대상 명시 — `[KB 기록: {domain} {key} — 생성|수정]`
 
 **금지:** "알겠습니다/기억하겠습니다"만 하고 KB에 쓰지 않는 것.
 
@@ -90,7 +100,7 @@ KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하
 |------|-----------|
 | 봇 프로필 | `semo kb get {botId} identity` |
 | 봇 역할 | `semo kb get {botId} role` |
-| 봇 게이트웨이 | `semo kb get {botId} gateway_config` |
+| 봇 게이트웨이 | `semo kb get {botId} gateway-config` |
 | SEMO 데이터 흐름 | `semo kb get semo spec data-flow` |
 | SEMO 워크스페이스 규격 | `semo kb get semo spec workspace-v2` |
 | SEMO MCP 서버 설정 | `semo kb get semo spec mcp-server-config` |

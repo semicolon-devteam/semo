@@ -788,6 +788,45 @@ export async function kbGet(
 }
 
 /**
+ * Delete a single KB entry by domain/key/sub_key.
+ * Returns the deleted entry content for confirmation, or null if not found.
+ */
+export async function kbDelete(
+  pool: Pool,
+  domain: string,
+  rawKey: string,
+  rawSubKey?: string
+): Promise<{ deleted: boolean; entry?: KBEntry; error?: string }> {
+  let key: string;
+  let subKey: string;
+  if (rawSubKey !== undefined) {
+    key = rawKey;
+    subKey = rawSubKey;
+  } else {
+    const split = splitKey(rawKey);
+    key = split.key;
+    subKey = split.subKey;
+  }
+
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `DELETE FROM semo.knowledge_base
+       WHERE domain = $1 AND key = $2 AND sub_key = $3
+       RETURNING domain, key, sub_key, content, metadata, created_by, version,
+                 created_at::text, updated_at::text`,
+      [domain, key, subKey]
+    );
+    if (result.rows.length === 0) {
+      return { deleted: false, error: `항목 없음: ${domain}/${combineKey(key, subKey)}` };
+    }
+    return { deleted: true, entry: result.rows[0] };
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Upsert a single KB entry with domain/key validation and embedding generation
  */
 export async function kbUpsert(
@@ -829,6 +868,23 @@ export async function kbUpsert(
     }
   } finally {
     client.release();
+  }
+
+  // Naming convention check: kebab-case only
+  const warnings: string[] = [];
+  if (/_/.test(key)) {
+    const suggested = key.replace(/_/g, "-");
+    return {
+      success: false,
+      error: `키 '${key}'에 snake_case가 포함되어 있습니다. kebab-case를 사용하세요: '${suggested}'`,
+    };
+  }
+  if (/_/.test(subKey)) {
+    const suggested = subKey.replace(/_/g, "-");
+    return {
+      success: false,
+      error: `sub_key '${subKey}'에 snake_case가 포함되어 있습니다. kebab-case를 사용하세요: '${suggested}'`,
+    };
   }
 
   // Key validation against type schema
@@ -1168,6 +1224,105 @@ export async function ontoRegister(
     return { success: true, created_entries: createdEntries };
   } catch (err) {
     return { success: false, error: String(err) };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Add a key to a type schema
+ */
+export async function ontoAddKey(
+  pool: Pool,
+  opts: {
+    type_key: string;
+    scheme_key: string;
+    description?: string;
+    key_type?: "singleton" | "collection";
+    required?: boolean;
+    value_hint?: string;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  const client = await pool.connect();
+  try {
+    // Naming convention: kebab-case only
+    if (/_/.test(opts.scheme_key)) {
+      const suggested = opts.scheme_key.replace(/_/g, "-");
+      return { success: false, error: `키 '${opts.scheme_key}'에 snake_case가 포함되어 있습니다. kebab-case를 사용하세요: '${suggested}'` };
+    }
+
+    // Check type exists
+    const typeCheck = await client.query(
+      "SELECT DISTINCT type_key FROM semo.kb_type_schema WHERE type_key = $1",
+      [opts.type_key]
+    );
+    if (typeCheck.rows.length === 0) {
+      // Check if this type exists in ontology at all
+      const ontoCheck = await client.query(
+        "SELECT DISTINCT entity_type FROM semo.ontology WHERE entity_type = $1",
+        [opts.type_key]
+      );
+      if (ontoCheck.rows.length === 0) {
+        return { success: false, error: `타입 '${opts.type_key}'이(가) 존재하지 않습니다.` };
+      }
+    }
+
+    // Check duplicate
+    const dupCheck = await client.query(
+      "SELECT id FROM semo.kb_type_schema WHERE type_key = $1 AND scheme_key = $2",
+      [opts.type_key, opts.scheme_key]
+    );
+    if (dupCheck.rows.length > 0) {
+      return { success: false, error: `키 '${opts.scheme_key}'은(는) '${opts.type_key}' 타입에 이미 존재합니다.` };
+    }
+
+    // Get max sort_order
+    const maxOrder = await client.query(
+      "SELECT COALESCE(MAX(sort_order), 0) + 10 as next_order FROM semo.kb_type_schema WHERE type_key = $1",
+      [opts.type_key]
+    );
+    const sortOrder = maxOrder.rows[0].next_order;
+
+    await client.query(
+      `INSERT INTO semo.kb_type_schema (type_key, scheme_key, scheme_description, key_type, required, value_hint, sort_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [
+        opts.type_key,
+        opts.scheme_key,
+        opts.description || opts.scheme_key,
+        opts.key_type || "singleton",
+        opts.required || false,
+        opts.value_hint || null,
+        sortOrder,
+      ]
+    );
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Remove a key from a type schema
+ */
+export async function ontoRemoveKey(
+  pool: Pool,
+  typeKey: string,
+  schemeKey: string
+): Promise<{ success: boolean; error?: string }> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      "DELETE FROM semo.kb_type_schema WHERE type_key = $1 AND scheme_key = $2 RETURNING id",
+      [typeKey, schemeKey]
+    );
+    if (result.rows.length === 0) {
+      return { success: false, error: `키 '${schemeKey}'은(는) '${typeKey}' 타입에 존재하지 않습니다.` };
+    }
+    return { success: true };
   } finally {
     client.release();
   }
