@@ -1057,6 +1057,122 @@ export async function ontoListInstances(pool: Pool): Promise<ServiceInstance[]> 
   }
 }
 
+// ============================================================
+// Ontology Domain Registration
+// ============================================================
+
+export interface OntoRegisterOptions {
+  domain: string;
+  entity_type: string;
+  description?: string;
+  service?: string;
+  tags?: string[];
+  init_required?: boolean; // 필수 KB entry 자동 생성 (default: true)
+}
+
+export interface OntoRegisterResult {
+  success: boolean;
+  error?: string;
+  created_entries?: Array<{ key: string; sub_key: string }>;
+}
+
+/**
+ * Register a new ontology domain with optional initial required KB entries.
+ *
+ * 1. Validate entity_type exists in ontology_types
+ * 2. Check domain doesn't already exist
+ * 3. INSERT into semo.ontology
+ * 4. If init_required (default true), create KB entries for required keys in kb_type_schema
+ */
+export async function ontoRegister(
+  pool: Pool,
+  opts: OntoRegisterOptions,
+): Promise<OntoRegisterResult> {
+  const client = await pool.connect();
+  try {
+    // 1. Validate entity_type
+    const typeCheck = await client.query(
+      "SELECT type_key FROM semo.ontology_types WHERE type_key = $1",
+      [opts.entity_type],
+    );
+    if (typeCheck.rows.length === 0) {
+      const known = await client.query("SELECT type_key FROM semo.ontology_types ORDER BY type_key");
+      const knownTypes = known.rows.map((r: { type_key: string }) => r.type_key);
+      return {
+        success: false,
+        error: `타입 '${opts.entity_type}'은(는) 존재하지 않습니다. 사용 가능한 타입: [${knownTypes.join(", ")}]`,
+      };
+    }
+
+    // 2. Check domain doesn't already exist
+    const existCheck = await client.query(
+      "SELECT domain FROM semo.ontology WHERE domain = $1",
+      [opts.domain],
+    );
+    if (existCheck.rows.length > 0) {
+      return { success: false, error: `도메인 '${opts.domain}'은(는) 이미 등록되어 있습니다.` };
+    }
+
+    // 3. INSERT into ontology
+    await client.query(
+      `INSERT INTO semo.ontology (domain, entity_type, description, service, tags, schema)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [
+        opts.domain,
+        opts.entity_type,
+        opts.description || null,
+        opts.service || "_global",
+        opts.tags || [opts.entity_type],
+        JSON.stringify({}),
+      ],
+    );
+
+    // 4. Create required KB entries
+    const createdEntries: Array<{ key: string; sub_key: string }> = [];
+    const initRequired = opts.init_required !== false;
+
+    if (initRequired) {
+      const schemaResult = await client.query(
+        `SELECT scheme_key, scheme_description, COALESCE(key_type, 'singleton') as key_type, value_hint
+         FROM semo.kb_type_schema
+         WHERE type_key = $1 AND required = true
+         ORDER BY sort_order`,
+        [opts.entity_type],
+      );
+
+      for (const s of schemaResult.rows) {
+        if (s.key_type === "collection") continue; // collection은 sub_key가 필요하므로 스킵
+
+        const placeholder = s.value_hint
+          ? `(미입력 — hint: ${s.value_hint})`
+          : `(미입력)`;
+
+        const text = `${s.scheme_key}: ${placeholder}`;
+        const embedding = await generateEmbedding(text);
+        const embeddingStr = embedding ? `[${embedding.join(",")}]` : null;
+
+        try {
+          await client.query(
+            `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, embedding)
+             VALUES ($1, $2, '', $3, '{}', 'semo-cli:onto-register', $4::vector)
+             ON CONFLICT (domain, key, sub_key) DO NOTHING`,
+            [opts.domain, s.scheme_key, placeholder, embeddingStr],
+          );
+          createdEntries.push({ key: s.scheme_key, sub_key: "" });
+        } catch {
+          // 개별 entry 실패는 무시 — 도메인 등록 자체는 성공
+        }
+      }
+    }
+
+    return { success: true, created_entries: createdEntries };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  } finally {
+    client.release();
+  }
+}
+
 /**
  * Write ontology schemas to local cache
  */

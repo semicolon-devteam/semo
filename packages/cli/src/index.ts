@@ -1531,6 +1531,7 @@ import {
   ontoRoutingTable,
   ontoListServices,
   ontoListInstances,
+  ontoRegister,
   generateEmbedding,
   KBEntry,
 } from "./kb";
@@ -1910,9 +1911,13 @@ kbCmd
 kbCmd
   .command("ontology")
   .description("온톨로지 조회 — 도메인/타입/스키마/라우팅 테이블")
-  .option("--action <type>", "조회 동작 (list|show|services|types|instances|schema|routing-table)", "list")
-  .option("--domain <name>", "action=show 시 도메인")
-  .option("--type <name>", "action=schema 시 타입 키")
+  .option("--action <type>", "동작 (list|show|services|types|instances|schema|routing-table|register)", "list")
+  .option("--domain <name>", "action=show|register 시 도메인")
+  .option("--type <name>", "action=schema|register 시 타입 키")
+  .option("--description <text>", "action=register 시 설명")
+  .option("--service <name>", "action=register 시 서비스 그룹")
+  .option("--tags <tags>", "action=register 시 태그 (쉼표 구분)")
+  .option("--no-init", "action=register 시 필수 KB entry 자동 생성 건너뛰기")
   .option("--format <type>", "출력 형식 (json|table)", "table")
   .action(async (options) => {
     try {
@@ -2035,8 +2040,47 @@ kbCmd
           }
           console.log();
         }
+      } else if (action === "register") {
+        if (!options.domain) {
+          console.log(chalk.red("--domain 옵션이 필요합니다."));
+          process.exit(1);
+        }
+        if (!options.type) {
+          console.log(chalk.red("--type 옵션이 필요합니다. (예: --type service, --type team, --type person)"));
+          const types = await ontoListTypes(pool);
+          console.log(chalk.gray(`사용 가능한 타입: ${types.map(t => t.type_key).join(", ")}`));
+          process.exit(1);
+        }
+
+        const tags = options.tags ? (options.tags as string).split(",").map((t: string) => t.trim()) : undefined;
+        const result = await ontoRegister(pool, {
+          domain: options.domain,
+          entity_type: options.type,
+          description: options.description,
+          service: options.service,
+          tags,
+          init_required: options.init !== false,
+        });
+
+        if (options.format === "json") {
+          console.log(JSON.stringify(result, null, 2));
+        } else {
+          if (result.success) {
+            console.log(chalk.green(`\n✅ 도메인 '${options.domain}' 등록 완료 (타입: ${options.type})`));
+            if (result.created_entries && result.created_entries.length > 0) {
+              console.log(chalk.gray(`  초기 KB entry ${result.created_entries.length}건 생성:`));
+              for (const e of result.created_entries) {
+                console.log(chalk.gray(`    - ${e.key}`));
+              }
+            }
+            console.log(chalk.gray(`\n  다음 단계: semo kb upsert ${options.domain} <key> --content "..." 으로 데이터 입력\n`));
+          } else {
+            console.log(chalk.red(`\n❌ 등록 실패: ${result.error}\n`));
+            process.exit(1);
+          }
+        }
       } else {
-        console.log(chalk.red(`알 수 없는 action: '${action}'. 사용 가능: list, show, services, types, instances, schema, routing-table`));
+        console.log(chalk.red(`알 수 없는 action: '${action}'. 사용 가능: list, show, services, types, instances, schema, routing-table, register`));
         process.exit(1);
       }
 
@@ -2214,6 +2258,55 @@ ontoCmd
       await closeConnection();
     } catch (err) {
       console.error(chalk.red(`검증 실패: ${err}`));
+      await closeConnection();
+      process.exit(1);
+    }
+  });
+
+ontoCmd
+  .command("register <domain>")
+  .description("새 온톨로지 도메인 등록")
+  .requiredOption("--type <type>", "엔티티 타입 (예: service, team, person, bot)")
+  .option("--description <text>", "도메인 설명")
+  .option("--service <name>", "서비스 그룹")
+  .option("--tags <tags>", "태그 (쉼표 구분)")
+  .option("--no-init", "필수 KB entry 자동 생성 건너뛰기")
+  .option("--format <type>", "출력 형식 (json|table)", "table")
+  .action(async (domain, options) => {
+    try {
+      const pool = getPool();
+      const tags = options.tags ? (options.tags as string).split(",").map((t: string) => t.trim()) : undefined;
+
+      const result = await ontoRegister(pool, {
+        domain,
+        entity_type: options.type,
+        description: options.description,
+        service: options.service,
+        tags,
+        init_required: options.init !== false,
+      });
+
+      if (options.format === "json") {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        if (result.success) {
+          console.log(chalk.green(`\n✅ 도메인 '${domain}' 등록 완료 (타입: ${options.type})`));
+          if (result.created_entries && result.created_entries.length > 0) {
+            console.log(chalk.gray(`  초기 KB entry ${result.created_entries.length}건 생성:`));
+            for (const e of result.created_entries) {
+              console.log(chalk.gray(`    - ${e.key}`));
+            }
+          }
+          console.log(chalk.gray(`\n  다음 단계: semo kb upsert ${domain} <key> --content "..." 으로 데이터 입력\n`));
+        } else {
+          console.log(chalk.red(`\n❌ 등록 실패: ${result.error}\n`));
+          process.exit(1);
+        }
+      }
+
+      await closeConnection();
+    } catch (err) {
+      console.error(chalk.red(`등록 실패: ${err}`));
       await closeConnection();
       process.exit(1);
     }
