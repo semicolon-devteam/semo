@@ -169,7 +169,7 @@ const CHECK_DEFS: CheckDef[] = [
 // DB-based rule loading
 // ============================================================
 
-interface WorkspaceStandardRow {
+export interface WorkspaceStandardRow {
   path_pattern: string;
   entry_type: string;
   level: string;
@@ -246,7 +246,7 @@ function botMatchesRow(row: WorkspaceStandardRow, botId: string): boolean {
   return true;
 }
 
-async function loadCheckDefs(pool: Pool): Promise<{ defs: CheckDef[]; rows: WorkspaceStandardRow[] }> {
+export async function loadCheckDefs(pool: Pool): Promise<{ defs: CheckDef[]; rows: WorkspaceStandardRow[] }> {
   const client = await pool.connect();
   try {
     const result = await client.query(
@@ -359,6 +359,7 @@ const FILE_TEMPLATES: Record<string, (botId: string) => string> = {
     `# ${botId} — SOUL\n\n## Identity\n\n> TODO\n\n## R&R\n\n> TODO\n\n## KB Lookup Protocol\n\n> semo kb get/search로 팀 정보 조회\n\n## Operating Procedures\n\n> TODO\n\n## NON-NEGOTIABLE\n\n1. TODO\n`,
 };
 
+/** Legacy hardcoded fix — used when DB is unavailable */
 export function fixBot(
   botDir: string,
   botId: string,
@@ -424,6 +425,321 @@ export function fixBot(
   }
 
   return fixed;
+}
+
+// ============================================================
+// DB-based auto-fix — fix_action/fix_template 활용
+// ============================================================
+
+/**
+ * DB `fix_action`/`fix_template` 기반 auto-fix.
+ * 지원 액션: create_file, create_dir, create_symlink, delete (--force 필요)
+ */
+export function fixBotFromDb(
+  botDir: string,
+  botId: string,
+  checks: AuditCheck[],
+  dbRules: WorkspaceStandardRow[],
+  options: { force?: boolean } = {},
+): { fixed: number; skipped: string[] } {
+  let fixed = 0;
+  const skipped: string[] = [];
+  const home = process.env.HOME || "/Users/reus";
+
+  // Build a map of check name → row for quick lookup
+  const failedCheckNames = new Set(
+    checks.filter((c) => !c.passed).map((c) => c.name),
+  );
+
+  for (const row of dbRules) {
+    if (!row.fix_action || !row.fix_template) continue;
+
+    const checkName = `${row.category}/${row.path_pattern}`;
+    // Check if any of the failed checks relate to this row
+    const isRelevant = failedCheckNames.has(checkName) ||
+      failedCheckNames.has(`${checkName}-symlink`);
+    if (!isRelevant) continue;
+
+    // Variable substitution in fix_template
+    const resolvedTemplate = row.fix_template
+      .replace(/\$BOT_ID/g, botId)
+      .replace(/\$HOME/g, home);
+
+    const targetPath = path.join(botDir, row.path_pattern);
+
+    switch (row.fix_action) {
+      case "create_file": {
+        if (fs.existsSync(targetPath)) break;
+        const dir = path.dirname(targetPath);
+        if (!fs.existsSync(dir)) {
+          fs.mkdirSync(dir, { recursive: true });
+        }
+        fs.writeFileSync(targetPath, resolvedTemplate, "utf-8");
+        fixed++;
+        break;
+      }
+      case "create_dir": {
+        const dirPath = row.path_pattern.endsWith("/")
+          ? path.join(botDir, row.path_pattern.slice(0, -1))
+          : targetPath;
+        if (!fs.existsSync(dirPath)) {
+          fs.mkdirSync(dirPath, { recursive: true });
+          fixed++;
+        }
+        break;
+      }
+      case "create_symlink": {
+        const symlinkTarget = resolvedTemplate;
+        if (!fs.existsSync(symlinkTarget)) break;
+        if (fs.existsSync(targetPath)) {
+          const stats = fs.lstatSync(targetPath);
+          if (stats.isSymbolicLink()) {
+            const existing = fs.readlinkSync(targetPath);
+            if (existing === symlinkTarget) break; // already correct
+            fs.unlinkSync(targetPath);
+          } else {
+            fs.unlinkSync(targetPath);
+          }
+        }
+        fs.symlinkSync(symlinkTarget, targetPath);
+        fixed++;
+        break;
+      }
+      case "delete": {
+        if (!fs.existsSync(targetPath)) break;
+        if (!options.force) {
+          skipped.push(`${row.path_pattern} (delete requires --force)`);
+          break;
+        }
+        const stats = fs.lstatSync(targetPath);
+        if (stats.isDirectory()) {
+          fs.rmSync(targetPath, { recursive: true, force: true });
+        } else {
+          fs.unlinkSync(targetPath);
+        }
+        fixed++;
+        break;
+      }
+    }
+  }
+
+  return { fixed, skipped };
+}
+
+// ============================================================
+// --sync: DB required 항목 proactive 보장
+// ============================================================
+
+/**
+ * DB의 required 규칙에 대해 파일이 없으면 생성.
+ * content_rules 위반은 보고만 한다.
+ */
+export function syncBotFromDb(
+  botDir: string,
+  botId: string,
+  dbRules: WorkspaceStandardRow[],
+): { created: number; violations: string[] } {
+  let created = 0;
+  const violations: string[] = [];
+  const home = process.env.HOME || "/Users/reus";
+
+  for (const row of dbRules) {
+    if (row.level !== "required") continue;
+    if (row.path_pattern.includes("*")) continue; // glob patterns handled separately
+
+    const targetPath = path.join(botDir, row.path_pattern);
+
+    if (row.entry_type === "dir") {
+      const dirPath = row.path_pattern.endsWith("/")
+        ? path.join(botDir, row.path_pattern.slice(0, -1))
+        : targetPath;
+      if (!fs.existsSync(dirPath)) {
+        if (row.fix_action === "create_dir") {
+          fs.mkdirSync(dirPath, { recursive: true });
+          created++;
+        }
+      }
+    } else if (row.entry_type === "symlink") {
+      if (!fs.existsSync(targetPath) && row.fix_action === "create_symlink" && row.fix_template) {
+        const symlinkTarget = row.fix_template
+          .replace(/\$BOT_ID/g, botId)
+          .replace(/\$HOME/g, home);
+        if (fs.existsSync(symlinkTarget)) {
+          const dir = path.dirname(targetPath);
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          fs.symlinkSync(symlinkTarget, targetPath);
+          created++;
+        }
+      }
+    } else {
+      // file
+      if (!fs.existsSync(targetPath)) {
+        if (row.fix_action === "create_file" && row.fix_template) {
+          const content = row.fix_template
+            .replace(/\$BOT_ID/g, botId)
+            .replace(/\$HOME/g, home);
+          const dir = path.dirname(targetPath);
+          if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+          fs.writeFileSync(targetPath, content, "utf-8");
+          created++;
+        }
+      } else if (row.content_rules) {
+        // File exists — check content_rules violations (report only)
+        const rules = row.content_rules as Record<string, unknown>;
+        const maxLines = rules.max_lines as number | undefined;
+        if (maxLines) {
+          try {
+            const lines = fs.readFileSync(targetPath, "utf-8").split("\n").length;
+            if (lines > maxLines) {
+              violations.push(`${row.path_pattern}: ${lines} lines (max ${maxLines})`);
+            }
+          } catch { /* skip unreadable */ }
+        }
+      }
+    }
+  }
+
+  return { created, violations };
+}
+
+// ============================================================
+// Skill structure validation
+// ============================================================
+
+export interface SkillAuditCheck extends AuditCheck {
+  skillName?: string;
+}
+
+/**
+ * 봇의 skills/ 하위 스킬 디렉토리 구조 검증
+ */
+export function auditSkillStructure(botDir: string, botId: string): SkillAuditCheck[] {
+  const checks: SkillAuditCheck[] = [];
+  const skillsDir = path.join(botDir, "skills");
+
+  if (!fs.existsSync(skillsDir) || !fs.statSync(skillsDir).isDirectory()) {
+    return checks;
+  }
+
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(skillsDir, { withFileTypes: true });
+  } catch {
+    return checks;
+  }
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    if (entry.name.startsWith("_") || entry.name.startsWith(".")) continue;
+    if (entry.name.endsWith(".skill")) continue;
+
+    const skillName = entry.name;
+    const skillDir = path.join(skillsDir, skillName);
+    const skillMdPath = path.join(skillDir, "SKILL.md");
+
+    // SKILL.md 존재 여부
+    if (!fs.existsSync(skillMdPath)) {
+      checks.push({
+        name: `skill/${skillName}/SKILL.md`,
+        passed: false,
+        detail: `skills/${skillName}/SKILL.md missing`,
+        skillName,
+      });
+      continue;
+    }
+
+    // SKILL.md 내용 검증
+    let content: string;
+    try {
+      content = fs.readFileSync(skillMdPath, "utf-8");
+    } catch {
+      checks.push({
+        name: `skill/${skillName}/SKILL.md`,
+        passed: false,
+        detail: `skills/${skillName}/SKILL.md unreadable`,
+        skillName,
+      });
+      continue;
+    }
+
+    // SKILL.md exists
+    checks.push({
+      name: `skill/${skillName}/SKILL.md`,
+      passed: true,
+      detail: `skills/${skillName}/SKILL.md exists`,
+      skillName,
+    });
+
+    // Line count check (max 500)
+    const lines = content.split("\n").length;
+    checks.push({
+      name: `skill/${skillName}/lines`,
+      passed: lines <= 500,
+      detail: lines <= 500
+        ? `skills/${skillName}/SKILL.md: ${lines} lines (≤ 500)`
+        : `skills/${skillName}/SKILL.md: ${lines} lines (> 500, too long)`,
+      skillName,
+    });
+
+    // Frontmatter check (---\nname: ...\ndescription: ...\n---)
+    const fmMatch = content.match(/^---\n([\s\S]*?)\n---/);
+    if (fmMatch) {
+      const fm = fmMatch[1];
+      const nameMatch = fm.match(/^name:\s*(.+)$/m);
+      const descMatch = fm.match(/^description:/m);
+
+      if (nameMatch) {
+        const fmName = nameMatch[1].trim();
+        const isKebab = /^[a-z0-9]+(-[a-z0-9]+)*$/.test(fmName);
+        checks.push({
+          name: `skill/${skillName}/name-kebab`,
+          passed: isKebab,
+          detail: isKebab
+            ? `skills/${skillName} name "${fmName}" is kebab-case`
+            : `skills/${skillName} name "${fmName}" is not kebab-case`,
+          skillName,
+        });
+      } else {
+        checks.push({
+          name: `skill/${skillName}/name-kebab`,
+          passed: false,
+          detail: `skills/${skillName}/SKILL.md frontmatter missing 'name'`,
+          skillName,
+        });
+      }
+
+      checks.push({
+        name: `skill/${skillName}/description`,
+        passed: !!descMatch,
+        detail: descMatch
+          ? `skills/${skillName}/SKILL.md has description`
+          : `skills/${skillName}/SKILL.md frontmatter missing 'description'`,
+        skillName,
+      });
+    } else {
+      checks.push({
+        name: `skill/${skillName}/frontmatter`,
+        passed: false,
+        detail: `skills/${skillName}/SKILL.md missing frontmatter (--- block)`,
+        skillName,
+      });
+    }
+
+    // Forbidden files check
+    const forbiddenFiles = ["README.md", "CHANGELOG.md", "INSTALL.md", "LICENSE", "LICENSE.md"];
+    for (const forbidden of forbiddenFiles) {
+      if (fs.existsSync(path.join(skillDir, forbidden))) {
+        checks.push({
+          name: `skill/${skillName}/forbidden-${forbidden}`,
+          passed: false,
+          detail: `skills/${skillName}/${forbidden} exists (forbidden)`,
+          skillName,
+        });
+      }
+    }
+  }
+
+  return checks;
 }
 
 // ============================================================

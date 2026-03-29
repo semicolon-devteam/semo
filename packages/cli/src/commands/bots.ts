@@ -16,7 +16,7 @@ import * as path from "path";
 import * as os from "os";
 import { getPool, closeConnection, isDbConnected, getDelegations, getActiveSkills } from "../database";
 import { syncBotSessions } from "./sessions";
-import { auditBot, auditBotFromDb, auditBotDb, auditBotKb, mergeDbChecks, fixBot, storeAuditResults, formatAuditSlack, BotAuditResult } from "./audit";
+import { auditBot, auditBotFromDb, auditBotDb, auditBotKb, mergeDbChecks, fixBot, fixBotFromDb, syncBotFromDb, auditSkillStructure, loadCheckDefs, storeAuditResults, formatAuditSlack, BotAuditResult, WorkspaceStandardRow } from "./audit";
 import { syncCronJobs } from "./context";
 
 // ============================================================
@@ -618,7 +618,9 @@ export function registerBotsCommands(program: Command): void {
     .command("audit")
     .description("봇 워크스페이스 표준 구조 audit")
     .option("--format <type>", "출력 형식 (table|json|slack)", "table")
-    .option("--fix", "누락 파일/디렉토리 자동 생성")
+    .option("--fix", "누락 파일/디렉토리 자동 생성 (DB fix_action 활용)")
+    .option("--sync", "DB required 항목 proactive 보장 (누락 파일 생성)")
+    .option("--force", "delete fix_action 실행 허용 (--fix와 함께 사용)")
     .option("--no-db", "DB 저장 건너뛰기")
     .option("--local", "~/.claude/semo/bots/ 로컬 미러 audit")
     .action(async (options) => {
@@ -659,8 +661,14 @@ export function registerBotsCommands(program: Command): void {
       // Run audit — try DB-based rules first, fallback to hardcoded
       let results: BotAuditResult[];
       const dbConnected = await isDbConnected();
+      let dbRules: WorkspaceStandardRow[] = [];
+
       if (dbConnected) {
         const pool = getPool();
+        try {
+          const { rows } = await loadCheckDefs(pool);
+          dbRules = rows;
+        } catch { /* DB rules load failed, will use fallback */ }
         results = await Promise.all(
           botEntries.map(({ botId, botDir }) => auditBotFromDb(botDir, botId, pool))
         );
@@ -668,7 +676,61 @@ export function registerBotsCommands(program: Command): void {
         results = botEntries.map(({ botId, botDir }) => auditBot(botDir, botId));
       }
 
+      // Merge skill structure checks into results
+      for (let i = 0; i < results.length; i++) {
+        const skillChecks = auditSkillStructure(botEntries[i].botDir, botEntries[i].botId);
+        if (skillChecks.length > 0) {
+          results[i] = mergeDbChecks(results[i], skillChecks);
+        }
+      }
+
       spinner.stop();
+
+      // --sync: DB required 항목 proactive 보장
+      if (options.sync && dbRules.length > 0) {
+        let totalCreated = 0;
+        const allViolations: string[] = [];
+        for (const { botId, botDir } of botEntries) {
+          const botSpecificRules = dbRules.filter((row) => {
+            if (row.bot_scope === "all") return true;
+            if (row.bot_scope === "include") return row.bot_ids.includes(botId);
+            if (row.bot_scope === "exclude") return !row.bot_ids.includes(botId);
+            return true;
+          });
+          const { created, violations } = syncBotFromDb(botDir, botId, botSpecificRules);
+          if (created > 0) {
+            console.log(chalk.green(`  ✔ ${botId}: ${created}개 항목 동기화 생성`));
+            totalCreated += created;
+          }
+          allViolations.push(...violations.map((v) => `${botId}: ${v}`));
+        }
+        if (totalCreated > 0) {
+          console.log(chalk.green(`\n총 ${totalCreated}개 동기화`));
+        }
+        if (allViolations.length > 0) {
+          console.log(chalk.yellow(`\n⚠ content_rules 위반 (보고만):`));
+          for (const v of allViolations) {
+            console.log(chalk.yellow(`  - ${v}`));
+          }
+        }
+        // Re-audit after sync
+        if (totalCreated > 0) {
+          if (dbConnected) {
+            const pool = getPool();
+            results = await Promise.all(
+              botEntries.map(({ botId, botDir }) => auditBotFromDb(botDir, botId, pool))
+            );
+          } else {
+            results = botEntries.map(({ botId, botDir }) => auditBot(botDir, botId));
+          }
+          for (let i = 0; i < results.length; i++) {
+            const skillChecks = auditSkillStructure(botEntries[i].botDir, botEntries[i].botId);
+            if (skillChecks.length > 0) {
+              results[i] = mergeDbChecks(results[i], skillChecks);
+            }
+          }
+        }
+      }
 
       // --fix
       if (options.fix) {
@@ -677,20 +739,49 @@ export function registerBotsCommands(program: Command): void {
           const botDir = isLocal
             ? path.join(home, ".claude", "semo", "bots", r.botId)
             : path.join(home, `.openclaw-${r.botId}`, "workspace");
-          const fixed = fixBot(botDir, r.botId, r.checks);
+
+          let fixed: number;
+          if (dbRules.length > 0) {
+            // DB-based fix
+            const botSpecificRules = dbRules.filter((row) => {
+              if (row.bot_scope === "all") return true;
+              if (row.bot_scope === "include") return row.bot_ids.includes(r.botId);
+              if (row.bot_scope === "exclude") return !row.bot_ids.includes(r.botId);
+              return true;
+            });
+            const result = fixBotFromDb(botDir, r.botId, r.checks, botSpecificRules, { force: options.force });
+            fixed = result.fixed;
+            if (result.skipped.length > 0) {
+              for (const s of result.skipped) {
+                console.log(chalk.yellow(`  ⚠ ${r.botId}: ${s}`));
+              }
+            }
+          } else {
+            // Fallback to hardcoded fix
+            fixed = fixBot(botDir, r.botId, r.checks);
+          }
+
           if (fixed > 0) {
-            console.log(chalk.green(`  ✔ ${r.botId}: ${fixed}개 파일/디렉토리 생성`));
+            console.log(chalk.green(`  ✔ ${r.botId}: ${fixed}개 파일/디렉토리 수정`));
             totalFixed += fixed;
           }
         }
         if (totalFixed > 0) {
           console.log(chalk.green(`\n총 ${totalFixed}개 수정`));
           // Re-audit after fix
+          if (dbConnected) {
+            const pool = getPool();
+            results = await Promise.all(
+              botEntries.map(({ botId, botDir }) => auditBotFromDb(botDir, botId, pool))
+            );
+          } else {
+            results = botEntries.map(({ botId, botDir }) => auditBot(botDir, botId));
+          }
           for (let i = 0; i < results.length; i++) {
-            const botDir = isLocal
-              ? path.join(home, ".claude", "semo", "bots", results[i].botId)
-              : path.join(home, `.openclaw-${results[i].botId}`, "workspace");
-            results[i] = auditBot(botDir, results[i].botId);
+            const skillChecks = auditSkillStructure(botEntries[i].botDir, botEntries[i].botId);
+            if (skillChecks.length > 0) {
+              results[i] = mergeDbChecks(results[i], skillChecks);
+            }
           }
         }
       }
