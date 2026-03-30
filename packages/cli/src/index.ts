@@ -1533,6 +1533,7 @@ import {
   ontoListServices,
   ontoListInstances,
   ontoRegister,
+  ontoCreateType,
   ontoAddKey,
   ontoRemoveKey,
   generateEmbedding,
@@ -1967,7 +1968,7 @@ kbCmd
 kbCmd
   .command("ontology")
   .description("온톨로지 조회 — 도메인/타입/스키마/라우팅 테이블")
-  .option("--action <type>", "동작 (list|show|services|types|instances|schema|routing-table|register|add-key|remove-key)", "list")
+  .option("--action <type>", "동작 (list|show|services|types|instances|schema|routing-table|register|create-type|add-key|remove-key)", "list")
   .option("--domain <name>", "action=show|register 시 도메인")
   .option("--type <name>", "action=schema|register|add-key|remove-key 시 타입 키")
   .option("--key <name>", "action=add-key|remove-key 시 스키마 키")
@@ -2139,6 +2140,23 @@ kbCmd
             process.exit(1);
           }
         }
+      } else if (action === "create-type") {
+        if (!options.type) {
+          console.log(chalk.red("--type 옵션이 필요합니다. (예: --type project)"));
+          process.exit(1);
+        }
+        const result = await ontoCreateType(pool, {
+          type_key: options.type,
+          description: options.description,
+        });
+        if (result.success) {
+          console.log(chalk.green(`\n✅ 온톨로지 타입 '${options.type}' 생성 완료`));
+          console.log(chalk.gray(`\n  다음 단계: semo kb ontology --action add-key --type ${options.type} --key <key> --key-type singleton|collection\n`));
+        } else {
+          console.log(chalk.red(`\n❌ 타입 생성 실패: ${result.error}\n`));
+          process.exit(1);
+        }
+
       } else if (action === "add-key") {
         if (!options.type) {
           console.log(chalk.red("--type 옵션이 필요합니다. (예: --type service)"));
@@ -2181,7 +2199,7 @@ kbCmd
         }
 
       } else {
-        console.log(chalk.red(`알 수 없는 action: '${action}'. 사용 가능: list, show, services, types, instances, schema, routing-table, register, add-key, remove-key`));
+        console.log(chalk.red(`알 수 없는 action: '${action}'. 사용 가능: list, show, services, types, instances, schema, routing-table, register, create-type, add-key, remove-key`));
         process.exit(1);
       }
 

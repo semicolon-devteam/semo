@@ -1306,6 +1306,51 @@ export async function ontoAddKey(
 }
 
 /**
+ * Create a new ontology type
+ */
+export async function ontoCreateType(
+  pool: Pool,
+  opts: {
+    type_key: string;
+    description?: string;
+    schema?: Record<string, unknown>;
+  }
+): Promise<{ success: boolean; error?: string }> {
+  // kebab-case 검증
+  if (!/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(opts.type_key)) {
+    return { success: false, error: `타입 키 '${opts.type_key}'이(가) 유효하지 않습니다. kebab-case 소문자만 사용 가능 (예: my-type)` };
+  }
+
+  const client = await pool.connect();
+  try {
+    // 중복 확인
+    const dupCheck = await client.query(
+      "SELECT type_key FROM semo.ontology_types WHERE type_key = $1",
+      [opts.type_key]
+    );
+    if (dupCheck.rows.length > 0) {
+      return { success: false, error: `타입 '${opts.type_key}'은(는) 이미 존재합니다.` };
+    }
+
+    await client.query(
+      `INSERT INTO semo.ontology_types (type_key, schema, description)
+       VALUES ($1, $2, $3)`,
+      [
+        opts.type_key,
+        JSON.stringify(opts.schema || {}),
+        opts.description || opts.type_key,
+      ]
+    );
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Remove a key from a type schema
  */
 export async function ontoRemoveKey(
