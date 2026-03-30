@@ -36,7 +36,7 @@
 - 의사결정 기록 → `domain: semicolon`, key: `decision`, sub_key: `{date}/{slug}`
 - 업무 프로세스 → `domain: semicolon`, key: `process`, sub_key: `{name}`
 - 인프라 구성 → `domain: semicolon`, key: `infra`, sub_key: `{name}`
-- 서비스 KPI → `domain: {serviceName}`, key: `kpi`, sub_key: `current`
+- 서비스 KPI → `domain: {serviceName}`, key: `kpi`, sub_key: `{YYYY-MM-DD}` (최신: 가장 최근 날짜 조회)
 - 봇 정보 → `domain: {botId}`, key: `identity` / `role` / `gateway-config`
 - SEMO 시스템 스펙 → `domain: semo`, key: `spec`, sub_key: `{name}`
 - 서비스 스코프 전체 검색 → `--service {serviceName}` 파라미터

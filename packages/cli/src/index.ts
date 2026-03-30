@@ -843,7 +843,7 @@ async function buildKbFirstBlock(): Promise<string> {
       const label = s.desc || s.scheme_key;
       domainGuide += `- 서비스 ${label} → \`domain: {서비스명}\`, key: \`${s.scheme_key}\`\n`;
     }
-    domainGuide += `- 서비스 KPI → \`domain: {서비스명}\`, key: \`kpi/current\`\n`;
+    domainGuide += `- 서비스 KPI → \`domain: {서비스명}\`, key: \`kpi/{YYYY-MM-DD}\` (최신: 가장 최근 날짜)\n`;
     domainGuide += `- 서비스 마일스톤 → \`domain: {서비스명}\`, key: \`milestone/{slug}\`\n`;
 
     domainGuide += `\n**정확한 경로를 모를 때:**\n`;
