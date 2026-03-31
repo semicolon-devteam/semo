@@ -124,7 +124,8 @@ export async function sendGfpRejectionSlack(opts: GfpRejectionNotifyOpts): Promi
       },
       body: JSON.stringify({
         channel,
-        text: `[GFP Rejection] ${opts.projectName} — ${opts.sectionKey} 섹션 거절됨`,
+        // text fallback에 멘션 포함 — OpenClaw는 text 필드에서 멘션을 감지
+        text: `<@${PLANCLAW_SLACK_ID}> [GFP Rejection] ${opts.projectName} — ${opts.sectionKey} 섹션 거절됨\nReason: ${opts.reviewerNote}`,
         blocks,
       }),
     });
