@@ -16,9 +16,12 @@ export default function GfpListPage() {
 
   useEffect(() => {
     fetch('/api/gfp')
-      .then((r) => r.json())
-      .then(setProjects)
-      .catch(() => {})
+      .then((r) => {
+        if (!r.ok) return [];
+        return r.json();
+      })
+      .then((data) => setProjects(Array.isArray(data) ? data : []))
+      .catch(() => setProjects([]))
       .finally(() => setLoading(false));
   }, []);
 
