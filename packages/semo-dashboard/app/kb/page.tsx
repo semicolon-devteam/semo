@@ -1,11 +1,20 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'next/navigation';
 import DomainCard from '@/components/DomainCard';
 import LayerModal from '@/components/LayerModal';
-import type { KBEntry, KBDomain } from '@/types';
+import type { KBEntry, KBDomain, OntologyEntry } from '@/types';
 
 const EMPTY_FORM = { title: '', content: '', bot_id: '', category: '' };
+
+export default function KBPageWrapper() {
+  return (
+    <Suspense>
+      <KBPage />
+    </Suspense>
+  );
+}
 
 const CATEGORY_ICONS: Record<string, string> = {
   team: '\u{1F465}',
@@ -23,7 +32,7 @@ function getCategoryIcon(category: string): string {
   return CATEGORY_ICONS[category] || '\u{1F4C2}';
 }
 
-export default function KBPage() {
+function KBPage() {
   const [entries, setEntries] = useState<KBEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -43,8 +52,22 @@ export default function KBPage() {
   const [allBotIds, setAllBotIds] = useState<string[]>([]);
 
   // Tabs
-  type KBTab = 'domains' | 'entries';
-  const [activeTab, setActiveTab] = useState<KBTab>('domains');
+  type KBTab = 'domains' | 'entries' | 'ontology';
+  const searchParams = useSearchParams();
+  const initialTab = (searchParams.get('tab') as KBTab) || 'domains';
+  const [activeTab, setActiveTab] = useState<KBTab>(
+    ['domains', 'entries', 'ontology'].includes(initialTab) ? initialTab : 'domains'
+  );
+
+  // Ontology state
+  const [ontologyDomains, setOntologyDomains] = useState<KBDomain[]>([]);
+  const [ontologyLoading, setOntologyLoading] = useState(false);
+  const [ontologyError, setOntologyError] = useState('');
+  const [selectedOntologyDomain, setSelectedOntologyDomain] = useState<KBDomain | null>(null);
+  const [ontologyEntries, setOntologyEntries] = useState<OntologyEntry[]>([]);
+  const [ontologyEntriesLoading, setOntologyEntriesLoading] = useState(false);
+  const [selectedOntologyEntry, setSelectedOntologyEntry] = useState<OntologyEntry | null>(null);
+  const [ontologyEntryLoading, setOntologyEntryLoading] = useState(false);
 
   // CRUD modal state
   const [modalOpen, setModalOpen] = useState(false);
@@ -100,6 +123,82 @@ export default function KBPage() {
       .then((bots: { id: string }[]) => setAllBotIds(bots.map((b) => b.id)))
       .catch(() => {});
   }, []);
+
+  // Ontology: fetch domains when tab is active
+  useEffect(() => {
+    if (activeTab !== 'ontology') return;
+    setOntologyLoading(true);
+    setOntologyError('');
+    fetch('/api/kb?action=domains')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d: KBDomain[]) => setOntologyDomains(d))
+      .catch((e) => setOntologyError(e instanceof Error ? e.message : 'Failed to fetch domains'))
+      .finally(() => setOntologyLoading(false));
+  }, [activeTab]);
+
+  const ONTOLOGY_DOMAIN_ICONS: Record<string, string> = {
+    semicolon: '\u{1F3E2}', team: '\u{1F465}', project: '\u{1F4CB}', decision: '\u2696\uFE0F',
+    process: '\u{1F504}', infra: '\u{1F3D7}\uFE0F', kpi: '\u{1F4CA}', milestone: '\u{1F3AF}',
+    'session-log': '\u{1F4DD}', 'bot-config': '\u2699\uFE0F', spec: '\u{1F4D0}',
+    skill: '\u{1F9E9}', memory: '\u{1F9E0}', service: '\u{1F680}',
+  };
+
+  function getOntologyDomainIcon(domain: string, entityType?: string | null): string {
+    if (ONTOLOGY_DOMAIN_ICONS[domain]) return ONTOLOGY_DOMAIN_ICONS[domain];
+    if (entityType === 'service') return ONTOLOGY_DOMAIN_ICONS.service;
+    if (entityType === 'organization') return ONTOLOGY_DOMAIN_ICONS.semicolon;
+    for (const [key, icon] of Object.entries(ONTOLOGY_DOMAIN_ICONS)) {
+      if (domain.includes(key)) return icon;
+    }
+    return '\u{1F4C2}';
+  }
+
+  async function handleOntologyDomainClick(domain: KBDomain) {
+    setSelectedOntologyDomain(domain);
+    setSelectedOntologyEntry(null);
+    setOntologyEntriesLoading(true);
+    try {
+      const res = await fetch(`/api/kb?domain=${encodeURIComponent(domain.domain)}`);
+      if (!res.ok) throw new Error('Failed to fetch entries');
+      const data = await res.json();
+      const mapped: OntologyEntry[] = (Array.isArray(data) ? data : []).map(
+        (item: Record<string, unknown>) => ({
+          kb_id: String(item.kb_id ?? ''),
+          domain: String(item.domain ?? ''),
+          key: String(item.key ?? ''),
+          content: String(item.content ?? '').slice(0, 80),
+          created_by: item.created_by ? String(item.created_by) : undefined,
+        }),
+      );
+      setOntologyEntries(mapped);
+    } catch {
+      setOntologyEntries([]);
+    } finally {
+      setOntologyEntriesLoading(false);
+    }
+  }
+
+  async function handleOntologyEntryClick(entry: OntologyEntry) {
+    setOntologyEntryLoading(true);
+    try {
+      const res = await fetch(
+        `/api/kb?domain=${encodeURIComponent(entry.domain)}&key=${encodeURIComponent(entry.key)}`,
+      );
+      if (!res.ok) throw new Error('Failed to fetch entry');
+      const data = await res.json();
+      setSelectedOntologyEntry({
+        kb_id: String(data.kb_id ?? ''),
+        domain: String(data.domain ?? ''),
+        key: String(data.key ?? ''),
+        content: String(data.content ?? ''),
+        created_by: data.created_by ? String(data.created_by) : undefined,
+      });
+    } catch {
+      setSelectedOntologyEntry(null);
+    } finally {
+      setOntologyEntryLoading(false);
+    }
+  }
 
   // Derived
   const botIds = Array.from(new Set(entries.map((e) => e.bot_id).filter(Boolean)));
@@ -236,7 +335,7 @@ export default function KBPage() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Knowledge Base
+            Knowledge
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
             Manage KB entries — {entries.length} entries
@@ -298,6 +397,7 @@ export default function KBPage() {
           {([
             { key: 'domains' as const, label: 'Domains' },
             { key: 'entries' as const, label: 'Entries' },
+            { key: 'ontology' as const, label: 'Ontology' },
           ]).map(({ key, label }) => (
             <button
               key={key}
@@ -331,6 +431,69 @@ export default function KBPage() {
           <p className="text-lg mb-2">No entries found</p>
           <p className="text-sm">Click &quot;+ New Entry&quot; to add the first one.</p>
         </div>
+      ) : activeTab === 'ontology' ? (
+        /* ── Ontology Tab ── */
+        ontologyLoading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : ontologyError ? (
+          <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 px-4 py-3 rounded-lg text-sm">
+            {ontologyError}
+          </div>
+        ) : ontologyDomains.length === 0 ? (
+          <div className="text-center py-16 text-gray-500 dark:text-gray-400">
+            <p className="text-lg mb-2">No domains found</p>
+            <p className="text-sm">KB domains will appear here once data is available.</p>
+          </div>
+        ) : (() => {
+          const globalDomains = ontologyDomains.filter((d) => !d.service || d.service === '_global');
+          const byService: Record<string, KBDomain[]> = {};
+          for (const d of ontologyDomains) {
+            if (d.service && d.service !== '_global') {
+              if (!byService[d.service]) byService[d.service] = [];
+              byService[d.service].push(d);
+            }
+          }
+          const serviceEntries = Object.entries(byService).sort(([a], [b]) => a.localeCompare(b));
+
+          return (
+            <div className="space-y-8">
+              {globalDomains.length > 0 && (
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">Global</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {globalDomains.map((domain) => (
+                      <DomainCard
+                        key={domain.domain}
+                        domain={domain}
+                        icon={getOntologyDomainIcon(domain.domain, domain.entity_type)}
+                        onClick={() => handleOntologyDomainClick(domain)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {serviceEntries.map(([service, svcDomains]) => (
+                <div key={service}>
+                  <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                    Service: {service}
+                  </h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {svcDomains.map((domain) => (
+                      <DomainCard
+                        key={domain.domain}
+                        domain={domain}
+                        icon={getOntologyDomainIcon(domain.domain, domain.entity_type)}
+                        onClick={() => handleOntologyDomainClick(domain)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()
       ) : activeTab === 'domains' ? (
         /* ── Domains Tab ── */
         committedSearch ? (
@@ -580,6 +743,79 @@ export default function KBPage() {
                   {entry.bot_id && (
                     <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
                       {entry.bot_id}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )
+        )}
+      </LayerModal>
+
+      {/* Ontology LayerModal */}
+      <LayerModal
+        open={!!selectedOntologyDomain}
+        onClose={() => {
+          setSelectedOntologyDomain(null);
+          setSelectedOntologyEntry(null);
+          setOntologyEntries([]);
+        }}
+        icon={selectedOntologyDomain ? getOntologyDomainIcon(selectedOntologyDomain.domain, selectedOntologyDomain.entity_type) : undefined}
+        title={selectedOntologyEntry ? selectedOntologyEntry.key : selectedOntologyDomain?.domain ?? ''}
+        subtitle={!selectedOntologyEntry ? selectedOntologyDomain?.description : undefined}
+        showBack={!!selectedOntologyEntry}
+        onBack={() => setSelectedOntologyEntry(null)}
+      >
+        {selectedOntologyEntry ? (
+          ontologyEntryLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {selectedOntologyEntry.created_by && (
+                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                  <span>Created by:</span>
+                  <span className="font-medium text-gray-700 dark:text-gray-300">
+                    {selectedOntologyEntry.created_by}
+                  </span>
+                </div>
+              )}
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+                <pre className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words font-mono">
+                  {selectedOntologyEntry.content}
+                </pre>
+              </div>
+            </div>
+          )
+        ) : (
+          ontologyEntriesLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : ontologyEntries.length === 0 ? (
+            <p className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+              No entries in this domain
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {ontologyEntries.map((entry) => (
+                <div
+                  key={entry.kb_id || entry.key}
+                  onClick={() => handleOntologyEntryClick(entry)}
+                  className="flex items-start justify-between gap-4 px-4 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                      {entry.key}
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
+                      {entry.content}
+                    </p>
+                  </div>
+                  {entry.created_by && (
+                    <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                      {entry.created_by}
                     </span>
                   )}
                 </div>
