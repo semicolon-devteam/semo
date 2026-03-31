@@ -4,25 +4,14 @@
  */
 
 import { query } from './db';
+import { getPhaseAssignee, getPhaseCc, PHASE_LABELS } from './gfp-phases';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const DASHBOARD_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space';
 const FALLBACK_CHANNEL = 'C0AFBQ209E0'; // #bot-ops
 
-// PlanClaw Slack User ID
-const PLANCLAW_SLACK_ID = 'U0AFNMGKURX';
-
-const PHASE_LABELS: Record<number, string> = {
-  0: 'Constitution',
-  1: 'Discovery',
-  2: 'PRD',
-  3: 'Design System',
-  4: 'Epic',
-  5: 'Functional Spec',
-  6: 'Technical Plan',
-  7: 'Task Breakdown',
-  8: 'Handoff',
-};
+// Re-export for backward compat (removed local PHASE_LABELS, now from gfp-phases)
+export { PHASE_LABELS } from './gfp-phases';
 
 // ── Channel Resolution ──
 
@@ -99,6 +88,7 @@ export async function sendGfpRejectionSlack(opts: GfpRejectionNotifyOpts): Promi
   }
 
   const channel = opts.channelId || await resolveGfpSlackChannel(opts.gfpId);
+  const assignee = getPhaseAssignee(opts.phase);
   const phaseLabel = PHASE_LABELS[opts.phase] ?? `Phase ${opts.phase}`;
   const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=${opts.phase}&section=${opts.sectionKey}`;
 
@@ -113,7 +103,7 @@ export async function sendGfpRejectionSlack(opts: GfpRejectionNotifyOpts): Promi
         { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
         { type: 'mrkdwn', text: `*Section:*\n${opts.sectionKey} (${opts.sectionTitle})` },
         { type: 'mrkdwn', text: `*Phase:*\n${opts.phase} — ${phaseLabel}` },
-        { type: 'mrkdwn', text: `*Assigned:*\n<@${PLANCLAW_SLACK_ID}>` },
+        { type: 'mrkdwn', text: `*Assigned:*\n<@${assignee.slackId}>` },
       ],
     },
     {
@@ -143,8 +133,7 @@ export async function sendGfpRejectionSlack(opts: GfpRejectionNotifyOpts): Promi
       },
       body: JSON.stringify({
         channel,
-        // text fallback에 멘션 포함 — OpenClaw는 text 필드에서 멘션을 감지
-        text: `<@${PLANCLAW_SLACK_ID}> [GFP Rejection] ${opts.projectName} — ${opts.sectionKey} 섹션 거절됨\nReason: ${opts.reviewerNote}`,
+        text: `<@${assignee.slackId}> [GFP Rejection] ${opts.projectName} — ${opts.sectionKey} 섹션 거절됨\nReason: ${opts.reviewerNote}`,
         blocks,
       }),
     });
@@ -186,14 +175,26 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
   const isLastPhase = opts.nextPhase === null || opts.nextPhase > 8;
   const nextLabel = isLastPhase ? null : (PHASE_LABELS[opts.nextPhase!] ?? `Phase ${opts.nextPhase}`);
 
-  // 담당자 멘션: PlanClaw + 프로젝트 오너
+  // 다음 Phase 담당 봇 + CC 봇 (예: InfraClaw)
+  const nextAssignee = isLastPhase ? null : getPhaseAssignee(opts.nextPhase!);
+  const ccBots = isLastPhase ? [] : getPhaseCc(opts.nextPhase!);
+
+  // 멘션 목록: 담당 봇 + CC 봇 + 오너
   const ownerMention = opts.ownerSlackId ? ` <@${opts.ownerSlackId}>` : '';
+  const assigneeMention = nextAssignee ? `<@${nextAssignee.slackId}>` : '';
+  const ccMentions = ccBots.map(b => `<@${b.slackId}>`).join(' ');
+  const allMentions = [assigneeMention, ccMentions, ownerMention].filter(Boolean).join(' ');
+
   const textFallback = isLastPhase
-    ? `<@${PLANCLAW_SLACK_ID}>${ownerMention} [GFP Complete] ${opts.projectName} — 모든 Phase 완료!`
-    : `<@${PLANCLAW_SLACK_ID}>${ownerMention} [GFP Phase Complete] ${opts.projectName} — Phase ${opts.completedPhase} (${completedLabel}) 전체 승인. Phase ${opts.nextPhase} (${nextLabel}) 섹션 작성을 시작해주세요.`;
+    ? `${ownerMention.trim()} [GFP Complete] ${opts.projectName} — 모든 Phase 완료!`
+    : `${allMentions} [GFP Phase Complete] ${opts.projectName} — Phase ${opts.completedPhase} (${completedLabel}) 전체 승인. Phase ${opts.nextPhase} (${nextLabel}) 섹션 작성을 시작해주세요.`;
 
   const ownerField = opts.ownerSlackId
     ? [{ type: 'mrkdwn', text: `*Owner:*\n<@${opts.ownerSlackId}>` }]
+    : [];
+
+  const ccField = ccBots.length > 0
+    ? [{ type: 'mrkdwn', text: `*CC:*\n${ccBots.map(b => `<@${b.slackId}> (${b.reason})`).join(', ')}` }]
     : [];
 
   const blocks = [
@@ -210,8 +211,9 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
           ? [{ type: 'mrkdwn', text: '*Status:*\n모든 Phase 완료 🎉' }, ...ownerField]
           : [
               { type: 'mrkdwn', text: `*Next:*\nPhase ${opts.nextPhase} — ${nextLabel}` },
-              { type: 'mrkdwn', text: `*Assigned:*\n<@${PLANCLAW_SLACK_ID}>` },
+              { type: 'mrkdwn', text: `*Assigned:*\n<@${nextAssignee!.slackId}>` },
               ...ownerField,
+              ...ccField,
             ]),
       ],
     },

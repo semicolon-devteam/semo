@@ -110,7 +110,7 @@ export async function PATCH(
 
     // On rejection, dispatch PlanClaw regeneration + Slack notification
     if (status === 'rejected' && reviewer_note) {
-      dispatchRegeneration(section_id, section.content, reviewer_note).catch((err) =>
+      dispatchRegeneration(section_id, section.content, reviewer_note, section.phase).catch((err) =>
         console.error('PlanClaw dispatch failed:', err)
       );
 

@@ -1,9 +1,10 @@
 /**
- * GFP Bot Dispatch — OpenClaw gateway wrapper for PlanClaw/GrowthClaw
+ * GFP Bot Dispatch — OpenClaw gateway wrapper for phase-specific bots
  */
 
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { getPhaseAssignee } from './gfp-phases';
 
 const execAsync = promisify(exec);
 
@@ -33,8 +34,10 @@ export async function dispatchResearch(
 export async function dispatchRegeneration(
   sectionId: string,
   originalContent: string,
-  reviewerNote: string
+  reviewerNote: string,
+  phase: number = 0
 ): Promise<void> {
+  const assignee = getPhaseAssignee(phase);
   const message = `[GFP Section Regeneration: ${sectionId}]
 
 ## Original Content
@@ -45,5 +48,5 @@ ${reviewerNote}
 
 Please regenerate the section addressing the rejection reason above.`;
 
-  await dispatchBotMessage('planclaw', message);
+  await dispatchBotMessage(assignee.botId, message);
 }
