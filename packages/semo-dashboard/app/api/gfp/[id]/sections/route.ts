@@ -9,6 +9,7 @@ import {
 } from '@/lib/gfp';
 import { dispatchRegeneration } from '@/lib/gfp-bot';
 import { publishPhaseToGitHub } from '@/lib/gfp-github';
+import { sendGfpRejectionSlack, resolveGfpSlackChannel } from '@/lib/slack';
 
 export const dynamic = 'force-dynamic';
 
@@ -103,11 +104,27 @@ export async function PATCH(
       return NextResponse.json({ error: 'Section not found' }, { status: 404 });
     }
 
-    // On rejection, dispatch PlanClaw regeneration
+    // On rejection, dispatch PlanClaw regeneration + Slack notification
     if (status === 'rejected' && reviewer_note) {
       dispatchRegeneration(section_id, section.content, reviewer_note).catch((err) =>
         console.error('PlanClaw dispatch failed:', err)
       );
+
+      // Slack 알림: 프로젝트 채널에 rejection 통지
+      const project = await getProject(id);
+      if (project) {
+        const channelId = await resolveGfpSlackChannel(id);
+        sendGfpRejectionSlack({
+          projectName: project.project_name,
+          gfpId: id,
+          sectionId: section_id,
+          sectionKey: section.section_key,
+          sectionTitle: section.title,
+          phase: section.phase,
+          reviewerNote: reviewer_note,
+          channelId,
+        }).catch((err) => console.error('Slack rejection notify failed:', err));
+      }
     }
 
     // Check if entire phase is now approved → KB write-back + GitHub publish
