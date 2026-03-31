@@ -1,0 +1,128 @@
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  listSections,
+  upsertSection,
+  updateSectionStatus,
+  updateSectionContent,
+  writebackPhaseToKB,
+  getProject,
+} from '@/lib/gfp';
+import { dispatchRegeneration } from '@/lib/gfp-bot';
+
+export const dynamic = 'force-dynamic';
+
+const PHASE_NAMES: Record<number, string> = {
+  0: 'constitution',
+  1: 'discovery',
+  2: 'prd',
+  3: 'design-system',
+  4: 'epic',
+  5: 'task-breakdown',
+  6: 'sprint-plan',
+  7: 'tech-spec',
+  8: 'launch-checklist',
+};
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const phaseParam = searchParams.get('phase');
+    const phase = phaseParam !== null ? parseInt(phaseParam, 10) : undefined;
+    const sections = await listSections(id, phase);
+    return NextResponse.json(sections);
+  } catch (error) {
+    console.error('GFP sections list error:', error);
+    return NextResponse.json({ error: 'Failed to list sections' }, { status: 500 });
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const { phase, section_key, title, content, ordinal, status, source } = body;
+
+    if (phase === undefined || !section_key || !title) {
+      return NextResponse.json(
+        { error: 'phase, section_key, and title are required' },
+        { status: 400 }
+      );
+    }
+
+    const section = await upsertSection({
+      gfp_id: id,
+      phase,
+      section_key,
+      title,
+      content: content ?? '',
+      ordinal,
+      status,
+      source,
+    });
+    return NextResponse.json(section, { status: 201 });
+  } catch (error) {
+    console.error('GFP section upsert error:', error);
+    return NextResponse.json({ error: 'Failed to upsert section' }, { status: 500 });
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const { section_id, action, status, reviewer_note, content } = body;
+
+    if (!section_id) {
+      return NextResponse.json({ error: 'section_id is required' }, { status: 400 });
+    }
+
+    // Update content
+    if (action === 'update-content' && content !== undefined) {
+      const section = await updateSectionContent(section_id, content, status);
+      return NextResponse.json(section);
+    }
+
+    // Approve or reject
+    if (!status || !['approved', 'rejected', 'pending-review', 'draft'].includes(status)) {
+      return NextResponse.json({ error: 'Valid status is required' }, { status: 400 });
+    }
+
+    const section = await updateSectionStatus(section_id, status, reviewer_note);
+    if (!section) {
+      return NextResponse.json({ error: 'Section not found' }, { status: 404 });
+    }
+
+    // On rejection, dispatch PlanClaw regeneration
+    if (status === 'rejected' && reviewer_note) {
+      dispatchRegeneration(section_id, section.content, reviewer_note).catch((err) =>
+        console.error('PlanClaw dispatch failed:', err)
+      );
+    }
+
+    // Check if entire phase is now approved → KB write-back
+    if (status === 'approved') {
+      const project = await getProject(id);
+      if (project?.service_domain) {
+        const phaseName = PHASE_NAMES[section.phase] ?? `phase-${section.phase}`;
+        writebackPhaseToKB(id, section.phase, project.service_domain, phaseName).catch((err) =>
+          console.error('KB write-back failed:', err)
+        );
+      }
+    }
+
+    return NextResponse.json(section);
+  } catch (error) {
+    console.error('GFP section status error:', error);
+    return NextResponse.json({ error: 'Failed to update section' }, { status: 500 });
+  }
+}
