@@ -6,12 +6,12 @@ const PHASE_LABELS: Record<number, string> = {
   0: 'Constitution',
   1: 'Discovery',
   2: 'PRD',
-  3: 'Design System',
+  3: 'Clarification',
   4: 'Epic',
-  5: 'Task Breakdown',
-  6: 'Sprint Plan',
-  7: 'Tech Spec',
-  8: 'Launch Checklist',
+  5: 'Functional Spec',
+  6: 'Technical Plan',
+  7: 'Task Breakdown',
+  8: 'Handoff',
 };
 
 interface GfpProgressBarProps {

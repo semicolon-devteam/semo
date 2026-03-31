@@ -105,7 +105,7 @@ KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하
 | SEMO 워크스페이스 규격 | `semo kb get semo spec workspace-v2` |
 | SEMO MCP 서버 설정 | `semo kb get semo spec mcp-server-config` |
 | OpenClaw 설정 | `semo kb get semo spec openclaw-config` |
-| 환경변수 (~/.semo.env) | `semo kb get semo infra env-config` |
+| 환경변수 (~/.claude/semo/.env) | `semo kb get semo infra env-config` |
 | 복구 명령어 | `semo kb get semo process recovery` |
 | 코딩 컨벤션 | `semo kb get semo process coding-convention` |
 

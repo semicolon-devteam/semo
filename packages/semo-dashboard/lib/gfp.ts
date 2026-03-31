@@ -42,6 +42,11 @@ export async function createProject(data: {
   service_domain?: string;
   metadata?: Record<string, unknown>;
 }): Promise<GfpProject> {
+  // 온톨로지 자동 등록: service_domain이 지정되었으나 아직 등록 안 된 경우
+  if (data.service_domain) {
+    await ensureOntologyDomain(data.service_domain, data.project_name);
+  }
+
   const res = await query<GfpProject>(
     `INSERT INTO semo.gfp_projects (project_name, owner_name, owner_contact, service_domain, metadata)
      VALUES ($1, $2, $3, $4, $5)
@@ -55,6 +60,25 @@ export async function createProject(data: {
     ]
   );
   return res.rows[0];
+}
+
+/**
+ * 온톨로지에 도메인이 없으면 자동 등록 (service 타입)
+ */
+async function ensureOntologyDomain(domain: string, projectName: string): Promise<void> {
+  const check = await query(
+    'SELECT 1 FROM semo.ontology WHERE domain = $1',
+    [domain]
+  );
+  if (check.rows.length > 0) return;
+
+  await query(
+    `INSERT INTO semo.ontology (domain, schema, entity_type, service, description, tags)
+     VALUES ($1, '{}', 'service', $1, $2, $3)
+     ON CONFLICT (domain) DO NOTHING`,
+    [domain, `${projectName} — GFP 프로젝트`, ['gfp', 'incubator']]
+  );
+  console.log(`[GFP] Ontology domain '${domain}' auto-registered for project '${projectName}'`);
 }
 
 export async function updateProject(
@@ -222,6 +246,21 @@ export async function listMaterials(gfpId: string): Promise<GfpMaterial[]> {
   return res.rows;
 }
 
+// ── Stitch Materials ──
+
+export async function createStitchMaterial(data: {
+  gfp_id: string;
+  content: string;
+}): Promise<GfpMaterial> {
+  const res = await query<GfpMaterial>(
+    `INSERT INTO semo.gfp_materials (gfp_id, content, material_type)
+     VALUES ($1, $2, 'stitch-export')
+     RETURNING *`,
+    [data.gfp_id, data.content]
+  );
+  return res.rows[0];
+}
+
 // ── Research Tasks ──
 
 export async function createResearchTask(data: {
@@ -294,6 +333,14 @@ export async function writebackPhaseToKB(
     .join('\n\n---\n\n');
 
   await upsertItem(serviceDomain, `spec/${phaseName}`, content, 'gfp-pipeline');
+
+  // KB write-back 시각 기록
+  const sectionIds = sections.map((s) => s.section_id);
+  await query(
+    `UPDATE semo.gfp_phase_sections SET kb_written_at = NOW() WHERE section_id = ANY($1)`,
+    [sectionIds]
+  );
+  console.log(`[GFP] KB write-back: ${serviceDomain} spec/${phaseName} (${sectionIds.length} sections)`);
 }
 
 // ── Bulk section creation from material mapping ──

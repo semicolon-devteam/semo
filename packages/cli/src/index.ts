@@ -370,8 +370,7 @@ async function showToolsStatus(): Promise<boolean> {
 // === 글로벌 설정 체크 ===
 function isGlobalSetupDone(): boolean {
   const home = os.homedir();
-  const hasEnv = fs.existsSync(path.join(home, ".claude", "semo", ".env")) ||
-                 fs.existsSync(path.join(home, ".semo.env"));  // 하위 호환
+  const hasEnv = fs.existsSync(path.join(home, ".claude", "semo", ".env"));
   const hasSetup = fs.existsSync(path.join(home, ".claude", "semo", "SOUL.md")) ||
                    fs.existsSync(path.join(home, ".claude", "skills"));  // 하위 호환
   return hasEnv && hasSetup;
@@ -563,9 +562,7 @@ const BASE_MCP_SERVERS: MCPServerConfig[] = [
 ];
 
 // === ~/.claude/semo/.env 설정 (자동 감지 → Gist → 프롬프트) ===
-// v4.5.0: ~/.semo.env → ~/.claude/semo/.env 이전
 const SEMO_ENV_PATH = path.join(os.homedir(), ".claude", "semo", ".env");
-const LEGACY_ENV_PATH = path.join(os.homedir(), ".semo.env");
 
 interface CredentialDef {
   key: string;
@@ -624,26 +621,10 @@ function writeSemoEnvFile(creds: Record<string, string>): void {
   lines.push("");
   fs.writeFileSync(SEMO_ENV_PATH, lines.join("\n"), { mode: 0o600 });
 
-  // 하위 호환 심링크: ~/.semo.env → ~/.claude/semo/.env
-  try {
-    if (fs.existsSync(LEGACY_ENV_PATH)) {
-      const stat = fs.lstatSync(LEGACY_ENV_PATH);
-      if (!stat.isSymbolicLink()) {
-        // 기존 실파일은 백업 후 심링크로 교체
-        fs.renameSync(LEGACY_ENV_PATH, LEGACY_ENV_PATH + ".bak");
-      } else {
-        fs.unlinkSync(LEGACY_ENV_PATH);
-      }
-    }
-    fs.symlinkSync(SEMO_ENV_PATH, LEGACY_ENV_PATH);
-  } catch {
-    // 심링크 실패 시 무시 — 새 경로가 원본
-  }
 }
 
 function readSemoEnvCreds(): Record<string, string> {
-  // 새 경로 우선, 없으면 레거시 폴백
-  const envFile = fs.existsSync(SEMO_ENV_PATH) ? SEMO_ENV_PATH : LEGACY_ENV_PATH;
+  const envFile = SEMO_ENV_PATH;
   if (!fs.existsSync(envFile)) return {};
   try {
     return parseEnvContent(fs.readFileSync(envFile, "utf-8"));
@@ -978,7 +959,7 @@ async function setupHooks(isUpdate: boolean = false) {
         hooks: [
           {
             type: "command",
-            command: ". ~/.claude/semo/.env 2>/dev/null || . ~/.semo.env 2>/dev/null; semo context sync 2>/dev/null || true",
+            command: ". ~/.claude/semo/.env 2>/dev/null; semo context sync 2>/dev/null || true",
             timeout: 30,
           },
         ],
@@ -990,7 +971,7 @@ async function setupHooks(isUpdate: boolean = false) {
         hooks: [
           {
             type: "command",
-            command: ". ~/.claude/semo/.env 2>/dev/null || . ~/.semo.env 2>/dev/null; semo context push 2>/dev/null || true",
+            command: ". ~/.claude/semo/.env 2>/dev/null; semo context push 2>/dev/null || true",
             timeout: 30,
           },
         ],
@@ -1261,9 +1242,9 @@ npm run build          # 빌드 검증
 
 ---
 
-## 환경변수 (\`~/.semo.env\`)
+## 환경변수 (\`~/.claude/semo/.env\`)
 
-SEMO는 \`~/.semo.env\` 파일에서 팀 공통 환경변수를 로드합니다.
+SEMO는 \`~/.claude/semo/.env\` 파일에서 팀 공통 환경변수를 로드합니다.
 SessionStart 훅과 OpenClaw 게이트웨이 래퍼에서 자동 source됩니다.
 
 | 변수 | 용도 | 필수 |
@@ -1272,7 +1253,7 @@ SessionStart 훅과 OpenClaw 게이트웨이 래퍼에서 자동 source됩니다
 | \`OPENAI_API_KEY\` | KB 임베딩용 (text-embedding-3-small) | 선택 |
 | \`SLACK_WEBHOOK\` | Slack 알림 | 선택 |
 
-키 갱신이 필요하면 \`~/.semo.env\`를 직접 편집하거나 \`semo onboarding -f\`를 실행하세요.
+키 갱신이 필요하면 \`~/.claude/semo/.env\`를 직접 편집하거나 \`semo onboarding -f\`를 실행하세요.
 
 ---
 

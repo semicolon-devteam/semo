@@ -285,7 +285,8 @@ export interface TestResult {
 
 export type GfpProjectStatus = 'active' | 'paused' | 'completed';
 export type GfpSectionStatus = 'draft' | 'pending-review' | 'approved' | 'rejected';
-export type GfpSectionSource = 'planclaw' | 'imported' | 'growthclaw' | 'manual';
+export type GfpSectionSource = 'planclaw' | 'imported' | 'growthclaw' | 'manual' | 'designclaw';
+export type GfpMaterialType = 'planning-doc' | 'stitch-export';
 export type GfpResearchTaskType = 'competitor-analysis' | 'market-research' | 'ux-pattern' | 'keyword-research';
 export type GfpResearchStatus = 'queued' | 'dispatched' | 'completed';
 
@@ -313,6 +314,7 @@ export interface GfpPhaseSection {
   status: GfpSectionStatus;
   reviewer_note: string | null;
   source: GfpSectionSource;
+  kb_written_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -322,6 +324,7 @@ export interface GfpMaterial {
   gfp_id: string;
   content: string;
   phase_mapping: GfpPhaseMapping[] | null;
+  material_type: GfpMaterialType;
   created_at: string;
 }
 

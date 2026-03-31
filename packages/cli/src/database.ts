@@ -21,11 +21,8 @@ import { parseEnvContent } from "./env-parser";
 // ~/.claude/semo/.env 자동 로드 — LaunchAgent / Claude Code 앱 / cron 등
 // 인터랙티브 쉘이 아닌 환경에서 환경변수를 공급한다.
 // 이미 설정된 환경변수는 덮어쓰지 않는다 (env var > file).
-// v4.5.0: ~/.semo.env → ~/.claude/semo/.env 이전. 구 경로 폴백 유지.
 function loadSemoEnv(): void {
-  const newEnvFile = path.join(os.homedir(), ".claude", "semo", ".env");
-  const legacyEnvFile = path.join(os.homedir(), ".semo.env");
-  const envFile = fs.existsSync(newEnvFile) ? newEnvFile : legacyEnvFile;
+  const envFile = path.join(os.homedir(), ".claude", "semo", ".env");
   if (!fs.existsSync(envFile)) return;
   try {
     const creds = parseEnvContent(fs.readFileSync(envFile, "utf8"));

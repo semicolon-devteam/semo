@@ -56,6 +56,11 @@ export default function GfpSectionCard({ section, onApprove, onReject }: GfpSect
           <span className="text-xs text-gray-400 dark:text-gray-500">
             {SOURCE_LABELS[section.source] ?? section.source}
           </span>
+          {section.kb_written_at && (
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400">
+              KB
+            </span>
+          )}
         </div>
         <span className="text-gray-400 text-sm shrink-0 ml-2">
           {expanded ? '\u25B2' : '\u25BC'}

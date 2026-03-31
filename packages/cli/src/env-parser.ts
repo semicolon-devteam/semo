@@ -1,6 +1,6 @@
 /**
  * 공용 KEY=VALUE 파서
- * ~/.semo.env 파일과 GitHub Gist 콘텐츠 모두 이 함수로 파싱한다.
+ * ~/.claude/semo/.env 파일과 GitHub Gist 콘텐츠 모두 이 함수로 파싱한다.
  */
 export function parseEnvContent(content: string): Record<string, string> {
   const result: Record<string, string> = {};

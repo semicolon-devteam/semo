@@ -8,6 +8,7 @@ import GfpProgressBar from '@/components/gfp/GfpProgressBar';
 import GfpSectionCard from '@/components/gfp/GfpSectionCard';
 import GfpMaterialUpload from '@/components/gfp/GfpMaterialUpload';
 import GfpResearchPanel from '@/components/gfp/GfpResearchPanel';
+import GfpStitchPanel from '@/components/gfp/GfpStitchPanel';
 import type { GfpProject, GfpPhaseSection, GfpResearchTask } from '@/types';
 import type { PhaseProgress } from '@/lib/gfp';
 
@@ -21,10 +22,10 @@ const PHASE_LABELS: Record<number, string> = {
   2: 'PRD',
   3: 'Design System',
   4: 'Epic',
-  5: 'Task Breakdown',
-  6: 'Sprint Plan',
-  7: 'Tech Spec',
-  8: 'Launch Checklist',
+  5: 'Functional Spec',
+  6: 'Technical Plan',
+  7: 'Task Breakdown',
+  8: 'Handoff',
 };
 
 async function fetchProjectData(id: string): Promise<ProjectWithProgress | null> {
@@ -155,6 +156,7 @@ export default function GfpDetailPage() {
 
   const phaseSections = sections;
   const showResearch = activePhase <= 2;
+  const showStitch = activePhase === 3;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -280,6 +282,13 @@ export default function GfpDetailPage() {
             gfpId={id}
             onUploaded={refresh}
           />
+          {showStitch && (
+            <GfpStitchPanel
+              gfpId={id}
+              sections={phaseSections}
+              onUploaded={refresh}
+            />
+          )}
           {showResearch && (
             <GfpResearchPanel
               gfpId={id}

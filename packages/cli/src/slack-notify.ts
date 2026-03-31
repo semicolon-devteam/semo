@@ -2,7 +2,7 @@
  * Slack 알림 유틸리티
  *
  * SLACK_WEBHOOK 환경변수에서 URL을 읽어 알림 전송.
- * ~/.semo.env에서 자동 로드됨 (database.ts loadSemoEnv).
+ * ~/.claude/semo/.env에서 자동 로드됨 (database.ts loadSemoEnv).
  */
 
 export async function sendSlackNotification(

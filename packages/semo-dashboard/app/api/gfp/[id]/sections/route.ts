@@ -8,6 +8,7 @@ import {
   getProject,
 } from '@/lib/gfp';
 import { dispatchRegeneration } from '@/lib/gfp-bot';
+import { publishPhaseToGitHub } from '@/lib/gfp-github';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,12 +16,12 @@ const PHASE_NAMES: Record<number, string> = {
   0: 'constitution',
   1: 'discovery',
   2: 'prd',
-  3: 'design-system',
+  3: 'clarification',
   4: 'epic',
-  5: 'task-breakdown',
-  6: 'sprint-plan',
-  7: 'tech-spec',
-  8: 'launch-checklist',
+  5: 'functional-spec',
+  6: 'technical-plan',
+  7: 'task-breakdown',
+  8: 'handoff',
 };
 
 export async function GET(
@@ -109,14 +110,31 @@ export async function PATCH(
       );
     }
 
-    // Check if entire phase is now approved → KB write-back
+    // Check if entire phase is now approved → KB write-back + GitHub publish
     if (status === 'approved') {
       const project = await getProject(id);
-      if (project?.service_domain) {
+      if (project) {
         const phaseName = PHASE_NAMES[section.phase] ?? `phase-${section.phase}`;
-        writebackPhaseToKB(id, section.phase, project.service_domain, phaseName).catch((err) =>
-          console.error('KB write-back failed:', err)
-        );
+
+        if (project.service_domain) {
+          writebackPhaseToKB(id, section.phase, project.service_domain, phaseName).catch((err) =>
+            console.error('KB write-back failed:', err)
+          );
+        }
+
+        // Publish to GitHub docs repo (runs after KB write-back independently)
+        (async () => {
+          const allSections = await listSections(id, section.phase);
+          const allApproved = allSections.length > 0 && allSections.every((s) => s.status === 'approved');
+          if (!allApproved) return;
+
+          const content = allSections
+            .sort((a, b) => a.ordinal - b.ordinal)
+            .map((s) => `## ${s.title}\n\n${s.content}`)
+            .join('\n\n---\n\n');
+
+          await publishPhaseToGitHub(project.project_name, phaseName, content);
+        })().catch((err) => console.error('GitHub publish failed:', err));
       }
     }
 
