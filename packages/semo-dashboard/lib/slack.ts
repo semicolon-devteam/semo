@@ -100,7 +100,7 @@ export async function sendGfpRejectionSlack(opts: GfpRejectionNotifyOpts): Promi
 
   const channel = opts.channelId || await resolveGfpSlackChannel(opts.gfpId);
   const phaseLabel = PHASE_LABELS[opts.phase] ?? `Phase ${opts.phase}`;
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=${opts.phase}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=${opts.phase}&section=${opts.sectionKey}`;
 
   const blocks = [
     {

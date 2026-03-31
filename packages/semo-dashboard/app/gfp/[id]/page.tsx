@@ -57,6 +57,7 @@ export default function GfpDetailPage() {
   const searchParams = useSearchParams();
   const id = params.id as string;
   const phaseParam = searchParams.get('phase');
+  const sectionParam = searchParams.get('section');
 
   const [project, setProject] = useState<ProjectWithProgress | null>(null);
   const [sections, setSections] = useState<GfpPhaseSection[]>([]);
@@ -277,6 +278,7 @@ export default function GfpDetailPage() {
               <GfpSectionCard
                 key={section.section_id}
                 section={section}
+                focused={sectionParam ? section.section_key === sectionParam : undefined}
                 onApprove={handleApprove}
                 onReject={handleReject}
               />

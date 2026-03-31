@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
@@ -24,16 +24,43 @@ const SOURCE_LABELS: Record<string, string> = {
 
 interface GfpSectionCardProps {
   section: GfpPhaseSection;
+  focused?: boolean;
   onApprove: (sectionId: string) => void;
   onReject: (sectionId: string, note: string) => void;
 }
 
-export default function GfpSectionCard({ section, onApprove, onReject }: GfpSectionCardProps) {
+export default function GfpSectionCard({ section, focused, onApprove, onReject }: GfpSectionCardProps) {
+  const ref = useRef<HTMLDivElement>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
-  const [expanded, setExpanded] = useState(section.status !== 'approved');
+  const [expanded, setExpanded] = useState(focused || section.status !== 'approved');
+  const [highlight, setHighlight] = useState(!!focused);
+  const [copied, setCopied] = useState(false);
+
+  // focused 시 스크롤 + 하이라이트 fade
+  useEffect(() => {
+    if (focused && ref.current) {
+      setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+      const timer = setTimeout(() => setHighlight(false), 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [focused]);
+
+  // focused=false인 카드는 section param이 있을 때 collapsed
+  useEffect(() => {
+    if (focused === false) setExpanded(false);
+  }, [focused]);
 
   const style = STATUS_STYLES[section.status];
+
+  function handleCopyLink(e: React.MouseEvent) {
+    e.stopPropagation();
+    const url = `${window.location.origin}${window.location.pathname}?phase=${section.phase}&section=${section.section_key}`;
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  }
 
   function handleReject() {
     if (!rejectNote.trim()) return;
@@ -43,7 +70,14 @@ export default function GfpSectionCard({ section, onApprove, onReject }: GfpSect
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div
+      ref={ref}
+      className={`bg-white dark:bg-gray-800 rounded-lg border overflow-hidden transition-all duration-500 ${
+        highlight
+          ? 'ring-2 ring-blue-500 border-blue-400'
+          : 'border-gray-200 dark:border-gray-700'
+      }`}
+    >
       {/* Header */}
       <div
         className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
@@ -65,9 +99,18 @@ export default function GfpSectionCard({ section, onApprove, onReject }: GfpSect
             </span>
           )}
         </div>
-        <span className="text-gray-400 text-sm shrink-0 ml-2">
-          {expanded ? '\u25B2' : '\u25BC'}
-        </span>
+        <div className="flex items-center gap-2 shrink-0 ml-2">
+          <button
+            onClick={handleCopyLink}
+            className="text-gray-400 hover:text-blue-500 transition-colors text-sm p-0.5"
+            title="섹션 링크 복사"
+          >
+            {copied ? '✓' : '🔗'}
+          </button>
+          <span className="text-gray-400 text-sm">
+            {expanded ? '\u25B2' : '\u25BC'}
+          </span>
+        </div>
       </div>
 
       {/* Content */}
