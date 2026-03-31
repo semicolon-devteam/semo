@@ -26,38 +26,57 @@ const PHASE_LABELS: Record<number, string> = {
 
 // ── Channel Resolution ──
 
-export async function resolveGfpSlackChannel(gfpId: string): Promise<string> {
+export interface GfpSlackContext {
+  channelId: string;
+  ownerSlackId: string | null;
+}
+
+export async function resolveGfpSlackContext(gfpId: string): Promise<GfpSlackContext> {
+  let channelId = FALLBACK_CHANNEL;
+  let ownerSlackId: string | null = null;
+
   try {
-    // 1. gfp_projects.metadata.slackChannel
     const project = await query(
       `SELECT metadata, service_domain FROM semo.gfp_projects WHERE gfp_id = $1`,
       [gfpId]
     );
     if (project.rows.length > 0) {
       const meta = project.rows[0].metadata as Record<string, unknown>;
-      if (meta?.slackChannel && typeof meta.slackChannel === 'string') {
-        return meta.slackChannel;
+
+      // Owner Slack ID
+      if (meta?.ownerSlackId && typeof meta.ownerSlackId === 'string') {
+        ownerSlackId = meta.ownerSlackId;
       }
 
-      // 2. KB: {service_domain} slack-channel
-      const domain = project.rows[0].service_domain as string;
-      if (domain) {
-        const kb = await query(
-          `SELECT content FROM semo.knowledge_base WHERE domain = $1 AND key = 'slack-channel' LIMIT 1`,
-          [domain]
-        );
-        if (kb.rows.length > 0) {
-          const channelId = (kb.rows[0].content as string).trim();
-          if (channelId.startsWith('C')) return channelId;
+      // 1. metadata.slackChannel
+      if (meta?.slackChannel && typeof meta.slackChannel === 'string') {
+        channelId = meta.slackChannel;
+      } else {
+        // 2. KB: {service_domain} slack-channel
+        const domain = project.rows[0].service_domain as string;
+        if (domain) {
+          const kb = await query(
+            `SELECT content FROM semo.knowledge_base WHERE domain = $1 AND key = 'slack-channel' LIMIT 1`,
+            [domain]
+          );
+          if (kb.rows.length > 0) {
+            const ch = (kb.rows[0].content as string).trim();
+            if (ch.startsWith('C')) channelId = ch;
+          }
         }
       }
     }
   } catch (err) {
-    console.error('Channel resolution failed:', err);
+    console.error('Slack context resolution failed:', err);
   }
 
-  // 3. Fallback
-  return FALLBACK_CHANNEL;
+  return { channelId, ownerSlackId };
+}
+
+// 하위 호환
+export async function resolveGfpSlackChannel(gfpId: string): Promise<string> {
+  const ctx = await resolveGfpSlackContext(gfpId);
+  return ctx.channelId;
 }
 
 // ── GFP Rejection Notification ──
@@ -150,6 +169,7 @@ export interface GfpPhaseCompletedOpts {
   completedPhase: number;
   nextPhase: number | null; // null = 마지막 phase 완료
   channelId?: string;
+  ownerSlackId?: string | null;
 }
 
 export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): Promise<boolean> {
@@ -165,9 +185,15 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
   const isLastPhase = opts.nextPhase === null || opts.nextPhase > 8;
   const nextLabel = isLastPhase ? null : (PHASE_LABELS[opts.nextPhase!] ?? `Phase ${opts.nextPhase}`);
 
+  // 담당자 멘션: PlanClaw + 프로젝트 오너
+  const ownerMention = opts.ownerSlackId ? ` <@${opts.ownerSlackId}>` : '';
   const textFallback = isLastPhase
-    ? `<@${PLANCLAW_SLACK_ID}> [GFP Complete] ${opts.projectName} — 모든 Phase 완료!`
-    : `<@${PLANCLAW_SLACK_ID}> [GFP Phase Complete] ${opts.projectName} — Phase ${opts.completedPhase} (${completedLabel}) 전체 승인. Phase ${opts.nextPhase} (${nextLabel}) 섹션 작성을 시작해주세요.`;
+    ? `<@${PLANCLAW_SLACK_ID}>${ownerMention} [GFP Complete] ${opts.projectName} — 모든 Phase 완료!`
+    : `<@${PLANCLAW_SLACK_ID}>${ownerMention} [GFP Phase Complete] ${opts.projectName} — Phase ${opts.completedPhase} (${completedLabel}) 전체 승인. Phase ${opts.nextPhase} (${nextLabel}) 섹션 작성을 시작해주세요.`;
+
+  const ownerField = opts.ownerSlackId
+    ? [{ type: 'mrkdwn', text: `*Owner:*\n<@${opts.ownerSlackId}>` }]
+    : [];
 
   const blocks = [
     {
@@ -180,10 +206,11 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
         { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
         { type: 'mrkdwn', text: `*Completed:*\nPhase ${opts.completedPhase} — ${completedLabel}` },
         ...(isLastPhase
-          ? [{ type: 'mrkdwn', text: '*Status:*\n모든 Phase 완료 🎉' }]
+          ? [{ type: 'mrkdwn', text: '*Status:*\n모든 Phase 완료 🎉' }, ...ownerField]
           : [
               { type: 'mrkdwn', text: `*Next:*\nPhase ${opts.nextPhase} — ${nextLabel}` },
               { type: 'mrkdwn', text: `*Assigned:*\n<@${PLANCLAW_SLACK_ID}>` },
+              ...ownerField,
             ]),
       ],
     },

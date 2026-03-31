@@ -10,7 +10,7 @@ import {
 } from '@/lib/gfp';
 import { dispatchRegeneration } from '@/lib/gfp-bot';
 import { publishPhaseToGitHub } from '@/lib/gfp-github';
-import { sendGfpRejectionSlack, sendGfpPhaseCompletedSlack, resolveGfpSlackChannel } from '@/lib/slack';
+import { sendGfpRejectionSlack, sendGfpPhaseCompletedSlack, resolveGfpSlackContext } from '@/lib/slack';
 
 export const dynamic = 'force-dynamic';
 
@@ -105,6 +105,9 @@ export async function PATCH(
       return NextResponse.json({ error: 'Section not found' }, { status: 404 });
     }
 
+    // Resolve Slack context once (channel + owner)
+    const slackCtx = await resolveGfpSlackContext(id);
+
     // On rejection, dispatch PlanClaw regeneration + Slack notification
     if (status === 'rejected' && reviewer_note) {
       dispatchRegeneration(section_id, section.content, reviewer_note).catch((err) =>
@@ -114,7 +117,6 @@ export async function PATCH(
       // Slack 알림: 프로젝트 채널에 rejection 통지
       const project = await getProject(id);
       if (project) {
-        const channelId = await resolveGfpSlackChannel(id);
         sendGfpRejectionSlack({
           projectName: project.project_name,
           gfpId: id,
@@ -123,7 +125,7 @@ export async function PATCH(
           sectionTitle: section.title,
           phase: section.phase,
           reviewerNote: reviewer_note,
-          channelId,
+          channelId: slackCtx.channelId,
         }).catch((err) => console.error('Slack rejection notify failed:', err));
       }
     }
@@ -160,14 +162,14 @@ export async function PATCH(
             await updateProject(id, { current_phase: nextPhase });
           }
 
-          // Slack 알림: PlanClaw에 다음 Phase 작업 유도
-          const channelId = await resolveGfpSlackChannel(id);
+          // Slack 알림: PlanClaw + 담당자에 다음 Phase 작업 유도
           sendGfpPhaseCompletedSlack({
             projectName: project.project_name,
             gfpId: id,
             completedPhase: section.phase,
             nextPhase: nextPhase <= 8 ? nextPhase : null,
-            channelId,
+            channelId: slackCtx.channelId,
+            ownerSlackId: slackCtx.ownerSlackId,
           }).catch((err) => console.error('Phase complete Slack failed:', err));
         }
       }
