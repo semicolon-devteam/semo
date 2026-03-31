@@ -141,3 +141,85 @@ export async function sendGfpRejectionSlack(opts: GfpRejectionNotifyOpts): Promi
     return false;
   }
 }
+
+// ── GFP Phase Completed Notification ──
+
+export interface GfpPhaseCompletedOpts {
+  projectName: string;
+  gfpId: string;
+  completedPhase: number;
+  nextPhase: number | null; // null = 마지막 phase 완료
+  channelId?: string;
+}
+
+export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): Promise<boolean> {
+  if (!SLACK_BOT_TOKEN) {
+    console.warn('SLACK_BOT_TOKEN not set — skipping GFP phase complete notification');
+    return false;
+  }
+
+  const channel = opts.channelId || await resolveGfpSlackChannel(opts.gfpId);
+  const completedLabel = PHASE_LABELS[opts.completedPhase] ?? `Phase ${opts.completedPhase}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}`;
+
+  const isLastPhase = opts.nextPhase === null || opts.nextPhase > 8;
+  const nextLabel = isLastPhase ? null : (PHASE_LABELS[opts.nextPhase!] ?? `Phase ${opts.nextPhase}`);
+
+  const textFallback = isLastPhase
+    ? `<@${PLANCLAW_SLACK_ID}> [GFP Complete] ${opts.projectName} — 모든 Phase 완료!`
+    : `<@${PLANCLAW_SLACK_ID}> [GFP Phase Complete] ${opts.projectName} — Phase ${opts.completedPhase} (${completedLabel}) 전체 승인. Phase ${opts.nextPhase} (${nextLabel}) 섹션 작성을 시작해주세요.`;
+
+  const blocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: isLastPhase ? '🎉 GFP All Phases Completed' : '🟢 GFP Phase Completed', emoji: true },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
+        { type: 'mrkdwn', text: `*Completed:*\nPhase ${opts.completedPhase} — ${completedLabel}` },
+        ...(isLastPhase
+          ? [{ type: 'mrkdwn', text: '*Status:*\n모든 Phase 완료 🎉' }]
+          : [
+              { type: 'mrkdwn', text: `*Next:*\nPhase ${opts.nextPhase} — ${nextLabel}` },
+              { type: 'mrkdwn', text: `*Assigned:*\n<@${PLANCLAW_SLACK_ID}>` },
+            ]),
+      ],
+    },
+    ...(isLastPhase ? [] : [{
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `다음 Phase 섹션을 작성해주세요. <${dashboardUrl}|Dashboard에서 확인>`,
+      },
+    }]),
+    {
+      type: 'context',
+      elements: [
+        { type: 'mrkdwn', text: `GFP ID: \`${opts.gfpId.slice(0, 8)}...\` | <${dashboardUrl}|Open Dashboard>` },
+      ],
+    },
+  ];
+
+  try {
+    const res = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+      body: JSON.stringify({ channel, text: textFallback, blocks }),
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      console.error('Slack phase complete error:', data.error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Slack phase complete failed:', err);
+    return false;
+  }
+}

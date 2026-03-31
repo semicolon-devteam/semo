@@ -4,12 +4,13 @@ import {
   upsertSection,
   updateSectionStatus,
   updateSectionContent,
+  updateProject,
   writebackPhaseToKB,
   getProject,
 } from '@/lib/gfp';
 import { dispatchRegeneration } from '@/lib/gfp-bot';
 import { publishPhaseToGitHub } from '@/lib/gfp-github';
-import { sendGfpRejectionSlack, resolveGfpSlackChannel } from '@/lib/slack';
+import { sendGfpRejectionSlack, sendGfpPhaseCompletedSlack, resolveGfpSlackChannel } from '@/lib/slack';
 
 export const dynamic = 'force-dynamic';
 
@@ -139,19 +140,36 @@ export async function PATCH(
           );
         }
 
-        // Publish to GitHub docs repo (runs after KB write-back independently)
-        (async () => {
-          const allSections = await listSections(id, section.phase);
-          const allApproved = allSections.length > 0 && allSections.every((s) => s.status === 'approved');
-          if (!allApproved) return;
+        // Check if entire phase is now approved
+        const allSections = await listSections(id, section.phase);
+        const allApproved = allSections.length > 0 && allSections.every((s) => s.status === 'approved');
 
-          const content = allSections
+        if (allApproved) {
+          // Publish to GitHub docs repo
+          const phaseContent = allSections
             .sort((a, b) => a.ordinal - b.ordinal)
             .map((s) => `## ${s.title}\n\n${s.content}`)
             .join('\n\n---\n\n');
 
-          await publishPhaseToGitHub(project.project_name, phaseName, content);
-        })().catch((err) => console.error('GitHub publish failed:', err));
+          publishPhaseToGitHub(project.project_name, phaseName, phaseContent)
+            .catch((err) => console.error('GitHub publish failed:', err));
+
+          // Phase 자동 진행: current_phase 증가
+          const nextPhase = section.phase + 1;
+          if (nextPhase <= 8) {
+            await updateProject(id, { current_phase: nextPhase });
+          }
+
+          // Slack 알림: PlanClaw에 다음 Phase 작업 유도
+          const channelId = await resolveGfpSlackChannel(id);
+          sendGfpPhaseCompletedSlack({
+            projectName: project.project_name,
+            gfpId: id,
+            completedPhase: section.phase,
+            nextPhase: nextPhase <= 8 ? nextPhase : null,
+            channelId,
+          }).catch((err) => console.error('Phase complete Slack failed:', err));
+        }
       }
     }
 
