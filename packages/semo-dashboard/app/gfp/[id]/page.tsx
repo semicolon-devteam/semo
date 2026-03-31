@@ -78,22 +78,26 @@ export default function GfpDetailPage() {
     setSections(secs);
     setResearchTasks(tasks);
     setLoading(false);
-    if (!initialized && proj) {
-      // URL ?phase=N 우선, 없으면 current_phase
-      const initialPhase = phaseParam !== null ? parseInt(phaseParam, 10) : (proj.current_phase ?? 0);
-      setActivePhase(initialPhase);
-      setInitialized(true);
-      // Re-fetch sections for the target phase if different from default
-      if (initialPhase !== p) {
-        const correctSecs = await fetchSectionsData(id, initialPhase);
-        setSections(correctSecs);
-      }
-    }
-  }, [id, activePhase, initialized, phaseParam]);
+  }, [id, activePhase]);
 
-  // Initial load + phase change
+  // Initial load: project 먼저 가져온 뒤 올바른 Phase로 섹션 로드
   if (loading && !initialized) {
-    refresh();
+    setInitialized(true);
+    (async () => {
+      const proj = await fetchProjectData(id);
+      if (!proj) { setLoading(false); return; }
+      // URL ?phase=N 우선, 없으면 current_phase
+      const targetPhase = phaseParam !== null ? parseInt(phaseParam, 10) : (proj.current_phase ?? 0);
+      setActivePhase(targetPhase);
+      const [secs, tasks] = await Promise.all([
+        fetchSectionsData(id, targetPhase),
+        fetchResearchData(id),
+      ]);
+      setProject(proj);
+      setSections(secs);
+      setResearchTasks(tasks);
+      setLoading(false);
+    })();
   }
 
   async function handlePhaseClick(phase: number) {
