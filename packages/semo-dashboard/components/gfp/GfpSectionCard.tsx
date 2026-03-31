@@ -37,9 +37,16 @@ export default function GfpSectionCard({ section, focused, onApprove, onReject }
   const [highlight, setHighlight] = useState(!!focused);
   const [copied, setCopied] = useState(false);
 
+  // section.status 변경 시 expanded 자동 갱신 (approve → collapsed)
+  useEffect(() => {
+    if (focused) return; // focused 카드는 무조건 expanded 유지
+    setExpanded(section.status !== 'approved');
+  }, [section.status, focused]);
+
   // focused 시 스크롤 + 하이라이트 fade
   useEffect(() => {
     if (focused && ref.current) {
+      setExpanded(true);
       setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
       const timer = setTimeout(() => setHighlight(false), 2500);
       return () => clearTimeout(timer);
