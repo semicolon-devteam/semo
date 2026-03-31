@@ -280,3 +280,66 @@ export interface TestResult {
   detail: string | null;
   duration_ms: number | null;
 }
+
+// GFP (Greenfield Project Pipeline) Types
+
+export type GfpProjectStatus = 'active' | 'paused' | 'completed';
+export type GfpSectionStatus = 'draft' | 'pending-review' | 'approved' | 'rejected';
+export type GfpSectionSource = 'planclaw' | 'imported' | 'growthclaw' | 'manual';
+export type GfpResearchTaskType = 'competitor-analysis' | 'market-research' | 'ux-pattern' | 'keyword-research';
+export type GfpResearchStatus = 'queued' | 'dispatched' | 'completed';
+
+export interface GfpProject {
+  gfp_id: string;
+  project_name: string;
+  service_domain: string | null;
+  owner_name: string;
+  owner_contact: string | null;
+  current_phase: number;
+  status: GfpProjectStatus;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GfpPhaseSection {
+  section_id: string;
+  gfp_id: string;
+  phase: number;
+  section_key: string;
+  title: string;
+  content: string;
+  ordinal: number;
+  status: GfpSectionStatus;
+  reviewer_note: string | null;
+  source: GfpSectionSource;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GfpMaterial {
+  material_id: string;
+  gfp_id: string;
+  content: string;
+  phase_mapping: GfpPhaseMapping[] | null;
+  created_at: string;
+}
+
+export interface GfpPhaseMapping {
+  phase: number;
+  coverage: number;
+  sections: { key: string; title: string; content: string }[];
+  gaps: string[];
+}
+
+export interface GfpResearchTask {
+  task_id: string;
+  gfp_id: string;
+  task_type: GfpResearchTaskType;
+  reference_urls: string[];
+  input_prompt: string;
+  status: GfpResearchStatus;
+  result: string | null;
+  created_at: string;
+  updated_at: string;
+}
