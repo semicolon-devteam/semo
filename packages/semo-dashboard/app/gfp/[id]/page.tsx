@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import GfpPhaseNav from '@/components/gfp/GfpPhaseNav';
 import GfpProgressBar from '@/components/gfp/GfpProgressBar';
@@ -54,7 +54,9 @@ async function fetchResearchData(id: string): Promise<GfpResearchTask[]> {
 
 export default function GfpDetailPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
+  const phaseParam = searchParams.get('phase');
 
   const [project, setProject] = useState<ProjectWithProgress | null>(null);
   const [sections, setSections] = useState<GfpPhaseSection[]>([]);
@@ -77,15 +79,17 @@ export default function GfpDetailPage() {
     setResearchTasks(tasks);
     setLoading(false);
     if (!initialized && proj) {
-      setActivePhase(proj.current_phase ?? 0);
+      // URL ?phase=N 우선, 없으면 current_phase
+      const initialPhase = phaseParam !== null ? parseInt(phaseParam, 10) : (proj.current_phase ?? 0);
+      setActivePhase(initialPhase);
       setInitialized(true);
-      // Re-fetch sections for the actual current phase if different
-      if ((proj.current_phase ?? 0) !== p) {
-        const correctSecs = await fetchSectionsData(id, proj.current_phase ?? 0);
+      // Re-fetch sections for the target phase if different from default
+      if (initialPhase !== p) {
+        const correctSecs = await fetchSectionsData(id, initialPhase);
         setSections(correctSecs);
       }
     }
-  }, [id, activePhase, initialized]);
+  }, [id, activePhase, initialized, phaseParam]);
 
   // Initial load + phase change
   if (loading && !initialized) {

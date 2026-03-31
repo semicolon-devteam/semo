@@ -100,7 +100,7 @@ export async function sendGfpRejectionSlack(opts: GfpRejectionNotifyOpts): Promi
 
   const channel = opts.channelId || await resolveGfpSlackChannel(opts.gfpId);
   const phaseLabel = PHASE_LABELS[opts.phase] ?? `Phase ${opts.phase}`;
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=${opts.phase}`;
 
   const blocks = [
     {
@@ -180,7 +180,8 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
 
   const channel = opts.channelId || await resolveGfpSlackChannel(opts.gfpId);
   const completedLabel = PHASE_LABELS[opts.completedPhase] ?? `Phase ${opts.completedPhase}`;
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}`;
+  const phaseForUrl = opts.nextPhase !== null && opts.nextPhase <= 8 ? opts.nextPhase : opts.completedPhase;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=${phaseForUrl}`;
 
   const isLastPhase = opts.nextPhase === null || opts.nextPhase > 8;
   const nextLabel = isLastPhase ? null : (PHASE_LABELS[opts.nextPhase!] ?? `Phase ${opts.nextPhase}`);
