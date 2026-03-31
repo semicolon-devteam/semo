@@ -3,6 +3,9 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import 'highlight.js/styles/github-dark.css';
+import MermaidBlock from './MermaidBlock';
 import type { GfpPhaseSection, GfpSectionStatus } from '@/types';
 
 const STATUS_STYLES: Record<GfpSectionStatus, { bg: string; text: string; label: string }> = {
@@ -79,8 +82,19 @@ export default function GfpSectionCard({ section, onApprove, onReject }: GfpSect
           )}
 
           {/* Markdown content */}
-          <div className="prose prose-sm dark:prose-invert max-w-none mb-4">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <div className="prose prose-sm dark:prose-invert max-w-none mb-4 gfp-prose">
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[rehypeHighlight]}
+              components={{
+                code({ className, children, ...props }) {
+                  if (/language-mermaid/.test(className || '')) {
+                    return <MermaidBlock code={String(children).trim()} />;
+                  }
+                  return <code className={className} {...props}>{children}</code>;
+                },
+              }}
+            >
               {section.content || '*No content yet*'}
             </ReactMarkdown>
           </div>
