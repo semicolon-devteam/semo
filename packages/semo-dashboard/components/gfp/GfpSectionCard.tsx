@@ -47,7 +47,8 @@ export default function GfpSectionCard({ section, focused, onApprove, onReject }
   useEffect(() => {
     if (focused && ref.current) {
       setExpanded(true);
-      setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 100);
+      // 렌더 완료 후 스크롤 (300ms) — block:'start' + scrollMarginTop으로 nav 아래에 위치
+      setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
       const timer = setTimeout(() => setHighlight(false), 2500);
       return () => clearTimeout(timer);
     }
@@ -79,6 +80,7 @@ export default function GfpSectionCard({ section, focused, onApprove, onReject }
   return (
     <div
       ref={ref}
+      style={{ scrollMarginTop: '80px' }}
       className={`bg-white dark:bg-gray-800 rounded-lg border overflow-hidden transition-all duration-500 ${
         highlight
           ? 'ring-2 ring-blue-500 border-blue-400'
