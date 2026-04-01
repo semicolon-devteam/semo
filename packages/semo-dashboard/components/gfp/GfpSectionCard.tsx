@@ -139,6 +139,9 @@ export default function GfpSectionCard({ section, focused, onApprove, onReject }
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeHighlight]}
               components={{
+                a({ href, children, ...props }) {
+                  return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>;
+                },
                 code({ className, children, ...props }) {
                   if (/language-mermaid/.test(className || '')) {
                     return <MermaidBlock code={String(children).trim()} />;
