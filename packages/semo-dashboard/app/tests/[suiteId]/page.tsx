@@ -79,7 +79,7 @@ export default function TestSuiteDetailPage() {
           href="/tests"
           className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400"
         >
-          &larr; Test Suites
+          &larr; 테스트 스위트
         </Link>
       </div>
 
@@ -88,20 +88,20 @@ export default function TestSuiteDetailPage() {
           {suiteId}
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          {runs.length} runs recorded
+          {runs.length}개 실행 기록
         </p>
       </div>
 
       {loading ? (
-        <p className="text-gray-500">Loading...</p>
+        <p className="text-gray-500">로딩 중...</p>
       ) : runs.length === 0 ? (
-        <p className="text-gray-500 italic">No runs yet. Run `semo test run {suiteId}` to create the first run.</p>
+        <p className="text-gray-500 italic">실행 기록이 없습니다. `semo test run {suiteId}`로 첫 실행을 생성하세요.</p>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Run List */}
           <div className="lg:col-span-1">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Run History
+              실행 이력
             </h2>
             <div className="space-y-2">
               {runs.map((run) => (
@@ -137,13 +137,13 @@ export default function TestSuiteDetailPage() {
                     {formatTime(run.started_at)} · {run.triggered_by}
                   </div>
                   <div className="mt-1 text-xs">
-                    <span className="text-green-600">{run.total_pass} pass</span>
+                    <span className="text-green-600">{run.total_pass} 통과</span>
                     {' · '}
-                    <span className="text-red-600">{run.total_fail} fail</span>
+                    <span className="text-red-600">{run.total_fail} 실패</span>
                     {run.total_warn > 0 && (
                       <>
                         {' · '}
-                        <span className="text-yellow-600">{run.total_warn} warn</span>
+                        <span className="text-yellow-600">{run.total_warn} 경고</span>
                       </>
                     )}
                   </div>
@@ -157,28 +157,28 @@ export default function TestSuiteDetailPage() {
             {selectedRunId ? (
               <>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                  Test Cases — {selectedRunId.substring(0, 8)}
+                  테스트 케이스 — {selectedRunId.substring(0, 8)}
                 </h2>
                 {resultsLoading ? (
-                  <p className="text-gray-500">Loading results...</p>
+                  <p className="text-gray-500">결과 로딩 중...</p>
                 ) : results.length === 0 ? (
-                  <p className="text-gray-500 italic">No test case results recorded.</p>
+                  <p className="text-gray-500 italic">테스트 케이스 결과가 없습니다.</p>
                 ) : (
                   <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                     <table className="w-full text-sm">
                       <thead className="bg-gray-50 dark:bg-gray-900">
                         <tr>
                           <th className="px-4 py-2 text-left text-gray-600 dark:text-gray-400 font-medium">
-                            Status
+                            상태
                           </th>
                           <th className="px-4 py-2 text-left text-gray-600 dark:text-gray-400 font-medium">
-                            Case ID
+                            케이스 ID
                           </th>
                           <th className="px-4 py-2 text-left text-gray-600 dark:text-gray-400 font-medium">
-                            Label
+                            라벨
                           </th>
                           <th className="px-4 py-2 text-left text-gray-600 dark:text-gray-400 font-medium">
-                            Detail
+                            상세
                           </th>
                         </tr>
                       </thead>
@@ -223,7 +223,7 @@ export default function TestSuiteDetailPage() {
               </>
             ) : (
               <div className="flex items-center justify-center h-64 text-gray-400">
-                Select a run to view test case results
+                실행을 선택하면 테스트 케이스 결과를 볼 수 있습니다
               </div>
             )}
           </div>

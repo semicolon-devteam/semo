@@ -68,7 +68,7 @@ export default function TranscriptionProgress({ meetingId, onComplete, onError }
           </div>
           <div className="text-center space-y-2">
             <p className="text-lg font-medium text-gray-800 dark:text-gray-200">
-              VITO is transcribing your audio...
+              VITO가 오디오를 녹취하고 있습니다...
             </p>
             <p className="text-3xl font-mono text-blue-600 dark:text-blue-400">
               {minutes}:{seconds.toString().padStart(2, '0')}
@@ -84,7 +84,7 @@ export default function TranscriptionProgress({ meetingId, onComplete, onError }
         <div className="text-center space-y-2">
           <div className="text-4xl">❌</div>
           <p className="text-lg font-medium text-red-600 dark:text-red-400">
-            Transcription failed
+            녹취 실패
           </p>
         </div>
       )}

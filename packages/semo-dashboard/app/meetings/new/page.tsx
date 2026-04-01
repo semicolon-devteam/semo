@@ -16,7 +16,7 @@ const REGULAR_ATTENDEES = [
   '@reus-jeon', '@garden92', '@Roki-Noh', '@kyago', '@Yeomsoyam',
 ];
 
-const STEPS = ['Meeting Info', 'Upload Audio', 'Transcription', 'Speaker Mapping', 'Preview & Generate'];
+const STEPS = ['회의 정보', '오디오 업로드', '녹취', '화자 매핑', '미리보기 & 생성'];
 
 type MeetingType = 'regular' | 'adhoc';
 type AdhocSubtype = 'client' | 'internal' | 'external' | 'workshop';
@@ -69,7 +69,7 @@ export default function NewMeetingPage() {
   async function handleCreateMeeting() {
     setError(null);
     const finalTitle = meetingType === 'regular' ? getRegularTitle() : title;
-    if (!finalTitle.trim()) { setError('Please enter a meeting title'); return; }
+    if (!finalTitle.trim()) { setError('회의 제목을 입력해주세요'); return; }
 
     try {
       const res = await fetch('/api/meetings', {
@@ -186,7 +186,7 @@ export default function NewMeetingPage() {
 
   return (
     <div className={`container mx-auto px-4 py-8 max-w-4xl ${step >= 4 && audioUrl ? 'pb-20' : ''}`}>
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">New Meeting</h1>
+      <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">새 회의</h1>
 
       {/* Step indicator */}
       <div className="flex items-center gap-1 mb-8">
@@ -221,7 +221,7 @@ export default function NewMeetingPage() {
       {step === 0 && (
         <div className="space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Meeting Type</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">회의 유형</label>
             <div className="flex gap-3">
               <button
                 onClick={() => { setMeetingType('regular'); setAttendees(REGULAR_ATTENDEES); }}
@@ -249,40 +249,40 @@ export default function NewMeetingPage() {
           {meetingType === 'adhoc' && (
             <>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Title</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">제목</label>
                 <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. 고객사 미팅, 아키텍처 워크숍..."
                   className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Subtype</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">세부 유형</label>
                 <select value={adhocSubtype} onChange={(e) => setAdhocSubtype(e.target.value as AdhocSubtype)}
                   className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
-                  <option value="internal">Internal</option>
-                  <option value="client">Client</option>
-                  <option value="external">External</option>
-                  <option value="workshop">Workshop</option>
+                  <option value="internal">내부</option>
+                  <option value="client">고객사</option>
+                  <option value="external">외부</option>
+                  <option value="workshop">워크숍</option>
                 </select>
               </div>
             </>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Date</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">날짜</label>
             <input type="date" value={meetingDate} onChange={(e) => setMeetingDate(e.target.value)}
               className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100" />
           </div>
 
           {meetingType === 'regular' && (
             <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Auto-generated title:</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">자동 생성 제목:</p>
               <p className="text-sm font-medium text-gray-900 dark:text-white">{getRegularTitle()}</p>
             </div>
           )}
 
           <button onClick={handleCreateMeeting}
             className="w-full py-3 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors">
-            Next: Upload Audio
+            다음: 오디오 업로드
           </button>
         </div>
       )}
@@ -311,7 +311,7 @@ export default function NewMeetingPage() {
         <div className="space-y-6">
           {/* Transcript with click-to-play and inline speaker editing */}
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Transcript</h3>
+            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">녹취록</h3>
             <TranscriptPreview
               utterances={utterances}
               speakerMap={speakerMap}
@@ -338,10 +338,10 @@ export default function NewMeetingPage() {
               {previewing ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Analyzing with AI...
+                  AI 분석 중...
                 </span>
               ) : (
-                'Preview Meeting Notes'
+                '회의록 미리보기'
               )}
             </button>
           ) : (

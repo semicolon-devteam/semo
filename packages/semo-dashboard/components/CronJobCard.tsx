@@ -13,7 +13,7 @@ function formatSchedule(schedule: CronJob['schedule']): string {
       return `cron: ${schedule.expression ?? schedule.expr ?? schedule.cron ?? ''}`;
     case 'every': {
       const ms = schedule.intervalMs ?? schedule.everyMs;
-      return `every ${ms ? `${Math.round(Number(ms) / 60000)}m` : '?'}`;
+      return `매 ${ms ? `${Math.round(Number(ms) / 60000)}분` : '?'}`;
     }
     case 'at':
       return `at ${schedule.datetime ?? ''}`;
@@ -73,8 +73,8 @@ export default function CronJobCard({ cronJob, onClick }: CronJobCardProps) {
 
       {/* Bottom: lastRun + nextRun */}
       <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
-        <span>last: {fmt(cronJob.lastRun)}</span>
-        <span>next: {fmt(cronJob.nextRun)}</span>
+        <span>마지막: {fmt(cronJob.lastRun)}</span>
+        <span>다음: {fmt(cronJob.nextRun)}</span>
       </div>
     </div>
   );

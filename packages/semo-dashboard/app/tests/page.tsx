@@ -27,17 +27,17 @@ export default async function TestsPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Test Suites
+          테스트 스위트
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          {suites.length} suites registered
+          {suites.length}개 스위트 등록됨
           {suites.some((s) => s.last_run_status) && (
             <span className="ml-2">
               — {allPassed ? (
-                <span className="text-green-600 font-medium">All Passing</span>
+                <span className="text-green-600 font-medium">전체 통과</span>
               ) : (
                 <span className="text-red-600 font-medium">
-                  {totalFail} failures across suites
+                  {totalFail}개 스위트에서 실패
                 </span>
               )}
             </span>

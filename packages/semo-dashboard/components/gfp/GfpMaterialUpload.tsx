@@ -59,10 +59,10 @@ export default function GfpMaterialUpload({ gfpId, onUploaded }: GfpMaterialUplo
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
       <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-        Upload Existing Plan
+        기존 기획서 업로드
       </h3>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-        Paste or upload your existing planning documents. AI will analyze and map them to GFP phases.
+        기존 기획 문서를 붙여넣거나 업로드하세요. AI가 분석하여 GFP Phase에 매핑합니다.
       </p>
 
       <div
@@ -78,7 +78,7 @@ export default function GfpMaterialUpload({ gfpId, onUploaded }: GfpMaterialUplo
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Paste your planning document here, or drag & drop a text/markdown file..."
+          placeholder="기획 문서를 여기에 붙여넣거나, 텍스트/마크다운 파일을 드래그 앤 드롭하세요..."
           rows={6}
           className="w-full bg-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none resize-y"
         />
@@ -87,7 +87,7 @@ export default function GfpMaterialUpload({ gfpId, onUploaded }: GfpMaterialUplo
             onClick={() => fileInputRef.current?.click()}
             className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
           >
-            Or click to upload a file
+            또는 클릭하여 파일 업로드
           </button>
           <input
             ref={fileInputRef}
@@ -112,7 +112,7 @@ export default function GfpMaterialUpload({ gfpId, onUploaded }: GfpMaterialUplo
           {uploading && (
             <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
           )}
-          Upload & Analyze
+          업로드 및 분석
         </button>
       </div>
     </div>

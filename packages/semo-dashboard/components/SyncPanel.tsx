@@ -48,10 +48,10 @@ export default function SyncPanel() {
         {/* Header */}
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
           <h1 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
-            Sync Visualization
+            동기화 시각화
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            OpenClaw ↔ Core DB ↔ Local ({flows.length} processes)
+            OpenClaw ↔ Core DB ↔ 로컬 ({flows.length} 프로세스)
           </p>
         </div>
 

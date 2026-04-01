@@ -12,9 +12,9 @@ const NODE_H = 100;
 const NODE_Y = (SVG_H - NODE_H) / 2;
 
 const NODES = [
-  { id: 'openclaw', label: 'OpenClaw Bots', x: 50, y: NODE_Y },
+  { id: 'openclaw', label: 'OpenClaw 봇', x: 50, y: NODE_Y },
   { id: 'db', label: 'Core DB', subtitle: 'PostgreSQL', x: (SVG_W - NODE_W) / 2, y: NODE_Y },
-  { id: 'local', label: 'Local Claude Code', x: SVG_W - NODE_W - 50, y: NODE_Y },
+  { id: 'local', label: '로컬 Claude Code', x: SVG_W - NODE_W - 50, y: NODE_Y },
 ] as const;
 
 function getArrowEndpoints(direction: SyncDirection): { from: typeof NODES[number]; to: typeof NODES[number] } {
@@ -53,7 +53,7 @@ function GroupArrow({ group, yOffset, isSelected, isDimmed, onClick }: GroupArro
   const opacity = isDimmed ? 0.15 : isSelected ? 1 : 0.7;
 
   // Build label: direction + flow count
-  const label = `${group.flows.length} flows`;
+  const label = `${group.flows.length} 플로우`;
 
   return (
     <g onClick={onClick} className="cursor-pointer" style={{ opacity }}>
@@ -167,7 +167,7 @@ export default function SyncDiagram() {
                 textAnchor="middle"
                 className="fill-gray-500 dark:fill-gray-400 text-[11px]"
               >
-                {onlineBots}/{totalBots} online
+                {onlineBots}/{totalBots} 온라인
               </text>
               <circle
                 cx={node.x + NODE_W - 16}
@@ -184,7 +184,7 @@ export default function SyncDiagram() {
               textAnchor="middle"
               className="fill-gray-500 dark:fill-gray-400 text-[10px]"
             >
-              Last migration: {new Date(status.lastMigration).toLocaleDateString('ko-KR')}
+              마지막 마이그레이션: {new Date(status.lastMigration).toLocaleDateString('ko-KR')}
             </text>
           )}
         </g>

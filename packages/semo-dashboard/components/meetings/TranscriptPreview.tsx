@@ -145,7 +145,7 @@ export default function TranscriptPreview({
                   onKeyDown={(e) => { if (e.key === 'Escape') setEditingGroup(null); }}
                   className="w-full border border-blue-400 rounded px-1 py-0.5 text-xs bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 z-10"
                 >
-                  <option value="" disabled>-- Select --</option>
+                  <option value="" disabled>-- 선택 --</option>
                   {teamMembers.map((m) => (
                     <option key={m.domain} value={m.name}>{m.name}</option>
                   ))}
@@ -159,7 +159,7 @@ export default function TranscriptPreview({
                   className={`text-sm font-medium text-blue-700 dark:text-blue-400 inline-block ${
                     editable ? 'cursor-pointer hover:underline hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded px-1 -mx-1' : ''
                   }`}
-                  title={editable ? 'Click to change speaker' : undefined}
+                  title={editable ? '클릭하여 화자 변경' : undefined}
                 >
                   {group.speaker}
                 </span>

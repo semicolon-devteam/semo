@@ -29,8 +29,8 @@ function SystemPage() {
         <div className="container mx-auto px-4">
           <nav className="flex gap-6">
             {([
-              { key: 'db' as const, label: 'DB Explorer' },
-              { key: 'sync' as const, label: 'Sync' },
+              { key: 'db' as const, label: 'DB 탐색기' },
+              { key: 'sync' as const, label: '동기화' },
             ]).map(({ key, label }) => (
               <button
                 key={key}

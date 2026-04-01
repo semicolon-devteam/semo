@@ -11,7 +11,7 @@ interface Props {
 export default function TimelineHeader({ projects, statusFilter, onStatusFilterChange }: Props) {
   return (
     <header className="h-[60px] bg-white border-b border-gray-200 flex items-center px-6 gap-6">
-      <h1 className="text-lg font-bold text-gray-900">Team Roadmap</h1>
+      <h1 className="text-lg font-bold text-gray-900">팀 로드맵</h1>
 
       {/* Project legend */}
       <div className="flex-1 flex items-center gap-4 overflow-x-auto">
@@ -32,10 +32,10 @@ export default function TimelineHeader({ projects, statusFilter, onStatusFilterC
         onChange={(e) => onStatusFilterChange(e.target.value)}
         className="text-sm border border-gray-200 rounded-md px-2 py-1 text-gray-600 bg-white"
       >
-        <option value="all">All</option>
-        <option value="planned">Planned</option>
-        <option value="in-progress">In Progress</option>
-        <option value="completed">Completed</option>
+        <option value="all">전체</option>
+        <option value="planned">예정</option>
+        <option value="in-progress">진행 중</option>
+        <option value="completed">완료</option>
       </select>
     </header>
   );

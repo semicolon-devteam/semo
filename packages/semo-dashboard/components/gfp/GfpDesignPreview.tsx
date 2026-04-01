@@ -71,7 +71,7 @@ export default function GfpDesignPreview({ htmlContent, title }: GfpDesignPrevie
           {title && (
             <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{title}</span>
           )}
-          <span className="text-xs text-purple-600 dark:text-purple-400 font-medium">Preview</span>
+          <span className="text-xs text-purple-600 dark:text-purple-400 font-medium">미리보기</span>
         </div>
         <div className="flex items-center gap-1">
           {/* Viewport toggles */}
@@ -93,13 +93,13 @@ export default function GfpDesignPreview({ htmlContent, title }: GfpDesignPrevie
             onClick={() => setShowSource(!showSource)}
             className="px-2 py-0.5 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
           >
-            {showSource ? 'Preview' : 'Source'}
+            {showSource ? '미리보기' : '소스'}
           </button>
           <button
             onClick={handleFullscreenToggle}
             className="px-2 py-0.5 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
           >
-            {fullscreen ? 'Exit' : 'Fullscreen'}
+            {fullscreen ? '닫기' : '전체화면'}
           </button>
         </div>
       </div>

@@ -70,8 +70,8 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
   if (!meeting) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <p className="text-gray-500">Meeting not found.</p>
-        <Link href="/meetings" className="text-blue-600 hover:underline text-sm mt-2 inline-block">Back to meetings</Link>
+        <p className="text-gray-500">회의를 찾을 수 없습니다.</p>
+        <Link href="/meetings" className="text-blue-600 hover:underline text-sm mt-2 inline-block">회의 목록으로 돌아가기</Link>
       </div>
     );
   }
@@ -84,7 +84,7 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <Link href="/meetings" className="text-sm text-blue-600 hover:underline mb-2 inline-block">&larr; Meetings</Link>
+          <Link href="/meetings" className="text-sm text-blue-600 hover:underline mb-2 inline-block">&larr; 회의</Link>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{meeting.title}</h1>
           <div className="flex items-center gap-3 mt-2 text-sm text-gray-500 dark:text-gray-400">
             <span>{meeting.meeting_date}</span>
@@ -109,20 +109,20 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
       {/* Status cards */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Transcription</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">녹취</p>
           <p className="text-sm font-medium capitalize">{meeting.transcription_status}</p>
           {meeting.audio_filename && <p className="text-xs text-gray-400 mt-1 truncate">{meeting.audio_filename}</p>}
         </div>
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Speakers</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">화자</p>
           <p className="text-sm font-medium">
             {Object.keys(meeting.speaker_map).length > 0
               ? Object.values(meeting.speaker_map).join(', ')
-              : 'Not mapped'}
+              : '미매핑'}
           </p>
         </div>
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">Generation</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">생성</p>
           <p className="text-sm font-medium capitalize">{meeting.generation_status}</p>
           {meeting.generation_result && (
             <p className="text-xs text-gray-400 mt-1">
@@ -134,7 +134,7 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
 
       {/* Attendees */}
       <div className="mb-6">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Attendees</h3>
+        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">참석자</h3>
         <div className="flex flex-wrap gap-2">
           {meeting.attendees.map((a: string) => (
             <span key={a} className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded-full">{a}</span>
@@ -146,8 +146,8 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
       {meeting.raw_transcript && meeting.raw_transcript.length > 0 && (
         <div className="mb-6">
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-            Transcript
-            <span className="text-xs font-normal text-gray-400 ml-2">Click text to play, click speaker name to edit</span>
+            녹취록
+            <span className="text-xs font-normal text-gray-400 ml-2">텍스트를 클릭하면 재생, 화자 이름을 클릭하면 수정</span>
           </h3>
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
             <TranscriptPreview
@@ -168,7 +168,7 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
           className={`w-full py-3 rounded-lg text-sm font-medium transition-colors ${
             regenerating ? 'bg-purple-400 text-white cursor-wait' : 'bg-blue-600 hover:bg-blue-700 text-white'
           }`}>
-          {regenerating ? 'Regenerating...' : (meeting.generation_status === 'completed' ? 'Regenerate Meeting Notes' : 'Generate Meeting Notes')}
+          {regenerating ? '재생성 중...' : (meeting.generation_status === 'completed' ? '회의록 재생성' : '회의록 생성')}
         </button>
       )}
 

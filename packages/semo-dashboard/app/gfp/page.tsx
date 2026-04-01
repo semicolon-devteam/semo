@@ -30,17 +30,17 @@ export default function GfpListPage() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            GFP Pipeline
+            GFP 파이프라인
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Greenfield Project Pipeline — {projects.length} projects
+            신규 프로젝트 파이프라인 — {projects.length}개 프로젝트
           </p>
         </div>
         <Link
           href="/gfp/new"
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
-          + New Project
+          + 새 프로젝트
         </Link>
       </div>
 
@@ -50,8 +50,8 @@ export default function GfpListPage() {
         </div>
       ) : projects.length === 0 ? (
         <div className="text-center py-16 text-gray-500 dark:text-gray-400">
-          <p className="text-lg mb-2">No projects yet</p>
-          <p className="text-sm">Click &quot;+ New Project&quot; to create your first GFP project.</p>
+          <p className="text-lg mb-2">아직 프로젝트가 없습니다</p>
+          <p className="text-sm">&quot;+ 새 프로젝트&quot;를 클릭하여 첫 GFP 프로젝트를 만드세요.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -72,9 +72,9 @@ export default function GfpListPage() {
                   </span>
                 </div>
                 <div className="space-y-1.5 text-sm text-gray-600 dark:text-gray-400">
-                  <p>Owner: {project.owner_name}</p>
+                  <p>오너: {project.owner_name}</p>
                   {project.service_domain && (
-                    <p>Domain: {project.service_domain}</p>
+                    <p>도메인: {project.service_domain}</p>
                   )}
                   <p>Phase: {project.current_phase} / 8</p>
                 </div>

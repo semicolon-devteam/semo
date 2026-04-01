@@ -6,10 +6,10 @@ import remarkGfm from 'remark-gfm';
 import type { GfpResearchTask } from '@/types';
 
 const TASK_TYPES = [
-  { value: 'competitor-analysis', label: 'Competitor Analysis' },
-  { value: 'market-research', label: 'Market Research' },
-  { value: 'ux-pattern', label: 'UX Pattern Analysis' },
-  { value: 'keyword-research', label: 'Keyword Research' },
+  { value: 'competitor-analysis', label: '경쟁사 분석' },
+  { value: 'market-research', label: '시장 조사' },
+  { value: 'ux-pattern', label: 'UX 패턴 분석' },
+  { value: 'keyword-research', label: '키워드 리서치' },
 ];
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
@@ -64,13 +64,13 @@ export default function GfpResearchPanel({ gfpId, tasks, onTaskCreated }: GfpRes
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-          Research (GrowthClaw)
+          리서치 (GrowthClaw)
         </h3>
         <button
           onClick={() => setShowForm(!showForm)}
           className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
         >
-          {showForm ? 'Cancel' : '+ New Research'}
+          {showForm ? '취소' : '+ 새 리서치'}
         </button>
       </div>
 
@@ -78,7 +78,7 @@ export default function GfpResearchPanel({ gfpId, tasks, onTaskCreated }: GfpRes
         <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg space-y-3">
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Research Type
+              리서치 유형
             </label>
             <select
               value={taskType}
@@ -92,7 +92,7 @@ export default function GfpResearchPanel({ gfpId, tasks, onTaskCreated }: GfpRes
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Reference URLs (one per line)
+              참고 URL (한 줄에 하나씩)
             </label>
             <textarea
               value={urls}
@@ -104,12 +104,12 @@ export default function GfpResearchPanel({ gfpId, tasks, onTaskCreated }: GfpRes
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Research Prompt
+              리서치 프롬프트
             </label>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe what you want to research..."
+              placeholder="조사하고 싶은 내용을 설명하세요..."
               rows={3}
               className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
             />
@@ -123,7 +123,7 @@ export default function GfpResearchPanel({ gfpId, tasks, onTaskCreated }: GfpRes
               {creating && (
                 <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
               )}
-              Dispatch Research
+              리서치 요청
             </button>
           </div>
         </div>
@@ -131,7 +131,7 @@ export default function GfpResearchPanel({ gfpId, tasks, onTaskCreated }: GfpRes
 
       {tasks.length === 0 ? (
         <p className="text-xs text-gray-400 dark:text-gray-500">
-          No research tasks yet. Click &quot;+ New Research&quot; to start.
+          아직 리서치 작업이 없습니다. &quot;+ 새 리서치&quot;를 클릭하여 시작하세요.
         </p>
       ) : (
         <div className="space-y-2">

@@ -10,9 +10,9 @@ interface Props {
 }
 
 const STATUS_LABEL: Record<string, { label: string; className: string }> = {
-  completed: { label: 'Completed', className: 'bg-green-100 text-green-700' },
-  'in-progress': { label: 'In Progress', className: 'bg-blue-100 text-blue-700' },
-  planned: { label: 'Planned', className: 'bg-gray-100 text-gray-600' },
+  completed: { label: '완료', className: 'bg-green-100 text-green-700' },
+  'in-progress': { label: '진행 중', className: 'bg-blue-100 text-blue-700' },
+  planned: { label: '예정', className: 'bg-gray-100 text-gray-600' },
 };
 
 export default function MilestoneDetailModal({ milestone, color, onClose }: Props) {
@@ -50,7 +50,7 @@ export default function MilestoneDetailModal({ milestone, color, onClose }: Prop
         {/* Footer */}
         <div className="border-t border-gray-100 pt-3 flex flex-wrap items-center justify-between text-xs text-gray-400">
           <span>KB: {milestone.key}</span>
-          <span>Updated {milestone.updated_at}</span>
+          <span>수정일 {milestone.updated_at}</span>
         </div>
       </div>
     </LayerModal>

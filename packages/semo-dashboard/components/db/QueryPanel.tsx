@@ -52,7 +52,7 @@ export default function QueryPanel() {
         />
         <div className="flex items-center justify-between mt-2">
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            Read-only queries only (SELECT/WITH). Cmd+Enter to run.
+            읽기 전용 쿼리만 가능 (SELECT/WITH). Cmd+Enter로 실행.
           </span>
           <button
             onClick={runQuery}
@@ -62,7 +62,7 @@ export default function QueryPanel() {
             {loading && (
               <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
             )}
-            Run
+            실행
           </button>
         </div>
       </div>
@@ -78,7 +78,7 @@ export default function QueryPanel() {
       {result && (
         <div className="space-y-2">
           <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
-            <span>{result.rowCount} row{result.rowCount !== 1 ? 's' : ''}</span>
+            <span>{result.rowCount}행</span>
             <span>{result.durationMs}ms</span>
           </div>
           <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg max-h-[500px] overflow-y-auto">

@@ -75,10 +75,10 @@ export default function CostPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Cost Dashboard
+          비용 대시보드
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Bot token usage and budget tracking
+          봇 토큰 사용량 및 예산 추적
         </p>
       </div>
 
@@ -90,35 +90,35 @@ export default function CostPage() {
         <>
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <SummaryCard label="Total Queries" value={String(totalQueries)} />
-            <SummaryCard label="Input Tokens" value={formatTokens(totalInputTokens)} />
-            <SummaryCard label="Output Tokens" value={formatTokens(totalOutputTokens)} />
-            <SummaryCard label="Active Bots" value={String(botCosts.length)} />
+            <SummaryCard label="총 쿼리" value={String(totalQueries)} />
+            <SummaryCard label="입력 토큰" value={formatTokens(totalInputTokens)} />
+            <SummaryCard label="출력 토큰" value={formatTokens(totalOutputTokens)} />
+            <SummaryCard label="활성 봇" value={String(botCosts.length)} />
           </div>
 
           {/* Bot Cost Table */}
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Bot Usage (Latest Month)
+                봇 사용량 (최근 월)
               </h2>
             </div>
             <table className="w-full">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-700/50 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  <th className="px-6 py-3">Bot</th>
-                  <th className="px-6 py-3 text-right">Queries</th>
-                  <th className="px-6 py-3 text-right">Input Tokens</th>
-                  <th className="px-6 py-3 text-right">Output Tokens</th>
-                  <th className="px-6 py-3 text-right">Avg Latency</th>
-                  <th className="px-6 py-3 text-right">Budget</th>
+                  <th className="px-6 py-3">봇</th>
+                  <th className="px-6 py-3 text-right">쿼리</th>
+                  <th className="px-6 py-3 text-right">입력 토큰</th>
+                  <th className="px-6 py-3 text-right">출력 토큰</th>
+                  <th className="px-6 py-3 text-right">평균 지연</th>
+                  <th className="px-6 py-3 text-right">예산</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {botCosts.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                      No usage data available
+                      사용 데이터가 없습니다
                     </td>
                   </tr>
                 ) : (
@@ -155,7 +155,7 @@ export default function CostPage() {
                             <span className="text-gray-700 dark:text-gray-300">
                               ${budget.monthly_budget_usd}/mo
                               {budget.auto_pause && (
-                                <span className="ml-1 text-xs text-yellow-600 dark:text-yellow-400">auto-pause</span>
+                                <span className="ml-1 text-xs text-yellow-600 dark:text-yellow-400">자동 일시정지</span>
                               )}
                             </span>
                           ) : (
@@ -174,16 +174,16 @@ export default function CostPage() {
           {data.costs.length > botCosts.length && (
             <div className="mt-8 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                Historical ({data.costs.length} records)
+                이력 ({data.costs.length}건)
               </h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                      <th className="pb-2">Bot</th>
-                      <th className="pb-2">Month</th>
-                      <th className="pb-2 text-right">Queries</th>
-                      <th className="pb-2 text-right">Tokens (in/out)</th>
+                      <th className="pb-2">봇</th>
+                      <th className="pb-2">월</th>
+                      <th className="pb-2 text-right">쿼리</th>
+                      <th className="pb-2 text-right">토큰 (입력/출력)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 dark:divide-gray-700">

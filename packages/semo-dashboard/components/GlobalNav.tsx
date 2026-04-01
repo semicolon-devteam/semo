@@ -6,15 +6,15 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
 const NAV_ITEMS = [
-  { href: '/bots', label: 'Bot Team' },
-  { href: '/org', label: 'Org Chart' },
-  { href: '/cost', label: 'Cost' },
-  { href: '/goals', label: 'Goals' },
-  { href: '/kb', label: 'Knowledge' },
-  { href: '/system', label: 'System' },
-  { href: '/tests', label: 'Tests' },
+  { href: '/bots', label: '봇 팀' },
+  { href: '/org', label: '조직도' },
+  { href: '/cost', label: '비용' },
+  { href: '/goals', label: '목표' },
+  { href: '/kb', label: '지식' },
+  { href: '/system', label: '시스템' },
+  { href: '/tests', label: '테스트' },
   { href: '/gfp', label: 'GFP' },
-  { href: '/meetings', label: 'Meetings' },
+  { href: '/meetings', label: '회의' },
 ];
 
 export default function GlobalNav() {
@@ -114,7 +114,7 @@ export default function GlobalNav() {
           >
             {/* Close button */}
             <div className="flex items-center justify-between px-4 h-16 border-b border-gray-200 dark:border-gray-700">
-              <span className="text-lg font-semibold text-gray-900 dark:text-white">Menu</span>
+              <span className="text-lg font-semibold text-gray-900 dark:text-white">메뉴</span>
               <button
                 onClick={() => setMenuOpen(false)}
                 className="p-2 rounded-md text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"

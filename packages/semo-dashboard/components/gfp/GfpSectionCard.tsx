@@ -11,17 +11,17 @@ import GfpDesignPreview, { extractHtmlFromContent } from './GfpDesignPreview';
 import type { GfpPhaseSection, GfpSectionStatus, GfpQAItem } from '@/types';
 
 const STATUS_STYLES: Record<GfpSectionStatus, { bg: string; text: string; label: string }> = {
-  draft: { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-600 dark:text-gray-400', label: 'Draft' },
-  'pending-review': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', label: 'Pending Review' },
-  approved: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', label: 'Approved' },
-  rejected: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', label: 'Rejected' },
+  draft: { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-600 dark:text-gray-400', label: '초안' },
+  'pending-review': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', label: '검토 대기' },
+  approved: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', label: '승인됨' },
+  rejected: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', label: '거절됨' },
 };
 
 const SOURCE_LABELS: Record<string, string> = {
   planclaw: 'PlanClaw',
-  imported: 'Imported',
+  imported: '가져옴',
   growthclaw: 'GrowthClaw',
-  manual: 'Manual',
+  manual: '수동',
 };
 
 interface GfpSectionCardProps {
@@ -135,7 +135,7 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
             <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-xs font-medium text-red-600 dark:text-red-400 mb-1">Rejection Reason</p>
+                  <p className="text-xs font-medium text-red-600 dark:text-red-400 mb-1">거절 사유</p>
                   {section.reviewer_note && (
                     <p className="text-sm text-red-700 dark:text-red-300">{section.reviewer_note}</p>
                   )}
@@ -148,7 +148,7 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
                     }}
                     className="shrink-0 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 bg-white dark:bg-gray-800 border border-red-300 dark:border-red-700 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                   >
-                    Undo Reject
+                    거절 취소
                   </button>
                 )}
               </div>
@@ -200,7 +200,7 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
                   },
                 }}
               >
-                {section.content || '*No content yet*'}
+                {section.content || '*아직 내용이 없습니다*'}
               </ReactMarkdown>
             </div>
           )}
@@ -222,9 +222,9 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
                   }}
                   disabled={approveDisabled}
                   className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors"
-                  title={approveDisabled ? `${unansweredCount} unanswered question(s)` : undefined}
+                  title={approveDisabled ? `${unansweredCount}개 미답변 질문` : undefined}
                 >
-                  Approve
+                  승인
                 </button>
                 <button
                   onClick={(e) => {
@@ -233,11 +233,11 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
                   }}
                   className="px-4 py-1.5 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 text-sm font-medium rounded-md transition-colors"
                 >
-                  Reject
+                  거절
                 </button>
                 {approveDisabled && (
                   <span className="text-xs text-amber-600 dark:text-amber-400">
-                    {unansweredCount} unanswered
+                    {unansweredCount}개 미답변
                   </span>
                 )}
               </div>
@@ -256,17 +256,17 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
           >
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Reject Section
+                섹션 거절
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                Provide a reason — PlanClaw will regenerate based on your feedback.
+                사유를 입력하세요 — PlanClaw가 피드백을 반영하여 재생성합니다.
               </p>
             </div>
             <div className="px-6 py-4">
               <textarea
                 value={rejectNote}
                 onChange={(e) => setRejectNote(e.target.value)}
-                placeholder="Why is this section being rejected? What should be changed?"
+                placeholder="이 섹션을 거절하는 이유는? 무엇을 변경해야 하나요?"
                 rows={4}
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
                 autoFocus
@@ -277,14 +277,14 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
                 onClick={() => setShowRejectModal(false)}
                 className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
-                Cancel
+                취소
               </button>
               <button
                 onClick={handleReject}
                 disabled={!rejectNote.trim()}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white text-sm font-medium rounded-md transition-colors"
               >
-                Reject
+                거절
               </button>
             </div>
           </div>

@@ -52,7 +52,7 @@ export default function SessionCard({ session, onClick }: SessionCardProps) {
       {/* Bottom: messageCount + lastActivity */}
       <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <span className="font-medium text-gray-700 dark:text-gray-300">
-          {session.messageCount} msgs
+          {session.messageCount}건
         </span>
         <span>{fmt(session.lastActivity)}</span>
       </div>

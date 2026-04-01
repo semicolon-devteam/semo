@@ -90,7 +90,7 @@ export default function FlowDetail({ flows, onClose }: FlowDetailProps) {
         {/* Flow list */}
         <div>
           <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">
-            Flows ({flows.length})
+            플로우 ({flows.length})
           </div>
           <div className="space-y-2">
             {flows.map((flow) => {
@@ -121,7 +121,7 @@ export default function FlowDetail({ flows, onClose }: FlowDetailProps) {
         {/* Recent records */}
         <div>
           <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">
-            Recent Records
+            최근 레코드
           </div>
           {/* Table selector */}
           {uniqueTables.length > 1 && (
@@ -179,7 +179,7 @@ export default function FlowDetail({ flows, onClose }: FlowDetailProps) {
                       ))}
                       {records.columns.filter((c) => !TIME_COLUMNS.includes(c)).length > 5 && (
                         <div className="text-[10px] text-gray-400 mt-0.5">
-                          +{records.columns.filter((c) => !TIME_COLUMNS.includes(c)).length - 5} more columns
+                          +{records.columns.filter((c) => !TIME_COLUMNS.includes(c)).length - 5}개 컬럼 더보기
                         </div>
                       )}
                     </div>
@@ -191,13 +191,13 @@ export default function FlowDetail({ flows, onClose }: FlowDetailProps) {
 
           {!recordsLoading && records && records.rows.length === 0 && (
             <p className="text-xs text-gray-400 dark:text-gray-500 py-4 text-center">
-              No records found
+              레코드가 없습니다
             </p>
           )}
 
           {!recordsLoading && !records && (
             <p className="text-xs text-gray-400 dark:text-gray-500 py-4 text-center">
-              Table not available
+              테이블을 사용할 수 없습니다
             </p>
           )}
         </div>

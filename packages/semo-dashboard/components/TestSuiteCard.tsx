@@ -22,12 +22,12 @@ const statusDot: Record<string, string> = {
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return '방금';
+  if (mins < 60) return `${mins}분 전`;
   const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return `${hours}시간 전`;
   const days = Math.floor(hours / 24);
-  return `${days}d ago`;
+  return `${days}일 전`;
 }
 
 export default function TestSuiteCard({ suite }: TestSuiteCardProps) {
@@ -51,7 +51,7 @@ export default function TestSuiteCard({ suite }: TestSuiteCardProps) {
           <div className="flex items-center gap-2">
             <div className={`w-2.5 h-2.5 rounded-full ${dotColor}`} />
             <span className="text-xs text-gray-600 dark:text-gray-400">
-              {suite.last_run_status || 'no runs'}
+              {suite.last_run_status || '실행 없음'}
             </span>
           </div>
         </div>
@@ -65,7 +65,7 @@ export default function TestSuiteCard({ suite }: TestSuiteCardProps) {
           </span>
           {!suite.enabled && (
             <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-              disabled
+              비활성
             </span>
           )}
         </div>
@@ -74,7 +74,7 @@ export default function TestSuiteCard({ suite }: TestSuiteCardProps) {
           {suite.last_run_status ? (
             <>
               <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400">Result</span>
+                <span className="text-gray-500 dark:text-gray-400">결과</span>
                 <span className="font-medium">
                   <span className="text-green-600">{suite.last_pass || 0}</span>
                   {' / '}
@@ -89,7 +89,7 @@ export default function TestSuiteCard({ suite }: TestSuiteCardProps) {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400">Last Run</span>
+                <span className="text-gray-500 dark:text-gray-400">마지막 실행</span>
                 <span className="font-medium">
                   {suite.last_run_at ? timeAgo(suite.last_run_at) : '-'}
                 </span>
@@ -97,7 +97,7 @@ export default function TestSuiteCard({ suite }: TestSuiteCardProps) {
             </>
           ) : (
             <p className="text-gray-400 dark:text-gray-500 italic">
-              No runs yet
+              실행 기록 없음
             </p>
           )}
         </div>

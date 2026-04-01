@@ -58,7 +58,7 @@ export default function TableList({ tables, selectedTable, onSelect, loading }: 
       ))}
       {tables.length === 0 && (
         <p className="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-          No tables found
+          테이블을 찾을 수 없습니다
         </p>
       )}
     </div>

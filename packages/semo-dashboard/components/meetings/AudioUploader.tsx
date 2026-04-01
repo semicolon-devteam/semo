@@ -88,7 +88,7 @@ export default function AudioUploader({ meetingId, onUploadComplete, onError }: 
         <div className="space-y-4">
           <div className="w-10 h-10 border-3 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            Uploading & starting transcription...
+            업로드 및 녹취 시작 중...
           </p>
           <div className="w-64 mx-auto bg-gray-200 dark:bg-gray-700 rounded-full h-2">
             <div
@@ -101,7 +101,7 @@ export default function AudioUploader({ meetingId, onUploadComplete, onError }: 
         <div className="space-y-3">
           <div className="text-4xl">🎙️</div>
           <p className="text-lg font-medium text-gray-700 dark:text-gray-300">
-            Drop audio file here or click to select
+            오디오 파일을 드롭하거나 클릭하여 선택
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             MP3, M4A, MP4, WAV, FLAC, OGG, WebM, AMR

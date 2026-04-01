@@ -121,7 +121,7 @@ export default function SpeakerMapper({ utterances, speakers, audioUrl, onConfir
       {teamLoading ? (
         <div className="flex items-center justify-center py-8">
           <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <span className="ml-2 text-sm text-gray-500">Loading team members...</span>
+          <span className="ml-2 text-sm text-gray-500">팀원 불러오는 중...</span>
         </div>
       ) : (
         <div className="space-y-4">
@@ -152,19 +152,19 @@ export default function SpeakerMapper({ utterances, speakers, audioUrl, onConfir
                       onChange={(e) => handleSelect(String(spk), e.target.value)}
                       className="w-full sm:flex-1 min-w-0 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
                     >
-                      <option value="">-- Select member --</option>
+                      <option value="">-- 멤버 선택 --</option>
                       {teamMembers.map((m) => (
                         <option key={m.domain} value={m.name}>
                           {m.name}{m.role ? ` — ${m.role}` : ''}
                         </option>
                       ))}
-                      <option value="__custom__">Other (type name)</option>
+                      <option value="__custom__">기타 (직접 입력)</option>
                     </select>
 
                     {isCustom[String(spk)] && (
                       <input
                         type="text"
-                        placeholder="Enter name..."
+                        placeholder="이름 입력..."
                         value={customNames[String(spk)] || ''}
                         onChange={(e) => handleCustomName(String(spk), e.target.value)}
                         className="w-full sm:flex-1 min-w-0 border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
@@ -216,7 +216,7 @@ export default function SpeakerMapper({ utterances, speakers, audioUrl, onConfir
           }
         `}
       >
-        {saving ? 'Saving...' : 'Confirm Speaker Mapping'}
+        {saving ? '저장 중...' : '화자 매핑 확인'}
       </button>
     </div>
   );

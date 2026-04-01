@@ -16,8 +16,8 @@ interface GenerationPreviewProps {
 }
 
 const TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  decision:      { label: 'Decision',    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
-  'action-item': { label: 'Action Item', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' },
+  decision:      { label: '의사결정',    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
+  'action-item': { label: '액션 아이템', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' },
   kpi:           { label: 'KPI',         color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
 };
 
@@ -76,7 +76,7 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          Discussion
+          디스커션
         </button>
         <button
           onClick={() => setActiveTab('kb')}
@@ -86,9 +86,9 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
               : 'border-transparent text-gray-500 hover:text-gray-700'
           }`}
         >
-          KB Entries ({activeEntries.length})
+          KB 항목 ({activeEntries.length})
           {skippedEntries.length > 0 && (
-            <span className="ml-1 text-xs text-gray-400">({skippedEntries.length} skipped)</span>
+            <span className="ml-1 text-xs text-gray-400">({skippedEntries.length}개 건너뜀)</span>
           )}
         </button>
       </div>
@@ -97,7 +97,7 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
       {activeTab === 'discussion' && (
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">제목</label>
             <input
               type="text"
               value={title}
@@ -106,7 +106,7 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Body (Markdown)</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">본문 (Markdown)</label>
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
@@ -121,7 +121,7 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
       {activeTab === 'kb' && (
         <div className="space-y-4">
           {entries.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-8">No KB entries to write.</p>
+            <p className="text-sm text-gray-500 text-center py-8">작성할 KB 항목이 없습니다.</p>
           ) : (
             entries.map((entry, i) => (
               <div
@@ -151,13 +151,13 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
                           : 'bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400'
                       }`}
                     >
-                      {entry.action === 'create' ? 'Active' : 'Skipped'}
+                      {entry.action === 'create' ? '활성' : '건너뜀'}
                     </button>
                     <button
                       onClick={() => removeEntry(i)}
                       className="text-xs text-red-500 hover:text-red-700 transition-colors"
                     >
-                      Remove
+                      삭제
                     </button>
                   </div>
                 </div>
@@ -212,7 +212,7 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
             onClick={addEntry}
             className="w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-500 hover:text-gray-700 hover:border-gray-400 transition-colors"
           >
-            + Add KB Entry
+            + KB 항목 추가
           </button>
         </div>
       )}
@@ -232,10 +232,10 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
         {generating ? (
           <span className="flex items-center justify-center gap-2">
             <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            Creating Discussion + KB...
+            디스커션 + KB 생성 중...
           </span>
         ) : (
-          `Confirm & Generate (${activeEntries.length} KB entries)`
+          `확인 & 생성 (KB 항목 ${activeEntries.length}개)`
         )}
       </button>
     </div>

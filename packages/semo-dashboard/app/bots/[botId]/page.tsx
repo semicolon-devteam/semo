@@ -144,7 +144,7 @@ export default function BotDetailPage() {
   if (error || !bot) {
     return (
       <div className="container mx-auto px-4 py-8">
-        <Link href="/bots" className="text-sm text-blue-600 hover:underline">&larr; Bot Team</Link>
+        <Link href="/bots" className="text-sm text-blue-600 hover:underline">&larr; 봇 팀</Link>
         <div className="mt-8 text-center text-gray-500">
           <p className="text-lg">{error || 'Bot not found'}</p>
         </div>
@@ -158,7 +158,7 @@ export default function BotDetailPage() {
     <div className="container mx-auto px-4 py-8">
       {/* Back */}
       <Link href="/bots" className="text-sm text-blue-600 hover:underline">
-        &larr; Bot Team
+        &larr; 봇 팀
       </Link>
 
       {/* Bot Navigation */}
@@ -178,26 +178,26 @@ export default function BotDetailPage() {
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
-              {isOnline ? 'Online' : 'Offline'}
+              {isOnline ? '온라인' : '오프라인'}
             </span>
           </div>
           <p className="text-gray-500 dark:text-gray-400 mt-0.5">{bot.role}</p>
 
           <div className="mt-4 flex flex-wrap gap-6 text-sm text-gray-600 dark:text-gray-400">
             <div>
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-0.5">Sessions</span>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-0.5">세션</span>
               <span className="font-semibold text-gray-900 dark:text-white">{bot.sessionCount}</span>
             </div>
             <div>
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-0.5">Last Active</span>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-0.5">마지막 활동</span>
               <span className="font-semibold text-gray-900 dark:text-white">{fmt(bot.lastActive)}</span>
             </div>
             <div>
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-0.5">Synced</span>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-0.5">동기화됨</span>
               <span className="font-semibold text-gray-900 dark:text-white">{fmt(bot.syncedAt)}</span>
             </div>
             <div className="flex-1 min-w-0">
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-0.5">Workspace</span>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-0.5">워크스페이스</span>
               <span className="font-mono text-xs text-gray-700 dark:text-gray-300 truncate block">{bot.workspacePath}</span>
             </div>
           </div>
@@ -208,12 +208,12 @@ export default function BotDetailPage() {
       <div className="mt-6 border-b border-gray-200 dark:border-gray-700">
         <nav className="flex gap-6">
           {([
-            { key: 'files' as Tab, label: 'Files' },
-            { key: 'skills' as Tab, label: `Skills (${skills.length})` },
-            { key: 'sessions' as Tab, label: `Sessions (${sessions.length})` },
-            { key: 'cron' as Tab, label: `Cron Jobs (${cronJobs.length})` },
-            { key: 'kb' as Tab, label: `Bot KB (${kbItems.length})` },
-            { key: 'audit' as Tab, label: `Audit${audit ? ` (${audit.score}%)` : ''}` },
+            { key: 'files' as Tab, label: '파일' },
+            { key: 'skills' as Tab, label: `스킬 (${skills.length})` },
+            { key: 'sessions' as Tab, label: `세션 (${sessions.length})` },
+            { key: 'cron' as Tab, label: `크론 작업 (${cronJobs.length})` },
+            { key: 'kb' as Tab, label: `봇 KB (${kbItems.length})` },
+            { key: 'audit' as Tab, label: `감사${audit ? ` (${audit.score}%)` : ''}` },
           ]).map(({ key, label }) => (
             <button
               key={key}
@@ -243,7 +243,7 @@ export default function BotDetailPage() {
         {activeTab === 'sessions' && (
           sessions.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
-              <p>No session records</p>
+              <p>세션 기록 없음</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -262,7 +262,7 @@ export default function BotDetailPage() {
           <div>
             {cronJobs.length === 0 ? (
               <div className="text-center py-16 text-gray-400">
-                <p>No cron jobs configured</p>
+                <p>크론 작업 없음</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -286,8 +286,8 @@ export default function BotDetailPage() {
             <AuditChecklist audit={audit} />
           ) : (
             <div className="text-center py-16 text-gray-400">
-              <p>No audit data available</p>
-              <p className="text-xs mt-1">Run <code className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">semo bots audit</code> to generate</p>
+              <p>감사 데이터 없음</p>
+              <p className="text-xs mt-1"><code className="bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">semo bots audit</code> 실행하여 생성</p>
             </div>
           )
         )}
@@ -295,7 +295,7 @@ export default function BotDetailPage() {
         {activeTab === 'kb' && (
           kbItems.length === 0 ? (
             <div className="text-center py-16 text-gray-400">
-              <p>No bot KB items</p>
+              <p>봇 KB 항목 없음</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -326,33 +326,33 @@ export default function BotDetailPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Schedule</span>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">일정</span>
                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
                   {selectedCron.schedule.kind === 'cron' && `cron: ${selectedCron.schedule.expression ?? selectedCron.schedule.expr ?? selectedCron.schedule.cron ?? ''}`}
-                  {selectedCron.schedule.kind === 'every' && `every ${(selectedCron.schedule.intervalMs ?? selectedCron.schedule.everyMs) ? `${Math.round(Number(selectedCron.schedule.intervalMs ?? selectedCron.schedule.everyMs) / 60000)}m` : '?'}`}
+                  {selectedCron.schedule.kind === 'every' && `매 ${(selectedCron.schedule.intervalMs ?? selectedCron.schedule.everyMs) ? `${Math.round(Number(selectedCron.schedule.intervalMs ?? selectedCron.schedule.everyMs) / 60000)}분` : '?'}`}
                   {selectedCron.schedule.kind === 'at' && `at ${selectedCron.schedule.datetime ?? ''}`}
                 </span>
               </div>
               <div>
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Status</span>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">상태</span>
                 <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                   selectedCron.enabled
                     ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
                     : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
                 }`}>
-                  {selectedCron.enabled ? 'Enabled' : 'Disabled'}
+                  {selectedCron.enabled ? '활성' : '비활성'}
                 </span>
               </div>
               <div>
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Last Run</span>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">마지막 실행</span>
                 <span className="text-sm text-gray-700 dark:text-gray-300">{fmt(selectedCron.lastRun)}</span>
               </div>
               <div>
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Next Run</span>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">다음 실행</span>
                 <span className="text-sm text-gray-700 dark:text-gray-300">{fmt(selectedCron.nextRun)}</span>
               </div>
               <div>
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Session Target</span>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">세션 대상</span>
                 <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                   selectedCron.sessionTarget === 'main'
                     ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
@@ -363,19 +363,19 @@ export default function BotDetailPage() {
               </div>
             </div>
             <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Job ID</span>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">작업 ID</span>
               <code className="text-xs font-mono text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-lg block break-all">
                 {selectedCron.jobId}
               </code>
             </div>
             <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Execution</span>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">실행 정보</span>
               {selectedCron.payload?.message ? (
                 <pre className="text-xs font-mono text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-lg whitespace-pre-wrap break-words max-h-64 overflow-y-auto">
                   {selectedCron.payload.message}
                 </pre>
               ) : (
-                <span className="text-xs text-gray-400 dark:text-gray-500">No execution info</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">실행 정보 없음</span>
               )}
             </div>
           </div>
@@ -393,7 +393,7 @@ export default function BotDetailPage() {
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Kind</span>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">유형</span>
                 <span
                   className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
                     selectedSession.kind === 'main'
@@ -405,22 +405,22 @@ export default function BotDetailPage() {
                 </span>
               </div>
               <div>
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Channel</span>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">채널</span>
                 <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
                   {selectedSession.chatType}
                 </span>
               </div>
               <div>
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Messages</span>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">메시지</span>
                 <span className="text-lg font-semibold text-gray-900 dark:text-white">{selectedSession.messageCount}</span>
               </div>
               <div>
-                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Last Activity</span>
+                <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">마지막 활동</span>
                 <span className="text-sm text-gray-700 dark:text-gray-300">{fmt(selectedSession.lastActivity)}</span>
               </div>
             </div>
             <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
-              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">Session Key</span>
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wide block mb-1">세션 키</span>
               <code className="text-xs font-mono text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 px-3 py-2 rounded-lg block break-all">
                 {selectedSession.sessionKey}
               </code>
@@ -447,7 +447,7 @@ export default function BotDetailPage() {
           <div className="space-y-4">
             {selectedKBItem.updated_at && (
               <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                <span>Updated:</span>
+                <span>업데이트:</span>
                 <span className="font-medium text-gray-700 dark:text-gray-300">
                   {fmt(selectedKBItem.updated_at)}
                 </span>
@@ -463,7 +463,7 @@ export default function BotDetailPage() {
           /* View A: KB Items List */
           domainKBItems.length === 0 ? (
             <p className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-              No items in this domain
+              이 도메인에 항목이 없습니다
             </p>
           ) : (
             <div className="space-y-1">

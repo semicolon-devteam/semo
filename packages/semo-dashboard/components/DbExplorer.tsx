@@ -96,9 +96,9 @@ export default function DbExplorer() {
   }
 
   const tabs: { key: Tab; label: string }[] = [
-    { key: 'schema', label: 'Schema' },
-    { key: 'data', label: 'Data' },
-    { key: 'query', label: 'Query' },
+    { key: 'schema', label: '스키마' },
+    { key: 'data', label: '데이터' },
+    { key: 'query', label: '쿼리' },
   ];
 
   return (
@@ -106,7 +106,7 @@ export default function DbExplorer() {
       {/* Sidebar */}
       <div className="w-[280px] shrink-0 border-r border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto">
         <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Tables</h2>
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-white">테이블</h2>
         </div>
         <TableList
           tables={tables}

@@ -67,7 +67,7 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-purple-200 dark:border-purple-800 p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-sm font-semibold text-purple-700 dark:text-purple-400">
-          Design Tools
+          디자인 도구
         </h3>
         <a
           href="https://stitch.withgoogle.com"
@@ -75,7 +75,7 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
           rel="noopener noreferrer"
           className="text-xs text-purple-600 dark:text-purple-400 hover:underline"
         >
-          Open Stitch
+          Stitch 열기
         </a>
       </div>
 
@@ -109,22 +109,22 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
       {(designStep === 1 || designStep === 2) && (
         <div className="mb-4 text-xs text-gray-600 dark:text-gray-400 space-y-1">
           <p className="font-medium text-gray-700 dark:text-gray-300">
-            {designStep === 1 ? 'Reference Discovery' : 'Design System'}
+            {designStep === 1 ? '레퍼런스 탐색' : '디자인 시스템'}
           </p>
           <p>
             {designStep === 1
-              ? 'DesignClaw will create Q&A sections for reference gathering. Answer via dashboard or Slack.'
-              : 'DesignClaw will generate design system sections (colors, typography, spacing, components).'
+              ? 'DesignClaw가 레퍼런스 수집을 위한 Q&A 섹션을 생성합니다. 대시보드 또는 Slack에서 답변하세요.'
+              : 'DesignClaw가 디자인 시스템 섹션(색상, 타이포그래피, 여백, 컴포넌트)을 생성합니다.'
             }
           </p>
           {refSections.length > 0 && designStep === 1 && (
             <p className="text-purple-600 dark:text-purple-400">
-              References: {sectionStatusSummary(refSections)} approved
+              레퍼런스: {sectionStatusSummary(refSections)} 승인됨
             </p>
           )}
           {dsSections.length > 0 && designStep === 2 && (
             <p className="text-purple-600 dark:text-purple-400">
-              Design System: {sectionStatusSummary(dsSections)} approved
+              디자인 시스템: {sectionStatusSummary(dsSections)} 승인됨
             </p>
           )}
         </div>
@@ -137,7 +137,7 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
           {promptSections.length > 0 && (
             <div className="mb-4 space-y-2">
               <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                Stitch Prompts ({promptSections.length})
+                Stitch 프롬프트 ({promptSections.length})
               </p>
               {promptSections.map((section) => {
                 const hasResult = resultSections.some(
@@ -160,7 +160,7 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
                       onClick={() => handleCopy(section.content, section.section_id)}
                       className="text-xs px-2 py-1 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors shrink-0 ml-2"
                     >
-                      {copiedId === section.section_id ? 'Copied!' : 'Copy'}
+                      {copiedId === section.section_id ? '복사됨!' : '복사'}
                     </button>
                   </div>
                 );
@@ -172,7 +172,7 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
           {implSections.length > 0 && (
             <div className="mb-4">
               <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Screen Prototypes ({sectionStatusSummary(implSections)} approved)
+                화면 프로토타입 ({sectionStatusSummary(implSections)} 승인됨)
               </p>
               <div className="flex gap-1 flex-wrap">
                 {implSections.map((s) => (
@@ -197,7 +197,7 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
           {resultSections.length > 0 && (
             <div className="mb-4">
               <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Stitch Exports ({resultSections.length})
+                Stitch 결과물 ({resultSections.length})
               </p>
               <div className="flex gap-1 flex-wrap">
                 {resultSections.map((r) => (
@@ -221,7 +221,7 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
             onClick={() => setShowUpload(!showUpload)}
             className="text-xs text-purple-600 dark:text-purple-400 hover:underline mb-2"
           >
-            {showUpload ? 'Cancel Upload' : 'Upload Stitch Export'}
+            {showUpload ? '업로드 취소' : 'Stitch 결과물 업로드'}
           </button>
 
           {showUpload && (
@@ -229,14 +229,14 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
               {promptSections.length > 0 && (
                 <div>
                   <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    For Prompt
+                    대상 프롬프트
                   </label>
                   <select
                     value={targetPrompt}
                     onChange={(e) => setTargetPrompt(e.target.value)}
                     className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
-                    <option value="">Select prompt...</option>
+                    <option value="">프롬프트 선택...</option>
                     {promptSections.map((s) => (
                       <option key={s.section_id} value={s.section_key}>
                         {s.title}
@@ -247,12 +247,12 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
               )}
               <div>
                 <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Tailwind CSS Export
+                  Tailwind CSS 결과물
                 </label>
                 <textarea
                   value={exportContent}
                   onChange={(e) => setExportContent(e.target.value)}
-                  placeholder="Paste your Stitch Tailwind CSS export here..."
+                  placeholder="Stitch Tailwind CSS 결과물을 여기에 붙여넣으세요..."
                   rows={6}
                   className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y font-mono"
                 />
@@ -266,7 +266,7 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
                   {uploading && (
                     <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
                   )}
-                  Upload Export
+                  결과물 업로드
                 </button>
               </div>
             </div>
@@ -277,16 +277,16 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
       {/* Step 5: Handoff checklist */}
       {designStep === 5 && (
         <div className="mb-4 text-xs text-gray-600 dark:text-gray-400 space-y-1">
-          <p className="font-medium text-gray-700 dark:text-gray-300">Handoff Checklist</p>
+          <p className="font-medium text-gray-700 dark:text-gray-300">핸드오프 체크리스트</p>
           <ul className="space-y-0.5">
             <li className={handoffSections.some((s) => s.section_key === 'handoff-design-spec') ? 'text-green-600' : ''}>
-              {handoffSections.some((s) => s.section_key === 'handoff-design-spec') ? '&#x2713;' : '&#x25CB;'} Design Spec
+              {handoffSections.some((s) => s.section_key === 'handoff-design-spec') ? '&#x2713;' : '&#x25CB;'} 디자인 스펙
             </li>
             <li className={handoffSections.some((s) => s.section_key === 'handoff-component-map') ? 'text-green-600' : ''}>
-              {handoffSections.some((s) => s.section_key === 'handoff-component-map') ? '&#x2713;' : '&#x25CB;'} Component Map
+              {handoffSections.some((s) => s.section_key === 'handoff-component-map') ? '&#x2713;' : '&#x25CB;'} 컴포넌트 맵
             </li>
             <li className={handoffSections.some((s) => s.section_key === 'handoff-stitch-assets') ? 'text-green-600' : ''}>
-              {handoffSections.some((s) => s.section_key === 'handoff-stitch-assets') ? '&#x2713;' : '&#x25CB;'} Stitch Assets
+              {handoffSections.some((s) => s.section_key === 'handoff-stitch-assets') ? '&#x2713;' : '&#x25CB;'} Stitch 에셋
             </li>
           </ul>
         </div>
@@ -295,7 +295,7 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
       {/* Empty state */}
       {sections.length === 0 && (
         <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-          No design sections yet. DesignClaw will start Reference Discovery when Phase 0-2 sections are approved.
+          아직 디자인 섹션이 없습니다. Phase 0-2 섹션이 승인되면 DesignClaw가 레퍼런스 탐색을 시작합니다.
         </p>
       )}
     </div>

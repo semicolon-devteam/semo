@@ -51,10 +51,10 @@ export default function GoalsPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Goal Alignment
+          목표 정렬
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Service goals, milestones, decisions, and action items — {goals.length} services, {totalItems} items
+          서비스 목표, 마일스톤, 의사결정, 액션 아이템 — {goals.length}개 서비스, {totalItems}개 항목
         </p>
       </div>
 
@@ -64,7 +64,7 @@ export default function GoalsPage() {
         </div>
       ) : goals.length === 0 ? (
         <div className="text-center py-16 text-gray-500 dark:text-gray-400">
-          No goal data found in KB
+          KB에 목표 데이터가 없습니다
         </div>
       ) : (
         <div className="space-y-4">
@@ -88,10 +88,10 @@ export default function GoalsPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 shrink-0 ml-4">
-                    {svc.projects.length > 0 && <Badge label="Projects" count={svc.projects.length} color="purple" />}
-                    {svc.milestones.length > 0 && <Badge label="Milestones" count={svc.milestones.length} color="blue" />}
-                    {svc.decisions.length > 0 && <Badge label="Decisions" count={svc.decisions.length} color="green" />}
-                    {svc.actionItems.length > 0 && <Badge label="Actions" count={svc.actionItems.length} color="orange" />}
+                    {svc.projects.length > 0 && <Badge label="프로젝트" count={svc.projects.length} color="purple" />}
+                    {svc.milestones.length > 0 && <Badge label="마일스톤" count={svc.milestones.length} color="blue" />}
+                    {svc.decisions.length > 0 && <Badge label="의사결정" count={svc.decisions.length} color="green" />}
+                    {svc.actionItems.length > 0 && <Badge label="액션" count={svc.actionItems.length} color="orange" />}
                     <span className="text-lg">{isExpanded ? '▾' : '▸'}</span>
                   </div>
                 </button>
@@ -100,16 +100,16 @@ export default function GoalsPage() {
                 {isExpanded && (
                   <div className="px-6 pb-5 border-t border-gray-100 dark:border-gray-700 pt-4 space-y-4">
                     {svc.projects.length > 0 && (
-                      <Section title="Projects" color="purple" items={svc.projects} />
+                      <Section title="프로젝트" color="purple" items={svc.projects} />
                     )}
                     {svc.milestones.length > 0 && (
-                      <Section title="Milestones" color="blue" items={svc.milestones} />
+                      <Section title="마일스톤" color="blue" items={svc.milestones} />
                     )}
                     {svc.decisions.length > 0 && (
-                      <Section title="Decisions" color="green" items={svc.decisions} />
+                      <Section title="의사결정" color="green" items={svc.decisions} />
                     )}
                     {svc.actionItems.length > 0 && (
-                      <Section title="Action Items" color="orange" items={svc.actionItems} />
+                      <Section title="액션 아이템" color="orange" items={svc.actionItems} />
                     )}
                   </div>
                 )}

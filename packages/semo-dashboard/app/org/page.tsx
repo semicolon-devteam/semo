@@ -16,10 +16,10 @@ export default async function OrgPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          Org Chart
+          조직도
         </h1>
         <p className="text-gray-600 dark:text-gray-400">
-          Bot team delegation structure — {data.nodes.length} bots, {data.edges.length} delegation flows
+          봇 팀 위임 구조 — {data.nodes.length}개 봇, {data.edges.length}개 위임 흐름
         </p>
       </div>
 

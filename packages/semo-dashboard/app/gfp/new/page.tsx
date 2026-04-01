@@ -51,21 +51,21 @@ export default function GfpNewProjectPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-xl">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">New GFP Project</h1>
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">새 GFP 프로젝트</h1>
       <p className="text-gray-600 dark:text-gray-400 mb-8">
-        Create a new Greenfield Project Pipeline.
+        신규 프로젝트 파이프라인을 생성합니다.
       </p>
 
       <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 space-y-5">
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Project Name <span className="text-red-500">*</span>
+            프로젝트 이름 <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={form.project_name}
             onChange={(e) => setForm((f) => ({ ...f, project_name: e.target.value }))}
-            placeholder="e.g., SEUM, StarSpot, By-Buyer"
+            placeholder="예: SEUM, StarSpot, By-Buyer"
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
             autoFocus
           />
@@ -73,40 +73,40 @@ export default function GfpNewProjectPage() {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Owner Name (PO) <span className="text-red-500">*</span>
+            오너 이름 (PO) <span className="text-red-500">*</span>
           </label>
           <input
             type="text"
             value={form.owner_name}
             onChange={(e) => setForm((f) => ({ ...f, owner_name: e.target.value }))}
-            placeholder="e.g., Blanky, Kai, Mark"
+            placeholder="예: Blanky, Kai, Mark"
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Owner Contact
+            오너 연락처
           </label>
           <input
             type="text"
             value={form.owner_contact}
             onChange={(e) => setForm((f) => ({ ...f, owner_contact: e.target.value }))}
-            placeholder="Slack ID or email"
+            placeholder="Slack ID 또는 이메일"
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Service Domain (KB)
+            서비스 도메인 (KB)
           </label>
           <select
             value={form.service_domain}
             onChange={(e) => setForm((f) => ({ ...f, service_domain: e.target.value }))}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">None (create later)</option>
+            <option value="">없음 (나중에 생성)</option>
             {domains.map((d) => (
               <option key={d.domain} value={d.domain}>
                 {d.domain}{d.description ? ` — ${d.description}` : ''}
@@ -125,7 +125,7 @@ export default function GfpNewProjectPage() {
             onClick={() => router.push('/gfp')}
             className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
-            Cancel
+            취소
           </button>
           <button
             type="submit"
@@ -135,7 +135,7 @@ export default function GfpNewProjectPage() {
             {saving && (
               <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
             )}
-            Create Project
+            프로젝트 생성
           </button>
         </div>
       </form>

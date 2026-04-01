@@ -76,7 +76,7 @@ export default function FilesTab({ botId }: FilesTabProps) {
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
-              Bot Files
+              봇 파일
             </button>
             <button
               onClick={() => switchSource('shared')}
@@ -86,7 +86,7 @@ export default function FilesTab({ botId }: FilesTabProps) {
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
               }`}
             >
-              Shared
+              공유
             </button>
           </div>
           <FileTree

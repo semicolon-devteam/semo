@@ -85,7 +85,7 @@ function EditModal({
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-          Edit: {column}
+          수정: {column}
         </h3>
         <textarea
           ref={textareaRef}
@@ -100,14 +100,14 @@ function EditModal({
             disabled={saving}
             className="px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
-            Cancel
+            취소
           </button>
           <button
             onClick={() => onSave(draft)}
             disabled={saving}
             className="px-3 py-1.5 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
-            {saving ? 'Saving…' : 'Save'}
+            {saving ? '저장 중…' : '저장'}
           </button>
         </div>
       </div>
@@ -154,7 +154,7 @@ function CellValue({
         className="text-left max-w-[300px]"
       >
         <span className="truncate block">{str.slice(0, 200)}</span>
-        <span className="text-blue-500 text-xs">...show more</span>
+        <span className="text-blue-500 text-xs">...더보기</span>
       </button>
     );
   }
@@ -170,7 +170,7 @@ function CellValue({
         className="text-left"
       >
         <span className="whitespace-pre-wrap break-all">{str}</span>
-        <span className="text-blue-500 text-xs ml-1">{editable ? 'edit' : 'show less'}</span>
+        <span className="text-blue-500 text-xs ml-1">{editable ? '수정' : '접기'}</span>
       </button>
     );
   }
@@ -247,7 +247,7 @@ export default function DataBrowser({
   if (!data) {
     return (
       <p className="text-center py-16 text-gray-500 dark:text-gray-400 text-sm">
-        Select a table to browse its data
+        테이블을 선택하여 데이터를 조회하세요
       </p>
     );
   }
@@ -327,7 +327,7 @@ export default function DataBrowser({
             {data.rows.length === 0 && (
               <tr>
                 <td colSpan={data.columns.length} className="py-8 text-center text-gray-500 dark:text-gray-400 text-sm">
-                  No data
+                  데이터 없음
                 </td>
               </tr>
             )}
@@ -338,7 +338,7 @@ export default function DataBrowser({
       {/* Pagination */}
       <div className="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
         <div className="flex items-center gap-2">
-          <span>Rows per page:</span>
+          <span>페이지당 행:</span>
           <select
             value={data.pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
@@ -350,8 +350,7 @@ export default function DataBrowser({
           </select>
           <span className="text-xs text-gray-500">
             {((data.page - 1) * data.pageSize + 1).toLocaleString()}–
-            {Math.min(data.page * data.pageSize, data.totalRows).toLocaleString()} of{' '}
-            {data.totalRows.toLocaleString()}
+            {Math.min(data.page * data.pageSize, data.totalRows).toLocaleString()} / {data.totalRows.toLocaleString()}
           </span>
         </div>
         <div className="flex items-center gap-1">
@@ -360,7 +359,7 @@ export default function DataBrowser({
             disabled={data.page <= 1}
             className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 text-xs disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
-            Prev
+            이전
           </button>
           <span className="px-2 text-xs tabular-nums">
             {data.page} / {totalPages}
@@ -370,7 +369,7 @@ export default function DataBrowser({
             disabled={data.page >= totalPages}
             className="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 text-xs disabled:opacity-40 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
-            Next
+            다음
           </button>
         </div>
       </div>

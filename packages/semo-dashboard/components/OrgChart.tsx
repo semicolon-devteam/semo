@@ -170,7 +170,7 @@ export default function OrgChart({ data }: { data: OrgData }) {
                 <div className={`w-2.5 h-2.5 rounded-full ${colors.dot} flex-shrink-0`} />
               </div>
               <div className="flex items-center gap-3 mt-2 text-xs text-gray-500 dark:text-gray-400">
-                <span>{node.sessionCount} sessions</span>
+                <span>{node.sessionCount} 세션</span>
                 {node.lastActive && (
                   <span>{new Date(node.lastActive).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })}</span>
                 )}
@@ -183,7 +183,7 @@ export default function OrgChart({ data }: { data: OrgData }) {
       {/* 위임 관계 범례 */}
       {data.edges.length > 0 && (
         <div className="mt-6 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Delegation Matrix</h3>
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">위임 매트릭스</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
             {data.edges.map((edge, i) => (
               <div

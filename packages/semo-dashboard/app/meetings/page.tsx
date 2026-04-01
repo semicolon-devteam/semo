@@ -5,12 +5,12 @@ import Link from 'next/link';
 import type { Meeting } from '@/lib/meeting';
 
 const STATUS_BADGE: Record<string, { label: string; color: string }> = {
-  pending:       { label: 'Pending',       color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
-  uploading:     { label: 'Uploading',     color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
-  transcribing:  { label: 'Transcribing',  color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 animate-pulse' },
-  completed:     { label: 'Transcribed',   color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-  failed:        { label: 'Failed',        color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
-  generating:    { label: 'Generating',    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 animate-pulse' },
+  pending:       { label: '대기',        color: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300' },
+  uploading:     { label: '업로드 중',   color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
+  transcribing:  { label: '녹취 중',     color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 animate-pulse' },
+  completed:     { label: '녹취 완료',   color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+  failed:        { label: '실패',        color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
+  generating:    { label: '생성 중',     color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 animate-pulse' },
 };
 
 function MeetingStatusBadge({ meeting }: { meeting: Meeting }) {
@@ -18,7 +18,7 @@ function MeetingStatusBadge({ meeting }: { meeting: Meeting }) {
   if (meeting.generation_status === 'completed') {
     return (
       <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 font-medium">
-        Done
+        완료
       </span>
     );
   }
@@ -48,17 +48,17 @@ export default function MeetingsListPage() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Meetings
+            회의
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Meeting transcription & notes — {meetings.length} meetings
+            회의 녹취 및 메모 — {meetings.length}건
           </p>
         </div>
         <Link
           href="/meetings/new"
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
-          + New Meeting
+          + 새 회의
         </Link>
       </div>
 
@@ -68,8 +68,8 @@ export default function MeetingsListPage() {
         </div>
       ) : meetings.length === 0 ? (
         <div className="text-center py-16 text-gray-500 dark:text-gray-400">
-          <p className="text-lg mb-2">No meetings yet</p>
-          <p className="text-sm">Click &quot;+ New Meeting&quot; to start transcribing.</p>
+          <p className="text-lg mb-2">아직 회의가 없습니다</p>
+          <p className="text-sm">&quot;+ 새 회의&quot;를 클릭하여 녹취를 시작하세요.</p>
         </div>
       ) : (
         <div className="space-y-3">

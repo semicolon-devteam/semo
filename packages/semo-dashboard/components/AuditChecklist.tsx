@@ -24,7 +24,7 @@ export default function AuditChecklist({ audit }: { audit: BotAudit }) {
         <div className="flex-1">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              {passed}/{audit.checks.length} checks passed
+              {passed}/{audit.checks.length}건 통과
             </span>
             <span className="text-2xl font-bold text-gray-900 dark:text-white">
               {audit.score}%
@@ -69,7 +69,7 @@ export default function AuditChecklist({ audit }: { audit: BotAudit }) {
       {/* Timestamp */}
       {audit.createdAt && (
         <p className="text-xs text-gray-400 dark:text-gray-500 text-right">
-          Last audited: {new Date(audit.createdAt).toLocaleString('ko-KR')}
+          마지막 감사: {new Date(audit.createdAt).toLocaleString('ko-KR')}
         </p>
       )}
     </div>

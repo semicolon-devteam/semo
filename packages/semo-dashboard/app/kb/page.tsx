@@ -335,17 +335,17 @@ function KBPage() {
       <div className="flex items-start justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Knowledge
+            지식
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Manage KB entries — {entries.length} entries
+            KB 항목 관리 — {entries.length}개 항목
           </p>
         </div>
         <button
           onClick={openNew}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
-          + New Entry
+          + 새 항목
         </button>
       </div>
 
@@ -355,7 +355,7 @@ function KBPage() {
           <div className="flex-1 flex gap-2">
             <input
               type="text"
-              placeholder="Search title or content..."
+              placeholder="제목 또는 내용 검색..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && triggerSearch()}
@@ -365,7 +365,7 @@ function KBPage() {
               onClick={triggerSearch}
               className="px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 border border-gray-300 dark:border-gray-600 rounded-md text-sm font-medium text-gray-700 dark:text-gray-200 transition-colors"
             >
-              Search
+              검색
             </button>
           </div>
           <select
@@ -373,7 +373,7 @@ function KBPage() {
             onChange={(e) => setFilterBotId(e.target.value)}
             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">All Bots</option>
+            <option value="">전체 봇</option>
             {botIds.map((id) => (
               <option key={id} value={id}>{id}</option>
             ))}
@@ -383,7 +383,7 @@ function KBPage() {
             onChange={(e) => setFilterTag(e.target.value)}
             className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">All Tags</option>
+            <option value="">전체 태그</option>
             {allTags.map((tag) => (
               <option key={tag} value={tag}>{tag}</option>
             ))}
@@ -395,9 +395,9 @@ function KBPage() {
       <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
         <nav className="flex gap-6">
           {([
-            { key: 'domains' as const, label: 'Domains' },
-            { key: 'entries' as const, label: 'Entries' },
-            { key: 'ontology' as const, label: 'Ontology' },
+            { key: 'domains' as const, label: '도메인' },
+            { key: 'entries' as const, label: '항목' },
+            { key: 'ontology' as const, label: '온톨로지' },
           ]).map(({ key, label }) => (
             <button
               key={key}
@@ -428,8 +428,8 @@ function KBPage() {
         </div>
       ) : entries.length === 0 ? (
         <div className="text-center py-16 text-gray-500 dark:text-gray-400">
-          <p className="text-lg mb-2">No entries found</p>
-          <p className="text-sm">Click &quot;+ New Entry&quot; to add the first one.</p>
+          <p className="text-lg mb-2">항목이 없습니다</p>
+          <p className="text-sm">&quot;+ 새 항목&quot;을 클릭하여 첫 항목을 추가하세요.</p>
         </div>
       ) : activeTab === 'ontology' ? (
         /* ── Ontology Tab ── */
@@ -443,8 +443,8 @@ function KBPage() {
           </div>
         ) : ontologyDomains.length === 0 ? (
           <div className="text-center py-16 text-gray-500 dark:text-gray-400">
-            <p className="text-lg mb-2">No domains found</p>
-            <p className="text-sm">KB domains will appear here once data is available.</p>
+            <p className="text-lg mb-2">도메인이 없습니다</p>
+            <p className="text-sm">데이터가 있으면 KB 도메인이 여기에 표시됩니다.</p>
           </div>
         ) : (() => {
           const globalDomains = ontologyDomains.filter((d) => !d.service || d.service === '_global');
@@ -477,7 +477,7 @@ function KBPage() {
               {serviceEntries.map(([service, svcDomains]) => (
                 <div key={service}>
                   <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">
-                    Service: {service}
+                    서비스: {service}
                   </h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                     {svcDomains.map((domain) => (
@@ -507,7 +507,7 @@ function KBPage() {
                     {category}
                   </h2>
                   <span className="text-xs text-gray-400 dark:text-gray-500">
-                    {catEntries.length} {catEntries.length === 1 ? 'result' : 'results'}
+                    {catEntries.length}건
                   </span>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700/50">
@@ -573,12 +573,12 @@ function KBPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Domain</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Key</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">Content</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden sm:table-cell">By</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">도메인</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">키</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">내용</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden sm:table-cell">작성자</th>
                 {committedSearch && (
-                  <th className="text-right px-4 py-3 font-medium text-gray-500 dark:text-gray-400 w-16">Score</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-500 dark:text-gray-400 w-16">유사도</th>
                 )}
               </tr>
             </thead>
@@ -649,7 +649,7 @@ function KBPage() {
             ? selectedEntry.bot_id
               ? `by ${selectedEntry.bot_id}`
               : undefined
-            : `${categoryEntries.length} entries`
+            : `${categoryEntries.length}개 항목`
         }
         showBack={!!selectedEntry}
         onBack={() => {
@@ -663,7 +663,7 @@ function KBPage() {
                 onClick={() => openEdit(selectedEntry)}
                 className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 text-xs font-medium px-2 py-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
               >
-                Edit
+                수정
               </button>
               {deleteConfirm === selectedEntry.id ? (
                 <div className="flex items-center gap-1">
@@ -671,13 +671,13 @@ function KBPage() {
                     onClick={() => handleDelete(selectedEntry)}
                     className="text-red-600 dark:text-red-400 text-xs font-medium px-2 py-1 rounded bg-red-50 dark:bg-red-900/20 hover:bg-red-100 transition-colors"
                   >
-                    Confirm
+                    확인
                   </button>
                   <button
                     onClick={() => setDeleteConfirm(null)}
                     className="text-gray-500 text-xs px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                   >
-                    Cancel
+                    취소
                   </button>
                 </div>
               ) : (
@@ -685,7 +685,7 @@ function KBPage() {
                   onClick={() => setDeleteConfirm(selectedEntry.id)}
                   className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 text-xs font-medium px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                 >
-                  Delete
+                  삭제
                 </button>
               )}
             </div>
@@ -709,7 +709,7 @@ function KBPage() {
             )}
             {selectedEntry.updated_at && (
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                Updated: {formatDate(selectedEntry.updated_at)}
+                수정일: {formatDate(selectedEntry.updated_at)}
               </div>
             )}
             <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
@@ -722,7 +722,7 @@ function KBPage() {
           /* View A: Entry List */
           categoryEntries.length === 0 ? (
             <p className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-              No entries in this category
+              이 카테고리에 항목이 없습니다
             </p>
           ) : (
             <div className="space-y-1">
@@ -775,7 +775,7 @@ function KBPage() {
             <div className="space-y-4">
               {selectedOntologyEntry.created_by && (
                 <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                  <span>Created by:</span>
+                  <span>작성자:</span>
                   <span className="font-medium text-gray-700 dark:text-gray-300">
                     {selectedOntologyEntry.created_by}
                   </span>
@@ -795,7 +795,7 @@ function KBPage() {
             </div>
           ) : ontologyEntries.length === 0 ? (
             <p className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-              No entries in this domain
+              이 도메인에 항목이 없습니다
             </p>
           ) : (
             <div className="space-y-1">
@@ -835,7 +835,7 @@ function KBPage() {
           <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {editingEntry ? 'Edit Entry' : 'New Entry'}
+                {editingEntry ? '항목 수정' : '새 항목'}
               </h2>
               <button
                 onClick={() => setModalOpen(false)}
@@ -848,25 +848,25 @@ function KBPage() {
             <div className="px-6 py-4 space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Title <span className="text-red-500">*</span>
+                  제목 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
                   value={form.title}
                   onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder="Entry title"
+                  placeholder="항목 제목"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Content <span className="text-red-500">*</span>
+                  내용 <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   value={form.content}
                   onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
-                  placeholder="Entry content..."
+                  placeholder="항목 내용..."
                   rows={6}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
                 />
@@ -875,14 +875,14 @@ function KBPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Bot ID
+                    봇 ID
                   </label>
                   <select
                     value={form.bot_id}
                     onChange={(e) => setForm((f) => ({ ...f, bot_id: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Select bot</option>
+                    <option value="">봇 선택</option>
                     {allBotIds.map((id) => (
                       <option key={id} value={id}>{id}</option>
                     ))}
@@ -890,14 +890,14 @@ function KBPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Category
+                    카테고리
                   </label>
                   <select
                     value={form.category}
                     onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Select domain</option>
+                    <option value="">도메인 선택</option>
                     {domains.map((d) => (
                       <option key={d.domain} value={d.domain}>
                         {d.domain}{d.description ? ` — ${d.description}` : ''}
@@ -913,7 +913,7 @@ function KBPage() {
                 onClick={() => setModalOpen(false)}
                 className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
               >
-                Cancel
+                취소
               </button>
               <button
                 onClick={handleSave}
@@ -923,7 +923,7 @@ function KBPage() {
                 {saving && (
                   <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
                 )}
-                {editingEntry ? 'Save Changes' : 'Create Entry'}
+                {editingEntry ? '변경사항 저장' : '항목 생성'}
               </button>
             </div>
           </div>

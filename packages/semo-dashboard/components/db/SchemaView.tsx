@@ -19,7 +19,7 @@ export default function SchemaView({ detail, loading }: SchemaViewProps) {
   if (!detail) {
     return (
       <p className="text-center py-16 text-gray-500 dark:text-gray-400 text-sm">
-        Select a table to view its schema
+        테이블을 선택하여 스키마를 확인하세요
       </p>
     );
   }
@@ -29,16 +29,16 @@ export default function SchemaView({ detail, loading }: SchemaViewProps) {
       {/* Columns */}
       <div>
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-          Columns ({detail.columns.length})
+          컬럼 ({detail.columns.length})
         </h3>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700">
-                <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
-                <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Type</th>
-                <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Nullable</th>
-                <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Default</th>
+                <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">이름</th>
+                <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">타입</th>
+                <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Null 허용</th>
+                <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">기본값</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
@@ -76,16 +76,16 @@ export default function SchemaView({ detail, loading }: SchemaViewProps) {
       {detail.constraints.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-            Constraints ({detail.constraints.length})
+            제약조건 ({detail.constraints.length})
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
-                  <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Type</th>
-                  <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Columns</th>
-                  <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">References</th>
+                  <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">이름</th>
+                  <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">타입</th>
+                  <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">컬럼</th>
+                  <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">참조</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
@@ -125,15 +125,15 @@ export default function SchemaView({ detail, loading }: SchemaViewProps) {
       {detail.indexes.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-            Indexes ({detail.indexes.length})
+            인덱스 ({detail.indexes.length})
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-700">
-                  <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Name</th>
-                  <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Unique</th>
-                  <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Definition</th>
+                  <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">이름</th>
+                  <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">유니크</th>
+                  <th className="text-left py-2 px-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">정의</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">

@@ -55,7 +55,7 @@ export default function MilestoneBar({ milestone, color, leftPct, widthPct, onCl
                   : 'bg-gray-100 text-gray-600'
             }`}
           >
-            {status}
+            {status === 'completed' ? '완료' : status === 'in-progress' ? '진행 중' : status === 'planned' ? '예정' : status}
           </span>
           {milestone.content && (
             <p className="text-xs text-gray-600 mt-2 line-clamp-3">{milestone.content}</p>

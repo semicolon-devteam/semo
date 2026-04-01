@@ -72,7 +72,7 @@ export default function FileViewer({ botId, filePath, onSave, fileApiBase }: Fil
     const base = fileApiBase || `/api/bots/${botId}/files`;
     fetch(`${base}/${filePath}`)
       .then(r => {
-        if (!r.ok) throw new Error(r.status === 404 ? 'File not found' : 'Failed to load file');
+        if (!r.ok) throw new Error(r.status === 404 ? '파일을 찾을 수 없습니다' : '파일 로드 실패');
         return r.json();
       })
       .then(data => {
@@ -129,14 +129,14 @@ export default function FileViewer({ botId, filePath, onSave, fileApiBase }: Fil
                 className="px-2.5 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
                 disabled={saving}
               >
-                Cancel
+                취소
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving || editContent === content}
                 className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {saving ? 'Saving...' : 'Save'}
+                {saving ? '저장 중...' : '저장'}
               </button>
             </>
           ) : (
@@ -146,7 +146,7 @@ export default function FileViewer({ botId, filePath, onSave, fileApiBase }: Fil
                 className="px-2.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
                 disabled={loading || !!error}
               >
-                ✏️ Edit
+                ✏️ 편집
               </button>
             )
           )}

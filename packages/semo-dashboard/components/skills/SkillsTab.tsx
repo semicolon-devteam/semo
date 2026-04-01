@@ -132,7 +132,7 @@ export default function SkillsTab({ botId }: SkillsTabProps) {
       {/* Status */}
       {saveSuccess && (
         <div className="px-4 py-2 bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 text-xs border-b border-green-200 dark:border-green-800">
-          Saved
+          저장 완료
         </div>
       )}
 
@@ -144,14 +144,14 @@ export default function SkillsTab({ botId }: SkillsTabProps) {
         >
           <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex items-center justify-between">
             <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-              Skills ({skills.length})
+              스킬 ({skills.length})
             </span>
             <button
               onClick={fetchSkills}
               className="text-xs text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
               title="Refresh"
             >
-              Refresh
+              새로고침
             </button>
           </div>
 
@@ -160,7 +160,7 @@ export default function SkillsTab({ botId }: SkillsTabProps) {
               <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
             </div>
           ) : skills.length === 0 ? (
-            <div className="text-center py-8 text-gray-400 text-xs">No skills found</div>
+            <div className="text-center py-8 text-gray-400 text-xs">스킬이 없습니다</div>
           ) : (
             <div className="py-1">
               {skills.map((skill) => {
@@ -204,7 +204,7 @@ export default function SkillsTab({ botId }: SkillsTabProps) {
             <div className="flex items-center justify-center h-full text-gray-400 dark:text-gray-500">
               <div className="text-center">
                 <div className="text-4xl mb-3">&#x1F9E9;</div>
-                <p className="text-sm">Select a skill to view</p>
+                <p className="text-sm">스킬을 선택하세요</p>
               </div>
             </div>
           ) : detailLoading ? (
@@ -244,7 +244,7 @@ export default function SkillsTab({ botId }: SkillsTabProps) {
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400'
                       }`}
                     >
-                      {skills.find((s) => s.name === selectedSkill)?.isActive ? 'Active' : 'Inactive'}
+                      {skills.find((s) => s.name === selectedSkill)?.isActive ? '활성' : '비활성'}
                     </button>
                   )}
 
@@ -259,14 +259,14 @@ export default function SkillsTab({ botId }: SkillsTabProps) {
                         className="px-2.5 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
                         disabled={saving}
                       >
-                        Cancel
+                        취소
                       </button>
                       <button
                         onClick={handleSave}
                         disabled={saving || editContent === detail.content}
                         className="px-3 py-1 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                       >
-                        {saving ? 'Saving...' : 'Save'}
+                        {saving ? '저장 중...' : '저장'}
                       </button>
                     </>
                   ) : (
@@ -278,7 +278,7 @@ export default function SkillsTab({ botId }: SkillsTabProps) {
                         }}
                         className="px-2.5 py-1 text-xs text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded transition-colors"
                       >
-                        Edit
+                        편집
                       </button>
                     )
                   )}
@@ -302,7 +302,7 @@ export default function SkillsTab({ botId }: SkillsTabProps) {
                   </div>
                 ) : (
                   <div className="flex items-center justify-center py-16 text-gray-400 text-sm">
-                    No SKILL.md content (DB-only skill)
+                    SKILL.md 콘텐츠 없음 (DB 전용 스킬)
                   </div>
                 )}
 
@@ -312,11 +312,11 @@ export default function SkillsTab({ botId }: SkillsTabProps) {
                     <div className="flex flex-wrap gap-4 text-xs text-gray-500 dark:text-gray-400">
                       {detail.dbMeta.updated_at && (
                         <span>
-                          Updated: {new Date(detail.dbMeta.updated_at).toLocaleString('ko-KR')}
+                          수정일: {new Date(detail.dbMeta.updated_at).toLocaleString('ko-KR')}
                         </span>
                       )}
-                      {detail.dbMeta.category && <span>Category: {detail.dbMeta.category}</span>}
-                      {detail.dbMeta.package && <span>Package: {detail.dbMeta.package}</span>}
+                      {detail.dbMeta.category && <span>카테고리: {detail.dbMeta.category}</span>}
+                      {detail.dbMeta.package && <span>패키지: {detail.dbMeta.package}</span>}
                     </div>
                   </div>
                 )}
@@ -324,7 +324,7 @@ export default function SkillsTab({ botId }: SkillsTabProps) {
             </>
           ) : (
             <div className="flex items-center justify-center py-16 text-red-500 text-sm">
-              Failed to load skill
+              스킬 로드 실패
             </div>
           )}
         </div>
