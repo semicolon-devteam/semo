@@ -15,7 +15,8 @@ UPDATE semo.gfp_phase_sections SET phase = 4
 WHERE phase = 3
   AND (section_key LIKE 'ref-%' OR section_key LIKE 'ds-%'
     OR section_key LIKE 'impl-%' OR section_key LIKE 'review-%'
-    OR section_key LIKE 'handoff-%' OR section_key LIKE 'stitch-%');
+    OR section_key LIKE 'handoff-%' OR section_key LIKE 'stitch-%'
+    OR section_key = 'design-system' OR section_key LIKE 'design-%');
 
 -- 3. Phase 3 non-design sections (Q&A) stay at 3
 
