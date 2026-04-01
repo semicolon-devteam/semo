@@ -7,7 +7,9 @@ import {
   updateProject,
   writebackPhaseToKB,
   getProject,
+  answerQAItems,
 } from '@/lib/gfp';
+import type { GfpQAItem } from '@/types';
 import { dispatchRegeneration } from '@/lib/gfp-bot';
 import { publishPhaseToGitHub } from '@/lib/gfp-github';
 import { sendGfpRejectionSlack, sendGfpPhaseCompletedSlack, resolveGfpSlackContext } from '@/lib/slack';
@@ -50,7 +52,7 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { phase, section_key, title, content, ordinal, status, source } = body;
+    const { phase, section_key, title, content, ordinal, status, source, qa_items } = body;
 
     if (phase === undefined || !section_key || !title) {
       return NextResponse.json(
@@ -68,6 +70,7 @@ export async function POST(
       ordinal,
       status,
       source,
+      qa_items,
     });
     return NextResponse.json(section, { status: 201 });
   } catch (error) {
@@ -83,10 +86,19 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { section_id, action, status, reviewer_note, content } = body;
+    const { section_id, action, status, reviewer_note, content, qa_answers } = body;
 
     if (!section_id) {
       return NextResponse.json({ error: 'section_id is required' }, { status: 400 });
+    }
+
+    // Answer Q&A items
+    if (action === 'answer-qa' && qa_answers) {
+      const section = await answerQAItems(section_id, qa_answers, 'dashboard');
+      if (!section) {
+        return NextResponse.json({ error: 'Section not found or has no Q&A items' }, { status: 404 });
+      }
+      return NextResponse.json(section);
     }
 
     // Update content
@@ -98,6 +110,24 @@ export async function PATCH(
     // Approve or reject
     if (!status || !['approved', 'rejected', 'pending-review', 'draft'].includes(status)) {
       return NextResponse.json({ error: 'Valid status is required' }, { status: 400 });
+    }
+
+    // Guard: cannot approve Q&A section with unanswered questions
+    if (status === 'approved') {
+      const checkRes = await listSections(id);
+      const target = checkRes.find((s) => s.section_id === section_id);
+      if (target?.qa_items) {
+        const items: GfpQAItem[] = (typeof target.qa_items === 'string'
+          ? JSON.parse(target.qa_items)
+          : target.qa_items) as GfpQAItem[];
+        const unanswered = items.filter((q) => !q.answer);
+        if (unanswered.length > 0) {
+          return NextResponse.json(
+            { error: `Cannot approve: ${unanswered.length} unanswered question(s)` },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     const section = await updateSectionStatus(section_id, status, reviewer_note);

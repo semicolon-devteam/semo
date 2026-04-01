@@ -5,6 +5,7 @@
 
 import { query } from './db';
 import { getPhaseAssignee, getPhaseCc, PHASE_LABELS } from './gfp-phases';
+import type { GfpQAItem } from '@/types';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const DASHBOARD_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space';
@@ -275,4 +276,140 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
     console.error('Slack phase complete failed:', err);
     return false;
   }
+}
+
+// ── GFP Q&A Slack Delivery ──
+
+export interface GfpQASlackOpts {
+  projectName: string;
+  gfpId: string;
+  sections: Array<{
+    section_id: string;
+    section_key: string;
+    title: string;
+    qa_items: GfpQAItem[];
+  }>;
+  channelId: string;
+}
+
+/**
+ * Send Phase 3 Q&A questions to Slack — one parent message + one threaded reply per category.
+ * Returns a map of section_id → Slack thread_ts for answer collection.
+ */
+export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, string>> {
+  const threadMap = new Map<string, string>();
+
+  if (!SLACK_BOT_TOKEN || !opts.channelId) return threadMap;
+
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=3`;
+  const totalQuestions = opts.sections.reduce((sum, s) => sum + s.qa_items.length, 0);
+
+  const categoryList = opts.sections
+    .map((s, i) => `${i + 1}. ${s.title} (${s.qa_items.length})`)
+    .join('\n');
+
+  // Parent message
+  const parentBlocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: `Phase 3 Clarification — ${opts.projectName}`, emoji: true },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `PRD 명확화를 위한 *${opts.sections.length}개 카테고리, ${totalQuestions}개 질문*이 생성되었습니다.\n\n${categoryList}`,
+      },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*답변 방법:*\n1. <${dashboardUrl}|Dashboard에서 답변> (추천)\n2. 각 카테고리 스레드에 \`Q1: 답변내용\` 형식으로 답변`,
+      },
+    },
+    {
+      type: 'context',
+      elements: [
+        { type: 'mrkdwn', text: `GFP ID: \`${opts.gfpId.slice(0, 8)}...\` | <${dashboardUrl}|Open Dashboard>` },
+      ],
+    },
+  ];
+
+  try {
+    const parentRes = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+      body: JSON.stringify({
+        channel: opts.channelId,
+        text: `[GFP] ${opts.projectName} — Phase 3 Clarification (${totalQuestions} questions)`,
+        blocks: parentBlocks,
+      }),
+    });
+    const parentData = await parentRes.json();
+    if (!parentData.ok) {
+      console.error('Slack Q&A parent message failed:', parentData.error);
+      return threadMap;
+    }
+
+    const parentTs = parentData.ts as string;
+
+    // One threaded reply per category
+    for (const section of opts.sections) {
+      const questions = section.qa_items
+        .map((q) => {
+          const bullets = q.sub_bullets?.length
+            ? '\n' + q.sub_bullets.map((b) => `    - ${b}`).join('\n')
+            : '';
+          return `*${q.id.toUpperCase()}:* ${q.question}${bullets}`;
+        })
+        .join('\n\n');
+
+      const sectionUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=3&section=${section.section_key}`;
+
+      const threadRes = await fetch('https://slack.com/api/chat.postMessage', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+        },
+        body: JSON.stringify({
+          channel: opts.channelId,
+          thread_ts: parentTs,
+          text: `[${section.title}] ${section.qa_items.length} questions`,
+          blocks: [
+            {
+              type: 'section',
+              text: {
+                type: 'mrkdwn',
+                text: `*${section.title}* (${section.qa_items.length})\n\n${questions}`,
+              },
+            },
+            {
+              type: 'context',
+              elements: [
+                { type: 'mrkdwn', text: `이 스레드에 \`Q1: 답변\` 형식으로 답변 | <${sectionUrl}|Dashboard>` },
+              ],
+            },
+          ],
+        }),
+      });
+
+      const threadData = await threadRes.json();
+      if (threadData.ok) {
+        threadMap.set(section.section_id, threadData.ts as string);
+      } else {
+        console.error(`Slack Q&A thread failed for ${section.section_key}:`, threadData.error);
+      }
+    }
+
+    console.log(`[GFP Slack] Q&A delivered: ${opts.sections.length} categories to channel ${opts.channelId}`);
+  } catch (err) {
+    console.error('Slack Q&A delivery failed:', err);
+  }
+
+  return threadMap;
 }

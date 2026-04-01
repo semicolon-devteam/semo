@@ -11,6 +11,7 @@ import type {
   GfpResearchTask,
   GfpSectionStatus,
   GfpPhaseMapping,
+  GfpQAItem,
 } from '@/types';
 
 // ── Projects ──
@@ -139,26 +140,32 @@ export async function upsertSection(data: {
   ordinal?: number;
   status?: GfpSectionStatus;
   source?: string;
+  qa_items?: GfpQAItem[];
 }): Promise<GfpPhaseSection> {
+  // If qa_items provided without content, auto-generate markdown
+  const content = data.content || (data.qa_items ? renderQAContent(data.qa_items) : '');
+
   const res = await query<GfpPhaseSection>(
-    `INSERT INTO semo.gfp_phase_sections (gfp_id, phase, section_key, title, content, ordinal, status, source)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `INSERT INTO semo.gfp_phase_sections (gfp_id, phase, section_key, title, content, ordinal, status, source, qa_items)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      ON CONFLICT (gfp_id, phase, section_key) DO UPDATE SET
        title   = EXCLUDED.title,
        content = EXCLUDED.content,
        ordinal = EXCLUDED.ordinal,
        status  = EXCLUDED.status,
-       source  = EXCLUDED.source
+       source  = EXCLUDED.source,
+       qa_items = EXCLUDED.qa_items
      RETURNING *`,
     [
       data.gfp_id,
       data.phase,
       data.section_key,
       data.title,
-      data.content,
+      content,
       data.ordinal ?? 0,
       data.status ?? 'draft',
       data.source ?? 'manual',
+      data.qa_items ? JSON.stringify(data.qa_items) : null,
     ]
   );
   return res.rows[0];
@@ -192,6 +199,78 @@ export async function updateSectionContent(
     [content, status ?? null, sectionId]
   );
   return res.rows[0] ?? null;
+}
+
+// ── Q&A helpers ──
+
+/**
+ * Render qa_items array into readable markdown (for content field, KB write-back, GitHub publish).
+ */
+export function renderQAContent(items: GfpQAItem[]): string {
+  return items
+    .map((item) => {
+      const bullets = item.sub_bullets?.length
+        ? '\n' + item.sub_bullets.map((b) => `  - ${b}`).join('\n')
+        : '';
+      const answer = item.answer
+        ? `\n> ${item.answer.replace(/\n/g, '\n> ')}`
+        : '\n_Awaiting answer_';
+      return `**${item.id.toUpperCase()}: ${item.question}**${bullets}${answer}`;
+    })
+    .join('\n\n');
+}
+
+/**
+ * Save answers to Q&A items on a section. Merges into existing qa_items and regenerates content.
+ */
+export async function answerQAItems(
+  sectionId: string,
+  answers: Array<{ id: string; answer: string }>,
+  via: 'dashboard' | 'slack'
+): Promise<GfpPhaseSection | null> {
+  const sectionRes = await query<GfpPhaseSection>(
+    'SELECT * FROM semo.gfp_phase_sections WHERE section_id = $1',
+    [sectionId]
+  );
+  const section = sectionRes.rows[0];
+  if (!section || !section.qa_items) return null;
+
+  const qaItems: GfpQAItem[] = (typeof section.qa_items === 'string'
+    ? JSON.parse(section.qa_items)
+    : section.qa_items) as GfpQAItem[];
+
+  const now = new Date().toISOString();
+  for (const ans of answers) {
+    const item = qaItems.find((q) => q.id === ans.id);
+    if (item && ans.answer.trim()) {
+      item.answer = ans.answer.trim();
+      item.answered_at = now;
+      item.answered_via = via;
+    }
+  }
+
+  const content = renderQAContent(qaItems);
+  const res = await query<GfpPhaseSection>(
+    `UPDATE semo.gfp_phase_sections
+     SET qa_items = $1, content = $2
+     WHERE section_id = $3
+     RETURNING *`,
+    [JSON.stringify(qaItems), content, sectionId]
+  );
+  return res.rows[0] ?? null;
+}
+
+/**
+ * Save Slack thread_ts on a section (for answer collection polling).
+ */
+export async function updateSectionSlackThread(
+  sectionId: string,
+  threadTs: string
+): Promise<void> {
+  await query(
+    'UPDATE semo.gfp_phase_sections SET slack_thread_ts = $1 WHERE section_id = $2',
+    [threadTs, sectionId]
+  );
 }
 
 // ── Phase progress helpers ──

@@ -68,6 +68,7 @@ export default function GfpDetailPage() {
   const [newSection, setNewSection] = useState({ section_key: '', title: '', content: '' });
   const [initialized, setInitialized] = useState(false);
   const [approvingAll, setApprovingAll] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   const refresh = useCallback(async (phase?: number) => {
     const p = phase ?? activePhase;
@@ -319,34 +320,47 @@ export default function GfpDetailPage() {
               <GfpSectionCard
                 key={section.section_id}
                 section={section}
+                gfpId={id}
                 focused={sectionParam ? section.section_key === sectionParam : undefined}
                 onApprove={handleApprove}
                 onReject={handleReject}
                 onUndoReject={handleUndoReject}
+                onQASaved={refresh}
               />
             ))
           )}
         </div>
 
         {/* Sidebar — Material Upload + Research */}
-        <div className="space-y-4">
-          <GfpMaterialUpload
-            gfpId={id}
-            onUploaded={refresh}
-          />
-          {showStitch && (
-            <GfpStitchPanel
-              gfpId={id}
-              sections={phaseSections}
-              onUploaded={refresh}
-            />
-          )}
-          {showResearch && (
-            <GfpResearchPanel
-              gfpId={id}
-              tasks={researchTasks}
-              onTaskCreated={refresh}
-            />
+        <div>
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg mb-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          >
+            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Tools</span>
+            <span className="text-xs text-gray-500">{sidebarOpen ? '▲' : '▼'}</span>
+          </button>
+          {sidebarOpen && (
+            <div className="space-y-4">
+              <GfpMaterialUpload
+                gfpId={id}
+                onUploaded={refresh}
+              />
+              {showStitch && (
+                <GfpStitchPanel
+                  gfpId={id}
+                  sections={phaseSections}
+                  onUploaded={refresh}
+                />
+              )}
+              {showResearch && (
+                <GfpResearchPanel
+                  gfpId={id}
+                  tasks={researchTasks}
+                  onTaskCreated={refresh}
+                />
+              )}
+            </div>
           )}
         </div>
       </div>

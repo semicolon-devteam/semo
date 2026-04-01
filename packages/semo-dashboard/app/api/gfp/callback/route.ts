@@ -14,7 +14,11 @@ import {
   updateResearchTask,
   upsertSection,
   createStitchMaterial,
+  listSections,
+  getProject,
+  updateSectionSlackThread,
 } from '@/lib/gfp';
+import { sendGfpQASlack, resolveGfpSlackContext } from '@/lib/slack';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,10 +44,17 @@ interface StitchExportPayload {
   bot_id: string;
 }
 
+interface ClarificationReadyPayload {
+  type: 'clarification-ready';
+  gfp_id: string;
+  bot_id: string;
+}
+
 type CallbackPayload =
   | SectionRegenerationPayload
   | ResearchResultPayload
-  | StitchExportPayload;
+  | StitchExportPayload
+  | ClarificationReadyPayload;
 
 export async function POST(request: NextRequest) {
   try {
@@ -124,6 +135,53 @@ export async function POST(request: NextRequest) {
           `[GFP Callback] Stitch export saved: material=${material.material_id}, section=${resultSection.section_id} by ${body.bot_id}`
         );
         return NextResponse.json({ ok: true, material, section: resultSection });
+      }
+
+      case 'clarification-ready': {
+        if (!body.gfp_id) {
+          return NextResponse.json(
+            { error: 'gfp_id is required for clarification-ready' },
+            { status: 400 }
+          );
+        }
+        const project = await getProject(body.gfp_id);
+        if (!project) {
+          return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+        }
+
+        // Find all Phase 3 sections with Q&A items
+        const allSections = await listSections(body.gfp_id, 3);
+        const qaSections = allSections.filter((s) => s.qa_items && Array.isArray(s.qa_items) && s.qa_items.length > 0);
+
+        if (qaSections.length === 0) {
+          return NextResponse.json({ ok: true, message: 'No Q&A sections found for Phase 3' });
+        }
+
+        // Send Q&A to Slack
+        const slackCtx = await resolveGfpSlackContext(body.gfp_id);
+        if (slackCtx.channelId) {
+          const threadMap = await sendGfpQASlack({
+            projectName: project.project_name,
+            gfpId: body.gfp_id,
+            sections: qaSections.map((s) => ({
+              section_id: s.section_id,
+              section_key: s.section_key,
+              title: s.title,
+              qa_items: (typeof s.qa_items === 'string' ? JSON.parse(s.qa_items) : s.qa_items) ?? [],
+            })),
+            channelId: slackCtx.channelId,
+          });
+
+          // Save thread_ts on each section
+          for (const [sectionId, threadTs] of threadMap.entries()) {
+            await updateSectionSlackThread(sectionId, threadTs);
+          }
+        }
+
+        console.log(
+          `[GFP Callback] Clarification ready: ${qaSections.length} Q&A sections for ${project.project_name} by ${body.bot_id}`
+        );
+        return NextResponse.json({ ok: true, qa_sections: qaSections.length });
       }
 
       default:

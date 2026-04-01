@@ -6,7 +6,8 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
 import MermaidBlock from './MermaidBlock';
-import type { GfpPhaseSection, GfpSectionStatus } from '@/types';
+import GfpQAForm from './GfpQAForm';
+import type { GfpPhaseSection, GfpSectionStatus, GfpQAItem } from '@/types';
 
 const STATUS_STYLES: Record<GfpSectionStatus, { bg: string; text: string; label: string }> = {
   draft: { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-600 dark:text-gray-400', label: 'Draft' },
@@ -24,13 +25,15 @@ const SOURCE_LABELS: Record<string, string> = {
 
 interface GfpSectionCardProps {
   section: GfpPhaseSection;
+  gfpId: string;
   focused?: boolean;
   onApprove: (sectionId: string) => void;
   onReject: (sectionId: string, note: string) => void;
   onUndoReject?: (sectionId: string) => void;
+  onQASaved?: () => void;
 }
 
-export default function GfpSectionCard({ section, focused, onApprove, onReject, onUndoReject }: GfpSectionCardProps) {
+export default function GfpSectionCard({ section, gfpId, focused, onApprove, onReject, onUndoReject, onQASaved }: GfpSectionCardProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
@@ -151,50 +154,76 @@ export default function GfpSectionCard({ section, focused, onApprove, onReject, 
             </div>
           )}
 
-          {/* Markdown content */}
-          <div className="prose prose-sm dark:prose-invert max-w-none mb-4 gfp-prose">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeHighlight]}
-              components={{
-                a({ href, children, ...props }) {
-                  return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>;
-                },
-                code({ className, children, ...props }) {
-                  if (/language-mermaid/.test(className || '')) {
-                    return <MermaidBlock code={String(children).trim()} />;
-                  }
-                  return <code className={className} {...props}>{children}</code>;
-                },
-              }}
-            >
-              {section.content || '*No content yet*'}
-            </ReactMarkdown>
-          </div>
-
-          {/* Actions */}
-          {(section.status === 'pending-review' || section.status === 'draft') && (
-            <div className="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onApprove(section.section_id);
+          {/* Content: Q&A form or Markdown */}
+          {section.qa_items && Array.isArray(section.qa_items) && section.qa_items.length > 0 ? (
+            <div className="mb-4">
+              <GfpQAForm
+                sectionId={section.section_id}
+                gfpId={gfpId}
+                qaItems={section.qa_items as GfpQAItem[]}
+                onSaved={onQASaved ?? (() => {})}
+              />
+            </div>
+          ) : (
+            <div className="prose prose-sm dark:prose-invert max-w-none mb-4 gfp-prose">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[rehypeHighlight]}
+                components={{
+                  a({ href, children, ...props }) {
+                    return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>;
+                  },
+                  code({ className, children, ...props }) {
+                    if (/language-mermaid/.test(className || '')) {
+                      return <MermaidBlock code={String(children).trim()} />;
+                    }
+                    return <code className={className} {...props}>{children}</code>;
+                  },
                 }}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md transition-colors"
               >
-                Approve
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowRejectModal(true);
-                }}
-                className="px-4 py-1.5 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 text-sm font-medium rounded-md transition-colors"
-              >
-                Reject
-              </button>
+                {section.content || '*No content yet*'}
+              </ReactMarkdown>
             </div>
           )}
+
+          {/* Actions */}
+          {(section.status === 'pending-review' || section.status === 'draft') && (() => {
+            const qaItems = section.qa_items as GfpQAItem[] | null;
+            const unansweredCount = qaItems
+              ? qaItems.filter((q) => !q.answer).length
+              : 0;
+            const approveDisabled = unansweredCount > 0;
+
+            return (
+              <div className="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onApprove(section.section_id);
+                  }}
+                  disabled={approveDisabled}
+                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors"
+                  title={approveDisabled ? `${unansweredCount} unanswered question(s)` : undefined}
+                >
+                  Approve
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowRejectModal(true);
+                  }}
+                  className="px-4 py-1.5 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 text-sm font-medium rounded-md transition-colors"
+                >
+                  Reject
+                </button>
+                {approveDisabled && (
+                  <span className="text-xs text-amber-600 dark:text-amber-400">
+                    {unansweredCount} unanswered
+                  </span>
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 

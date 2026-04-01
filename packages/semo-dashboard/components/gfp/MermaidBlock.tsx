@@ -2,6 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+function ensureLR(code: string): string {
+  return code.replace(/^(graph|flowchart)\s+(TD|TB)\b/m, '$1 LR');
+}
+
 export default function MermaidBlock({ code }: { code: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -13,7 +17,7 @@ export default function MermaidBlock({ code }: { code: string }) {
       if (cancelled) return;
       mermaid.initialize({ startOnLoad: false, theme: 'dark', securityLevel: 'loose' });
       const id = `mermaid-${Math.random().toString(36).slice(2, 9)}`;
-      mermaid.render(id, code).then(({ svg }) => {
+      mermaid.render(id, ensureLR(code)).then(({ svg }) => {
         if (!cancelled && ref.current) {
           ref.current.innerHTML = svg;
         }

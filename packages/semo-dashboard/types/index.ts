@@ -283,6 +283,15 @@ export interface TestResult {
 
 // GFP (Greenfield Project Pipeline) Types
 
+export interface GfpQAItem {
+  id: string;            // e.g., "q01", "q02"
+  question: string;
+  sub_bullets?: string[];
+  answer: string | null;
+  answered_at: string | null;   // ISO timestamp
+  answered_via: 'dashboard' | 'slack' | null;
+}
+
 export type GfpProjectStatus = 'active' | 'paused' | 'completed';
 export type GfpSectionStatus = 'draft' | 'pending-review' | 'approved' | 'rejected';
 export type GfpSectionSource = 'planclaw' | 'imported' | 'growthclaw' | 'manual' | 'designclaw';
@@ -315,6 +324,8 @@ export interface GfpPhaseSection {
   reviewer_note: string | null;
   source: GfpSectionSource;
   kb_written_at: string | null;
+  qa_items: GfpQAItem[] | null;
+  slack_thread_ts: string | null;
   created_at: string;
   updated_at: string;
 }
