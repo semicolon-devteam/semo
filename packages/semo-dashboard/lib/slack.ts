@@ -8,7 +8,8 @@ import { getPhaseAssignee, getPhaseCc, PHASE_LABELS } from './gfp-phases';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const DASHBOARD_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space';
-const FALLBACK_CHANNEL = 'C0AFBQ209E0'; // #bot-ops
+const REUS_DM_CHANNEL = 'D0AEBL7AK4H'; // Reus DM
+const REUS_SLACK_ID = 'URSQYUNQJ';
 
 // Re-export for backward compat (removed local PHASE_LABELS, now from gfp-phases)
 export { PHASE_LABELS } from './gfp-phases';
@@ -21,45 +22,59 @@ export interface GfpSlackContext {
 }
 
 export async function resolveGfpSlackContext(gfpId: string): Promise<GfpSlackContext> {
-  let channelId = FALLBACK_CHANNEL;
+  let channelId: string | null = null;
   let ownerSlackId: string | null = null;
 
   try {
     const project = await query(
-      `SELECT metadata, service_domain FROM semo.gfp_projects WHERE gfp_id = $1`,
+      `SELECT metadata, service_domain, project_name FROM semo.gfp_projects WHERE gfp_id = $1`,
       [gfpId]
     );
     if (project.rows.length > 0) {
       const meta = project.rows[0].metadata as Record<string, unknown>;
+      const domain = project.rows[0].service_domain as string;
+      const projectName = project.rows[0].project_name as string;
 
       // Owner Slack ID
       if (meta?.ownerSlackId && typeof meta.ownerSlackId === 'string') {
         ownerSlackId = meta.ownerSlackId;
       }
 
-      // 1. metadata.slackChannel
-      if (meta?.slackChannel && typeof meta.slackChannel === 'string') {
-        channelId = meta.slackChannel;
-      } else {
-        // 2. KB: {service_domain} slack-channel
-        const domain = project.rows[0].service_domain as string;
-        if (domain) {
-          const kb = await query(
-            `SELECT content FROM semo.knowledge_base WHERE domain = $1 AND key = 'slack-channel' LIMIT 1`,
-            [domain]
-          );
-          if (kb.rows.length > 0) {
-            const ch = (kb.rows[0].content as string).trim();
-            if (ch.startsWith('C')) channelId = ch;
-          }
+      // KB SoT: {service_domain} slack-channel
+      if (domain) {
+        const kb = await query(
+          `SELECT content FROM semo.knowledge_base WHERE domain = $1 AND key = 'slack-channel' LIMIT 1`,
+          [domain]
+        );
+        if (kb.rows.length > 0) {
+          const ch = (kb.rows[0].content as string).trim();
+          if (ch.startsWith('C')) channelId = ch;
         }
+      }
+
+      // 채널 없으면 Reus에게 DM으로 설정 요청
+      if (!channelId && SLACK_BOT_TOKEN) {
+        const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${gfpId}`;
+        await fetch('https://slack.com/api/chat.postMessage', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+          },
+          body: JSON.stringify({
+            channel: REUS_DM_CHANNEL,
+            text: `[GFP] ${projectName} (domain: ${domain || 'N/A'}) 프로젝트에 Slack 채널이 설정되지 않았습니다.\n\nKB에 채널을 등록해주세요:\n\`semo kb upsert ${domain || 'DOMAIN'} slack-channel --content "C채널ID"\`\n\n프로젝트: <${dashboardUrl}|${projectName}>`,
+          }),
+        }).catch(err => console.error('Channel missing DM failed:', err));
+        // DM 보냈으므로 null 반환 — 호출자가 알림 skip
+        return { channelId: '', ownerSlackId };
       }
     }
   } catch (err) {
     console.error('Slack context resolution failed:', err);
   }
 
-  return { channelId, ownerSlackId };
+  return { channelId: channelId || '', ownerSlackId };
 }
 
 // 하위 호환
@@ -88,6 +103,10 @@ export async function sendGfpRejectionSlack(opts: GfpRejectionNotifyOpts): Promi
   }
 
   const channel = opts.channelId || await resolveGfpSlackChannel(opts.gfpId);
+  if (!channel) {
+    console.warn('No Slack channel resolved — DM sent to Reus');
+    return false;
+  }
   const assignee = getPhaseAssignee(opts.phase);
   const phaseLabel = PHASE_LABELS[opts.phase] ?? `Phase ${opts.phase}`;
   const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=${opts.phase}&section=${opts.sectionKey}`;
@@ -168,6 +187,10 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
   }
 
   const channel = opts.channelId || await resolveGfpSlackChannel(opts.gfpId);
+  if (!channel) {
+    console.warn('No Slack channel resolved — DM sent to Reus');
+    return false;
+  }
   const completedLabel = PHASE_LABELS[opts.completedPhase] ?? `Phase ${opts.completedPhase}`;
   const phaseForUrl = opts.nextPhase !== null && opts.nextPhase <= 8 ? opts.nextPhase : opts.completedPhase;
   const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=${phaseForUrl}`;
