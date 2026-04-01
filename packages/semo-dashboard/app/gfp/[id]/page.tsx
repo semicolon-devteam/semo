@@ -67,6 +67,7 @@ export default function GfpDetailPage() {
   const [showNewSection, setShowNewSection] = useState(false);
   const [newSection, setNewSection] = useState({ section_key: '', title: '', content: '' });
   const [initialized, setInitialized] = useState(false);
+  const [approvingAll, setApprovingAll] = useState(false);
 
   const refresh = useCallback(async (phase?: number) => {
     const p = phase ?? activePhase;
@@ -122,6 +123,32 @@ export default function GfpDetailPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ section_id: sectionId, status: 'rejected', reviewer_note: note }),
     });
+    refresh();
+  }
+
+  async function handleUndoReject(sectionId: string) {
+    await fetch(`/api/gfp/${id}/sections`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ section_id: sectionId, status: 'pending-review' }),
+    });
+    refresh();
+  }
+
+  async function handleApproveAll() {
+    const targets = sections.filter(
+      (s) => s.status !== 'approved' && s.status !== 'rejected'
+    );
+    if (targets.length === 0) return;
+    setApprovingAll(true);
+    for (const s of targets) {
+      await fetch(`/api/gfp/${id}/sections`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ section_id: s.section_id, status: 'approved' }),
+      });
+    }
+    setApprovingAll(false);
     refresh();
   }
 
@@ -212,12 +239,26 @@ export default function GfpDetailPage() {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Phase {activePhase}: {PHASE_LABELS[activePhase] ?? `Phase ${activePhase}`}
             </h2>
-            <button
-              onClick={() => setShowNewSection(!showNewSection)}
-              className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              {showNewSection ? 'Cancel' : '+ Add Section'}
-            </button>
+            <div className="flex items-center gap-3">
+              {phaseSections.filter((s) => s.status !== 'approved' && s.status !== 'rejected').length > 0 && (
+                <button
+                  onClick={handleApproveAll}
+                  disabled={approvingAll}
+                  className="text-xs px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-md transition-colors inline-flex items-center gap-1.5"
+                >
+                  {approvingAll && (
+                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  전체승인 ({phaseSections.filter((s) => s.status !== 'approved' && s.status !== 'rejected').length})
+                </button>
+              )}
+              <button
+                onClick={() => setShowNewSection(!showNewSection)}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                {showNewSection ? 'Cancel' : '+ Add Section'}
+              </button>
+            </div>
           </div>
 
           {/* New section form */}
@@ -281,6 +322,7 @@ export default function GfpDetailPage() {
                 focused={sectionParam ? section.section_key === sectionParam : undefined}
                 onApprove={handleApprove}
                 onReject={handleReject}
+                onUndoReject={handleUndoReject}
               />
             ))
           )}

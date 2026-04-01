@@ -27,9 +27,10 @@ interface GfpSectionCardProps {
   focused?: boolean;
   onApprove: (sectionId: string) => void;
   onReject: (sectionId: string, note: string) => void;
+  onUndoReject?: (sectionId: string) => void;
 }
 
-export default function GfpSectionCard({ section, focused, onApprove, onReject }: GfpSectionCardProps) {
+export default function GfpSectionCard({ section, focused, onApprove, onReject, onUndoReject }: GfpSectionCardProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
@@ -125,11 +126,28 @@ export default function GfpSectionCard({ section, focused, onApprove, onReject }
       {/* Content */}
       {expanded && (
         <div className="px-4 pb-4">
-          {/* Rejection note */}
-          {section.status === 'rejected' && section.reviewer_note && (
+          {/* Rejection note + Undo */}
+          {section.status === 'rejected' && (
             <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg">
-              <p className="text-xs font-medium text-red-600 dark:text-red-400 mb-1">Rejection Reason</p>
-              <p className="text-sm text-red-700 dark:text-red-300">{section.reviewer_note}</p>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-medium text-red-600 dark:text-red-400 mb-1">Rejection Reason</p>
+                  {section.reviewer_note && (
+                    <p className="text-sm text-red-700 dark:text-red-300">{section.reviewer_note}</p>
+                  )}
+                </div>
+                {onUndoReject && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUndoReject(section.section_id);
+                    }}
+                    className="shrink-0 px-3 py-1 text-xs font-medium text-red-600 dark:text-red-400 bg-white dark:bg-gray-800 border border-red-300 dark:border-red-700 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    Undo Reject
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
