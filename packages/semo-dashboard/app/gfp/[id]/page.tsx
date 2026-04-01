@@ -13,22 +13,11 @@ import GfpDesignStepNav from '@/components/gfp/GfpDesignStepNav';
 import type { GfpProject, GfpPhaseSection, GfpResearchTask, DesignStep } from '@/types';
 import { DESIGN_STEPS } from '@/types';
 import type { PhaseProgress } from '@/lib/gfp';
+import { PHASE_LABELS } from '@/lib/gfp-phases';
 
 interface ProjectWithProgress extends GfpProject {
   progress: PhaseProgress[];
 }
-
-const PHASE_LABELS: Record<number, string> = {
-  0: '헌법',
-  1: '디스커버리',
-  2: 'PRD',
-  3: '디자인 시스템',
-  4: '에픽',
-  5: '기능 스펙',
-  6: '기술 설계',
-  7: '태스크 분해',
-  8: '핸드오프',
-};
 
 async function fetchProjectData(id: string): Promise<ProjectWithProgress | null> {
   try {
@@ -102,8 +91,8 @@ export default function GfpDetailPage() {
       setProject(proj);
       setSections(secs);
       setResearchTasks(tasks);
-      // Phase 3: fetch design step from project metadata
-      if (targetPhase === 3) {
+      // Phase 4: fetch design step from project metadata
+      if (targetPhase === 4) {
         const ds = (proj.metadata?.design_step as number) ?? 1;
         setActiveDesignStep(ds as DesignStep);
       }
@@ -115,7 +104,7 @@ export default function GfpDetailPage() {
     setActivePhase(phase);
     const secs = await fetchSectionsData(id, phase);
     setSections(secs);
-    if (phase === 3 && project) {
+    if (phase === 4 && project) {
       const ds = (project.metadata?.design_step as number) ?? 1;
       setActiveDesignStep(ds as DesignStep);
     }
@@ -204,7 +193,7 @@ export default function GfpDetailPage() {
   }
 
   const showResearch = activePhase <= 2;
-  const showStitch = activePhase === 3;
+  const showStitch = activePhase === 4;
 
   // Phase 3: filter sections by active design step
   const activeStepDef = DESIGN_STEPS.find((s) => s.step === activeDesignStep);

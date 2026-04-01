@@ -299,7 +299,7 @@ export type GfpMaterialType = 'planning-doc' | 'stitch-export' | 'design-prototy
 export type GfpResearchTaskType = 'competitor-analysis' | 'market-research' | 'ux-pattern' | 'keyword-research' | 'design-reference';
 export type GfpResearchStatus = 'queued' | 'dispatched' | 'completed';
 
-// GFP Phase 3 Design Sub-Steps
+// GFP Phase 4 Design Sub-Steps
 export type DesignStep = 1 | 2 | 3 | 4 | 5;
 
 export const DESIGN_STEPS = [

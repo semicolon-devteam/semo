@@ -87,7 +87,7 @@ export async function POST(
 
 /**
  * GET /api/gfp/[id]/design
- * Phase 3 디자인 섹션 요약 (Stitch 프롬프트 + 결과)
+ * Phase 4 디자인 섹션 요약 (Stitch 프롬프트 + 결과)
  */
 export async function GET(
   _request: NextRequest,
@@ -95,7 +95,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const sections = await listSections(id, 3);
+    const sections = await listSections(id, 4);
 
     const prompts = sections.filter((s) => s.section_key.startsWith('stitch-prompt-'));
     const results = sections.filter((s) => s.section_key.startsWith('stitch-result-'));

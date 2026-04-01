@@ -194,10 +194,10 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
     return false;
   }
   const completedLabel = PHASE_LABELS[opts.completedPhase] ?? `Phase ${opts.completedPhase}`;
-  const phaseForUrl = opts.nextPhase !== null && opts.nextPhase <= 8 ? opts.nextPhase : opts.completedPhase;
+  const phaseForUrl = opts.nextPhase !== null && opts.nextPhase <= 9 ? opts.nextPhase : opts.completedPhase;
   const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=${phaseForUrl}`;
 
-  const isLastPhase = opts.nextPhase === null || opts.nextPhase > 8;
+  const isLastPhase = opts.nextPhase === null || opts.nextPhase > 9;
   const nextLabel = isLastPhase ? null : (PHASE_LABELS[opts.nextPhase!] ?? `Phase ${opts.nextPhase}`);
 
   // 다음 Phase 담당 봇 + CC 봇 (예: InfraClaw)

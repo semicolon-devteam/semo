@@ -1,18 +1,7 @@
 'use client';
 
 import type { PhaseProgress } from '@/lib/gfp';
-
-const PHASE_LABELS: Record<number, string> = {
-  0: '헌법',
-  1: '디스커버리',
-  2: 'PRD',
-  3: '디자인 시스템',
-  4: '에픽',
-  5: '기능 스펙',
-  6: '기술 설계',
-  7: '태스크 분해',
-  8: '핸드오프',
-};
+import { PHASE_LABELS } from '@/lib/gfp-phases';
 
 interface GfpProgressBarProps {
   progress: PhaseProgress[];

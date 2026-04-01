@@ -23,11 +23,12 @@ const PHASE_NAMES: Record<number, string> = {
   1: 'discovery',
   2: 'prd',
   3: 'clarification',
-  4: 'epic',
-  5: 'functional-spec',
-  6: 'technical-plan',
-  7: 'task-breakdown',
-  8: 'handoff',
+  4: 'design-system',
+  5: 'epic',
+  6: 'functional-spec',
+  7: 'technical-plan',
+  8: 'task-breakdown',
+  9: 'handoff',
 };
 
 export async function GET(
@@ -174,8 +175,8 @@ export async function PATCH(
           );
         }
 
-        // Phase 3: check design sub-step advancement
-        if (section.phase === 3) {
+        // Phase 4: check design sub-step advancement
+        if (section.phase === 4) {
           checkDesignStepAdvance(id).catch((err) =>
             console.error('Design step advance check failed:', err)
           );
@@ -197,7 +198,7 @@ export async function PATCH(
 
           // Phase 자동 진행: current_phase 증가
           const nextPhase = section.phase + 1;
-          if (nextPhase <= 8) {
+          if (nextPhase <= 9) {
             await updateProject(id, { current_phase: nextPhase });
           }
 
@@ -205,7 +206,7 @@ export async function PATCH(
           if (project.service_domain) {
             writebackPhaseProgressToKB(
               id, project.service_domain, section.phase,
-              nextPhase <= 8 ? nextPhase : null
+              nextPhase <= 9 ? nextPhase : null
             ).catch((err) => console.error('KB phase progress failed:', err));
           }
 
@@ -214,7 +215,7 @@ export async function PATCH(
             projectName: project.project_name,
             gfpId: id,
             completedPhase: section.phase,
-            nextPhase: nextPhase <= 8 ? nextPhase : null,
+            nextPhase: nextPhase <= 9 ? nextPhase : null,
             channelId: slackCtx.channelId,
             ownerSlackId: slackCtx.ownerSlackId,
             serviceDomain: project.service_domain ?? undefined,

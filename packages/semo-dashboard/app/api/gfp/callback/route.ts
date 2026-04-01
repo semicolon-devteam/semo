@@ -137,11 +137,11 @@ export async function POST(request: NextRequest) {
           content: body.export_content,
         });
 
-        // 2. Phase 3에 결과 섹션 생성 (프롬프트 섹션 키에서 번호 추출)
+        // 2. Phase 4에 결과 섹션 생성 (프롬프트 섹션 키에서 번호 추출)
         const promptNum = body.prompt_section_id.match(/\d+/)?.[0] ?? '01';
         const resultSection = await upsertSection({
           gfp_id: body.gfp_id,
-          phase: 3,
+          phase: 4,
           section_key: `stitch-result-${promptNum}`,
           title: `Stitch Export #${promptNum} — Tailwind CSS`,
           content: body.export_content,
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
         }
         const refSection = await upsertSection({
           gfp_id: body.gfp_id,
-          phase: 3,
+          phase: 4,
           section_key: 'ref-analysis',
           title: 'Reference Analysis',
           content: body.analysis,
@@ -239,11 +239,11 @@ export async function POST(request: NextRequest) {
           material_type: 'design-prototype',
         });
 
-        // 2. Phase 3에 impl-screen 섹션 생성
+        // 2. Phase 4에 impl-screen 섹션 생성
         const screenKey = `impl-screen-${body.screen_name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
         const screenSection = await upsertSection({
           gfp_id: body.gfp_id,
-          phase: 3,
+          phase: 4,
           section_key: screenKey,
           title: `Screen: ${body.screen_name}`,
           content: `${body.description || ''}\n\n\`\`\`html\n${body.html_content}\n\`\`\``,

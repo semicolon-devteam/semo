@@ -387,7 +387,7 @@ export async function setDesignStep(gfpId: string, step: number): Promise<void> 
 }
 
 /**
- * Phase 3 섹션들의 현재 design step 자동 전진 체크.
+ * Phase 4 섹션들의 현재 design step 자동 전진 체크.
  * 현재 스텝의 모든 섹션이 approved면 다음 스텝으로 전진.
  * Returns the new step (or current if no advance).
  */
@@ -398,7 +398,7 @@ export async function checkDesignStepAdvance(gfpId: string): Promise<number> {
   const stepDef = DESIGN_STEPS.find((s) => s.step === currentStep);
   if (!stepDef || currentStep >= 5) return currentStep;
 
-  const sections = await listSections(gfpId, 3);
+  const sections = await listSections(gfpId, 4);
   const stepSections = sections.filter((s) => s.section_key.startsWith(stepDef.prefix));
 
   // 해당 스텝에 섹션이 없으면 전진하지 않음
@@ -510,13 +510,13 @@ export async function writebackPhaseProgressToKB(
     `${i}-${(PHASE_LABELS[i] ?? 'unknown').toLowerCase().replace(/\s+/g, '-')}`
   );
 
-  const nextAssignee = nextPhase !== null && nextPhase <= 8
+  const nextAssignee = nextPhase !== null && nextPhase <= 9
     ? getPhaseAssignee(nextPhase)
     : null;
 
   const content = [
     `gfp_id: ${gfpId}`,
-    `current_phase: ${nextPhase !== null && nextPhase <= 8 ? nextPhase : 'completed'}`,
+    `current_phase: ${nextPhase !== null && nextPhase <= 9 ? nextPhase : 'completed'}`,
     `last_completed_phase: ${completedPhase} (${PHASE_LABELS[completedPhase]})`,
     `completed_phases: [${completedPhases.join(', ')}]`,
     nextAssignee

@@ -22,30 +22,32 @@ export const PHASE_ASSIGNEES: Record<number, PhaseAssignee> = {
   0: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Constitution
   1: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Discovery
   2: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // PRD
-  3: { botId: 'designclaw', slackId: 'U0AFC0MK2TY' },  // Design System
-  4: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Epic
-  5: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Functional Spec
-  6: { botId: 'workclaw', slackId: 'U0AFECSJHK3' },    // Technical Plan
-  7: { botId: 'workclaw', slackId: 'U0AFECSJHK3' },    // Task Breakdown
-  8: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Handoff
+  3: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Clarification (Q&A)
+  4: { botId: 'designclaw', slackId: 'U0AFC0MK2TY' },  // Design System
+  5: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Epic
+  6: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Functional Spec
+  7: { botId: 'workclaw', slackId: 'U0AFECSJHK3' },    // Technical Plan
+  8: { botId: 'workclaw', slackId: 'U0AFECSJHK3' },    // Task Breakdown
+  9: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Handoff
 };
 
 // Phase 완료 후 다음 Phase 시작 시 추가 멘션할 봇
 export const PHASE_CC: Record<number, PhaseCcBot[]> = {
-  // Phase 6 (Technical Plan) 승인 → InfraClaw에게 인프라 세팅 알림
-  7: [{ botId: 'infraclaw', slackId: 'U0AFPDMCGHX', reason: '인프라 세팅 시작' }],
+  // Phase 7 (Technical Plan) 승인 → InfraClaw에게 인프라 세팅 알림
+  8: [{ botId: 'infraclaw', slackId: 'U0AFPDMCGHX', reason: '인프라 세팅 시작' }],
 };
 
 export const PHASE_LABELS: Record<number, string> = {
   0: '헌법',
   1: '디스커버리',
   2: 'PRD',
-  3: '디자인 시스템',
-  4: '에픽',
-  5: '기능 스펙',
-  6: '기술 설계',
-  7: '태스크 분해',
-  8: '핸드오프',
+  3: '명확화',
+  4: '디자인 시스템',
+  5: '에픽',
+  6: '기능 스펙',
+  7: '기술 설계',
+  8: '태스크 분해',
+  9: '핸드오프',
 };
 
 export function getPhaseAssignee(phase: number): PhaseAssignee {

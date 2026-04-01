@@ -1,7 +1,7 @@
 /**
  * GFP Design Step API
  *
- * Phase 3 내부 디자인 서브스텝 진행 체크 및 전진.
+ * Phase 4 내부 디자인 서브스텝 진행 체크 및 전진.
  * POST: 현재 스텝 체크 후 가능하면 자동 전진
  * GET: 현재 스텝 상태 조회
  */
@@ -24,7 +24,7 @@ export async function GET(
     }
 
     const designStep = await getDesignStep(id);
-    const sections = await listSections(id, 3);
+    const sections = await listSections(id, 4);
 
     const currentDef = DESIGN_STEPS.find((s) => s.step === designStep);
     const stepSections = currentDef
