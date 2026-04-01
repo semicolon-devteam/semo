@@ -6,7 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getProject, listSections } from '@/lib/gfp';
+import { getProject, listSections, getDesignStep } from '@/lib/gfp';
+import { DESIGN_STEPS } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,7 +101,24 @@ export async function GET(
     const results = sections.filter((s) => s.section_key.startsWith('stitch-result-'));
     const summary = sections.find((s) => s.section_key === 'design-spec-summary');
 
+    // Design step information
+    const designStep = await getDesignStep(id);
+    const steps = DESIGN_STEPS.map((def) => {
+      const stepSections = sections.filter((s) => s.section_key.startsWith(def.prefix));
+      const allApproved = stepSections.length > 0 && stepSections.every((s) => s.status === 'approved');
+      const hasAny = stepSections.length > 0;
+      return {
+        ...def,
+        sections: stepSections,
+        status: allApproved ? 'completed' as const : hasAny ? 'in-progress' as const : 'pending' as const,
+      };
+    });
+
     return NextResponse.json({
+      // New: design step data
+      design_step: designStep,
+      steps,
+      // Backward compat
       prompts,
       results,
       summary: summary ?? null,

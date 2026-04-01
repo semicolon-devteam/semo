@@ -50,11 +50,29 @@ interface ClarificationReadyPayload {
   bot_id: string;
 }
 
+interface DesignReferenceAnalysisPayload {
+  type: 'design-reference-analysis';
+  gfp_id: string;
+  analysis: string;
+  bot_id: string;
+}
+
+interface DesignPrototypePayload {
+  type: 'design-prototype';
+  gfp_id: string;
+  screen_name: string;
+  html_content: string;
+  description: string;
+  bot_id: string;
+}
+
 type CallbackPayload =
   | SectionRegenerationPayload
   | ResearchResultPayload
   | StitchExportPayload
-  | ClarificationReadyPayload;
+  | ClarificationReadyPayload
+  | DesignReferenceAnalysisPayload
+  | DesignPrototypePayload;
 
 export async function POST(request: NextRequest) {
   try {
@@ -182,6 +200,61 @@ export async function POST(request: NextRequest) {
           `[GFP Callback] Clarification ready: ${qaSections.length} Q&A sections for ${project.project_name} by ${body.bot_id}`
         );
         return NextResponse.json({ ok: true, qa_sections: qaSections.length });
+      }
+
+      case 'design-reference-analysis': {
+        if (!body.gfp_id || !body.analysis) {
+          return NextResponse.json(
+            { error: 'gfp_id and analysis are required for design-reference-analysis' },
+            { status: 400 }
+          );
+        }
+        const refSection = await upsertSection({
+          gfp_id: body.gfp_id,
+          phase: 3,
+          section_key: 'ref-analysis',
+          title: 'Reference Analysis',
+          content: body.analysis,
+          source: 'designclaw',
+          status: 'pending-review',
+        });
+        console.log(
+          `[GFP Callback] Design reference analysis saved: section=${refSection.section_id} by ${body.bot_id}`
+        );
+        return NextResponse.json({ ok: true, section: refSection });
+      }
+
+      case 'design-prototype': {
+        if (!body.gfp_id || !body.screen_name || !body.html_content) {
+          return NextResponse.json(
+            { error: 'gfp_id, screen_name, and html_content are required for design-prototype' },
+            { status: 400 }
+          );
+        }
+
+        // 1. gfp_materials에 프로토타입 저장
+        const protoMaterial = await createStitchMaterial({
+          gfp_id: body.gfp_id,
+          content: body.html_content,
+          material_type: 'design-prototype',
+        });
+
+        // 2. Phase 3에 impl-screen 섹션 생성
+        const screenKey = `impl-screen-${body.screen_name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+        const screenSection = await upsertSection({
+          gfp_id: body.gfp_id,
+          phase: 3,
+          section_key: screenKey,
+          title: `Screen: ${body.screen_name}`,
+          content: `${body.description || ''}\n\n\`\`\`html\n${body.html_content}\n\`\`\``,
+          source: 'designclaw',
+          status: 'pending-review',
+        });
+
+        console.log(
+          `[GFP Callback] Design prototype saved: material=${protoMaterial.material_id}, section=${screenSection.section_id} by ${body.bot_id}`
+        );
+        return NextResponse.json({ ok: true, material: protoMaterial, section: screenSection });
       }
 
       default:

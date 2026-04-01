@@ -7,6 +7,7 @@ import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
 import MermaidBlock from './MermaidBlock';
 import GfpQAForm from './GfpQAForm';
+import GfpDesignPreview, { extractHtmlFromContent } from './GfpDesignPreview';
 import type { GfpPhaseSection, GfpSectionStatus, GfpQAItem } from '@/types';
 
 const STATUS_STYLES: Record<GfpSectionStatus, { bg: string; text: string; label: string }> = {
@@ -154,7 +155,7 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
             </div>
           )}
 
-          {/* Content: Q&A form or Markdown */}
+          {/* Content: Q&A form, Design Preview, or Markdown */}
           {section.qa_items && Array.isArray(section.qa_items) && section.qa_items.length > 0 ? (
             <div className="mb-4">
               <GfpQAForm
@@ -162,6 +163,24 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
                 gfpId={gfpId}
                 qaItems={section.qa_items as GfpQAItem[]}
                 onSaved={onQASaved ?? (() => {})}
+              />
+            </div>
+          ) : section.section_key.startsWith('impl-screen-') && extractHtmlFromContent(section.content) ? (
+            <div className="mb-4 space-y-3">
+              {/* Description text above the preview */}
+              {(() => {
+                const descPart = section.content.split('```html')[0].trim();
+                return descPart ? (
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {descPart}
+                    </ReactMarkdown>
+                  </div>
+                ) : null;
+              })()}
+              <GfpDesignPreview
+                htmlContent={extractHtmlFromContent(section.content)!}
+                title={section.title}
               />
             </div>
           ) : (

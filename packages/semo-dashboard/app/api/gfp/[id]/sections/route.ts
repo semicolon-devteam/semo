@@ -6,8 +6,10 @@ import {
   updateSectionContent,
   updateProject,
   writebackPhaseToKB,
+  writebackPhaseProgressToKB,
   getProject,
   answerQAItems,
+  checkDesignStepAdvance,
 } from '@/lib/gfp';
 import type { GfpQAItem } from '@/types';
 import { dispatchRegeneration } from '@/lib/gfp-bot';
@@ -172,6 +174,13 @@ export async function PATCH(
           );
         }
 
+        // Phase 3: check design sub-step advancement
+        if (section.phase === 3) {
+          checkDesignStepAdvance(id).catch((err) =>
+            console.error('Design step advance check failed:', err)
+          );
+        }
+
         // Check if entire phase is now approved
         const allSections = await listSections(id, section.phase);
         const allApproved = allSections.length > 0 && allSections.every((s) => s.status === 'approved');
@@ -192,6 +201,14 @@ export async function PATCH(
             await updateProject(id, { current_phase: nextPhase });
           }
 
+          // KB phase progress 기록
+          if (project.service_domain) {
+            writebackPhaseProgressToKB(
+              id, project.service_domain, section.phase,
+              nextPhase <= 8 ? nextPhase : null
+            ).catch((err) => console.error('KB phase progress failed:', err));
+          }
+
           // Slack 알림: PlanClaw + 담당자에 다음 Phase 작업 유도
           sendGfpPhaseCompletedSlack({
             projectName: project.project_name,
@@ -200,6 +217,7 @@ export async function PATCH(
             nextPhase: nextPhase <= 8 ? nextPhase : null,
             channelId: slackCtx.channelId,
             ownerSlackId: slackCtx.ownerSlackId,
+            serviceDomain: project.service_domain ?? undefined,
           }).catch((err) => console.error('Phase complete Slack failed:', err));
         }
       }

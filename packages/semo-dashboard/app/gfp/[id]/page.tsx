@@ -9,7 +9,9 @@ import GfpSectionCard from '@/components/gfp/GfpSectionCard';
 import GfpMaterialUpload from '@/components/gfp/GfpMaterialUpload';
 import GfpResearchPanel from '@/components/gfp/GfpResearchPanel';
 import GfpStitchPanel from '@/components/gfp/GfpStitchPanel';
-import type { GfpProject, GfpPhaseSection, GfpResearchTask } from '@/types';
+import GfpDesignStepNav from '@/components/gfp/GfpDesignStepNav';
+import type { GfpProject, GfpPhaseSection, GfpResearchTask, DesignStep } from '@/types';
+import { DESIGN_STEPS } from '@/types';
 import type { PhaseProgress } from '@/lib/gfp';
 
 interface ProjectWithProgress extends GfpProject {
@@ -69,6 +71,7 @@ export default function GfpDetailPage() {
   const [initialized, setInitialized] = useState(false);
   const [approvingAll, setApprovingAll] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [activeDesignStep, setActiveDesignStep] = useState<DesignStep>(1);
 
   const refresh = useCallback(async (phase?: number) => {
     const p = phase ?? activePhase;
@@ -99,6 +102,11 @@ export default function GfpDetailPage() {
       setProject(proj);
       setSections(secs);
       setResearchTasks(tasks);
+      // Phase 3: fetch design step from project metadata
+      if (targetPhase === 3) {
+        const ds = (proj.metadata?.design_step as number) ?? 1;
+        setActiveDesignStep(ds as DesignStep);
+      }
       setLoading(false);
     })();
   }
@@ -107,6 +115,10 @@ export default function GfpDetailPage() {
     setActivePhase(phase);
     const secs = await fetchSectionsData(id, phase);
     setSections(secs);
+    if (phase === 3 && project) {
+      const ds = (project.metadata?.design_step as number) ?? 1;
+      setActiveDesignStep(ds as DesignStep);
+    }
   }
 
   async function handleApprove(sectionId: string) {
@@ -191,9 +203,29 @@ export default function GfpDetailPage() {
     );
   }
 
-  const phaseSections = sections;
   const showResearch = activePhase <= 2;
   const showStitch = activePhase === 3;
+
+  // Phase 3: filter sections by active design step
+  const activeStepDef = DESIGN_STEPS.find((s) => s.step === activeDesignStep);
+  const phaseSections = showStitch && activeStepDef
+    ? sections.filter((s) => s.section_key.startsWith(activeStepDef.prefix))
+    : sections;
+
+  // Build step statuses for the nav
+  const stepStatuses: Record<number, 'pending' | 'in-progress' | 'completed'> = {};
+  if (showStitch) {
+    for (const def of DESIGN_STEPS) {
+      const stepSecs = sections.filter((s) => s.section_key.startsWith(def.prefix));
+      if (stepSecs.length === 0) {
+        stepStatuses[def.step] = 'pending';
+      } else if (stepSecs.every((s) => s.status === 'approved')) {
+        stepStatuses[def.step] = 'completed';
+      } else {
+        stepStatuses[def.step] = 'in-progress';
+      }
+    }
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -236,9 +268,25 @@ export default function GfpDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main content — Sections */}
         <div className="lg:col-span-2 space-y-4">
+          {/* Phase 3: Design Step Navigation */}
+          {showStitch && (
+            <div className="mb-4">
+              <GfpDesignStepNav
+                currentStep={activeDesignStep}
+                stepStatuses={stepStatuses}
+                onStepClick={setActiveDesignStep}
+              />
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Phase {activePhase}: {PHASE_LABELS[activePhase] ?? `Phase ${activePhase}`}
+              {showStitch && activeStepDef && (
+                <span className="text-sm font-normal text-purple-600 dark:text-purple-400 ml-2">
+                  / {activeStepDef.label}
+                </span>
+              )}
             </h2>
             <div className="flex items-center gap-3">
               {phaseSections.filter((s) => s.status !== 'approved' && s.status !== 'rejected').length > 0 && (
@@ -349,7 +397,8 @@ export default function GfpDetailPage() {
               {showStitch && (
                 <GfpStitchPanel
                   gfpId={id}
-                  sections={phaseSections}
+                  sections={sections}
+                  designStep={activeDesignStep}
                   onUploaded={refresh}
                 />
               )}

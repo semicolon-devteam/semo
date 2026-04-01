@@ -60,7 +60,16 @@ export async function createProject(data: {
       JSON.stringify(data.metadata ?? {}),
     ]
   );
-  return res.rows[0];
+  const project = res.rows[0];
+
+  // KB에 gfp_id 저장 (service_domain이 있을 때)
+  if (data.service_domain) {
+    writeGfpIdToKB(data.service_domain, project).catch((err) =>
+      console.error('[GFP] KB gfp-id write failed:', err)
+    );
+  }
+
+  return project;
 }
 
 /**
@@ -80,6 +89,24 @@ async function ensureOntologyDomain(domain: string, projectName: string): Promis
     [domain, `${projectName} — GFP 프로젝트`, ['gfp', 'incubator']]
   );
   console.log(`[GFP] Ontology domain '${domain}' auto-registered for project '${projectName}'`);
+}
+
+/**
+ * GFP 프로젝트 생성 시 gfp_id를 KB에 기록.
+ * 봇이 KB 검색으로 서비스의 GFP 프로젝트를 찾을 수 있도록 함.
+ */
+async function writeGfpIdToKB(serviceDomain: string, project: GfpProject): Promise<void> {
+  const { upsertItem } = await import('./kb');
+  const content = [
+    `gfp_id: ${project.gfp_id}`,
+    `project_name: ${project.project_name}`,
+    `owner: ${project.owner_name}`,
+    `status: ${project.status}`,
+    `current_phase: ${project.current_phase}`,
+    `created_at: ${project.created_at}`,
+  ].join('\n');
+  await upsertItem(serviceDomain, 'gfp-id', content, 'gfp-pipeline');
+  console.log(`[GFP] KB gfp-id written for domain '${serviceDomain}': ${project.gfp_id}`);
 }
 
 export async function updateProject(
@@ -330,14 +357,60 @@ export async function listMaterials(gfpId: string): Promise<GfpMaterial[]> {
 export async function createStitchMaterial(data: {
   gfp_id: string;
   content: string;
+  material_type?: string;
 }): Promise<GfpMaterial> {
+  const materialType = data.material_type ?? 'stitch-export';
   const res = await query<GfpMaterial>(
     `INSERT INTO semo.gfp_materials (gfp_id, content, material_type)
-     VALUES ($1, $2, 'stitch-export')
+     VALUES ($1, $2, $3)
      RETURNING *`,
-    [data.gfp_id, data.content]
+    [data.gfp_id, data.content, materialType]
   );
   return res.rows[0];
+}
+
+// ── Design Step ──
+
+export async function getDesignStep(gfpId: string): Promise<number> {
+  const project = await getProject(gfpId);
+  if (!project) return 1;
+  return (project.metadata?.design_step as number) ?? 1;
+}
+
+export async function setDesignStep(gfpId: string, step: number): Promise<void> {
+  await query(
+    `UPDATE semo.gfp_projects
+     SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb
+     WHERE gfp_id = $2`,
+    [JSON.stringify({ design_step: step }), gfpId]
+  );
+}
+
+/**
+ * Phase 3 섹션들의 현재 design step 자동 전진 체크.
+ * 현재 스텝의 모든 섹션이 approved면 다음 스텝으로 전진.
+ * Returns the new step (or current if no advance).
+ */
+export async function checkDesignStepAdvance(gfpId: string): Promise<number> {
+  const { DESIGN_STEPS } = await import('@/types');
+
+  const currentStep = await getDesignStep(gfpId);
+  const stepDef = DESIGN_STEPS.find((s) => s.step === currentStep);
+  if (!stepDef || currentStep >= 5) return currentStep;
+
+  const sections = await listSections(gfpId, 3);
+  const stepSections = sections.filter((s) => s.section_key.startsWith(stepDef.prefix));
+
+  // 해당 스텝에 섹션이 없으면 전진하지 않음
+  if (stepSections.length === 0) return currentStep;
+
+  const allApproved = stepSections.every((s) => s.status === 'approved');
+  if (allApproved) {
+    const nextStep = currentStep + 1;
+    await setDesignStep(gfpId, nextStep);
+    return nextStep;
+  }
+  return currentStep;
 }
 
 // ── Research Tasks ──
@@ -420,6 +493,40 @@ export async function writebackPhaseToKB(
     [sectionIds]
   );
   console.log(`[GFP] KB write-back: ${serviceDomain} spec/${phaseName} (${sectionIds.length} sections)`);
+}
+
+// ── KB Write-back (phase progress) ──
+
+export async function writebackPhaseProgressToKB(
+  gfpId: string,
+  serviceDomain: string,
+  completedPhase: number,
+  nextPhase: number | null
+): Promise<void> {
+  const { upsertItem } = await import('./kb');
+  const { PHASE_LABELS, getPhaseAssignee } = await import('./gfp-phases');
+
+  const completedPhases = Array.from({ length: completedPhase + 1 }, (_, i) =>
+    `${i}-${(PHASE_LABELS[i] ?? 'unknown').toLowerCase().replace(/\s+/g, '-')}`
+  );
+
+  const nextAssignee = nextPhase !== null && nextPhase <= 8
+    ? getPhaseAssignee(nextPhase)
+    : null;
+
+  const content = [
+    `gfp_id: ${gfpId}`,
+    `current_phase: ${nextPhase !== null && nextPhase <= 8 ? nextPhase : 'completed'}`,
+    `last_completed_phase: ${completedPhase} (${PHASE_LABELS[completedPhase]})`,
+    `completed_phases: [${completedPhases.join(', ')}]`,
+    nextAssignee
+      ? `next_assignee: ${nextAssignee.botId} (Phase ${nextPhase} — ${PHASE_LABELS[nextPhase!]})`
+      : 'status: all-phases-completed',
+    `updated_at: ${new Date().toISOString()}`,
+  ].join('\n');
+
+  await upsertItem(serviceDomain, 'gfp-status', content, 'gfp-pipeline');
+  console.log(`[GFP] KB phase progress: ${serviceDomain}/gfp-status → phase ${nextPhase ?? 'done'}`);
 }
 
 // ── Bulk section creation from material mapping ──

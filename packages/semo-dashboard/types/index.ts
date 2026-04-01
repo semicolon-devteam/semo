@@ -295,9 +295,20 @@ export interface GfpQAItem {
 export type GfpProjectStatus = 'active' | 'paused' | 'completed';
 export type GfpSectionStatus = 'draft' | 'pending-review' | 'approved' | 'rejected';
 export type GfpSectionSource = 'planclaw' | 'imported' | 'growthclaw' | 'manual' | 'designclaw';
-export type GfpMaterialType = 'planning-doc' | 'stitch-export';
-export type GfpResearchTaskType = 'competitor-analysis' | 'market-research' | 'ux-pattern' | 'keyword-research';
+export type GfpMaterialType = 'planning-doc' | 'stitch-export' | 'design-prototype';
+export type GfpResearchTaskType = 'competitor-analysis' | 'market-research' | 'ux-pattern' | 'keyword-research' | 'design-reference';
 export type GfpResearchStatus = 'queued' | 'dispatched' | 'completed';
+
+// GFP Phase 3 Design Sub-Steps
+export type DesignStep = 1 | 2 | 3 | 4 | 5;
+
+export const DESIGN_STEPS = [
+  { step: 1 as const, label: 'Reference Discovery', prefix: 'ref-', icon: 'magnifying-glass' },
+  { step: 2 as const, label: 'Design System', prefix: 'ds-', icon: 'palette' },
+  { step: 3 as const, label: 'Implementation', prefix: 'impl-', icon: 'code' },
+  { step: 4 as const, label: 'Review', prefix: 'review-', icon: 'eye' },
+  { step: 5 as const, label: 'Handoff', prefix: 'handoff-', icon: 'arrow-right' },
+] as const;
 
 export interface GfpProject {
   gfp_id: string;
