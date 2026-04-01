@@ -1229,6 +1229,75 @@ export async function ontoRegister(
   }
 }
 
+// --- ontoUnregister ---
+
+export interface OntoUnregisterResult {
+  success: boolean;
+  deleted_entries?: number;
+  error?: string;
+}
+
+/**
+ * Unregister an ontology domain.
+ * If force=false and KB entries exist, returns error with count.
+ * If force=true, deletes all KB entries in a transaction, then removes the domain.
+ */
+export async function ontoUnregister(
+  pool: Pool,
+  domain: string,
+  force: boolean,
+): Promise<OntoUnregisterResult> {
+  const client = await pool.connect();
+  try {
+    // 1. Check domain exists
+    const domainCheck = await client.query(
+      "SELECT domain, entity_type, service FROM semo.ontology WHERE domain = $1",
+      [domain],
+    );
+    if (domainCheck.rows.length === 0) {
+      return { success: false, error: `도메인 '${domain}'은(는) 존재하지 않습니다.` };
+    }
+
+    // 2. Count KB entries
+    const countResult = await client.query(
+      "SELECT COUNT(*)::int AS cnt FROM semo.knowledge_base WHERE domain = $1",
+      [domain],
+    );
+    const entryCount: number = countResult.rows[0].cnt;
+
+    // 3. If entries exist and no force → error
+    if (entryCount > 0 && !force) {
+      return {
+        success: false,
+        error: `도메인 '${domain}'에 KB 항목 ${entryCount}건이 남아있습니다. --force 옵션으로 모두 삭제 후 제거할 수 있습니다.`,
+      };
+    }
+
+    // 4. Transaction: delete KB entries (if any) → delete ontology
+    await client.query("BEGIN");
+    try {
+      let deletedEntries = 0;
+      if (entryCount > 0) {
+        const delResult = await client.query(
+          "DELETE FROM semo.knowledge_base WHERE domain = $1",
+          [domain],
+        );
+        deletedEntries = delResult.rowCount ?? 0;
+      }
+
+      await client.query("DELETE FROM semo.ontology WHERE domain = $1", [domain]);
+      await client.query("COMMIT");
+
+      return { success: true, deleted_entries: deletedEntries };
+    } catch (err) {
+      await client.query("ROLLBACK");
+      return { success: false, error: String(err) };
+    }
+  } finally {
+    client.release();
+  }
+}
+
 /**
  * Add a key to a type schema
  */

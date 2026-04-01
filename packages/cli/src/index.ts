@@ -1517,6 +1517,7 @@ import {
   ontoCreateType,
   ontoAddKey,
   ontoRemoveKey,
+  ontoUnregister,
   generateEmbedding,
   KBEntry,
 } from "./kb";
@@ -1949,7 +1950,7 @@ kbCmd
 kbCmd
   .command("ontology")
   .description("온톨로지 조회 — 도메인/타입/스키마/라우팅 테이블")
-  .option("--action <type>", "동작 (list|show|services|types|instances|schema|routing-table|register|create-type|add-key|remove-key)", "list")
+  .option("--action <type>", "동작 (list|show|services|types|instances|schema|routing-table|register|unregister|create-type|add-key|remove-key)", "list")
   .option("--domain <name>", "action=show|register 시 도메인")
   .option("--type <name>", "action=schema|register|add-key|remove-key 시 타입 키")
   .option("--key <name>", "action=add-key|remove-key 시 스키마 키")
@@ -1960,6 +1961,8 @@ kbCmd
   .option("--service <name>", "action=register 시 서비스 그룹")
   .option("--tags <tags>", "action=register 시 태그 (쉼표 구분)")
   .option("--no-init", "action=register 시 필수 KB entry 자동 생성 건너뛰기")
+  .option("--force", "action=unregister 시 잔존 KB 항목도 모두 삭제")
+  .option("--yes", "action=unregister 시 확인 프롬프트 건너뛰기")
   .option("--format <type>", "출력 형식 (json|table)", "table")
   .action(async (options) => {
     try {
@@ -2179,8 +2182,70 @@ kbCmd
           process.exit(1);
         }
 
+      } else if (action === "unregister") {
+        if (!options.domain) {
+          console.log(chalk.red("--domain 옵션이 필요합니다."));
+          process.exit(1);
+        }
+
+        // 도메인 정보 조회
+        const domainInfo = await ontoShow(pool, options.domain);
+        if (!domainInfo) {
+          console.log(chalk.red(`\n❌ 도메인 '${options.domain}'은(는) 존재하지 않습니다.\n`));
+          process.exit(1);
+        }
+
+        // KB 엔트리 수 확인
+        const countRes = await pool.query(
+          "SELECT COUNT(*)::int AS cnt FROM semo.knowledge_base WHERE domain = $1",
+          [options.domain],
+        );
+        const kbCount: number = countRes.rows[0].cnt;
+
+        // 확인 프롬프트
+        if (!options.yes) {
+          const typeStr = domainInfo.entity_type ? ` [${domainInfo.entity_type}]` : "";
+          const svcStr = domainInfo.service && domainInfo.service !== "_global" ? ` (${domainInfo.service})` : "";
+          if (kbCount > 0 && options.force) {
+            console.log(chalk.yellow(`\n⚠️  도메인 '${options.domain}'에 KB 항목 ${kbCount}건이 남아있습니다.`));
+            console.log(chalk.yellow(`  --force 옵션으로 모두 삭제됩니다.\n`));
+          } else {
+            console.log(chalk.cyan(`\n📐 삭제 대상 도메인: ${options.domain}${typeStr}${svcStr}`));
+            console.log(chalk.gray(`  KB 항목: ${kbCount}건\n`));
+          }
+
+          const { createInterface } = await import("readline");
+          const rl = createInterface({ input: process.stdin, output: process.stdout });
+          const answer = await new Promise<string>((resolve) => {
+            rl.question(chalk.yellow("  정말 삭제하시겠습니까? (y/N): "), resolve);
+          });
+          rl.close();
+
+          if (answer.toLowerCase() !== "y") {
+            console.log(chalk.gray("  취소됨.\n"));
+            await closeConnection();
+            return;
+          }
+        }
+
+        const result = await ontoUnregister(pool, options.domain, !!options.force);
+        if (options.format === "json") {
+          console.log(JSON.stringify(result, null, 2));
+        } else {
+          if (result.success) {
+            console.log(chalk.green(`\n✅ 도메인 '${options.domain}' 삭제 완료`));
+            if (result.deleted_entries && result.deleted_entries > 0) {
+              console.log(chalk.gray(`  KB 항목 ${result.deleted_entries}건 함께 삭제됨`));
+            }
+            console.log();
+          } else {
+            console.log(chalk.red(`\n❌ 삭제 실패: ${result.error}\n`));
+            process.exit(1);
+          }
+        }
+
       } else {
-        console.log(chalk.red(`알 수 없는 action: '${action}'. 사용 가능: list, show, services, types, instances, schema, routing-table, register, create-type, add-key, remove-key`));
+        console.log(chalk.red(`알 수 없는 action: '${action}'. 사용 가능: list, show, services, types, instances, schema, routing-table, register, create-type, add-key, remove-key, unregister`));
         process.exit(1);
       }
 
@@ -2407,6 +2472,81 @@ ontoCmd
       await closeConnection();
     } catch (err) {
       console.error(chalk.red(`등록 실패: ${err}`));
+      await closeConnection();
+      process.exit(1);
+    }
+  });
+
+ontoCmd
+  .command("unregister <domain>")
+  .description("온톨로지 도메인 삭제 (KB 데이터 포함)")
+  .option("--force", "잔존 KB 항목이 있어도 모두 삭제 후 도메인 제거")
+  .option("--yes", "확인 프롬프트 건너뛰기")
+  .option("--format <type>", "출력 형식 (json|table)", "table")
+  .action(async (domain, options) => {
+    try {
+      const pool = getPool();
+
+      // 도메인 정보 조회
+      const domainInfo = await ontoShow(pool, domain);
+      if (!domainInfo) {
+        console.log(chalk.red(`\n❌ 도메인 '${domain}'은(는) 존재하지 않습니다.\n`));
+        await closeConnection();
+        process.exit(1);
+      }
+
+      // KB 엔트리 수 확인
+      const countRes = await pool.query(
+        "SELECT COUNT(*)::int AS cnt FROM semo.knowledge_base WHERE domain = $1",
+        [domain],
+      );
+      const kbCount: number = countRes.rows[0].cnt;
+
+      // 확인 프롬프트
+      if (!options.yes) {
+        const typeStr = domainInfo.entity_type ? ` [${domainInfo.entity_type}]` : "";
+        const svcStr = domainInfo.service && domainInfo.service !== "_global" ? ` (${domainInfo.service})` : "";
+        if (kbCount > 0 && options.force) {
+          console.log(chalk.yellow(`\n⚠️  도메인 '${domain}'에 KB 항목 ${kbCount}건이 남아있습니다.`));
+          console.log(chalk.yellow(`  --force 옵션으로 모두 삭제됩니다.\n`));
+        } else {
+          console.log(chalk.cyan(`\n📐 삭제 대상 도메인: ${domain}${typeStr}${svcStr}`));
+          console.log(chalk.gray(`  KB 항목: ${kbCount}건\n`));
+        }
+
+        const { createInterface } = await import("readline");
+        const rl = createInterface({ input: process.stdin, output: process.stdout });
+        const answer = await new Promise<string>((resolve) => {
+          rl.question(chalk.yellow("  정말 삭제하시겠습니까? (y/N): "), resolve);
+        });
+        rl.close();
+
+        if (answer.toLowerCase() !== "y") {
+          console.log(chalk.gray("  취소됨.\n"));
+          await closeConnection();
+          return;
+        }
+      }
+
+      const result = await ontoUnregister(pool, domain, !!options.force);
+      if (options.format === "json") {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        if (result.success) {
+          console.log(chalk.green(`\n✅ 도메인 '${domain}' 삭제 완료`));
+          if (result.deleted_entries && result.deleted_entries > 0) {
+            console.log(chalk.gray(`  KB 항목 ${result.deleted_entries}건 함께 삭제됨`));
+          }
+          console.log();
+        } else {
+          console.log(chalk.red(`\n❌ 삭제 실패: ${result.error}\n`));
+          process.exit(1);
+        }
+      }
+
+      await closeConnection();
+    } catch (err) {
+      console.error(chalk.red(`삭제 실패: ${err}`));
       await closeConnection();
       process.exit(1);
     }

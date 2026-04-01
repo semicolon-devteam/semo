@@ -108,6 +108,7 @@ KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하
 | 환경변수 (~/.claude/semo/.env) | `semo kb get semo infra env-config` |
 | 복구 명령어 | `semo kb get semo process recovery` |
 | 코딩 컨벤션 | `semo kb get semo process coding-convention` |
+| 도메인 삭제 | `semo onto unregister <domain> [--force --yes]` |
 
 ---
 
