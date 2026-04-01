@@ -19,15 +19,15 @@ interface ProjectWithProgress extends GfpProject {
 }
 
 const PHASE_LABELS: Record<number, string> = {
-  0: 'Constitution',
-  1: 'Discovery',
+  0: '헌법',
+  1: '디스커버리',
   2: 'PRD',
-  3: 'Design System',
-  4: 'Epic',
-  5: 'Functional Spec',
-  6: 'Technical Plan',
-  7: 'Task Breakdown',
-  8: 'Handoff',
+  3: '디자인 시스템',
+  4: '에픽',
+  5: '기능 스펙',
+  6: '기술 설계',
+  7: '태스크 분해',
+  8: '핸드오프',
 };
 
 async function fetchProjectData(id: string): Promise<ProjectWithProgress | null> {
@@ -281,7 +281,7 @@ export default function GfpDetailPage() {
 
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Phase {activePhase}: {PHASE_LABELS[activePhase] ?? `Phase ${activePhase}`}
+              {activePhase}단계: {PHASE_LABELS[activePhase] ?? `${activePhase}단계`}
               {showStitch && activeStepDef && (
                 <span className="text-sm font-normal text-purple-600 dark:text-purple-400 ml-2">
                   / {activeStepDef.label}

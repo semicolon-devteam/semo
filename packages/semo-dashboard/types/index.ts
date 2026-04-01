@@ -303,11 +303,11 @@ export type GfpResearchStatus = 'queued' | 'dispatched' | 'completed';
 export type DesignStep = 1 | 2 | 3 | 4 | 5;
 
 export const DESIGN_STEPS = [
-  { step: 1 as const, label: 'Reference Discovery', prefix: 'ref-', icon: 'magnifying-glass' },
-  { step: 2 as const, label: 'Design System', prefix: 'ds-', icon: 'palette' },
-  { step: 3 as const, label: 'Implementation', prefix: 'impl-', icon: 'code' },
-  { step: 4 as const, label: 'Review', prefix: 'review-', icon: 'eye' },
-  { step: 5 as const, label: 'Handoff', prefix: 'handoff-', icon: 'arrow-right' },
+  { step: 1 as const, label: '레퍼런스 탐색', prefix: 'ref-', icon: 'magnifying-glass' },
+  { step: 2 as const, label: '디자인 시스템', prefix: 'ds-', icon: 'palette' },
+  { step: 3 as const, label: '구현', prefix: 'impl-', icon: 'code' },
+  { step: 4 as const, label: '리뷰', prefix: 'review-', icon: 'eye' },
+  { step: 5 as const, label: '핸드오프', prefix: 'handoff-', icon: 'arrow-right' },
 ] as const;
 
 export interface GfpProject {

@@ -37,15 +37,15 @@ export const PHASE_CC: Record<number, PhaseCcBot[]> = {
 };
 
 export const PHASE_LABELS: Record<number, string> = {
-  0: 'Constitution',
-  1: 'Discovery',
+  0: '헌법',
+  1: '디스커버리',
   2: 'PRD',
-  3: 'Design System',
-  4: 'Epic',
-  5: 'Functional Spec',
-  6: 'Technical Plan',
-  7: 'Task Breakdown',
-  8: 'Handoff',
+  3: '디자인 시스템',
+  4: '에픽',
+  5: '기능 스펙',
+  6: '기술 설계',
+  7: '태스크 분해',
+  8: '핸드오프',
 };
 
 export function getPhaseAssignee(phase: number): PhaseAssignee {
