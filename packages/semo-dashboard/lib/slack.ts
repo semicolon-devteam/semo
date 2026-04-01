@@ -179,6 +179,7 @@ export interface GfpPhaseCompletedOpts {
   nextPhase: number | null; // null = 마지막 phase 완료
   channelId?: string;
   ownerSlackId?: string | null;
+  serviceDomain?: string;
 }
 
 export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): Promise<boolean> {
@@ -245,7 +246,7 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `다음 Phase 섹션을 작성해주세요. <${dashboardUrl}|Dashboard에서 확인>`,
+        text: `다음 Phase 섹션을 작성해주세요. <${dashboardUrl}|Dashboard에서 확인>\nKB 참조: \`semo kb get semicolon process/gfp-phases\`${opts.serviceDomain ? ` | \`semo kb get ${opts.serviceDomain} gfp-status\`` : ''}`,
       },
     }]),
     {

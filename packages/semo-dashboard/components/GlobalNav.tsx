@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { href: '/system', label: 'System' },
   { href: '/tests', label: 'Tests' },
   { href: '/gfp', label: 'GFP' },
+  { href: '/meetings', label: 'Meetings' },
 ];
 
 export default function GlobalNav() {
