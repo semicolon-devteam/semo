@@ -252,7 +252,12 @@ export async function PATCH(
             await updateProject(id, { current_phase: 1 });
 
             // Track B 활성화 (parallel 프리셋 or infra_phase가 이미 있는 경우)
-            if (project.infra_phase !== null) {
+            const preset = (project.metadata as Record<string, unknown>)?.preset;
+            if (project.infra_phase !== null || preset === 'parallel') {
+              // infra_phase가 아직 null이면 (생성 시 누락된 경우) 즉시 초기화
+              if (project.infra_phase === null && preset === 'parallel') {
+                await updateProject(id, { infra_phase: 0 });
+              }
               sendGfpTrackForkSlack({
                 projectName: project.project_name,
                 gfpId: id,
