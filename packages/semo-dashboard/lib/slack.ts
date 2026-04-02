@@ -48,8 +48,10 @@ export async function resolveGfpSlackContext(gfpId: string): Promise<GfpSlackCon
           [domain]
         );
         if (kb.rows.length > 0) {
-          const ch = (kb.rows[0].content as string).trim();
-          if (ch.startsWith('C')) channelId = ch;
+          const raw = (kb.rows[0].content as string).trim();
+          // Support both pure ID ("C0A5MLV4BL7") and "#name (C0A5MLV4BL7)" formats
+          const match = raw.match(/\b(C[A-Z0-9]{8,})\b/);
+          if (match) channelId = match[1];
         }
       }
 

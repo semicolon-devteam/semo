@@ -129,10 +129,14 @@ async function main() {
       const content = fs.readFileSync(soulPath, "utf-8");
       const soul = parseSoulMd(content);
 
-      if (soul.role) {
+      // KB is SoT for roles — skip upsert if SOUL.md R&R is a pointer (no role table)
+      const isRolePointer = soul.role && !soul.role.includes("| 카테고리");
+      if (soul.role && !isRolePointer) {
         if (await upsert(bot.bot_id, "role", soul.role)) {
           console.log(`  ✅ role (${soul.role.split("\n").length} lines)`);
         }
+      } else if (isRolePointer) {
+        console.log(`  ⏭️ role (KB is SoT — pointer detected, skip)`);
       }
 
       if (soul.delegation) {
