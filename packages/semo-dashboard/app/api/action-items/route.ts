@@ -16,15 +16,40 @@ export async function GET() {
        ORDER BY kb.sub_key DESC`,
     );
 
+    // team 도메인 → nickname + role 조회
+    const teamDomains = [...new Set(res.rows.filter(r => r.entity_type === 'team').map(r => r.domain))];
+    const nicknames = new Map<string, { nickname: string; role: string }>();
+    if (teamDomains.length > 0) {
+      const nickRes = await query(
+        `SELECT domain, key, content FROM semo.knowledge_base
+         WHERE domain = ANY($1) AND key IN ('nickname', 'role')`,
+        [teamDomains],
+      );
+      for (const r of nickRes.rows) {
+        const entry = nicknames.get(r.domain) || { nickname: '', role: '' };
+        if (r.key === 'nickname') entry.nickname = r.content?.trim() || '';
+        if (r.key === 'role') entry.role = r.content?.trim() || '';
+        nicknames.set(r.domain, entry);
+      }
+    }
+
     const items: ActionItem[] = [];
     for (const row of res.rows) {
       const domainType = row.entity_type === 'team' ? 'team' as const : 'service' as const;
+      let label: string;
+      if (domainType === 'team') {
+        const info = nicknames.get(row.domain);
+        const name = info?.nickname || row.domain.charAt(0).toUpperCase() + row.domain.slice(1);
+        label = info?.role ? `${name} — ${info.role}` : name;
+      } else {
+        label = row.description || row.domain;
+      }
       const parsed = parseActionItems(
         row.content,
         row.domain,
         row.sub_key,
         domainType,
-        row.description || row.domain,
+        label,
       );
       items.push(...parsed);
     }
