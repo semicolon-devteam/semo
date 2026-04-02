@@ -10,7 +10,10 @@ interface GfpQAFormProps {
   onSaved: () => void;
 }
 
-export default function GfpQAForm({ sectionId, gfpId, qaItems, onSaved }: GfpQAFormProps) {
+export default function GfpQAForm({ sectionId, gfpId, qaItems: rawItems, onSaved }: GfpQAFormProps) {
+  // id가 누락된 QA 항목 방어: q1, q2, ... 자동 부여
+  const qaItems = rawItems.map((item, i) => item.id ? item : { ...item, id: `q${i + 1}` });
+
   const [answers, setAnswers] = useState<Record<string, string>>(() => {
     const init: Record<string, string> = {};
     for (const item of qaItems) {
