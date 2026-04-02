@@ -61,7 +61,7 @@ export async function createProject(data: {
       data.owner_name,
       data.owner_contact ?? null,
       data.service_domain ?? null,
-      JSON.stringify(data.metadata ?? {}),
+      JSON.stringify({ preset: 'parallel', ...data.metadata }),
     ]
   );
   const project = res.rows[0];
