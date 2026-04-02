@@ -115,22 +115,22 @@ export async function sendGfpRejectionSlack(opts: GfpRejectionNotifyOpts): Promi
   const blocks = [
     {
       type: 'header',
-      text: { type: 'plain_text', text: '🔴 GFP Section Rejected', emoji: true },
+      text: { type: 'plain_text', text: '🔴 GFP 섹션 거절', emoji: true },
     },
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
-        { type: 'mrkdwn', text: `*Section:*\n${opts.sectionKey} (${opts.sectionTitle})` },
+        { type: 'mrkdwn', text: `*프로젝트:*\n${opts.projectName}` },
+        { type: 'mrkdwn', text: `*섹션:*\n${opts.sectionKey} (${opts.sectionTitle})` },
         { type: 'mrkdwn', text: `*Phase:*\n${opts.phase} — ${phaseLabel}` },
-        { type: 'mrkdwn', text: `*Assigned:*\n<@${assignee.slackId}>` },
+        { type: 'mrkdwn', text: `*담당:*\n<@${assignee.slackId}>` },
       ],
     },
     {
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `*Rejection Reason:*\n> ${opts.reviewerNote.replace(/\n/g, '\n> ')}`,
+        text: `*거절 사유:*\n> ${opts.reviewerNote.replace(/\n/g, '\n> ')}`,
       },
     },
     {
@@ -138,7 +138,7 @@ export async function sendGfpRejectionSlack(opts: GfpRejectionNotifyOpts): Promi
       elements: [
         {
           type: 'mrkdwn',
-          text: `Section ID: \`${opts.sectionId.slice(0, 8)}...\` | <${dashboardUrl}|Open Dashboard>`,
+          text: `섹션 ID: \`${opts.sectionId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>`,
         },
       ],
     },
@@ -221,28 +221,28 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
     : `${allMentions} [GFP Phase Complete] ${opts.projectName} — Phase ${opts.completedPhase} (${completedLabel}) 전체 승인. Phase ${opts.nextPhase} (${nextLabel}) 섹션 작성을 시작해주세요.`;
 
   const ownerField = opts.ownerSlackId
-    ? [{ type: 'mrkdwn', text: `*Owner:*\n<@${opts.ownerSlackId}>` }]
+    ? [{ type: 'mrkdwn', text: `*오너:*\n<@${opts.ownerSlackId}>` }]
     : [];
 
   const ccField = ccBots.length > 0
-    ? [{ type: 'mrkdwn', text: `*CC:*\n${ccBots.map(b => `<@${b.slackId}> (${b.reason})`).join(', ')}` }]
+    ? [{ type: 'mrkdwn', text: `*참조:*\n${ccBots.map(b => `<@${b.slackId}> (${b.reason})`).join(', ')}` }]
     : [];
 
   const blocks = [
     {
       type: 'header',
-      text: { type: 'plain_text', text: isLastPhase ? '🎉 GFP All Phases Completed' : '🟢 GFP Phase Completed', emoji: true },
+      text: { type: 'plain_text', text: isLastPhase ? '🎉 GFP 전체 Phase 완료' : '🟢 GFP Phase 완료', emoji: true },
     },
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
-        { type: 'mrkdwn', text: `*Completed:*\nPhase ${opts.completedPhase} — ${completedLabel}` },
+        { type: 'mrkdwn', text: `*프로젝트:*\n${opts.projectName}` },
+        { type: 'mrkdwn', text: `*완료:*\nPhase ${opts.completedPhase} — ${completedLabel}` },
         ...(isLastPhase
-          ? [{ type: 'mrkdwn', text: '*Status:*\n모든 Phase 완료 🎉' }, ...ownerField]
+          ? [{ type: 'mrkdwn', text: '*상태:*\n모든 Phase 완료 🎉' }, ...ownerField]
           : [
-              { type: 'mrkdwn', text: `*Next:*\nPhase ${opts.nextPhase} — ${nextLabel}` },
-              { type: 'mrkdwn', text: `*Assigned:*\n<@${nextAssignee!.slackId}>` },
+              { type: 'mrkdwn', text: `*다음:*\nPhase ${opts.nextPhase} — ${nextLabel}` },
+              { type: 'mrkdwn', text: `*담당:*\n<@${nextAssignee!.slackId}>` },
               ...ownerField,
               ...ccField,
             ]),
@@ -252,13 +252,13 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
       type: 'section',
       text: {
         type: 'mrkdwn',
-        text: `다음 Phase 섹션을 작성해주세요. <${dashboardUrl}|Dashboard에서 확인>\nKB 참조: \`semo kb get semicolon process/gfp-phases\`${opts.serviceDomain ? ` | \`semo kb get ${opts.serviceDomain} gfp-status\`` : ''}`,
+        text: `다음 Phase 섹션을 작성해주세요. <${dashboardUrl}|대시보드에서 확인>\nKB 참조: \`semo kb get semicolon process/gfp-phases\`${opts.serviceDomain ? ` | \`semo kb get ${opts.serviceDomain} gfp-status\`` : ''}`,
       },
     }]),
     {
       type: 'context',
       elements: [
-        { type: 'mrkdwn', text: `GFP ID: \`${opts.gfpId.slice(0, 8)}...\` | <${dashboardUrl}|Open Dashboard>` },
+        { type: 'mrkdwn', text: `GFP ID: \`${opts.gfpId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>` },
       ],
     },
   ];
@@ -319,7 +319,7 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
   const parentBlocks = [
     {
       type: 'header',
-      text: { type: 'plain_text', text: `Phase 3 Clarification — ${opts.projectName}`, emoji: true },
+      text: { type: 'plain_text', text: `Phase 3 명확화 — ${opts.projectName}`, emoji: true },
     },
     {
       type: 'section',
@@ -338,7 +338,7 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
     {
       type: 'context',
       elements: [
-        { type: 'mrkdwn', text: `GFP ID: \`${opts.gfpId.slice(0, 8)}...\` | <${dashboardUrl}|Open Dashboard>` },
+        { type: 'mrkdwn', text: `GFP ID: \`${opts.gfpId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>` },
       ],
     },
   ];
@@ -352,7 +352,7 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
       },
       body: JSON.stringify({
         channel: opts.channelId,
-        text: `[GFP] ${opts.projectName} — Phase 3 Clarification (${totalQuestions} questions)`,
+        text: `[GFP] ${opts.projectName} — Phase 3 명확화 (${totalQuestions}개 질문)`,
         blocks: parentBlocks,
       }),
     });
@@ -451,10 +451,10 @@ export async function sendGfpProjectCreatedSlack(opts: GfpProjectCreatedOpts): P
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
-        { type: 'mrkdwn', text: `*Owner:*\n${opts.ownerName}` },
+        { type: 'mrkdwn', text: `*프로젝트:*\n${opts.projectName}` },
+        { type: 'mrkdwn', text: `*오너:*\n${opts.ownerName}` },
         { type: 'mrkdwn', text: `*Phase:*\n0 — 온보딩` },
-        { type: 'mrkdwn', text: `*Assigned:*\n<@${assignee.slackId}>` },
+        { type: 'mrkdwn', text: `*담당:*\n<@${assignee.slackId}>` },
       ],
     },
     {
@@ -540,8 +540,8 @@ export async function sendGfpTrackForkSlack(opts: GfpTrackForkOpts): Promise<boo
           {
             type: 'section',
             fields: [
-              { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
-              { type: 'mrkdwn', text: `*Assigned:*\n<@${planAssignee.slackId}>` },
+              { type: 'mrkdwn', text: `*프로젝트:*\n${opts.projectName}` },
+              { type: 'mrkdwn', text: `*담당:*\n<@${planAssignee.slackId}>` },
               { type: 'mrkdwn', text: '*Phase:*\n1 — 디스커버리' },
             ],
           },
@@ -573,8 +573,8 @@ export async function sendGfpTrackForkSlack(opts: GfpTrackForkOpts): Promise<boo
           {
             type: 'section',
             fields: [
-              { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
-              { type: 'mrkdwn', text: `*Assigned:*\n<@${infraAssignee.slackId}>` },
+              { type: 'mrkdwn', text: `*프로젝트:*\n${opts.projectName}` },
+              { type: 'mrkdwn', text: `*담당:*\n<@${infraAssignee.slackId}>` },
               { type: 'mrkdwn', text: '*Phase:*\nInfra 0 — 기본 세팅' },
             ],
           },
@@ -624,25 +624,25 @@ export async function sendGfpInfraRequestSlack(opts: GfpInfraRequestSlackOpts): 
         blocks: [
           {
             type: 'header',
-            text: { type: 'plain_text', text: 'Infra Request Flagged', emoji: true },
+            text: { type: 'plain_text', text: '🔧 인프라 요청', emoji: true },
           },
           {
             type: 'section',
             fields: [
-              { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
-              { type: 'mrkdwn', text: `*Category:*\n${opts.request.category}` },
-              { type: 'mrkdwn', text: `*Title:*\n${opts.request.title}` },
-              { type: 'mrkdwn', text: `*Priority:*\n${opts.request.priority}` },
+              { type: 'mrkdwn', text: `*프로젝트:*\n${opts.projectName}` },
+              { type: 'mrkdwn', text: `*카테고리:*\n${opts.request.category}` },
+              { type: 'mrkdwn', text: `*제목:*\n${opts.request.title}` },
+              { type: 'mrkdwn', text: `*우선순위:*\n${opts.request.priority}` },
             ],
           },
           ...(opts.request.description ? [{
             type: 'section' as const,
-            text: { type: 'mrkdwn' as const, text: `*Description:*\n${opts.request.description}` },
+            text: { type: 'mrkdwn' as const, text: `*설명:*\n${opts.request.description}` },
           }] : []),
           {
             type: 'context',
             elements: [
-              { type: 'mrkdwn', text: `Source: Phase ${opts.request.source_phase} | <${dashboardUrl}|Dashboard>` },
+              { type: 'mrkdwn', text: `출처: Phase ${opts.request.source_phase} | <${dashboardUrl}|대시보드>` },
             ],
           },
         ],
@@ -685,18 +685,18 @@ export async function sendGfpInfraPhaseCompletedSlack(opts: GfpInfraPhaseComplet
   const blocks = [
     {
       type: 'header',
-      text: { type: 'plain_text', text: isLast ? 'Track B: Infra Complete' : 'Track B: Infra Phase Complete', emoji: true },
+      text: { type: 'plain_text', text: isLast ? 'Track B: 인프라 트랙 완료' : 'Track B: 인프라 Phase 완료', emoji: true },
     },
     {
       type: 'section',
       fields: [
-        { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
-        { type: 'mrkdwn', text: `*Completed:*\nInfra ${opts.completedPhase} — ${completedLabel}` },
+        { type: 'mrkdwn', text: `*프로젝트:*\n${opts.projectName}` },
+        { type: 'mrkdwn', text: `*완료:*\nInfra ${opts.completedPhase} — ${completedLabel}` },
         ...(isLast
-          ? [{ type: 'mrkdwn', text: '*Status:*\nInfra 트랙 완료' }]
+          ? [{ type: 'mrkdwn', text: '*상태:*\n인프라 트랙 완료' }]
           : [
-            { type: 'mrkdwn', text: `*Next:*\nInfra ${opts.nextPhase} — ${nextLabel}` },
-            { type: 'mrkdwn', text: `*Assigned:*\n<@${nextAssignee!.slackId}>` },
+            { type: 'mrkdwn', text: `*다음:*\nInfra ${opts.nextPhase} — ${nextLabel}` },
+            { type: 'mrkdwn', text: `*담당:*\n<@${nextAssignee!.slackId}>` },
           ]),
       ],
     },
