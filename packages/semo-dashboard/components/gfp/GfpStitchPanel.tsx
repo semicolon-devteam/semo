@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { GfpPhaseSection, DesignStep } from '@/types';
 import { DESIGN_STEPS } from '@/types';
+import DesignSystemPreview from './DesignSystemPreview';
 
 interface GfpDesignToolsPanelProps {
   gfpId: string;
@@ -104,6 +105,11 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
           );
         })}
       </div>
+
+      {/* Design System Preview — ds-* 섹션이 있으면 Phase 4 전체에서 표시 */}
+      {dsSections.length > 0 && (
+        <DesignSystemPreview sections={dsSections} />
+      )}
 
       {/* Step 1-2: Reference & Design System summary */}
       {(designStep === 1 || designStep === 2) && (

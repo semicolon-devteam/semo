@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
 import { transcribe } from '@/lib/vito';
 import { getMeeting, updateTranscriptionStarted } from '@/lib/meeting';
 
@@ -12,8 +10,6 @@ export const maxDuration = 300;
 const ALLOWED_EXTENSIONS = new Set([
   'mp3', 'm4a', 'mp4', 'wav', 'flac', 'ogg', 'webm', 'amr',
 ]);
-
-const AUDIO_DIR = '/tmp/semo-meetings';
 
 /** POST /api/meetings/upload — upload audio and start VITO transcription */
 export async function POST(request: NextRequest) {
@@ -48,17 +44,13 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Save audio to /tmp for playback during speaker mapping
-    await mkdir(AUDIO_DIR, { recursive: true });
     const audioFileName = `${meetingId}.${ext}`;
-    const audioFilePath = path.join(AUDIO_DIR, audioFileName);
-    await writeFile(audioFilePath, buffer);
 
     // Send to VITO
     const transcribeId = await transcribe(buffer, file.name);
 
-    // Update meeting with transcription info + audio path
-    await updateTranscriptionStarted(meetingId, transcribeId, file.name, audioFileName);
+    // Update meeting with transcription info + audio stored in DB
+    await updateTranscriptionStarted(meetingId, transcribeId, file.name, audioFileName, buffer);
 
     return NextResponse.json({
       meetingId,

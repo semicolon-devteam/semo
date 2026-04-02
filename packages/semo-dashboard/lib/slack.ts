@@ -414,3 +414,83 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
 
   return threadMap;
 }
+
+// ── GFP Design System Notification (Color Palette) ──
+
+export interface GfpDesignSystemSlackOpts {
+  projectName: string;
+  gfpId: string;
+  channelId: string;
+  /** Parsed primary colors for attachment color bars */
+  primaryColors?: Array<{ name: string; hex: string }>;
+}
+
+/**
+ * ds-* 섹션 전체 승인 시 Slack에 디자인 시스템 알림 전송.
+ * - Block Kit image 블록: 팔레트 이미지 API URL
+ * - Attachments: 주요 색상별 색상 바
+ */
+export async function sendDesignSystemSlack(opts: GfpDesignSystemSlackOpts): Promise<boolean> {
+  if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
+
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=4`;
+  const paletteImageUrl = `${DASHBOARD_BASE_URL}/api/gfp/${opts.gfpId}/design-palette-image`;
+
+  const blocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: '🎨 디자인 시스템 완성', emoji: true },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `*${opts.projectName}*의 디자인 시스템(색상, 타이포그래피, 여백, 컴포넌트) 섹션이 모두 승인되었습니다.`,
+      },
+    },
+    {
+      type: 'image',
+      image_url: paletteImageUrl,
+      alt_text: `${opts.projectName} 색상 팔레트`,
+    },
+    {
+      type: 'context',
+      elements: [
+        { type: 'mrkdwn', text: `<${dashboardUrl}|대시보드에서 확인>` },
+      ],
+    },
+  ];
+
+  // 주요 색상 attachment 색상 바 (최대 20개)
+  const attachments = (opts.primaryColors ?? []).slice(0, 20).map((c) => ({
+    color: c.hex,
+    text: `${c.name}: ${c.hex}`,
+  }));
+
+  try {
+    const res = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+      body: JSON.stringify({
+        channel: opts.channelId,
+        text: `[GFP] ${opts.projectName} — 디자인 시스템 완성 🎨`,
+        blocks,
+        ...(attachments.length > 0 ? { attachments } : {}),
+      }),
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      console.error('Slack design system notify error:', data.error);
+      return false;
+    }
+    console.log(`[GFP Slack] Design system notification sent for ${opts.projectName}`);
+    return true;
+  } catch (err) {
+    console.error('Slack design system notify failed:', err);
+    return false;
+  }
+}

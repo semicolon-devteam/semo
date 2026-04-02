@@ -8,6 +8,9 @@ import 'highlight.js/styles/github-dark.css';
 import MermaidBlock from './MermaidBlock';
 import GfpQAForm from './GfpQAForm';
 import GfpDesignPreview, { extractHtmlFromContent } from './GfpDesignPreview';
+import ColorCodeBlock from './ColorCodeBlock';
+import ColorPaletteSummary from './ColorPaletteSummary';
+import { hasMultipleColors } from '@/lib/design-system-parser';
 import type { GfpPhaseSection, GfpSectionStatus, GfpQAItem } from '@/types';
 
 const STATUS_STYLES: Record<GfpSectionStatus, { bg: string; text: string; label: string }> = {
@@ -165,6 +168,33 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
                 onSaved={onQASaved ?? (() => {})}
               />
             </div>
+          ) : section.section_key.startsWith('ds-color') ? (
+            <div className="mb-4">
+              <ColorPaletteSummary content={section.content} />
+              <div className="prose prose-sm dark:prose-invert max-w-none gfp-prose">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeHighlight]}
+                  components={{
+                    a({ href, children, ...props }) {
+                      return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>;
+                    },
+                    code({ className, children, ...props }) {
+                      if (/language-mermaid/.test(className || '')) {
+                        return <MermaidBlock code={String(children).trim()} />;
+                      }
+                      const text = String(children);
+                      if (hasMultipleColors(text)) {
+                        return <ColorCodeBlock className={className}>{children}</ColorCodeBlock>;
+                      }
+                      return <code className={className} {...props}>{children}</code>;
+                    },
+                  }}
+                >
+                  {section.content || '*아직 내용이 없습니다*'}
+                </ReactMarkdown>
+              </div>
+            </div>
           ) : section.section_key.startsWith('impl-screen-') && extractHtmlFromContent(section.content) ? (
             <div className="mb-4 space-y-3">
               {/* Description text above the preview */}
@@ -195,6 +225,10 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
                   code({ className, children, ...props }) {
                     if (/language-mermaid/.test(className || '')) {
                       return <MermaidBlock code={String(children).trim()} />;
+                    }
+                    const text = String(children);
+                    if (hasMultipleColors(text)) {
+                      return <ColorCodeBlock className={className}>{children}</ColorCodeBlock>;
                     }
                     return <code className={className} {...props}>{children}</code>;
                   },

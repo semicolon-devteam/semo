@@ -75,15 +75,37 @@ export async function updateTranscriptionStarted(
   meetingId: string,
   vitoTranscribeId: string,
   audioOriginalName: string,
-  audioFileName?: string
+  audioFileName?: string,
+  audioData?: Buffer
 ): Promise<void> {
-  await query(
-    `UPDATE semo.meetings
-     SET vito_transcribe_id = $2, audio_filename = $3,
-         transcription_status = 'transcribing', updated_at = NOW()
-     WHERE meeting_id = $1`,
-    [meetingId, vitoTranscribeId, audioFileName ?? audioOriginalName]
+  if (audioData) {
+    await query(
+      `UPDATE semo.meetings
+       SET vito_transcribe_id = $2, audio_filename = $3,
+           audio_data = $4,
+           transcription_status = 'transcribing', updated_at = NOW()
+       WHERE meeting_id = $1`,
+      [meetingId, vitoTranscribeId, audioFileName ?? audioOriginalName, audioData]
+    );
+  } else {
+    await query(
+      `UPDATE semo.meetings
+       SET vito_transcribe_id = $2, audio_filename = $3,
+           transcription_status = 'transcribing', updated_at = NOW()
+       WHERE meeting_id = $1`,
+      [meetingId, vitoTranscribeId, audioFileName ?? audioOriginalName]
+    );
+  }
+}
+
+export async function getAudioData(meetingId: string): Promise<{ data: Buffer; filename: string } | null> {
+  const result = await query<{ audio_data: Buffer; audio_filename: string }>(
+    'SELECT audio_data, audio_filename FROM semo.meetings WHERE meeting_id = $1 AND audio_data IS NOT NULL',
+    [meetingId]
   );
+  const row = result.rows[0];
+  if (!row?.audio_data) return null;
+  return { data: row.audio_data, filename: row.audio_filename };
 }
 
 export async function updateTranscriptionCompleted(

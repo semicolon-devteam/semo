@@ -14,7 +14,8 @@ import {
 import type { GfpQAItem } from '@/types';
 import { dispatchRegeneration } from '@/lib/gfp-bot';
 import { publishPhaseToGitHub } from '@/lib/gfp-github';
-import { sendGfpRejectionSlack, sendGfpPhaseCompletedSlack, resolveGfpSlackContext } from '@/lib/slack';
+import { sendGfpRejectionSlack, sendGfpPhaseCompletedSlack, sendDesignSystemSlack, resolveGfpSlackContext } from '@/lib/slack';
+import { parseColors } from '@/lib/design-system-parser';
 
 export const dynamic = 'force-dynamic';
 
@@ -185,6 +186,27 @@ export async function PATCH(
         // Check if entire phase is now approved
         const allSections = await listSections(id, section.phase);
         const allApproved = allSections.length > 0 && allSections.every((s) => s.status === 'approved');
+
+        // Phase 4 ds-* 섹션 전체 승인 시 Slack 디자인 시스템 알림
+        if (section.phase === 4 && section.section_key.startsWith('ds-')) {
+          const allDs = allSections.filter((s) => s.section_key.startsWith('ds-'));
+          const allDsApproved = allDs.length > 0 && allDs.every((s) => s.status === 'approved');
+          if (allDsApproved) {
+            const colorSection = allDs.find((s) => s.section_key.startsWith('ds-color'));
+            const colorGroups = colorSection ? parseColors(colorSection.content) : [];
+            const primaryColors = colorGroups.flatMap((g) => {
+              const shade400 = g.shades.find((s) => s.shade === 400) ?? g.shades[Math.floor(g.shades.length / 2)];
+              return shade400 ? [{ name: `${g.name} 400`, hex: shade400.hex }] : [];
+            });
+
+            sendDesignSystemSlack({
+              projectName: project.project_name,
+              gfpId: id,
+              channelId: slackCtx.channelId,
+              primaryColors,
+            }).catch((err) => console.error('Design system Slack failed:', err));
+          }
+        }
 
         if (allApproved) {
           // Publish to GitHub docs repo
