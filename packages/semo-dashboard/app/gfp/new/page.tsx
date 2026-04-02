@@ -2,14 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import type { KBDomain, GfpPresetId } from '@/types';
+import type { KBDomain, GfpPresetId, PoProfile } from '@/types';
 import { GFP_PRESETS } from '@/lib/gfp-presets';
+import PoProfileWizard from '@/components/gfp/PoProfileWizard';
 
 const PRESET_LIST = Object.values(GFP_PRESETS);
+
+type WizardStep = 'basics' | 'profile';
 
 export default function GfpNewProjectPage() {
   const router = useRouter();
   const [domains, setDomains] = useState<KBDomain[]>([]);
+  const [wizardStep, setWizardStep] = useState<WizardStep>('basics');
   const [form, setForm] = useState({
     project_name: '',
     owner_name: '',
@@ -33,15 +37,18 @@ export default function GfpNewProjectPage() {
       .catch(() => {});
   }, []);
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleBasicsNext(e: React.FormEvent) {
     e.preventDefault();
     if (!form.project_name.trim() || !form.owner_name.trim()) return;
     if (preset === 'infra-ready' && (!infraForm.repo_url.trim() || !infraForm.live_url.trim())) return;
-    // Note: 'parallel' preset has no extra required fields
+    setWizardStep('profile');
+  }
+
+  async function handleProfileComplete(profile: PoProfile) {
     setSaving(true);
     setError('');
     try {
-      const metadata: Record<string, unknown> = { preset };
+      const metadata: Record<string, unknown> = { preset, po_profile: profile };
       if (preset === 'infra-ready') {
         const presetDef = GFP_PRESETS['infra-ready'];
         metadata.preset_config = {
@@ -72,11 +79,40 @@ export default function GfpNewProjectPage() {
       router.push(`/gfp/${project.gfp_id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create');
+      setWizardStep('basics');
     } finally {
       setSaving(false);
     }
   }
 
+  // ── Step 2: PO Profile Wizard ──
+  if (wizardStep === 'profile') {
+    if (saving) {
+      return (
+        <div className="container mx-auto px-4 py-8 max-w-xl flex items-center justify-center min-h-[400px]">
+          <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400">
+            <span className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+            프로젝트 생성 중...
+          </div>
+        </div>
+      );
+    }
+    return (
+      <>
+        {error && (
+          <div className="container mx-auto px-4 pt-4 max-w-xl">
+            <p className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{error}</p>
+          </div>
+        )}
+        <PoProfileWizard
+          onComplete={handleProfileComplete}
+          onBack={() => setWizardStep('basics')}
+        />
+      </>
+    );
+  }
+
+  // ── Step 1: Basic Info ──
   return (
     <div className="container mx-auto px-4 py-8 max-w-xl">
       <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">새 GFP 프로젝트</h1>
@@ -84,7 +120,7 @@ export default function GfpNewProjectPage() {
         신규 프로젝트 파이프라인을 생성합니다.
       </p>
 
-      <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 space-y-5">
+      <form onSubmit={handleBasicsNext} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 space-y-5">
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             프로젝트 이름 <span className="text-red-500">*</span>
@@ -234,13 +270,10 @@ export default function GfpNewProjectPage() {
           </button>
           <button
             type="submit"
-            disabled={saving || !form.project_name.trim() || !form.owner_name.trim() || (preset === 'infra-ready' && (!infraForm.repo_url.trim() || !infraForm.live_url.trim()))}
+            disabled={!form.project_name.trim() || !form.owner_name.trim() || (preset === 'infra-ready' && (!infraForm.repo_url.trim() || !infraForm.live_url.trim()))}
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium rounded-md transition-colors"
           >
-            {saving && (
-              <span className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
-            )}
-            프로젝트 생성
+            다음: PO 프로필 설정 →
           </button>
         </div>
       </form>

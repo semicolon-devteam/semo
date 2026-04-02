@@ -37,7 +37,7 @@ export interface KBItem {
   domain: string;
   key: string;
   content: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   created_by?: string;
   updated_at?: string;
   similarity_pct?: number;
@@ -110,7 +110,7 @@ export async function search(
            ROUND((1 - (embedding <=> $1::vector))::numeric * 100, 1) as similarity_pct
     FROM semo.knowledge_base
   `;
-  const params: any[] = [embeddingStr];
+  const params: (string | number)[] = [embeddingStr];
   let idx = 2;
 
   if (createdBy) {

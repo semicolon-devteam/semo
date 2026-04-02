@@ -25,9 +25,9 @@ export async function GET(
     );
 
     return NextResponse.json(result.rows);
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch test runs' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch test runs' },
       { status: 500 }
     );
   }

@@ -29,6 +29,7 @@ export default function DbExplorer() {
 
   // Fetch tables
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTablesLoading(true);
     fetch('/api/db/tables')
       .then((r) => (r.ok ? r.json() : []))
@@ -40,9 +41,11 @@ export default function DbExplorer() {
   // Fetch table detail
   useEffect(() => {
     if (!selectedTable) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDetail(null);
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loading state before fetch
     setDetailLoading(true);
     fetch(`/api/db/tables/${selectedTable.schema}/${selectedTable.table}`)
       .then((r) => (r.ok ? r.json() : null))
@@ -74,6 +77,7 @@ export default function DbExplorer() {
   }, [selectedTable, dataPage, dataPageSize, sortColumn, sortDir]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetchData triggers loading state
     if (activeTab === 'data') fetchData();
   }, [activeTab, fetchData]);
 

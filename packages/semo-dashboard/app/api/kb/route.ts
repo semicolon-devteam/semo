@@ -10,7 +10,7 @@ const EMPTY_STATS = {
 
 function isConnectionError(error: unknown): boolean {
   const msg = (error as Error)?.message ?? '';
-  const code = (error as any)?.code ?? '';
+  const code = (error as Record<string, unknown>)?.code ?? '';
   return code === 'ECONNREFUSED' || code === 'ENOTFOUND' || msg.includes('ECONNREFUSED');
 }
 

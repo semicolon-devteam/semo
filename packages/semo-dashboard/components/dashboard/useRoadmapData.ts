@@ -84,7 +84,17 @@ function parseContentMetadata(content: string, domain: string): Partial<Mileston
   return result;
 }
 
-function enrichMetadata(item: any): any {
+interface RawKBItem {
+  kb_id: string;
+  domain?: string;
+  key?: string;
+  sub_key?: string;
+  content?: string;
+  metadata?: Record<string, unknown>;
+  updated_at?: string;
+}
+
+function enrichMetadata(item: RawKBItem): RawKBItem {
   const m = item.metadata;
   const isEmpty = !m || Object.keys(m).length === 0;
   if (!isEmpty && m.project && m.title && m.start_date && m.end_date) return item;
@@ -108,14 +118,14 @@ function enrichMetadata(item: any): any {
   return { ...item, metadata: merged };
 }
 
-function isValidMilestone(item: any): item is { kb_id: string; key: string; content: string; metadata: MilestoneMetadata; updated_at: string } {
+function isValidMilestone(item: RawKBItem): item is RawKBItem & { key: string; content: string; metadata: MilestoneMetadata; updated_at: string } {
   const m = item?.metadata;
-  return m && typeof m.project === 'string' && typeof m.title === 'string'
+  return !!m && typeof m.project === 'string' && typeof m.title === 'string'
     && typeof m.start_date === 'string' && typeof m.end_date === 'string';
 }
 
 export function useRoadmapData(statusFilter?: string): RoadmapData {
-  const [rawItems, setRawItems] = useState<any[]>([]);
+  const [rawItems, setRawItems] = useState<RawKBItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

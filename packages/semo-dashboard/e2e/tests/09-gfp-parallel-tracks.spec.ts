@@ -14,7 +14,7 @@ import { test, expect } from '@playwright/test';
  */
 test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', () => {
   let projectId: string;
-  let phase0SectionIds: string[] = [];
+  const phase0SectionIds: string[] = [];
   let infraSectionId: string;
   let infraRequestId: string;
 

@@ -77,6 +77,7 @@ export default function BotDetailPage() {
   useEffect(() => {
     if (!botId) return;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     Promise.all([
       fetch(`/api/bots/${botId}`).then((r) => {

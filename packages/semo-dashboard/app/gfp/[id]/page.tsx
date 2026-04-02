@@ -18,6 +18,8 @@ import { DESIGN_STEPS } from '@/types';
 import type { PhaseProgress } from '@/lib/gfp';
 import { PHASE_LABELS, INFRA_PHASE_LABELS } from '@/lib/gfp-phases';
 import { GFP_PRESETS } from '@/lib/gfp-presets';
+import { PoProfileProvider } from '@/components/gfp/PoProfileContext';
+import { getPoProfile } from '@/lib/po-profile';
 
 interface ProjectWithProgress extends GfpProject {
   progress: PhaseProgress[];
@@ -284,7 +286,10 @@ export default function GfpDetailPage() {
     }
   }
 
+  const poProfile = getPoProfile(project.metadata as Record<string, unknown>);
+
   return (
+    <PoProfileProvider value={poProfile}>
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
@@ -517,5 +522,6 @@ export default function GfpDetailPage() {
         />
       )}
     </div>
+    </PoProfileProvider>
   );
 }

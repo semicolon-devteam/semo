@@ -59,9 +59,11 @@ export default function TestSuiteDetailPage() {
 
   useEffect(() => {
     if (!selectedRunId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResults([]);
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setResultsLoading(true);
     fetch(`/api/tests/${suiteId}/${selectedRunId}`)
       .then((r) => r.json())

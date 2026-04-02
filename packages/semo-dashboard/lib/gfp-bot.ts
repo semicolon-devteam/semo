@@ -5,6 +5,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { getPhaseAssignee } from './gfp-phases';
+import { getPoProfile, buildProfileContext } from './po-profile';
 import type { GfpTrack } from '@/types';
 
 const execAsync = promisify(exec);
@@ -43,14 +44,17 @@ export async function dispatchRegeneration(
   const assignee = getPhaseAssignee(phase, track);
 
   let presetContext = '';
+  let profileCtx = '';
   if (projectMetadata) {
     const { getBotHintForPhase } = await import('./gfp-presets');
     const hint = getBotHintForPhase(projectMetadata, phase);
     if (hint) presetContext = `\n## Preset Context\n${hint}\n`;
+    const poProfile = getPoProfile(projectMetadata);
+    profileCtx = `\n## PO Profile\n${buildProfileContext(poProfile)}\n`;
   }
 
   const message = `[GFP Section Regeneration: ${sectionId}]
-${presetContext}
+${presetContext}${profileCtx}
 ## Original Content
 ${originalContent}
 

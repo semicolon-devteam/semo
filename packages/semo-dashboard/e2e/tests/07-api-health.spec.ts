@@ -81,7 +81,7 @@ test.describe('API 엔드포인트 동작 확인', () => {
 
     const body = await response.json();
     if (body.length > 0) {
-      body.forEach((item: any) => {
+      body.forEach((item: Record<string, unknown>) => {
         expect(item.domain).toBe('team');
       });
     }

@@ -49,22 +49,22 @@ function extractTableName(table: string): string {
 }
 
 export default function FlowDetail({ flows, onClose }: FlowDetailProps) {
-  if (flows.length === 0) return null;
-
-  const direction = flows[0].direction;
+  const direction = flows.length > 0 ? flows[0].direction : 'read';
   const uniqueTables = [...new Set(flows.map((f) => extractTableName(f.table)))];
-  const primaryTable = uniqueTables[0];
+  const primaryTable = uniqueTables[0] ?? '';
 
   const [records, setRecords] = useState<RecentRecords | null>(null);
   const [recordsLoading, setRecordsLoading] = useState(false);
   const [activeTable, setActiveTable] = useState(primaryTable);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setActiveTable(primaryTable);
   }, [primaryTable]);
 
   useEffect(() => {
     if (!activeTable) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRecordsLoading(true);
     fetch(`/api/sync/recent?table=${activeTable}`)
       .then((r) => (r.ok ? r.json() : null))
@@ -72,6 +72,8 @@ export default function FlowDetail({ flows, onClose }: FlowDetailProps) {
       .catch(() => setRecords(null))
       .finally(() => setRecordsLoading(false));
   }, [activeTable]);
+
+  if (flows.length === 0) return null;
 
   return (
     <div className="w-[400px] shrink-0 border-l border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-y-auto">

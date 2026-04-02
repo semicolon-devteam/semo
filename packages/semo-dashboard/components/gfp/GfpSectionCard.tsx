@@ -10,7 +10,12 @@ import GfpQAForm from './GfpQAForm';
 import GfpDesignPreview, { extractHtmlFromContent } from './GfpDesignPreview';
 import ColorCodeBlock from './ColorCodeBlock';
 import ColorPaletteSummary from './ColorPaletteSummary';
+import TypographyPreviewFull from './TypographyPreviewFull';
+import SpacingPreviewFull from './SpacingPreviewFull';
+import ComponentStylePicker from './ComponentStylePicker';
 import { hasMultipleColors } from '@/lib/design-system-parser';
+import { usePoProfile } from './PoProfileContext';
+import { shouldShowCode } from '@/lib/po-profile';
 import type { GfpPhaseSection, GfpSectionStatus, GfpQAItem } from '@/types';
 
 const STATUS_STYLES: Record<GfpSectionStatus, { bg: string; text: string; label: string }> = {
@@ -39,6 +44,7 @@ interface GfpSectionCardProps {
 
 export default function GfpSectionCard({ section, gfpId, focused, onApprove, onReject, onUndoReject, onQASaved }: GfpSectionCardProps) {
   const ref = useRef<HTMLDivElement>(null);
+  const poProfile = usePoProfile();
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectNote, setRejectNote] = useState('');
   const [expanded, setExpanded] = useState(focused || section.status !== 'approved');
@@ -48,12 +54,14 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
   // section.status 변경 시 expanded 자동 갱신 (approve → collapsed)
   useEffect(() => {
     if (focused) return; // focused 카드는 무조건 expanded 유지
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setExpanded(section.status !== 'approved');
   }, [section.status, focused]);
 
   // focused 시 스크롤 + 하이라이트 fade
   useEffect(() => {
     if (focused && ref.current) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setExpanded(true);
       // 렌더 완료 후 스크롤 (300ms) — block:'start' + scrollMarginTop으로 nav 아래에 위치
       setTimeout(() => ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
@@ -64,6 +72,7 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
 
   // focused=false인 카드는 section param이 있을 때 collapsed
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (focused === false) setExpanded(false);
   }, [focused]);
 
@@ -171,7 +180,58 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
           ) : section.section_key.startsWith('ds-color') ? (
             <div className="mb-4">
               <ColorPaletteSummary content={section.content} />
-              <div className="prose prose-sm dark:prose-invert max-w-none gfp-prose">
+              <CodeAccordion content={section.content} />
+            </div>
+          ) : section.section_key.startsWith('ds-typo') ? (
+            <div className="mb-4">
+              <TypographyPreviewFull content={section.content} />
+              <CodeAccordion content={section.content} />
+            </div>
+          ) : section.section_key.startsWith('ds-spac') ? (
+            <div className="mb-4">
+              <SpacingPreviewFull content={section.content} />
+              <CodeAccordion content={section.content} />
+            </div>
+          ) : section.section_key.startsWith('ds-component') ? (
+            <div className="mb-4">
+              <ComponentStylePicker
+                content={section.content}
+                sectionId={section.section_id}
+                gfpId={gfpId}
+              />
+              <CodeAccordion content={section.content} />
+            </div>
+          ) : section.section_key.startsWith('impl-screen-') && extractHtmlFromContent(section.content) ? (
+            <div className="mb-4 space-y-3">
+              {/* Description text above the preview */}
+              {(() => {
+                const descPart = section.content.split('```html')[0].trim();
+                return descPart ? (
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {descPart}
+                    </ReactMarkdown>
+                  </div>
+                ) : null;
+              })()}
+              <GfpDesignPreview
+                htmlContent={extractHtmlFromContent(section.content)!}
+                title={section.title}
+              />
+            </div>
+          ) : (
+            <div className="mb-4">
+              {/* Non-technical PO: 기술 페이즈(7,8) 콘텐츠를 접어서 표시 */}
+              {poProfile.tech_level === 'non-technical' && section.phase >= 7 && (
+                <div className="mb-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    기술적 세부사항은 봇이 처리합니다. 아래에서 요약을 확인하세요.
+                  </p>
+                </div>
+              )}
+              <div className={`prose prose-sm dark:prose-invert max-w-none gfp-prose ${
+                poProfile.tech_level === 'non-technical' && section.phase >= 7 ? 'max-h-[200px] overflow-hidden relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-12 after:bg-gradient-to-t after:from-white dark:after:from-gray-800' : ''
+              }`}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeHighlight]}
@@ -194,48 +254,36 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
                   {section.content || '*아직 내용이 없습니다*'}
                 </ReactMarkdown>
               </div>
-            </div>
-          ) : section.section_key.startsWith('impl-screen-') && extractHtmlFromContent(section.content) ? (
-            <div className="mb-4 space-y-3">
-              {/* Description text above the preview */}
-              {(() => {
-                const descPart = section.content.split('```html')[0].trim();
-                return descPart ? (
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {descPart}
+              {poProfile.tech_level === 'non-technical' && section.phase >= 7 && (
+                <details className="mt-1">
+                  <summary className="text-xs text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600">
+                    전체 내용 보기
+                  </summary>
+                  <div className="mt-2 prose prose-sm dark:prose-invert max-w-none gfp-prose">
+                    <ReactMarkdown
+                      remarkPlugins={[remarkGfm]}
+                      rehypePlugins={[rehypeHighlight]}
+                      components={{
+                        a({ href, children, ...props }) {
+                          return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>;
+                        },
+                        code({ className, children, ...props }) {
+                          if (/language-mermaid/.test(className || '')) {
+                            return <MermaidBlock code={String(children).trim()} />;
+                          }
+                          const text = String(children);
+                          if (hasMultipleColors(text)) {
+                            return <ColorCodeBlock className={className}>{children}</ColorCodeBlock>;
+                          }
+                          return <code className={className} {...props}>{children}</code>;
+                        },
+                      }}
+                    >
+                      {section.content || '*아직 내용이 없습니다*'}
                     </ReactMarkdown>
                   </div>
-                ) : null;
-              })()}
-              <GfpDesignPreview
-                htmlContent={extractHtmlFromContent(section.content)!}
-                title={section.title}
-              />
-            </div>
-          ) : (
-            <div className="prose prose-sm dark:prose-invert max-w-none mb-4 gfp-prose">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeHighlight]}
-                components={{
-                  a({ href, children, ...props }) {
-                    return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>;
-                  },
-                  code({ className, children, ...props }) {
-                    if (/language-mermaid/.test(className || '')) {
-                      return <MermaidBlock code={String(children).trim()} />;
-                    }
-                    const text = String(children);
-                    if (hasMultipleColors(text)) {
-                      return <ColorCodeBlock className={className}>{children}</ColorCodeBlock>;
-                    }
-                    return <code className={className} {...props}>{children}</code>;
-                  },
-                }}
-              >
-                {section.content || '*아직 내용이 없습니다*'}
-              </ReactMarkdown>
+                </details>
+              )}
             </div>
           )}
 
@@ -325,5 +373,42 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
         </div>
       )}
     </div>
+  );
+}
+
+/** 비주얼 프리뷰 하단에 원본 코드를 접어서 보여주는 아코디언 */
+function CodeAccordion({ content }: { content: string }) {
+  const poProfile = usePoProfile();
+  const showByDefault = shouldShowCode(poProfile) && poProfile.tech_level === 'advanced';
+
+  return (
+    <details className="mt-3" open={showByDefault || undefined}>
+      <summary className="text-xs text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 select-none">
+        코드 보기
+      </summary>
+      <div className="mt-2 prose prose-sm dark:prose-invert max-w-none gfp-prose">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          rehypePlugins={[rehypeHighlight]}
+          components={{
+            a({ href, children, ...props }) {
+              return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>;
+            },
+            code({ className, children, ...props }) {
+              if (/language-mermaid/.test(className || '')) {
+                return <MermaidBlock code={String(children).trim()} />;
+              }
+              const text = String(children);
+              if (hasMultipleColors(text)) {
+                return <ColorCodeBlock className={className}>{children}</ColorCodeBlock>;
+              }
+              return <code className={className} {...props}>{children}</code>;
+            },
+          }}
+        >
+          {content || '*아직 내용이 없습니다*'}
+        </ReactMarkdown>
+      </div>
+    </details>
   );
 }

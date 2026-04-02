@@ -408,3 +408,18 @@ export interface GfpResearchTask {
   created_at: string;
   updated_at: string;
 }
+
+// GFP PO Profile — Phase 0 RPG-style profiling
+export type PoTechLevel = 'non-technical' | 'basic' | 'intermediate' | 'advanced';
+export type PoDesignSensitivity = 'low' | 'medium' | 'high';
+export type PoDomainArea = 'business' | 'engineering' | 'design' | 'product';
+export type PoInteractionStyle = 'concise' | 'detailed';
+export type PoDecisionStyle = 'options' | 'recommendation';
+
+export interface PoProfile {
+  tech_level: PoTechLevel;
+  design_sensitivity: PoDesignSensitivity;
+  domain_area: PoDomainArea;
+  interaction_style: PoInteractionStyle;
+  decision_style: PoDecisionStyle;
+}
