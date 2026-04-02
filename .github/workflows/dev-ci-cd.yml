@@ -96,13 +96,16 @@ jobs:
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "*커밋:*\n${{ steps.status.outputs.commit_title }}"
-                    },
-                    {
-                      "type": "mrkdwn",
                       "text": "*작성자:*\n${{ github.actor }}"
                     }
                   ]
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*커밋:* `${{ steps.status.outputs.commit_title }}`"
+                  }
                 },
                 {
                   "type": "section",
