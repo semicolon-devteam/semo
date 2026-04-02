@@ -165,6 +165,29 @@ export interface BotProtocol {
   description: string | null;
 }
 
+export interface BotCommitment {
+  id: string;
+  bot_id: string;
+  status: 'pending' | 'active' | 'done' | 'failed' | 'expired';
+  title: string;
+  description: string | null;
+  source_type: string | null;
+  source_ref: string | null;
+  deadline_at: string | null;
+  steps: Array<{ label: string; done: boolean }>;
+  metadata: Record<string, unknown>;
+  last_heartbeat_at: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface ActiveCommitmentView extends BotCommitment {
+  health: 'overdue' | 'stale' | 'on-track';
+  minutes_since_heartbeat: number;
+  minutes_overdue: number | null;
+}
+
 // ============================================================
 // 폴백 데이터 (DB 연결 실패 시 사용)
 // ============================================================

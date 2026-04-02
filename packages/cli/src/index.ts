@@ -42,6 +42,7 @@ import { registerSessionsCommands } from "./commands/sessions";
 import { registerDbCommands } from "./commands/db";
 import { registerMemoryCommands } from "./commands/memory";
 import { registerTestCommands } from "./commands/test";
+import { registerCommitmentsCommands } from "./commands/commitments";
 import { syncGlobalCache } from "./global-cache";
 import {
   ensureSemoDir,
@@ -2560,6 +2561,7 @@ registerSessionsCommands(program);
 registerDbCommands(program);
 registerMemoryCommands(program);
 registerTestCommands(program);
+registerCommitmentsCommands(program);
 
 // === semo skills — DB 시딩 ===
 

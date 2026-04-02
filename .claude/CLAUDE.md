@@ -124,10 +124,10 @@ npm run lint && npx tsc --noEmit && npm run build
 
 | 패키지 | npm 이름 | 배포 트리거 |
 |--------|----------|------------|
-| `packages/cli` | `@team-semicolon/semo-cli` | Git tag `cli-v*` |
+| `packages/cli` | `@team-semicolon/semo-cli` | `dev` 브랜치 push 시 자동 배포 |
 | `packages/mcp-kb` | `@team-semicolon/semo-mcp-kb` | Git tag `mcp-v*` |
 
-CLI 소스 수정 후에는 사용자에게 배포 필요 여부를 확인할 것.
+`dev` 브랜치에 커밋 후 push하면 CLI npm 패키지가 자동 배포된다. 별도 태그 불필요.
 
 ---
 
