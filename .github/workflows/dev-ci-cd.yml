@@ -58,9 +58,13 @@ jobs:
         run: |
           if [[ "${{ needs.build-and-deploy.result }}" == "success" && "${{ needs.kustomize-version-update.result }}" == "success" ]]; then
             echo "result=✅ 성공" >> $GITHUB_OUTPUT
+            echo "is_failure=false" >> $GITHUB_OUTPUT
           else
             echo "result=❌ 실패" >> $GITHUB_OUTPUT
+            echo "is_failure=true" >> $GITHUB_OUTPUT
           fi
+          COMMIT_TITLE=$(echo "${{ github.event.head_commit.message }}" | head -1)
+          echo "commit_title=${COMMIT_TITLE}" >> $GITHUB_OUTPUT
 
       - name: Send Slack notification
         uses: slackapi/slack-github-action@v2
@@ -92,7 +96,7 @@ jobs:
                     },
                     {
                       "type": "mrkdwn",
-                      "text": "*커밋:*\n${{ github.event.head_commit.message }}"
+                      "text": "*커밋:*\n${{ steps.status.outputs.commit_title }}"
                     },
                     {
                       "type": "mrkdwn",
@@ -104,7 +108,7 @@ jobs:
                   "type": "section",
                   "text": {
                     "type": "mrkdwn",
-                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|워크플로우 보기>\n\n<@U0AFPDMCGHX> 확인 필요"
+                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|워크플로우 보기>${{ steps.status.outputs.is_failure == 'true' && '\n\n<@U0AF1RK0E67> 빌드 실패 확인 필요' || '' }}"
                   }
                 }
               ]
