@@ -35,11 +35,20 @@ export async function dispatchRegeneration(
   sectionId: string,
   originalContent: string,
   reviewerNote: string,
-  phase: number = 0
+  phase: number = 0,
+  projectMetadata?: Record<string, unknown>
 ): Promise<void> {
   const assignee = getPhaseAssignee(phase);
-  const message = `[GFP Section Regeneration: ${sectionId}]
 
+  let presetContext = '';
+  if (projectMetadata) {
+    const { getBotHintForPhase } = await import('./gfp-presets');
+    const hint = getBotHintForPhase(projectMetadata, phase);
+    if (hint) presetContext = `\n## Preset Context\n${hint}\n`;
+  }
+
+  const message = `[GFP Section Regeneration: ${sectionId}]
+${presetContext}
 ## Original Content
 ${originalContent}
 

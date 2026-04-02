@@ -57,6 +57,8 @@ export default function GfpListPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {projects.map((project) => {
             const style = STATUS_STYLES[project.status] ?? STATUS_STYLES.active;
+            const presetId = (project.metadata as Record<string, unknown>)?.preset as string | undefined;
+            const isInfraReady = presetId === 'infra-ready';
             return (
               <Link
                 key={project.gfp_id}
@@ -67,22 +69,29 @@ export default function GfpListPage() {
                   <h2 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
                     {project.project_name}
                   </h2>
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ml-2 ${style.bg} ${style.text}`}>
-                    {project.status}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    {isInfraReady && (
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                        인프라 선행
+                      </span>
+                    )}
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}>
+                      {project.status}
+                    </span>
+                  </div>
                 </div>
                 <div className="space-y-1.5 text-sm text-gray-600 dark:text-gray-400">
                   <p>오너: {project.owner_name}</p>
                   {project.service_domain && (
                     <p>도메인: {project.service_domain}</p>
                   )}
-                  <p>Phase: {project.current_phase} / 8</p>
+                  <p>Phase: {project.current_phase} / 9</p>
                 </div>
                 <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700">
                   <div className="w-full h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-blue-600 rounded-full transition-all"
-                      style={{ width: `${Math.round((project.current_phase / 8) * 100)}%` }}
+                      style={{ width: `${Math.round((project.current_phase / 9) * 100)}%` }}
                     />
                   </div>
                 </div>

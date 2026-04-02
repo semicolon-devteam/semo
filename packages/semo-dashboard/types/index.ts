@@ -281,6 +281,25 @@ export interface TestResult {
   duration_ms: number | null;
 }
 
+// GFP Preset Types
+
+export type GfpPresetId = 'standard' | 'infra-ready';
+
+export interface GfpInfraConfig {
+  repo_url: string;
+  live_url: string;
+  deploy_pipeline?: string;
+  dns_configured?: boolean;
+  provisioned_by?: string;
+  provisioned_at?: string;
+}
+
+export interface GfpPresetConfig {
+  infra?: GfpInfraConfig;
+  skip_cc?: number[];
+  bot_hints?: Partial<Record<number, string>>;
+}
+
 // GFP (Greenfield Project Pipeline) Types
 
 export interface GfpQAItem {

@@ -180,6 +180,7 @@ export interface GfpPhaseCompletedOpts {
   channelId?: string;
   ownerSlackId?: string | null;
   serviceDomain?: string;
+  metadata?: Record<string, unknown>; // 프리셋 CC skip 판별용
 }
 
 export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): Promise<boolean> {
@@ -200,9 +201,14 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
   const isLastPhase = opts.nextPhase === null || opts.nextPhase > 9;
   const nextLabel = isLastPhase ? null : (PHASE_LABELS[opts.nextPhase!] ?? `Phase ${opts.nextPhase}`);
 
-  // 다음 Phase 담당 봇 + CC 봇 (예: InfraClaw)
+  // 다음 Phase 담당 봇 + CC 봇 (예: InfraClaw) — 프리셋에 따라 skip 가능
   const nextAssignee = isLastPhase ? null : getPhaseAssignee(opts.nextPhase!);
-  const ccBots = isLastPhase ? [] : getPhaseCc(opts.nextPhase!);
+  const { shouldSkipCc } = await import('./gfp-presets');
+  const ccBots = isLastPhase
+    ? []
+    : (opts.metadata && shouldSkipCc(opts.metadata, opts.nextPhase!))
+      ? []
+      : getPhaseCc(opts.nextPhase!);
 
   // 멘션 목록: 담당 봇 + CC 봇 + 오너
   const ownerMention = opts.ownerSlackId ? ` <@${opts.ownerSlackId}>` : '';

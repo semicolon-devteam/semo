@@ -67,6 +67,13 @@ export async function createProject(data: {
     writeGfpIdToKB(data.service_domain, project).catch((err) =>
       console.error('[GFP] KB gfp-id write failed:', err)
     );
+
+    // infra-ready 프리셋: 인프라 정보를 KB에 별도 기록
+    if (data.metadata?.preset === 'infra-ready') {
+      writeInfraToKB(data.service_domain, data.metadata).catch((err) =>
+        console.error('[GFP] KB infra write failed:', err)
+      );
+    }
   }
 
   return project;
@@ -97,16 +104,52 @@ async function ensureOntologyDomain(domain: string, projectName: string): Promis
  */
 async function writeGfpIdToKB(serviceDomain: string, project: GfpProject): Promise<void> {
   const { upsertItem } = await import('./kb');
-  const content = [
+  const presetId = (project.metadata?.preset as string) ?? 'standard';
+  const presetConfig = project.metadata?.preset_config as Record<string, unknown> | undefined;
+  const infraConfig = presetConfig?.infra as Record<string, unknown> | undefined;
+
+  const lines = [
     `gfp_id: ${project.gfp_id}`,
     `project_name: ${project.project_name}`,
     `owner: ${project.owner_name}`,
     `status: ${project.status}`,
     `current_phase: ${project.current_phase}`,
-    `created_at: ${project.created_at}`,
-  ].join('\n');
-  await upsertItem(serviceDomain, 'gfp-id', content, 'gfp-pipeline');
-  console.log(`[GFP] KB gfp-id written for domain '${serviceDomain}': ${project.gfp_id}`);
+    `preset: ${presetId}`,
+  ];
+
+  if (presetId === 'infra-ready' && infraConfig) {
+    if (infraConfig.repo_url) lines.push(`infra_repo: ${infraConfig.repo_url}`);
+    if (infraConfig.live_url) lines.push(`infra_live_url: ${infraConfig.live_url}`);
+  }
+
+  lines.push(`created_at: ${project.created_at}`);
+
+  await upsertItem(serviceDomain, 'gfp-id', lines.join('\n'), 'gfp-pipeline');
+  console.log(`[GFP] KB gfp-id written for domain '${serviceDomain}': ${project.gfp_id} (preset: ${presetId})`);
+}
+
+/**
+ * infra-ready 프리셋: 사전 구축된 인프라 정보를 KB에 기록.
+ * 봇이 `semo kb get {domain} infra`로 인프라 정보를 조회할 수 있음.
+ */
+async function writeInfraToKB(serviceDomain: string, metadata: Record<string, unknown>): Promise<void> {
+  const { upsertItem } = await import('./kb');
+  const presetConfig = metadata.preset_config as Record<string, unknown> | undefined;
+  const infra = presetConfig?.infra as Record<string, unknown> | undefined;
+  if (!infra) return;
+
+  const lines = [
+    infra.repo_url ? `repo_url: ${infra.repo_url}` : null,
+    infra.live_url ? `live_url: ${infra.live_url}` : null,
+    infra.deploy_pipeline ? `deploy_pipeline: ${infra.deploy_pipeline}` : null,
+    `dns_configured: ${infra.dns_configured ?? false}`,
+    infra.provisioned_by ? `provisioned_by: ${infra.provisioned_by}` : null,
+    `provisioned_at: ${infra.provisioned_at ?? new Date().toISOString()}`,
+    'source: gfp-preset-infra-ready',
+  ].filter(Boolean);
+
+  await upsertItem(serviceDomain, 'infra', lines.join('\n'), 'gfp-pipeline');
+  console.log(`[GFP] KB infra written for domain '${serviceDomain}'`);
 }
 
 export async function updateProject(

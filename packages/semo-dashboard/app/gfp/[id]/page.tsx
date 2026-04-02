@@ -10,10 +10,12 @@ import GfpMaterialUpload from '@/components/gfp/GfpMaterialUpload';
 import GfpResearchPanel from '@/components/gfp/GfpResearchPanel';
 import GfpStitchPanel from '@/components/gfp/GfpStitchPanel';
 import GfpDesignStepNav from '@/components/gfp/GfpDesignStepNav';
-import type { GfpProject, GfpPhaseSection, GfpResearchTask, DesignStep } from '@/types';
+import GfpPresetInfoPanel from '@/components/gfp/GfpPresetInfoPanel';
+import type { GfpProject, GfpPhaseSection, GfpResearchTask, DesignStep, GfpPresetId } from '@/types';
 import { DESIGN_STEPS } from '@/types';
 import type { PhaseProgress } from '@/lib/gfp';
 import { PHASE_LABELS } from '@/lib/gfp-phases';
+import { GFP_PRESETS } from '@/lib/gfp-presets';
 
 interface ProjectWithProgress extends GfpProject {
   progress: PhaseProgress[];
@@ -230,10 +232,19 @@ export default function GfpDetailPage() {
               {project.project_name}
             </h1>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            오너: {project.owner_name}
-            {project.service_domain && ` | 도메인: ${project.service_domain}`}
-          </p>
+          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+            <span>오너: {project.owner_name}</span>
+            {project.service_domain && <span>| 도메인: {project.service_domain}</span>}
+            {(() => {
+              const pid = (project.metadata as Record<string, unknown>)?.preset as GfpPresetId | undefined;
+              const pdef = pid && pid !== 'standard' ? GFP_PRESETS[pid] : null;
+              return pdef ? (
+                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                  {pdef.label}
+                </span>
+              ) : null;
+            })()}
+          </div>
         </div>
       </div>
 
@@ -243,6 +254,10 @@ export default function GfpDetailPage() {
           currentPhase={activePhase}
           progress={project.progress}
           onPhaseClick={handlePhaseClick}
+          skipCcPhases={(() => {
+            const pc = (project.metadata as Record<string, unknown>)?.preset_config as Record<string, unknown> | undefined;
+            return (pc?.skip_cc as number[]) ?? [];
+          })()}
         />
       </div>
 
@@ -379,6 +394,7 @@ export default function GfpDetailPage() {
           </button>
           {sidebarOpen && (
             <div className="space-y-4">
+              <GfpPresetInfoPanel metadata={project.metadata as Record<string, unknown>} />
               <GfpMaterialUpload
                 gfpId={id}
                 onUploaded={refresh}

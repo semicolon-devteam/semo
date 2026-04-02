@@ -144,7 +144,11 @@ export async function PATCH(
 
     // On rejection, dispatch PlanClaw regeneration + Slack notification
     if (status === 'rejected' && reviewer_note) {
-      dispatchRegeneration(section_id, section.content, reviewer_note, section.phase).catch((err) =>
+      const proj = await getProject(id);
+      dispatchRegeneration(
+        section_id, section.content, reviewer_note, section.phase,
+        (proj?.metadata as Record<string, unknown>) ?? undefined
+      ).catch((err) =>
         console.error('PlanClaw dispatch failed:', err)
       );
 
@@ -241,6 +245,7 @@ export async function PATCH(
             channelId: slackCtx.channelId,
             ownerSlackId: slackCtx.ownerSlackId,
             serviceDomain: project.service_domain ?? undefined,
+            metadata: project.metadata as Record<string, unknown>,
           }).catch((err) => console.error('Phase complete Slack failed:', err));
         }
       }

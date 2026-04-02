@@ -7,9 +7,10 @@ interface GfpPhaseNavProps {
   currentPhase: number;
   progress: PhaseProgress[];
   onPhaseClick: (phase: number) => void;
+  skipCcPhases?: number[];
 }
 
-export default function GfpPhaseNav({ currentPhase, progress, onPhaseClick }: GfpPhaseNavProps) {
+export default function GfpPhaseNav({ currentPhase, progress, onPhaseClick, skipCcPhases = [] }: GfpPhaseNavProps) {
   const progressMap = new Map(progress.map((p) => [p.phase, p]));
 
   return (
@@ -19,11 +20,13 @@ export default function GfpPhaseNav({ currentPhase, progress, onPhaseClick }: Gf
         const isComplete = p && p.total > 0 && p.approved === p.total;
         const hasContent = p && p.total > 0;
         const isActive = currentPhase === i;
+        const isCcSkipped = skipCcPhases.includes(i);
 
         return (
           <button
             key={i}
             onClick={() => onPhaseClick(i)}
+            title={isCcSkipped ? `${PHASE_LABELS[i]} (인프라 선행 — CC 생략)` : PHASE_LABELS[i]}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-colors ${
               isActive
                 ? 'bg-blue-600 text-white'
@@ -37,6 +40,7 @@ export default function GfpPhaseNav({ currentPhase, progress, onPhaseClick }: Gf
             {isComplete && <span className="text-green-600 dark:text-green-400">&#10003;</span>}
             <span>{i}</span>
             <span className="hidden sm:inline">{PHASE_LABELS[i]}</span>
+            {isCcSkipped && <span className="text-purple-500 dark:text-purple-400 text-[10px]" title="CC skip">&#9889;</span>}
           </button>
         );
       })}
