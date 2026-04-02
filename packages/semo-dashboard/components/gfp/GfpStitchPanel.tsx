@@ -99,7 +99,7 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
             >
               <span>{def.step}. {def.label}</span>
               <span>
-                {allApproved ? '&#x2713;' : stepSecs.length > 0 ? sectionStatusSummary(stepSecs) : '-'}
+                {allApproved ? '✓' : stepSecs.length > 0 ? sectionStatusSummary(stepSecs) : '-'}
               </span>
             </div>
           );
@@ -286,13 +286,13 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
           <p className="font-medium text-gray-700 dark:text-gray-300">핸드오프 체크리스트</p>
           <ul className="space-y-0.5">
             <li className={handoffSections.some((s) => s.section_key === 'handoff-design-spec') ? 'text-green-600' : ''}>
-              {handoffSections.some((s) => s.section_key === 'handoff-design-spec') ? '&#x2713;' : '&#x25CB;'} 디자인 스펙
+              {handoffSections.some((s) => s.section_key === 'handoff-design-spec') ? '✓' : '○'} 디자인 스펙
             </li>
             <li className={handoffSections.some((s) => s.section_key === 'handoff-component-map') ? 'text-green-600' : ''}>
-              {handoffSections.some((s) => s.section_key === 'handoff-component-map') ? '&#x2713;' : '&#x25CB;'} 컴포넌트 맵
+              {handoffSections.some((s) => s.section_key === 'handoff-component-map') ? '✓' : '○'} 컴포넌트 맵
             </li>
             <li className={handoffSections.some((s) => s.section_key === 'handoff-stitch-assets') ? 'text-green-600' : ''}>
-              {handoffSections.some((s) => s.section_key === 'handoff-stitch-assets') ? '&#x2713;' : '&#x25CB;'} Stitch 에셋
+              {handoffSections.some((s) => s.section_key === 'handoff-stitch-assets') ? '✓' : '○'} Stitch 에셋
             </li>
           </ul>
         </div>

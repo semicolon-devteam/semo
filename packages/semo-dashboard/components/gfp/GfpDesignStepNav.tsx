@@ -45,7 +45,7 @@ export default function GfpDesignStepNav({ currentStep, stepStatuses, onStepClic
             >
               <span className="text-sm">{STEP_ICONS[def.icon] ?? ''}</span>
               <span>{def.label}</span>
-              {isPast && <span className="text-green-500">&#x2713;</span>}
+              {isPast && <span className="text-green-500">✓</span>}
             </button>
           </div>
         );
