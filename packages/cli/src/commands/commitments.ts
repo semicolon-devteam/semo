@@ -318,6 +318,8 @@ export function registerCommitmentsCommands(program: Command): void {
     .command("watch")
     .description("워치독 — 활성 약속의 health 상태 조회")
     .option("--format <type>", "출력 형식 (table|json)", "table")
+    .option("--bot-id <id>", "특정 봇만 필터")
+    .option("--exclude-bot <id>", "특정 봇 제외")
     .action(async (options) => {
       const connected = await isDbConnected();
       if (!connected) {
@@ -328,18 +330,37 @@ export function registerCommitmentsCommands(program: Command): void {
 
       try {
         const pool = getPool();
+        const conditions: string[] = [];
+        const params: string[] = [];
+        let paramIdx = 1;
+
+        if (options.botId) {
+          conditions.push(`bot_id = $${paramIdx++}`);
+          params.push(options.botId);
+        }
+        if (options.excludeBot) {
+          conditions.push(`bot_id != $${paramIdx++}`);
+          params.push(options.excludeBot);
+        }
+
+        const whereClause = conditions.length > 0
+          ? `WHERE ${conditions.join(" AND ")}`
+          : "";
+
         const result = await pool.query(
           `SELECT id, bot_id, status, title, deadline_at::text,
                   health, minutes_since_heartbeat, minutes_overdue,
                   steps, last_heartbeat_at::text, created_at::text, metadata
            FROM semo.v_active_commitments
+           ${whereClause}
            ORDER BY
              CASE health
                WHEN 'overdue' THEN 0
                WHEN 'stale' THEN 1
                ELSE 2
              END,
-             deadline_at ASC NULLS LAST`
+             deadline_at ASC NULLS LAST`,
+          params
         );
 
         if (options.format === "json") {
