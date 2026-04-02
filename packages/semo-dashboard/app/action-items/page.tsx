@@ -137,6 +137,20 @@ export default function ActionItemsPage() {
     return d < today;
   };
 
+  const formatRelativeDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    d.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+    if (diffDays === 0) return '오늘';
+    if (diffDays === 1) return '어제';
+    if (diffDays < 7) return `${diffDays}일 전`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}주 전`;
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
@@ -254,12 +268,12 @@ export default function ActionItemsPage() {
                             {/* Deadline */}
                             {item.deadline && (
                               <span className={`text-xs ${isOverdue(item) ? 'text-red-500 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-                                {item.deadline}
+                                ~ {item.deadline}
                               </span>
                             )}
                             {/* Date */}
                             <span className="text-xs text-gray-400 dark:text-gray-500">
-                              {item.date}
+                              {formatRelativeDate(item.date)}
                             </span>
                           </div>
                         </div>
