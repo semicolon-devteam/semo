@@ -190,7 +190,7 @@ export async function updateProject(
     params.push(data.status);
   }
   if (data.metadata !== undefined) {
-    sets.push(`metadata = $${idx++}`);
+    sets.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${idx++}::jsonb`);
     params.push(JSON.stringify(data.metadata));
   }
 
