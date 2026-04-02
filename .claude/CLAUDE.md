@@ -31,7 +31,7 @@
 
 ### 읽기 (Query-First)
 다음 주제 질문 → **반드시 `semo kb search`/`semo kb get`으로 KB 먼저 조회** 후 답변:
-- 팀원 정보 → `domain: semicolon`, key: `team`, sub_key: `{name}`
+- 팀원 정보 → `domain: {name}` (개인 도메인, team 타입), key: `contact` or `role`
 - 프로젝트/서비스 현황 → `semo kb ontology --action instances` 또는 `domain: {serviceName}`
 - 의사결정 기록 → `domain: semicolon`, key: `decision`, sub_key: `{date}/{slug}`
 - 업무 프로세스 → `domain: semicolon`, key: `process`, sub_key: `{name}`
@@ -50,12 +50,12 @@
 #### 도메인 구조
 | 패턴 | 예시 | 용도 |
 |------|------|------|
-| `semicolon` | `semicolon` | 조직 공통 — team/decision/process/infra/slack-channel 하위 키 |
+| `semicolon` | `semicolon` | 조직 공통 — decision/process/infra/slack-channel 하위 키 |
 | `{service}` | `semo`, `axoracle` | 서비스 고유 — base-information/status/spec/kpi/slack-channel 하위 키 |
 | `{botId}` | `semiclaw`, `workclaw` | 봇 프로필 — identity/role/status/gateway-config 하위 키 |
 
 **답변근거 표기**: KB 기반 답변 첫 줄에 출처 명시 — `[답변근거: KB {domain} {key}]`
-  복수 조회 시: `[답변근거: KB semicolon team/*, axoracle base-information]`
+  복수 조회 시: `[답변근거: KB semo bot-ids, axoracle base-information]`
 
 **금지:** 위 주제를 자체 지식/세션 기억만으로 답변하는 것.
 KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하겠습니다."

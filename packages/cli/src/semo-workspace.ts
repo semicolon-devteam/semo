@@ -251,7 +251,7 @@ export function generateUserMd(): void {
   const content = `# User Profile
 
 > 이 파일은 사용자 프로필입니다.
-> \`semo kb get semicolon team/{name}\`으로 KB에서 가져오거나 직접 수정하세요.
+> \`semo kb get {name} contact\`으로 KB에서 가져오거나 직접 수정하세요.
 
 ## 기본 정보
 
