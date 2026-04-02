@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import type { VitoUtterance } from '@/lib/vito';
+import type { VitoUtterance } from '@/lib/stt';
 
 interface TeamMember {
   domain: string;
@@ -115,7 +115,7 @@ export default function SpeakerMapper({ utterances, speakers, audioUrl, onConfir
       {audioUrl && <audio ref={audioRef} src={audioUrl} preload="auto" className="hidden" />}
 
       <p className="text-sm text-gray-600 dark:text-gray-400">
-        VITO가 {speakers.length}명의 화자를 감지했습니다. 각 화자에 이름을 매핑해주세요.
+        {speakers.length}명의 화자가 감지되었습니다. 각 화자에 이름을 매핑해주세요.
       </p>
 
       {teamLoading ? (

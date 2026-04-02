@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: '/org', label: '조직도' },
   { href: '/cost', label: '비용' },
   { href: '/goals', label: '목표' },
+  { href: '/action-items', label: '액션' },
   { href: '/kb', label: '지식' },
   { href: '/system', label: '시스템' },
   { href: '/tests', label: '테스트' },

@@ -5,7 +5,7 @@
  */
 
 import { query } from './db';
-import type { VitoUtterance } from './vito';
+import type { VitoUtterance } from './stt';
 
 export interface Meeting {
   meeting_id: string;

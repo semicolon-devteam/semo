@@ -11,10 +11,12 @@ import GfpResearchPanel from '@/components/gfp/GfpResearchPanel';
 import GfpStitchPanel from '@/components/gfp/GfpStitchPanel';
 import GfpDesignStepNav from '@/components/gfp/GfpDesignStepNav';
 import GfpPresetInfoPanel from '@/components/gfp/GfpPresetInfoPanel';
-import type { GfpProject, GfpPhaseSection, GfpResearchTask, DesignStep, GfpPresetId } from '@/types';
+import GfpInfraRequestPanel from '@/components/gfp/GfpInfraRequestPanel';
+import GfpInfraFlagModal from '@/components/gfp/GfpInfraFlagModal';
+import type { GfpProject, GfpPhaseSection, GfpResearchTask, GfpInfraRequest, DesignStep, GfpPresetId, GfpTrack } from '@/types';
 import { DESIGN_STEPS } from '@/types';
 import type { PhaseProgress } from '@/lib/gfp';
-import { PHASE_LABELS } from '@/lib/gfp-phases';
+import { PHASE_LABELS, INFRA_PHASE_LABELS } from '@/lib/gfp-phases';
 import { GFP_PRESETS } from '@/lib/gfp-presets';
 
 interface ProjectWithProgress extends GfpProject {
@@ -29,9 +31,9 @@ async function fetchProjectData(id: string): Promise<ProjectWithProgress | null>
   } catch { return null; }
 }
 
-async function fetchSectionsData(id: string, phase: number): Promise<GfpPhaseSection[]> {
+async function fetchSectionsData(id: string, phase: number, track: GfpTrack = 'plan'): Promise<GfpPhaseSection[]> {
   try {
-    const res = await fetch(`/api/gfp/${id}/sections?phase=${phase}`);
+    const res = await fetch(`/api/gfp/${id}/sections?phase=${phase}&track=${track}`);
     if (!res.ok) return [];
     return res.json();
   } catch { return []; }
@@ -45,17 +47,51 @@ async function fetchResearchData(id: string): Promise<GfpResearchTask[]> {
   } catch { return []; }
 }
 
+async function fetchInfraRequests(id: string): Promise<GfpInfraRequest[]> {
+  try {
+    const res = await fetch(`/api/gfp/${id}/infra-requests`);
+    if (!res.ok) return [];
+    return res.json();
+  } catch { return []; }
+}
+
+async function fetchInfraProgress(id: string): Promise<PhaseProgress[]> {
+  try {
+    // Fetch all sections for infra track and compute progress client-side
+    const res = await fetch(`/api/gfp/${id}/sections?track=infra`);
+    if (!res.ok) return [];
+    const sections: GfpPhaseSection[] = await res.json();
+    const phaseMap = new Map<number, PhaseProgress>();
+    for (const s of sections) {
+      if (!phaseMap.has(s.phase)) {
+        phaseMap.set(s.phase, { phase: s.phase, total: 0, approved: 0, rejected: 0, pending: 0, draft: 0 });
+      }
+      const p = phaseMap.get(s.phase)!;
+      p.total++;
+      if (s.status === 'approved') p.approved++;
+      else if (s.status === 'rejected') p.rejected++;
+      else if (s.status === 'pending-review') p.pending++;
+      else p.draft++;
+    }
+    return Array.from(phaseMap.values()).sort((a, b) => a.phase - b.phase);
+  } catch { return []; }
+}
+
 export default function GfpDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const id = params.id as string;
   const phaseParam = searchParams.get('phase');
   const sectionParam = searchParams.get('section');
+  const trackParam = searchParams.get('track') as GfpTrack | null;
 
   const [project, setProject] = useState<ProjectWithProgress | null>(null);
   const [sections, setSections] = useState<GfpPhaseSection[]>([]);
   const [researchTasks, setResearchTasks] = useState<GfpResearchTask[]>([]);
+  const [infraRequests, setInfraRequests] = useState<GfpInfraRequest[]>([]);
+  const [infraProgress, setInfraProgress] = useState<PhaseProgress[]>([]);
   const [activePhase, setActivePhase] = useState(0);
+  const [activeTrack, setActiveTrack] = useState<GfpTrack>(trackParam ?? 'plan');
   const [loading, setLoading] = useState(true);
   const [showNewSection, setShowNewSection] = useState(false);
   const [newSection, setNewSection] = useState({ section_key: '', title: '', content: '' });
@@ -63,19 +99,26 @@ export default function GfpDetailPage() {
   const [approvingAll, setApprovingAll] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [activeDesignStep, setActiveDesignStep] = useState<DesignStep>(1);
+  const [showInfraFlagModal, setShowInfraFlagModal] = useState(false);
+  const [infraFlagSectionId, setInfraFlagSectionId] = useState<string | undefined>();
 
-  const refresh = useCallback(async (phase?: number) => {
+  const refresh = useCallback(async (phase?: number, track?: GfpTrack) => {
     const p = phase ?? activePhase;
-    const [proj, secs, tasks] = await Promise.all([
+    const t = track ?? activeTrack;
+    const [proj, secs, tasks, infraReqs, infraProg] = await Promise.all([
       fetchProjectData(id),
-      fetchSectionsData(id, p),
+      fetchSectionsData(id, p, t),
       fetchResearchData(id),
+      fetchInfraRequests(id),
+      fetchInfraProgress(id),
     ]);
     setProject(proj);
     setSections(secs);
     setResearchTasks(tasks);
+    setInfraRequests(infraReqs);
+    setInfraProgress(infraProg);
     setLoading(false);
-  }, [id, activePhase]);
+  }, [id, activePhase, activeTrack]);
 
   // Initial load: project 먼저 가져온 뒤 올바른 Phase로 섹션 로드
   if (loading && !initialized) {
@@ -83,18 +126,28 @@ export default function GfpDetailPage() {
     (async () => {
       const proj = await fetchProjectData(id);
       if (!proj) { setLoading(false); return; }
-      // URL ?phase=N 우선, 없으면 current_phase
-      const targetPhase = phaseParam !== null ? parseInt(phaseParam, 10) : (proj.current_phase ?? 0);
+      const initTrack = trackParam ?? 'plan';
+      // URL ?phase=N 우선, 없으면 current_phase (or infra_phase for infra track)
+      const targetPhase = phaseParam !== null
+        ? parseInt(phaseParam, 10)
+        : initTrack === 'infra'
+          ? Math.min(proj.infra_phase ?? 0, 2)
+          : (proj.current_phase ?? 0);
       setActivePhase(targetPhase);
-      const [secs, tasks] = await Promise.all([
-        fetchSectionsData(id, targetPhase),
+      setActiveTrack(initTrack);
+      const [secs, tasks, infraReqs, infraProg] = await Promise.all([
+        fetchSectionsData(id, targetPhase, initTrack),
         fetchResearchData(id),
+        fetchInfraRequests(id),
+        fetchInfraProgress(id),
       ]);
       setProject(proj);
       setSections(secs);
       setResearchTasks(tasks);
+      setInfraRequests(infraReqs);
+      setInfraProgress(infraProg);
       // Phase 4: fetch design step from project metadata
-      if (targetPhase === 4) {
+      if (targetPhase === 4 && initTrack === 'plan') {
         const ds = (proj.metadata?.design_step as number) ?? 1;
         setActiveDesignStep(ds as DesignStep);
       }
@@ -104,12 +157,22 @@ export default function GfpDetailPage() {
 
   async function handlePhaseClick(phase: number) {
     setActivePhase(phase);
-    const secs = await fetchSectionsData(id, phase);
+    const secs = await fetchSectionsData(id, phase, activeTrack);
     setSections(secs);
-    if (phase === 4 && project) {
+    if (phase === 4 && activeTrack === 'plan' && project) {
       const ds = (project.metadata?.design_step as number) ?? 1;
       setActiveDesignStep(ds as DesignStep);
     }
+  }
+
+  async function handleTrackChange(track: GfpTrack) {
+    setActiveTrack(track);
+    const targetPhase = track === 'infra'
+      ? Math.min(project?.infra_phase ?? 0, 2)
+      : (project?.current_phase ?? 0);
+    setActivePhase(targetPhase);
+    const secs = await fetchSectionsData(id, targetPhase, track);
+    setSections(secs);
   }
 
   async function handleApprove(sectionId: string) {
@@ -168,6 +231,7 @@ export default function GfpDetailPage() {
         content: newSection.content.trim(),
         status: 'draft',
         source: 'manual',
+        track: activeTrack,
       }),
     });
     setNewSection({ section_key: '', title: '', content: '' });
@@ -194,8 +258,10 @@ export default function GfpDetailPage() {
     );
   }
 
-  const showResearch = activePhase <= 2;
-  const showStitch = activePhase === 4;
+  const hasInfraTrack = project.infra_phase !== null && project.infra_phase !== undefined;
+  const showResearch = activeTrack === 'plan' && activePhase <= 2;
+  const showStitch = activeTrack === 'plan' && activePhase === 4;
+  const phaseLabels = activeTrack === 'plan' ? PHASE_LABELS : INFRA_PHASE_LABELS;
 
   // Phase 3: filter sections by active design step
   const activeStepDef = DESIGN_STEPS.find((s) => s.step === activeDesignStep);
@@ -258,11 +324,15 @@ export default function GfpDetailPage() {
             const pc = (project.metadata as Record<string, unknown>)?.preset_config as Record<string, unknown> | undefined;
             return (pc?.skip_cc as number[]) ?? [];
           })()}
+          activeTrack={activeTrack}
+          infraPhase={project.infra_phase}
+          infraProgress={infraProgress}
+          onTrackChange={hasInfraTrack ? handleTrackChange : undefined}
         />
       </div>
 
       {/* Progress Overview */}
-      {project.progress.length > 0 && (
+      {project.progress.length > 0 && activeTrack === 'plan' && (
         <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
           <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">전체 진행률</h3>
           <GfpProgressBar progress={project.progress} />
@@ -285,7 +355,7 @@ export default function GfpDetailPage() {
 
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {activePhase}단계: {PHASE_LABELS[activePhase] ?? `${activePhase}단계`}
+              {activeTrack === 'infra' ? `인프라 ${activePhase}단계` : `${activePhase}단계`}: {phaseLabels[activePhase] ?? `${activePhase}단계`}
               {showStitch && activeStepDef && (
                 <span className="text-sm font-normal text-purple-600 dark:text-purple-400 ml-2">
                   / {activeStepDef.label}
@@ -293,6 +363,15 @@ export default function GfpDetailPage() {
               )}
             </h2>
             <div className="flex items-center gap-3">
+              {/* Infra flag button (only on plan track) */}
+              {activeTrack === 'plan' && hasInfraTrack && (
+                <button
+                  onClick={() => { setInfraFlagSectionId(undefined); setShowInfraFlagModal(true); }}
+                  className="text-xs px-3 py-1.5 bg-orange-100 hover:bg-orange-200 dark:bg-orange-900/20 dark:hover:bg-orange-900/40 text-orange-700 dark:text-orange-400 font-medium rounded-md transition-colors"
+                >
+                  인프라 요구사항
+                </button>
+              )}
               {phaseSections.filter((s) => s.status !== 'approved' && s.status !== 'rejected').length > 0 && (
                 <button
                   onClick={handleApproveAll}
@@ -383,7 +462,7 @@ export default function GfpDetailPage() {
           )}
         </div>
 
-        {/* Sidebar — Material Upload + Research */}
+        {/* Sidebar — Material Upload + Research + Infra */}
         <div>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -395,6 +474,14 @@ export default function GfpDetailPage() {
           {sidebarOpen && (
             <div className="space-y-4">
               <GfpPresetInfoPanel metadata={project.metadata as Record<string, unknown>} />
+              {/* Infra request panel (always visible if infra track exists) */}
+              {hasInfraTrack && (
+                <GfpInfraRequestPanel
+                  gfpId={id}
+                  requests={infraRequests}
+                  onRefresh={() => refresh()}
+                />
+              )}
               <GfpMaterialUpload
                 gfpId={id}
                 onUploaded={refresh}
@@ -418,6 +505,17 @@ export default function GfpDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Infra Flag Modal */}
+      {showInfraFlagModal && (
+        <GfpInfraFlagModal
+          gfpId={id}
+          sourcePhase={activePhase}
+          sourceSectionId={infraFlagSectionId}
+          onClose={() => setShowInfraFlagModal(false)}
+          onCreated={() => refresh()}
+        />
+      )}
     </div>
   );
 }

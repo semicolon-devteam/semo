@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import type { VitoUtterance } from '@/lib/vito';
+import type { VitoUtterance } from '@/lib/stt';
 
 interface TeamMember {
   domain: string;

@@ -6,39 +6,46 @@
  * Rejection 시 해당 Phase 담당 봇에게 재작업 요청.
  */
 
+import type { GfpTrack } from '@/types';
+
 export interface PhaseAssignee {
   botId: string;
   slackId: string;
 }
 
-// Phase 완료 시 추가로 멘션할 봇 (인프라 세팅 등)
+// Phase 완료 시 추가로 멘션할 봇 (레거시 — 병렬 트랙에서는 사용 안 함)
 export interface PhaseCcBot {
   botId: string;
   slackId: string;
   reason: string; // 멘션 사유
 }
 
+// Track A (plan) Phase 할당
 export const PHASE_ASSIGNEES: Record<number, PhaseAssignee> = {
-  0: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Constitution
-  1: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Discovery
-  2: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // PRD
-  3: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Clarification (Q&A)
-  4: { botId: 'designclaw', slackId: 'U0AFC0MK2TY' },  // Design System
-  5: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Epic
-  6: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Functional Spec
-  7: { botId: 'workclaw', slackId: 'U0AFECSJHK3' },    // Technical Plan
-  8: { botId: 'workclaw', slackId: 'U0AFECSJHK3' },    // Task Breakdown
-  9: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },   // Handoff
+  0: { botId: 'semiclaw', slackId: 'U0AFNMGKURX' },    // Onboarding (SemiClaw)
+  1: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },    // Discovery
+  2: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },    // PRD
+  3: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },    // Clarification (Q&A)
+  4: { botId: 'designclaw', slackId: 'U0AFC0MK2TY' },   // Design System
+  5: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },    // Epic
+  6: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },    // Functional Spec
+  7: { botId: 'workclaw', slackId: 'U0AFECSJHK3' },     // Technical Plan
+  8: { botId: 'workclaw', slackId: 'U0AFECSJHK3' },     // Task Breakdown
+  9: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },    // Handoff
 };
 
-// Phase 완료 후 다음 Phase 시작 시 추가 멘션할 봇
-export const PHASE_CC: Record<number, PhaseCcBot[]> = {
-  // Phase 7 (Technical Plan) 승인 → InfraClaw에게 인프라 세팅 알림
-  8: [{ botId: 'infraclaw', slackId: 'U0AFPDMCGHX', reason: '인프라 세팅 시작' }],
+// Track B (infra) Phase 할당
+export const INFRA_PHASE_ASSIGNEES: Record<number, PhaseAssignee> = {
+  0: { botId: 'infraclaw', slackId: 'U0AFPDMCGHX' },
+  1: { botId: 'infraclaw', slackId: 'U0AFPDMCGHX' },
+  2: { botId: 'infraclaw', slackId: 'U0AFPDMCGHX' },
 };
+
+// Phase 완료 후 다음 Phase 시작 시 추가 멘션할 봇 (레거시 호환 — 병렬 트랙에서는 비어 있음)
+export const PHASE_CC: Record<number, PhaseCcBot[]> = {};
 
 export const PHASE_LABELS: Record<number, string> = {
-  0: '헌법',
+  0: '온보딩',
   1: '디스커버리',
   2: 'PRD',
   3: '명확화',
@@ -50,7 +57,16 @@ export const PHASE_LABELS: Record<number, string> = {
   9: '핸드오프',
 };
 
-export function getPhaseAssignee(phase: number): PhaseAssignee {
+export const INFRA_PHASE_LABELS: Record<number, string> = {
+  0: '기본 세팅',
+  1: '기능 연동 인프라',
+  2: '검증 & 핸드오프',
+};
+
+export function getPhaseAssignee(phase: number, track: GfpTrack = 'plan'): PhaseAssignee {
+  if (track === 'infra') {
+    return INFRA_PHASE_ASSIGNEES[phase] ?? INFRA_PHASE_ASSIGNEES[0];
+  }
   return PHASE_ASSIGNEES[phase] ?? PHASE_ASSIGNEES[0];
 }
 

@@ -4,8 +4,8 @@
  */
 
 import { query } from './db';
-import { getPhaseAssignee, getPhaseCc, PHASE_LABELS } from './gfp-phases';
-import type { GfpQAItem } from '@/types';
+import { getPhaseAssignee, getPhaseCc, PHASE_LABELS, INFRA_PHASE_LABELS } from './gfp-phases';
+import type { GfpQAItem, GfpInfraRequest } from '@/types';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const DASHBOARD_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space';
@@ -419,6 +419,319 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
   }
 
   return threadMap;
+}
+
+// ── GFP Project Created — Phase 0 Bot Mention ──
+
+export interface GfpProjectCreatedOpts {
+  projectName: string;
+  gfpId: string;
+  ownerName: string;
+  channelId: string;
+  preset: string;
+}
+
+/**
+ * 프로젝트 생성 시 Slack 채널에 Phase 0 담당 봇 멘션.
+ * parallel 프리셋 → SemiClaw, 그 외 → PlanClaw.
+ * 봇이 Slack 멘션을 감지하여 자동으로 Phase 0 작업을 시작함.
+ */
+export async function sendGfpProjectCreatedSlack(opts: GfpProjectCreatedOpts): Promise<boolean> {
+  if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
+
+  const assignee = getPhaseAssignee(0, 'plan');
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}`;
+  const isParallel = opts.preset === 'parallel';
+
+  const blocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: 'GFP 프로젝트 생성', emoji: true },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
+        { type: 'mrkdwn', text: `*Owner:*\n${opts.ownerName}` },
+        { type: 'mrkdwn', text: `*Phase:*\n0 — 온보딩` },
+        { type: 'mrkdwn', text: `*Assigned:*\n<@${assignee.slackId}>` },
+      ],
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: isParallel
+          ? `<@${assignee.slackId}> 프로젝트 기본 정보를 수집해주세요: 프로젝트명, 담당자, 연락처, 서비스 도메인.\n온보딩 완료 후 기획/인프라 병렬 트랙이 시작됩니다.`
+          : `<@${assignee.slackId}> Phase 0 (온보딩) 섹션 작성을 시작해주세요.`,
+      },
+    },
+    {
+      type: 'context',
+      elements: [
+        { type: 'mrkdwn', text: `<${dashboardUrl}|Dashboard에서 확인>` },
+      ],
+    },
+  ];
+
+  try {
+    const res = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+      body: JSON.stringify({
+        channel: opts.channelId,
+        text: `<@${assignee.slackId}> [GFP] ${opts.projectName} — Phase 0 온보딩을 시작해주세요.`,
+        blocks,
+      }),
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      console.error('Slack project created error:', data.error);
+      return false;
+    }
+    console.log(`[GFP Slack] Project created notification sent for ${opts.projectName}`);
+    return true;
+  } catch (err) {
+    console.error('Slack project created failed:', err);
+    return false;
+  }
+}
+
+// ── GFP Track Fork Notification ──
+
+export interface GfpTrackForkOpts {
+  projectName: string;
+  gfpId: string;
+  channelId: string;
+  ownerSlackId?: string | null;
+}
+
+/**
+ * Phase 0 완료 후 Track A/B 포크 알림 (메시지 2개)
+ */
+export async function sendGfpTrackForkSlack(opts: GfpTrackForkOpts): Promise<boolean> {
+  if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
+
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}`;
+  const planAssignee = getPhaseAssignee(1, 'plan');
+  const infraAssignee = getPhaseAssignee(0, 'infra');
+  const ownerMention = opts.ownerSlackId ? ` <@${opts.ownerSlackId}>` : '';
+
+  try {
+    // Message 1: Track A — PlanClaw
+    await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+      body: JSON.stringify({
+        channel: opts.channelId,
+        text: `<@${planAssignee.slackId}>${ownerMention} [GFP Track A] ${opts.projectName} — Phase 1 (디스커버리) 시작해주세요.`,
+        blocks: [
+          {
+            type: 'header',
+            text: { type: 'plain_text', text: 'Track A: 기획 트랙 시작', emoji: true },
+          },
+          {
+            type: 'section',
+            fields: [
+              { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
+              { type: 'mrkdwn', text: `*Assigned:*\n<@${planAssignee.slackId}>` },
+              { type: 'mrkdwn', text: '*Phase:*\n1 — 디스커버리' },
+            ],
+          },
+          {
+            type: 'context',
+            elements: [
+              { type: 'mrkdwn', text: `온보딩 완료 → 기획/인프라 병렬 트랙 시작 | <${dashboardUrl}?phase=1|Dashboard>` },
+            ],
+          },
+        ],
+      }),
+    });
+
+    // Message 2: Track B — InfraClaw
+    await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+      body: JSON.stringify({
+        channel: opts.channelId,
+        text: `<@${infraAssignee.slackId}>${ownerMention} [GFP Track B] ${opts.projectName} — 기본 인프라 세팅을 시작해주세요.`,
+        blocks: [
+          {
+            type: 'header',
+            text: { type: 'plain_text', text: 'Track B: 인프라 트랙 시작', emoji: true },
+          },
+          {
+            type: 'section',
+            fields: [
+              { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
+              { type: 'mrkdwn', text: `*Assigned:*\n<@${infraAssignee.slackId}>` },
+              { type: 'mrkdwn', text: '*Phase:*\nInfra 0 — 기본 세팅' },
+            ],
+          },
+          {
+            type: 'context',
+            elements: [
+              { type: 'mrkdwn', text: `레포, CI/CD, DNS, 호스팅 기본 세팅 | <${dashboardUrl}?track=infra|Dashboard>` },
+            ],
+          },
+        ],
+      }),
+    });
+
+    console.log(`[GFP Slack] Track fork notifications sent for ${opts.projectName}`);
+    return true;
+  } catch (err) {
+    console.error('Slack track fork failed:', err);
+    return false;
+  }
+}
+
+// ── GFP Infra Request Notification ──
+
+export interface GfpInfraRequestSlackOpts {
+  projectName: string;
+  gfpId: string;
+  channelId: string;
+  request: GfpInfraRequest;
+}
+
+export async function sendGfpInfraRequestSlack(opts: GfpInfraRequestSlackOpts): Promise<boolean> {
+  if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
+
+  const infraAssignee = getPhaseAssignee(0, 'infra');
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?track=infra`;
+
+  try {
+    const res = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+      body: JSON.stringify({
+        channel: opts.channelId,
+        text: `<@${infraAssignee.slackId}> [GFP Infra Request] ${opts.projectName} — ${opts.request.title}`,
+        blocks: [
+          {
+            type: 'header',
+            text: { type: 'plain_text', text: 'Infra Request Flagged', emoji: true },
+          },
+          {
+            type: 'section',
+            fields: [
+              { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
+              { type: 'mrkdwn', text: `*Category:*\n${opts.request.category}` },
+              { type: 'mrkdwn', text: `*Title:*\n${opts.request.title}` },
+              { type: 'mrkdwn', text: `*Priority:*\n${opts.request.priority}` },
+            ],
+          },
+          ...(opts.request.description ? [{
+            type: 'section' as const,
+            text: { type: 'mrkdwn' as const, text: `*Description:*\n${opts.request.description}` },
+          }] : []),
+          {
+            type: 'context',
+            elements: [
+              { type: 'mrkdwn', text: `Source: Phase ${opts.request.source_phase} | <${dashboardUrl}|Dashboard>` },
+            ],
+          },
+        ],
+      }),
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      console.error('Slack infra request error:', data.error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Slack infra request failed:', err);
+    return false;
+  }
+}
+
+// ── GFP Infra Phase Completed Notification ──
+
+export interface GfpInfraPhaseCompletedOpts {
+  projectName: string;
+  gfpId: string;
+  completedPhase: number;
+  nextPhase: number | null;
+  channelId: string;
+  ownerSlackId?: string | null;
+}
+
+export async function sendGfpInfraPhaseCompletedSlack(opts: GfpInfraPhaseCompletedOpts): Promise<boolean> {
+  if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
+
+  const completedLabel = INFRA_PHASE_LABELS[opts.completedPhase] ?? `Infra Phase ${opts.completedPhase}`;
+  const isLast = opts.nextPhase === null || opts.nextPhase > 2;
+  const nextLabel = isLast ? null : (INFRA_PHASE_LABELS[opts.nextPhase!] ?? `Infra Phase ${opts.nextPhase}`);
+  const nextAssignee = isLast ? null : getPhaseAssignee(opts.nextPhase!, 'infra');
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?track=infra`;
+  const ownerMention = opts.ownerSlackId ? ` <@${opts.ownerSlackId}>` : '';
+
+  const blocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: isLast ? 'Track B: Infra Complete' : 'Track B: Infra Phase Complete', emoji: true },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*Project:*\n${opts.projectName}` },
+        { type: 'mrkdwn', text: `*Completed:*\nInfra ${opts.completedPhase} — ${completedLabel}` },
+        ...(isLast
+          ? [{ type: 'mrkdwn', text: '*Status:*\nInfra 트랙 완료' }]
+          : [
+            { type: 'mrkdwn', text: `*Next:*\nInfra ${opts.nextPhase} — ${nextLabel}` },
+            { type: 'mrkdwn', text: `*Assigned:*\n<@${nextAssignee!.slackId}>` },
+          ]),
+      ],
+    },
+    {
+      type: 'context',
+      elements: [
+        { type: 'mrkdwn', text: `<${dashboardUrl}|Dashboard>` },
+      ],
+    },
+  ];
+
+  const textFallback = isLast
+    ? `${ownerMention.trim()} [GFP] ${opts.projectName} — Track B 인프라 트랙 완료!`
+    : `<@${nextAssignee!.slackId}>${ownerMention} [GFP] ${opts.projectName} — Infra Phase ${opts.completedPhase} 완료. Infra Phase ${opts.nextPhase} (${nextLabel}) 시작해주세요.`;
+
+  try {
+    const res = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+      body: JSON.stringify({ channel: opts.channelId, text: textFallback, blocks }),
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      console.error('Slack infra phase complete error:', data.error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Slack infra phase complete failed:', err);
+    return false;
+  }
 }
 
 // ── GFP Design System Notification (Color Palette) ──

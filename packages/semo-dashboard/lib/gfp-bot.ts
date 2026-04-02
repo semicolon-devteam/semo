@@ -5,6 +5,7 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { getPhaseAssignee } from './gfp-phases';
+import type { GfpTrack } from '@/types';
 
 const execAsync = promisify(exec);
 
@@ -36,9 +37,10 @@ export async function dispatchRegeneration(
   originalContent: string,
   reviewerNote: string,
   phase: number = 0,
-  projectMetadata?: Record<string, unknown>
+  projectMetadata?: Record<string, unknown>,
+  track: GfpTrack = 'plan'
 ): Promise<void> {
-  const assignee = getPhaseAssignee(phase);
+  const assignee = getPhaseAssignee(phase, track);
 
   let presetContext = '';
   if (projectMetadata) {

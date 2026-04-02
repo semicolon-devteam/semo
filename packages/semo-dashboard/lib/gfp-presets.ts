@@ -2,7 +2,9 @@
  * GFP Preset Registry
  *
  * 프리셋은 GFP 파이프라인의 사전 구성 모드를 정의.
- * 예: 인프라가 이미 구축된 프로젝트는 Phase 8에서 InfraClaw CC를 생략.
+ * parallel: SemiClaw 온보딩 → 기획/인프라 병렬 진행 (기본값)
+ * infra-ready: 인프라가 이미 구축된 프로젝트 (Track B 생략)
+ * standard: 레거시 호환
  */
 
 import type { GfpPresetId, GfpPresetConfig } from '@/types';
@@ -17,6 +19,16 @@ export interface GfpPresetDef {
 }
 
 export const GFP_PRESETS: Record<GfpPresetId, GfpPresetDef> = {
+  parallel: {
+    id: 'parallel',
+    label: '병렬 트랙',
+    description: 'SemiClaw 온보딩 → 기획/인프라 병렬 진행 (기본값)',
+    requiredFields: [],
+    skipCcPhases: [],
+    botHintTemplate: {
+      0: '프로젝트 기본 정보를 수집해주세요: 프로젝트명, 담당자, 연락처, 서비스 도메인.',
+    },
+  },
   standard: {
     id: 'standard',
     label: '표준',

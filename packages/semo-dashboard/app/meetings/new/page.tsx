@@ -9,7 +9,7 @@ import TranscriptPreview from '@/components/meetings/TranscriptPreview';
 import AudioPlayer from '@/components/meetings/AudioPlayer';
 import GenerationPreview from '@/components/meetings/GenerationPreview';
 import type { AudioPlayerHandle } from '@/components/meetings/AudioPlayer';
-import type { VitoUtterance } from '@/lib/vito';
+import type { VitoUtterance } from '@/lib/stt';
 import type { KBEntry } from '@/lib/meeting-generate';
 
 const REGULAR_ATTENDEES = [

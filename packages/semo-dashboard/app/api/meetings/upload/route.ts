@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { transcribe } from '@/lib/vito';
+import { transcribe } from '@/lib/stt';
 import { getMeeting, updateTranscriptionStarted } from '@/lib/meeting';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +11,7 @@ const ALLOWED_EXTENSIONS = new Set([
   'mp3', 'm4a', 'mp4', 'wav', 'flac', 'ogg', 'webm', 'amr',
 ]);
 
-/** POST /api/meetings/upload — upload audio and start VITO transcription */
+/** POST /api/meetings/upload — upload audio and start STT transcription */
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
     const audioFileName = `${meetingId}.${ext}`;
 
-    // Send to VITO
+    // Send to STT service
     const transcribeId = await transcribe(buffer, file.name);
 
     // Update meeting with transcription info + audio stored in DB

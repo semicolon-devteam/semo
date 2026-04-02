@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getMeeting, updateTranscriptionCompleted, updateTranscriptionFailed } from '@/lib/meeting';
-import { getTranscribeStatus } from '@/lib/vito';
+import { getTranscribeStatus } from '@/lib/stt';
 
 export const dynamic = 'force-dynamic';
 
-/** GET /api/meetings/[id]/status — poll VITO transcription status */
+/** GET /api/meetings/[id]/status — poll STT transcription status */
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -51,10 +51,10 @@ export async function GET(
     }
 
     if (result.status === 'failed') {
-      await updateTranscriptionFailed(id, 'VITO transcription failed');
+      await updateTranscriptionFailed(id, 'STT transcription failed');
       return NextResponse.json({
         status: 'failed',
-        error: 'VITO transcription failed',
+        error: 'STT transcription failed',
       });
     }
 

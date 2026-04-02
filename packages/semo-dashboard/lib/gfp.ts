@@ -12,6 +12,10 @@ import type {
   GfpSectionStatus,
   GfpPhaseMapping,
   GfpQAItem,
+  GfpTrack,
+  GfpInfraRequest,
+  GfpInfraRequestStatus,
+  GfpInfraCategory,
 } from '@/types';
 
 // ── Projects ──
@@ -61,6 +65,15 @@ export async function createProject(data: {
     ]
   );
   const project = res.rows[0];
+
+  // parallel 프리셋: infra_phase = 0 초기화 (Track B 활성화)
+  if (data.metadata?.preset === 'parallel') {
+    await query(
+      'UPDATE semo.gfp_projects SET infra_phase = 0 WHERE gfp_id = $1',
+      [project.gfp_id]
+    );
+    project.infra_phase = 0;
+  }
 
   // KB에 gfp_id 저장 (service_domain이 있을 때)
   if (data.service_domain) {
@@ -154,7 +167,7 @@ async function writeInfraToKB(serviceDomain: string, metadata: Record<string, un
 
 export async function updateProject(
   gfpId: string,
-  data: Partial<Pick<GfpProject, 'project_name' | 'current_phase' | 'status' | 'metadata'>>
+  data: Partial<Pick<GfpProject, 'project_name' | 'current_phase' | 'infra_phase' | 'status' | 'metadata'>>
 ): Promise<GfpProject | null> {
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -167,6 +180,10 @@ export async function updateProject(
   if (data.current_phase !== undefined) {
     sets.push(`current_phase = $${idx++}`);
     params.push(data.current_phase);
+  }
+  if (data.infra_phase !== undefined) {
+    sets.push(`infra_phase = $${idx++}`);
+    params.push(data.infra_phase);
   }
   if (data.status !== undefined) {
     sets.push(`status = $${idx++}`);
@@ -189,12 +206,17 @@ export async function updateProject(
 
 // ── Sections ──
 
-export async function listSections(gfpId: string, phase?: number): Promise<GfpPhaseSection[]> {
+export async function listSections(gfpId: string, phase?: number, track?: GfpTrack): Promise<GfpPhaseSection[]> {
   let sql = 'SELECT * FROM semo.gfp_phase_sections WHERE gfp_id = $1';
   const params: unknown[] = [gfpId];
+  let idx = 2;
   if (phase !== undefined) {
-    sql += ' AND phase = $2';
+    sql += ` AND phase = $${idx++}`;
     params.push(phase);
+  }
+  if (track !== undefined) {
+    sql += ` AND track = $${idx++}`;
+    params.push(track);
   }
   sql += ' ORDER BY phase, ordinal';
   const res = await query<GfpPhaseSection>(sql, params);
@@ -211,14 +233,16 @@ export async function upsertSection(data: {
   status?: GfpSectionStatus;
   source?: string;
   qa_items?: GfpQAItem[];
+  track?: GfpTrack;
 }): Promise<GfpPhaseSection> {
   // If qa_items provided without content, auto-generate markdown
   const content = data.content || (data.qa_items ? renderQAContent(data.qa_items) : '');
+  const track = data.track ?? 'plan';
 
   const res = await query<GfpPhaseSection>(
-    `INSERT INTO semo.gfp_phase_sections (gfp_id, phase, section_key, title, content, ordinal, status, source, qa_items)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     ON CONFLICT (gfp_id, phase, section_key) DO UPDATE SET
+    `INSERT INTO semo.gfp_phase_sections (gfp_id, phase, section_key, title, content, ordinal, status, source, qa_items, track)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+     ON CONFLICT (gfp_id, track, phase, section_key) DO UPDATE SET
        title   = EXCLUDED.title,
        content = EXCLUDED.content,
        ordinal = EXCLUDED.ordinal,
@@ -236,6 +260,7 @@ export async function upsertSection(data: {
       data.status ?? 'draft',
       data.source ?? 'manual',
       data.qa_items ? JSON.stringify(data.qa_items) : null,
+      track,
     ]
   );
   return res.rows[0];
@@ -354,20 +379,22 @@ export interface PhaseProgress {
   draft: number;
 }
 
-export async function getPhaseProgress(gfpId: string): Promise<PhaseProgress[]> {
-  const res = await query<PhaseProgress>(
-    `SELECT phase,
+export async function getPhaseProgress(gfpId: string, track?: GfpTrack): Promise<PhaseProgress[]> {
+  let sql = `SELECT phase,
             COUNT(*)::int as total,
             COUNT(*) FILTER (WHERE status = 'approved')::int as approved,
             COUNT(*) FILTER (WHERE status = 'rejected')::int as rejected,
             COUNT(*) FILTER (WHERE status = 'pending-review')::int as pending,
             COUNT(*) FILTER (WHERE status = 'draft')::int as draft
      FROM semo.gfp_phase_sections
-     WHERE gfp_id = $1
-     GROUP BY phase
-     ORDER BY phase`,
-    [gfpId]
-  );
+     WHERE gfp_id = $1`;
+  const params: unknown[] = [gfpId];
+  if (track !== undefined) {
+    sql += ' AND track = $2';
+    params.push(track);
+  }
+  sql += ' GROUP BY phase ORDER BY phase';
+  const res = await query<PhaseProgress>(sql, params);
   return res.rows;
 }
 
@@ -544,10 +571,24 @@ export async function writebackPhaseProgressToKB(
   gfpId: string,
   serviceDomain: string,
   completedPhase: number,
-  nextPhase: number | null
+  nextPhase: number | null,
+  track: GfpTrack = 'plan'
 ): Promise<void> {
   const { upsertItem } = await import('./kb');
-  const { PHASE_LABELS, getPhaseAssignee } = await import('./gfp-phases');
+  const { PHASE_LABELS, INFRA_PHASE_LABELS, getPhaseAssignee } = await import('./gfp-phases');
+
+  if (track === 'infra') {
+    const content = [
+      `gfp_id: ${gfpId}`,
+      `infra_completed_phase: ${completedPhase} (${INFRA_PHASE_LABELS[completedPhase]})`,
+      `infra_next_phase: ${nextPhase !== null ? `${nextPhase} (${INFRA_PHASE_LABELS[nextPhase]})` : 'completed'}`,
+      `updated_at: ${new Date().toISOString()}`,
+    ].join('\n');
+
+    await upsertItem(serviceDomain, 'infra-status', content, 'gfp-pipeline');
+    console.log(`[GFP] KB infra progress: ${serviceDomain}/infra-status → phase ${nextPhase ?? 'done'}`);
+    return;
+  }
 
   const completedPhases = Array.from({ length: completedPhase + 1 }, (_, i) =>
     `${i}-${(PHASE_LABELS[i] ?? 'unknown').toLowerCase().replace(/\s+/g, '-')}`
@@ -557,11 +598,18 @@ export async function writebackPhaseProgressToKB(
     ? getPhaseAssignee(nextPhase)
     : null;
 
+  // Include infra track info if available
+  const project = await getProject(gfpId);
+  const infraLines = project?.infra_phase !== null
+    ? [`infra_phase: ${project?.infra_phase}`]
+    : [];
+
   const content = [
     `gfp_id: ${gfpId}`,
     `current_phase: ${nextPhase !== null && nextPhase <= 9 ? nextPhase : 'completed'}`,
     `last_completed_phase: ${completedPhase} (${PHASE_LABELS[completedPhase]})`,
     `completed_phases: [${completedPhases.join(', ')}]`,
+    ...infraLines,
     nextAssignee
       ? `next_assignee: ${nextAssignee.botId} (Phase ${nextPhase} — ${PHASE_LABELS[nextPhase!]})`
       : 'status: all-phases-completed',
@@ -576,7 +624,8 @@ export async function writebackPhaseProgressToKB(
 
 export async function createSectionsFromMapping(
   gfpId: string,
-  mappings: GfpPhaseMapping[]
+  mappings: GfpPhaseMapping[],
+  track: GfpTrack = 'plan'
 ): Promise<number> {
   let count = 0;
   await transaction(async (client) => {
@@ -584,16 +633,78 @@ export async function createSectionsFromMapping(
       for (let i = 0; i < mapping.sections.length; i++) {
         const sec = mapping.sections[i];
         await client.query(
-          `INSERT INTO semo.gfp_phase_sections (gfp_id, phase, section_key, title, content, ordinal, status, source)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-           ON CONFLICT (gfp_id, phase, section_key) DO UPDATE SET
+          `INSERT INTO semo.gfp_phase_sections (gfp_id, phase, section_key, title, content, ordinal, status, source, track)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           ON CONFLICT (gfp_id, track, phase, section_key) DO UPDATE SET
              title = EXCLUDED.title, content = EXCLUDED.content, ordinal = EXCLUDED.ordinal,
              status = EXCLUDED.status, source = EXCLUDED.source`,
-          [gfpId, mapping.phase, sec.key, sec.title, sec.content, i, 'pending-review', 'imported']
+          [gfpId, mapping.phase, sec.key, sec.title, sec.content, i, 'pending-review', 'imported', track]
         );
         count++;
       }
     }
   });
   return count;
+}
+
+// ── Infra Requests ──
+
+export async function listInfraRequests(gfpId: string): Promise<GfpInfraRequest[]> {
+  const res = await query<GfpInfraRequest>(
+    'SELECT * FROM semo.gfp_infra_requests WHERE gfp_id = $1 ORDER BY created_at DESC',
+    [gfpId]
+  );
+  return res.rows;
+}
+
+export async function createInfraRequest(data: {
+  gfp_id: string;
+  source_phase: number;
+  source_section_id?: string;
+  category: GfpInfraCategory;
+  title: string;
+  description?: string;
+  priority?: 'low' | 'normal' | 'high';
+}): Promise<GfpInfraRequest> {
+  const res = await query<GfpInfraRequest>(
+    `INSERT INTO semo.gfp_infra_requests (gfp_id, source_phase, source_section_id, category, title, description, priority)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
+     RETURNING *`,
+    [
+      data.gfp_id,
+      data.source_phase,
+      data.source_section_id ?? null,
+      data.category,
+      data.title,
+      data.description ?? null,
+      data.priority ?? 'normal',
+    ]
+  );
+  return res.rows[0];
+}
+
+export async function updateInfraRequest(
+  requestId: string,
+  status: GfpInfraRequestStatus,
+  slackThreadTs?: string
+): Promise<GfpInfraRequest | null> {
+  const res = await query<GfpInfraRequest>(
+    `UPDATE semo.gfp_infra_requests
+     SET status = $1, slack_thread_ts = COALESCE($2, slack_thread_ts), updated_at = NOW()
+     WHERE request_id = $3
+     RETURNING *`,
+    [status, slackThreadTs ?? null, requestId]
+  );
+  return res.rows[0] ?? null;
+}
+
+export async function checkInfraTrackComplete(gfpId: string): Promise<boolean> {
+  const project = await getProject(gfpId);
+  if (!project || project.infra_phase === null) return true; // No infra track → considered complete
+  if (project.infra_phase < 2) return false; // Infra has 3 phases (0, 1, 2)
+
+  // Check phase 2 sections are all approved
+  const sections = await listSections(gfpId, 2, 'infra');
+  if (sections.length === 0) return project.infra_phase > 2;
+  return sections.every((s) => s.status === 'approved');
 }

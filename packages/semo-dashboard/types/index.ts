@@ -283,7 +283,26 @@ export interface TestResult {
 
 // GFP Preset Types
 
-export type GfpPresetId = 'standard' | 'infra-ready';
+export type GfpPresetId = 'standard' | 'infra-ready' | 'parallel';
+
+export type GfpTrack = 'plan' | 'infra';
+export type GfpInfraRequestStatus = 'pending' | 'acknowledged' | 'in-progress' | 'completed';
+export type GfpInfraCategory = 'oauth' | 'push' | 'api' | 'storage' | 'dns' | 'cicd' | 'other';
+
+export interface GfpInfraRequest {
+  request_id: string;
+  gfp_id: string;
+  source_phase: number;
+  source_section_id: string | null;
+  category: GfpInfraCategory;
+  title: string;
+  description: string | null;
+  priority: 'low' | 'normal' | 'high';
+  status: GfpInfraRequestStatus;
+  slack_thread_ts: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface GfpInfraConfig {
   repo_url: string;
@@ -313,7 +332,7 @@ export interface GfpQAItem {
 
 export type GfpProjectStatus = 'active' | 'paused' | 'completed';
 export type GfpSectionStatus = 'draft' | 'pending-review' | 'approved' | 'rejected';
-export type GfpSectionSource = 'planclaw' | 'imported' | 'growthclaw' | 'manual' | 'designclaw';
+export type GfpSectionSource = 'planclaw' | 'imported' | 'growthclaw' | 'manual' | 'designclaw' | 'semiclaw' | 'infraclaw';
 export type GfpMaterialType = 'planning-doc' | 'stitch-export' | 'design-prototype';
 export type GfpResearchTaskType = 'competitor-analysis' | 'market-research' | 'ux-pattern' | 'keyword-research' | 'design-reference';
 export type GfpResearchStatus = 'queued' | 'dispatched' | 'completed';
@@ -336,6 +355,7 @@ export interface GfpProject {
   owner_name: string;
   owner_contact: string | null;
   current_phase: number;
+  infra_phase: number | null;
   status: GfpProjectStatus;
   metadata: Record<string, unknown>;
   created_at: string;
@@ -346,6 +366,7 @@ export interface GfpPhaseSection {
   section_id: string;
   gfp_id: string;
   phase: number;
+  track: GfpTrack;
   section_key: string;
   title: string;
   content: string;

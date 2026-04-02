@@ -16,7 +16,7 @@ export default function GfpNewProjectPage() {
     owner_contact: '',
     service_domain: '',
   });
-  const [preset, setPreset] = useState<GfpPresetId>('standard');
+  const [preset, setPreset] = useState<GfpPresetId>('parallel');
   const [infraForm, setInfraForm] = useState({
     repo_url: '',
     live_url: '',
@@ -37,6 +37,7 @@ export default function GfpNewProjectPage() {
     e.preventDefault();
     if (!form.project_name.trim() || !form.owner_name.trim()) return;
     if (preset === 'infra-ready' && (!infraForm.repo_url.trim() || !infraForm.live_url.trim())) return;
+    // Note: 'parallel' preset has no extra required fields
     setSaving(true);
     setError('');
     try {
