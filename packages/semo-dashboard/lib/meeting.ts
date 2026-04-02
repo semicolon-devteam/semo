@@ -55,9 +55,15 @@ export async function createMeeting(input: CreateMeetingInput): Promise<Meeting>
   return result.rows[0];
 }
 
+// All columns except audio_data (binary, up to ~8MB per row)
+const MEETING_COLS = `meeting_id, title, meeting_type, adhoc_subtype, meeting_date, attendees,
+  audio_filename, audio_duration_ms, vito_transcribe_id, transcription_status, transcription_error,
+  raw_transcript, speaker_map, mapped_transcript, discussion_url, discussion_number,
+  generation_status, generation_error, generation_result, created_at, updated_at`;
+
 export async function getMeeting(meetingId: string): Promise<Meeting | null> {
   const result = await query<Meeting>(
-    'SELECT * FROM semo.meetings WHERE meeting_id = $1',
+    `SELECT ${MEETING_COLS} FROM semo.meetings WHERE meeting_id = $1`,
     [meetingId]
   );
   return result.rows[0] ?? null;
@@ -65,7 +71,7 @@ export async function getMeeting(meetingId: string): Promise<Meeting | null> {
 
 export async function listMeetings(limit = 50, offset = 0): Promise<Meeting[]> {
   const result = await query<Meeting>(
-    'SELECT * FROM semo.meetings ORDER BY meeting_date DESC, created_at DESC LIMIT $1 OFFSET $2',
+    `SELECT ${MEETING_COLS} FROM semo.meetings ORDER BY meeting_date DESC, created_at DESC LIMIT $1 OFFSET $2`,
     [limit, offset]
   );
   return result.rows;
