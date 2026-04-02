@@ -19,6 +19,63 @@ export interface ActionItem {
   service: string | null;
   source: string | null;
   date: string;
+  resolvedAssignee: string | null;
+  resolvedLabel: string | null;
+  isTeamMember: boolean;
+}
+
+export interface TeamMemberInfo {
+  domain: string;
+  nickname: string;
+  realName: string;
+  role: string;
+}
+
+export type AliasMap = Map<string, TeamMemberInfo>;
+
+/**
+ * 팀원 alias 맵으로 assignee를 정규화한다.
+ * nickname, real-name, domain 중 하나라도 매칭되면 해당 팀원으로 resolve.
+ */
+export function resolveAssignees(items: ActionItem[], aliasMap: AliasMap): void {
+  for (const item of items) {
+    // team 도메인 아이템: domain 자체가 assignee
+    if (item.domainType === 'team') {
+      const info = aliasMap.get(item.domain.toLowerCase());
+      if (info) {
+        item.resolvedAssignee = info.domain;
+        item.resolvedLabel = info.role
+          ? `${info.nickname} — ${info.role}`
+          : info.nickname;
+        item.isTeamMember = true;
+      }
+      continue;
+    }
+
+    // service 도메인 아이템: assignee 필드로 resolve
+    if (!item.assignee) continue;
+
+    // 쉼표로 구분된 복수 담당자는 첫 번째 팀원으로 resolve
+    const candidates = item.assignee.split(/[,、]/).map(s => s.trim());
+    for (const candidate of candidates) {
+      const info = aliasMap.get(candidate.toLowerCase());
+      if (info) {
+        item.resolvedAssignee = info.domain;
+        item.resolvedLabel = info.role
+          ? `${info.nickname} — ${info.role}`
+          : info.nickname;
+        item.isTeamMember = true;
+        break;
+      }
+    }
+
+    // 매칭 안 된 경우 원본 유지
+    if (!item.resolvedAssignee && item.assignee) {
+      item.resolvedAssignee = item.assignee;
+      item.resolvedLabel = item.assignee;
+      item.isTeamMember = false;
+    }
+  }
 }
 
 function extractDate(subKey: string): string {
@@ -64,6 +121,9 @@ function parsePersonTable(
       service: cells[4] || null,
       source: cells[5] || null,
       date: extractDate(subKey),
+      resolvedAssignee: null,
+      resolvedLabel: null,
+      isTeamMember: false,
     });
     idx++;
   }
@@ -118,6 +178,9 @@ function parseServiceSpecific(
     service: domainType === 'service' ? domain : null,
     source: fields['출처'] || null,
     date: extractDate(subKey),
+    resolvedAssignee: null,
+    resolvedLabel: null,
+    isTeamMember: false,
   }];
 }
 
@@ -162,6 +225,9 @@ function parseServiceBatch(
         service: domainType === 'service' ? domain : null,
         source: null,
         date: extractDate(subKey),
+        resolvedAssignee: null,
+        resolvedLabel: null,
+        isTeamMember: false,
       });
       idx++;
     }
@@ -266,6 +332,123 @@ export function toggleItemInContent(
       }
     }
     return content;
+  }
+
+  return content;
+}
+
+// ── CRUD Helpers ──
+
+export interface NewActionItem {
+  description: string;
+  assignee?: string;
+  deadline?: string;
+  service?: string;
+}
+
+/**
+ * Format 2 마크다운으로 새 액션 아이템 생성
+ */
+export function generateNewContent(item: NewActionItem): string {
+  const lines = [`## ${item.description}`, ''];
+  if (item.assignee) lines.push(`- **담당자**: ${item.assignee}`);
+  lines.push(`- **내용**: ${item.description}`);
+  if (item.deadline) lines.push(`- **기한**: ${item.deadline}`);
+  lines.push(`- **상태**: open`);
+  if (item.service) lines.push(`- **서비스**: ${item.service}`);
+  lines.push(`- **출처**: dashboard`);
+  return lines.join('\n');
+}
+
+/**
+ * 기존 content에서 특정 인덱스의 아이템을 제거
+ */
+export function removeItemFromContent(content: string, itemIndex: number): string {
+  // Format 1: table
+  if (content.includes('| # |') || content.includes('| 항목 |')) {
+    const lines = content.split('\n');
+    let dataRowIdx = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim();
+      if (!trimmed.startsWith('|')) continue;
+      if (trimmed.includes('| # |') || trimmed.includes('|---|')) continue;
+      const cells = trimmed.split('|').map((c) => c.trim()).filter(Boolean);
+      if (cells.length < 4) continue;
+      if (dataRowIdx === itemIndex) {
+        lines.splice(i, 1);
+        return lines.join('\n');
+      }
+      dataRowIdx++;
+    }
+    return content;
+  }
+
+  // Format 2: single item per entry — return empty
+  if (content.includes('- **담당자**:') || content.includes('- **내용**:')) {
+    return '';
+  }
+
+  // Format 3: checkbox
+  if (/- \[[ xX]\]/.test(content)) {
+    const lines = content.split('\n');
+    let checkboxIdx = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (/^-\s+\[[ xX]\]/.test(lines[i])) {
+        if (checkboxIdx === itemIndex) {
+          lines.splice(i, 1);
+          return lines.join('\n');
+        }
+        checkboxIdx++;
+      }
+    }
+    return content;
+  }
+
+  return content;
+}
+
+/**
+ * 기존 content 내 특정 인덱스 아이템의 description을 수정
+ */
+export function updateItemInContent(
+  content: string,
+  itemIndex: number,
+  updates: { description?: string; deadline?: string; assignee?: string },
+): string {
+  // Format 2: field-based
+  if (content.includes('- **담당자**:') || content.includes('- **내용**:')) {
+    let result = content;
+    if (updates.description) {
+      result = result.replace(/^(##\s+).+$/m, `$1${updates.description}`);
+      result = result.replace(/^(-\s+\*\*내용\*\*:\s*).+$/m, `$1${updates.description}`);
+    }
+    if (updates.deadline) {
+      if (result.includes('- **기한**:')) {
+        result = result.replace(/^(-\s+\*\*기한\*\*:\s*).+$/m, `$1${updates.deadline}`);
+      } else {
+        result = result.replace(/^(-\s+\*\*상태\*\*:)/m, `- **기한**: ${updates.deadline}\n$1`);
+      }
+    }
+    if (updates.assignee) {
+      result = result.replace(/^(-\s+\*\*담당자\*\*:\s*).+$/m, `$1${updates.assignee}`);
+    }
+    return result;
+  }
+
+  // Format 3: checkbox — update description
+  if (/- \[[ xX]\]/.test(content) && updates.description) {
+    const lines = content.split('\n');
+    let checkboxIdx = 0;
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(/^(-\s+\[[ xX]\]\s+).+$/);
+      if (m) {
+        if (checkboxIdx === itemIndex) {
+          lines[i] = `${m[1]}${updates.description}`;
+          return lines.join('\n');
+        }
+        checkboxIdx++;
+      }
+    }
   }
 
   return content;

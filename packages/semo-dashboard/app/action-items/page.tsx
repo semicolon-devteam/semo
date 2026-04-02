@@ -1,178 +1,103 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState } from 'react';
 import type { ActionItem } from '@/lib/action-items';
-
-type Tab = 'person' | 'service';
-type StatusFilter = 'all' | 'open' | 'completed';
-
-interface APIResponse {
-  items: ActionItem[];
-  stats: { total: number; open: number; completed: number };
-}
+import { useActionItems } from '@/components/action-items/useActionItems';
+import ActionItemList from '@/components/action-items/ActionItemList';
+import ActionItemKanban from '@/components/action-items/ActionItemKanban';
+import ActionItemTimeline from '@/components/action-items/ActionItemTimeline';
+import ActionItemFormModal, { type FormData } from '@/components/action-items/ActionItemFormModal';
 
 export default function ActionItemsPage() {
-  const [items, setItems] = useState<ActionItem[]>([]);
-  const [stats, setStats] = useState({ total: 0, open: 0, completed: 0 });
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<Tab>('person');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [toggling, setToggling] = useState<Set<string>>(new Set());
+  const {
+    filtered, groups, stats, loading, teamMembers, serviceDomains,
+    activeTab, setActiveTab,
+    statusFilter, setStatusFilter,
+    viewMode, setViewMode,
+    toggling, handleToggle, handleCreate, handleUpdate, handleDelete,
+  } = useActionItems();
 
-  useEffect(() => {
-    fetch('/api/action-items')
-      .then((r) => (r.ok ? r.json() : { items: [], stats: { total: 0, open: 0, completed: 0 } }))
-      .then((data: APIResponse) => {
-        setItems(data.items);
-        setStats(data.stats);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
+  const [showForm, setShowForm] = useState(false);
+  const [editItem, setEditItem] = useState<ActionItem | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    let list = items.filter((i) =>
-      activeTab === 'person' ? i.domainType === 'team' : i.domainType === 'service',
-    );
-    if (statusFilter !== 'all') {
-      list = list.filter((i) => i.status === statusFilter);
-    }
-    return list;
-  }, [items, activeTab, statusFilter]);
-
-  const groups = useMemo(() => {
-    const map = new Map<string, { label: string; items: ActionItem[] }>();
-    for (const item of filtered) {
-      let group = map.get(item.domain);
-      if (!group) {
-        group = { label: item.domainLabel, items: [] };
-        map.set(item.domain, group);
-      }
-      group.items.push(item);
-    }
-    // sort: open count descending
-    return Array.from(map.entries())
-      .sort(([, a], [, b]) => {
-        const aOpen = a.items.filter((i) => i.status === 'open').length;
-        const bOpen = b.items.filter((i) => i.status === 'open').length;
-        return bOpen - aOpen;
-      });
-  }, [filtered]);
-
-  const toggleExpand = (key: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
-      return next;
-    });
-  };
-
-  const handleToggle = async (item: ActionItem) => {
-    const newCompleted = item.status === 'open';
-    setToggling((prev) => new Set(prev).add(item.id));
-
-    // optimistic update
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === item.id ? { ...i, status: newCompleted ? 'completed' : 'open' } : i,
-      ),
-    );
-    setStats((prev) => ({
-      ...prev,
-      open: prev.open + (newCompleted ? -1 : 1),
-      completed: prev.completed + (newCompleted ? 1 : -1),
-    }));
-
-    try {
-      const res = await fetch('/api/action-items', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          domain: item.domain,
-          subKey: item.subKey,
-          itemIndex: item.itemIndex,
-          completed: newCompleted,
-        }),
-      });
-      if (!res.ok) throw new Error();
-    } catch {
-      // revert
-      setItems((prev) =>
-        prev.map((i) =>
-          i.id === item.id ? { ...i, status: item.status } : i,
-        ),
-      );
-      setStats((prev) => ({
-        ...prev,
-        open: prev.open + (newCompleted ? 1 : -1),
-        completed: prev.completed + (newCompleted ? -1 : 1),
-      }));
-    } finally {
-      setToggling((prev) => {
-        const next = new Set(prev);
-        next.delete(item.id);
-        return next;
-      });
-    }
-  };
-
-  const isOverdue = (item: ActionItem) => {
-    if (item.status === 'completed' || !item.deadline) return false;
-    // try parse YYYY-MM-DD or MM/DD
-    let d: Date | null = null;
-    const isoMatch = item.deadline.match(/(\d{4}-\d{2}-\d{2})/);
-    if (isoMatch) {
-      d = new Date(isoMatch[1]);
+  const openCreate = () => { setEditItem(null); setShowForm(true); };
+  const openEdit = (item: ActionItem) => { setEditItem(item); setShowForm(true); };
+  const confirmDelete = (item: ActionItem) => {
+    if (deleteConfirm === item.id) {
+      handleDelete(item);
+      setDeleteConfirm(null);
     } else {
-      const mdMatch = item.deadline.match(/^(\d{2})\/(\d{2})/);
-      if (mdMatch) {
-        const year = new Date().getFullYear();
-        d = new Date(year, parseInt(mdMatch[1]) - 1, parseInt(mdMatch[2]));
-      }
+      setDeleteConfirm(item.id);
+      setTimeout(() => setDeleteConfirm(null), 3000);
     }
-    if (!d) return false;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return d < today;
   };
 
-  const formatRelativeDate = (dateStr: string) => {
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return dateStr;
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    d.setHours(0, 0, 0, 0);
-    const diffDays = Math.round((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-    if (diffDays === 0) return '오늘';
-    if (diffDays === 1) return '어제';
-    if (diffDays < 7) return `${diffDays}일 전`;
-    if (diffDays < 30) return `${Math.floor(diffDays / 7)}주 전`;
-    return `${d.getMonth() + 1}/${d.getDate()}`;
+  const onSubmit = async (data: FormData) => {
+    if (editItem) {
+      await handleUpdate(editItem, data);
+    } else {
+      await handleCreate(data);
+    }
   };
 
   return (
     <div className="container mx-auto px-4 py-8">
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          액션 아이템
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          {stats.open}개 진행 중 · {stats.completed}개 완료
-        </p>
+      <div className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            액션 아이템
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            {stats.open}개 진행 중 · {stats.completed}개 완료
+          </p>
+        </div>
+        <button
+          onClick={openCreate}
+          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          추가
+        </button>
       </div>
 
-      {/* Tab bar + Status filter */}
+      {/* Controls: Tab + View switcher + Status filter */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-        <div className="flex border-b border-gray-200 dark:border-gray-700">
-          <TabButton active={activeTab === 'person'} onClick={() => setActiveTab('person')}>
-            사람별
-          </TabButton>
-          <TabButton active={activeTab === 'service'} onClick={() => setActiveTab('service')}>
-            프로젝트별
-          </TabButton>
+        <div className="flex items-center gap-4">
+          {/* Tabs */}
+          <div className="flex border-b border-gray-200 dark:border-gray-700">
+            <TabButton active={activeTab === 'person'} onClick={() => setActiveTab('person')}>
+              사람별
+            </TabButton>
+            <TabButton active={activeTab === 'service'} onClick={() => setActiveTab('service')}>
+              프로젝트별
+            </TabButton>
+          </div>
+
+          {/* View switcher */}
+          <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5">
+            <ViewButton active={viewMode === 'list'} onClick={() => setViewMode('list')} title="리스트">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </ViewButton>
+            <ViewButton active={viewMode === 'kanban'} onClick={() => setViewMode('kanban')} title="칸반">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+              </svg>
+            </ViewButton>
+            <ViewButton active={viewMode === 'timeline'} onClick={() => setViewMode('timeline')} title="타임라인">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </ViewButton>
+          </div>
         </div>
+
+        {/* Status filter */}
         <div className="flex gap-1">
           <FilterButton active={statusFilter === 'all'} onClick={() => setStatusFilter('all')}>
             전체
@@ -191,101 +116,43 @@ export default function ActionItemsPage() {
         <div className="flex items-center justify-center py-16">
           <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : groups.length === 0 ? (
-        <div className="text-center py-16 text-gray-500 dark:text-gray-400">
-          해당 조건의 액션 아이템이 없습니다
-        </div>
+      ) : viewMode === 'list' ? (
+        <ActionItemList
+          groups={groups}
+          activeTab={activeTab}
+          toggling={toggling}
+          onToggle={handleToggle}
+          onEdit={openEdit}
+          onDelete={confirmDelete}
+        />
+      ) : viewMode === 'kanban' ? (
+        <ActionItemKanban
+          groups={groups}
+          allItems={filtered}
+          activeTab={activeTab}
+          toggling={toggling}
+          onToggle={handleToggle}
+          onEdit={openEdit}
+          onDelete={confirmDelete}
+        />
       ) : (
-        <div className="space-y-3">
-          {groups.map(([domain, group]) => {
-            const isExp = expanded.has(domain);
-            const openCount = group.items.filter((i) => i.status === 'open').length;
-
-            return (
-              <div
-                key={domain}
-                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
-              >
-                {/* Group header */}
-                <button
-                  onClick={() => toggleExpand(domain)}
-                  className="w-full flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-base font-semibold text-gray-900 dark:text-white">
-                      {group.label}
-                    </h2>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {openCount}/{group.items.length}
-                    </span>
-                  </div>
-                  <span className="text-gray-400 text-sm">{isExp ? '▾' : '▸'}</span>
-                </button>
-
-                {/* Items */}
-                {isExp && (
-                  <div className="border-t border-gray-100 dark:border-gray-700">
-                    {group.items.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-start gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700/50 last:border-b-0"
-                      >
-                        {/* Checkbox */}
-                        <button
-                          onClick={() => handleToggle(item)}
-                          disabled={toggling.has(item.id)}
-                          className="mt-0.5 shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors disabled:opacity-50"
-                          style={{
-                            borderColor: item.status === 'completed' ? '#3b82f6' : '#d1d5db',
-                            backgroundColor: item.status === 'completed' ? '#3b82f6' : 'transparent',
-                          }}
-                        >
-                          {item.status === 'completed' && (
-                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </button>
-
-                        {/* Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-sm ${item.status === 'completed' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                            {item.description}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 mt-1">
-                            {/* Assignee (shown in service tab) */}
-                            {activeTab === 'service' && item.assignee && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-                                {item.assignee}
-                              </span>
-                            )}
-                            {/* Service (shown in person tab) */}
-                            {activeTab === 'person' && item.service && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-                                {item.service}
-                              </span>
-                            )}
-                            {/* Deadline */}
-                            {item.deadline && (
-                              <span className={`text-xs ${isOverdue(item) ? 'text-red-500 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-                                ~ {item.deadline}
-                              </span>
-                            )}
-                            {/* Date */}
-                            <span className="text-xs text-gray-400 dark:text-gray-500">
-                              {formatRelativeDate(item.date)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+        <ActionItemTimeline
+          groups={groups}
+          activeTab={activeTab}
+          toggling={toggling}
+          onToggle={handleToggle}
+        />
       )}
+
+      {/* Create/Edit Modal */}
+      <ActionItemFormModal
+        open={showForm}
+        onClose={() => setShowForm(false)}
+        onSubmit={onSubmit}
+        editItem={editItem}
+        teamMembers={teamMembers}
+        serviceDomains={serviceDomains}
+      />
     </div>
   );
 }
@@ -298,6 +165,22 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
         active
           ? 'border-blue-600 text-blue-600 dark:text-blue-400 dark:border-blue-400'
           : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ViewButton({ active, onClick, title, children }: { active: boolean; onClick: () => void; title: string; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={`p-1.5 rounded-md transition-colors ${
+        active
+          ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
       }`}
     >
       {children}
