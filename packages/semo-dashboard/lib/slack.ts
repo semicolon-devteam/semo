@@ -843,10 +843,10 @@ export function verifySlackSignature(
     .update(sigBasestring, 'utf8')
     .digest('hex');
 
-  return crypto.timingSafeEqual(
-    Buffer.from(mySignature, 'utf8'),
-    Buffer.from(signature, 'utf8'),
-  );
+  const myBuf = Buffer.from(mySignature, 'utf8');
+  const theirBuf = Buffer.from(signature, 'utf8');
+  if (myBuf.length !== theirBuf.length) return false;
+  return crypto.timingSafeEqual(myBuf, theirBuf);
 }
 
 /**
