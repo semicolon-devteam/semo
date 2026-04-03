@@ -86,6 +86,7 @@ export default function GfpDetailPage() {
   const phaseParam = searchParams.get('phase');
   const sectionParam = searchParams.get('section');
   const trackParam = searchParams.get('track') as GfpTrack | null;
+  const stepParam = searchParams.get('step');
 
   const [project, setProject] = useState<ProjectWithProgress | null>(null);
   const [sections, setSections] = useState<GfpPhaseSection[]>([]);
@@ -148,10 +149,10 @@ export default function GfpDetailPage() {
       setResearchTasks(tasks);
       setInfraRequests(infraReqs);
       setInfraProgress(infraProg);
-      // Phase 4: fetch design step from project metadata
+      // Phase 4: fetch design step from project metadata (URL ?step= overrides)
       if (targetPhase === 4 && initTrack === 'plan') {
-        const ds = (proj.metadata?.design_step as number) ?? 1;
-        setActiveDesignStep(ds as DesignStep);
+        const ds = stepParam ? parseInt(stepParam, 10) : ((proj.metadata?.design_step as number) ?? 1);
+        setActiveDesignStep((ds >= 1 && ds <= 5 ? ds : 1) as DesignStep);
       }
       setLoading(false);
     })();

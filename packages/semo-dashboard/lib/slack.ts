@@ -443,7 +443,7 @@ export async function sendGfpProjectCreatedSlack(opts: GfpProjectCreatedOpts): P
   if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
 
   const assignee = getPhaseAssignee(0, 'plan');
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=0`;
   const isParallel = opts.preset === 'parallel';
 
   const blocks = [
@@ -519,7 +519,7 @@ export interface GfpTrackForkOpts {
 export async function sendGfpTrackForkSlack(opts: GfpTrackForkOpts): Promise<boolean> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
 
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=1`;
   const planAssignee = getPhaseAssignee(1, 'plan');
   const infraAssignee = getPhaseAssignee(0, 'infra');
   const ownerMention = opts.ownerSlackId ? ` <@${opts.ownerSlackId}>` : '';
@@ -1099,7 +1099,7 @@ export async function sendGfpDesignStepAdvanceSlack(opts: {
   const guide = DESIGN_STEP_GUIDES[opts.toStep] || `Step ${opts.toStep} 작업을 시작해주세요.`;
   const fromLabel = DESIGN_STEP_LABELS[opts.fromStep] || `Step ${opts.fromStep}`;
   const toLabel = DESIGN_STEP_LABELS[opts.toStep] || `Step ${opts.toStep}`;
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=4&step=${opts.toStep}`;
 
   await fetch('https://slack.com/api/chat.postMessage', {
     method: 'POST',
