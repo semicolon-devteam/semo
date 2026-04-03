@@ -27,14 +27,14 @@ export default function ActionItemList({ groups, activeTab, toggling, onToggle, 
 
   if (groups.length === 0) {
     return (
-      <div className="text-center py-16 text-gray-500 dark:text-gray-400">
+      <div className="text-center py-16 text-gray-500 dark:text-gray-400 col-span-full">
         해당 조건의 액션 아이템이 없습니다
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
       {groups.map((group) => {
         const isExp = expanded.has(group.key);
         const openCount = group.items.filter((i) => i.status === 'open').length;
@@ -44,7 +44,7 @@ export default function ActionItemList({ groups, activeTab, toggling, onToggle, 
           <div key={group.key}>
             {/* 외부/기타 섹션 구분 */}
             {isExternalGroup && group === groups.find(g => g.items.every(i => !i.isTeamMember)) && (
-              <div className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-6 mb-2 px-1">
+              <div className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-6 mb-2 px-1 col-span-full">
                 외부 / 기타
               </div>
             )}

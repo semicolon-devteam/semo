@@ -44,9 +44,7 @@ export function resolveAssignees(items: ActionItem[], aliasMap: AliasMap): void 
       const info = aliasMap.get(item.domain.toLowerCase());
       if (info) {
         item.resolvedAssignee = info.domain;
-        item.resolvedLabel = info.role
-          ? `${info.nickname} — ${info.role}`
-          : info.nickname;
+        item.resolvedLabel = info.nickname || info.domain;
         item.isTeamMember = true;
       }
       continue;
@@ -61,9 +59,7 @@ export function resolveAssignees(items: ActionItem[], aliasMap: AliasMap): void 
       const info = aliasMap.get(candidate.toLowerCase());
       if (info) {
         item.resolvedAssignee = info.domain;
-        item.resolvedLabel = info.role
-          ? `${info.nickname} — ${info.role}`
-          : info.nickname;
+        item.resolvedLabel = info.nickname || info.domain;
         item.isTeamMember = true;
         break;
       }

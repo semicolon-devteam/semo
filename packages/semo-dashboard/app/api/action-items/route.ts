@@ -45,8 +45,7 @@ export async function GET() {
       let label: string;
       if (domainType === 'team') {
         const info = teamInfoMap.get(row.domain);
-        const name = info?.nickname || row.domain.charAt(0).toUpperCase() + row.domain.slice(1);
-        label = info?.role ? `${name} — ${info.role}` : name;
+        label = info?.nickname || row.domain.charAt(0).toUpperCase() + row.domain.slice(1);
       } else {
         label = row.description || row.domain;
       }
