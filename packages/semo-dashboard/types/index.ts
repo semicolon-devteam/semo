@@ -445,3 +445,43 @@ export type ServiceInfraRequestStatus = GfpInfraRequestStatus;
 export type ServicePresetConfig = GfpPresetConfig;
 export type ServiceInfraConfig = GfpInfraConfig;
 export type ServiceQAItem = GfpQAItem;
+
+// ── Service Features (ops mode) ──
+
+export type ServiceFeatureCategory = 'core' | 'growth' | 'infra' | 'ux' | 'integration';
+export type ServiceFeatureStatus = 'active' | 'planned' | 'in-dev' | 'deprecated';
+
+export interface ServiceFeature {
+  feature_id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  category: ServiceFeatureCategory;
+  status: ServiceFeatureStatus;
+  parent_id: string | null;
+  sort_order: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Service Incidents (ops mode) ──
+
+export type ServiceIncidentSeverity = 'low' | 'medium' | 'high' | 'critical';
+export type ServiceIncidentStatus = 'open' | 'investigating' | 'resolved' | 'postmortem';
+
+export interface ServiceIncident {
+  incident_id: string;
+  project_id: string;
+  iteration_id: string | null;
+  severity: ServiceIncidentSeverity;
+  title: string;
+  description: string | null;
+  root_cause: string | null;
+  resolution: string | null;
+  status: ServiceIncidentStatus;
+  occurred_at: string;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}

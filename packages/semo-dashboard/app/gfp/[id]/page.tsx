@@ -87,8 +87,11 @@ export default function GfpDetailPage() {
   const sectionParam = searchParams.get('section');
   const trackParam = searchParams.get('track') as GfpTrack | null;
   const stepParam = searchParams.get('step');
+  const actionParam = searchParams.get('action');
+  const sectionIdParam = searchParams.get('sectionId');
 
   const [project, setProject] = useState<ProjectWithProgress | null>(null);
+  const [slackActionProcessed, setSlackActionProcessed] = useState(false);
   const [sections, setSections] = useState<GfpPhaseSection[]>([]);
   const [researchTasks, setResearchTasks] = useState<GfpResearchTask[]>([]);
   const [infraRequests, setInfraRequests] = useState<GfpInfraRequest[]>([]);
@@ -155,6 +158,50 @@ export default function GfpDetailPage() {
         setActiveDesignStep((ds >= 1 && ds <= 5 ? ds : 1) as DesignStep);
       }
       setLoading(false);
+
+      // Slack URL 버튼에서 진입한 경우 자동 액션 처리
+      if (actionParam && sectionIdParam && !slackActionProcessed) {
+        setSlackActionProcessed(true);
+        if (actionParam === 'approve') {
+          if (window.confirm(`이 섹션을 승인하시겠습니까?`)) {
+            try {
+              const res = await fetch(`/api/gfp/${id}/sections`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sectionId: sectionIdParam, action: 'approve' }),
+              });
+              if (res.ok) {
+                alert('승인 완료');
+                await refresh(targetPhase, initTrack);
+              } else {
+                alert('승인 실패: ' + (await res.text()));
+              }
+            } catch { alert('승인 처리 중 오류 발생'); }
+          }
+        } else if (actionParam === 'reject') {
+          const reason = window.prompt('거절 사유를 입력해주세요:');
+          if (reason !== null) {
+            try {
+              const res = await fetch(`/api/gfp/${id}/sections`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sectionId: sectionIdParam, action: 'reject', reviewerNote: reason }),
+              });
+              if (res.ok) {
+                alert('거절 완료');
+                await refresh(targetPhase, initTrack);
+              } else {
+                alert('거절 실패: ' + (await res.text()));
+              }
+            } catch { alert('거절 처리 중 오류 발생'); }
+          }
+        }
+        // URL에서 action param 제거 (뒤로가기 시 재실행 방지)
+        const url = new URL(window.location.href);
+        url.searchParams.delete('action');
+        url.searchParams.delete('sectionId');
+        window.history.replaceState({}, '', url.toString());
+      }
     })();
   }
 
@@ -259,6 +306,12 @@ export default function GfpDetailPage() {
         </Link>
       </div>
     );
+  }
+
+  // lifecycle='ops' or 'sunset' → 운영 대시보드 렌더
+  if (project.lifecycle === 'ops' || project.lifecycle === 'sunset') {
+    const ServiceOpsView = require('@/components/service-ops/ServiceOpsView').default;
+    return <ServiceOpsView projectId={id} />;
   }
 
   const hasInfraTrack = project.infra_phase !== null && project.infra_phase !== undefined;

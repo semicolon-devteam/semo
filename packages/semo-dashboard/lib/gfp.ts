@@ -762,3 +762,165 @@ export async function checkInfraTrackComplete(gfpId: string): Promise<boolean> {
   if (sections.length === 0) return project.infra_phase > 2;
   return sections.every((s) => s.status === 'approved');
 }
+
+// ── Service Features (ops mode) ──
+
+export interface ServiceFeature {
+  feature_id: string;
+  project_id: string;
+  name: string;
+  description: string | null;
+  category: string;
+  status: string;
+  parent_id: string | null;
+  sort_order: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function listFeatures(projectId: string): Promise<ServiceFeature[]> {
+  const res = await query<ServiceFeature>(
+    'SELECT * FROM semo.service_features WHERE project_id = $1 ORDER BY category, sort_order, name',
+    [projectId]
+  );
+  return res.rows;
+}
+
+export async function createFeature(data: {
+  project_id: string;
+  name: string;
+  description?: string;
+  category?: string;
+  status?: string;
+  parent_id?: string;
+  sort_order?: number;
+  metadata?: Record<string, unknown>;
+}): Promise<ServiceFeature> {
+  const res = await query<ServiceFeature>(
+    `INSERT INTO semo.service_features (project_id, name, description, category, status, parent_id, sort_order, metadata)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING *`,
+    [
+      data.project_id,
+      data.name,
+      data.description ?? null,
+      data.category ?? 'core',
+      data.status ?? 'active',
+      data.parent_id ?? null,
+      data.sort_order ?? 0,
+      JSON.stringify(data.metadata ?? {}),
+    ]
+  );
+  return res.rows[0];
+}
+
+export async function updateFeature(
+  featureId: string,
+  data: Partial<Pick<ServiceFeature, 'name' | 'description' | 'category' | 'status' | 'parent_id' | 'sort_order' | 'metadata'>>
+): Promise<ServiceFeature | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  let idx = 1;
+
+  if (data.name !== undefined) { sets.push(`name = $${idx++}`); params.push(data.name); }
+  if (data.description !== undefined) { sets.push(`description = $${idx++}`); params.push(data.description); }
+  if (data.category !== undefined) { sets.push(`category = $${idx++}`); params.push(data.category); }
+  if (data.status !== undefined) { sets.push(`status = $${idx++}`); params.push(data.status); }
+  if (data.parent_id !== undefined) { sets.push(`parent_id = $${idx++}`); params.push(data.parent_id); }
+  if (data.sort_order !== undefined) { sets.push(`sort_order = $${idx++}`); params.push(data.sort_order); }
+  if (data.metadata !== undefined) {
+    sets.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${idx++}::jsonb`);
+    params.push(JSON.stringify(data.metadata));
+  }
+
+  if (sets.length === 0) return null;
+  params.push(featureId);
+  const res = await query<ServiceFeature>(
+    `UPDATE semo.service_features SET ${sets.join(', ')} WHERE feature_id = $${idx} RETURNING *`,
+    params
+  );
+  return res.rows[0] ?? null;
+}
+
+export async function deleteFeature(featureId: string): Promise<boolean> {
+  const res = await query(
+    `UPDATE semo.service_features SET status = 'deprecated' WHERE feature_id = $1`,
+    [featureId]
+  );
+  return (res.rowCount ?? 0) > 0;
+}
+
+// ── Service Overview (KB aggregation for ops mode) ──
+
+export interface ServiceOverviewKB {
+  baseInformation: string | null;
+  po: string | null;
+  techStack: string | null;
+  serviceUrl: string | null;
+  repo: string | null;
+  slackChannel: string | null;
+  bm: string | null;
+  currentSituation: string | null;
+  infra: string | null;
+}
+
+export async function getServiceOverviewKB(serviceDomain: string): Promise<ServiceOverviewKB> {
+  const keys = [
+    'base-information', 'po', 'tech-stack', 'service-url',
+    'repo', 'slack-channel', 'bm', 'current-situation', 'infra',
+  ];
+  const res = await query<{ key: string; content: string }>(
+    `SELECT key, content FROM semo.knowledge_base
+     WHERE domain = $1 AND key = ANY($2) AND sub_key = ''
+     ORDER BY key`,
+    [serviceDomain, keys]
+  );
+  const map = new Map(res.rows.map((r) => [r.key, r.content]));
+  return {
+    baseInformation: map.get('base-information') ?? null,
+    po: map.get('po') ?? null,
+    techStack: map.get('tech-stack') ?? null,
+    serviceUrl: map.get('service-url') ?? null,
+    repo: map.get('repo') ?? null,
+    slackChannel: map.get('slack-channel') ?? null,
+    bm: map.get('bm') ?? null,
+    currentSituation: map.get('current-situation') ?? null,
+    infra: map.get('infra') ?? null,
+  };
+}
+
+export async function getServiceKPIData(serviceDomain: string, limit = 5) {
+  // KPI snapshots — latest N
+  const kpiRes = await query<{ key: string; sub_key: string; content: string; updated_at: string }>(
+    `SELECT key, sub_key, content, updated_at::text
+     FROM semo.knowledge_base
+     WHERE domain = $1 AND key = 'kpi' AND sub_key != ''
+     ORDER BY sub_key DESC LIMIT $2`,
+    [serviceDomain, limit]
+  );
+
+  // Action items — latest N
+  const actionRes = await query<{ key: string; sub_key: string; content: string; updated_at: string }>(
+    `SELECT key, sub_key, content, updated_at::text
+     FROM semo.knowledge_base
+     WHERE domain = $1 AND key = 'action-item' AND sub_key != ''
+     ORDER BY sub_key DESC LIMIT $2`,
+    [serviceDomain, limit]
+  );
+
+  // Milestones
+  const milestoneRes = await query<{ key: string; sub_key: string; content: string; metadata: Record<string, unknown> }>(
+    `SELECT key, sub_key, content, metadata
+     FROM semo.knowledge_base
+     WHERE domain = $1 AND key = 'milestone'
+     ORDER BY sub_key`,
+    [serviceDomain]
+  );
+
+  return {
+    kpiSnapshots: kpiRes.rows.map((r) => ({ subKey: r.sub_key, content: r.content, updatedAt: r.updated_at })),
+    actionItems: actionRes.rows.map((r) => ({ subKey: r.sub_key, content: r.content, updatedAt: r.updated_at })),
+    milestones: milestoneRes.rows.map((r) => ({ subKey: r.sub_key, content: r.content, metadata: r.metadata ?? {} })),
+  };
+}
