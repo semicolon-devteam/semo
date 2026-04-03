@@ -171,6 +171,20 @@ export async function executeSectionAction(params: SectionActionParams): Promise
 
     if (!allApproved) return { section };
 
+    // Phase 4: design sub-steps가 완료될 때까지 phase advance 차단
+    // ds-* 전체 승인이 phase 완료가 아님 — handoff(step 5)까지 완료되어야 함
+    if (section.phase === 4) {
+      const designStep = await getDesignStep(gfpId);
+      if (designStep < 5) {
+        return { section };
+      }
+      // step 5이고 handoff-* 섹션도 전부 approved일 때만 phase advance
+      const handoffSections = allSections.filter((s) => s.section_key.startsWith('handoff-'));
+      if (handoffSections.length === 0 || !handoffSections.every((s) => s.status === 'approved')) {
+        return { section };
+      }
+    }
+
     // ── Phase complete: publish + advance ──
     const phaseContent = allSections
       .sort((a, b) => a.ordinal - b.ordinal)
