@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { GfpProject, ServiceFeature } from '@/types';
+import type { GfpProject, ServiceFeature, ServiceKPIMetric, ServiceActionItem } from '@/types';
 import type { ServiceOverviewKB } from '@/lib/gfp';
 import ServiceOverviewTab from './ServiceOverviewTab';
 import ServiceSprintTab from './ServiceSprintTab';
+import type { SprintTabData } from './ServiceSprintTab';
 import ServiceFeaturesTab from './ServiceFeaturesTab';
 
 type OpsTab = 'overview' | 'sprint' | 'features';
@@ -18,39 +19,52 @@ interface OverviewData {
   kb: ServiceOverviewKB;
 }
 
-interface KPIData {
+interface KBKPIData {
   kpiSnapshots: Array<{ subKey: string; content: string; updatedAt: string }>;
   actionItems: Array<{ subKey: string; content: string; updatedAt: string }>;
   milestones: Array<{ subKey: string; content: string; metadata: Record<string, unknown> }>;
   incidents: Array<Record<string, unknown>>;
 }
 
+interface DBKPIMetricsData {
+  metrics: ServiceKPIMetric[];
+  periods: string[];
+  latestPeriod: string | null;
+}
+
 export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
   const [activeTab, setActiveTab] = useState<OpsTab>('overview');
   const [overview, setOverview] = useState<OverviewData | null>(null);
-  const [kpiData, setKpiData] = useState<KPIData | null>(null);
+  const [kbKpiData, setKbKpiData] = useState<KBKPIData | null>(null);
+  const [dbMetrics, setDbMetrics] = useState<DBKPIMetricsData | null>(null);
+  const [dbActionItems, setDbActionItems] = useState<ServiceActionItem[]>([]);
   const [features, setFeatures] = useState<ServiceFeature[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const [ovRes, kpiRes, featRes] = await Promise.all([
-          fetch(`/api/gfp/${projectId}/overview`),
-          fetch(`/api/gfp/${projectId}/kpi?limit=10`),
-          fetch(`/api/gfp/${projectId}/features`),
-        ]);
-        if (ovRes.ok) setOverview(await ovRes.json());
-        if (kpiRes.ok) setKpiData(await kpiRes.json());
-        if (featRes.ok) setFeatures(await featRes.json());
-      } catch (err) {
-        console.error('Failed to load ops data:', err);
-      } finally {
-        setLoading(false);
-      }
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [ovRes, kpiRes, metricsRes, actionsRes, featRes] = await Promise.all([
+        fetch(`/api/gfp/${projectId}/overview`),
+        fetch(`/api/gfp/${projectId}/kpi?limit=10`),
+        fetch(`/api/gfp/${projectId}/kpi-metrics`),
+        fetch(`/api/gfp/${projectId}/service-action-items`),
+        fetch(`/api/gfp/${projectId}/features`),
+      ]);
+      if (ovRes.ok) setOverview(await ovRes.json());
+      if (kpiRes.ok) setKbKpiData(await kpiRes.json());
+      if (metricsRes.ok) setDbMetrics(await metricsRes.json());
+      if (actionsRes.ok) setDbActionItems(await actionsRes.json());
+      if (featRes.ok) setFeatures(await featRes.json());
+    } catch (err) {
+      console.error('Failed to load ops data:', err);
+    } finally {
+      setLoading(false);
     }
-    load();
+  };
+
+  useEffect(() => {
+    loadData();
   }, [projectId]);
 
   const refreshFeatures = async () => {
@@ -129,8 +143,21 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
       {activeTab === 'overview' && (
         <ServiceOverviewTab project={project} kb={overview.kb} />
       )}
-      {activeTab === 'sprint' && kpiData && (
-        <ServiceSprintTab data={kpiData} />
+      {activeTab === 'sprint' && kbKpiData && (
+        <ServiceSprintTab
+          data={{
+            metrics: dbMetrics?.metrics,
+            periods: dbMetrics?.periods,
+            latestPeriod: dbMetrics?.latestPeriod,
+            actionItems: dbActionItems.length > 0 ? dbActionItems : undefined,
+            kpiSnapshots: kbKpiData.kpiSnapshots,
+            actionItemsRaw: kbKpiData.actionItems,
+            milestones: kbKpiData.milestones,
+            incidents: kbKpiData.incidents,
+            projectId,
+          } satisfies SprintTabData}
+          onRefresh={loadData}
+        />
       )}
       {activeTab === 'features' && (
         <ServiceFeaturesTab

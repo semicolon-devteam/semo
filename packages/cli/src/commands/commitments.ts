@@ -90,6 +90,9 @@ export function registerCommitmentsCommands(program: Command): void {
           ]
         );
         console.log(chalk.green(`✔ commitment created: ${id}`));
+        if (!options.sourceType) {
+          console.log(chalk.yellow(`⚠ source-type 미지정: 자동 검증 불가. --source-type 권장.`));
+        }
         console.log(JSON.stringify({ id, bot_id: options.botId, title: options.title, deadline_at: deadlineAt }));
       } catch (err) {
         console.error(chalk.red(`❌ create 실패: ${err}`));
@@ -264,7 +267,8 @@ export function registerCommitmentsCommands(program: Command): void {
         params.push(parseInt(options.limit));
 
         const result = await pool.query(
-          `SELECT id, bot_id, status, title, deadline_at::text, steps,
+          `SELECT id, bot_id, status, title, description, source_type, source_ref,
+                  deadline_at::text, steps,
                   last_heartbeat_at::text, created_at::text, completed_at::text, metadata
            FROM semo.bot_commitments
            ${where}
@@ -348,7 +352,8 @@ export function registerCommitmentsCommands(program: Command): void {
           : "";
 
         const result = await pool.query(
-          `SELECT id, bot_id, status, title, deadline_at::text,
+          `SELECT id, bot_id, status, title, description, source_type, source_ref,
+                  deadline_at::text,
                   health, minutes_since_heartbeat, minutes_overdue,
                   steps, last_heartbeat_at::text, created_at::text, metadata
            FROM semo.v_active_commitments
