@@ -201,7 +201,7 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
               />
               <CodeAccordion content={section.content} />
             </div>
-          ) : section.section_key.startsWith('impl-screen-') && extractHtmlFromContent(section.content) ? (
+          ) : (section.section_key.startsWith('impl-screen-') || section.section_key.startsWith('stitch-result-')) && extractHtmlFromContent(section.content) ? (
             <div className="mb-4 space-y-3">
               {/* Description text above the preview */}
               {(() => {

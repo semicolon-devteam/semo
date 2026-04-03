@@ -18,7 +18,10 @@ import {
   getProject,
   updateSectionSlackThread,
 } from '@/lib/gfp';
-import { sendGfpQASlack, sendGfpSectionPendingReviewSlack, resolveGfpSlackContext } from '@/lib/slack';
+import { query } from '@/lib/db';
+import { sendGfpQASlack, sendGfpSectionPendingReviewSlack, sendGfpStitchResultSlack, resolveGfpSlackContext } from '@/lib/slack';
+
+const DASHBOARD_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,6 +44,8 @@ interface StitchExportPayload {
   gfp_id: string;
   prompt_section_id: string;
   export_content: string;
+  screenshot_base64?: string;
+  stitch_share_url?: string;
   bot_id: string;
 }
 
@@ -150,11 +155,19 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // 1. Stitch export를 gfp_materials에 저장
+        // 1. Stitch export를 gfp_materials에 저장 (+ 스크린샷/공유 URL)
         const material = await createStitchMaterial({
           gfp_id: body.gfp_id,
           content: body.export_content,
         });
+
+        // 1b. 스크린샷 + 공유 URL 저장 (있는 경우)
+        if (body.screenshot_base64 || body.stitch_share_url) {
+          await query(
+            `UPDATE semo.gfp_materials SET screenshot_data = $1, stitch_share_url = $2 WHERE material_id = $3`,
+            [body.screenshot_base64 ?? null, body.stitch_share_url ?? null, material.material_id]
+          );
+        }
 
         // 2. Phase 4에 결과 섹션 생성 (프롬프트 섹션 키에서 번호 추출)
         const promptNum = body.prompt_section_id.match(/\d+/)?.[0] ?? '01';
@@ -167,6 +180,26 @@ export async function POST(request: NextRequest) {
           source: 'designclaw',
           status: 'pending-review',
         });
+
+        // 3. Slack 알림 (스크린샷 포함)
+        const stitchProject = await getProject(body.gfp_id);
+        if (stitchProject) {
+          const stitchSlackCtx = await resolveGfpSlackContext(body.gfp_id);
+          if (stitchSlackCtx.channelId) {
+            const screenshotUrl = body.screenshot_base64
+              ? `${DASHBOARD_BASE_URL}/api/gfp/${body.gfp_id}/stitch-screenshot/${material.material_id}`
+              : undefined;
+            sendGfpStitchResultSlack({
+              projectName: stitchProject.project_name,
+              gfpId: body.gfp_id,
+              sectionKey: `stitch-result-${promptNum}`,
+              sectionTitle: `Stitch Export #${promptNum}`,
+              screenshotUrl,
+              stitchShareUrl: body.stitch_share_url,
+              channelId: stitchSlackCtx.channelId,
+            }).catch(err => console.error('Stitch result Slack failed:', err));
+          }
+        }
 
         console.log(
           `[GFP Callback] Stitch export saved: material=${material.material_id}, section=${resultSection.section_id} by ${body.bot_id}`

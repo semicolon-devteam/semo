@@ -1130,3 +1130,69 @@ export async function sendGfpDesignStepAdvanceSlack(opts: {
     }),
   }).catch(err => console.error('Design step advance Slack failed:', err));
 }
+
+// ── Stitch Result Notification ──
+
+export async function sendGfpStitchResultSlack(opts: {
+  projectName: string;
+  gfpId: string;
+  sectionKey: string;
+  sectionTitle: string;
+  screenshotUrl?: string;
+  stitchShareUrl?: string;
+  channelId: string;
+}): Promise<void> {
+  if (!SLACK_BOT_TOKEN || !opts.channelId) return;
+
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=4&step=3&section=${opts.sectionKey}`;
+
+  const blocks: Record<string, unknown>[] = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: `🎨 [${opts.projectName}] Stitch 디자인 생성 완료` },
+    },
+    {
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*${opts.sectionTitle}*\n프로토타입이 생성되어 리뷰 대기 중입니다.` },
+    },
+  ];
+
+  if (opts.screenshotUrl) {
+    blocks.push({
+      type: 'image',
+      image_url: opts.screenshotUrl,
+      alt_text: `${opts.sectionTitle} 스크린샷`,
+    });
+  }
+
+  const actions: Record<string, unknown>[] = [
+    {
+      type: 'button',
+      text: { type: 'plain_text', text: '대시보드에서 보기' },
+      url: dashboardUrl,
+    },
+  ];
+
+  if (opts.stitchShareUrl) {
+    actions.push({
+      type: 'button',
+      text: { type: 'plain_text', text: 'Stitch에서 보기' },
+      url: opts.stitchShareUrl,
+    });
+  }
+
+  blocks.push({ type: 'actions', elements: actions });
+
+  await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+    },
+    body: JSON.stringify({
+      channel: opts.channelId,
+      text: `🎨 [${opts.projectName}] Stitch 디자인 생성 완료 — ${opts.sectionTitle}`,
+      blocks,
+    }),
+  }).catch(err => console.error('Stitch result Slack failed:', err));
+}
