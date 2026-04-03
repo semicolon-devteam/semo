@@ -16,7 +16,8 @@ import * as os from "os";
 import { Pool } from "pg";
 import { getPool, closeConnection, isDbConnected } from "../database";
 import { KBEntry, generateEmbeddings } from "../kb";
-// [v4.4.0] syncSkillsToDB 제거 — semo-system/ 폐기됨, 스킬 SoT는 DB 직접 관리
+// [v4.7.0] syncSkillsToDB 복원 — 워크스페이스 → DB 동기화 경로 재활성화
+import { syncSkillsToDB, getBotIds } from "./skill-sync";
 import { syncGlobalCache } from "../global-cache";
 import { populateBotMirrors } from "../semo-workspace";
 
@@ -219,8 +220,25 @@ export function registerContextCommands(program: Command): void {
         // 기존 memory/*.md (team, projects, decisions, infra, process, bots, ontology) 파일은
         // semo CLI가 실시간 DB 조회로 대체합니다.
 
-        // [v4.4.0] semo-system/ → DB 스킬 동기화 제거 (semo-system 폐기됨)
-        // 스킬 SoT는 DB(skill_definitions). 수정은 직접 DB UPDATE 또는 마이그레이션.
+        // [v4.7.0] 워크스페이스 → DB 스킬 동기화 복원
+        // v4.4.0에서 제거했으나, 워크스페이스 스킬이 DB에 미반영되는 문제 발생.
+        // --no-skills 플래그로 스킵 가능.
+        if (options.skills !== false) {
+          spinner.text = "스킬 동기화 (워크스페이스 → DB)...";
+          try {
+            const client = await pool.connect();
+            try {
+              const skillResult = await syncSkillsToDB(client, pool);
+              if (skillResult.total > 0) {
+                console.log(chalk.green(`  ✓ 스킬 DB 동기화: ${skillResult.total}개 스킬 upsert`));
+              }
+            } finally {
+              client.release();
+            }
+          } catch (skillErr) {
+            console.log(chalk.yellow(`  ⚠ 스킬 DB 동기화 실패 (비치명적): ${skillErr}`));
+          }
+        }
 
         // DB → 글로벌 캐시 (skills/commands/agents → ~/.claude/)
         if (options.globalCache !== false) {
