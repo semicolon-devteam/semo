@@ -1071,3 +1071,62 @@ export function buildRejectionModalView(params: {
     ],
   };
 }
+
+// ── Design Step Advance Dispatch ──
+
+const DESIGN_STEP_GUIDES: Record<number, string> = {
+  2: '레퍼런스 탐색이 완료되었습니다. 디자인 시스템(색상, 타이포, 스페이싱, 컴포넌트) 작업을 시작해주세요.',
+  3: '디자인 시스템이 승인되었습니다. Stitch를 활용하여 화면별 프로토타입 생성을 시작해주세요.',
+  4: '프로토타입 생성이 완료되었습니다. PO 리뷰를 진행해주세요.',
+  5: '리뷰가 완료되었습니다. WorkClaw 핸드오프 문서를 작성해주세요.',
+};
+
+const DESIGN_STEP_LABELS: Record<number, string> = {
+  1: '레퍼런스 탐색', 2: '디자인 시스템', 3: '구현', 4: '리뷰', 5: '핸드오프',
+};
+
+const DESIGNCLAW_SLACK_ID = 'U0AFC0MK2TY';
+
+export async function sendGfpDesignStepAdvanceSlack(opts: {
+  projectName: string;
+  gfpId: string;
+  fromStep: number;
+  toStep: number;
+  channelId: string;
+}): Promise<void> {
+  if (!SLACK_BOT_TOKEN || !opts.channelId) return;
+
+  const guide = DESIGN_STEP_GUIDES[opts.toStep] || `Step ${opts.toStep} 작업을 시작해주세요.`;
+  const fromLabel = DESIGN_STEP_LABELS[opts.fromStep] || `Step ${opts.fromStep}`;
+  const toLabel = DESIGN_STEP_LABELS[opts.toStep] || `Step ${opts.toStep}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}`;
+
+  await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+    },
+    body: JSON.stringify({
+      channel: opts.channelId,
+      text: `🎨 [${opts.projectName}] 디자인 Step ${opts.toStep} (${toLabel}) 시작`,
+      blocks: [
+        {
+          type: 'header',
+          text: { type: 'plain_text', text: `🎨 [${opts.projectName}] 디자인 Step ${opts.toStep}: ${toLabel}` },
+        },
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: `<@${DESIGNCLAW_SLACK_ID}> ${guide}` },
+        },
+        {
+          type: 'context',
+          elements: [
+            { type: 'mrkdwn', text: `✅ ${fromLabel} 완료 → 🔜 ${toLabel} 시작` },
+            { type: 'mrkdwn', text: `<${dashboardUrl}|대시보드에서 보기>` },
+          ],
+        },
+      ],
+    }),
+  }).catch(err => console.error('Design step advance Slack failed:', err));
+}

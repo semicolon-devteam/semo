@@ -11,6 +11,7 @@ import {
   writebackPhaseProgressToKB,
   getProject,
   checkDesignStepAdvance,
+  getDesignStep,
   checkInfraTrackComplete,
 } from './gfp';
 import { dispatchRegeneration } from './gfp-bot';
@@ -22,6 +23,7 @@ import {
   resolveGfpSlackContext,
   sendGfpTrackForkSlack,
   sendGfpInfraPhaseCompletedSlack,
+  sendGfpDesignStepAdvanceSlack,
 } from './slack';
 import { parseColors } from './design-system-parser';
 import type { GfpPhaseSection, GfpQAItem, GfpTrack } from '@/types';
@@ -128,10 +130,19 @@ export async function executeSectionAction(params: SectionActionParams): Promise
         console.error('KB write-back failed:', err));
     }
 
-    // Phase 4: design sub-step advancement
+    // Phase 4: design sub-step advancement + DesignClaw dispatch
     if (section.phase === 4) {
-      checkDesignStepAdvance(gfpId).catch((err) =>
-        console.error('Design step advance check failed:', err));
+      const prevStep = await getDesignStep(gfpId);
+      const newStep = await checkDesignStepAdvance(gfpId);
+      if (newStep > prevStep) {
+        sendGfpDesignStepAdvanceSlack({
+          projectName: project.project_name,
+          gfpId,
+          fromStep: prevStep,
+          toStep: newStep,
+          channelId: slackCtx.channelId,
+        }).catch((err) => console.error('Design step dispatch failed:', err));
+      }
     }
 
     // Check if entire phase is now approved
