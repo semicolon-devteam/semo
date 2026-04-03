@@ -20,13 +20,15 @@ import {
   writePmSummaryToKB,
   printAuditReport,
   printDryRunReport,
+  diagnoseServiceStatus,
+  updateServiceProject,
   type MigrationResult,
 } from "../service-migrate";
 
 export function registerServiceCommands(program: Command): void {
   const service = program
     .command("service")
-    .description("서비스 관리 — 이식, 목록 조회");
+    .description("서비스 관리 — 이식, 목록 조회, 진단, 업데이트");
 
   // ── semo service migrate ──
   service
@@ -172,4 +174,164 @@ export function registerServiceCommands(program: Command): void {
         await closeConnection();
       }
     });
+
+  // ── semo service diagnose ──
+  service
+    .command("diagnose")
+    .description("서비스 KB ↔ service_projects 교차 진단")
+    .requiredOption("--domain <name>", "진단할 서비스 도메인")
+    .action(async (options: { domain: string }) => {
+      const pool = getPool();
+      const spinner = ora("서비스 진단 중...").start();
+
+      try {
+        const result = await diagnoseServiceStatus(pool, options.domain);
+        spinner.stop();
+
+        console.log(chalk.cyan.bold(`\n🔍 서비스 진단: ${result.domain}\n`));
+
+        // KB 상태
+        if (result.kbEntryCount > 0) {
+          console.log(chalk.bold("  ┌─ KB ─────────────────────────────┐"));
+          console.log(`  │ 도메인: ${result.domain} (service)`);
+          console.log(`  │ KB 엔트리: ${result.kbEntryCount}개`);
+          console.log(`  │ 키: ${result.kbKeys.join(", ")}`);
+          if (result.missingRequired.length > 0) {
+            console.log(chalk.yellow(`  │ 필수 키 누락: ${result.missingRequired.join(", ")}`));
+          }
+          console.log(chalk.bold("  └──────────────────────────────────┘\n"));
+        } else {
+          console.log(chalk.yellow("  KB 도메인 없음\n"));
+        }
+
+        // service_projects 상태
+        const sp = result.serviceProject;
+        if (sp) {
+          console.log(chalk.bold("  ┌─ service_projects ────────────────┐"));
+          console.log(`  │ gfp_id: ${sp.gfp_id}`);
+          console.log(`  │ project_name: ${sp.project_name}`);
+          console.log(`  │ owner_name: ${sp.owner_name}`);
+          console.log(`  │ lifecycle: ${sp.lifecycle}`);
+          console.log(`  │ current_phase: ${sp.current_phase}`);
+          console.log(`  │ status: ${sp.status}`);
+          if (sp.launched_at) {
+            console.log(`  │ launched_at: ${sp.launched_at}`);
+          }
+          console.log(chalk.bold("  └─────────────────────────────────┘\n"));
+        } else {
+          console.log(chalk.yellow("  service_projects 미등록\n"));
+        }
+
+        // 교차 검증
+        if (result.mismatches.length > 0) {
+          console.log(chalk.bold("  ┌─ 교차 검증 ──────────────────────┐"));
+          for (const m of result.mismatches) {
+            console.log(chalk.yellow(`  │ ⚠️  ${m.field}: KB=${m.kbValue}, SP=${m.spValue}`));
+            console.log(chalk.gray(`  │    기대값: ${m.expected}`));
+          }
+          console.log(chalk.bold("  └─────────────────────────────────┘\n"));
+        }
+
+        // Verdict
+        const verdictMap: Record<string, string> = {
+          healthy: chalk.green("✅ HEALTHY — 정합성 양호"),
+          mismatch: chalk.yellow(`⚠️  MISMATCH (${result.mismatches.length}건)`),
+          "kb-only": chalk.yellow("⚠️  KB-ONLY — service_projects 미등록"),
+          "sp-only": chalk.red("❌ SP-ONLY — KB 도메인 없음 (비정상)"),
+          missing: chalk.red("❌ MISSING — KB, service_projects 모두 없음"),
+        };
+        console.log(`  결과: ${verdictMap[result.verdict] ?? result.verdict}\n`);
+      } catch (err) {
+        spinner.fail(`진단 실패: ${(err as Error).message}`);
+      } finally {
+        await closeConnection();
+      }
+    });
+
+  // ── semo service update ──
+  service
+    .command("update")
+    .description("service_projects 레코드 업데이트")
+    .requiredOption("--domain <name>", "대상 서비스 도메인")
+    .option("--status <status>", "서비스 상태 (active|paused|completed)")
+    .option("--lifecycle <lifecycle>", "라이프사이클 (build|ops|sunset)")
+    .option("--phase <number>", "현재 phase (0-9)", parseInt)
+    .option("--name <projectName>", "프로젝트명")
+    .option("--owner <ownerName>", "오너명")
+    .action(
+      async (options: {
+        domain: string;
+        status?: string;
+        lifecycle?: string;
+        phase?: number;
+        name?: string;
+        owner?: string;
+      }) => {
+        const pool = getPool();
+        const spinner = ora("서비스 업데이트 중...").start();
+
+        try {
+          // Validate enum values
+          const validStatuses = ["active", "paused", "completed"];
+          if (options.status && !validStatuses.includes(options.status)) {
+            spinner.fail(`잘못된 status: '${options.status}' (허용: ${validStatuses.join(", ")})`);
+            await closeConnection();
+            return;
+          }
+
+          const validLifecycles = ["build", "ops", "sunset"];
+          if (options.lifecycle && !validLifecycles.includes(options.lifecycle)) {
+            spinner.fail(
+              `잘못된 lifecycle: '${options.lifecycle}' (허용: ${validLifecycles.join(", ")})`
+            );
+            await closeConnection();
+            return;
+          }
+
+          if (options.phase !== undefined && (options.phase < 0 || options.phase > 9)) {
+            spinner.fail(`잘못된 phase: ${options.phase} (허용: 0-9)`);
+            await closeConnection();
+            return;
+          }
+
+          const updates: Record<string, unknown> = {};
+          if (options.status) updates.status = options.status;
+          if (options.lifecycle) updates.lifecycle = options.lifecycle;
+          if (options.phase !== undefined) updates.current_phase = options.phase;
+          if (options.name) updates.project_name = options.name;
+          if (options.owner) updates.owner_name = options.owner;
+
+          if (Object.keys(updates).length === 0) {
+            spinner.info("업데이트할 항목이 없습니다. --status, --lifecycle, --phase 등을 지정하세요.");
+            await closeConnection();
+            return;
+          }
+
+          const result = await updateServiceProject(pool, options.domain, updates);
+
+          if (!result) {
+            spinner.fail(`'${options.domain}'은(는) service_projects에 등록되지 않았습니다.`);
+            await closeConnection();
+            return;
+          }
+
+          spinner.succeed(`'${options.domain}' 업데이트 완료`);
+
+          console.log(chalk.gray(
+            `  project_name: ${result.project_name}\n` +
+            `  owner_name: ${result.owner_name}\n` +
+            `  lifecycle: ${result.lifecycle}\n` +
+            `  current_phase: ${result.current_phase}\n` +
+            `  status: ${result.status}\n` +
+            `  launched_at: ${result.launched_at ?? "(없음)"}\n` +
+            `  updated_at: ${result.updated_at}`
+          ));
+          console.log();
+        } catch (err) {
+          spinner.fail(`업데이트 실패: ${(err as Error).message}`);
+        } finally {
+          await closeConnection();
+        }
+      }
+    );
 }

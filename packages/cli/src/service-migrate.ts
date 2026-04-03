@@ -50,7 +50,7 @@ export interface MigrationResult {
 
 // ── KB Status Mapping ──
 
-const STATUS_MAP: Record<string, { lifecycle: string; status: string }> = {
+export const STATUS_MAP: Record<string, { lifecycle: string; status: string }> = {
   active: { lifecycle: "ops", status: "active" },
   hold: { lifecycle: "ops", status: "paused" },
   maintenance: { lifecycle: "ops", status: "active" },
@@ -399,4 +399,270 @@ export function printDryRunReport(results: MigrationResult[]): void {
   }
 
   console.log(chalk.cyan(`  총 ${results.length}개 서비스 이식 대상\n`));
+}
+
+// ── Service Project Lookup / Update / Diagnose ──
+
+export interface ServiceProjectRow {
+  gfp_id: string;
+  project_name: string;
+  service_domain: string | null;
+  owner_name: string;
+  owner_contact: string | null;
+  current_phase: number;
+  infra_phase: number | null;
+  status: string;
+  lifecycle: string;
+  launched_at: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function getServiceProjectByDomain(
+  pool: Pool,
+  domain: string
+): Promise<ServiceProjectRow | null> {
+  const result = await pool.query(
+    `SELECT gfp_id, project_name, service_domain, owner_name, owner_contact,
+            current_phase, infra_phase, status, lifecycle,
+            launched_at::text, metadata,
+            created_at::text, updated_at::text
+     FROM semo.service_projects
+     WHERE service_domain = $1`,
+    [domain]
+  );
+  return result.rows[0] ?? null;
+}
+
+export interface ServiceProjectUpdate {
+  status?: string;
+  lifecycle?: string;
+  current_phase?: number;
+  project_name?: string;
+  owner_name?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export async function updateServiceProject(
+  pool: Pool,
+  domain: string,
+  updates: ServiceProjectUpdate
+): Promise<ServiceProjectRow | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  let idx = 1;
+
+  if (updates.project_name !== undefined) {
+    sets.push(`project_name = $${idx++}`);
+    params.push(updates.project_name);
+  }
+  if (updates.owner_name !== undefined) {
+    sets.push(`owner_name = $${idx++}`);
+    params.push(updates.owner_name);
+  }
+  if (updates.current_phase !== undefined) {
+    sets.push(`current_phase = $${idx++}`);
+    params.push(updates.current_phase);
+  }
+  if (updates.status !== undefined) {
+    sets.push(`status = $${idx++}`);
+    params.push(updates.status);
+  }
+  if (updates.lifecycle !== undefined) {
+    sets.push(`lifecycle = $${idx++}`);
+    params.push(updates.lifecycle);
+    // ops 전환 시 launched_at 자동 설정
+    if (updates.lifecycle === "ops") {
+      sets.push(`launched_at = COALESCE(launched_at, NOW())`);
+    }
+  }
+  if (updates.metadata !== undefined) {
+    sets.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${idx++}::jsonb`);
+    params.push(JSON.stringify(updates.metadata));
+  }
+
+  if (sets.length === 0) return getServiceProjectByDomain(pool, domain);
+
+  params.push(domain);
+  const result = await pool.query(
+    `UPDATE semo.service_projects SET ${sets.join(", ")}
+     WHERE service_domain = $${idx}
+     RETURNING gfp_id, project_name, service_domain, owner_name, owner_contact,
+               current_phase, infra_phase, status, lifecycle,
+               launched_at::text, metadata, created_at::text, updated_at::text`,
+    params
+  );
+  return result.rows[0] ?? null;
+}
+
+// ── Diagnose ──
+
+export interface DiagnoseMismatch {
+  field: string;
+  kbValue: string;
+  spValue: string;
+  expected: string;
+}
+
+export interface DiagnoseResult {
+  domain: string;
+  verdict: "healthy" | "mismatch" | "kb-only" | "sp-only" | "missing";
+  kbEntryCount: number;
+  kbKeys: string[];
+  serviceProject: ServiceProjectRow | null;
+  mismatches: DiagnoseMismatch[];
+  missingRequired: string[];
+}
+
+export async function diagnoseServiceStatus(
+  pool: Pool,
+  domain: string
+): Promise<DiagnoseResult> {
+  // 1. KB 도메인 존재 확인
+  const ontoResult = await pool.query(
+    `SELECT domain, description, created_at::text
+     FROM semo.ontology WHERE domain = $1 AND entity_type = 'service'`,
+    [domain]
+  );
+  const kbExists = ontoResult.rows.length > 0;
+
+  // 2. service_projects 조회
+  const sp = await getServiceProjectByDomain(pool, domain);
+
+  // 3. 분류
+  if (!kbExists && !sp) {
+    return {
+      domain,
+      verdict: "missing",
+      kbEntryCount: 0,
+      kbKeys: [],
+      serviceProject: null,
+      mismatches: [],
+      missingRequired: [],
+    };
+  }
+
+  if (!kbExists && sp) {
+    return {
+      domain,
+      verdict: "sp-only",
+      kbEntryCount: 0,
+      kbKeys: [],
+      serviceProject: sp,
+      mismatches: [],
+      missingRequired: [],
+    };
+  }
+
+  // KB 엔트리 목록
+  const entriesResult = await pool.query(
+    `SELECT DISTINCT key FROM semo.knowledge_base WHERE domain = $1 ORDER BY key`,
+    [domain]
+  );
+  const kbKeys = entriesResult.rows.map((r: { key: string }) => r.key);
+
+  const countResult = await pool.query(
+    `SELECT COUNT(*)::int as cnt FROM semo.knowledge_base WHERE domain = $1`,
+    [domain]
+  );
+  const kbEntryCount = countResult.rows[0]?.cnt ?? 0;
+
+  if (kbExists && !sp) {
+    // 필수 키 체크
+    const missingRequired: string[] = [];
+    for (const req of ["base-information", "po", "status"]) {
+      if (!kbKeys.includes(req)) missingRequired.push(req);
+    }
+    return {
+      domain,
+      verdict: "kb-only",
+      kbEntryCount,
+      kbKeys,
+      serviceProject: null,
+      mismatches: [],
+      missingRequired,
+    };
+  }
+
+  // 4. 양쪽 다 존재 → 교차 비교
+  const mismatches: DiagnoseMismatch[] = [];
+
+  // KB status vs service_projects status/lifecycle
+  const statusEntry = await pool.query(
+    `SELECT content FROM semo.knowledge_base
+     WHERE domain = $1 AND key = 'status' AND (sub_key IS NULL OR sub_key = '')
+     LIMIT 1`,
+    [domain]
+  );
+  if (statusEntry.rows.length > 0 && sp) {
+    const kbStatus = statusEntry.rows[0].content.split("\n")[0].trim().toLowerCase();
+    const expected = STATUS_MAP[kbStatus];
+    if (expected) {
+      if (expected.lifecycle !== sp.lifecycle) {
+        mismatches.push({
+          field: "lifecycle",
+          kbValue: `status=${kbStatus} → lifecycle=${expected.lifecycle}`,
+          spValue: sp.lifecycle,
+          expected: expected.lifecycle,
+        });
+      }
+      if (expected.status !== sp.status) {
+        mismatches.push({
+          field: "status",
+          kbValue: `status=${kbStatus} → status=${expected.status}`,
+          spValue: sp.status,
+          expected: expected.status,
+        });
+      }
+    }
+  }
+
+  // KB po vs service_projects owner_name
+  const poEntry = await pool.query(
+    `SELECT content FROM semo.knowledge_base
+     WHERE domain = $1 AND key = 'po' AND (sub_key IS NULL OR sub_key = '')
+     LIMIT 1`,
+    [domain]
+  );
+  if (poEntry.rows.length > 0 && sp) {
+    const kbPo = poEntry.rows[0].content.split("\n")[0].trim().toLowerCase();
+    if (kbPo !== sp.owner_name.toLowerCase()) {
+      mismatches.push({
+        field: "owner",
+        kbValue: kbPo,
+        spValue: sp.owner_name,
+        expected: kbPo,
+      });
+    }
+  }
+
+  // section 존재 여부 vs current_phase
+  if (sp && sp.lifecycle === "build" && sp.current_phase > 0) {
+    const sectionResult = await pool.query(
+      `SELECT COUNT(*)::int as cnt
+       FROM semo.service_sections
+       WHERE gfp_id = $1 AND status = 'approved'`,
+      [sp.gfp_id]
+    );
+    const approvedSections = sectionResult.rows[0]?.cnt ?? 0;
+    if (approvedSections === 0 && sp.current_phase > 0) {
+      mismatches.push({
+        field: "phase",
+        kbValue: "승인된 섹션 0개",
+        spValue: `current_phase=${sp.current_phase}`,
+        expected: "phase=0 (승인된 섹션 없음)",
+      });
+    }
+  }
+
+  return {
+    domain,
+    verdict: mismatches.length > 0 ? "mismatch" : "healthy",
+    kbEntryCount,
+    kbKeys,
+    serviceProject: sp,
+    mismatches,
+    missingRequired: [],
+  };
 }

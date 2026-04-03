@@ -173,7 +173,7 @@ async function writeInfraToKB(serviceDomain: string, metadata: Record<string, un
 
 export async function updateProject(
   gfpId: string,
-  data: Partial<Pick<GfpProject, 'project_name' | 'current_phase' | 'infra_phase' | 'status' | 'metadata'>>
+  data: Partial<Pick<GfpProject, 'project_name' | 'current_phase' | 'infra_phase' | 'status' | 'lifecycle' | 'launched_at' | 'metadata'>>
 ): Promise<GfpProject | null> {
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -194,6 +194,17 @@ export async function updateProject(
   if (data.status !== undefined) {
     sets.push(`status = $${idx++}`);
     params.push(data.status);
+  }
+  if (data.lifecycle !== undefined) {
+    sets.push(`lifecycle = $${idx++}`);
+    params.push(data.lifecycle);
+    if (data.lifecycle === 'ops') {
+      sets.push(`launched_at = COALESCE(launched_at, NOW())`);
+    }
+  }
+  if (data.launched_at !== undefined) {
+    sets.push(`launched_at = $${idx++}`);
+    params.push(data.launched_at);
   }
   if (data.metadata !== undefined) {
     sets.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${idx++}::jsonb`);
