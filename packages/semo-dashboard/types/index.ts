@@ -341,12 +341,20 @@ export type GfpResearchStatus = 'queued' | 'dispatched' | 'completed';
 export type DesignStep = 1 | 2 | 3 | 4 | 5;
 
 export const DESIGN_STEPS = [
-  { step: 1 as const, label: '레퍼런스 탐색', prefix: 'ref-', icon: 'magnifying-glass' },
-  { step: 2 as const, label: '디자인 시스템', prefix: 'ds-', icon: 'palette' },
-  { step: 3 as const, label: '구현', prefix: 'impl-', icon: 'code' },
-  { step: 4 as const, label: '리뷰', prefix: 'review-', icon: 'eye' },
-  { step: 5 as const, label: '핸드오프', prefix: 'handoff-', icon: 'arrow-right' },
+  { step: 1 as const, label: '레퍼런스 탐색', prefixes: ['ref-'] as const, icon: 'magnifying-glass' },
+  { step: 2 as const, label: '디자인 시스템', prefixes: ['ds-'] as const, icon: 'palette' },
+  { step: 3 as const, label: '구현', prefixes: ['impl-', 'stitch-prompt-', 'stitch-result-'] as const, icon: 'code' },
+  { step: 4 as const, label: '리뷰', prefixes: ['review-'] as const, icon: 'eye' },
+  { step: 5 as const, label: '핸드오프', prefixes: ['handoff-'] as const, icon: 'arrow-right' },
 ] as const;
+
+/** Check if a section_key belongs to a given step definition */
+export function matchesStep(
+  sectionKey: string,
+  step: (typeof DESIGN_STEPS)[number],
+): boolean {
+  return step.prefixes.some((p) => sectionKey.startsWith(p));
+}
 
 export type ServiceLifecycle = 'build' | 'ops' | 'sunset';
 
@@ -482,6 +490,58 @@ export interface ServiceIncident {
   status: ServiceIncidentStatus;
   occurred_at: string;
   resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Service KPI Metrics ──
+
+export type KPISignal = 'green' | 'yellow' | 'red' | 'neutral';
+export type KPICategory = 'common' | 'service-specific' | 'search' | 'engagement';
+export type KPISource = 'bot' | 'manual' | 'api' | 'import';
+
+export interface ServiceKPIMetric {
+  metric_id: string;
+  project_id: string;
+  iteration_id: string | null;
+  period: string;
+  metric_name: string;
+  metric_label: string | null;
+  category: KPICategory;
+  current_value: number | null;
+  baseline_value: number | null;
+  target_value: number | null;
+  unit: string | null;
+  wow_change: number | null;
+  signal: KPISignal;
+  achieved: boolean;
+  source: KPISource;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Service Action Items ──
+
+export type ActionItemStatus = 'open' | 'completed' | 'cancelled';
+export type ActionItemPriority = 'low' | 'normal' | 'high' | 'urgent';
+export type ActionItemSource = 'manual' | 'bot' | 'dashboard' | 'import';
+
+export interface ServiceActionItem {
+  action_item_id: string;
+  project_id: string;
+  iteration_id: string | null;
+  description: string;
+  assignee: string | null;
+  deadline: string | null;
+  status: ActionItemStatus;
+  priority: ActionItemPriority;
+  category: string | null;
+  source: ActionItemSource;
+  related_url: string | null;
+  sort_order: number;
+  completed_at: string | null;
+  metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
 }

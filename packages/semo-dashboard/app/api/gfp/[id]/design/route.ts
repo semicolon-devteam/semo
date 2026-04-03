@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getProject, listSections, getDesignStep } from '@/lib/gfp';
-import { DESIGN_STEPS } from '@/types';
+import { DESIGN_STEPS, matchesStep } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,7 +104,7 @@ export async function GET(
     // Design step information
     const designStep = await getDesignStep(id);
     const steps = DESIGN_STEPS.map((def) => {
-      const stepSections = sections.filter((s) => s.section_key.startsWith(def.prefix));
+      const stepSections = sections.filter((s) => matchesStep(s.section_key, def));
       const allApproved = stepSections.length > 0 && stepSections.every((s) => s.status === 'approved');
       const hasAny = stepSections.length > 0;
       return {

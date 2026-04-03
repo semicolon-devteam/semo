@@ -973,6 +973,9 @@ export async function sendGfpSectionPendingReviewSlack(
     });
   }
 
+  const approveUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?action=approve&sectionId=${opts.sectionId}&phase=${opts.phase}&section=${opts.sectionKey}`;
+  const rejectUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?action=reject&sectionId=${opts.sectionId}&phase=${opts.phase}&section=${opts.sectionKey}`;
+
   blocks.push(
     {
       type: 'actions',
@@ -981,15 +984,15 @@ export async function sendGfpSectionPendingReviewSlack(
           type: 'button',
           text: { type: 'plain_text', text: '승인', emoji: true },
           style: 'primary',
+          url: approveUrl,
           action_id: `gfp_approve_${opts.sectionId}`,
-          value: actionValue,
         },
         {
           type: 'button',
           text: { type: 'plain_text', text: '거절', emoji: true },
           style: 'danger',
+          url: rejectUrl,
           action_id: `gfp_reject_${opts.sectionId}`,
-          value: actionValue,
         },
         {
           type: 'button',
@@ -1195,4 +1198,68 @@ export async function sendGfpStitchResultSlack(opts: {
       blocks,
     }),
   }).catch(err => console.error('Stitch result Slack failed:', err));
+}
+
+// ── Stitch Fallback Notification ──
+
+export async function sendGfpStitchFallbackSlack(opts: {
+  projectName: string;
+  gfpId: string;
+  screenName: string;
+  sectionKey: string;
+  reason?: string;
+  botId: string;
+  channelId: string;
+}): Promise<void> {
+  if (!SLACK_BOT_TOKEN || !opts.channelId) return;
+
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=4&step=3`;
+
+  const blocks: Record<string, unknown>[] = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: `[${opts.projectName}] Stitch 미사용 — 직접 디자인 fallback` },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: [
+          `*${opts.screenName}* 화면이 Stitch 없이 직접 생성되었습니다.`,
+          opts.reason ? `*사유:* ${opts.reason}` : '*사유:* Stitch MCP 미가용 (API 키 미설정 또는 도구 없음)',
+          `*섹션:* \`${opts.sectionKey}\``,
+          `*봇:* ${opts.botId}`,
+        ].join('\n'),
+      },
+    },
+    {
+      type: 'context',
+      elements: [
+        { type: 'mrkdwn', text: 'Stitch 프롬프트/결과 없이 design-prototype 콜백이 사용되었습니다. 디자인 품질을 대시보드에서 확인해주세요.' },
+      ],
+    },
+    {
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '대시보드에서 확인' },
+          url: dashboardUrl,
+        },
+      ],
+    },
+  ];
+
+  await fetch('https://slack.com/api/chat.postMessage', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+    },
+    body: JSON.stringify({
+      channel: opts.channelId,
+      text: `[${opts.projectName}] Stitch fallback — ${opts.screenName} 직접 디자인 생성`,
+      blocks,
+    }),
+  }).catch(err => console.error('Stitch fallback Slack failed:', err));
 }

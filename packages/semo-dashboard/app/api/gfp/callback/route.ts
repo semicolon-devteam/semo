@@ -19,7 +19,7 @@ import {
   updateSectionSlackThread,
 } from '@/lib/gfp';
 import { query } from '@/lib/db';
-import { sendGfpQASlack, sendGfpSectionPendingReviewSlack, sendGfpStitchResultSlack, resolveGfpSlackContext } from '@/lib/slack';
+import { sendGfpQASlack, sendGfpSectionPendingReviewSlack, sendGfpStitchResultSlack, sendGfpStitchFallbackSlack, resolveGfpSlackContext } from '@/lib/slack';
 
 const DASHBOARD_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space';
 
@@ -68,6 +68,7 @@ interface DesignPrototypePayload {
   screen_name: string;
   html_content: string;
   description: string;
+  fallback_reason?: string;
   bot_id: string;
 }
 
@@ -284,6 +285,17 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        // Stitch 미사용 경고: stitch-result/stitch-prompt 없이 fallback 사용 시 로그
+        const existingSections = await listSections(body.gfp_id, 4);
+        const hasStitchAttempt = existingSections.some(
+          (s) => s.section_key.startsWith('stitch-result-') || s.section_key.startsWith('stitch-prompt-'),
+        );
+        if (!hasStitchAttempt) {
+          console.warn(
+            `[GFP Callback] design-prototype fallback without any stitch attempt for ${body.gfp_id} by ${body.bot_id}`,
+          );
+        }
+
         // 1. gfp_materials에 프로토타입 저장
         const protoMaterial = await createStitchMaterial({
           gfp_id: body.gfp_id,
@@ -291,8 +303,14 @@ export async function POST(request: NextRequest) {
           material_type: 'design-prototype',
         });
 
-        // 2. Phase 4에 impl-screen 섹션 생성
-        const screenKey = `impl-screen-${body.screen_name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+        // 2. Phase 4에 impl-screen 섹션 생성 (camelCase→kebab-case 정규화)
+        const normalizedName = body.screen_name
+          .replace(/([a-z])([A-Z])/g, '$1-$2')
+          .replace(/([A-Z]+)([A-Z][a-z])/g, '$1-$2')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        const screenKey = `impl-screen-${normalizedName}`;
         const screenSection = await upsertSection({
           gfp_id: body.gfp_id,
           phase: 4,
@@ -303,8 +321,31 @@ export async function POST(request: NextRequest) {
           status: 'pending-review',
         });
 
+        // 3. Stitch fallback Slack 알림 (Stitch 미시도 + 이 화면이 첫 fallback일 때)
+        if (!hasStitchAttempt) {
+          const existingImplScreens = existingSections.filter(
+            (s) => s.section_key.startsWith('impl-screen-'),
+          );
+          const isFirstFallback = existingImplScreens.length === 0;
+          const protoProject = await getProject(body.gfp_id);
+          if (protoProject && isFirstFallback) {
+            const protoSlackCtx = await resolveGfpSlackContext(body.gfp_id);
+            if (protoSlackCtx.channelId) {
+              sendGfpStitchFallbackSlack({
+                projectName: protoProject.project_name,
+                gfpId: body.gfp_id,
+                screenName: body.screen_name,
+                sectionKey: screenKey,
+                reason: body.fallback_reason,
+                botId: body.bot_id,
+                channelId: protoSlackCtx.channelId,
+              }).catch(err => console.error('Stitch fallback Slack failed:', err));
+            }
+          }
+        }
+
         console.log(
-          `[GFP Callback] Design prototype saved: material=${protoMaterial.material_id}, section=${screenSection.section_id} by ${body.bot_id}`
+          `[GFP Callback] Design prototype saved: material=${protoMaterial.material_id}, section=${screenSection.section_id} by ${body.bot_id}${!hasStitchAttempt ? ' (FALLBACK)' : ''}`,
         );
         return NextResponse.json({ ok: true, material: protoMaterial, section: screenSection });
       }

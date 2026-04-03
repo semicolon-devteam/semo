@@ -14,7 +14,7 @@ import GfpPresetInfoPanel from '@/components/gfp/GfpPresetInfoPanel';
 import GfpInfraRequestPanel from '@/components/gfp/GfpInfraRequestPanel';
 import GfpInfraFlagModal from '@/components/gfp/GfpInfraFlagModal';
 import type { GfpProject, GfpPhaseSection, GfpResearchTask, GfpInfraRequest, DesignStep, GfpPresetId, GfpTrack } from '@/types';
-import { DESIGN_STEPS } from '@/types';
+import { DESIGN_STEPS, matchesStep } from '@/types';
 import type { PhaseProgress } from '@/lib/gfp';
 import { PHASE_LABELS, INFRA_PHASE_LABELS } from '@/lib/gfp-phases';
 import { GFP_PRESETS } from '@/lib/gfp-presets';
@@ -322,14 +322,14 @@ export default function GfpDetailPage() {
   // Phase 3: filter sections by active design step
   const activeStepDef = DESIGN_STEPS.find((s) => s.step === activeDesignStep);
   const phaseSections = showStitch && activeStepDef
-    ? sections.filter((s) => s.section_key.startsWith(activeStepDef.prefix))
+    ? sections.filter((s) => matchesStep(s.section_key, activeStepDef))
     : sections;
 
   // Build step statuses for the nav
   const stepStatuses: Record<number, 'pending' | 'in-progress' | 'completed'> = {};
   if (showStitch) {
     for (const def of DESIGN_STEPS) {
-      const stepSecs = sections.filter((s) => s.section_key.startsWith(def.prefix));
+      const stepSecs = sections.filter((s) => matchesStep(s.section_key, def));
       if (stepSecs.length === 0) {
         stepStatuses[def.step] = 'pending';
       } else if (stepSecs.every((s) => s.status === 'approved')) {

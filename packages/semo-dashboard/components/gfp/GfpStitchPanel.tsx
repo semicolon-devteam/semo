@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { GfpPhaseSection, DesignStep } from '@/types';
-import { DESIGN_STEPS } from '@/types';
+import { DESIGN_STEPS, matchesStep } from '@/types';
 import DesignSystemPreview from './DesignSystemPreview';
 
 interface GfpDesignToolsPanelProps {
@@ -83,7 +83,7 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
       {/* Step Progress Overview */}
       <div className="mb-4 space-y-1.5">
         {DESIGN_STEPS.map((def) => {
-          const stepSecs = sections.filter((s) => s.section_key.startsWith(def.prefix));
+          const stepSecs = sections.filter((s) => matchesStep(s.section_key, def));
           const allApproved = stepSecs.length > 0 && stepSecs.every((s) => s.status === 'approved');
           const isActive = def.step === designStep;
           return (

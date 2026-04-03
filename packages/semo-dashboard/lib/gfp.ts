@@ -20,6 +20,8 @@ import type {
   GfpInfraRequest,
   GfpInfraRequestStatus,
   GfpInfraCategory,
+  ServiceKPIMetric,
+  ServiceActionItem,
 } from '@/types';
 
 // ── Projects ──
@@ -512,17 +514,26 @@ export async function setDesignStep(gfpId: string, step: number): Promise<void> 
  * Returns the new step (or current if no advance).
  */
 export async function checkDesignStepAdvance(gfpId: string): Promise<number> {
-  const { DESIGN_STEPS } = await import('@/types');
+  const { DESIGN_STEPS, matchesStep } = await import('@/types');
 
   const currentStep = await getDesignStep(gfpId);
   const stepDef = DESIGN_STEPS.find((s) => s.step === currentStep);
   if (!stepDef || currentStep >= 5) return currentStep;
 
   const sections = await listSections(gfpId, 4);
-  const stepSections = sections.filter((s) => s.section_key.startsWith(stepDef.prefix));
+  const stepSections = sections.filter((s) => matchesStep(s.section_key, stepDef));
 
   // 해당 스텝에 섹션이 없으면 전진하지 않음
   if (stepSections.length === 0) return currentStep;
+
+  // Step 3: stitch-result 또는 impl-screen이 최소 1개 있어야 전진
+  // (stitch-prompt만 있고 결과물이 없으면 step 3에서 대기)
+  if (currentStep === 3) {
+    const hasResults = stepSections.some(
+      (s) => s.section_key.startsWith('stitch-result-') || s.section_key.startsWith('impl-screen-'),
+    );
+    if (!hasResults) return currentStep;
+  }
 
   const allApproved = stepSections.every((s) => s.status === 'approved');
   if (allApproved) {
@@ -923,4 +934,184 @@ export async function getServiceKPIData(serviceDomain: string, limit = 5) {
     actionItems: actionRes.rows.map((r) => ({ subKey: r.sub_key, content: r.content, updatedAt: r.updated_at })),
     milestones: milestoneRes.rows.map((r) => ({ subKey: r.sub_key, content: r.content, metadata: r.metadata ?? {} })),
   };
+}
+
+// ── KPI Metrics (DB records) ──
+
+export async function listKPIMetrics(projectId: string, period?: string, limit = 50): Promise<ServiceKPIMetric[]> {
+  if (period) {
+    const res = await query<ServiceKPIMetric>(
+      `SELECT * FROM semo.service_kpi_metrics
+       WHERE project_id = $1 AND period = $2::date
+       ORDER BY category, metric_name`,
+      [projectId, period]
+    );
+    return res.rows;
+  }
+  const res = await query<ServiceKPIMetric>(
+    `SELECT * FROM semo.service_kpi_metrics
+     WHERE project_id = $1
+     ORDER BY period DESC, category, metric_name
+     LIMIT $2`,
+    [projectId, limit]
+  );
+  return res.rows;
+}
+
+export async function listKPIPeriods(projectId: string): Promise<string[]> {
+  const res = await query<{ period: string }>(
+    `SELECT DISTINCT period::text FROM semo.service_kpi_metrics
+     WHERE project_id = $1 ORDER BY period DESC`,
+    [projectId]
+  );
+  return res.rows.map((r) => r.period);
+}
+
+export async function batchCreateKPIMetrics(
+  projectId: string,
+  period: string,
+  source: string,
+  metrics: Array<Omit<ServiceKPIMetric, 'metric_id' | 'project_id' | 'period' | 'source' | 'created_at' | 'updated_at'>>
+): Promise<ServiceKPIMetric[]> {
+  return transaction(async (client) => {
+    const results: ServiceKPIMetric[] = [];
+    for (const m of metrics) {
+      const res = await client.query<ServiceKPIMetric>(
+        `INSERT INTO semo.service_kpi_metrics
+           (project_id, iteration_id, period, metric_name, metric_label, category,
+            current_value, baseline_value, target_value, unit, wow_change, signal, achieved, source, metadata)
+         VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         RETURNING *`,
+        [
+          projectId, m.iteration_id ?? null, period, m.metric_name, m.metric_label ?? null, m.category ?? 'common',
+          m.current_value ?? null, m.baseline_value ?? null, m.target_value ?? null,
+          m.unit ?? null, m.wow_change ?? null, m.signal ?? 'neutral', m.achieved ?? false,
+          source, JSON.stringify(m.metadata ?? {}),
+        ]
+      );
+      results.push(res.rows[0]);
+    }
+    return results;
+  });
+}
+
+export async function updateKPIMetric(
+  metricId: string,
+  data: Partial<Pick<ServiceKPIMetric, 'current_value' | 'baseline_value' | 'target_value' | 'wow_change' | 'signal' | 'achieved' | 'metric_label' | 'category' | 'unit' | 'metadata'>>
+): Promise<ServiceKPIMetric | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  let idx = 1;
+
+  for (const [key, val] of Object.entries(data)) {
+    if (val === undefined) continue;
+    if (key === 'metadata') {
+      sets.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${idx++}::jsonb`);
+      params.push(JSON.stringify(val));
+    } else {
+      sets.push(`${key} = $${idx++}`);
+      params.push(val);
+    }
+  }
+  if (sets.length === 0) return null;
+  params.push(metricId);
+  const res = await query<ServiceKPIMetric>(
+    `UPDATE semo.service_kpi_metrics SET ${sets.join(', ')} WHERE metric_id = $${idx} RETURNING *`,
+    params
+  );
+  return res.rows[0] ?? null;
+}
+
+export async function deleteKPIMetric(metricId: string): Promise<boolean> {
+  const res = await query('DELETE FROM semo.service_kpi_metrics WHERE metric_id = $1', [metricId]);
+  return (res.rowCount ?? 0) > 0;
+}
+
+// ── Service Action Items (DB records) ──
+
+export async function listServiceActionItems(projectId: string, status?: string): Promise<ServiceActionItem[]> {
+  if (status) {
+    const res = await query<ServiceActionItem>(
+      `SELECT * FROM semo.service_action_items
+       WHERE project_id = $1 AND status = $2
+       ORDER BY sort_order, created_at DESC`,
+      [projectId, status]
+    );
+    return res.rows;
+  }
+  const res = await query<ServiceActionItem>(
+    `SELECT * FROM semo.service_action_items
+     WHERE project_id = $1
+     ORDER BY CASE status WHEN 'open' THEN 0 WHEN 'completed' THEN 1 ELSE 2 END, sort_order, created_at DESC`,
+    [projectId]
+  );
+  return res.rows;
+}
+
+export async function createServiceActionItem(data: {
+  project_id: string;
+  description: string;
+  assignee?: string;
+  deadline?: string;
+  status?: string;
+  priority?: string;
+  category?: string;
+  source?: string;
+  related_url?: string;
+  sort_order?: number;
+  iteration_id?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<ServiceActionItem> {
+  const res = await query<ServiceActionItem>(
+    `INSERT INTO semo.service_action_items
+       (project_id, iteration_id, description, assignee, deadline, status, priority, category, source, related_url, sort_order, metadata)
+     VALUES ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12)
+     RETURNING *`,
+    [
+      data.project_id, data.iteration_id ?? null, data.description,
+      data.assignee ?? null, data.deadline ?? null, data.status ?? 'open',
+      data.priority ?? 'normal', data.category ?? null, data.source ?? 'manual',
+      data.related_url ?? null, data.sort_order ?? 0, JSON.stringify(data.metadata ?? {}),
+    ]
+  );
+  return res.rows[0];
+}
+
+export async function updateServiceActionItem(
+  itemId: string,
+  data: Partial<Pick<ServiceActionItem, 'description' | 'assignee' | 'deadline' | 'status' | 'priority' | 'category' | 'related_url' | 'sort_order' | 'metadata'>>
+): Promise<ServiceActionItem | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  let idx = 1;
+
+  for (const [key, val] of Object.entries(data)) {
+    if (val === undefined) continue;
+    if (key === 'metadata') {
+      sets.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${idx++}::jsonb`);
+      params.push(JSON.stringify(val));
+    } else {
+      sets.push(`${key} = $${idx++}`);
+      params.push(val);
+    }
+  }
+  // auto-set completed_at
+  if (data.status === 'completed') {
+    sets.push(`completed_at = NOW()`);
+  } else if (data.status === 'open') {
+    sets.push(`completed_at = NULL`);
+  }
+
+  if (sets.length === 0) return null;
+  params.push(itemId);
+  const res = await query<ServiceActionItem>(
+    `UPDATE semo.service_action_items SET ${sets.join(', ')} WHERE action_item_id = $${idx} RETURNING *`,
+    params
+  );
+  return res.rows[0] ?? null;
+}
+
+export async function deleteServiceActionItem(itemId: string): Promise<boolean> {
+  const res = await query('DELETE FROM semo.service_action_items WHERE action_item_id = $1', [itemId]);
+  return (res.rowCount ?? 0) > 0;
 }
