@@ -355,6 +355,52 @@ export async function answerQAItems(
   return res.rows[0] ?? null;
 }
 
+// ── Section management (delete / move) ──
+
+export async function deleteSection(sectionId: string, gfpId: string): Promise<GfpPhaseSection | null> {
+  const res = await query<GfpPhaseSection>(
+    'DELETE FROM semo.gfp_phase_sections WHERE section_id = $1 AND gfp_id = $2 RETURNING *',
+    [sectionId, gfpId]
+  );
+  return res.rows[0] ?? null;
+}
+
+export async function moveSection(
+  sectionId: string,
+  gfpId: string,
+  targetPhase: number,
+  targetTrack?: GfpTrack
+): Promise<GfpPhaseSection | null> {
+  // Fetch current section to check existence and get section_key for conflict check
+  const current = await query<GfpPhaseSection>(
+    'SELECT * FROM semo.gfp_phase_sections WHERE section_id = $1 AND gfp_id = $2',
+    [sectionId, gfpId]
+  );
+  if (!current.rows[0]) return null;
+
+  const section = current.rows[0];
+  const track = targetTrack ?? section.track ?? 'plan';
+
+  // Check UNIQUE constraint (gfp_id, track, phase, section_key)
+  const conflict = await query<GfpPhaseSection>(
+    `SELECT section_id FROM semo.gfp_phase_sections
+     WHERE gfp_id = $1 AND track = $2 AND phase = $3 AND section_key = $4 AND section_id != $5`,
+    [gfpId, track, targetPhase, section.section_key, sectionId]
+  );
+  if (conflict.rows.length > 0) {
+    throw new Error('CONFLICT');
+  }
+
+  const res = await query<GfpPhaseSection>(
+    `UPDATE semo.gfp_phase_sections
+     SET phase = $1, track = $2
+     WHERE section_id = $3 AND gfp_id = $4
+     RETURNING *`,
+    [targetPhase, track, sectionId, gfpId]
+  );
+  return res.rows[0] ?? null;
+}
+
 /**
  * Save Slack thread_ts on a section (for answer collection polling).
  */

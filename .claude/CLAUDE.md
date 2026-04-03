@@ -60,31 +60,60 @@
 **금지:** 위 주제를 자체 지식/세션 기억만으로 답변하는 것.
 KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하겠습니다."
 
-### 쓰기 (Write-Back)
-다음 상황 → **반드시 `semo kb upsert`로 KB에 즉시 기록:**
-- 사용자가 팀 정보를 정정하거나 새 사실을 알려줄 때
-- 의사결정이 내려졌을 때
-- 프로세스/규칙이 변경되었을 때
-- **쓰기 대상 고지**: upsert 전 대상 명시 — `[KB 기록: {domain} {key} — 생성|수정]`
+### 쓰기 (Write-Back) — 자동 KB 기록
 
-**금지:** "알겠습니다/기억하겠습니다"만 하고 KB에 쓰지 않는 것.
+다음 상황 발생 시 **사용자 지시 없이도** 즉시 `semo kb upsert`로 KB에 기록:
+
+| 트리거 | KB 경로 | 예시 |
+|--------|---------|------|
+| 의사결정/합의 | `semicolon decision/{date}/{slug}` | 봇 규칙 이동, 배포 정책 변경 |
+| 프로세스/규칙 변경 | `semicolon process/{slug}` | naming convention, GFP 프리셋 정책 |
+| 봇 설정 변경 (SOUL.md, AGENTS.md, 스킬) | `semicolon decision/{date}/{slug}` | Commitment Protocol 위치 이동 |
+| 인프라 정책 변경 | `semicolon infra/{name}` | 배포 전략, CI/CD 채널 설정 |
+| 서비스 상태/정보 변경 | `{service} {key}` | preset 변경, slack-channel 설정 |
+| 팀원 정보 정정/추가 | `{member} {key}` | 역할 변경, 연락처 업데이트 |
+
+- **쓰기 대상 고지**: upsert 전 대상 명시 — `[KB 기록: {domain} {key} — 생성|수정]`
+- **금지:** "알겠습니다/기억하겠습니다"만 하고 KB에 쓰지 않는 것.
 
 ---
 
 ## 3자 동기화 검증 규칙 (NON-NEGOTIABLE)
 
 > 이 프로젝트의 모든 변경은 3자 동기화 관점에서 평가되어야 한다.
+> 3자 = **소스코드** ↔ **KB 포함 DB** ↔ **OpenClaw 봇 워크스페이스 로컬 파일**
 
-### 변경 전 체크리스트
+### 3자 정의
+
+| 축 | 위치 | 예시 |
+|----|------|------|
+| **소스코드** | 이 레포 (`packages/cli`, `packages/semo-dashboard` 등) | Phase 정의, API 라우트, 타입, 마이그레이션 |
+| **KB 포함 DB** | semo-kb (PostgreSQL + 벡터 임베딩) | `semicolon process/gfp-phases`, `{botId} role`, 온톨로지 |
+| **봇 로컬 파일** | `~/.openclaw-{botId}/workspace/` (SOUL.md, skills/, memory/) + `~/.claude/semo/` (semo CLI 로컬 환경) | 봇 스킬 SKILL.md, 스크립트, SOUL.md, MEMORY.md |
+
+### 변경 시 동기화 체크리스트
+
+**기능/프로세스/스펙을 변경할 때** 아래 질문을 반드시 확인:
+
+1. **소스코드 변경 시** → KB와 봇 로컬 파일에 반영할 내용이 있는가?
+   - 예: Phase 구조 변경 → KB `semicolon process/gfp-phases` 업데이트 + 관련 봇 SKILL.md 수정
+   - 예: API 엔드포인트 추가 → 봇 스킬 스크립트가 참조하면 스크립트도 수정
+2. **KB 변경 시** → 소스코드나 봇 로컬 파일과 불일치가 생기지 않는가?
+   - 예: 봇 역할(role) 변경 → 해당 봇 SOUL.md, 스킬 파일 동시 수정
+3. **봇 로컬 파일 변경 시** → KB에 기록할 사항이 있는가? 소스코드와 정합성이 맞는가?
+   - 예: 봇 스킬 워크플로우 변경 → KB의 프로세스 엔트리와 일치하는지 확인
+   - `bot_workspace_standard`에서 해당 파일의 `content_rules` 확인 필수
+
+### 추가 규칙
 
 1. **SoT 위치**: DB 테이블 → DB에서 읽기 (하드코딩 금지). KB → `semo kb get/search` 조회.
-2. **동기화 영향**: CLI만/CLI+봇/DB 스키마/봇 워크스페이스 규격 중 어디에 영향?
-3. **하드코딩 금지**: 봇 목록 → `bot_status` DB. 도메인 → `ontology` DB. 워크스페이스 규격 → `bot_workspace_standard` DB.
-4. **봇 워크스페이스 파일 수정 시**: SOUL.md, MEMORY.md 등 봇 파일을 수정하기 전에 반드시 `bot_workspace_standard`에서 해당 파일의 `content_rules`(max_lines, required_sections, forbidden_patterns)를 확인하고, 수정 후 규격 위반이 없는지 검증할 것.
-5. **KB 데이터 쓰기 시**: 반드시 `semo kb upsert` CLI 또는 `kbUpsert()` 함수를 사용 (임베딩 + 도메인/스키마 검증 포함). raw SQL INSERT 금지.
-6. **검증**: `semo test run workspace-audit` / `semo test run 018-transplant` / KB 도구 호출 테스트.
+2. **하드코딩 금지**: 봇 목록 → `bot_status` DB. 도메인 → `ontology` DB. 워크스페이스 규격 → `bot_workspace_standard` DB.
+3. **KB 데이터 쓰기 시**: 반드시 `semo kb upsert` CLI 또는 `kbUpsert()` 함수를 사용 (임베딩 + 도메인/스키마 검증 포함). raw SQL INSERT 금지.
+4. **검증**: `semo test run workspace-audit` / `semo test run 018-transplant` / KB 도구 호출 테스트.
 
 ### 위반 사례
+- 소스코드에서 Phase 구조를 바꾸고 KB/봇 스킬을 업데이트하지 않음 (**→ 봇이 잘못된 답변**)
+- KB에 프로세스를 등록하고 봇 SKILL.md에 반영하지 않음 (**→ 봇이 구버전 워크플로우 실행**)
 - 봇 이름을 배열로 하드코딩
 - 워크스페이스 규칙을 스크립트에 직접 작성 (DB `bot_workspace_standard`가 SoT)
 - 서비스 고유 정보를 `semicolon` 조직 도메인에 저장 (해당 서비스 도메인 사용)
@@ -109,6 +138,30 @@ KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하
 | 복구 명령어 | `semo kb get semo process recovery` |
 | 코딩 컨벤션 | `semo kb get semo process coding-convention` |
 | 도메인 삭제 | `semo onto unregister <domain> [--force --yes]` |
+
+---
+
+## GFP Slack-First 원칙 (NON-NEGOTIABLE)
+
+> GFP 파이프라인은 **Slack-first, Dashboard-as-visual-companion** 구조.
+
+### 핵심 규칙
+1. **PO는 Slack에서 봇과의 대화만으로 전 Phase를 진행** 가능해야 함
+2. 진입점: `@SemiClaw 신규서비스 GFP 시작해줘` → Phase 0 온보딩 → 자동 포크
+3. 봇이 섹션을 제출하면 Slack에 승인/거절 버튼 포함 알림 발송 (`sendGfpSectionPendingReviewSlack`)
+4. **시각적 산출물**(디자인 팔레트, HTML 프로토타입, 다이어그램)은 **Dashboard에서 확인** 필수 → Slack 알림에 "대시보드에서 보기" 버튼 포함
+5. **양방향 싱크**: Slack 버튼 클릭 → Dashboard DB 반영 / Dashboard 승인 → Slack 메시지 업데이트
+6. Phase 0에서 RPG식 PO 프로파일링(tech_level, design_sensitivity, domain_area 등) 수행 → `metadata.po_profile`에 저장
+
+### 아키텍처
+- **공유 액션 레이어**: `lib/gfp-actions.ts` → `executeSectionAction()` — Dashboard와 Slack 양쪽에서 호출
+- **Slack Interactivity**: `POST /api/slack/interactions` — 버튼 클릭/모달 제출 핸들러
+- **알림 함수**: `sendGfpSectionPendingReviewSlack()` — 승인/거절 액션 버튼 포함
+- **사전 조건**: Slack App에 Interactivity Request URL 설정 + `SLACK_SIGNING_SECRET` 환경변수
+
+### 봇 스킬 작성 시 주의
+- 섹션 제출 완료 안내 시: "Slack에서 바로 승인/거절 가능합니다. 시각 산출물은 대시보드에서 확인하세요."
+- "대시보드에서 검토해주세요"만 안내하면 안 됨 — Slack-first 원칙 위반
 
 ---
 

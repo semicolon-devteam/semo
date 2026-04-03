@@ -3,6 +3,7 @@
  * Uses Slack Bot Token (chat.postMessage) for structured Block Kit messages.
  */
 
+import crypto from 'crypto';
 import { query } from './db';
 import { getPhaseAssignee, getPhaseCc, PHASE_LABELS, INFRA_PHASE_LABELS } from './gfp-phases';
 import type { GfpQAItem, GfpInfraRequest } from '@/types';
@@ -814,4 +815,259 @@ export async function sendDesignSystemSlack(opts: GfpDesignSystemSlackOpts): Pro
     console.error('Slack design system notify failed:', err);
     return false;
   }
+}
+
+// ── Slack Interactivity Utilities ──
+
+const SLACK_SIGNING_SECRET = process.env.SLACK_SIGNING_SECRET;
+
+/**
+ * Slack request 서명 검증 (HMAC-SHA256).
+ * Interactivity 엔드포인트 보안용.
+ */
+export function verifySlackSignature(
+  rawBody: string,
+  timestamp: string,
+  signature: string,
+): boolean {
+  if (!SLACK_SIGNING_SECRET) {
+    console.warn('[Slack] SLACK_SIGNING_SECRET not configured — skipping verification');
+    return true; // 개발환경에서는 통과 (프로덕션에서 반드시 설정 필요)
+  }
+  const fiveMinutesAgo = Math.floor(Date.now() / 1000) - 300;
+  if (parseInt(timestamp, 10) < fiveMinutesAgo) return false; // replay attack prevention
+
+  const sigBasestring = `v0:${timestamp}:${rawBody}`;
+  const mySignature = 'v0=' + crypto
+    .createHmac('sha256', SLACK_SIGNING_SECRET)
+    .update(sigBasestring, 'utf8')
+    .digest('hex');
+
+  return crypto.timingSafeEqual(
+    Buffer.from(mySignature, 'utf8'),
+    Buffer.from(signature, 'utf8'),
+  );
+}
+
+/**
+ * Slack 모달 열기 (views.open).
+ * 거절 사유 입력 등 인터랙티브 폼용.
+ */
+export async function openSlackModal(
+  triggerId: string,
+  view: Record<string, unknown>,
+): Promise<boolean> {
+  if (!SLACK_BOT_TOKEN) return false;
+  try {
+    const res = await fetch('https://slack.com/api/views.open', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ trigger_id: triggerId, view }),
+    });
+    const data = await res.json();
+    if (!data.ok) console.error('[Slack] views.open failed:', data.error);
+    return !!data.ok;
+  } catch (err) {
+    console.error('[Slack] views.open error:', err);
+    return false;
+  }
+}
+
+/**
+ * Slack 메시지 업데이트 (chat.update).
+ * 버튼 클릭 후 상태 배지로 교체, 양방향 싱크용.
+ */
+export async function updateSlackMessage(
+  channelId: string,
+  messageTs: string,
+  blocks: unknown[],
+  text?: string,
+): Promise<boolean> {
+  if (!SLACK_BOT_TOKEN) return false;
+  try {
+    const res = await fetch('https://slack.com/api/chat.update', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        channel: channelId,
+        ts: messageTs,
+        blocks,
+        text: text ?? 'GFP 섹션 상태 업데이트',
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) console.error('[Slack] chat.update failed:', data.error);
+    return !!data.ok;
+  } catch (err) {
+    console.error('[Slack] chat.update error:', err);
+    return false;
+  }
+}
+
+// ── GFP Section Pending Review Notification ──
+
+export interface GfpSectionPendingReviewOpts {
+  projectName: string;
+  gfpId: string;
+  sectionId: string;
+  sectionKey: string;
+  sectionTitle: string;
+  phase: number;
+  contentPreview: string;
+  channelId: string;
+}
+
+/**
+ * 봇이 섹션을 제출(pending-review)할 때 PO에게 승인/거절 버튼 포함 Slack 알림.
+ * 반환: 전송된 메시지의 ts (양방향 싱크용) 또는 null.
+ */
+export async function sendGfpSectionPendingReviewSlack(
+  opts: GfpSectionPendingReviewOpts,
+): Promise<string | null> {
+  if (!SLACK_BOT_TOKEN) return null;
+  const phaseLabel = PHASE_LABELS[opts.phase] ?? `Phase ${opts.phase}`;
+  const preview = opts.contentPreview.length > 200
+    ? opts.contentPreview.slice(0, 200) + '…'
+    : opts.contentPreview;
+
+  const isVisualSection = opts.sectionKey.startsWith('ds-') || opts.sectionKey.startsWith('impl-screen-');
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=${opts.phase}&section=${opts.sectionKey}`;
+
+  const actionValue = JSON.stringify({
+    gfpId: opts.gfpId,
+    sectionId: opts.sectionId,
+    phase: opts.phase,
+  });
+
+  const blocks: unknown[] = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: '📋 GFP 섹션 검토 요청', emoji: true },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*프로젝트:*\n${opts.projectName}` },
+        { type: 'mrkdwn', text: `*섹션:*\n${opts.sectionKey} (${opts.sectionTitle})` },
+        { type: 'mrkdwn', text: `*Phase:*\n${opts.phase} — ${phaseLabel}` },
+      ],
+    },
+    {
+      type: 'section',
+      text: { type: 'mrkdwn', text: `> ${preview.replace(/\n/g, '\n> ')}` },
+    },
+  ];
+
+  if (isVisualSection) {
+    blocks.push({
+      type: 'context',
+      elements: [
+        { type: 'mrkdwn', text: '🎨 _시각적 산출물은 대시보드에서 확인을 권장합니다_' },
+      ],
+    });
+  }
+
+  blocks.push(
+    {
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '승인', emoji: true },
+          style: 'primary',
+          action_id: `gfp_approve_${opts.sectionId}`,
+          value: actionValue,
+        },
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '거절', emoji: true },
+          style: 'danger',
+          action_id: `gfp_reject_${opts.sectionId}`,
+          value: actionValue,
+        },
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '대시보드에서 보기', emoji: true },
+          url: dashboardUrl,
+          action_id: `gfp_view_dashboard_${opts.sectionId}`,
+        },
+      ],
+    },
+    {
+      type: 'context',
+      elements: [
+        { type: 'mrkdwn', text: `섹션 ID: \`${opts.sectionId.slice(0, 8)}...\`` },
+      ],
+    },
+  );
+
+  try {
+    const res = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        channel: opts.channelId,
+        text: `📋 GFP 섹션 검토 요청: ${opts.sectionTitle}`,
+        blocks,
+      }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      console.error('[Slack] pending-review notify failed:', data.error);
+      return null;
+    }
+    return data.ts as string;
+  } catch (err) {
+    console.error('[Slack] pending-review notify error:', err);
+    return null;
+  }
+}
+
+/**
+ * 거절 사유 입력 모달 View 생성.
+ */
+export function buildRejectionModalView(params: {
+  gfpId: string;
+  sectionId: string;
+  sectionTitle: string;
+  phase: number;
+}): Record<string, unknown> {
+  return {
+    type: 'modal',
+    callback_id: 'gfp_rejection_modal',
+    private_metadata: JSON.stringify({
+      gfpId: params.gfpId,
+      sectionId: params.sectionId,
+      phase: params.phase,
+    }),
+    title: { type: 'plain_text', text: 'GFP 섹션 거절' },
+    submit: { type: 'plain_text', text: '거절' },
+    close: { type: 'plain_text', text: '취소' },
+    blocks: [
+      {
+        type: 'section',
+        text: { type: 'mrkdwn', text: `*${params.sectionTitle}* 섹션을 거절합니다.` },
+      },
+      {
+        type: 'input',
+        block_id: 'rejection_reason',
+        label: { type: 'plain_text', text: '거절 사유' },
+        element: {
+          type: 'plain_text_input',
+          action_id: 'reason_input',
+          multiline: true,
+          placeholder: { type: 'plain_text', text: '수정이 필요한 이유를 작성해주세요...' },
+        },
+      },
+    ],
+  };
 }
