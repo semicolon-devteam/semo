@@ -348,6 +348,8 @@ export const DESIGN_STEPS = [
   { step: 5 as const, label: '핸드오프', prefix: 'handoff-', icon: 'arrow-right' },
 ] as const;
 
+export type ServiceLifecycle = 'build' | 'ops' | 'sunset';
+
 export interface GfpProject {
   gfp_id: string;
   project_name: string;
@@ -357,6 +359,8 @@ export interface GfpProject {
   current_phase: number;
   infra_phase: number | null;
   status: GfpProjectStatus;
+  lifecycle: ServiceLifecycle;
+  launched_at: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
@@ -423,3 +427,21 @@ export interface PoProfile {
   interaction_style: PoInteractionStyle;
   decision_style: PoDecisionStyle;
 }
+
+// ── Service* type aliases (canonical names, Gfp* retained for backward compat) ──
+
+export type ServiceProject = GfpProject;
+export type ServiceSection = GfpPhaseSection;
+export type ServiceMaterial = GfpMaterial;
+export type ServiceResearchTask = GfpResearchTask;
+export type ServiceInfraRequest = GfpInfraRequest;
+export type ServicePresetId = GfpPresetId;
+export type ServiceTrack = GfpTrack;
+export type ServiceProjectStatus = GfpProjectStatus;
+export type ServiceSectionStatus = GfpSectionStatus;
+export type ServiceSectionSource = GfpSectionSource;
+export type ServiceInfraCategory = GfpInfraCategory;
+export type ServiceInfraRequestStatus = GfpInfraRequestStatus;
+export type ServicePresetConfig = GfpPresetConfig;
+export type ServiceInfraConfig = GfpInfraConfig;
+export type ServiceQAItem = GfpQAItem;

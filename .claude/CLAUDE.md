@@ -165,6 +165,47 @@ KB에 없으면: "KB에 해당 정보가 없습니다. 알려주시면 등록하
 
 ---
 
+## Data Routing (NON-NEGOTIABLE)
+
+> PM 테이블(`service_*`)과 KB는 역할이 다르다. 봇은 아래 라우팅 규칙을 반드시 준수.
+
+### 읽기 라우팅
+| 정보 | 조회 방법 | 이유 |
+|------|-----------|------|
+| 프로젝트 실행 상태 (phase, sections, approvals) | PM API: `GET /api/gfp/{id}` | 실시간 워크플로우 상태 |
+| 서비스 정체성 (base-info, po, tech-stack) | KB: `semo kb get {service} base-information` | 서비스 메타데이터 SoT |
+| 완료된 스펙 (discovery, prd 등) | KB: `semo kb get {service} spec/{phase}` | PM 파이프라인이 자동 동기화 |
+| 의사결정/프로세스 | KB: `semo kb get semicolon decision/...` | 조직 지식 SoT |
+
+### 쓰기 라우팅
+| 작업 | 쓰기 대상 | 금지 |
+|------|-----------|------|
+| 섹션 제출/재생성 | PM API: `POST /api/gfp/callback` | KB에 직접 spec/* 쓰기 ✗ |
+| 서비스 정보 변경 | KB: `semo kb upsert {service} {key}` | PM 테이블 직접 수정 ✗ |
+| 진행 상태 요약 | (자동) PM 파이프라인 → KB projection | 봇이 pm-status 직접 쓰기 ✗ |
+
+### Projection Key (읽기 전용)
+아래 KB 키는 PM 파이프라인(`pm-pipeline`)이 자동 동기화. **봇이 직접 쓰면 CLI가 거부:**
+- `{service} spec/*` — 승인된 섹션 콘텐츠 자동 합산
+- `{service} pm-status` — phase 진행도 자동 업데이트
+- `{service} infra-status` — 인프라 트랙 상태
+- `{service} pm-summary` — 라이프사이클 요약
+
+### 테이블 매핑 (v045+)
+| 기존 (`gfp_*`) | 신규 (`service_*`) | 비고 |
+|----------------|--------------------|------|
+| `gfp_projects` | `service_projects` | +lifecycle, +launched_at |
+| `gfp_phase_sections` | `service_sections` | +iteration_id (ops phase) |
+| `gfp_materials` | `service_materials` | |
+| `gfp_research_tasks` | `service_research_tasks` | |
+| `gfp_infra_requests` | `service_infra_requests` | |
+| (신규) | `service_iterations` | 운영 이터레이션 |
+| (신규) | `service_incidents` | 운영 인시던트 |
+
+하위 호환 VIEW(`gfp_*`)가 존재하므로 기존 쿼리도 동작. 신규 코드는 `service_*` 사용.
+
+---
+
 ## Quality Gate
 
 ```bash

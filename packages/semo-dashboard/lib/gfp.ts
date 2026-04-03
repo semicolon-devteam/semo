@@ -1,6 +1,10 @@
 /**
- * GFP (Greenfield Project Pipeline) DB Layer
- * CRUD operations for GFP projects, sections, materials, and research tasks.
+ * Service Project DB Layer (formerly GFP — Greenfield Project Pipeline)
+ * CRUD operations for service projects, sections, materials, and research tasks.
+ *
+ * Table mapping: service_projects, service_sections, service_materials,
+ *   service_research_tasks, service_infra_requests
+ * KB projection keys: spec/*, pm-status, infra-status (written by pm-pipeline)
  */
 
 import { query, transaction } from './db';
@@ -21,7 +25,7 @@ import type {
 // ── Projects ──
 
 export async function listProjects(status?: string): Promise<GfpProject[]> {
-  let sql = 'SELECT * FROM semo.gfp_projects';
+  let sql = 'SELECT * FROM semo.service_projects';
   const params: string[] = [];
   if (status) {
     sql += ' WHERE status = $1';
@@ -34,7 +38,7 @@ export async function listProjects(status?: string): Promise<GfpProject[]> {
 
 export async function getProject(gfpId: string): Promise<GfpProject | null> {
   const res = await query<GfpProject>(
-    'SELECT * FROM semo.gfp_projects WHERE gfp_id = $1',
+    'SELECT * FROM semo.service_projects WHERE gfp_id = $1',
     [gfpId]
   );
   return res.rows[0] ?? null;
@@ -53,7 +57,7 @@ export async function createProject(data: {
   }
 
   const res = await query<GfpProject>(
-    `INSERT INTO semo.gfp_projects (project_name, owner_name, owner_contact, service_domain, metadata)
+    `INSERT INTO semo.service_projects (project_name, owner_name, owner_contact, service_domain, metadata)
      VALUES ($1, $2, $3, $4, $5)
      RETURNING *`,
     [
@@ -69,7 +73,7 @@ export async function createProject(data: {
   // parallel 프리셋: infra_phase = 0 초기화 (Track B 활성화)
   if (data.metadata?.preset === 'parallel') {
     await query(
-      'UPDATE semo.gfp_projects SET infra_phase = 0 WHERE gfp_id = $1',
+      'UPDATE semo.service_projects SET infra_phase = 0 WHERE gfp_id = $1',
       [project.gfp_id]
     );
     project.infra_phase = 0;
@@ -78,13 +82,13 @@ export async function createProject(data: {
   // KB에 gfp_id 저장 (service_domain이 있을 때)
   if (data.service_domain) {
     writeGfpIdToKB(data.service_domain, project).catch((err) =>
-      console.error('[GFP] KB gfp-id write failed:', err)
+      console.error('[PM] KB gfp-id write failed:', err)
     );
 
     // infra-ready 프리셋: 인프라 정보를 KB에 별도 기록
     if (data.metadata?.preset === 'infra-ready') {
       writeInfraToKB(data.service_domain, data.metadata).catch((err) =>
-        console.error('[GFP] KB infra write failed:', err)
+        console.error('[PM] KB infra write failed:', err)
       );
     }
   }
@@ -108,7 +112,7 @@ async function ensureOntologyDomain(domain: string, projectName: string): Promis
      ON CONFLICT (domain) DO NOTHING`,
     [domain, `${projectName} — GFP 프로젝트`, ['gfp', 'incubator']]
   );
-  console.log(`[GFP] Ontology domain '${domain}' auto-registered for project '${projectName}'`);
+  console.log(`[PM] Ontology domain '${domain}' auto-registered for project '${projectName}'`);
 }
 
 /**
@@ -137,8 +141,8 @@ async function writeGfpIdToKB(serviceDomain: string, project: GfpProject): Promi
 
   lines.push(`created_at: ${project.created_at}`);
 
-  await upsertItem(serviceDomain, 'gfp-id', lines.join('\n'), 'gfp-pipeline');
-  console.log(`[GFP] KB gfp-id written for domain '${serviceDomain}': ${project.gfp_id} (preset: ${presetId})`);
+  await upsertItem(serviceDomain, 'gfp-id', lines.join('\n'), 'pm-pipeline');
+  console.log(`[PM] KB gfp-id written for domain '${serviceDomain}': ${project.gfp_id} (preset: ${presetId})`);
 }
 
 /**
@@ -161,8 +165,8 @@ async function writeInfraToKB(serviceDomain: string, metadata: Record<string, un
     'source: gfp-preset-infra-ready',
   ].filter(Boolean);
 
-  await upsertItem(serviceDomain, 'infra', lines.join('\n'), 'gfp-pipeline');
-  console.log(`[GFP] KB infra written for domain '${serviceDomain}'`);
+  await upsertItem(serviceDomain, 'infra', lines.join('\n'), 'pm-pipeline');
+  console.log(`[PM] KB infra written for domain '${serviceDomain}'`);
 }
 
 export async function updateProject(
@@ -198,7 +202,7 @@ export async function updateProject(
 
   params.push(gfpId);
   const res = await query<GfpProject>(
-    `UPDATE semo.gfp_projects SET ${sets.join(', ')} WHERE gfp_id = $${idx} RETURNING *`,
+    `UPDATE semo.service_projects SET ${sets.join(', ')} WHERE gfp_id = $${idx} RETURNING *`,
     params
   );
   return res.rows[0] ?? null;
@@ -207,7 +211,7 @@ export async function updateProject(
 // ── Sections ──
 
 export async function listSections(gfpId: string, phase?: number, track?: GfpTrack): Promise<GfpPhaseSection[]> {
-  let sql = 'SELECT * FROM semo.gfp_phase_sections WHERE gfp_id = $1';
+  let sql = 'SELECT * FROM semo.service_sections WHERE gfp_id = $1';
   const params: unknown[] = [gfpId];
   let idx = 2;
   if (phase !== undefined) {
@@ -240,7 +244,7 @@ export async function upsertSection(data: {
   const track = data.track ?? 'plan';
 
   const res = await query<GfpPhaseSection>(
-    `INSERT INTO semo.gfp_phase_sections (gfp_id, phase, section_key, title, content, ordinal, status, source, qa_items, track)
+    `INSERT INTO semo.service_sections (gfp_id, phase, section_key, title, content, ordinal, status, source, qa_items, track)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (gfp_id, track, phase, section_key) DO UPDATE SET
        title   = EXCLUDED.title,
@@ -272,7 +276,7 @@ export async function updateSectionStatus(
   reviewerNote?: string
 ): Promise<GfpPhaseSection | null> {
   const res = await query<GfpPhaseSection>(
-    `UPDATE semo.gfp_phase_sections
+    `UPDATE semo.service_sections
      SET status = $1, reviewer_note = $2
      WHERE section_id = $3
      RETURNING *`,
@@ -287,7 +291,7 @@ export async function updateSectionContent(
   status?: GfpSectionStatus
 ): Promise<GfpPhaseSection | null> {
   const res = await query<GfpPhaseSection>(
-    `UPDATE semo.gfp_phase_sections
+    `UPDATE semo.service_sections
      SET content = $1, status = COALESCE($2, status)
      WHERE section_id = $3
      RETURNING *`,
@@ -324,7 +328,7 @@ export async function answerQAItems(
   via: 'dashboard' | 'slack'
 ): Promise<GfpPhaseSection | null> {
   const sectionRes = await query<GfpPhaseSection>(
-    'SELECT * FROM semo.gfp_phase_sections WHERE section_id = $1',
+    'SELECT * FROM semo.service_sections WHERE section_id = $1',
     [sectionId]
   );
   const section = sectionRes.rows[0];
@@ -346,7 +350,7 @@ export async function answerQAItems(
 
   const content = renderQAContent(qaItems);
   const res = await query<GfpPhaseSection>(
-    `UPDATE semo.gfp_phase_sections
+    `UPDATE semo.service_sections
      SET qa_items = $1, content = $2
      WHERE section_id = $3
      RETURNING *`,
@@ -359,7 +363,7 @@ export async function answerQAItems(
 
 export async function deleteSection(sectionId: string, gfpId: string): Promise<GfpPhaseSection | null> {
   const res = await query<GfpPhaseSection>(
-    'DELETE FROM semo.gfp_phase_sections WHERE section_id = $1 AND gfp_id = $2 RETURNING *',
+    'DELETE FROM semo.service_sections WHERE section_id = $1 AND gfp_id = $2 RETURNING *',
     [sectionId, gfpId]
   );
   return res.rows[0] ?? null;
@@ -373,7 +377,7 @@ export async function moveSection(
 ): Promise<GfpPhaseSection | null> {
   // Fetch current section to check existence and get section_key for conflict check
   const current = await query<GfpPhaseSection>(
-    'SELECT * FROM semo.gfp_phase_sections WHERE section_id = $1 AND gfp_id = $2',
+    'SELECT * FROM semo.service_sections WHERE section_id = $1 AND gfp_id = $2',
     [sectionId, gfpId]
   );
   if (!current.rows[0]) return null;
@@ -383,7 +387,7 @@ export async function moveSection(
 
   // Check UNIQUE constraint (gfp_id, track, phase, section_key)
   const conflict = await query<GfpPhaseSection>(
-    `SELECT section_id FROM semo.gfp_phase_sections
+    `SELECT section_id FROM semo.service_sections
      WHERE gfp_id = $1 AND track = $2 AND phase = $3 AND section_key = $4 AND section_id != $5`,
     [gfpId, track, targetPhase, section.section_key, sectionId]
   );
@@ -392,7 +396,7 @@ export async function moveSection(
   }
 
   const res = await query<GfpPhaseSection>(
-    `UPDATE semo.gfp_phase_sections
+    `UPDATE semo.service_sections
      SET phase = $1, track = $2
      WHERE section_id = $3 AND gfp_id = $4
      RETURNING *`,
@@ -409,7 +413,7 @@ export async function updateSectionSlackThread(
   threadTs: string
 ): Promise<void> {
   await query(
-    'UPDATE semo.gfp_phase_sections SET slack_thread_ts = $1 WHERE section_id = $2',
+    'UPDATE semo.service_sections SET slack_thread_ts = $1 WHERE section_id = $2',
     [threadTs, sectionId]
   );
 }
@@ -432,7 +436,7 @@ export async function getPhaseProgress(gfpId: string, track?: GfpTrack): Promise
             COUNT(*) FILTER (WHERE status = 'rejected')::int as rejected,
             COUNT(*) FILTER (WHERE status = 'pending-review')::int as pending,
             COUNT(*) FILTER (WHERE status = 'draft')::int as draft
-     FROM semo.gfp_phase_sections
+     FROM semo.service_sections
      WHERE gfp_id = $1`;
   const params: unknown[] = [gfpId];
   if (track !== undefined) {
@@ -452,7 +456,7 @@ export async function createMaterial(data: {
   phase_mapping?: GfpPhaseMapping[];
 }): Promise<GfpMaterial> {
   const res = await query<GfpMaterial>(
-    `INSERT INTO semo.gfp_materials (gfp_id, content, phase_mapping)
+    `INSERT INTO semo.service_materials (gfp_id, content, phase_mapping)
      VALUES ($1, $2, $3)
      RETURNING *`,
     [data.gfp_id, data.content, data.phase_mapping ? JSON.stringify(data.phase_mapping) : null]
@@ -462,7 +466,7 @@ export async function createMaterial(data: {
 
 export async function listMaterials(gfpId: string): Promise<GfpMaterial[]> {
   const res = await query<GfpMaterial>(
-    'SELECT * FROM semo.gfp_materials WHERE gfp_id = $1 ORDER BY created_at DESC',
+    'SELECT * FROM semo.service_materials WHERE gfp_id = $1 ORDER BY created_at DESC',
     [gfpId]
   );
   return res.rows;
@@ -477,7 +481,7 @@ export async function createStitchMaterial(data: {
 }): Promise<GfpMaterial> {
   const materialType = data.material_type ?? 'stitch-export';
   const res = await query<GfpMaterial>(
-    `INSERT INTO semo.gfp_materials (gfp_id, content, material_type)
+    `INSERT INTO semo.service_materials (gfp_id, content, material_type)
      VALUES ($1, $2, $3)
      RETURNING *`,
     [data.gfp_id, data.content, materialType]
@@ -495,7 +499,7 @@ export async function getDesignStep(gfpId: string): Promise<number> {
 
 export async function setDesignStep(gfpId: string, step: number): Promise<void> {
   await query(
-    `UPDATE semo.gfp_projects
+    `UPDATE semo.service_projects
      SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb
      WHERE gfp_id = $2`,
     [JSON.stringify({ design_step: step }), gfpId]
@@ -538,7 +542,7 @@ export async function createResearchTask(data: {
   input_prompt: string;
 }): Promise<GfpResearchTask> {
   const res = await query<GfpResearchTask>(
-    `INSERT INTO semo.gfp_research_tasks (gfp_id, task_type, reference_urls, input_prompt)
+    `INSERT INTO semo.service_research_tasks (gfp_id, task_type, reference_urls, input_prompt)
      VALUES ($1, $2, $3, $4)
      RETURNING *`,
     [data.gfp_id, data.task_type, data.reference_urls, data.input_prompt]
@@ -548,7 +552,7 @@ export async function createResearchTask(data: {
 
 export async function listResearchTasks(gfpId: string): Promise<GfpResearchTask[]> {
   const res = await query<GfpResearchTask>(
-    'SELECT * FROM semo.gfp_research_tasks WHERE gfp_id = $1 ORDER BY created_at DESC',
+    'SELECT * FROM semo.service_research_tasks WHERE gfp_id = $1 ORDER BY created_at DESC',
     [gfpId]
   );
   return res.rows;
@@ -574,7 +578,7 @@ export async function updateResearchTask(
 
   params.push(taskId);
   const res = await query<GfpResearchTask>(
-    `UPDATE semo.gfp_research_tasks SET ${sets.join(', ')} WHERE task_id = $${idx} RETURNING *`,
+    `UPDATE semo.service_research_tasks SET ${sets.join(', ')} WHERE task_id = $${idx} RETURNING *`,
     params
   );
   return res.rows[0] ?? null;
@@ -600,15 +604,15 @@ export async function writebackPhaseToKB(
     .map((s) => `## ${s.title}\n\n${s.content}`)
     .join('\n\n---\n\n');
 
-  await upsertItem(serviceDomain, `spec/${phaseName}`, content, 'gfp-pipeline');
+  await upsertItem(serviceDomain, `spec/${phaseName}`, content, 'pm-pipeline');
 
   // KB write-back 시각 기록
   const sectionIds = sections.map((s) => s.section_id);
   await query(
-    `UPDATE semo.gfp_phase_sections SET kb_written_at = NOW() WHERE section_id = ANY($1)`,
+    `UPDATE semo.service_sections SET kb_written_at = NOW() WHERE section_id = ANY($1)`,
     [sectionIds]
   );
-  console.log(`[GFP] KB write-back: ${serviceDomain} spec/${phaseName} (${sectionIds.length} sections)`);
+  console.log(`[PM] KB write-back: ${serviceDomain} spec/${phaseName} (${sectionIds.length} sections)`);
 }
 
 // ── KB Write-back (phase progress) ──
@@ -625,14 +629,14 @@ export async function writebackPhaseProgressToKB(
 
   if (track === 'infra') {
     const content = [
-      `gfp_id: ${gfpId}`,
+      `project_id: ${gfpId}`,
       `infra_completed_phase: ${completedPhase} (${INFRA_PHASE_LABELS[completedPhase]})`,
       `infra_next_phase: ${nextPhase !== null ? `${nextPhase} (${INFRA_PHASE_LABELS[nextPhase]})` : 'completed'}`,
       `updated_at: ${new Date().toISOString()}`,
     ].join('\n');
 
-    await upsertItem(serviceDomain, 'infra-status', content, 'gfp-pipeline');
-    console.log(`[GFP] KB infra progress: ${serviceDomain}/infra-status → phase ${nextPhase ?? 'done'}`);
+    await upsertItem(serviceDomain, 'infra-status', content, 'pm-pipeline');
+    console.log(`[PM] KB infra progress: ${serviceDomain}/infra-status → phase ${nextPhase ?? 'done'}`);
     return;
   }
 
@@ -651,7 +655,7 @@ export async function writebackPhaseProgressToKB(
     : [];
 
   const content = [
-    `gfp_id: ${gfpId}`,
+    `project_id: ${gfpId}`,
     `current_phase: ${nextPhase !== null && nextPhase <= 9 ? nextPhase : 'completed'}`,
     `last_completed_phase: ${completedPhase} (${PHASE_LABELS[completedPhase]})`,
     `completed_phases: [${completedPhases.join(', ')}]`,
@@ -662,8 +666,12 @@ export async function writebackPhaseProgressToKB(
     `updated_at: ${new Date().toISOString()}`,
   ].join('\n');
 
-  await upsertItem(serviceDomain, 'gfp-status', content, 'gfp-pipeline');
-  console.log(`[GFP] KB phase progress: ${serviceDomain}/gfp-status → phase ${nextPhase ?? 'done'}`);
+  // 새 pm-status 키에 쓰기 + 레거시 gfp-status 병행 유지
+  await Promise.all([
+    upsertItem(serviceDomain, 'pm-status', content, 'pm-pipeline'),
+    upsertItem(serviceDomain, 'gfp-status', content, 'pm-pipeline'),
+  ]);
+  console.log(`[PM] KB phase progress: ${serviceDomain}/pm-status → phase ${nextPhase ?? 'done'}`);
 }
 
 // ── Bulk section creation from material mapping ──
@@ -679,7 +687,7 @@ export async function createSectionsFromMapping(
       for (let i = 0; i < mapping.sections.length; i++) {
         const sec = mapping.sections[i];
         await client.query(
-          `INSERT INTO semo.gfp_phase_sections (gfp_id, phase, section_key, title, content, ordinal, status, source, track)
+          `INSERT INTO semo.service_sections (gfp_id, phase, section_key, title, content, ordinal, status, source, track)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            ON CONFLICT (gfp_id, track, phase, section_key) DO UPDATE SET
              title = EXCLUDED.title, content = EXCLUDED.content, ordinal = EXCLUDED.ordinal,
@@ -697,7 +705,7 @@ export async function createSectionsFromMapping(
 
 export async function listInfraRequests(gfpId: string): Promise<GfpInfraRequest[]> {
   const res = await query<GfpInfraRequest>(
-    'SELECT * FROM semo.gfp_infra_requests WHERE gfp_id = $1 ORDER BY created_at DESC',
+    'SELECT * FROM semo.service_infra_requests WHERE gfp_id = $1 ORDER BY created_at DESC',
     [gfpId]
   );
   return res.rows;
@@ -713,7 +721,7 @@ export async function createInfraRequest(data: {
   priority?: 'low' | 'normal' | 'high';
 }): Promise<GfpInfraRequest> {
   const res = await query<GfpInfraRequest>(
-    `INSERT INTO semo.gfp_infra_requests (gfp_id, source_phase, source_section_id, category, title, description, priority)
+    `INSERT INTO semo.service_infra_requests (gfp_id, source_phase, source_section_id, category, title, description, priority)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
     [
@@ -735,7 +743,7 @@ export async function updateInfraRequest(
   slackThreadTs?: string
 ): Promise<GfpInfraRequest | null> {
   const res = await query<GfpInfraRequest>(
-    `UPDATE semo.gfp_infra_requests
+    `UPDATE semo.service_infra_requests
      SET status = $1, slack_thread_ts = COALESCE($2, slack_thread_ts), updated_at = NOW()
      WHERE request_id = $3
      RETURNING *`,

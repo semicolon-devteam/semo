@@ -245,6 +245,30 @@ export async function upsertItem(
     throw new Error(`도메인 '${domain}'은(는) 온톨로지에 등록되지 않았습니다. 등록된 도메인: [${known.join(', ')}]`);
   }
 
+  // Type schema validation + projection key 차단 (CLI kbUpsert와 동일 enforcement)
+  const typeResult = await pool.query(
+    'SELECT entity_type FROM semo.ontology WHERE domain = $1 AND entity_type IS NOT NULL',
+    [domain]
+  );
+  if (typeResult.rows.length > 0) {
+    const entityType = typeResult.rows[0].entity_type;
+    const schemaResult = await pool.query(
+      "SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source FROM semo.kb_type_schema WHERE type_key = $1",
+      [entityType]
+    );
+    const schemas = schemaResult.rows as Array<{ scheme_key: string; key_type: string; source: string }>;
+    if (schemas.length > 0) {
+      const match = schemas.find(s => s.scheme_key === key);
+      // Projection key 차단: pm-pipeline/gfp-pipeline만 쓰기 허용
+      if (match?.source === 'projection') {
+        const cb = createdBy ?? '';
+        if (!cb.startsWith('pm-') && !cb.startsWith('gfp-')) {
+          throw new Error(`키 '${key}'은(는) projection 키입니다 (PM 파이프라인에서 자동 동기화). 직접 쓰기가 차단됩니다.`);
+        }
+      }
+    }
+  }
+
   // 임베딩 필수 생성 (CLI와 동일 — NULL 임베딩은 벡터 검색 누락 유발)
   const embeddingText = `${combineKey(key, subKey)}: ${content}`;
   const embedding = await genEmbedding(embeddingText);

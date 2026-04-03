@@ -77,6 +77,11 @@ export async function POST(request: NextRequest) {
     const item = await upsertItem(domain, key, content, created_by);
     return NextResponse.json(item, { status: 201 });
   } catch (error) {
+    const msg = (error as Error)?.message ?? '';
+    // Projection key / domain validation → 403 (known validation errors)
+    if (msg.includes('projection') || msg.includes('온톨로지에 등록되지')) {
+      return NextResponse.json({ error: msg }, { status: 403 });
+    }
     console.error('KB API POST error:', error);
     return NextResponse.json({ error: 'Failed to save KB entry' }, { status: 500 });
   }

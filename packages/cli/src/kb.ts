@@ -898,10 +898,10 @@ export async function kbUpsert(
       if (typeResult.rows.length > 0) {
         const entityType = typeResult.rows[0].entity_type;
         const schemaResult = await schemaClient.query(
-          "SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type FROM semo.kb_type_schema WHERE type_key = $1",
+          "SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source FROM semo.kb_type_schema WHERE type_key = $1",
           [entityType]
         );
-        const schemas = schemaResult.rows as Array<{ scheme_key: string; key_type: string }>;
+        const schemas = schemaResult.rows as Array<{ scheme_key: string; key_type: string; source: string }>;
         if (schemas.length > 0) {
           const match = schemas.find(s => s.scheme_key === key);
           if (!match) {
@@ -912,6 +912,16 @@ export async function kbUpsert(
               success: false,
               error: `키 '${key}'은(는) '${entityType}' 타입의 스키마에 허용되지 않습니다. 허용 키: [${allowedKeys.join(", ")}]`,
             };
+          }
+          // Projection key 차단: pm-pipeline만 쓰기 허용
+          if (match.source === "projection") {
+            const createdBy = entry.created_by ?? "";
+            if (!createdBy.startsWith("pm-") && !createdBy.startsWith("gfp-")) {
+              return {
+                success: false,
+                error: `키 '${key}'은(는) projection 키입니다 (PM 파이프라인에서 자동 동기화). 직접 쓰기가 차단됩니다.`,
+              };
+            }
           }
           if (match.key_type === "singleton" && subKey !== "") {
             return { success: false, error: `키 '${key}'은(는) singleton이므로 sub_key가 비어야 합니다.` };
