@@ -135,8 +135,8 @@ export interface KBEntry {
 
 // Bot Skill Types
 export interface BotSkill {
-  name: string;           // e.g. "axoracle-blog"
-  fullName: string;       // e.g. "growthclaw/axoracle-blog"
+  name: string; // e.g. "axoracle-blog"
+  fullName: string; // e.g. "growthclaw/axoracle-blog"
   source: 'synced' | 'workspace-only' | 'db-only';
   isActive: boolean;
   category: string | null;
@@ -202,8 +202,8 @@ export interface DBQueryResult {
 export interface MilestoneMetadata {
   project: string;
   title: string;
-  start_date: string;   // ISO date: "2026-01-15"
-  end_date: string;      // ISO date: "2026-02-28"
+  start_date: string; // ISO date: "2026-01-15"
+  end_date: string; // ISO date: "2026-02-28"
   status: 'planned' | 'in-progress' | 'completed';
   order?: number;
 }
@@ -351,37 +351,56 @@ export interface GfpPresetConfig {
 // GFP (Greenfield Project Pipeline) Types
 
 export interface GfpQAItem {
-  id: string;            // e.g., "q01", "q02"
+  id: string; // e.g., "q01", "q02"
   question: string;
   sub_bullets?: string[];
   answer: string | null;
-  answered_at: string | null;   // ISO timestamp
+  answered_at: string | null; // ISO timestamp
   answered_via: 'dashboard' | 'slack' | null;
 }
 
 export type GfpProjectStatus = 'active' | 'paused' | 'completed';
 export type GfpSectionStatus = 'draft' | 'pending-review' | 'approved' | 'rejected';
-export type GfpSectionSource = 'planclaw' | 'imported' | 'growthclaw' | 'manual' | 'designclaw' | 'semiclaw' | 'infraclaw';
+export type GfpSectionSource =
+  | 'planclaw'
+  | 'imported'
+  | 'growthclaw'
+  | 'manual'
+  | 'designclaw'
+  | 'semiclaw'
+  | 'infraclaw';
 export type GfpMaterialType = 'planning-doc' | 'stitch-export' | 'design-prototype';
-export type GfpResearchTaskType = 'competitor-analysis' | 'market-research' | 'ux-pattern' | 'keyword-research' | 'design-reference';
+export type GfpResearchTaskType =
+  | 'competitor-analysis'
+  | 'market-research'
+  | 'ux-pattern'
+  | 'keyword-research'
+  | 'design-reference';
 export type GfpResearchStatus = 'queued' | 'dispatched' | 'completed';
 
 // GFP Phase 4 Design Sub-Steps
 export type DesignStep = 1 | 2 | 3 | 4 | 5;
 
 export const DESIGN_STEPS = [
-  { step: 1 as const, label: '레퍼런스 탐색', prefixes: ['ref-'] as const, icon: 'magnifying-glass' },
+  {
+    step: 1 as const,
+    label: '레퍼런스 탐색',
+    prefixes: ['ref-'] as const,
+    icon: 'magnifying-glass',
+  },
   { step: 2 as const, label: '디자인 시스템', prefixes: ['ds-'] as const, icon: 'palette' },
-  { step: 3 as const, label: '구현', prefixes: ['impl-', 'stitch-prompt-', 'stitch-result-'] as const, icon: 'code' },
+  {
+    step: 3 as const,
+    label: '구현',
+    prefixes: ['impl-', 'stitch-prompt-', 'stitch-result-'] as const,
+    icon: 'code',
+  },
   { step: 4 as const, label: '리뷰', prefixes: ['review-'] as const, icon: 'eye' },
   { step: 5 as const, label: '핸드오프', prefixes: ['handoff-'] as const, icon: 'arrow-right' },
 ] as const;
 
 /** Check if a section_key belongs to a given step definition */
-export function matchesStep(
-  sectionKey: string,
-  step: (typeof DESIGN_STEPS)[number],
-): boolean {
+export function matchesStep(sectionKey: string, step: (typeof DESIGN_STEPS)[number]): boolean {
   return step.prefixes.some((p) => sectionKey.startsWith(p));
 }
 
@@ -503,7 +522,14 @@ export interface ServiceIteration {
 // ── Service Features (ops mode) ──
 
 export type ServiceFeatureCategory = 'core' | 'growth' | 'infra' | 'ux' | 'integration';
-export type ServiceFeatureStatus = 'active' | 'planned' | 'in-dev' | 'deprecated';
+export type ServiceFeatureStatus =
+  | 'planned'
+  | 'in-spec'
+  | 'spec-ready'
+  | 'in-dev'
+  | 'in-test'
+  | 'active'
+  | 'deprecated';
 
 export interface ServiceFeature {
   feature_id: string;
@@ -638,7 +664,12 @@ export interface FeatureSpec {
 
 // ── Feature Discovery Sessions ──
 
-export type DiscoverySessionStatus = 'crawling' | 'candidates_ready' | 'reviewing' | 'confirmed' | 'failed';
+export type DiscoverySessionStatus =
+  | 'crawling'
+  | 'candidates_ready'
+  | 'reviewing'
+  | 'confirmed'
+  | 'failed';
 
 export interface DiscoveredFeature {
   name: string;
@@ -675,7 +706,12 @@ export interface FeatureConversationSession {
   service_id: string;
   mode: ConversationMode;
   status: ConversationStatus;
-  features: Array<{ name: string; description: string; category: string; spec?: Partial<FeatureSpec> }>;
+  features: Array<{
+    name: string;
+    description: string;
+    category: string;
+    spec?: Partial<FeatureSpec>;
+  }>;
   slack_channel: string | null;
   slack_thread_ts: string | null;
   created_at: string;

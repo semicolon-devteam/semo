@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getItem, upsertItem, deleteItemByKey } from '@/lib/kb';
-import { parseActionItems, resolveAssignees, toggleItemInContent, generateNewContent, removeItemFromContent, updateItemInContent, type ActionItem, type AliasMap, type TeamMemberInfo } from '@/lib/action-items';
+import {
+  parseActionItems,
+  resolveAssignees,
+  toggleItemInContent,
+  generateNewContent,
+  removeItemFromContent,
+  updateItemInContent,
+  type ActionItem,
+  type AliasMap,
+  type TeamMemberInfo,
+} from '@/lib/action-items';
+import { syncKBToDb } from '@/lib/kb-sync';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +38,12 @@ export async function GET() {
     );
     const teamInfoMap = new Map<string, TeamMemberInfo>();
     for (const r of allTeamRes.rows) {
-      const info = teamInfoMap.get(r.domain) || { domain: r.domain, nickname: '', realName: '', role: '' };
+      const info = teamInfoMap.get(r.domain) || {
+        domain: r.domain,
+        nickname: '',
+        realName: '',
+        role: '',
+      };
       if (r.key === 'nickname') info.nickname = r.content?.trim() || '';
       if (r.key === 'real-name') info.realName = r.content?.trim() || '';
       if (r.key === 'role') info.role = r.content?.trim() || '';
@@ -43,7 +59,7 @@ export async function GET() {
 
     const items: ActionItem[] = [];
     for (const row of res.rows) {
-      const domainType = row.entity_type === 'team' ? 'team' as const : 'service' as const;
+      const domainType = row.entity_type === 'team' ? ('team' as const) : ('service' as const);
       let label: string;
       if (domainType === 'team') {
         const info = teamInfoMap.get(row.domain);
@@ -51,13 +67,7 @@ export async function GET() {
       } else {
         label = row.project_name || row.domain;
       }
-      const parsed = parseActionItems(
-        row.content,
-        row.domain,
-        row.sub_key,
-        domainType,
-        label,
-      );
+      const parsed = parseActionItems(row.content, row.domain, row.sub_key, domainType, label);
       items.push(...parsed);
     }
 
@@ -65,7 +75,7 @@ export async function GET() {
     resolveAssignees(items, aliasMap);
 
     // team 멤버 목록도 클라이언트에 전달 (필터/생성 UI용)
-    const teamMembers = Array.from(teamInfoMap.values()).map(info => ({
+    const teamMembers = Array.from(teamInfoMap.values()).map((info) => ({
       domain: info.domain,
       nickname: info.nickname || info.domain,
       role: info.role,
@@ -79,7 +89,10 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Action items GET error:', error);
-    return NextResponse.json({ items: [], stats: { total: 0, open: 0, completed: 0 } }, { status: 500 });
+    return NextResponse.json(
+      { items: [], stats: { total: 0, open: 0, completed: 0 } },
+      { status: 500 },
+    );
   }
 }
 
@@ -98,6 +111,11 @@ export async function PATCH(request: NextRequest) {
 
     const updatedContent = toggleItemInContent(existing.content, itemIndex, completed);
     await upsertItem(domain, rawKey, updatedContent, 'dashboard');
+
+    // DB 동기화 (토글 후 service_action_items에도 반영)
+    syncKBToDb(domain, 'action-item', subKey, updatedContent).catch((err) =>
+      console.error('KB-sync after toggle failed:', err),
+    );
 
     return NextResponse.json({ ok: true });
   } catch (error) {
@@ -125,6 +143,12 @@ export async function POST(request: NextRequest) {
     const content = generateNewContent({ description, assignee, deadline, service });
     await upsertItem(domain, rawKey, content, 'dashboard');
 
+    // DB 동기화
+    const subKey = `${today}/${slug}`;
+    syncKBToDb(domain, 'action-item', subKey, content).catch((err) =>
+      console.error('KB-sync after create failed:', err),
+    );
+
     return NextResponse.json({ ok: true, key: rawKey });
   } catch (error) {
     console.error('Action items POST error:', error);
@@ -145,7 +169,11 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
-    const updated = updateItemInContent(existing.content, itemIndex, { description, assignee, deadline });
+    const updated = updateItemInContent(existing.content, itemIndex, {
+      description,
+      assignee,
+      deadline,
+    });
     await upsertItem(domain, rawKey, updated, 'dashboard');
 
     return NextResponse.json({ ok: true });

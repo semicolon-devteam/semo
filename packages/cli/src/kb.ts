@@ -8,9 +8,9 @@
  * v3.15.1: pgvector embedding integration
  */
 
-import { Pool } from "pg";
-import * as fs from "fs";
-import * as path from "path";
+import { Pool } from 'pg';
+import * as fs from 'fs';
+import * as path from 'path';
 
 function splitKey(combinedKey: string): { key: string; subKey: string } {
   const idx = combinedKey.indexOf('/');
@@ -26,7 +26,7 @@ function combineKey(key: string, subKey: string): string {
 // Embedding
 // ============================================================
 
-const EMBEDDING_MODEL = "text-embedding-3-small";
+const EMBEDDING_MODEL = 'text-embedding-3-small';
 const EMBEDDING_DIMENSIONS = 1024; // DB vector(1024) 유지 — OpenAI dimensions 파라미터로 축소
 
 /**
@@ -38,11 +38,11 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
   if (!apiKey) return null;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/embeddings", {
-      method: "POST",
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: EMBEDDING_MODEL,
@@ -57,7 +57,7 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
       return null;
     }
 
-    const data = await response.json() as any;
+    const data = (await response.json()) as any;
     return data.data?.[0]?.embedding || null;
   } catch (err) {
     console.error(`Embedding error: ${err}`);
@@ -73,22 +73,22 @@ export async function generateEmbeddings(texts: string[]): Promise<(number[] | n
   if (!apiKey) return texts.map(() => null);
 
   try {
-    const response = await fetch("https://api.openai.com/v1/embeddings", {
-      method: "POST",
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
       headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: EMBEDDING_MODEL,
-        input: texts.map(t => t.substring(0, 8000)),
+        input: texts.map((t) => t.substring(0, 8000)),
         dimensions: EMBEDDING_DIMENSIONS,
       }),
     });
 
     if (!response.ok) return texts.map(() => null);
 
-    const data = await response.json() as any;
+    const data = (await response.json()) as any;
     return data.data?.map((d: any) => d.embedding) || texts.map(() => null);
   } catch {
     return texts.map(() => null);
@@ -160,8 +160,8 @@ export interface SyncState {
 // KB Directory Management
 // ============================================================
 
-const KB_DIR = ".kb";
-const SYNC_STATE_FILE = ".sync-state.json";
+const KB_DIR = '.kb';
+const SYNC_STATE_FILE = '.sync-state.json';
 
 function getKBDir(cwd: string): string {
   return path.join(cwd, KB_DIR);
@@ -172,7 +172,7 @@ function ensureKBDir(cwd: string): string {
   if (!fs.existsSync(kbDir)) {
     fs.mkdirSync(kbDir, { recursive: true });
   }
-  const ontoDir = path.join(kbDir, "ontology");
+  const ontoDir = path.join(kbDir, 'ontology');
   if (!fs.existsSync(ontoDir)) {
     fs.mkdirSync(ontoDir, { recursive: true });
   }
@@ -183,7 +183,7 @@ function readSyncState(cwd: string): SyncState {
   const statePath = path.join(getKBDir(cwd), SYNC_STATE_FILE);
   if (fs.existsSync(statePath)) {
     try {
-      return JSON.parse(fs.readFileSync(statePath, "utf-8"));
+      return JSON.parse(fs.readFileSync(statePath, 'utf-8'));
     } catch {
       // corrupted file
     }
@@ -205,7 +205,7 @@ function readKBFile(cwd: string, filename: string): KBEntry[] {
   const filePath = path.join(getKBDir(cwd), filename);
   if (!fs.existsSync(filePath)) return [];
   try {
-    return JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
   } catch {
     return [];
   }
@@ -218,11 +218,7 @@ function readKBFile(cwd: string, filename: string): KBEntry[] {
 /**
  * Pull KB entries from semo.knowledge_base to local .kb/
  */
-export async function kbPull(
-  pool: Pool,
-  domain?: string,
-  cwd?: string
-): Promise<KBEntry[]> {
+export async function kbPull(pool: Pool, domain?: string, cwd?: string): Promise<KBEntry[]> {
   const client = await pool.connect();
   try {
     let query = `
@@ -232,16 +228,16 @@ export async function kbPull(
     `;
     const params: string[] = [];
     if (domain) {
-      query += " WHERE domain = $1";
+      query += ' WHERE domain = $1';
       params.push(domain);
     }
-    query += " ORDER BY domain, key";
+    query += ' ORDER BY domain, key';
 
     const result = await client.query(query, params);
     const entries: KBEntry[] = result.rows;
 
     if (cwd) {
-      writeKBFile(cwd, "team.json", entries);
+      writeKBFile(cwd, 'team.json', entries);
 
       const state = readSyncState(cwd);
       state.lastPull = new Date().toISOString();
@@ -262,7 +258,7 @@ export async function kbPush(
   pool: Pool,
   entries: KBEntry[],
   createdBy?: string,
-  cwd?: string
+  cwd?: string,
 ): Promise<{ upserted: number; errors: string[] }> {
   const client = await pool.connect();
   let upserted = 0;
@@ -270,7 +266,7 @@ export async function kbPush(
 
   try {
     // Domain validation: check all domains against ontology before transaction
-    const ontologyResult = await client.query("SELECT domain FROM semo.ontology");
+    const ontologyResult = await client.query('SELECT domain FROM semo.ontology');
     const knownDomains = new Set(ontologyResult.rows.map((r: { domain: string }) => r.domain));
     const invalidEntries: string[] = [];
     const validEntries: typeof entries = [];
@@ -286,16 +282,16 @@ export async function kbPush(
       errors.push(...invalidEntries);
     }
 
-    await client.query("BEGIN");
+    await client.query('BEGIN');
 
-    const texts = validEntries.map(e => `${e.key}: ${e.content}`);
+    const texts = validEntries.map((e) => `${e.key}: ${e.content}`);
     const embeddings = await generateEmbeddings(texts);
 
     for (let i = 0; i < validEntries.length; i++) {
       const entry = validEntries[i];
       try {
         const embedding = embeddings[i];
-        const embeddingStr = embedding ? `[${embedding.join(",")}]` : null;
+        const embeddingStr = embedding ? `[${embedding.join(',')}]` : null;
 
         const { key: flatKey, subKey } = splitKey(entry.key);
         await client.query(
@@ -305,7 +301,15 @@ export async function kbPush(
              content = EXCLUDED.content,
              metadata = EXCLUDED.metadata,
              embedding = EXCLUDED.embedding`,
-          [entry.domain, flatKey, subKey, entry.content, JSON.stringify(entry.metadata || {}), entry.created_by || createdBy || "unknown", embeddingStr]
+          [
+            entry.domain,
+            flatKey,
+            subKey,
+            entry.content,
+            JSON.stringify(entry.metadata || {}),
+            entry.created_by || createdBy || 'unknown',
+            embeddingStr,
+          ],
         );
         upserted++;
       } catch (err) {
@@ -313,7 +317,7 @@ export async function kbPush(
       }
     }
 
-    await client.query("COMMIT");
+    await client.query('COMMIT');
 
     if (cwd) {
       const state = readSyncState(cwd);
@@ -321,7 +325,7 @@ export async function kbPush(
       writeSyncState(cwd, state);
     }
   } catch (err) {
-    await client.query("ROLLBACK");
+    await client.query('ROLLBACK');
     errors.push(`Transaction failed: ${err}`);
   } finally {
     client.release();
@@ -341,8 +345,12 @@ export async function kbStatus(pool: Pool): Promise<KBStatusInfo> {
       FROM semo.knowledge_base
       GROUP BY domain ORDER BY domain
     `);
-    const sharedTotal = await client.query(`SELECT COUNT(*)::int as total FROM semo.knowledge_base`);
-    const sharedLastUpdated = await client.query(`SELECT MAX(updated_at)::text as last FROM semo.knowledge_base`);
+    const sharedTotal = await client.query(
+      `SELECT COUNT(*)::int as total FROM semo.knowledge_base`,
+    );
+    const sharedLastUpdated = await client.query(
+      `SELECT MAX(updated_at)::text as last FROM semo.knowledge_base`,
+    );
 
     const sharedDomains: Record<string, number> = {};
     for (const row of sharedStats.rows) {
@@ -366,14 +374,15 @@ export async function kbStatus(pool: Pool): Promise<KBStatusInfo> {
  */
 export async function kbList(
   pool: Pool,
-  options: { domain?: string; service?: string; limit?: number; offset?: number }
+  options: { domain?: string; service?: string; limit?: number; offset?: number },
 ): Promise<KBEntry[]> {
   const client = await pool.connect();
   const limit = options.limit || 50;
   const offset = options.offset || 0;
 
   try {
-    let query = "SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text FROM semo.knowledge_base";
+    let query =
+      'SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text FROM semo.knowledge_base';
     const params: (string | number)[] = [];
     let paramIdx = 1;
 
@@ -404,11 +413,16 @@ export async function kbList(
 export async function kbSearch(
   pool: Pool,
   query: string,
-  options: { domain?: string; service?: string; limit?: number; mode?: "semantic" | "text" | "hybrid" }
+  options: {
+    domain?: string;
+    service?: string;
+    limit?: number;
+    mode?: 'semantic' | 'text' | 'hybrid';
+  },
 ): Promise<KBEntry[]> {
   const client = await pool.connect();
   const limit = options.limit || 10;
-  const mode = options.mode || "hybrid";
+  const mode = options.mode || 'hybrid';
 
   // Resolve service → domain list for filtering
   let serviceDomains: string[] | null = null;
@@ -420,11 +434,11 @@ export async function kbSearch(
     let results: KBEntry[] = [];
 
     // Try semantic search first (if mode allows and embedding API available)
-    if (mode !== "text") {
+    if (mode !== 'text') {
       const queryEmbedding = await generateEmbedding(query);
 
       if (queryEmbedding) {
-        const embeddingStr = `[${queryEmbedding.join(",")}]`;
+        const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
         // Vector search on shared KB
         let sql = `
@@ -450,7 +464,7 @@ export async function kbSearch(
         results = sharedResult.rows;
 
         // If we got results from semantic search and mode is not hybrid, return
-        if (results.length > 0 && mode === "semantic") {
+        if (results.length > 0 && mode === 'semantic') {
           return results;
         }
       }
@@ -460,8 +474,8 @@ export async function kbSearch(
     // Split query into tokens and match ANY token via ILIKE (Korean-friendly)
     // For Korean tokens of 4+ chars with no spaces, add 2-char sub-tokens
     // e.g. "노조관리" → ["노조관리", "노조", "관리"]
-    if (mode !== "semantic" || results.length === 0) {
-      const rawTokens = query.split(/\s+/).filter(t => t.length >= 2);
+    if (mode !== 'semantic' || results.length === 0) {
+      const rawTokens = query.split(/\s+/).filter((t) => t.length >= 2);
       const tokens: string[] = [];
       const KOREAN_RE = /[\uAC00-\uD7AF]/;
       for (const t of rawTokens) {
@@ -477,22 +491,20 @@ export async function kbSearch(
       let tIdx = 1;
 
       // Build per-token ILIKE conditions + count matching tokens for scoring
-      const tokenConditions = tokens.map(token => {
+      const tokenConditions = tokens.map((token) => {
         textParams.push(`%${token}%`);
         return `(CASE WHEN content ILIKE $${tIdx} OR key ILIKE $${tIdx} OR sub_key ILIKE $${tIdx++} THEN 1 ELSE 0 END)`;
       });
 
       // Score = 0.7 base + 0.15 * (matched_tokens / total_tokens), capped at 0.95
-      const matchCountExpr = tokenConditions.length > 0
-        ? tokenConditions.join(" + ")
-        : "0";
+      const matchCountExpr = tokenConditions.length > 0 ? tokenConditions.join(' + ') : '0';
       const scoreExpr = `LEAST(0.95, 0.7 + 0.15 * (${matchCountExpr})::float / ${Math.max(tokens.length, 1)})`;
 
       // WHERE: any token matches
-      const whereTokens = tokens.map((_, i) => `(content ILIKE $${i + 1} OR key ILIKE $${i + 1} OR sub_key ILIKE $${i + 1})`);
-      const whereClause = whereTokens.length > 0
-        ? whereTokens.join(" OR ")
-        : "FALSE";
+      const whereTokens = tokens.map(
+        (_, i) => `(content ILIKE $${i + 1} OR key ILIKE $${i + 1} OR sub_key ILIKE $${i + 1})`,
+      );
+      const whereClause = whereTokens.length > 0 ? whereTokens.join(' OR ') : 'FALSE';
 
       let textSql = `
         SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text,
@@ -532,7 +544,7 @@ export async function kbSearch(
 
       // Sort by score descending
       results = Array.from(resultMap.values()).sort(
-        (a: any, b: any) => Number(b.score) - Number(a.score)
+        (a: any, b: any) => Number(b.score) - Number(a.score),
       );
     }
 
@@ -594,7 +606,7 @@ export async function ontoShow(pool: Pool, domain: string): Promise<OntologyDoma
               service, entity_type, parent, tags,
               updated_at::text
        FROM semo.ontology WHERE domain = $1`,
-      [domain]
+      [domain],
     );
     return result.rows[0] || null;
   } finally {
@@ -624,7 +636,10 @@ export async function ontoListTypes(pool: Pool): Promise<OntologyType[]> {
  * Resolve a service name to its associated domain list.
  * Uses ontology.service column + dot-notation domain detection.
  */
-async function resolveServiceDomainsLocal(client: import("pg").PoolClient, service: string): Promise<string[]> {
+async function resolveServiceDomainsLocal(
+  client: import('pg').PoolClient,
+  service: string,
+): Promise<string[]> {
   try {
     const result = await client.query(
       `SELECT domain FROM semo.ontology WHERE service = $1
@@ -632,7 +647,7 @@ async function resolveServiceDomainsLocal(client: import("pg").PoolClient, servi
        SELECT domain FROM semo.ontology WHERE domain LIKE $2
        UNION
        SELECT domain FROM semo.ontology WHERE domain = $1`,
-      [service, `${service}.%`]
+      [service, `${service}.%`],
     );
     return result.rows.map((r: { domain: string }) => r.domain);
   } catch {
@@ -646,11 +661,11 @@ async function resolveServiceDomainsLocal(client: import("pg").PoolClient, servi
 export async function ontoValidate(
   pool: Pool,
   domain: string,
-  entries?: KBEntry[]
+  entries?: KBEntry[],
 ): Promise<{ valid: number; invalid: Array<{ key: string; errors: string[] }> }> {
   const onto = await ontoShow(pool, domain);
   if (!onto) {
-    return { valid: 0, invalid: [{ key: "*", errors: [`Ontology domain '${domain}' not found`] }] };
+    return { valid: 0, invalid: [{ key: '*', errors: [`Ontology domain '${domain}' not found`] }] };
   }
 
   // If no entries provided, fetch from DB
@@ -659,7 +674,7 @@ export async function ontoValidate(
     try {
       const result = await client.query(
         `SELECT domain, key, content, metadata FROM semo.knowledge_base WHERE domain = $1`,
-        [domain]
+        [domain],
       );
       entries = result.rows;
     } finally {
@@ -677,7 +692,7 @@ export async function ontoValidate(
 
     // Check required fields
     for (const field of required) {
-      if (!(entry as any)[field] && (entry as any)[field] !== "") {
+      if (!(entry as any)[field] && (entry as any)[field] !== '') {
         errors.push(`Missing required field: ${field}`);
       }
     }
@@ -690,12 +705,14 @@ export async function ontoValidate(
         const val = (entry.metadata as any)[propKey];
         if (val !== undefined) {
           if (def.enum && !def.enum.includes(val)) {
-            errors.push(`metadata.${propKey}: '${val}' not in allowed values [${def.enum.join(", ")}]`);
+            errors.push(
+              `metadata.${propKey}: '${val}' not in allowed values [${def.enum.join(', ')}]`,
+            );
           }
-          if (def.type === "string" && typeof val !== "string") {
+          if (def.type === 'string' && typeof val !== 'string') {
             errors.push(`metadata.${propKey}: expected string, got ${typeof val}`);
           }
-          if (def.type === "array" && !Array.isArray(val)) {
+          if (def.type === 'array' && !Array.isArray(val)) {
             errors.push(`metadata.${propKey}: expected array, got ${typeof val}`);
           }
         }
@@ -720,7 +737,11 @@ export async function ontoValidate(
  * Generate KB change digest based on a since timestamp.
  * Returns all KB changes since the given ISO timestamp.
  */
-export async function kbDigest(pool: Pool, since: string, domain?: string): Promise<KBDigestResult> {
+export async function kbDigest(
+  pool: Pool,
+  since: string,
+  domain?: string,
+): Promise<KBDigestResult> {
   const client = await pool.connect();
   const generatedAt = new Date().toISOString();
 
@@ -759,7 +780,7 @@ export async function kbGet(
   pool: Pool,
   domain: string,
   rawKey: string,
-  rawSubKey?: string
+  rawSubKey?: string,
 ): Promise<KBEntry | null> {
   let key: string;
   let subKey: string;
@@ -779,7 +800,7 @@ export async function kbGet(
               created_at::text, updated_at::text
        FROM semo.knowledge_base
        WHERE domain = $1 AND key = $2 AND sub_key = $3`,
-      [domain, key, subKey]
+      [domain, key, subKey],
     );
     return result.rows[0] || null;
   } finally {
@@ -795,7 +816,7 @@ export async function kbDelete(
   pool: Pool,
   domain: string,
   rawKey: string,
-  rawSubKey?: string
+  rawSubKey?: string,
 ): Promise<{ deleted: boolean; entry?: KBEntry; error?: string }> {
   let key: string;
   let subKey: string;
@@ -815,7 +836,7 @@ export async function kbDelete(
        WHERE domain = $1 AND key = $2 AND sub_key = $3
        RETURNING domain, key, sub_key, content, metadata, created_by, version,
                  created_at::text, updated_at::text`,
-      [domain, key, subKey]
+      [domain, key, subKey],
     );
     if (result.rows.length === 0) {
       return { deleted: false, error: `항목 없음: ${domain}/${combineKey(key, subKey)}` };
@@ -838,7 +859,7 @@ export async function kbUpsert(
     content: string;
     metadata?: Record<string, unknown>;
     created_by?: string;
-  }
+  },
 ): Promise<{ success: boolean; error?: string; warnings?: string[] }> {
   let key: string;
   let subKey: string;
@@ -854,16 +875,15 @@ export async function kbUpsert(
   // Domain validation
   const client = await pool.connect();
   try {
-    const ontoCheck = await client.query(
-      "SELECT domain FROM semo.ontology WHERE domain = $1",
-      [entry.domain]
-    );
+    const ontoCheck = await client.query('SELECT domain FROM semo.ontology WHERE domain = $1', [
+      entry.domain,
+    ]);
     if (ontoCheck.rows.length === 0) {
-      const known = await client.query("SELECT domain FROM semo.ontology ORDER BY domain");
+      const known = await client.query('SELECT domain FROM semo.ontology ORDER BY domain');
       const knownDomains = known.rows.map((r: { domain: string }) => r.domain);
       return {
         success: false,
-        error: `도메인 '${entry.domain}'은(는) 온톨로지에 등록되지 않았습니다. 등록된 도메인: [${knownDomains.join(", ")}]`,
+        error: `도메인 '${entry.domain}'은(는) 온톨로지에 등록되지 않았습니다. 등록된 도메인: [${knownDomains.join(', ')}]`,
       };
     }
   } finally {
@@ -873,14 +893,14 @@ export async function kbUpsert(
   // Naming convention check: kebab-case only
   const warnings: string[] = [];
   if (/_/.test(key)) {
-    const suggested = key.replace(/_/g, "-");
+    const suggested = key.replace(/_/g, '-');
     return {
       success: false,
       error: `키 '${key}'에 snake_case가 포함되어 있습니다. kebab-case를 사용하세요: '${suggested}'`,
     };
   }
   if (/_/.test(subKey)) {
-    const suggested = subKey.replace(/_/g, "-");
+    const suggested = subKey.replace(/_/g, '-');
     return {
       success: false,
       error: `sub_key '${subKey}'에 snake_case가 포함되어 있습니다. kebab-case를 사용하세요: '${suggested}'`,
@@ -892,42 +912,52 @@ export async function kbUpsert(
     const schemaClient = await pool.connect();
     try {
       const typeResult = await schemaClient.query(
-        "SELECT entity_type FROM semo.ontology WHERE domain = $1 AND entity_type IS NOT NULL",
-        [entry.domain]
+        'SELECT entity_type FROM semo.ontology WHERE domain = $1 AND entity_type IS NOT NULL',
+        [entry.domain],
       );
       if (typeResult.rows.length > 0) {
         const entityType = typeResult.rows[0].entity_type;
         const schemaResult = await schemaClient.query(
           "SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source FROM semo.kb_type_schema WHERE type_key = $1",
-          [entityType]
+          [entityType],
         );
-        const schemas = schemaResult.rows as Array<{ scheme_key: string; key_type: string; source: string }>;
+        const schemas = schemaResult.rows as Array<{
+          scheme_key: string;
+          key_type: string;
+          source: string;
+        }>;
         if (schemas.length > 0) {
-          const match = schemas.find(s => s.scheme_key === key);
+          const match = schemas.find((s) => s.scheme_key === key);
           if (!match) {
-            const allowedKeys = schemas.map(s =>
-              s.key_type === "singleton" ? s.scheme_key : `${s.scheme_key}/{sub_key}`
+            const allowedKeys = schemas.map((s) =>
+              s.key_type === 'singleton' ? s.scheme_key : `${s.scheme_key}/{sub_key}`,
             );
             return {
               success: false,
-              error: `키 '${key}'은(는) '${entityType}' 타입의 스키마에 허용되지 않습니다. 허용 키: [${allowedKeys.join(", ")}]`,
+              error: `키 '${key}'은(는) '${entityType}' 타입의 스키마에 허용되지 않습니다. 허용 키: [${allowedKeys.join(', ')}]`,
             };
           }
           // Projection key 차단: pm-pipeline만 쓰기 허용
-          if (match.source === "projection") {
-            const createdBy = entry.created_by ?? "";
-            if (!createdBy.startsWith("pm-") && !createdBy.startsWith("gfp-")) {
+          if (match.source === 'projection') {
+            const createdBy = entry.created_by ?? '';
+            if (!createdBy.startsWith('pm-') && !createdBy.startsWith('gfp-')) {
               return {
                 success: false,
                 error: `키 '${key}'은(는) projection 키입니다 (PM 파이프라인에서 자동 동기화). 직접 쓰기가 차단됩니다.`,
               };
             }
           }
-          if (match.key_type === "singleton" && subKey !== "") {
-            return { success: false, error: `키 '${key}'은(는) singleton이므로 sub_key가 비어야 합니다.` };
+          if (match.key_type === 'singleton' && subKey !== '') {
+            return {
+              success: false,
+              error: `키 '${key}'은(는) singleton이므로 sub_key가 비어야 합니다.`,
+            };
           }
-          if (match.key_type === "collection" && subKey === "") {
-            return { success: false, error: `키 '${key}'은(는) collection이므로 sub_key가 필요합니다.` };
+          if (match.key_type === 'collection' && subKey === '') {
+            return {
+              success: false,
+              error: `키 '${key}'은(는) collection이므로 sub_key가 필요합니다.`,
+            };
           }
         }
       }
@@ -945,14 +975,14 @@ export async function kbUpsert(
   const embedding = await generateEmbedding(text);
   if (!embedding) {
     const reason = process.env.OPENAI_API_KEY
-      ? "임베딩 생성 API 호출 실패"
-      : "OPENAI_API_KEY가 설정되지 않음";
+      ? '임베딩 생성 API 호출 실패'
+      : 'OPENAI_API_KEY가 설정되지 않음';
     return {
       success: false,
       error: `임베딩 생성 실패 — ${reason}. 임베딩 없이 저장하면 벡터 검색에서 누락되므로 저장이 거부됩니다.`,
     };
   }
-  const embeddingStr = `[${embedding.join(",")}]`;
+  const embeddingStr = `[${embedding.join(',')}]`;
 
   const writeClient = await pool.connect();
   try {
@@ -969,11 +999,43 @@ export async function kbUpsert(
         subKey,
         entry.content,
         JSON.stringify(entry.metadata || {}),
-        entry.created_by || "semo-cli",
+        entry.created_by || 'semo-cli',
         embeddingStr,
-      ]
+      ],
     );
-    return { success: true };
+
+    // KB→DB 동기화: Dashboard API에 위임 (파서 단일화)
+    if ((key === 'kpi' || key === 'action-item') && subKey) {
+      try {
+        const baseUrl =
+          process.env.DASHBOARD_URL ||
+          process.env.NEXT_PUBLIC_BASE_URL ||
+          'https://semo.semi-colon.space';
+        const syncRes = await fetch(`${baseUrl}/api/kb-sync`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            domain: entry.domain,
+            key,
+            sub_key: subKey,
+            content: entry.content,
+          }),
+        });
+        if (syncRes.ok) {
+          const syncData = await syncRes.json();
+          if (syncData.synced > 0) {
+            console.error(`  ↳ DB sync: ${syncData.synced} records`);
+          }
+        } else {
+          console.error(`[kb] ⚠️  DB sync failed: ${syncRes.status}`);
+        }
+      } catch (wtErr) {
+        // sync 실패는 KB 성공에 영향 없음 — 로깅만
+        console.error(`[kb] ⚠️  DB sync 실패 (KB 저장은 정상): ${wtErr}`);
+      }
+    }
+
+    return { success: true, warnings: warnings.length > 0 ? warnings : undefined };
   } catch (err) {
     return { success: false, error: String(err) };
   } finally {
@@ -992,7 +1054,7 @@ export interface TypeSchemaEntry {
   required: boolean;
   value_hint: string | null;
   sort_order: number;
-  key_type: "singleton" | "collection";
+  key_type: 'singleton' | 'collection';
 }
 
 export interface RoutingEntry {
@@ -1024,10 +1086,7 @@ export interface ServiceInstance {
 /**
  * List type schema entries for a given entity type
  */
-export async function ontoListSchema(
-  pool: Pool,
-  typeKey: string,
-): Promise<TypeSchemaEntry[]> {
+export async function ontoListSchema(pool: Pool, typeKey: string): Promise<TypeSchemaEntry[]> {
   const client = await pool.connect();
   try {
     const result = await client.query(
@@ -1158,23 +1217,24 @@ export async function ontoRegister(
   try {
     // 1. Validate entity_type
     const typeCheck = await client.query(
-      "SELECT type_key FROM semo.ontology_types WHERE type_key = $1",
+      'SELECT type_key FROM semo.ontology_types WHERE type_key = $1',
       [opts.entity_type],
     );
     if (typeCheck.rows.length === 0) {
-      const known = await client.query("SELECT type_key FROM semo.ontology_types ORDER BY type_key");
+      const known = await client.query(
+        'SELECT type_key FROM semo.ontology_types ORDER BY type_key',
+      );
       const knownTypes = known.rows.map((r: { type_key: string }) => r.type_key);
       return {
         success: false,
-        error: `타입 '${opts.entity_type}'은(는) 존재하지 않습니다. 사용 가능한 타입: [${knownTypes.join(", ")}]`,
+        error: `타입 '${opts.entity_type}'은(는) 존재하지 않습니다. 사용 가능한 타입: [${knownTypes.join(', ')}]`,
       };
     }
 
     // 2. Check domain doesn't already exist
-    const existCheck = await client.query(
-      "SELECT domain FROM semo.ontology WHERE domain = $1",
-      [opts.domain],
-    );
+    const existCheck = await client.query('SELECT domain FROM semo.ontology WHERE domain = $1', [
+      opts.domain,
+    ]);
     if (existCheck.rows.length > 0) {
       return { success: false, error: `도메인 '${opts.domain}'은(는) 이미 등록되어 있습니다.` };
     }
@@ -1187,7 +1247,7 @@ export async function ontoRegister(
         opts.domain,
         opts.entity_type,
         opts.description || null,
-        opts.service || "_global",
+        opts.service || '_global',
         opts.tags || [opts.entity_type],
         JSON.stringify({}),
       ],
@@ -1207,15 +1267,13 @@ export async function ontoRegister(
       );
 
       for (const s of schemaResult.rows) {
-        if (s.key_type === "collection") continue; // collection은 sub_key가 필요하므로 스킵
+        if (s.key_type === 'collection') continue; // collection은 sub_key가 필요하므로 스킵
 
-        const placeholder = s.value_hint
-          ? `(미입력 — hint: ${s.value_hint})`
-          : `(미입력)`;
+        const placeholder = s.value_hint ? `(미입력 — hint: ${s.value_hint})` : `(미입력)`;
 
         const text = `${s.scheme_key}: ${placeholder}`;
         const embedding = await generateEmbedding(text);
-        const embeddingStr = embedding ? `[${embedding.join(",")}]` : null;
+        const embeddingStr = embedding ? `[${embedding.join(',')}]` : null;
 
         try {
           await client.query(
@@ -1224,7 +1282,7 @@ export async function ontoRegister(
              ON CONFLICT (domain, key, sub_key) DO NOTHING`,
             [opts.domain, s.scheme_key, placeholder, embeddingStr],
           );
-          createdEntries.push({ key: s.scheme_key, sub_key: "" });
+          createdEntries.push({ key: s.scheme_key, sub_key: '' });
         } catch {
           // 개별 entry 실패는 무시 — 도메인 등록 자체는 성공
         }
@@ -1261,7 +1319,7 @@ export async function ontoUnregister(
   try {
     // 1. Check domain exists
     const domainCheck = await client.query(
-      "SELECT domain, entity_type, service FROM semo.ontology WHERE domain = $1",
+      'SELECT domain, entity_type, service FROM semo.ontology WHERE domain = $1',
       [domain],
     );
     if (domainCheck.rows.length === 0) {
@@ -1270,7 +1328,7 @@ export async function ontoUnregister(
 
     // 2. Count KB entries
     const countResult = await client.query(
-      "SELECT COUNT(*)::int AS cnt FROM semo.knowledge_base WHERE domain = $1",
+      'SELECT COUNT(*)::int AS cnt FROM semo.knowledge_base WHERE domain = $1',
       [domain],
     );
     const entryCount: number = countResult.rows[0].cnt;
@@ -1284,23 +1342,22 @@ export async function ontoUnregister(
     }
 
     // 4. Transaction: delete KB entries (if any) → delete ontology
-    await client.query("BEGIN");
+    await client.query('BEGIN');
     try {
       let deletedEntries = 0;
       if (entryCount > 0) {
-        const delResult = await client.query(
-          "DELETE FROM semo.knowledge_base WHERE domain = $1",
-          [domain],
-        );
+        const delResult = await client.query('DELETE FROM semo.knowledge_base WHERE domain = $1', [
+          domain,
+        ]);
         deletedEntries = delResult.rowCount ?? 0;
       }
 
-      await client.query("DELETE FROM semo.ontology WHERE domain = $1", [domain]);
-      await client.query("COMMIT");
+      await client.query('DELETE FROM semo.ontology WHERE domain = $1', [domain]);
+      await client.query('COMMIT');
 
       return { success: true, deleted_entries: deletedEntries };
     } catch (err) {
-      await client.query("ROLLBACK");
+      await client.query('ROLLBACK');
       return { success: false, error: String(err) };
     }
   } finally {
@@ -1317,29 +1374,32 @@ export async function ontoAddKey(
     type_key: string;
     scheme_key: string;
     description?: string;
-    key_type?: "singleton" | "collection";
+    key_type?: 'singleton' | 'collection';
     required?: boolean;
     value_hint?: string;
-  }
+  },
 ): Promise<{ success: boolean; error?: string }> {
   const client = await pool.connect();
   try {
     // Naming convention: kebab-case only
     if (/_/.test(opts.scheme_key)) {
-      const suggested = opts.scheme_key.replace(/_/g, "-");
-      return { success: false, error: `키 '${opts.scheme_key}'에 snake_case가 포함되어 있습니다. kebab-case를 사용하세요: '${suggested}'` };
+      const suggested = opts.scheme_key.replace(/_/g, '-');
+      return {
+        success: false,
+        error: `키 '${opts.scheme_key}'에 snake_case가 포함되어 있습니다. kebab-case를 사용하세요: '${suggested}'`,
+      };
     }
 
     // Check type exists
     const typeCheck = await client.query(
-      "SELECT DISTINCT type_key FROM semo.kb_type_schema WHERE type_key = $1",
-      [opts.type_key]
+      'SELECT DISTINCT type_key FROM semo.kb_type_schema WHERE type_key = $1',
+      [opts.type_key],
     );
     if (typeCheck.rows.length === 0) {
       // Check if this type exists in ontology at all
       const ontoCheck = await client.query(
-        "SELECT DISTINCT entity_type FROM semo.ontology WHERE entity_type = $1",
-        [opts.type_key]
+        'SELECT DISTINCT entity_type FROM semo.ontology WHERE entity_type = $1',
+        [opts.type_key],
       );
       if (ontoCheck.rows.length === 0) {
         return { success: false, error: `타입 '${opts.type_key}'이(가) 존재하지 않습니다.` };
@@ -1348,17 +1408,20 @@ export async function ontoAddKey(
 
     // Check duplicate
     const dupCheck = await client.query(
-      "SELECT id FROM semo.kb_type_schema WHERE type_key = $1 AND scheme_key = $2",
-      [opts.type_key, opts.scheme_key]
+      'SELECT id FROM semo.kb_type_schema WHERE type_key = $1 AND scheme_key = $2',
+      [opts.type_key, opts.scheme_key],
     );
     if (dupCheck.rows.length > 0) {
-      return { success: false, error: `키 '${opts.scheme_key}'은(는) '${opts.type_key}' 타입에 이미 존재합니다.` };
+      return {
+        success: false,
+        error: `키 '${opts.scheme_key}'은(는) '${opts.type_key}' 타입에 이미 존재합니다.`,
+      };
     }
 
     // Get max sort_order
     const maxOrder = await client.query(
-      "SELECT COALESCE(MAX(sort_order), 0) + 10 as next_order FROM semo.kb_type_schema WHERE type_key = $1",
-      [opts.type_key]
+      'SELECT COALESCE(MAX(sort_order), 0) + 10 as next_order FROM semo.kb_type_schema WHERE type_key = $1',
+      [opts.type_key],
     );
     const sortOrder = maxOrder.rows[0].next_order;
 
@@ -1369,11 +1432,11 @@ export async function ontoAddKey(
         opts.type_key,
         opts.scheme_key,
         opts.description || opts.scheme_key,
-        opts.key_type || "singleton",
+        opts.key_type || 'singleton',
         opts.required || false,
         opts.value_hint || null,
         sortOrder,
-      ]
+      ],
     );
 
     return { success: true };
@@ -1393,19 +1456,22 @@ export async function ontoCreateType(
     type_key: string;
     description?: string;
     schema?: Record<string, unknown>;
-  }
+  },
 ): Promise<{ success: boolean; error?: string }> {
   // kebab-case 검증
   if (!/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/.test(opts.type_key)) {
-    return { success: false, error: `타입 키 '${opts.type_key}'이(가) 유효하지 않습니다. kebab-case 소문자만 사용 가능 (예: my-type)` };
+    return {
+      success: false,
+      error: `타입 키 '${opts.type_key}'이(가) 유효하지 않습니다. kebab-case 소문자만 사용 가능 (예: my-type)`,
+    };
   }
 
   const client = await pool.connect();
   try {
     // 중복 확인
     const dupCheck = await client.query(
-      "SELECT type_key FROM semo.ontology_types WHERE type_key = $1",
-      [opts.type_key]
+      'SELECT type_key FROM semo.ontology_types WHERE type_key = $1',
+      [opts.type_key],
     );
     if (dupCheck.rows.length > 0) {
       return { success: false, error: `타입 '${opts.type_key}'은(는) 이미 존재합니다.` };
@@ -1414,11 +1480,7 @@ export async function ontoCreateType(
     await client.query(
       `INSERT INTO semo.ontology_types (type_key, schema, description)
        VALUES ($1, $2, $3)`,
-      [
-        opts.type_key,
-        JSON.stringify(opts.schema || {}),
-        opts.description || opts.type_key,
-      ]
+      [opts.type_key, JSON.stringify(opts.schema || {}), opts.description || opts.type_key],
     );
 
     return { success: true };
@@ -1435,16 +1497,19 @@ export async function ontoCreateType(
 export async function ontoRemoveKey(
   pool: Pool,
   typeKey: string,
-  schemeKey: string
+  schemeKey: string,
 ): Promise<{ success: boolean; error?: string }> {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      "DELETE FROM semo.kb_type_schema WHERE type_key = $1 AND scheme_key = $2 RETURNING id",
-      [typeKey, schemeKey]
+      'DELETE FROM semo.kb_type_schema WHERE type_key = $1 AND scheme_key = $2 RETURNING id',
+      [typeKey, schemeKey],
     );
     if (result.rows.length === 0) {
-      return { success: false, error: `키 '${schemeKey}'은(는) '${typeKey}' 타입에 존재하지 않습니다.` };
+      return {
+        success: false,
+        error: `키 '${schemeKey}'은(는) '${typeKey}' 타입에 존재하지 않습니다.`,
+      };
     }
     return { success: true };
   } finally {
@@ -1458,7 +1523,7 @@ export async function ontoRemoveKey(
 export async function ontoPullToLocal(pool: Pool, cwd: string): Promise<number> {
   const domains = await ontoList(pool);
   const kbDir = ensureKBDir(cwd);
-  const ontoDir = path.join(kbDir, "ontology");
+  const ontoDir = path.join(kbDir, 'ontology');
 
   for (const d of domains) {
     fs.writeFileSync(path.join(ontoDir, `${d.domain}.json`), JSON.stringify(d, null, 2));

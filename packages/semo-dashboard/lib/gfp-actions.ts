@@ -31,13 +31,22 @@ import { parseColors } from './design-system-parser';
 import type { GfpPhaseSection, GfpQAItem, GfpTrack } from '@/types';
 
 const PHASE_NAMES: Record<number, string> = {
-  0: 'onboarding', 1: 'discovery', 2: 'prd', 3: 'clarification',
-  4: 'design-system', 5: 'epic', 6: 'functional-spec',
-  7: 'technical-plan', 8: 'task-breakdown', 9: 'handoff',
+  0: 'onboarding',
+  1: 'discovery',
+  2: 'prd',
+  3: 'clarification',
+  4: 'design-system',
+  5: 'epic',
+  6: 'functional-spec',
+  7: 'technical-plan',
+  8: 'task-breakdown',
+  9: 'handoff',
 };
 
 const INFRA_PHASE_NAMES: Record<number, string> = {
-  0: 'infra-setup', 1: 'infra-integration', 2: 'infra-verification',
+  0: 'infra-setup',
+  1: 'infra-integration',
+  2: 'infra-verification',
 };
 
 export interface SectionActionParams {
@@ -59,7 +68,9 @@ export interface SectionActionResult {
  * 섹션 승인/거절의 핵심 비즈니스 로직.
  * Dashboard PATCH와 Slack interactions 모두 이 함수를 호출.
  */
-export async function executeSectionAction(params: SectionActionParams): Promise<SectionActionResult> {
+export async function executeSectionAction(
+  params: SectionActionParams,
+): Promise<SectionActionResult> {
   const { gfpId, sectionId, action, reviewerNote, actionSource } = params;
   const status = action === 'approve' ? 'approved' : 'rejected';
 
@@ -68,9 +79,9 @@ export async function executeSectionAction(params: SectionActionParams): Promise
     const allSecs = await listSections(gfpId);
     const target = allSecs.find((s) => s.section_id === sectionId);
     if (target?.qa_items) {
-      const items: GfpQAItem[] = (typeof target.qa_items === 'string'
-        ? JSON.parse(target.qa_items)
-        : target.qa_items) as GfpQAItem[];
+      const items: GfpQAItem[] = (
+        typeof target.qa_items === 'string' ? JSON.parse(target.qa_items) : target.qa_items
+      ) as GfpQAItem[];
       const unanswered = items.filter((q) => !q.answer);
       if (unanswered.length > 0) {
         return {
@@ -93,7 +104,10 @@ export async function executeSectionAction(params: SectionActionParams): Promise
   if (status === 'rejected' && reviewerNote) {
     const proj = await getProject(gfpId);
     dispatchRegeneration(
-      sectionId, section.content, reviewerNote, section.phase,
+      sectionId,
+      section.content,
+      reviewerNote,
+      section.phase,
       (proj?.metadata as Record<string, unknown>) ?? undefined,
       sectionTrack,
     ).catch((err) => console.error('Bot dispatch failed:', err));
@@ -129,7 +143,8 @@ export async function executeSectionAction(params: SectionActionParams): Promise
 
     if (project.service_domain) {
       writebackPhaseToKB(gfpId, section.phase, project.service_domain, phaseName).catch((err) =>
-        console.error('KB write-back failed:', err));
+        console.error('KB write-back failed:', err),
+      );
     }
 
     // Phase 4: design sub-step advancement + DesignClaw dispatch
@@ -159,7 +174,8 @@ export async function executeSectionAction(params: SectionActionParams): Promise
         const colorSection = allDs.find((s) => s.section_key.startsWith('ds-color'));
         const colorGroups = colorSection ? parseColors(colorSection.content) : [];
         const primaryColors = colorGroups.flatMap((g) => {
-          const shade400 = g.shades.find((s) => s.shade === 400) ?? g.shades[Math.floor(g.shades.length / 2)];
+          const shade400 =
+            g.shades.find((s) => s.shade === 400) ?? g.shades[Math.floor(g.shades.length / 2)];
           return shade400 ? [{ name: `${g.name} 400`, hex: shade400.hex }] : [];
         });
         sendDesignSystemSlack({
@@ -193,8 +209,18 @@ export async function executeSectionAction(params: SectionActionParams): Promise
       .map((s) => `## ${s.title}\n\n${s.content}`)
       .join('\n\n---\n\n');
 
-    publishPhaseToGitHub(project.project_name, phaseName, phaseContent)
-      .catch((err) => console.error('GitHub publish failed:', err));
+    publishPhaseToGitHub(project.project_name, phaseName, phaseContent).catch((err) =>
+      console.error('GitHub publish failed:', err),
+    );
+
+    // Phase 5(에픽) / Phase 6(기능 스펙) 완료 시 → service_features 자동 추출
+    if ([5, 6].includes(section.phase) && project.service_domain) {
+      import('./feature-extractor')
+        .then(({ extractAndCreateFeaturesFromPhase }) =>
+          extractAndCreateFeaturesFromPhase(gfpId, section.phase, allSections, project),
+        )
+        .catch((err) => console.error('Feature extraction failed:', err));
+    }
 
     // Phase 0 완료 → Track A/B 포크
     if (section.phase === 0) {
@@ -212,8 +238,10 @@ export async function executeSectionAction(params: SectionActionParams): Promise
         }).catch((err) => console.error('Track fork Slack failed:', err));
       } else {
         sendGfpPhaseCompletedSlack({
-          projectName: project.project_name, gfpId,
-          completedPhase: 0, nextPhase: 1,
+          projectName: project.project_name,
+          gfpId,
+          completedPhase: 0,
+          nextPhase: 1,
           channelId: slackCtx.channelId,
           ownerSlackId: slackCtx.ownerSlackId,
           serviceDomain: project.service_domain ?? undefined,
@@ -222,7 +250,8 @@ export async function executeSectionAction(params: SectionActionParams): Promise
       }
       if (project.service_domain) {
         writebackPhaseProgressToKB(gfpId, project.service_domain, 0, 1).catch((err) =>
-          console.error('KB phase progress failed:', err));
+          console.error('KB phase progress failed:', err),
+        );
       }
       return { section, phaseAdvanced: true };
     }
@@ -232,8 +261,10 @@ export async function executeSectionAction(params: SectionActionParams): Promise
       const infraComplete = await checkInfraTrackComplete(gfpId);
       if (!infraComplete) {
         sendGfpPhaseCompletedSlack({
-          projectName: project.project_name, gfpId,
-          completedPhase: 9, nextPhase: null,
+          projectName: project.project_name,
+          gfpId,
+          completedPhase: 9,
+          nextPhase: null,
           channelId: slackCtx.channelId,
           ownerSlackId: slackCtx.ownerSlackId,
           serviceDomain: project.service_domain ?? undefined,
@@ -244,11 +275,14 @@ export async function executeSectionAction(params: SectionActionParams): Promise
       await updateProject(gfpId, { status: 'completed' });
       if (project.service_domain) {
         writebackPhaseProgressToKB(gfpId, project.service_domain, 9, null).catch((err) =>
-          console.error('KB phase progress failed:', err));
+          console.error('KB phase progress failed:', err),
+        );
       }
       sendGfpPhaseCompletedSlack({
-        projectName: project.project_name, gfpId,
-        completedPhase: 9, nextPhase: null,
+        projectName: project.project_name,
+        gfpId,
+        completedPhase: 9,
+        nextPhase: null,
         channelId: slackCtx.channelId,
         ownerSlackId: slackCtx.ownerSlackId,
         serviceDomain: project.service_domain ?? undefined,
@@ -264,12 +298,15 @@ export async function executeSectionAction(params: SectionActionParams): Promise
     }
     if (project.service_domain) {
       writebackPhaseProgressToKB(
-        gfpId, project.service_domain, section.phase,
+        gfpId,
+        project.service_domain,
+        section.phase,
         nextPhase <= 9 ? nextPhase : null,
       ).catch((err) => console.error('KB phase progress failed:', err));
     }
     sendGfpPhaseCompletedSlack({
-      projectName: project.project_name, gfpId,
+      projectName: project.project_name,
+      gfpId,
       completedPhase: section.phase,
       nextPhase: nextPhase <= 9 ? nextPhase : null,
       channelId: slackCtx.channelId,
@@ -289,7 +326,13 @@ export async function executeSectionAction(params: SectionActionParams): Promise
 async function handleInfraTrackApproval(
   gfpId: string,
   phase: number,
-  project: { service_id: string; project_name: string; service_domain: string | null; infra_phase: number | null; metadata: Record<string, unknown> },
+  project: {
+    service_id: string;
+    project_name: string;
+    service_domain: string | null;
+    infra_phase: number | null;
+    metadata: Record<string, unknown>;
+  },
   slackCtx: { channelId: string; ownerSlackId: string | null },
 ): Promise<void> {
   const allSections = await listSections(gfpId, phase, 'infra');
@@ -300,7 +343,9 @@ async function handleInfraTrackApproval(
   if (phase === 0 || phase === 2) {
     const verification = await getLatestVerification(gfpId, phase);
     if (!verification || verification.overall_status !== 'pass') {
-      console.warn(`[GFP] Infra phase ${phase} approval blocked — deploy verification missing or failed for ${gfpId}`);
+      console.warn(
+        `[GFP] Infra phase ${phase} approval blocked — deploy verification missing or failed for ${gfpId}`,
+      );
       sendDeployVerificationRequiredSlack({
         projectName: project.project_name,
         gfpId,
@@ -319,15 +364,20 @@ async function handleInfraTrackApproval(
   if (project.service_domain) {
     const infraPhaseName = INFRA_PHASE_NAMES[phase] ?? `infra-phase-${phase}`;
     writebackPhaseToKB(gfpId, phase, project.service_domain, infraPhaseName).catch((err) =>
-      console.error('KB infra write-back failed:', err));
+      console.error('KB infra write-back failed:', err),
+    );
     writebackPhaseProgressToKB(
-      gfpId, project.service_domain, phase,
-      isLastInfra ? null : nextInfraPhase, 'infra',
+      gfpId,
+      project.service_domain,
+      phase,
+      isLastInfra ? null : nextInfraPhase,
+      'infra',
     ).catch((err) => console.error('KB infra progress failed:', err));
   }
 
   sendGfpInfraPhaseCompletedSlack({
-    projectName: project.project_name, gfpId,
+    projectName: project.project_name,
+    gfpId,
     completedPhase: phase,
     nextPhase: isLastInfra ? null : nextInfraPhase,
     channelId: slackCtx.channelId,

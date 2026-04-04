@@ -23,7 +23,16 @@ import {
   createDeployVerification,
 } from '@/lib/gfp';
 import { query } from '@/lib/db';
-import { sendGfpQASlack, sendGfpSectionPendingReviewSlack, sendGfpStitchResultSlack, sendGfpStitchFallbackSlack, resolveGfpSlackContext, sendFeatureSpecReviewSlack, sendFeatureWorkCompleteSlack } from '@/lib/slack';
+import {
+  sendGfpQASlack,
+  sendGfpSectionPendingReviewSlack,
+  sendGfpStitchResultSlack,
+  sendGfpStitchFallbackSlack,
+  resolveGfpSlackContext,
+  sendFeatureSpecReviewSlack,
+  sendFeatureWorkCompleteSlack,
+} from '@/lib/slack';
+import { transitionFeatureStatus } from '@/lib/feature-lifecycle';
 
 const DASHBOARD_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space';
 
@@ -114,6 +123,14 @@ interface FeatureConversationCompletePayload {
   bot_id: string;
 }
 
+interface FeatureTestCompletePayload {
+  type: 'feature-test-complete';
+  feature_id: string;
+  test_passed: boolean;
+  test_report?: string;
+  bot_id: string;
+}
+
 interface DeployVerificationPayload {
   type: 'deploy-verification';
   service_id: string;
@@ -134,6 +151,7 @@ type CallbackPayload =
   | FeatureDiscoveryCompletePayload
   | FeatureSpecEnrichedPayload
   | FeatureConversationCompletePayload
+  | FeatureTestCompletePayload
   | DeployVerificationPayload;
 
 export async function POST(request: NextRequest) {
@@ -141,10 +159,7 @@ export async function POST(request: NextRequest) {
     const body: CallbackPayload = await request.json();
 
     if (!body.type || !body.bot_id) {
-      return NextResponse.json(
-        { error: 'type and bot_id are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'type and bot_id are required' }, { status: 400 });
     }
 
     switch (body.type) {
@@ -152,14 +167,10 @@ export async function POST(request: NextRequest) {
         if (!body.section_id || !body.content) {
           return NextResponse.json(
             { error: 'section_id and content are required for section-regeneration' },
-            { status: 400 }
+            { status: 400 },
           );
         }
-        const section = await updateSectionContent(
-          body.section_id,
-          body.content,
-          'pending-review'
-        );
+        const section = await updateSectionContent(body.section_id, body.content, 'pending-review');
         if (!section) {
           return NextResponse.json({ error: 'Section not found' }, { status: 404 });
         }
@@ -178,9 +189,11 @@ export async function POST(request: NextRequest) {
             phase: section.phase,
             contentPreview: section.content.slice(0, 300),
             channelId: slackCtx.channelId,
-          }).then((ts) => {
-            if (ts) updateSectionSlackThread(section.section_id, ts).catch(() => {});
-          }).catch((err) => console.error('Slack pending-review notify failed:', err));
+          })
+            .then((ts) => {
+              if (ts) updateSectionSlackThread(section.section_id, ts).catch(() => {});
+            })
+            .catch((err) => console.error('Slack pending-review notify failed:', err));
         }
 
         return NextResponse.json({ ok: true, section });
@@ -190,7 +203,7 @@ export async function POST(request: NextRequest) {
         if (!body.task_id || !body.result) {
           return NextResponse.json(
             { error: 'task_id and result are required for research-result' },
-            { status: 400 }
+            { status: 400 },
           );
         }
         const task = await updateResearchTask(body.task_id, {
@@ -207,8 +220,11 @@ export async function POST(request: NextRequest) {
       case 'stitch-export': {
         if (!body.service_id || !body.prompt_section_id || !body.export_content) {
           return NextResponse.json(
-            { error: 'service_id, prompt_section_id, and export_content are required for stitch-export' },
-            { status: 400 }
+            {
+              error:
+                'service_id, prompt_section_id, and export_content are required for stitch-export',
+            },
+            { status: 400 },
           );
         }
 
@@ -222,7 +238,7 @@ export async function POST(request: NextRequest) {
         if (body.screenshot_base64 || body.stitch_share_url) {
           await query(
             `UPDATE semo.gfp_materials SET screenshot_data = $1, stitch_share_url = $2 WHERE material_id = $3`,
-            [body.screenshot_base64 ?? null, body.stitch_share_url ?? null, material.material_id]
+            [body.screenshot_base64 ?? null, body.stitch_share_url ?? null, material.material_id],
           );
         }
 
@@ -254,12 +270,12 @@ export async function POST(request: NextRequest) {
               screenshotUrl,
               stitchShareUrl: body.stitch_share_url,
               channelId: stitchSlackCtx.channelId,
-            }).catch(err => console.error('Stitch result Slack failed:', err));
+            }).catch((err) => console.error('Stitch result Slack failed:', err));
           }
         }
 
         console.log(
-          `[GFP Callback] Stitch export saved: material=${material.material_id}, section=${resultSection.section_id} by ${body.bot_id}`
+          `[GFP Callback] Stitch export saved: material=${material.material_id}, section=${resultSection.section_id} by ${body.bot_id}`,
         );
         return NextResponse.json({ ok: true, material, section: resultSection });
       }
@@ -268,7 +284,7 @@ export async function POST(request: NextRequest) {
         if (!body.service_id) {
           return NextResponse.json(
             { error: 'service_id is required for clarification-ready' },
-            { status: 400 }
+            { status: 400 },
           );
         }
         const project = await getProject(body.service_id);
@@ -278,7 +294,9 @@ export async function POST(request: NextRequest) {
 
         // Find all Phase 3 sections with Q&A items
         const allSections = await listSections(body.service_id, 3);
-        const qaSections = allSections.filter((s) => s.qa_items && Array.isArray(s.qa_items) && s.qa_items.length > 0);
+        const qaSections = allSections.filter(
+          (s) => s.qa_items && Array.isArray(s.qa_items) && s.qa_items.length > 0,
+        );
 
         if (qaSections.length === 0) {
           return NextResponse.json({ ok: true, message: 'No Q&A sections found for Phase 3' });
@@ -294,7 +312,8 @@ export async function POST(request: NextRequest) {
               section_id: s.section_id,
               section_key: s.section_key,
               title: s.title,
-              qa_items: (typeof s.qa_items === 'string' ? JSON.parse(s.qa_items) : s.qa_items) ?? [],
+              qa_items:
+                (typeof s.qa_items === 'string' ? JSON.parse(s.qa_items) : s.qa_items) ?? [],
             })),
             channelId: slackCtx.channelId,
           });
@@ -306,7 +325,7 @@ export async function POST(request: NextRequest) {
         }
 
         console.log(
-          `[GFP Callback] Clarification ready: ${qaSections.length} Q&A sections for ${project.project_name} by ${body.bot_id}`
+          `[GFP Callback] Clarification ready: ${qaSections.length} Q&A sections for ${project.project_name} by ${body.bot_id}`,
         );
         return NextResponse.json({ ok: true, qa_sections: qaSections.length });
       }
@@ -315,7 +334,7 @@ export async function POST(request: NextRequest) {
         if (!body.service_id || !body.analysis) {
           return NextResponse.json(
             { error: 'service_id and analysis are required for design-reference-analysis' },
-            { status: 400 }
+            { status: 400 },
           );
         }
         const refSection = await upsertSection({
@@ -328,7 +347,7 @@ export async function POST(request: NextRequest) {
           status: 'pending-review',
         });
         console.log(
-          `[GFP Callback] Design reference analysis saved: section=${refSection.section_id} by ${body.bot_id}`
+          `[GFP Callback] Design reference analysis saved: section=${refSection.section_id} by ${body.bot_id}`,
         );
         return NextResponse.json({ ok: true, section: refSection });
       }
@@ -336,15 +355,19 @@ export async function POST(request: NextRequest) {
       case 'design-prototype': {
         if (!body.service_id || !body.screen_name || !body.html_content) {
           return NextResponse.json(
-            { error: 'service_id, screen_name, and html_content are required for design-prototype' },
-            { status: 400 }
+            {
+              error: 'service_id, screen_name, and html_content are required for design-prototype',
+            },
+            { status: 400 },
           );
         }
 
         // Stitch 미사용 경고: stitch-result/stitch-prompt 없이 fallback 사용 시 로그
         const existingSections = await listSections(body.service_id, 4);
         const hasStitchAttempt = existingSections.some(
-          (s) => s.section_key.startsWith('stitch-result-') || s.section_key.startsWith('stitch-prompt-'),
+          (s) =>
+            s.section_key.startsWith('stitch-result-') ||
+            s.section_key.startsWith('stitch-prompt-'),
         );
         if (!hasStitchAttempt) {
           console.warn(
@@ -379,8 +402,8 @@ export async function POST(request: NextRequest) {
 
         // 3. Stitch fallback Slack 알림 (Stitch 미시도 + 이 화면이 첫 fallback일 때)
         if (!hasStitchAttempt) {
-          const existingImplScreens = existingSections.filter(
-            (s) => s.section_key.startsWith('impl-screen-'),
+          const existingImplScreens = existingSections.filter((s) =>
+            s.section_key.startsWith('impl-screen-'),
           );
           const isFirstFallback = existingImplScreens.length === 0;
           const protoProject = await getProject(body.service_id);
@@ -395,7 +418,7 @@ export async function POST(request: NextRequest) {
                 reason: body.fallback_reason,
                 botId: body.bot_id,
                 channelId: protoSlackCtx.channelId,
-              }).catch(err => console.error('Stitch fallback Slack failed:', err));
+              }).catch((err) => console.error('Stitch fallback Slack failed:', err));
             }
           }
         }
@@ -410,7 +433,7 @@ export async function POST(request: NextRequest) {
         if (!body.feature_id || !body.spec_content) {
           return NextResponse.json(
             { error: 'feature_id and spec_content are required for feature-spec-ready' },
-            { status: 400 }
+            { status: 400 },
           );
         }
 
@@ -427,7 +450,18 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Feature not found' }, { status: 404 });
         }
 
-        // 2. project 조회 후 Slack 알림
+        // 2. Lifecycle pipeline: in-spec → spec-ready
+        if (feature.metadata?.lifecycle_pipeline) {
+          await transitionFeatureStatus(body.feature_id, 'spec-ready', {
+            triggeredBy: body.bot_id,
+            reason: 'Spec generated by bot, awaiting PO review',
+            metadata: { estimated_effort: body.estimated_effort },
+          }).catch((err) =>
+            console.error('Lifecycle transition failed (in-spec → spec-ready):', err),
+          );
+        }
+
+        // 3. project 조회 후 Slack 알림
         const specProject = await getProject(feature.service_id);
         if (specProject) {
           const specSlackCtx = await resolveGfpSlackContext(feature.service_id);
@@ -452,10 +486,37 @@ export async function POST(request: NextRequest) {
         if (!body.feature_id) {
           return NextResponse.json(
             { error: 'feature_id is required for feature-work-complete' },
-            { status: 400 }
+            { status: 400 },
           );
         }
 
+        // 먼저 현재 feature 조회하여 pipeline 여부 확인
+        const currentFeature = await query<import('@/types').ServiceFeature>(
+          'SELECT * FROM semo.service_features WHERE feature_id = $1',
+          [body.feature_id],
+        );
+        const isLifecyclePipeline = currentFeature.rows[0]?.metadata?.lifecycle_pipeline;
+
+        if (isLifecyclePipeline) {
+          // Lifecycle pipeline: in-dev → in-test (ReviewClaw 자동 디스패치)
+          const transResult = await transitionFeatureStatus(body.feature_id, 'in-test', {
+            triggeredBy: body.bot_id,
+            reason: 'Implementation complete, dispatching test verification',
+            metadata: {
+              github_issue_state: 'closed',
+              work_completed_at: new Date().toISOString(),
+            },
+          });
+          if (!transResult.ok) {
+            return NextResponse.json({ error: transResult.error }, { status: 400 });
+          }
+          console.log(
+            `[GFP Callback] Feature work complete (pipeline → in-test): ${body.feature_id} by ${body.bot_id}`,
+          );
+          return NextResponse.json({ ok: true, feature: transResult.feature, nextStep: 'in-test' });
+        }
+
+        // Legacy: 바로 active
         const completedFeature = await updateFeature(body.feature_id, {
           status: 'active',
           metadata: {
@@ -485,11 +546,68 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true, feature: completedFeature });
       }
 
+      case 'feature-test-complete': {
+        if (!body.feature_id) {
+          return NextResponse.json(
+            { error: 'feature_id is required for feature-test-complete' },
+            { status: 400 },
+          );
+        }
+
+        if (body.test_passed) {
+          // 테스트 통과 → in-test → active
+          const activeResult = await transitionFeatureStatus(body.feature_id, 'active', {
+            triggeredBy: body.bot_id,
+            reason: 'Test verification passed',
+            metadata: {
+              test_report: body.test_report,
+              test_completed_at: new Date().toISOString(),
+            },
+          });
+          if (!activeResult.ok) {
+            return NextResponse.json({ error: activeResult.error }, { status: 400 });
+          }
+
+          // Slack 완료 알림
+          const testProject = await getProject(activeResult.feature!.service_id);
+          if (testProject) {
+            const testSlackCtx = await resolveGfpSlackContext(activeResult.feature!.service_id);
+            if (testSlackCtx.channelId) {
+              sendFeatureWorkCompleteSlack({
+                projectName: testProject.project_name,
+                featureName: activeResult.feature!.name,
+                issueUrl: activeResult.feature!.metadata?.github_issue_url as string | undefined,
+                channelId: testSlackCtx.channelId,
+              }).catch((err: unknown) => console.error('Feature test complete Slack failed:', err));
+            }
+          }
+
+          console.log(
+            `[GFP Callback] Feature test passed → active: ${body.feature_id} by ${body.bot_id}`,
+          );
+          return NextResponse.json({ ok: true, feature: activeResult.feature });
+        } else {
+          // 테스트 실패 → in-test → in-dev (재작업)
+          const redevResult = await transitionFeatureStatus(body.feature_id, 'in-dev', {
+            triggeredBy: body.bot_id,
+            reason: `Test failed: ${body.test_report ?? 'no details'}`,
+            metadata: {
+              test_report: body.test_report,
+              test_failed_at: new Date().toISOString(),
+            },
+          });
+          console.log(
+            `[GFP Callback] Feature test failed → in-dev: ${body.feature_id} by ${body.bot_id}`,
+          );
+          return NextResponse.json({ ok: true, feature: redevResult.feature, retest: true });
+        }
+      }
+
       case 'feature-discovery-complete': {
         if (!body.session_id || !body.candidates) {
           return NextResponse.json(
             { error: 'session_id and candidates are required for feature-discovery-complete' },
-            { status: 400 }
+            { status: 400 },
           );
         }
 
@@ -520,7 +638,9 @@ export async function POST(request: NextRequest) {
             }
           }
         }
-        console.log(`[GFP Callback] Feature discovery complete: ${body.session_id}, ${body.candidates.length} candidates by ${body.bot_id}`);
+        console.log(
+          `[GFP Callback] Feature discovery complete: ${body.session_id}, ${body.candidates.length} candidates by ${body.bot_id}`,
+        );
         return NextResponse.json({ ok: true, session });
       }
 
@@ -528,14 +648,14 @@ export async function POST(request: NextRequest) {
         if (!body.feature_id || !body.spec) {
           return NextResponse.json(
             { error: 'feature_id and spec are required for feature-spec-enriched' },
-            { status: 400 }
+            { status: 400 },
           );
         }
 
         const { normalizeSpec, mergeSpecs } = await import('@/lib/feature-spec');
         const featureRes = await query<{ metadata: Record<string, unknown> }>(
           'SELECT metadata FROM semo.service_features WHERE feature_id = $1',
-          [body.feature_id]
+          [body.feature_id],
         );
         if (!featureRes.rows[0]) {
           return NextResponse.json({ error: 'Feature not found' }, { status: 404 });
@@ -550,7 +670,9 @@ export async function POST(request: NextRequest) {
           spec_generated_at: new Date().toISOString(),
         });
 
-        const enrichedFeature = await updateFeature(body.feature_id, { metadata: { spec: merged } });
+        const enrichedFeature = await updateFeature(body.feature_id, {
+          metadata: { spec: merged },
+        });
 
         // TODO: Slack 스펙 검토 알림 (Sprint 4에서 구현)
         console.log(`[GFP Callback] Feature spec enriched: ${body.feature_id} by ${body.bot_id}`);
@@ -561,16 +683,19 @@ export async function POST(request: NextRequest) {
         if (!body.session_id) {
           return NextResponse.json(
             { error: 'session_id is required for feature-conversation-complete' },
-            { status: 400 }
+            { status: 400 },
           );
         }
 
         await updateConversationSession(body.session_id, {
           status: 'reviewing',
-          features: body.features as unknown as import('@/types').FeatureConversationSession['features'],
+          features:
+            body.features as unknown as import('@/types').FeatureConversationSession['features'],
         });
 
-        console.log(`[GFP Callback] Feature conversation complete: ${body.session_id}, ${body.features?.length ?? 0} features by ${body.bot_id}`);
+        console.log(
+          `[GFP Callback] Feature conversation complete: ${body.session_id}, ${body.features?.length ?? 0} features by ${body.bot_id}`,
+        );
         return NextResponse.json({ ok: true, session_id: body.session_id });
       }
 
@@ -598,7 +723,7 @@ export async function POST(request: NextRequest) {
       default:
         return NextResponse.json(
           { error: `Unknown callback type: ${(body as CallbackPayload).type}` },
-          { status: 400 }
+          { status: 400 },
         );
     }
   } catch (error) {
