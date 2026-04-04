@@ -35,7 +35,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
     expect(body.current_phase).toBe(0);
     expect(body.infra_phase).toBe(0);
     expect(body.status).toBe('active');
-    projectId = body.gfp_id;
+    projectId = body.service_id;
   });
 
   test('standard 프리셋 프로젝트는 infra_phase=null', async ({ request }) => {
@@ -390,7 +390,7 @@ test.describe.serial('GFP Handoff Gate — Track B 미완 블로킹', () => {
       },
     });
     expect(res.status()).toBe(201);
-    projectId = (await res.json()).gfp_id;
+    projectId = (await res.json()).service_id;
   });
 
   test('Phase 0~8 빠르게 통과 (infra 미완)', async ({ request }) => {
@@ -455,7 +455,7 @@ test.describe('GFP Backward Compatibility — 기존 프로젝트 호환', () =>
     const proj = await projRes.json();
 
     // track 미지정으로 섹션 생성
-    const secRes = await request.post(`/api/gfp/${proj.gfp_id}/sections`, {
+    const secRes = await request.post(`/api/gfp/${proj.service_id}/sections`, {
       data: {
         phase: 0,
         section_key: 'compat-test',

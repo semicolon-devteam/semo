@@ -35,11 +35,11 @@ export async function POST(request: NextRequest) {
     });
 
     // Slack 알림: Phase 0 담당 봇에게 온보딩 시작 멘션
-    const slackCtx = await resolveGfpSlackContext(project.gfp_id);
+    const slackCtx = await resolveGfpSlackContext(project.service_id);
     if (slackCtx.channelId) {
       sendGfpProjectCreatedSlack({
         projectName: project.project_name,
-        gfpId: project.gfp_id,
+        gfpId: project.service_id,
         ownerName: project.owner_name,
         channelId: slackCtx.channelId,
         preset: (metadata?.preset as string) ?? 'standard',

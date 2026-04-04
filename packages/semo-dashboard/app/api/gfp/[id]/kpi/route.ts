@@ -25,7 +25,7 @@ export async function GET(
 
     // Incidents from DB
     const incidentsRes = await query(
-      `SELECT * FROM semo.service_incidents WHERE project_id = $1 ORDER BY occurred_at DESC LIMIT $2`,
+      `SELECT * FROM semo.service_incidents WHERE service_id = $1 ORDER BY occurred_at DESC LIMIT $2`,
       [id, limit]
     );
 

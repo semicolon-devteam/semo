@@ -35,7 +35,7 @@ export async function POST(
     }
 
     const task = await createResearchTask({
-      gfp_id: id,
+      service_id: id,
       task_type,
       reference_urls: reference_urls ?? [],
       input_prompt,

@@ -29,7 +29,7 @@ export async function resolveGfpSlackContext(gfpId: string): Promise<GfpSlackCon
 
   try {
     const project = await query(
-      `SELECT metadata, service_domain, project_name FROM semo.gfp_projects WHERE gfp_id = $1`,
+      `SELECT metadata, service_domain, project_name FROM semo.services WHERE service_id = $1`,
       [gfpId]
     );
     if (project.rows.length > 0) {
@@ -1262,4 +1262,153 @@ export async function sendGfpStitchFallbackSlack(opts: {
       blocks,
     }),
   }).catch(err => console.error('Stitch fallback Slack failed:', err));
+}
+
+// ── Feature Spec Review (ops mode) ──
+
+interface FeatureSpecReviewOpts {
+  projectName: string;
+  projectId: string;
+  featureId: string;
+  featureName: string;
+  specPreview: string;
+  estimatedEffort?: string;
+  channelId: string;
+}
+
+export async function sendFeatureSpecReviewSlack(opts: FeatureSpecReviewOpts): Promise<string | null> {
+  if (!SLACK_BOT_TOKEN) return null;
+
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.projectId}`;
+  const effortLabel = opts.estimatedEffort ? ` | 규모: ${opts.estimatedEffort}` : '';
+
+  const blocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: `[기능 스펙] ${opts.featureName} — 검토 필요` },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*프로젝트*\n${opts.projectName}` },
+        { type: 'mrkdwn', text: `*기능*\n${opts.featureName}${effortLabel}` },
+      ],
+    },
+    {
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*스펙 미리보기*\n\`\`\`\n${opts.specPreview}...\n\`\`\`` },
+    },
+    {
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '승인' },
+          style: 'primary',
+          action_id: `feature_approve_spec_${opts.featureId}`,
+          value: JSON.stringify({ projectId: opts.projectId, featureId: opts.featureId }),
+        },
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '거절' },
+          style: 'danger',
+          action_id: `feature_reject_spec_${opts.featureId}`,
+          value: JSON.stringify({ projectId: opts.projectId, featureId: opts.featureId }),
+        },
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '대시보드에서 보기' },
+          url: dashboardUrl,
+        },
+      ],
+    },
+  ];
+
+  try {
+    const res = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+      body: JSON.stringify({
+        channel: opts.channelId,
+        text: `[${opts.projectName}] 기능 스펙 검토 필요: ${opts.featureName}`,
+        blocks,
+      }),
+    });
+    const data = await res.json();
+    return data.ts ?? null;
+  } catch {
+    return null;
+  }
+}
+
+interface FeatureWorkCompleteOpts {
+  projectName: string;
+  featureName: string;
+  issueUrl?: string;
+  channelId: string;
+}
+
+export async function sendFeatureWorkCompleteSlack(opts: FeatureWorkCompleteOpts): Promise<boolean> {
+  if (!SLACK_BOT_TOKEN) return false;
+
+  const issueLink = opts.issueUrl ? `\n<${opts.issueUrl}|GitHub Issue>` : '';
+  const blocks = [
+    {
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*[${opts.projectName}]* 기능 구현 완료: *${opts.featureName}*${issueLink}` },
+    },
+  ];
+
+  try {
+    await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+      body: JSON.stringify({
+        channel: opts.channelId,
+        text: `[${opts.projectName}] 기능 구현 완료: ${opts.featureName}`,
+        blocks,
+      }),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function buildFeatureSpecRejectionModalView(params: {
+  projectId: string;
+  featureId: string;
+  featureName: string;
+}): Record<string, unknown> {
+  return {
+    type: 'modal',
+    callback_id: 'feature_spec_rejection_modal',
+    private_metadata: JSON.stringify({ projectId: params.projectId, featureId: params.featureId }),
+    title: { type: 'plain_text', text: '스펙 거절' },
+    submit: { type: 'plain_text', text: '거절' },
+    close: { type: 'plain_text', text: '취소' },
+    blocks: [
+      {
+        type: 'section',
+        text: { type: 'mrkdwn', text: `*${params.featureName}* 스펙을 거절합니다.` },
+      },
+      {
+        type: 'input',
+        block_id: 'rejection_reason',
+        label: { type: 'plain_text', text: '거절 사유' },
+        element: {
+          type: 'plain_text_input',
+          action_id: 'reason_input',
+          multiline: true,
+          placeholder: { type: 'plain_text', text: '수정이 필요한 부분을 설명해주세요...' },
+        },
+      },
+    ],
+  };
 }

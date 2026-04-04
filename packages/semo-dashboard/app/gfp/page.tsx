@@ -110,8 +110,8 @@ export default function GfpListPage() {
 
             return (
               <Link
-                key={project.gfp_id}
-                href={`/gfp/${project.gfp_id}`}
+                key={project.service_id}
+                href={`/gfp/${project.service_id}`}
                 className="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all"
               >
                 <div className="flex items-start justify-between mb-3">

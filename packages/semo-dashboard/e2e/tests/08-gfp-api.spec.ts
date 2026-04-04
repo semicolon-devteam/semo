@@ -25,10 +25,10 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     expect(response.status()).toBe(201);
 
     const body = await response.json();
-    expect(body).toHaveProperty('gfp_id');
+    expect(body).toHaveProperty('service_id');
     expect(body.status).toBe('active');
     expect(body.current_phase).toBe(0);
-    projectId = body.gfp_id;
+    projectId = body.service_id;
   });
 
   test('POST /api/gfp — 필수 필드 누락 시 400', async ({ request }) => {
@@ -43,7 +43,7 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     expect(response.ok()).toBeTruthy();
 
     const body = await response.json();
-    expect(body.gfp_id).toBe(projectId);
+    expect(body.service_id).toBe(projectId);
     expect(body).toHaveProperty('progress');
     expect(Array.isArray(body.progress)).toBeTruthy();
   });

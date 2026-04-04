@@ -291,7 +291,7 @@ export type GfpInfraCategory = 'oauth' | 'push' | 'api' | 'storage' | 'dns' | 'c
 
 export interface GfpInfraRequest {
   request_id: string;
-  gfp_id: string;
+  service_id: string;
   source_phase: number;
   source_section_id: string | null;
   category: GfpInfraCategory;
@@ -359,7 +359,7 @@ export function matchesStep(
 export type ServiceLifecycle = 'build' | 'ops' | 'sunset';
 
 export interface GfpProject {
-  gfp_id: string;
+  service_id: string;
   project_name: string;
   service_domain: string | null;
   owner_name: string;
@@ -376,7 +376,7 @@ export interface GfpProject {
 
 export interface GfpPhaseSection {
   section_id: string;
-  gfp_id: string;
+  service_id: string;
   phase: number;
   track: GfpTrack;
   section_key: string;
@@ -395,7 +395,7 @@ export interface GfpPhaseSection {
 
 export interface GfpMaterial {
   material_id: string;
-  gfp_id: string;
+  service_id: string;
   content: string;
   phase_mapping: GfpPhaseMapping[] | null;
   material_type: GfpMaterialType;
@@ -411,7 +411,7 @@ export interface GfpPhaseMapping {
 
 export interface GfpResearchTask {
   task_id: string;
-  gfp_id: string;
+  service_id: string;
   task_type: GfpResearchTaskType;
   reference_urls: string[];
   input_prompt: string;
@@ -454,6 +454,23 @@ export type ServicePresetConfig = GfpPresetConfig;
 export type ServiceInfraConfig = GfpInfraConfig;
 export type ServiceQAItem = GfpQAItem;
 
+// ── Service Iterations (ops mode) ──
+
+export type IterationStatus = 'planned' | 'active' | 'completed';
+
+export interface ServiceIteration {
+  iteration_id: string;
+  service_id: string;
+  title: string;
+  goal: string | null;
+  status: IterationStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  retrospective: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // ── Service Features (ops mode) ──
 
 export type ServiceFeatureCategory = 'core' | 'growth' | 'infra' | 'ux' | 'integration';
@@ -461,12 +478,13 @@ export type ServiceFeatureStatus = 'active' | 'planned' | 'in-dev' | 'deprecated
 
 export interface ServiceFeature {
   feature_id: string;
-  project_id: string;
+  service_id: string;
   name: string;
   description: string | null;
   category: ServiceFeatureCategory;
   status: ServiceFeatureStatus;
   parent_id: string | null;
+  iteration_id: string | null;
   sort_order: number;
   metadata: Record<string, unknown>;
   created_at: string;
@@ -480,7 +498,7 @@ export type ServiceIncidentStatus = 'open' | 'investigating' | 'resolved' | 'pos
 
 export interface ServiceIncident {
   incident_id: string;
-  project_id: string;
+  service_id: string;
   iteration_id: string | null;
   severity: ServiceIncidentSeverity;
   title: string;
@@ -502,7 +520,7 @@ export type KPISource = 'bot' | 'manual' | 'api' | 'import';
 
 export interface ServiceKPIMetric {
   metric_id: string;
-  project_id: string;
+  service_id: string;
   iteration_id: string | null;
   period: string;
   metric_name: string;
@@ -529,7 +547,7 @@ export type ActionItemSource = 'manual' | 'bot' | 'dashboard' | 'import';
 
 export interface ServiceActionItem {
   action_item_id: string;
-  project_id: string;
+  service_id: string;
   iteration_id: string | null;
   description: string;
   assignee: string | null;

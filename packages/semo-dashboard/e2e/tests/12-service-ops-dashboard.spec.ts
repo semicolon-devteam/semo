@@ -11,7 +11,7 @@ import { test, expect } from '@playwright/test';
  * 5. 기능 탭: CRUD (추가/수정/삭제)
  * 6. API 레벨: overview, kpi, features 응답 구조 검증
  *
- * 선행 조건: axoracle, jungchipan이 service_projects에 lifecycle='ops'로 이식 완료
+ * 선행 조건: axoracle, jungchipan이 services에 lifecycle='ops'로 이식 완료
  */
 
 // ── A. API 레벨 — Overview/KPI/Features 응답 구조 검증 ──
@@ -28,7 +28,7 @@ test.describe.serial('Service Ops API — axoracle', () => {
     expect(axoracle.lifecycle).toBe('ops');
     expect(axoracle.status).toBe('active');
     expect(axoracle.project_name).toContain('AXOracle');
-    axoracleId = axoracle.gfp_id;
+    axoracleId = axoracle.service_id;
   });
 
   test('GET /api/gfp/[id]/overview — KB 데이터 집계 정상', async ({ request }) => {
@@ -38,7 +38,7 @@ test.describe.serial('Service Ops API — axoracle', () => {
     const body = await res.json();
 
     // project 필드
-    expect(body.project).toHaveProperty('gfp_id', axoracleId);
+    expect(body.project).toHaveProperty('service_id', axoracleId);
     expect(body.project.lifecycle).toBe('ops');
 
     // KB 필드 — axoracle은 풍부한 KB 데이터 보유
@@ -186,7 +186,7 @@ test.describe.serial('Service Ops API — jungchipan (KB-rich)', () => {
     const jp = projects.find((p: { service_domain: string }) => p.service_domain === 'jungchipan');
     expect(jp).toBeTruthy();
     expect(jp.lifecycle).toBe('ops');
-    jungchipanId = jp.gfp_id;
+    jungchipanId = jp.service_id;
   });
 
   test('overview — KB 데이터 정상 (po=harry-lee, bm 존재, service-url 존재)', async ({ request }) => {
@@ -248,7 +248,7 @@ test.describe('Service Ops Detail Page', () => {
     const res = await request.get('/api/gfp');
     const projects = await res.json();
     const axoracle = projects.find((p: { service_domain: string }) => p.service_domain === 'axoracle');
-    axoracleId = axoracle?.gfp_id;
+    axoracleId = axoracle?.service_id;
   });
 
   test('/gfp/[id] — ops 서비스는 탭 UI 렌더 (Phase Nav 없음)', async ({ page }) => {

@@ -9,9 +9,11 @@ export async function GET() {
   try {
     const res = await query(
       `SELECT kb.kb_id, kb.domain, kb.sub_key, kb.content,
-              o.entity_type, o.description
+              o.entity_type, o.description,
+              s.project_name
        FROM semo.knowledge_base kb
        JOIN semo.ontology o ON kb.domain = o.domain
+       LEFT JOIN semo.services s ON s.service_domain = o.domain
        WHERE kb.key = 'action-item'
        ORDER BY kb.sub_key DESC`,
     );
@@ -47,7 +49,7 @@ export async function GET() {
         const info = teamInfoMap.get(row.domain);
         label = info?.nickname || row.domain.charAt(0).toUpperCase() + row.domain.slice(1);
       } else {
-        label = row.description || row.domain;
+        label = row.project_name || row.domain;
       }
       const parsed = parseActionItems(
         row.content,

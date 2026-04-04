@@ -47,7 +47,7 @@ export async function POST(
     }
 
     const section = await upsertSection({
-      gfp_id: id,
+      service_id: id,
       phase,
       section_key,
       title,

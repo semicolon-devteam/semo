@@ -41,7 +41,7 @@ export default function GfpStitchPanel({ gfpId, sections, designStep, onUploaded
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'stitch-export',
-          gfp_id: gfpId,
+          service_id: gfpId,
           prompt_section_id: targetPrompt,
           export_content: exportContent.trim(),
           bot_id: 'manual',

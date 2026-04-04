@@ -33,7 +33,7 @@ export function registerServiceCommands(program: Command): void {
   // ── semo service migrate ──
   service
     .command("migrate")
-    .description("기존 서비스를 service_projects 테이블에 이식")
+    .description("기존 서비스를 services 테이블에 이식")
     .option("--domain <name>", "특정 서비스 도메인")
     .option("--all", "미등록 서비스 전체 이식")
     .option("--dry-run", "미리보기 (DB 변경 없음)")
@@ -65,7 +65,7 @@ export function registerServiceCommands(program: Command): void {
             // 도메인이 있는데 미등록 목록에 없으면 → 이미 등록됨 또는 미존재
             const registered = await getRegisteredServices(pool);
             if (registered.includes(options.domain)) {
-              spinner.info(`'${options.domain}'은(는) 이미 service_projects에 등록되어 있습니다.`);
+              spinner.info(`'${options.domain}'은(는) 이미 services에 등록되어 있습니다.`);
             } else {
               spinner.fail(
                 `'${options.domain}'은(는) 온톨로지에 service 타입으로 등록되지 않았습니다.`
@@ -178,7 +178,7 @@ export function registerServiceCommands(program: Command): void {
   // ── semo service diagnose ──
   service
     .command("diagnose")
-    .description("서비스 KB ↔ service_projects 교차 진단")
+    .description("서비스 KB ↔ services 교차 진단")
     .requiredOption("--domain <name>", "진단할 서비스 도메인")
     .action(async (options: { domain: string }) => {
       const pool = getPool();
@@ -204,11 +204,11 @@ export function registerServiceCommands(program: Command): void {
           console.log(chalk.yellow("  KB 도메인 없음\n"));
         }
 
-        // service_projects 상태
+        // services 상태
         const sp = result.serviceProject;
         if (sp) {
-          console.log(chalk.bold("  ┌─ service_projects ────────────────┐"));
-          console.log(`  │ gfp_id: ${sp.gfp_id}`);
+          console.log(chalk.bold("  ┌─ services ───────────────────────┐"));
+          console.log(`  │ service_id: ${sp.service_id}`);
           console.log(`  │ project_name: ${sp.project_name}`);
           console.log(`  │ owner_name: ${sp.owner_name}`);
           console.log(`  │ lifecycle: ${sp.lifecycle}`);
@@ -219,7 +219,7 @@ export function registerServiceCommands(program: Command): void {
           }
           console.log(chalk.bold("  └─────────────────────────────────┘\n"));
         } else {
-          console.log(chalk.yellow("  service_projects 미등록\n"));
+          console.log(chalk.yellow("  services 미등록\n"));
         }
 
         // 교차 검증
@@ -236,9 +236,9 @@ export function registerServiceCommands(program: Command): void {
         const verdictMap: Record<string, string> = {
           healthy: chalk.green("✅ HEALTHY — 정합성 양호"),
           mismatch: chalk.yellow(`⚠️  MISMATCH (${result.mismatches.length}건)`),
-          "kb-only": chalk.yellow("⚠️  KB-ONLY — service_projects 미등록"),
+          "kb-only": chalk.yellow("⚠️  KB-ONLY — services 미등록"),
           "sp-only": chalk.red("❌ SP-ONLY — KB 도메인 없음 (비정상)"),
-          missing: chalk.red("❌ MISSING — KB, service_projects 모두 없음"),
+          missing: chalk.red("❌ MISSING — KB, services 모두 없음"),
         };
         console.log(`  결과: ${verdictMap[result.verdict] ?? result.verdict}\n`);
       } catch (err) {
@@ -251,7 +251,7 @@ export function registerServiceCommands(program: Command): void {
   // ── semo service update ──
   service
     .command("update")
-    .description("service_projects 레코드 업데이트")
+    .description("services 레코드 업데이트")
     .requiredOption("--domain <name>", "대상 서비스 도메인")
     .option("--status <status>", "서비스 상태 (active|paused|completed)")
     .option("--lifecycle <lifecycle>", "라이프사이클 (build|ops|sunset)")
@@ -310,7 +310,7 @@ export function registerServiceCommands(program: Command): void {
           const result = await updateServiceProject(pool, options.domain, updates);
 
           if (!result) {
-            spinner.fail(`'${options.domain}'은(는) service_projects에 등록되지 않았습니다.`);
+            spinner.fail(`'${options.domain}'은(는) services에 등록되지 않았습니다.`);
             await closeConnection();
             return;
           }

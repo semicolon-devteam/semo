@@ -24,19 +24,20 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { name, description, category, status, parent_id, sort_order, metadata } = body;
+    const { name, description, category, status, parent_id, iteration_id, sort_order, metadata } = body;
 
     if (!name) {
       return NextResponse.json({ error: 'name is required' }, { status: 400 });
     }
 
     const feature = await createFeature({
-      project_id: id,
+      service_id: id,
       name,
       description,
       category,
       status,
       parent_id,
+      iteration_id,
       sort_order,
       metadata,
     });

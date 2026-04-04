@@ -13,7 +13,7 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
   const testDomain = `e2e-svcmig-${Date.now()}`;
   let projectId: string;
 
-  // ── A. 프로젝트 CRUD (service_projects 테이블) ──
+  // ── A. 프로젝트 CRUD (services 테이블) ──
 
   test('POST /api/gfp — 프로젝트 생성 시 lifecycle=build, launched_at=null', async ({ request }) => {
     const response = await request.post('/api/gfp', {
@@ -28,7 +28,7 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
     expect(response.status()).toBe(201);
 
     const body = await response.json();
-    expect(body).toHaveProperty('gfp_id');
+    expect(body).toHaveProperty('service_id');
     expect(body.status).toBe('active');
     expect(body.current_phase).toBe(0);
     expect(body.lifecycle).toBe('build');
@@ -36,7 +36,7 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
     // parallel ���리셋: infra_phase 활성화
     expect(body.infra_phase).toBe(0);
 
-    projectId = body.gfp_id;
+    projectId = body.service_id;
   });
 
   test('GET /api/gfp/[id] — 상세 조회에 lifecycle 필드 포함', async ({ request }) => {
@@ -44,7 +44,7 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
     expect(response.ok()).toBeTruthy();
 
     const body = await response.json();
-    expect(body.gfp_id).toBe(projectId);
+    expect(body.service_id).toBe(projectId);
     expect(body.lifecycle).toBe('build');
     expect(body).toHaveProperty('progress');
   });
@@ -69,7 +69,7 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
 
     const body = await response.json();
     expect(body).toHaveProperty('section_id');
-    expect(body.gfp_id).toBe(projectId);
+    expect(body.service_id).toBe(projectId);
     expect(body.track).toBe('plan');
     sectionId = body.section_id;
   });
@@ -249,14 +249,14 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
       const kbRes = await request.get(`/api/kb?domain=${testDomain}&key=pm-status`);
       if (kbRes.ok()) {
         const kbBody = await kbRes.json();
-        expect(kbBody.content).toContain('project_id:');
+        expect(kbBody.content).toContain('service_id:');
       }
 
       // 레거시 gfp-status도 병행 기록 확인
       const legacyRes = await request.get(`/api/kb?domain=${testDomain}&key=gfp-status`);
       if (legacyRes.ok()) {
         const legacyBody = await legacyRes.json();
-        expect(legacyBody.content).toContain('project_id:');
+        expect(legacyBody.content).toContain('service_id:');
       }
     }
   });
@@ -270,7 +270,7 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
     const body = await response.json();
     expect(Array.isArray(body)).toBeTruthy();
     // 방금 생성한 프로젝트가 목록에 포함
-    const found = body.find((p: { gfp_id: string }) => p.gfp_id === projectId);
+    const found = body.find((p: { service_id: string }) => p.service_id === projectId);
     expect(found).toBeTruthy();
     expect(found.lifecycle).toBe('build');
   });

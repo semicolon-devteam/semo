@@ -1,13 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import type { ServiceFeature } from '@/types';
+import type { ServiceFeature, ServiceIteration } from '@/types';
+import FeatureSpecReviewModal from './FeatureSpecReviewModal';
 
 interface Props {
   projectId: string;
   features: ServiceFeature[];
   onRefresh: () => Promise<void>;
   serviceDomain: string | null;
+  iterations?: ServiceIteration[];
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -25,15 +27,22 @@ const STATUS_BADGES: Record<string, { label: string; color: string }> = {
   deprecated: { label: '폐기', color: 'bg-red-900/50 text-red-300' },
 };
 
-export default function ServiceFeaturesTab({ projectId, features, onRefresh, serviceDomain }: Props) {
+const SPEC_STATUS_BADGES: Record<string, { label: string; color: string }> = {
+  generating: { label: '스펙 작성 중', color: 'bg-yellow-600/80' },
+  'pending-review': { label: '스펙 검토 대기', color: 'bg-blue-500' },
+  approved: { label: '스펙 승인', color: 'bg-green-600/80' },
+};
+
+export default function ServiceFeaturesTab({ projectId, features, onRefresh, iterations = [] }: Props) {
   const [showModal, setShowModal] = useState(false);
   const [editingFeature, setEditingFeature] = useState<ServiceFeature | null>(null);
   const [showImproveModal, setShowImproveModal] = useState<ServiceFeature | null>(null);
+  const [reviewingFeature, setReviewingFeature] = useState<ServiceFeature | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Form state
-  const [form, setForm] = useState({ name: '', description: '', category: 'core', status: 'active', parent_id: '' });
-  const [improveForm, setImproveForm] = useState({ title: '', description: '', priority: 'normal' });
+  const [form, setForm] = useState({ name: '', description: '', category: 'core', status: 'active', parent_id: '', iteration_id: '' });
+  const [improveForm, setImproveForm] = useState({ title: '', description: '', priority: 'normal', mode: 'issue-only' as 'issue-only' | 'spec-request' });
 
   // Group features by category
   const activeFeatures = features.filter((f) => f.status !== 'deprecated');
@@ -51,11 +60,9 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
     childMap.set(pid, arr);
   }
 
-  const topLevel = activeFeatures.filter((f) => !f.parent_id);
-
   const openCreate = () => {
     setEditingFeature(null);
-    setForm({ name: '', description: '', category: 'core', status: 'active', parent_id: '' });
+    setForm({ name: '', description: '', category: 'core', status: 'active', parent_id: '', iteration_id: '' });
     setShowModal(true);
   };
 
@@ -67,6 +74,7 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
       category: f.category,
       status: f.status,
       parent_id: f.parent_id || '',
+      iteration_id: f.iteration_id || '',
     });
     setShowModal(true);
   };
@@ -74,17 +82,18 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
   const saveFeature = async () => {
     setSaving(true);
     try {
+      const payload = { ...form, parent_id: form.parent_id || null, iteration_id: form.iteration_id || null };
       if (editingFeature) {
         await fetch(`/api/gfp/${projectId}/features`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ feature_id: editingFeature.feature_id, ...form, parent_id: form.parent_id || null }),
+          body: JSON.stringify({ feature_id: editingFeature.feature_id, ...payload }),
         });
       } else {
         await fetch(`/api/gfp/${projectId}/features`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...form, parent_id: form.parent_id || null }),
+          body: JSON.stringify(payload),
         });
       }
       setShowModal(false);
@@ -106,11 +115,15 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
           title: improveForm.title,
           description: improveForm.description,
           priority: improveForm.priority,
+          mode: improveForm.mode,
         }),
       });
       if (res.ok) {
         const data = await res.json();
-        alert(`GitHub Issue 생성 완료: ${data.issue_url}`);
+        const modeLabel = data.mode === 'spec-request'
+          ? 'GitHub Issue 생성 + PlanClaw 스펙 작성 요청됨'
+          : `GitHub Issue 생성 완료: ${data.issue_url}`;
+        alert(modeLabel);
         setShowImproveModal(null);
         await onRefresh();
       } else {
@@ -128,6 +141,29 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
     await onRefresh();
   };
 
+  const renderSpecBadge = (f: ServiceFeature) => {
+    const specStatus = f.metadata?.spec_status as string | undefined;
+    if (!specStatus) return null;
+    const badge = SPEC_STATUS_BADGES[specStatus];
+    if (!badge) return null;
+
+    return (
+      <>
+        <span className={`px-1.5 py-0.5 rounded text-[10px] text-white ${badge.color}`}>
+          {badge.label}
+        </span>
+        {specStatus === 'pending-review' && (
+          <button
+            onClick={(e) => { e.stopPropagation(); setReviewingFeature(f); }}
+            className="text-[10px] text-blue-400 hover:text-blue-300 px-1"
+          >
+            검토
+          </button>
+        )}
+      </>
+    );
+  };
+
   const renderFeatureItem = (f: ServiceFeature, depth = 0) => {
     const badge = STATUS_BADGES[f.status] || STATUS_BADGES.active;
     const children = childMap.get(f.feature_id) || [];
@@ -142,6 +178,7 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
           {children.length > 0 && <span className="text-zinc-500 text-xs">&#9656;</span>}
           <span className={`px-1.5 py-0.5 rounded text-[10px] ${badge.color} text-white`}>{badge.label}</span>
           <span className="text-sm text-zinc-200 flex-1">{f.name}</span>
+          {renderSpecBadge(f)}
           {issueUrl && (
             <a href={issueUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline">
               Issue
@@ -152,7 +189,7 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
             <button
               onClick={() => {
                 setShowImproveModal(f);
-                setImproveForm({ title: '', description: '', priority: 'normal' });
+                setImproveForm({ title: '', description: '', priority: 'normal', mode: 'issue-only' });
               }}
               className="text-[10px] text-blue-400 hover:text-blue-300 px-1"
             >
@@ -278,6 +315,23 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
                     ))}
                 </select>
               </div>
+              {iterations.length > 0 && (
+                <div>
+                  <label className="text-xs text-zinc-400">이터레이션 (선택)</label>
+                  <select
+                    value={form.iteration_id}
+                    onChange={(e) => setForm({ ...form, iteration_id: e.target.value })}
+                    className="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-white"
+                  >
+                    <option value="">없음</option>
+                    {iterations.map((it) => (
+                      <option key={it.iteration_id} value={it.iteration_id}>
+                        [{it.status === 'active' ? '진행 중' : it.status === 'planned' ? '예정' : '완료'}] {it.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             <div className="flex justify-end gap-2 mt-5">
               <button onClick={() => setShowModal(false)} className="px-3 py-1.5 text-sm text-zinc-400 hover:text-white">취소</button>
@@ -299,9 +353,38 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
           <div className="bg-zinc-800 border border-zinc-600 rounded-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-white mb-1">기능 개선 요청</h3>
             <p className="text-sm text-zinc-400 mb-4">
-              <strong>{showImproveModal.name}</strong>에 대한 개선 GitHub Issue를 생성합니다.
+              <strong>{showImproveModal.name}</strong>에 대한 개선을 요청합니다.
             </p>
             <div className="space-y-3">
+              {/* Mode selection */}
+              <div>
+                <label className="text-xs text-zinc-400 block mb-1.5">모드</label>
+                <div className="flex gap-3">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="improve-mode"
+                      checked={improveForm.mode === 'issue-only'}
+                      onChange={() => setImproveForm({ ...improveForm, mode: 'issue-only' })}
+                      className="accent-blue-500"
+                    />
+                    <span className="text-sm text-zinc-300">GitHub Issue만</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="improve-mode"
+                      checked={improveForm.mode === 'spec-request'}
+                      onChange={() => setImproveForm({ ...improveForm, mode: 'spec-request' })}
+                      className="accent-blue-500"
+                    />
+                    <span className="text-sm text-zinc-300">봇 스펙 요청</span>
+                  </label>
+                </div>
+                {improveForm.mode === 'spec-request' && (
+                  <p className="text-[10px] text-zinc-500 mt-1">PlanClaw가 기능 스펙을 자동 생성합니다. 승인 후 WorkClaw가 구현에 착수합니다.</p>
+                )}
+              </div>
               <div>
                 <label className="text-xs text-zinc-400">제목</label>
                 <input
@@ -341,11 +424,21 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
                 disabled={!improveForm.title || saving}
                 className="px-4 py-1.5 bg-green-600 text-white text-sm rounded hover:bg-green-500 disabled:opacity-50"
               >
-                {saving ? '생성 중...' : 'GitHub Issue 생성'}
+                {saving ? '생성 중...' : improveForm.mode === 'spec-request' ? '스펙 요청' : 'GitHub Issue 생성'}
               </button>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Spec Review Modal */}
+      {reviewingFeature && (
+        <FeatureSpecReviewModal
+          feature={reviewingFeature}
+          projectId={projectId}
+          onClose={() => setReviewingFeature(null)}
+          onRefresh={onRefresh}
+        />
       )}
     </div>
   );

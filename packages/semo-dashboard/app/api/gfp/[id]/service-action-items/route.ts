@@ -39,7 +39,7 @@ export async function POST(
     }
 
     const item = await createServiceActionItem({
-      project_id: id,
+      service_id: id,
       description,
       assignee,
       deadline,

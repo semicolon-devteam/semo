@@ -1,7 +1,7 @@
 /**
- * Service Migration — 기존 운영 서비스를 service_projects 테이블에 이식
+ * Service Migration — 기존 운영 서비스를 services 테이블에 이식
  *
- * KB 온톨로지에 service 타입으로 등록된 도메인 중 service_projects에 미등록된 것을
+ * KB 온톨로지에 service 타입으로 등록된 도메인 중 services에 미등록된 것을
  * 자동으로 이식. KB 엔트리 전수 조사(audit) 후 매핑/비매핑 분류.
  */
 
@@ -58,7 +58,7 @@ export const STATUS_MAP: Record<string, { lifecycle: string; status: string }> =
   deprecated: { lifecycle: "sunset", status: "completed" },
 };
 
-// Keys that map directly to service_projects columns
+// Keys that map directly to services columns
 const COLUMN_KEYS: Record<string, string> = {
   "base-information": "project_name",
   po: "owner_name",
@@ -105,7 +105,7 @@ export async function getUnregisteredServices(
      WHERE o.entity_type = 'service'
        AND o.domain NOT LIKE 'e2e-%'
        AND NOT EXISTS (
-         SELECT 1 FROM semo.service_projects sp WHERE sp.service_domain = o.domain
+         SELECT 1 FROM semo.services sp WHERE sp.service_domain = o.domain
        )
      ORDER BY o.domain`
   );
@@ -116,7 +116,7 @@ export async function getRegisteredServices(
   pool: Pool
 ): Promise<string[]> {
   const result = await pool.query(
-    `SELECT service_domain FROM semo.service_projects WHERE service_domain IS NOT NULL`
+    `SELECT service_domain FROM semo.services WHERE service_domain IS NOT NULL`
   );
   return result.rows.map((r: { service_domain: string }) => r.service_domain);
 }
@@ -172,7 +172,7 @@ export async function auditServiceKBEntries(
 
   for (const [key, items] of byKey) {
     if (COLUMN_KEYS[key]) {
-      // Maps to service_projects column
+      // Maps to services column
       const firstContent = items[0]?.content ?? "";
       audit.mapped.push({
         key,
@@ -259,10 +259,10 @@ export async function insertServiceProject(
   row: MigrationRow
 ): Promise<string> {
   const result = await pool.query(
-    `INSERT INTO semo.service_projects
+    `INSERT INTO semo.services
        (project_name, owner_name, service_domain, status, lifecycle, launched_at, metadata)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING gfp_id`,
+     RETURNING service_id`,
     [
       row.project_name,
       row.owner_name,
@@ -273,7 +273,7 @@ export async function insertServiceProject(
       JSON.stringify(row.metadata),
     ]
   );
-  return result.rows[0].gfp_id;
+  return result.rows[0].service_id;
 }
 
 export async function writePmSummaryToKB(
@@ -284,7 +284,7 @@ export async function writePmSummaryToKB(
   kbEntryCount: number
 ): Promise<void> {
   const content = [
-    `project_id: ${projectId}`,
+    `service_id: ${projectId}`,
     `project_name: ${row.project_name}`,
     `lifecycle: ${row.lifecycle}`,
     `status: ${row.status}`,
@@ -325,7 +325,7 @@ export function printAuditReport(results: MigrationResult[]): void {
     if (r.action === "created") {
       console.log(
         chalk.gray(
-          `    project_id: ${r.projectId}\n` +
+          `    service_id: ${r.projectId}\n` +
           `    mapped: ${r.audit.mapped.map((m) => m.key).join(", ") || "(없음)"}\n` +
           `    metadata: ${r.audit.metadata.map((m) => m.key).join(", ") || "(없음)"}\n` +
           `    kb-only: ${r.audit.kbOnly.map((k) => `${k.key}(${k.count})`).join(", ") || "(없음)"}`
@@ -404,7 +404,7 @@ export function printDryRunReport(results: MigrationResult[]): void {
 // ── Service Project Lookup / Update / Diagnose ──
 
 export interface ServiceProjectRow {
-  gfp_id: string;
+  service_id: string;
   project_name: string;
   service_domain: string | null;
   owner_name: string;
@@ -424,11 +424,11 @@ export async function getServiceProjectByDomain(
   domain: string
 ): Promise<ServiceProjectRow | null> {
   const result = await pool.query(
-    `SELECT gfp_id, project_name, service_domain, owner_name, owner_contact,
+    `SELECT service_id, project_name, service_domain, owner_name, owner_contact,
             current_phase, infra_phase, status, lifecycle,
             launched_at::text, metadata,
             created_at::text, updated_at::text
-     FROM semo.service_projects
+     FROM semo.services
      WHERE service_domain = $1`,
     [domain]
   );
@@ -486,9 +486,9 @@ export async function updateServiceProject(
 
   params.push(domain);
   const result = await pool.query(
-    `UPDATE semo.service_projects SET ${sets.join(", ")}
+    `UPDATE semo.services SET ${sets.join(", ")}
      WHERE service_domain = $${idx}
-     RETURNING gfp_id, project_name, service_domain, owner_name, owner_contact,
+     RETURNING service_id, project_name, service_domain, owner_name, owner_contact,
                current_phase, infra_phase, status, lifecycle,
                launched_at::text, metadata, created_at::text, updated_at::text`,
     params
@@ -527,7 +527,7 @@ export async function diagnoseServiceStatus(
   );
   const kbExists = ontoResult.rows.length > 0;
 
-  // 2. service_projects 조회
+  // 2. services 조회
   const sp = await getServiceProjectByDomain(pool, domain);
 
   // 3. 분류
@@ -588,7 +588,7 @@ export async function diagnoseServiceStatus(
   // 4. 양쪽 다 존재 → 교차 비교
   const mismatches: DiagnoseMismatch[] = [];
 
-  // KB status vs service_projects status/lifecycle
+  // KB status vs services status/lifecycle
   const statusEntry = await pool.query(
     `SELECT content FROM semo.knowledge_base
      WHERE domain = $1 AND key = 'status' AND (sub_key IS NULL OR sub_key = '')
@@ -618,7 +618,7 @@ export async function diagnoseServiceStatus(
     }
   }
 
-  // KB po vs service_projects owner_name
+  // KB po vs services owner_name
   const poEntry = await pool.query(
     `SELECT content FROM semo.knowledge_base
      WHERE domain = $1 AND key = 'po' AND (sub_key IS NULL OR sub_key = '')
@@ -642,8 +642,8 @@ export async function diagnoseServiceStatus(
     const sectionResult = await pool.query(
       `SELECT COUNT(*)::int as cnt
        FROM semo.service_sections
-       WHERE gfp_id = $1 AND status = 'approved'`,
-      [sp.gfp_id]
+       WHERE service_id = $1 AND status = 'approved'`,
+      [sp.service_id]
     );
     const approvedSections = sectionResult.rows[0]?.cnt ?? 0;
     if (approvedSections === 0 && sp.current_phase > 0) {

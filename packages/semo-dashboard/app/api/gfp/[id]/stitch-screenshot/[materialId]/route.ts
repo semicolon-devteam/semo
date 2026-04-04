@@ -9,7 +9,7 @@ export async function GET(
 
   const res = await query(
     `SELECT screenshot_data FROM semo.gfp_materials
-     WHERE material_id = $1 AND gfp_id = $2 AND screenshot_data IS NOT NULL`,
+     WHERE material_id = $1 AND service_id = $2 AND screenshot_data IS NOT NULL`,
     [materialId, id]
   );
 

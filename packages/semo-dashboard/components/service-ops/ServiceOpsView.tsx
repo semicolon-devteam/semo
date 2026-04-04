@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { GfpProject, ServiceFeature, ServiceKPIMetric, ServiceActionItem } from '@/types';
+import type { GfpProject, ServiceFeature, ServiceKPIMetric, ServiceActionItem, ServiceIteration } from '@/types';
 import type { ServiceOverviewKB } from '@/lib/gfp';
 import ServiceOverviewTab from './ServiceOverviewTab';
 import ServiceSprintTab from './ServiceSprintTab';
@@ -39,23 +39,26 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
   const [dbMetrics, setDbMetrics] = useState<DBKPIMetricsData | null>(null);
   const [dbActionItems, setDbActionItems] = useState<ServiceActionItem[]>([]);
   const [features, setFeatures] = useState<ServiceFeature[]>([]);
+  const [iterations, setIterations] = useState<ServiceIteration[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [ovRes, kpiRes, metricsRes, actionsRes, featRes] = await Promise.all([
+      const [ovRes, kpiRes, metricsRes, actionsRes, featRes, iterRes] = await Promise.all([
         fetch(`/api/gfp/${projectId}/overview`),
         fetch(`/api/gfp/${projectId}/kpi?limit=10`),
         fetch(`/api/gfp/${projectId}/kpi-metrics`),
         fetch(`/api/gfp/${projectId}/service-action-items`),
         fetch(`/api/gfp/${projectId}/features`),
+        fetch(`/api/gfp/${projectId}/iterations`),
       ]);
       if (ovRes.ok) setOverview(await ovRes.json());
       if (kpiRes.ok) setKbKpiData(await kpiRes.json());
       if (metricsRes.ok) setDbMetrics(await metricsRes.json());
       if (actionsRes.ok) setDbActionItems(await actionsRes.json());
       if (featRes.ok) setFeatures(await featRes.json());
+      if (iterRes.ok) setIterations(await iterRes.json());
     } catch (err) {
       console.error('Failed to load ops data:', err);
     } finally {
@@ -156,6 +159,7 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
             incidents: kbKpiData.incidents,
             projectId,
           } satisfies SprintTabData}
+          iterations={iterations}
           onRefresh={loadData}
         />
       )}
@@ -165,6 +169,7 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
           features={features}
           onRefresh={refreshFeatures}
           serviceDomain={project.service_domain}
+          iterations={iterations}
         />
       )}
     </div>

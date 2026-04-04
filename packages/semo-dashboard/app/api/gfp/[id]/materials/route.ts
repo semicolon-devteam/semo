@@ -32,7 +32,7 @@ export async function POST(
     }
 
     const material = await createMaterial({
-      gfp_id: id,
+      service_id: id,
       content,
       phase_mapping: phase_mapping as GfpPhaseMapping[] | undefined,
     });

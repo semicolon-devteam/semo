@@ -12,6 +12,7 @@ import {
   openSlackModal,
   updateSlackMessage,
   buildRejectionModalView,
+  buildFeatureSpecRejectionModalView,
 } from '@/lib/slack';
 import { executeSectionAction } from '@/lib/gfp-actions';
 import { getProject } from '@/lib/gfp';
@@ -114,6 +115,41 @@ async function handleBlockAction(payload: Record<string, unknown>): Promise<void
     return;
   }
 
+  // feature_approve_spec_{featureId}
+  if (actionId.startsWith('feature_approve_spec_')) {
+    const { projectId, featureId } = value;
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space'}/api/gfp/${projectId}/features/improve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature_id: featureId, action: 'approve-spec' }),
+    });
+
+    const channel = (payload.channel as Record<string, string>)?.id;
+    const messageTs = (payload.message as Record<string, string>)?.ts;
+    if (channel && messageTs) {
+      const statusText = res.ok ? '✅ 스펙 승인됨 — via Slack' : '❌ 스펙 승인 실패';
+      await updateSlackMessage(channel, messageTs, [
+        { type: 'section', text: { type: 'mrkdwn', text: statusText } },
+      ]);
+    }
+    return;
+  }
+
+  // feature_reject_spec_{featureId} → 거절 모달 열기
+  if (actionId.startsWith('feature_reject_spec_')) {
+    const { projectId, featureId } = value;
+    const project = await getProject(projectId);
+    await openSlackModal(
+      triggerId,
+      buildFeatureSpecRejectionModalView({
+        projectId,
+        featureId,
+        featureName: project?.project_name ?? '기능',
+      }),
+    );
+    return;
+  }
+
   // gfp_view_dashboard_* — URL 버튼이므로 Slack이 직접 처리, no-op
 }
 
@@ -121,26 +157,45 @@ async function handleBlockAction(payload: Record<string, unknown>): Promise<void
 
 async function handleViewSubmission(payload: Record<string, unknown>): Promise<void> {
   const view = payload.view as Record<string, unknown>;
-  if (!view || view.callback_id !== 'gfp_rejection_modal') return;
+  if (!view) return;
 
-  const metadata = JSON.parse(view.private_metadata as string);
-  const { gfpId, sectionId } = metadata;
-
-  // 모달 input에서 거절 사유 추출
+  const callbackId = view.callback_id as string;
   const stateValues = (view.state as Record<string, unknown>)?.values as Record<string, Record<string, Record<string, unknown>>>;
   const reviewerNote = stateValues?.rejection_reason?.reason_input?.value as string;
 
-  if (!reviewerNote) return;
+  if (callbackId === 'gfp_rejection_modal') {
+    const metadata = JSON.parse(view.private_metadata as string);
+    const { gfpId, sectionId } = metadata;
+    if (!reviewerNote) return;
 
-  const result = await executeSectionAction({
-    gfpId,
-    sectionId,
-    action: 'reject',
-    reviewerNote,
-    actionSource: 'slack',
-  });
+    const result = await executeSectionAction({
+      gfpId,
+      sectionId,
+      action: 'reject',
+      reviewerNote,
+      actionSource: 'slack',
+    });
 
-  if (result.error) {
-    console.error('[Slack Interactions] Rejection failed:', result.error);
+    if (result.error) {
+      console.error('[Slack Interactions] Rejection failed:', result.error);
+    }
+    return;
+  }
+
+  if (callbackId === 'feature_spec_rejection_modal') {
+    const metadata = JSON.parse(view.private_metadata as string);
+    const { projectId, featureId } = metadata;
+    if (!reviewerNote) return;
+
+    const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space'}/api/gfp/${projectId}/features/improve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ feature_id: featureId, action: 'reject-spec', reviewer_note: reviewerNote }),
+    });
+
+    if (!res.ok) {
+      console.error('[Slack Interactions] Feature spec rejection failed:', await res.text());
+    }
+    return;
   }
 }

@@ -287,7 +287,7 @@ export async function executeSectionAction(params: SectionActionParams): Promise
 async function handleInfraTrackApproval(
   gfpId: string,
   phase: number,
-  project: { gfp_id: string; project_name: string; service_domain: string | null; infra_phase: number | null; metadata: Record<string, unknown> },
+  project: { service_id: string; project_name: string; service_domain: string | null; infra_phase: number | null; metadata: Record<string, unknown> },
   slackCtx: { channelId: string; ownerSlackId: string | null },
 ): Promise<void> {
   const allSections = await listSections(gfpId, phase, 'infra');

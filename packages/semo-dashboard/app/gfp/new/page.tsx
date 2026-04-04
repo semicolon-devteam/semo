@@ -76,7 +76,7 @@ export default function GfpNewProjectPage() {
       });
       if (!res.ok) throw new Error('Failed to create project');
       const project = await res.json();
-      router.push(`/gfp/${project.gfp_id}`);
+      router.push(`/gfp/${project.service_id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create');
       setWizardStep('basics');

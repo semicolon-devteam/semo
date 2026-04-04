@@ -19,7 +19,7 @@ export async function GET(
   // ds-color* 섹션 조회
   const res = await query(
     `SELECT content FROM semo.gfp_phase_sections
-     WHERE gfp_id = $1 AND section_key LIKE 'ds-color%' AND status != 'rejected'
+     WHERE service_id = $1 AND section_key LIKE 'ds-color%' AND status != 'rejected'
      ORDER BY ordinal LIMIT 1`,
     [id]
   );

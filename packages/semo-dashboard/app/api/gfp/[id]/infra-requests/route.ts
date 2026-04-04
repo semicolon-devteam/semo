@@ -44,7 +44,7 @@ export async function POST(
     }
 
     const infraRequest = await createInfraRequest({
-      gfp_id: id,
+      service_id: id,
       source_phase: source_phase ?? 0,
       source_section_id,
       category,

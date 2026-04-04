@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import type { ServiceKPIMetric, ServiceActionItem } from '@/types';
+import type { ServiceKPIMetric, ServiceActionItem, ServiceIteration } from '@/types';
 import ServiceKPISection from './ServiceKPISection';
 import ServiceActionItemsSection from './ServiceActionItemsSection';
+import IterationSelector from './IterationSelector';
 
 // KB fallback types (legacy)
 interface KBSnapshot {
@@ -35,19 +37,41 @@ export interface SprintTabData {
 
 interface Props {
   data: SprintTabData;
+  iterations?: ServiceIteration[];
   onRefresh?: () => void;
 }
 
-export default function ServiceSprintTab({ data, onRefresh }: Props) {
+export default function ServiceSprintTab({ data, iterations = [], onRefresh }: Props) {
+  const [selectedIterationId, setSelectedIterationId] = useState<string | null>(null);
+
   const hasDBMetrics = data.metrics && data.metrics.length > 0;
   const hasDBActions = data.actionItems && data.actionItems.length > 0;
 
+  // Filter by selected iteration
+  const filteredMetrics = selectedIterationId && data.metrics
+    ? data.metrics.filter((m) => m.iteration_id === selectedIterationId)
+    : data.metrics;
+  const filteredActions = selectedIterationId && data.actionItems
+    ? data.actionItems.filter((a) => a.iteration_id === selectedIterationId)
+    : data.actionItems;
+
   return (
     <div className="space-y-8">
+      {/* Iteration Selector */}
+      {iterations.length > 0 && (
+        <IterationSelector
+          iterations={iterations}
+          selectedId={selectedIterationId}
+          onSelect={setSelectedIterationId}
+          projectId={data.projectId}
+          onRefresh={onRefresh ?? (() => {})}
+        />
+      )}
+
       {/* KPI Section — DB structured or KB markdown fallback */}
       {hasDBMetrics ? (
         <ServiceKPISection
-          metrics={data.metrics!}
+          metrics={filteredMetrics!}
           periods={data.periods ?? []}
           latestPeriod={data.latestPeriod ?? null}
         />
@@ -58,7 +82,7 @@ export default function ServiceSprintTab({ data, onRefresh }: Props) {
       {/* Action Items — DB structured or KB markdown fallback */}
       {hasDBActions ? (
         <ServiceActionItemsSection
-          items={data.actionItems!}
+          items={filteredActions!}
           projectId={data.projectId}
           onRefresh={onRefresh}
         />
