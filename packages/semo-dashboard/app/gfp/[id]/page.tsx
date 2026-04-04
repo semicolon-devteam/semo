@@ -137,8 +137,8 @@ export default function GfpDetailPage() {
   const [showInfraFlagModal, setShowInfraFlagModal] = useState(false);
   const [infraFlagSectionId, setInfraFlagSectionId] = useState<string | undefined>();
 
-  // eslint-disable-next-line -- pre-existing memoization pattern
   const refresh = useCallback(
+    // eslint-disable-next-line -- pre-existing memoization pattern
     async (phase?: number, track?: GfpTrack) => {
       const p = phase ?? activePhase;
       const t = track ?? activeTrack;
