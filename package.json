@@ -12,7 +12,8 @@
     "dev:web": "npm run dev --workspace=@team-semicolon/semo-office-web",
     "dev": "npm run dev:server & npm run dev:web",
     "lint": "npm run lint --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "prepare": "husky"
   },
   "keywords": [
     "semo",
@@ -30,5 +31,23 @@
     "@google-analytics/data": "^5.2.1",
     "googleapis": "^171.4.0",
     "node-pty": "^1.1.0"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "prettier": "^3.8.1"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs}": [
+      "prettier --write"
+    ],
+    "*.{json,yml,yaml}": [
+      "prettier --write"
+    ],
+    "*.md": [
+      "prettier --write"
+    ]
   }
 }

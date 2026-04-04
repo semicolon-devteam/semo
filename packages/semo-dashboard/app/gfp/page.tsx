@@ -6,7 +6,10 @@ import type { GfpProject, ServiceLifecycle } from '@/types';
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   active: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
-  paused: { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400' },
+  paused: {
+    bg: 'bg-yellow-100 dark:bg-yellow-900/30',
+    text: 'text-yellow-700 dark:text-yellow-400',
+  },
   completed: { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-400' },
 };
 
@@ -34,9 +37,7 @@ export default function GfpListPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const filtered = filter === 'all'
-    ? projects
-    : projects.filter((p) => p.lifecycle === filter);
+  const filtered = filter === 'all' ? projects : projects.filter((p) => p.lifecycle === filter);
 
   const counts = {
     all: projects.length,
@@ -56,9 +57,7 @@ export default function GfpListPage() {
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            서비스 프로젝트
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">서비스 프로젝트</h1>
           <p className="text-gray-600 dark:text-gray-400">
             서비스 라이프사이클 관리 — {filtered.length}개 프로젝트
           </p>
@@ -95,7 +94,9 @@ export default function GfpListPage() {
       ) : filtered.length === 0 ? (
         <div className="text-center py-16 text-gray-500 dark:text-gray-400">
           <p className="text-lg mb-2">
-            {filter === 'all' ? '아직 프로젝트가 없습니다' : `${tabs.find(t => t.key === filter)?.label.split(' ')[0]} 프로젝트가 없습니다`}
+            {filter === 'all'
+              ? '아직 프로젝트가 없습니다'
+              : `${tabs.find((t) => t.key === filter)?.label.split(' ')[0]} 프로젝트가 없습니다`}
           </p>
           {filter === 'all' && (
             <p className="text-sm">&quot;+ 새 프로젝트&quot;를 클릭하여 새 서비스를 시작하세요.</p>
@@ -119,23 +120,26 @@ export default function GfpListPage() {
                     {project.project_name}
                   </h2>
                   <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${lcBadge.color}`}>
+                    <span
+                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${lcBadge.color}`}
+                    >
                       {lcBadge.label}
                     </span>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}>
+                    <span
+                      className={`text-xs font-medium px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}
+                    >
                       {project.status}
                     </span>
                   </div>
                 </div>
                 <div className="space-y-1.5 text-sm text-gray-600 dark:text-gray-400">
                   <p>오너: {project.owner_name}</p>
-                  {project.service_domain && (
-                    <p>도메인: {project.service_domain}</p>
-                  )}
+                  {project.service_domain && <p>도메인: {project.service_domain}</p>}
                   {isOps ? (
                     <p>
                       {project.launched_at
-                        ? `운영 D+${Math.floor((Date.now() - new Date(project.launched_at).getTime()) / 86400000)}`
+                        ? // eslint-disable-next-line -- Date.now() in render
+                          `운영 D+${Math.floor((Date.now() - new Date(project.launched_at).getTime()) / 86400000)}`
                         : '운영 중'}
                     </p>
                   ) : (

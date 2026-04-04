@@ -13,7 +13,15 @@ import GfpDesignStepNav from '@/components/gfp/GfpDesignStepNav';
 import GfpPresetInfoPanel from '@/components/gfp/GfpPresetInfoPanel';
 import GfpInfraRequestPanel from '@/components/gfp/GfpInfraRequestPanel';
 import GfpInfraFlagModal from '@/components/gfp/GfpInfraFlagModal';
-import type { GfpProject, GfpPhaseSection, GfpResearchTask, GfpInfraRequest, DesignStep, GfpPresetId, GfpTrack } from '@/types';
+import type {
+  GfpProject,
+  GfpPhaseSection,
+  GfpResearchTask,
+  GfpInfraRequest,
+  DesignStep,
+  GfpPresetId,
+  GfpTrack,
+} from '@/types';
 import { DESIGN_STEPS, matchesStep } from '@/types';
 import type { PhaseProgress } from '@/lib/gfp';
 import { PHASE_LABELS, INFRA_PHASE_LABELS } from '@/lib/gfp-phases';
@@ -30,15 +38,23 @@ async function fetchProjectData(id: string): Promise<ProjectWithProgress | null>
     const res = await fetch(`/api/gfp/${id}`);
     if (!res.ok) return null;
     return res.json();
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
-async function fetchSectionsData(id: string, phase: number, track: GfpTrack = 'plan'): Promise<GfpPhaseSection[]> {
+async function fetchSectionsData(
+  id: string,
+  phase: number,
+  track: GfpTrack = 'plan',
+): Promise<GfpPhaseSection[]> {
   try {
     const res = await fetch(`/api/gfp/${id}/sections?phase=${phase}&track=${track}`);
     if (!res.ok) return [];
     return res.json();
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 async function fetchResearchData(id: string): Promise<GfpResearchTask[]> {
@@ -46,7 +62,9 @@ async function fetchResearchData(id: string): Promise<GfpResearchTask[]> {
     const res = await fetch(`/api/gfp/${id}/research`);
     if (!res.ok) return [];
     return res.json();
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 async function fetchInfraRequests(id: string): Promise<GfpInfraRequest[]> {
@@ -54,7 +72,9 @@ async function fetchInfraRequests(id: string): Promise<GfpInfraRequest[]> {
     const res = await fetch(`/api/gfp/${id}/infra-requests`);
     if (!res.ok) return [];
     return res.json();
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 async function fetchInfraProgress(id: string): Promise<PhaseProgress[]> {
@@ -66,7 +86,14 @@ async function fetchInfraProgress(id: string): Promise<PhaseProgress[]> {
     const phaseMap = new Map<number, PhaseProgress>();
     for (const s of sections) {
       if (!phaseMap.has(s.phase)) {
-        phaseMap.set(s.phase, { phase: s.phase, total: 0, approved: 0, rejected: 0, pending: 0, draft: 0 });
+        phaseMap.set(s.phase, {
+          phase: s.phase,
+          total: 0,
+          approved: 0,
+          rejected: 0,
+          pending: 0,
+          draft: 0,
+        });
       }
       const p = phaseMap.get(s.phase)!;
       p.total++;
@@ -76,7 +103,9 @@ async function fetchInfraProgress(id: string): Promise<PhaseProgress[]> {
       else p.draft++;
     }
     return Array.from(phaseMap.values()).sort((a, b) => a.phase - b.phase);
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 }
 
 export default function GfpDetailPage() {
@@ -108,37 +137,45 @@ export default function GfpDetailPage() {
   const [showInfraFlagModal, setShowInfraFlagModal] = useState(false);
   const [infraFlagSectionId, setInfraFlagSectionId] = useState<string | undefined>();
 
-  const refresh = useCallback(async (phase?: number, track?: GfpTrack) => {
-    const p = phase ?? activePhase;
-    const t = track ?? activeTrack;
-    const [proj, secs, tasks, infraReqs, infraProg] = await Promise.all([
-      fetchProjectData(id),
-      fetchSectionsData(id, p, t),
-      fetchResearchData(id),
-      fetchInfraRequests(id),
-      fetchInfraProgress(id),
-    ]);
-    setProject(proj);
-    setSections(secs);
-    setResearchTasks(tasks);
-    setInfraRequests(infraReqs);
-    setInfraProgress(infraProg);
-    setLoading(false);
-  }, [id, activePhase, activeTrack]);
+  // eslint-disable-next-line -- pre-existing memoization pattern
+  const refresh = useCallback(
+    async (phase?: number, track?: GfpTrack) => {
+      const p = phase ?? activePhase;
+      const t = track ?? activeTrack;
+      const [proj, secs, tasks, infraReqs, infraProg] = await Promise.all([
+        fetchProjectData(id),
+        fetchSectionsData(id, p, t),
+        fetchResearchData(id),
+        fetchInfraRequests(id),
+        fetchInfraProgress(id),
+      ]);
+      setProject(proj);
+      setSections(secs);
+      setResearchTasks(tasks);
+      setInfraRequests(infraReqs);
+      setInfraProgress(infraProg);
+      setLoading(false);
+    },
+    [id, activePhase, activeTrack],
+  );
 
   // Initial load: project 먼저 가져온 뒤 올바른 Phase로 섹션 로드
   if (loading && !initialized) {
     setInitialized(true);
     (async () => {
       const proj = await fetchProjectData(id);
-      if (!proj) { setLoading(false); return; }
+      if (!proj) {
+        setLoading(false);
+        return;
+      }
       const initTrack = trackParam ?? 'plan';
       // URL ?phase=N 우선, 없으면 current_phase (or infra_phase for infra track)
-      const targetPhase = phaseParam !== null
-        ? parseInt(phaseParam, 10)
-        : initTrack === 'infra'
-          ? Math.min(proj.infra_phase ?? 0, 2)
-          : (proj.current_phase ?? 0);
+      const targetPhase =
+        phaseParam !== null
+          ? parseInt(phaseParam, 10)
+          : initTrack === 'infra'
+            ? Math.min(proj.infra_phase ?? 0, 2)
+            : (proj.current_phase ?? 0);
       setActivePhase(targetPhase);
       setActiveTrack(initTrack);
       const [secs, tasks, infraReqs, infraProg] = await Promise.all([
@@ -154,7 +191,9 @@ export default function GfpDetailPage() {
       setInfraProgress(infraProg);
       // Phase 4: fetch design step from project metadata (URL ?step= overrides)
       if (targetPhase === 4 && initTrack === 'plan') {
-        const ds = stepParam ? parseInt(stepParam, 10) : ((proj.metadata?.design_step as number) ?? 1);
+        const ds = stepParam
+          ? parseInt(stepParam, 10)
+          : ((proj.metadata?.design_step as number) ?? 1);
         setActiveDesignStep((ds >= 1 && ds <= 5 ? ds : 1) as DesignStep);
       }
       setLoading(false);
@@ -176,7 +215,9 @@ export default function GfpDetailPage() {
               } else {
                 alert('승인 실패: ' + (await res.text()));
               }
-            } catch { alert('승인 처리 중 오류 발생'); }
+            } catch {
+              alert('승인 처리 중 오류 발생');
+            }
           }
         } else if (actionParam === 'reject') {
           const reason = window.prompt('거절 사유를 입력해주세요:');
@@ -185,7 +226,11 @@ export default function GfpDetailPage() {
               const res = await fetch(`/api/gfp/${id}/sections`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sectionId: sectionIdParam, action: 'reject', reviewerNote: reason }),
+                body: JSON.stringify({
+                  sectionId: sectionIdParam,
+                  action: 'reject',
+                  reviewerNote: reason,
+                }),
               });
               if (res.ok) {
                 alert('거절 완료');
@@ -193,7 +238,9 @@ export default function GfpDetailPage() {
               } else {
                 alert('거절 실패: ' + (await res.text()));
               }
-            } catch { alert('거절 처리 중 오류 발생'); }
+            } catch {
+              alert('거절 처리 중 오류 발생');
+            }
           }
         }
         // URL에서 action param 제거 (뒤로가기 시 재실행 방지)
@@ -217,9 +264,8 @@ export default function GfpDetailPage() {
 
   async function handleTrackChange(track: GfpTrack) {
     setActiveTrack(track);
-    const targetPhase = track === 'infra'
-      ? Math.min(project?.infra_phase ?? 0, 2)
-      : (project?.current_phase ?? 0);
+    const targetPhase =
+      track === 'infra' ? Math.min(project?.infra_phase ?? 0, 2) : (project?.current_phase ?? 0);
     setActivePhase(targetPhase);
     const secs = await fetchSectionsData(id, targetPhase, track);
     setSections(secs);
@@ -253,9 +299,7 @@ export default function GfpDetailPage() {
   }
 
   async function handleApproveAll() {
-    const targets = sections.filter(
-      (s) => s.status !== 'approved' && s.status !== 'rejected'
-    );
+    const targets = sections.filter((s) => s.status !== 'approved' && s.status !== 'rejected');
     if (targets.length === 0) return;
     setApprovingAll(true);
     for (const s of targets) {
@@ -321,9 +365,10 @@ export default function GfpDetailPage() {
 
   // Phase 3: filter sections by active design step
   const activeStepDef = DESIGN_STEPS.find((s) => s.step === activeDesignStep);
-  const phaseSections = showStitch && activeStepDef
-    ? sections.filter((s) => matchesStep(s.section_key, activeStepDef))
-    : sections;
+  const phaseSections =
+    showStitch && activeStepDef
+      ? sections.filter((s) => matchesStep(s.section_key, activeStepDef))
+      : sections;
 
   // Build step statuses for the nav
   const stepStatuses: Record<number, 'pending' | 'in-progress' | 'completed'> = {};
@@ -344,238 +389,259 @@ export default function GfpDetailPage() {
 
   return (
     <PoProfileProvider value={poProfile}>
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <div className="flex items-center gap-3 mb-1">
-            <Link href="/gfp" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm">
-              GFP
-            </Link>
-            <span className="text-gray-300 dark:text-gray-600">/</span>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              {project.project_name}
-            </h1>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
-            <span>오너: {project.owner_name}</span>
-            {project.service_domain && <span>| 도메인: {project.service_domain}</span>}
-            {(() => {
-              const pid = (project.metadata as Record<string, unknown>)?.preset as GfpPresetId | undefined;
-              const pdef = pid && pid !== 'standard' ? GFP_PRESETS[pid] : null;
-              return pdef ? (
-                <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-                  {pdef.label}
-                </span>
-              ) : null;
-            })()}
-          </div>
-        </div>
-      </div>
-
-      {/* Phase Navigation */}
-      <div className="mb-6">
-        <GfpPhaseNav
-          currentPhase={activePhase}
-          progress={project.progress}
-          onPhaseClick={handlePhaseClick}
-          skipCcPhases={(() => {
-            const pc = (project.metadata as Record<string, unknown>)?.preset_config as Record<string, unknown> | undefined;
-            return (pc?.skip_cc as number[]) ?? [];
-          })()}
-          activeTrack={activeTrack}
-          infraPhase={project.infra_phase}
-          infraProgress={infraProgress}
-          onTrackChange={hasInfraTrack ? handleTrackChange : undefined}
-        />
-      </div>
-
-      {/* Progress Overview */}
-      {project.progress.length > 0 && activeTrack === 'plan' && (
-        <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">전체 진행률</h3>
-          <GfpProgressBar progress={project.progress} />
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Main content — Sections */}
-        <div className="lg:col-span-2 space-y-4">
-          {/* Phase 3: Design Step Navigation */}
-          {showStitch && (
-            <div className="mb-4">
-              <GfpDesignStepNav
-                currentStep={activeDesignStep}
-                stepStatuses={stepStatuses}
-                onStepClick={setActiveDesignStep}
-              />
-            </div>
-          )}
-
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {activeTrack === 'infra' ? `인프라 ${activePhase}단계` : `${activePhase}단계`}: {phaseLabels[activePhase] ?? `${activePhase}단계`}
-              {showStitch && activeStepDef && (
-                <span className="text-sm font-normal text-purple-600 dark:text-purple-400 ml-2">
-                  / {activeStepDef.label}
-                </span>
-              )}
-            </h2>
-            <div className="flex items-center gap-3">
-              {/* Infra flag button (only on plan track) */}
-              {activeTrack === 'plan' && hasInfraTrack && (
-                <button
-                  onClick={() => { setInfraFlagSectionId(undefined); setShowInfraFlagModal(true); }}
-                  className="text-xs px-3 py-1.5 bg-orange-100 hover:bg-orange-200 dark:bg-orange-900/20 dark:hover:bg-orange-900/40 text-orange-700 dark:text-orange-400 font-medium rounded-md transition-colors"
-                >
-                  인프라 요구사항
-                </button>
-              )}
-              {phaseSections.filter((s) => s.status !== 'approved' && s.status !== 'rejected').length > 0 && (
-                <button
-                  onClick={handleApproveAll}
-                  disabled={approvingAll}
-                  className="text-xs px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-md transition-colors inline-flex items-center gap-1.5"
-                >
-                  {approvingAll && (
-                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  )}
-                  전체승인 ({phaseSections.filter((s) => s.status !== 'approved' && s.status !== 'rejected').length})
-                </button>
-              )}
-              <button
-                onClick={() => setShowNewSection(!showNewSection)}
-                className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <Link
+                href="/gfp"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm"
               >
-                {showNewSection ? '취소' : '+ 섹션 추가'}
-              </button>
+                GFP
+              </Link>
+              <span className="text-gray-300 dark:text-gray-600">/</span>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                {project.project_name}
+              </h1>
+            </div>
+            <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <span>오너: {project.owner_name}</span>
+              {project.service_domain && <span>| 도메인: {project.service_domain}</span>}
+              {(() => {
+                const pid = (project.metadata as Record<string, unknown>)?.preset as
+                  | GfpPresetId
+                  | undefined;
+                const pdef = pid && pid !== 'standard' ? GFP_PRESETS[pid] : null;
+                return pdef ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                    {pdef.label}
+                  </span>
+                ) : null;
+              })()}
             </div>
           </div>
+        </div>
 
-          {/* New section form */}
-          {showNewSection && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">섹션 키</label>
-                  <input
-                    type="text"
-                    value={newSection.section_key}
-                    onChange={(e) => setNewSection((s) => ({ ...s, section_key: e.target.value }))}
-                    placeholder="예: overview, core-value"
-                    className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">제목</label>
-                  <input
-                    type="text"
-                    value={newSection.title}
-                    onChange={(e) => setNewSection((s) => ({ ...s, title: e.target.value }))}
-                    placeholder="섹션 제목"
-                    className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">내용 (Markdown)</label>
-                <textarea
-                  value={newSection.content}
-                  onChange={(e) => setNewSection((s) => ({ ...s, content: e.target.value }))}
-                  placeholder="섹션 내용..."
-                  rows={4}
-                  className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+        {/* Phase Navigation */}
+        <div className="mb-6">
+          <GfpPhaseNav
+            currentPhase={activePhase}
+            progress={project.progress}
+            onPhaseClick={handlePhaseClick}
+            skipCcPhases={(() => {
+              const pc = (project.metadata as Record<string, unknown>)?.preset_config as
+                | Record<string, unknown>
+                | undefined;
+              return (pc?.skip_cc as number[]) ?? [];
+            })()}
+            activeTrack={activeTrack}
+            infraPhase={project.infra_phase}
+            infraProgress={infraProgress}
+            onTrackChange={hasInfraTrack ? handleTrackChange : undefined}
+          />
+        </div>
+
+        {/* Progress Overview */}
+        {project.progress.length > 0 && activeTrack === 'plan' && (
+          <div className="mb-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+              전체 진행률
+            </h3>
+            <GfpProgressBar progress={project.progress} />
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main content — Sections */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Phase 3: Design Step Navigation */}
+            {showStitch && (
+              <div className="mb-4">
+                <GfpDesignStepNav
+                  currentStep={activeDesignStep}
+                  stepStatuses={stepStatuses}
+                  onStepClick={setActiveDesignStep}
                 />
               </div>
-              <div className="flex justify-end">
+            )}
+
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                {activeTrack === 'infra' ? `인프라 ${activePhase}단계` : `${activePhase}단계`}:{' '}
+                {phaseLabels[activePhase] ?? `${activePhase}단계`}
+                {showStitch && activeStepDef && (
+                  <span className="text-sm font-normal text-purple-600 dark:text-purple-400 ml-2">
+                    / {activeStepDef.label}
+                  </span>
+                )}
+              </h2>
+              <div className="flex items-center gap-3">
+                {/* Infra flag button (only on plan track) */}
+                {activeTrack === 'plan' && hasInfraTrack && (
+                  <button
+                    onClick={() => {
+                      setInfraFlagSectionId(undefined);
+                      setShowInfraFlagModal(true);
+                    }}
+                    className="text-xs px-3 py-1.5 bg-orange-100 hover:bg-orange-200 dark:bg-orange-900/20 dark:hover:bg-orange-900/40 text-orange-700 dark:text-orange-400 font-medium rounded-md transition-colors"
+                  >
+                    인프라 요구사항
+                  </button>
+                )}
+                {phaseSections.filter((s) => s.status !== 'approved' && s.status !== 'rejected')
+                  .length > 0 && (
+                  <button
+                    onClick={handleApproveAll}
+                    disabled={approvingAll}
+                    className="text-xs px-3 py-1.5 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-md transition-colors inline-flex items-center gap-1.5"
+                  >
+                    {approvingAll && (
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    )}
+                    전체승인 (
+                    {
+                      phaseSections.filter(
+                        (s) => s.status !== 'approved' && s.status !== 'rejected',
+                      ).length
+                    }
+                    )
+                  </button>
+                )}
                 <button
-                  onClick={handleAddSection}
-                  disabled={!newSection.section_key.trim() || !newSection.title.trim()}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-medium rounded-md transition-colors"
+                  onClick={() => setShowNewSection(!showNewSection)}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                 >
-                  섹션 추가
+                  {showNewSection ? '취소' : '+ 섹션 추가'}
                 </button>
               </div>
             </div>
-          )}
 
-          {/* Section cards */}
-          {phaseSections.length === 0 ? (
-            <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-              <p className="text-sm">이 Phase에 섹션이 없습니다.</p>
-              <p className="text-xs mt-1">수동으로 섹션을 추가하거나 기획 문서를 업로드하세요.</p>
-            </div>
-          ) : (
-            phaseSections.map((section) => (
-              <GfpSectionCard
-                key={section.section_id}
-                section={section}
-                gfpId={id}
-                focused={sectionParam ? section.section_key === sectionParam : undefined}
-                onApprove={handleApprove}
-                onReject={handleReject}
-                onUndoReject={handleUndoReject}
-                onQASaved={refresh}
-              />
-            ))
-          )}
+            {/* New section form */}
+            {showNewSection && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      섹션 키
+                    </label>
+                    <input
+                      type="text"
+                      value={newSection.section_key}
+                      onChange={(e) =>
+                        setNewSection((s) => ({ ...s, section_key: e.target.value }))
+                      }
+                      placeholder="예: overview, core-value"
+                      className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      제목
+                    </label>
+                    <input
+                      type="text"
+                      value={newSection.title}
+                      onChange={(e) => setNewSection((s) => ({ ...s, title: e.target.value }))}
+                      placeholder="섹션 제목"
+                      className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    내용 (Markdown)
+                  </label>
+                  <textarea
+                    value={newSection.content}
+                    onChange={(e) => setNewSection((s) => ({ ...s, content: e.target.value }))}
+                    placeholder="섹션 내용..."
+                    rows={4}
+                    className="w-full px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-y"
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleAddSection}
+                    disabled={!newSection.section_key.trim() || !newSection.title.trim()}
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-medium rounded-md transition-colors"
+                  >
+                    섹션 추가
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Section cards */}
+            {phaseSections.length === 0 ? (
+              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                <p className="text-sm">이 Phase에 섹션이 없습니다.</p>
+                <p className="text-xs mt-1">수동으로 섹션을 추가하거나 기획 문서를 업로드하세요.</p>
+              </div>
+            ) : (
+              phaseSections.map((section) => (
+                <GfpSectionCard
+                  key={section.section_id}
+                  section={section}
+                  gfpId={id}
+                  focused={sectionParam ? section.section_key === sectionParam : undefined}
+                  onApprove={handleApprove}
+                  onReject={handleReject}
+                  onUndoReject={handleUndoReject}
+                  onQASaved={refresh}
+                />
+              ))
+            )}
+          </div>
+
+          {/* Sidebar — Material Upload + Research + Infra */}
+          <div>
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg mb-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            >
+              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">도구</span>
+              <span className="text-xs text-gray-500">{sidebarOpen ? '▲' : '▼'}</span>
+            </button>
+            {sidebarOpen && (
+              <div className="space-y-4">
+                <GfpPresetInfoPanel metadata={project.metadata as Record<string, unknown>} />
+                {/* Infra request panel (always visible if infra track exists) */}
+                {hasInfraTrack && (
+                  <GfpInfraRequestPanel
+                    gfpId={id}
+                    requests={infraRequests}
+                    onRefresh={() => refresh()}
+                  />
+                )}
+                <GfpMaterialUpload gfpId={id} onUploaded={refresh} />
+                {showStitch && (
+                  <GfpStitchPanel
+                    gfpId={id}
+                    sections={sections}
+                    designStep={activeDesignStep}
+                    onUploaded={refresh}
+                  />
+                )}
+                {showResearch && (
+                  <GfpResearchPanel gfpId={id} tasks={researchTasks} onTaskCreated={refresh} />
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Sidebar — Material Upload + Research + Infra */}
-        <div>
-          <button
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg mb-2 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          >
-            <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">도구</span>
-            <span className="text-xs text-gray-500">{sidebarOpen ? '▲' : '▼'}</span>
-          </button>
-          {sidebarOpen && (
-            <div className="space-y-4">
-              <GfpPresetInfoPanel metadata={project.metadata as Record<string, unknown>} />
-              {/* Infra request panel (always visible if infra track exists) */}
-              {hasInfraTrack && (
-                <GfpInfraRequestPanel
-                  gfpId={id}
-                  requests={infraRequests}
-                  onRefresh={() => refresh()}
-                />
-              )}
-              <GfpMaterialUpload
-                gfpId={id}
-                onUploaded={refresh}
-              />
-              {showStitch && (
-                <GfpStitchPanel
-                  gfpId={id}
-                  sections={sections}
-                  designStep={activeDesignStep}
-                  onUploaded={refresh}
-                />
-              )}
-              {showResearch && (
-                <GfpResearchPanel
-                  gfpId={id}
-                  tasks={researchTasks}
-                  onTaskCreated={refresh}
-                />
-              )}
-            </div>
-          )}
-        </div>
+        {/* Infra Flag Modal */}
+        {showInfraFlagModal && (
+          <GfpInfraFlagModal
+            gfpId={id}
+            sourcePhase={activePhase}
+            sourceSectionId={infraFlagSectionId}
+            onClose={() => setShowInfraFlagModal(false)}
+            onCreated={() => refresh()}
+          />
+        )}
       </div>
-
-      {/* Infra Flag Modal */}
-      {showInfraFlagModal && (
-        <GfpInfraFlagModal
-          gfpId={id}
-          sourcePhase={activePhase}
-          sourceSectionId={infraFlagSectionId}
-          onClose={() => setShowInfraFlagModal(false)}
-          onCreated={() => refresh()}
-        />
-      )}
-    </div>
     </PoProfileProvider>
   );
 }

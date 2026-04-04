@@ -1,0 +1,8 @@
+node_modules
+.next
+dist
+build
+*.tgz
+supabase/.temp
+packages/semo-dashboard/playwright-report
+packages/semo-dashboard/test-results
