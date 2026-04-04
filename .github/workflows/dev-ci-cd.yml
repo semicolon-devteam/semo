@@ -22,7 +22,7 @@ jobs:
       source_repository: semo
       environment: dev
       ref: dev
-      dockerfile_name: Dockerfile-next
+      dockerfile_name: Dockerfile
       context_path: ./source/packages/semo-dashboard
     secrets:
       ACTION_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
@@ -62,11 +62,57 @@ jobs:
           else
             echo "result=❌ 실패" >> $GITHUB_OUTPUT
             echo "is_failure=true" >> $GITHUB_OUTPUT
+            if [[ "${{ needs.build-and-deploy.result }}" != "success" ]]; then
+              echo "failed_job=build-and-deploy" >> $GITHUB_OUTPUT
+            elif [[ "${{ needs.kustomize-version-update.result }}" != "success" ]]; then
+              echo "failed_job=kustomize-version-update" >> $GITHUB_OUTPUT
+            fi
           fi
           COMMIT_TITLE=$(echo "${{ github.event.head_commit.message }}" | head -1)
           echo "commit_title=${COMMIT_TITLE}" >> $GITHUB_OUTPUT
 
-      - name: Send Slack notification
+      - name: Check for existing CI issue
+        if: steps.status.outputs.is_failure == 'true'
+        id: check-existing
+        run: |
+          EXISTING=$(gh issue list --repo ${{ github.repository }} \
+            --label ci-failure --state open \
+            --search "in:title ${{ github.sha }}" \
+            --json number --jq '.[0].number // empty')
+          echo "existing_issue=${EXISTING}" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.SOURCE_REPO_TOKEN }}
+
+      - name: Create GitHub Issue on failure
+        if: steps.status.outputs.is_failure == 'true' && steps.check-existing.outputs.existing_issue == ''
+        uses: actions/github-script@v7
+        id: create-issue
+        with:
+          github-token: ${{ secrets.SOURCE_REPO_TOKEN }}
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `[CI 실패] ${context.sha.substring(0, 7)} — ${{ steps.status.outputs.failed_job }}`,
+              body: [
+                '## 빌드 실패 리포트',
+                '',
+                '| 항목 | 값 |',
+                '|------|------|',
+                '| 환경 | dev |',
+                `| 브랜치 | \`${{ github.ref_name }}\` |`,
+                `| 커밋 | \`${context.sha.substring(0, 7)}\` — ${{ steps.status.outputs.commit_title }} |`,
+                `| 작성자 | ${{ github.actor }} |`,
+                `| 실패 Job | \`${{ steps.status.outputs.failed_job }}\` |`,
+                `| Actions Run | [보기](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}) |`,
+              ].join('\n'),
+              labels: ['bug', 'ci-failure']
+            });
+            core.setOutput('issue_number', issue.data.number);
+            core.setOutput('issue_url', issue.data.html_url);
+
+      - name: Send Slack notification (success)
+        if: steps.status.outputs.is_failure == 'false'
         uses: slackapi/slack-github-action@v2
         with:
           method: chat.postMessage
@@ -86,33 +132,63 @@ jobs:
                 {
                   "type": "section",
                   "fields": [
-                    {
-                      "type": "mrkdwn",
-                      "text": "*환경:*\ndev"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*브랜치:*\n${{ github.ref_name }}"
-                    },
-                    {
-                      "type": "mrkdwn",
-                      "text": "*작성자:*\n${{ github.actor }}"
-                    }
+                    { "type": "mrkdwn", "text": "*환경:*\ndev" },
+                    { "type": "mrkdwn", "text": "*브랜치:*\n${{ github.ref_name }}" },
+                    { "type": "mrkdwn", "text": "*작성자:*\n${{ github.actor }}" }
                   ]
                 },
                 {
                   "type": "section",
+                  "text": { "type": "mrkdwn", "text": "*커밋:* `${{ steps.status.outputs.commit_title }}`" }
+                },
+                {
+                  "type": "section",
+                  "text": { "type": "mrkdwn", "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|워크플로우 보기>" }
+                }
+              ]
+            }
+
+      - name: Send Slack notification (failure)
+        if: steps.status.outputs.is_failure == 'true'
+        uses: slackapi/slack-github-action@v2
+        with:
+          method: chat.postMessage
+          token: ${{ secrets.INFRACLAW_TOKEN }}
+          payload: |
+            {
+              "channel": "C0AKZRPKJU8",
+              "text": "🔨 [semo] 개발환경 빌드 ${{ steps.status.outputs.result }} — <@U0AF1RK0E67> 빌드 실패 확인 필요",
+              "blocks": [
+                {
+                  "type": "header",
                   "text": {
-                    "type": "mrkdwn",
-                    "text": "*커밋:* `${{ steps.status.outputs.commit_title }}`"
+                    "type": "plain_text",
+                    "text": "🔨 [semo] 개발환경 빌드 ${{ steps.status.outputs.result }}"
                   }
                 },
                 {
                   "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|워크플로우 보기>${{ steps.status.outputs.is_failure == 'true' && '\n\n<@U0AF1RK0E67> 빌드 실패 확인 필요' || '' }}"
-                  }
+                  "fields": [
+                    { "type": "mrkdwn", "text": "*환경:*\ndev" },
+                    { "type": "mrkdwn", "text": "*브랜치:*\n${{ github.ref_name }}" },
+                    { "type": "mrkdwn", "text": "*작성자:*\n${{ github.actor }}" }
+                  ]
+                },
+                {
+                  "type": "section",
+                  "text": { "type": "mrkdwn", "text": "*커밋:* `${{ steps.status.outputs.commit_title }}`" }
+                },
+                {
+                  "type": "section",
+                  "text": { "type": "mrkdwn", "text": "*실패 단계:* `${{ steps.status.outputs.failed_job }}`" }
+                },
+                {
+                  "type": "section",
+                  "text": { "type": "mrkdwn", "text": "<${{ steps.create-issue.outputs.issue_url || format('{0}/{1}/actions/runs/{2}', github.server_url, github.repository, github.run_id) }}|${{ steps.create-issue.outputs.issue_number && format('GitHub 이슈 #{0}', steps.create-issue.outputs.issue_number) || '워크플로우 보기' }}>" }
+                },
+                {
+                  "type": "section",
+                  "text": { "type": "mrkdwn", "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|워크플로우 보기>\n\n<@U0AF1RK0E67> 빌드 실패 확인 필요" }
                 }
               ]
             }

@@ -1,3 +1,17 @@
 {
-  "mcpServers": {}
+  "mcpServers": {},
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/reus/.openclaw-shared/hooks/decision-reminder.sh",
+            "timeout": 15000
+          }
+        ]
+      }
+    ]
+  }
 }

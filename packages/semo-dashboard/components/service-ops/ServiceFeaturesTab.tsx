@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import type { ServiceFeature } from '@/types';
+import type { ServiceFeature, FeatureDiscoverySession } from '@/types';
+import FeatureDiscoveryReview from './FeatureDiscoveryReview';
+import FeatureSpecEditor from './FeatureSpecEditor';
 
 interface Props {
   projectId: string;
@@ -30,6 +32,9 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
   const [editingFeature, setEditingFeature] = useState<ServiceFeature | null>(null);
   const [showImproveModal, setShowImproveModal] = useState<ServiceFeature | null>(null);
   const [saving, setSaving] = useState(false);
+  const [discoverySession, setDiscoverySession] = useState<FeatureDiscoverySession | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [specFeature, setSpecFeature] = useState<ServiceFeature | null>(null);
 
   // Form state
   const [form, setForm] = useState({ name: '', description: '', category: 'core', status: 'active', parent_id: '' });
@@ -128,6 +133,58 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
     await onRefresh();
   };
 
+  const startDiscovery = async () => {
+    setScanning(true);
+    try {
+      const res = await fetch(`/api/gfp/${projectId}/features/discover`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`오류: ${err.error}`);
+        setScanning(false);
+        return;
+      }
+      const { session_id } = await res.json();
+      // 폴링으로 완료 대기
+      const poll = setInterval(async () => {
+        const statusRes = await fetch(`/api/gfp/${projectId}/features/discover?session_id=${session_id}`);
+        if (statusRes.ok) {
+          const session = await statusRes.json() as FeatureDiscoverySession;
+          if (session.status === 'candidates_ready') {
+            clearInterval(poll);
+            setScanning(false);
+            setDiscoverySession(session);
+          } else if (session.status === 'failed') {
+            clearInterval(poll);
+            setScanning(false);
+            alert(`스캔 실패: ${session.error || '알 수 없는 오류'}`);
+          }
+        }
+      }, 5000);
+      // 5분 타임아웃
+      setTimeout(() => { clearInterval(poll); setScanning(false); }, 300000);
+    } catch {
+      setScanning(false);
+    }
+  };
+
+  const startConversation = async () => {
+    const res = await fetch(`/api/gfp/${projectId}/features/conversation`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'create' }),
+    });
+    if (res.ok) {
+      alert('SemiClaw에게 기능 기획 대화가 시작되었습니다. Slack을 확인하세요.');
+    } else {
+      const err = await res.json();
+      alert(`오류: ${err.error}`);
+    }
+  };
+
   const renderFeatureItem = (f: ServiceFeature, depth = 0) => {
     const badge = STATUS_BADGES[f.status] || STATUS_BADGES.active;
     const children = childMap.get(f.feature_id) || [];
@@ -141,7 +198,7 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
         >
           {children.length > 0 && <span className="text-zinc-500 text-xs">&#9656;</span>}
           <span className={`px-1.5 py-0.5 rounded text-[10px] ${badge.color} text-white`}>{badge.label}</span>
-          <span className="text-sm text-zinc-200 flex-1">{f.name}</span>
+          <button onClick={() => setSpecFeature(f)} className="text-sm text-zinc-200 flex-1 text-left hover:text-blue-300">{f.name}</button>
           {issueUrl && (
             <a href={issueUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline">
               Issue
@@ -172,9 +229,24 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">기능 관리</h2>
-        <button onClick={openCreate} className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-500">
-          + 기능 추가
-        </button>
+        <div className="flex gap-2">
+          <button onClick={openCreate} className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-500">
+            + 기능 추가
+          </button>
+          <button
+            onClick={startConversation}
+            className="px-3 py-1.5 bg-zinc-700 text-zinc-200 text-sm rounded hover:bg-zinc-600"
+          >
+            봇과 기획
+          </button>
+          <button
+            onClick={startDiscovery}
+            disabled={scanning}
+            className="px-3 py-1.5 bg-zinc-700 text-zinc-200 text-sm rounded hover:bg-zinc-600 disabled:opacity-50"
+          >
+            {scanning ? '스캔 중...' : '기능 스캔'}
+          </button>
+        </div>
       </div>
 
       {/* Feature list grouped by category */}
@@ -346,6 +418,28 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
             </div>
           </div>
         </div>
+      )}
+
+      {/* Discovery Review Modal */}
+      {discoverySession && discoverySession.status === 'candidates_ready' && (
+        <FeatureDiscoveryReview
+          projectId={projectId}
+          sessionId={discoverySession.session_id}
+          candidates={discoverySession.candidates}
+          screenshots={discoverySession.screenshots}
+          onClose={() => setDiscoverySession(null)}
+          onConfirm={onRefresh}
+        />
+      )}
+
+      {/* Feature Spec Editor */}
+      {specFeature && (
+        <FeatureSpecEditor
+          feature={specFeature}
+          projectId={projectId}
+          onClose={() => setSpecFeature(null)}
+          onRefresh={onRefresh}
+        />
       )}
     </div>
   );

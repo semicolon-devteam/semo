@@ -524,4 +524,182 @@ export function registerSessionsCommands(program: Command): void {
         await closeConnection();
       }
     });
+
+  // ── semo sessions digest ──────────────────────────────────────────────────
+  sessionsCmd
+    .command("digest")
+    .description("세션 transcript에서 미기록 의사결정 추출")
+    .option("--transcript <path>", "transcript JSONL 파일 경로")
+    .option("--session-dir <dir>", "세션 디렉토리 (최신 transcript 자동 선택)")
+    .option("--hours <n>", "최근 N시간 내 transcript만 (session-dir 사용 시)", "24")
+    .option("--format <type>", "출력 형식 (table|json)", "table")
+    .option("--output <path>", "결과를 파일로 출력")
+    .action(async (options) => {
+      // transcript 파일 찾기
+      let transcripts: string[] = [];
+
+      if (options.transcript) {
+        if (!fs.existsSync(options.transcript)) {
+          console.error(chalk.red(`❌ 파일 없음: ${options.transcript}`));
+          process.exit(1);
+        }
+        transcripts = [options.transcript];
+      } else if (options.sessionDir) {
+        const dir = options.sessionDir;
+        if (!fs.existsSync(dir)) {
+          console.error(chalk.red(`❌ 디렉토리 없음: ${dir}`));
+          process.exit(1);
+        }
+        const hours = parseInt(options.hours) || 24;
+        const cutoff = Date.now() - hours * 60 * 60 * 1000;
+        const files = fs.readdirSync(dir)
+          .filter(f => f.endsWith(".jsonl"))
+          .map(f => ({ name: f, path: path.join(dir, f), mtime: fs.statSync(path.join(dir, f)).mtimeMs }))
+          .filter(f => f.mtime > cutoff)
+          .sort((a, b) => b.mtime - a.mtime);
+        transcripts = files.map(f => f.path);
+      } else {
+        // 기본: 현재 semo 프로젝트의 세션 디렉토리
+        const semoSessionDir = path.join(
+          os.homedir(), ".claude", "projects",
+          "-Users-reus-Desktop-Sources-semicolon-projects-semo"
+        );
+        if (fs.existsSync(semoSessionDir)) {
+          const hours = parseInt(options.hours) || 24;
+          const cutoff = Date.now() - hours * 60 * 60 * 1000;
+          const files = fs.readdirSync(semoSessionDir)
+            .filter(f => f.endsWith(".jsonl"))
+            .map(f => ({ name: f, path: path.join(semoSessionDir, f), mtime: fs.statSync(path.join(semoSessionDir, f)).mtimeMs }))
+            .filter(f => f.mtime > cutoff)
+            .sort((a, b) => b.mtime - a.mtime);
+          transcripts = files.map(f => f.path);
+        }
+      }
+
+      if (transcripts.length === 0) {
+        console.log(chalk.yellow("⚠ 분석할 transcript가 없습니다."));
+        process.exit(0);
+      }
+
+      // 의사결정 키워드 패턴
+      const decisionRe = /(?:도입했|폐기했|전환했|적용했|배포했|마이그레이션|변경했|합의했|결정했|도입합니다|폐기합니다|전환합니다|적용합니다|배포합니다|도입 완료|폐기 완료|전환 완료|적용 완료|배포 완료|표준화했|통합했|분리했|추가했|제거했|Phase \d+ 완료|설정을? 변경|규칙을? 변경|프로세스를? 변경|NON-NEGOTIABLE|신규 생성|전체 배포)/g;
+      const kbRecordRe = /KB 기록:|semo kb upsert|KB upsert 완료|답변근거: KB/;
+
+      interface DecisionCandidate {
+        file: string;
+        lineNum: number;
+        text: string;
+        keywords: string[];
+        hasKbRecord: boolean;
+        timestamp?: string;
+      }
+
+      const candidates: DecisionCandidate[] = [];
+
+      for (const tPath of transcripts) {
+        const lines = fs.readFileSync(tPath, "utf-8").split("\n").filter(l => l.trim());
+        let lastKbUpsertLine = -1;
+
+        for (let i = 0; i < lines.length; i++) {
+          try {
+            const entry = JSON.parse(lines[i]);
+            const msg = entry.message ?? entry;
+
+            // KB upsert tool call 추적
+            if (msg.role === "assistant") {
+              const content = msg.content ?? [];
+              for (const block of content) {
+                if (block?.type === "tool_use") {
+                  const inp = JSON.stringify(block.input ?? {});
+                  if (inp.includes("kb upsert") || inp.includes("kb_upsert")) {
+                    lastKbUpsertLine = i;
+                  }
+                }
+              }
+            }
+
+            // tool result에서 upsert 완료 추적
+            if (msg.role === "tool") {
+              const content = Array.isArray(msg.content)
+                ? msg.content.map((c: any) => typeof c === "string" ? c : c?.text ?? "").join(" ")
+                : String(msg.content ?? "");
+              if (content.includes("upsert 완료")) {
+                lastKbUpsertLine = i;
+              }
+            }
+
+            // assistant 텍스트에서 의사결정 키워드 탐지
+            if (msg.role === "assistant") {
+              const content = msg.content ?? [];
+              for (const block of content) {
+                if (block?.type !== "text") continue;
+                let text = block.text ?? "";
+
+                // 코드 블록 제거
+                text = text.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]+`/g, "");
+
+                const matches = text.match(decisionRe);
+                if (matches && matches.length > 0) {
+                  const hasKbInText = kbRecordRe.test(text);
+                  // 같은 턴(±5줄 이내)에 KB upsert가 있었는지
+                  const hasKbNearby = Math.abs(i - lastKbUpsertLine) <= 10;
+
+                  candidates.push({
+                    file: path.basename(tPath),
+                    lineNum: i,
+                    text: text.slice(0, 200).replace(/\n/g, " "),
+                    keywords: [...new Set(matches)].slice(0, 3) as string[],
+                    hasKbRecord: hasKbInText || hasKbNearby,
+                    timestamp: entry.timestamp ? new Date(entry.timestamp).toLocaleString("ko-KR") : undefined,
+                  });
+                }
+              }
+            }
+          } catch { /* skip */ }
+        }
+      }
+
+      // 미기록 건만 필터
+      const unrecorded = candidates.filter(c => !c.hasKbRecord);
+      const recorded = candidates.filter(c => c.hasKbRecord);
+
+      if (options.format === "json") {
+        const result = { total: candidates.length, recorded: recorded.length, unrecorded: unrecorded.length, items: unrecorded };
+        const out = JSON.stringify(result, null, 2);
+        if (options.output) {
+          fs.writeFileSync(options.output, out);
+          console.log(chalk.green(`✔ 결과 저장: ${options.output}`));
+        } else {
+          console.log(out);
+        }
+      } else {
+        console.log(chalk.cyan.bold(`\n📋 세션 의사결정 다이제스트\n`));
+        console.log(chalk.gray(`  transcript: ${transcripts.length}개 | 총 감지: ${candidates.length}건 | 기록됨: ${recorded.length}건 | 미기록: ${unrecorded.length}건\n`));
+
+        if (unrecorded.length === 0) {
+          console.log(chalk.green("  ✅ 미기록 의사결정 없음\n"));
+        } else {
+          console.log(chalk.yellow.bold("  ⚠ 미기록 의사결정:\n"));
+          for (const c of unrecorded) {
+            console.log(chalk.yellow(`  [${c.file}:${c.lineNum}]`) + chalk.gray(c.timestamp ? ` ${c.timestamp}` : ""));
+            console.log(chalk.white(`    키워드: ${c.keywords.join(", ")}`));
+            console.log(chalk.gray(`    "${c.text.slice(0, 120)}..."\n`));
+          }
+        }
+
+        if (options.output) {
+          const lines = [`# 세션 의사결정 다이제스트`, ``, `총 감지: ${candidates.length}건 | 기록됨: ${recorded.length}건 | 미기록: ${unrecorded.length}건`, ``];
+          if (unrecorded.length > 0) {
+            lines.push(`## 미기록 의사결정`, ``);
+            for (const c of unrecorded) {
+              lines.push(`- **[${c.file}:${c.lineNum}]** ${c.keywords.join(", ")}`);
+              lines.push(`  > ${c.text.slice(0, 150)}...`);
+              lines.push(``);
+            }
+          }
+          fs.writeFileSync(options.output, lines.join("\n"));
+          console.log(chalk.green(`✔ 결과 저장: ${options.output}`));
+        }
+      }
+    });
 }

@@ -737,6 +737,73 @@ export async function sendGfpInfraPhaseCompletedSlack(opts: GfpInfraPhaseComplet
   }
 }
 
+// ── Deploy Verification Required Notification ──
+
+export interface DeployVerificationRequiredOpts {
+  projectName: string;
+  gfpId: string;
+  infraPhase: number;
+  channelId: string;
+}
+
+export async function sendDeployVerificationRequiredSlack(
+  opts: DeployVerificationRequiredOpts,
+): Promise<boolean> {
+  if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
+
+  const infraLabel = INFRA_PHASE_LABELS[opts.infraPhase] ?? `Infra Phase ${opts.infraPhase}`;
+  const assignee = getPhaseAssignee(opts.infraPhase, 'infra');
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?track=infra`;
+
+  const blocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: 'Track B: 배포 검증 필요', emoji: true },
+    },
+    {
+      type: 'section',
+      fields: [
+        { type: 'mrkdwn', text: `*프로젝트:*\n${opts.projectName}` },
+        { type: 'mrkdwn', text: `*Phase:*\nInfra ${opts.infraPhase} — ${infraLabel}` },
+      ],
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: '모든 섹션이 승인되었으나, 배포 검증 결과가 없거나 실패 상태입니다.\n배포 검증(`0c-verify`)을 완료하고 결과를 API로 전송해주세요.',
+      },
+    },
+    {
+      type: 'context',
+      elements: [{ type: 'mrkdwn', text: `<${dashboardUrl}|Dashboard에서 확인>` }],
+    },
+  ];
+
+  const mention = assignee ? `<@${assignee.slackId}>` : '';
+  const text = `${mention} [GFP] ${opts.projectName} — Infra Phase ${opts.infraPhase} 배포 검증이 필요합니다.`;
+
+  try {
+    const res = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+      body: JSON.stringify({ channel: opts.channelId, text, blocks }),
+    });
+    const data = await res.json();
+    if (!data.ok) {
+      console.error('Slack deploy verification required error:', data.error);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error('Slack deploy verification required failed:', err);
+    return false;
+  }
+}
+
 // ── GFP Design System Notification (Color Palette) ──
 
 export interface GfpDesignSystemSlackOpts {
@@ -1411,4 +1478,70 @@ export function buildFeatureSpecRejectionModalView(params: {
       },
     ],
   };
+}
+
+// ── Feature Discovery Notifications ──
+
+export async function sendFeatureDiscoveryCompleteSlack(opts: {
+  projectName: string;
+  projectId: string;
+  sessionId: string;
+  candidateCount: number;
+  channelId: string;
+}): Promise<boolean> {
+  if (!SLACK_BOT_TOKEN) return false;
+
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.projectId}`;
+  const blocks = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: `[${opts.projectName}] 기능 스캔 완료` },
+    },
+    {
+      type: 'section',
+      text: { type: 'mrkdwn', text: `*${opts.candidateCount}개 기능* 후보가 발견되었습니다.\n대시보드에서 검토하고 등록하세요.` },
+    },
+    {
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: '대시보드에서 검토' },
+          style: 'primary',
+          url: dashboardUrl,
+        },
+      ],
+    },
+  ];
+
+  try {
+    await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SLACK_BOT_TOKEN}` },
+      body: JSON.stringify({ channel: opts.channelId, text: `[${opts.projectName}] 기능 스캔 완료 — ${opts.candidateCount}개 발견`, blocks }),
+    });
+    return true;
+  } catch { return false; }
+}
+
+export async function sendFeatureConversationStartSlack(opts: {
+  projectName: string;
+  mode: string;
+  channelId: string;
+}): Promise<string | null> {
+  if (!SLACK_BOT_TOKEN) return null;
+
+  const modeLabel = opts.mode === 'enrich' ? '스펙 보강' : '신규 기능 기획';
+  try {
+    const res = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SLACK_BOT_TOKEN}` },
+      body: JSON.stringify({
+        channel: opts.channelId,
+        text: `[${opts.projectName}] ${modeLabel} 대화를 시작합니다.`,
+      }),
+    });
+    const data = await res.json();
+    return data.ts ?? null;
+  } catch { return null; }
 }

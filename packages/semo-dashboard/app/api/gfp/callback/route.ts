@@ -18,6 +18,9 @@ import {
   getProject,
   updateSectionSlackThread,
   updateFeature,
+  updateDiscoverySession,
+  updateConversationSession,
+  createDeployVerification,
 } from '@/lib/gfp';
 import { query } from '@/lib/db';
 import { sendGfpQASlack, sendGfpSectionPendingReviewSlack, sendGfpStitchResultSlack, sendGfpStitchFallbackSlack, resolveGfpSlackContext, sendFeatureSpecReviewSlack, sendFeatureWorkCompleteSlack } from '@/lib/slack';
@@ -89,6 +92,36 @@ interface FeatureWorkCompletePayload {
   bot_id: string;
 }
 
+interface FeatureDiscoveryCompletePayload {
+  type: 'feature-discovery-complete';
+  session_id: string;
+  candidates: Array<Record<string, unknown>>;
+  screenshots: Record<string, string>;
+  bot_id: string;
+}
+
+interface FeatureSpecEnrichedPayload {
+  type: 'feature-spec-enriched';
+  feature_id: string;
+  spec: Record<string, unknown>;
+  bot_id: string;
+}
+
+interface FeatureConversationCompletePayload {
+  type: 'feature-conversation-complete';
+  session_id: string;
+  features: Array<Record<string, unknown>>;
+  bot_id: string;
+}
+
+interface DeployVerificationPayload {
+  type: 'deploy-verification';
+  service_id: string;
+  infra_phase: number;
+  checks: import('@/types').DeployVerificationChecks;
+  bot_id: string;
+}
+
 type CallbackPayload =
   | SectionRegenerationPayload
   | ResearchResultPayload
@@ -97,7 +130,11 @@ type CallbackPayload =
   | DesignReferenceAnalysisPayload
   | DesignPrototypePayload
   | FeatureSpecReadyPayload
-  | FeatureWorkCompletePayload;
+  | FeatureWorkCompletePayload
+  | FeatureDiscoveryCompletePayload
+  | FeatureSpecEnrichedPayload
+  | FeatureConversationCompletePayload
+  | DeployVerificationPayload;
 
 export async function POST(request: NextRequest) {
   try {
@@ -446,6 +483,116 @@ export async function POST(request: NextRequest) {
 
         console.log(`[GFP Callback] Feature work complete: ${body.feature_id} by ${body.bot_id}`);
         return NextResponse.json({ ok: true, feature: completedFeature });
+      }
+
+      case 'feature-discovery-complete': {
+        if (!body.session_id || !body.candidates) {
+          return NextResponse.json(
+            { error: 'session_id and candidates are required for feature-discovery-complete' },
+            { status: 400 }
+          );
+        }
+
+        const session = await updateDiscoverySession(body.session_id, {
+          status: 'candidates_ready',
+          candidates: body.candidates as unknown as import('@/types').DiscoveredFeature[],
+          screenshots: body.screenshots ?? {},
+        });
+
+        if (!session) {
+          return NextResponse.json({ error: 'Discovery session not found' }, { status: 404 });
+        }
+
+        // Slack 알림
+        if (session.service_id) {
+          const discProject = await getProject(session.service_id);
+          if (discProject) {
+            const discSlackCtx = await resolveGfpSlackContext(session.service_id);
+            if (discSlackCtx.channelId) {
+              const { sendFeatureDiscoveryCompleteSlack } = await import('@/lib/slack');
+              sendFeatureDiscoveryCompleteSlack({
+                projectName: discProject.project_name,
+                projectId: session.service_id,
+                sessionId: body.session_id,
+                candidateCount: body.candidates.length,
+                channelId: discSlackCtx.channelId,
+              }).catch((err: unknown) => console.error('Discovery Slack failed:', err));
+            }
+          }
+        }
+        console.log(`[GFP Callback] Feature discovery complete: ${body.session_id}, ${body.candidates.length} candidates by ${body.bot_id}`);
+        return NextResponse.json({ ok: true, session });
+      }
+
+      case 'feature-spec-enriched': {
+        if (!body.feature_id || !body.spec) {
+          return NextResponse.json(
+            { error: 'feature_id and spec are required for feature-spec-enriched' },
+            { status: 400 }
+          );
+        }
+
+        const { normalizeSpec, mergeSpecs } = await import('@/lib/feature-spec');
+        const featureRes = await query<{ metadata: Record<string, unknown> }>(
+          'SELECT metadata FROM semo.service_features WHERE feature_id = $1',
+          [body.feature_id]
+        );
+        if (!featureRes.rows[0]) {
+          return NextResponse.json({ error: 'Feature not found' }, { status: 404 });
+        }
+
+        const existing = normalizeSpec(featureRes.rows[0].metadata?.spec);
+        const incoming = body.spec as Partial<import('@/types').FeatureSpec>;
+        const merged = mergeSpecs(existing, {
+          ...incoming,
+          spec_status: 'pending-review',
+          spec_generated_by: body.bot_id,
+          spec_generated_at: new Date().toISOString(),
+        });
+
+        const enrichedFeature = await updateFeature(body.feature_id, { metadata: { spec: merged } });
+
+        // TODO: Slack 스펙 검토 알림 (Sprint 4에서 구현)
+        console.log(`[GFP Callback] Feature spec enriched: ${body.feature_id} by ${body.bot_id}`);
+        return NextResponse.json({ ok: true, feature: enrichedFeature });
+      }
+
+      case 'feature-conversation-complete': {
+        if (!body.session_id) {
+          return NextResponse.json(
+            { error: 'session_id is required for feature-conversation-complete' },
+            { status: 400 }
+          );
+        }
+
+        await updateConversationSession(body.session_id, {
+          status: 'reviewing',
+          features: body.features as unknown as import('@/types').FeatureConversationSession['features'],
+        });
+
+        console.log(`[GFP Callback] Feature conversation complete: ${body.session_id}, ${body.features?.length ?? 0} features by ${body.bot_id}`);
+        return NextResponse.json({ ok: true, session_id: body.session_id });
+      }
+
+      case 'deploy-verification': {
+        if (!body.service_id || body.infra_phase === undefined || !body.checks) {
+          return NextResponse.json(
+            { error: 'service_id, infra_phase, and checks are required for deploy-verification' },
+            { status: 400 },
+          );
+        }
+
+        const verification = await createDeployVerification({
+          service_id: body.service_id,
+          infra_phase: body.infra_phase,
+          checks: body.checks,
+          verified_by: body.bot_id,
+        });
+
+        console.log(
+          `[GFP Callback] Deploy verification for ${body.service_id} infra-phase ${body.infra_phase}: ${verification.overall_status} by ${body.bot_id}`,
+        );
+        return NextResponse.json({ ok: true, verification });
       }
 
       default:

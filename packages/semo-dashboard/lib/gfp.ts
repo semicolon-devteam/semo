@@ -23,6 +23,10 @@ import type {
   ServiceKPIMetric,
   ServiceActionItem,
   ServiceIteration,
+  FeatureDiscoverySession,
+  FeatureConversationSession,
+  DeployVerification,
+  DeployVerificationChecks,
 } from '@/types';
 
 // ── Projects ──
@@ -786,6 +790,41 @@ export async function checkInfraTrackComplete(gfpId: string): Promise<boolean> {
   return sections.every((s) => s.status === 'approved');
 }
 
+// ── Deploy Verifications ──
+
+export async function createDeployVerification(data: {
+  service_id: string;
+  infra_phase: number;
+  checks: DeployVerificationChecks;
+  verified_by: string;
+}): Promise<DeployVerification> {
+  const allPassed = Object.values(data.checks).every(
+    (c) => c.status === 'pass' || c.status === 'skip',
+  );
+  const overall = allPassed ? 'pass' : 'fail';
+
+  const res = await query<DeployVerification>(
+    `INSERT INTO semo.deploy_verifications (service_id, infra_phase, checks, overall_status, verified_by)
+     VALUES ($1, $2, $3, $4, $5)
+     RETURNING *`,
+    [data.service_id, data.infra_phase, JSON.stringify(data.checks), overall, data.verified_by],
+  );
+  return res.rows[0];
+}
+
+export async function getLatestVerification(
+  serviceId: string,
+  infraPhase: number,
+): Promise<DeployVerification | null> {
+  const res = await query<DeployVerification>(
+    `SELECT * FROM semo.deploy_verifications
+     WHERE service_id = $1 AND infra_phase = $2
+     ORDER BY created_at DESC LIMIT 1`,
+    [serviceId, infraPhase],
+  );
+  return res.rows[0] ?? null;
+}
+
 // ── Service Features (ops mode) ──
 
 export interface ServiceFeature {
@@ -1227,4 +1266,131 @@ export async function completeIteration(iterationId: string, retrospective?: str
 export async function deleteIteration(iterationId: string): Promise<boolean> {
   const res = await query('DELETE FROM semo.service_iterations WHERE iteration_id = $1', [iterationId]);
   return (res.rowCount ?? 0) > 0;
+}
+
+// ── Feature Discovery Sessions ──
+
+export async function createDiscoverySession(data: {
+  service_id: string;
+  source_url: string;
+}): Promise<FeatureDiscoverySession> {
+  const res = await query<FeatureDiscoverySession>(
+    `INSERT INTO semo.feature_discovery_sessions (service_id, source_url) VALUES ($1, $2) RETURNING *`,
+    [data.service_id, data.source_url]
+  );
+  return res.rows[0];
+}
+
+export async function getDiscoverySession(sessionId: string): Promise<FeatureDiscoverySession | null> {
+  const res = await query<FeatureDiscoverySession>(
+    'SELECT * FROM semo.feature_discovery_sessions WHERE session_id = $1',
+    [sessionId]
+  );
+  return res.rows[0] ?? null;
+}
+
+export async function updateDiscoverySession(
+  sessionId: string,
+  data: Partial<Pick<FeatureDiscoverySession, 'status' | 'candidates' | 'confirmed' | 'screenshots' | 'error'>>
+): Promise<FeatureDiscoverySession | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  let idx = 1;
+
+  if (data.status !== undefined) { sets.push(`status = $${idx++}`); params.push(data.status); }
+  if (data.candidates !== undefined) { sets.push(`candidates = $${idx++}::jsonb`); params.push(JSON.stringify(data.candidates)); }
+  if (data.confirmed !== undefined) { sets.push(`confirmed = $${idx++}::jsonb`); params.push(JSON.stringify(data.confirmed)); }
+  if (data.screenshots !== undefined) { sets.push(`screenshots = $${idx++}::jsonb`); params.push(JSON.stringify(data.screenshots)); }
+  if (data.error !== undefined) { sets.push(`error = $${idx++}`); params.push(data.error); }
+
+  if (sets.length === 0) return null;
+  params.push(sessionId);
+  const res = await query<FeatureDiscoverySession>(
+    `UPDATE semo.feature_discovery_sessions SET ${sets.join(', ')} WHERE session_id = $${idx} RETURNING *`,
+    params
+  );
+  return res.rows[0] ?? null;
+}
+
+export async function listDiscoverySessions(serviceId: string): Promise<FeatureDiscoverySession[]> {
+  const res = await query<FeatureDiscoverySession>(
+    'SELECT * FROM semo.feature_discovery_sessions WHERE service_id = $1 ORDER BY created_at DESC LIMIT 10',
+    [serviceId]
+  );
+  return res.rows;
+}
+
+// ── Feature Conversation Sessions ──
+
+export async function createConversationSession(data: {
+  service_id: string;
+  mode?: string;
+  slack_channel?: string;
+  slack_thread_ts?: string;
+}): Promise<FeatureConversationSession> {
+  const res = await query<FeatureConversationSession>(
+    `INSERT INTO semo.feature_conversation_sessions (service_id, mode, slack_channel, slack_thread_ts)
+     VALUES ($1, $2, $3, $4) RETURNING *`,
+    [data.service_id, data.mode ?? 'create', data.slack_channel ?? null, data.slack_thread_ts ?? null]
+  );
+  return res.rows[0];
+}
+
+export async function getConversationSession(sessionId: string): Promise<FeatureConversationSession | null> {
+  const res = await query<FeatureConversationSession>(
+    'SELECT * FROM semo.feature_conversation_sessions WHERE session_id = $1',
+    [sessionId]
+  );
+  return res.rows[0] ?? null;
+}
+
+export async function updateConversationSession(
+  sessionId: string,
+  data: Partial<Pick<FeatureConversationSession, 'status' | 'features'>>
+): Promise<FeatureConversationSession | null> {
+  const sets: string[] = [];
+  const params: unknown[] = [];
+  let idx = 1;
+
+  if (data.status !== undefined) { sets.push(`status = $${idx++}`); params.push(data.status); }
+  if (data.features !== undefined) { sets.push(`features = $${idx++}::jsonb`); params.push(JSON.stringify(data.features)); }
+
+  if (sets.length === 0) return null;
+  params.push(sessionId);
+  const res = await query<FeatureConversationSession>(
+    `UPDATE semo.feature_conversation_sessions SET ${sets.join(', ')} WHERE session_id = $${idx} RETURNING *`,
+    params
+  );
+  return res.rows[0] ?? null;
+}
+
+// ── Bulk Feature Creation ──
+
+export async function bulkCreateFeatures(
+  serviceId: string,
+  features: Array<{
+    name: string;
+    description?: string;
+    category?: string;
+    status?: string;
+    parent_id?: string;
+    metadata?: Record<string, unknown>;
+  }>
+): Promise<ServiceFeature[]> {
+  if (features.length === 0) return [];
+
+  const results: ServiceFeature[] = [];
+  for (const f of features) {
+    const res = await query<ServiceFeature>(
+      `INSERT INTO semo.service_features (service_id, name, description, category, status, parent_id, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [
+        serviceId, f.name, f.description ?? null,
+        f.category ?? 'core', f.status ?? 'active',
+        f.parent_id ?? null, JSON.stringify(f.metadata ?? {}),
+      ]
+    );
+    results.push(res.rows[0]);
+  }
+  return results;
 }

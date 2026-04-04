@@ -304,6 +304,35 @@ export interface GfpInfraRequest {
   updated_at: string;
 }
 
+// ── Deploy Verification ──
+
+export type DeployCheckStatus = 'pass' | 'fail' | 'skip';
+
+export interface DeployCheckResult {
+  status: DeployCheckStatus;
+  detail: string;
+  [key: string]: unknown;
+}
+
+export interface DeployVerificationChecks {
+  ci_build: DeployCheckResult;
+  pod_status: DeployCheckResult;
+  health_endpoint: DeployCheckResult;
+  tls_cert: DeployCheckResult;
+}
+
+export type DeployVerificationOverall = 'pass' | 'fail';
+
+export interface DeployVerification {
+  verification_id: string;
+  service_id: string;
+  infra_phase: number;
+  checks: DeployVerificationChecks;
+  overall_status: DeployVerificationOverall;
+  verified_by: string;
+  created_at: string;
+}
+
 export interface GfpInfraConfig {
   repo_url: string;
   live_url: string;
@@ -560,6 +589,95 @@ export interface ServiceActionItem {
   sort_order: number;
   completed_at: string | null;
   metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Feature Spec (구조화된 기능 명세) ──
+
+export interface AcceptanceCriterion {
+  id: string;
+  criterion: string;
+  verified: boolean;
+  verified_at?: string;
+}
+
+export interface UserStory {
+  id: string;
+  as_a: string;
+  i_want: string;
+  so_that: string;
+  acceptance_ids: string[];
+}
+
+export interface TestScenario {
+  id: string;
+  title: string;
+  preconditions?: string;
+  steps: string[];
+  expected: string;
+  acceptance_ids: string[];
+  last_result?: 'pass' | 'fail' | 'skip';
+  last_tested_at?: string;
+  last_tested_by?: string;
+}
+
+export interface FeatureSpec {
+  summary?: string;
+  estimated_effort?: 'small' | 'medium' | 'large';
+  acceptance_criteria: AcceptanceCriterion[];
+  user_stories: UserStory[];
+  test_scenarios: TestScenario[];
+  source_url?: string;
+  screenshot_key?: string;
+  spec_status: 'draft' | 'pending-review' | 'approved';
+  spec_generated_by?: string;
+  spec_generated_at?: string;
+  spec_approved_at?: string;
+}
+
+// ── Feature Discovery Sessions ──
+
+export type DiscoverySessionStatus = 'crawling' | 'candidates_ready' | 'reviewing' | 'confirmed' | 'failed';
+
+export interface DiscoveredFeature {
+  name: string;
+  description: string;
+  category: string;
+  source_url?: string;
+  screenshot_key?: string;
+  confidence: 'high' | 'medium' | 'low';
+  nav_path?: string[];
+  visible_elements?: string[];
+  suggested_children?: Omit<DiscoveredFeature, 'suggested_children'>[];
+}
+
+export interface FeatureDiscoverySession {
+  session_id: string;
+  service_id: string;
+  source_url: string;
+  status: DiscoverySessionStatus;
+  candidates: DiscoveredFeature[];
+  confirmed: DiscoveredFeature[];
+  screenshots: Record<string, string>;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+// ── Feature Conversation Sessions ──
+
+export type ConversationMode = 'create' | 'enrich';
+export type ConversationStatus = 'collecting' | 'reviewing' | 'confirmed' | 'cancelled';
+
+export interface FeatureConversationSession {
+  session_id: string;
+  service_id: string;
+  mode: ConversationMode;
+  status: ConversationStatus;
+  features: Array<{ name: string; description: string; category: string; spec?: Partial<FeatureSpec> }>;
+  slack_channel: string | null;
+  slack_thread_ts: string | null;
   created_at: string;
   updated_at: string;
 }

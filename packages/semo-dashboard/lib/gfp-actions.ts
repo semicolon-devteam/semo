@@ -13,6 +13,7 @@ import {
   checkDesignStepAdvance,
   getDesignStep,
   checkInfraTrackComplete,
+  getLatestVerification,
 } from './gfp';
 import { dispatchRegeneration } from './gfp-bot';
 import { publishPhaseToGitHub } from './gfp-github';
@@ -24,6 +25,7 @@ import {
   sendGfpTrackForkSlack,
   sendGfpInfraPhaseCompletedSlack,
   sendGfpDesignStepAdvanceSlack,
+  sendDeployVerificationRequiredSlack,
 } from './slack';
 import { parseColors } from './design-system-parser';
 import type { GfpPhaseSection, GfpQAItem, GfpTrack } from '@/types';
@@ -293,6 +295,21 @@ async function handleInfraTrackApproval(
   const allSections = await listSections(gfpId, phase, 'infra');
   const allApproved = allSections.length > 0 && allSections.every((s) => s.status === 'approved');
   if (!allApproved) return;
+
+  // Deploy verification gate: Phase 0 (기본 세팅) and Phase 2 (검증 & 핸드오프) require passing verification
+  if (phase === 0 || phase === 2) {
+    const verification = await getLatestVerification(gfpId, phase);
+    if (!verification || verification.overall_status !== 'pass') {
+      console.warn(`[GFP] Infra phase ${phase} approval blocked — deploy verification missing or failed for ${gfpId}`);
+      sendDeployVerificationRequiredSlack({
+        projectName: project.project_name,
+        gfpId,
+        infraPhase: phase,
+        channelId: slackCtx.channelId,
+      }).catch((err) => console.error('Deploy verification Slack failed:', err));
+      return;
+    }
+  }
 
   const nextInfraPhase = phase + 1;
   const isLastInfra = nextInfraPhase > 2;
