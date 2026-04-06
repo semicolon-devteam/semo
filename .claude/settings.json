@@ -1,29 +1,3 @@
 {
-  "mcpServers": {},
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash /Users/reus/.openclaw-shared/hooks/context-router.sh",
-            "timeout": 3000
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash /Users/reus/.openclaw-shared/hooks/decision-reminder.sh",
-            "timeout": 15000
-          }
-        ]
-      }
-    ]
-  }
+  "mcpServers": {}
 }

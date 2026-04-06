@@ -980,7 +980,8 @@ async function setupHooks(isUpdate: boolean = false) {
   const homeDir = os.homedir();
   const settingsPath = path.join(homeDir, '.claude', 'settings.local.json');
 
-  // hooks 설정 객체 — semo CLI만 사용 (프로젝트 경로 무관)
+  // hooks 설정 객체 — semo CLI + enforcement hooks (프로젝트 경로 무관)
+  const sharedHooksDir = path.join(homeDir, '.openclaw-shared', 'hooks');
   const hooksConfig = {
     SessionStart: [
       {
@@ -994,6 +995,18 @@ async function setupHooks(isUpdate: boolean = false) {
         ],
       },
     ],
+    UserPromptSubmit: [
+      {
+        matcher: '',
+        hooks: [
+          {
+            type: 'command',
+            command: `bash ${path.join(sharedHooksDir, 'context-router.sh')}`,
+            timeout: 3000,
+          },
+        ],
+      },
+    ],
     Stop: [
       {
         matcher: '',
@@ -1002,6 +1015,11 @@ async function setupHooks(isUpdate: boolean = false) {
             type: 'command',
             command: '. ~/.claude/semo/.env 2>/dev/null; semo context push 2>/dev/null || true',
             timeout: 30,
+          },
+          {
+            type: 'command',
+            command: `bash ${path.join(sharedHooksDir, 'decision-reminder.sh')}`,
+            timeout: 15000,
           },
         ],
       },

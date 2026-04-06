@@ -310,6 +310,57 @@ export function generateThinRouter(kbFirstBlock: string): void {
 - 사용자가 "다른 탭에서 뭐 돌아가고 있어?" 같은 질문을 하면 cmux 명령어로 확인
 
 ${kbFirstBlock}
+
+---
+
+## 3자 동기화 규칙 (NON-NEGOTIABLE)
+
+> 모든 SEMO 프로젝트의 변경은 3자 동기화 관점에서 평가되어야 한다.
+> 3자 = **소스코드** ↔ **KB 포함 DB** ↔ **OpenClaw 봇 워크스페이스 로컬 파일**
+
+| 축 | 위치 | 예시 |
+|----|------|------|
+| **소스코드** | 각 프로젝트 레포 | API 라우트, 타입, 마이그레이션 |
+| **KB 포함 DB** | semo-kb (PostgreSQL + 벡터 임베딩) | 프로세스, 봇 역할, 온톨로지 |
+| **봇 로컬 파일** | \`~/.openclaw-{botId}/workspace/\` + \`~/.claude/semo/\` | SOUL.md, skills/, memory/ |
+
+**변경 시 체크리스트**:
+1. **소스코드 변경** → KB와 봇 파일에 반영할 내용이 있는가?
+2. **KB 변경** → 소스코드나 봇 파일과 불일치가 생기지 않는가?
+3. **봇 파일 변경** → KB에 기록할 사항이 있는가? 소스코드와 정합성이 맞는가?
+
+**추가 규칙**:
+- SoT 위치: DB → DB에서 읽기 (하드코딩 금지). KB → \`semo kb get/search\` 조회.
+- KB 쓰기: 반드시 \`semo kb upsert\` CLI 사용 (임베딩 + 스키마 검증 포함). raw SQL INSERT 금지.
+
+---
+
+## KB CLI 참조 가이드
+
+| 정보 | 조회 명령 |
+|------|-----------|
+| 봇 프로필 | \`semo kb get {botId} identity\` |
+| 봇 역할 | \`semo kb get {botId} role\` |
+| SEMO 워크스페이스 규격 | \`semo kb get semo spec workspace-v2\` |
+| 환경변수 | \`semo kb get semo infra env-config\` |
+| 코딩 컨벤션 | \`semo kb get semo process coding-convention\` |
+| 인시던트 기록 | \`semo kb get {service} incident {slug}\` |
+| 의사결정 기록 | \`semo kb get semicolon decision {slug}\` |
+| 경로 모를 때 | \`semo kb search "검색어"\` 또는 \`semo kb ontology --action routing-table\` |
+
+---
+
+## 공통 Enforcement Hooks
+
+아래 훅은 \`~/.openclaw-shared/hooks/\`에 위치하며, 봇 + 로컬 세션 양쪽에서 사용:
+
+| 훅 | 트리거 | 역할 |
+|----|--------|------|
+| \`context-router.sh\` | UserPromptSubmit | 메시지 키워드 → KB/GFP/INFRA 컨텍스트 힌트 주입 |
+| \`decision-reminder.sh\` | Stop | 의사결정 패턴 감지 → KB 기록 안 했으면 차단 |
+| \`commitment-guard.sh\` | Stop | 한국어 약속 패턴 → commitment 미등록 시 차단 |
+| \`kb-first-guard.sh\` | Stop | KB 필요 질문에 KB 조회 없이 답변 시 차단 |
+| \`response-length-guard.sh\` | Stop | 봇 응답 20줄 초과 시 차단 |
 `;
 
   // 기존 파일 백업 (마이그레이션)
