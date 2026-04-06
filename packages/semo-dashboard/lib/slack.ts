@@ -30,7 +30,7 @@ export async function resolveGfpSlackContext(gfpId: string): Promise<GfpSlackCon
   try {
     const project = await query(
       `SELECT metadata, service_domain, project_name FROM semo.services WHERE service_id = $1`,
-      [gfpId]
+      [gfpId],
     );
     if (project.rows.length > 0) {
       const meta = project.rows[0].metadata as Record<string, unknown>;
@@ -46,7 +46,7 @@ export async function resolveGfpSlackContext(gfpId: string): Promise<GfpSlackCon
       if (domain) {
         const kb = await query(
           `SELECT content FROM semo.knowledge_base WHERE domain = $1 AND key = 'slack-channel' LIMIT 1`,
-          [domain]
+          [domain],
         );
         if (kb.rows.length > 0) {
           const raw = (kb.rows[0].content as string).trim();
@@ -69,7 +69,7 @@ export async function resolveGfpSlackContext(gfpId: string): Promise<GfpSlackCon
             channel: REUS_DM_CHANNEL,
             text: `[GFP] ${projectName} (domain: ${domain || 'N/A'}) 프로젝트에 Slack 채널이 설정되지 않았습니다.\n\nKB에 채널을 등록해주세요:\n\`semo kb upsert ${domain || 'DOMAIN'} slack-channel --content "C채널ID"\`\n\n프로젝트: <${dashboardUrl}|${projectName}>`,
           }),
-        }).catch(err => console.error('Channel missing DM failed:', err));
+        }).catch((err) => console.error('Channel missing DM failed:', err));
         // DM 보냈으므로 null 반환 — 호출자가 알림 skip
         return { channelId: '', ownerSlackId };
       }
@@ -106,7 +106,7 @@ export async function sendGfpRejectionSlack(opts: GfpRejectionNotifyOpts): Promi
     return false;
   }
 
-  const channel = opts.channelId || await resolveGfpSlackChannel(opts.gfpId);
+  const channel = opts.channelId || (await resolveGfpSlackChannel(opts.gfpId));
   if (!channel) {
     console.warn('No Slack channel resolved — DM sent to Reus');
     return false;
@@ -192,31 +192,34 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
     return false;
   }
 
-  const channel = opts.channelId || await resolveGfpSlackChannel(opts.gfpId);
+  const channel = opts.channelId || (await resolveGfpSlackChannel(opts.gfpId));
   if (!channel) {
     console.warn('No Slack channel resolved — DM sent to Reus');
     return false;
   }
   const completedLabel = PHASE_LABELS[opts.completedPhase] ?? `Phase ${opts.completedPhase}`;
-  const phaseForUrl = opts.nextPhase !== null && opts.nextPhase <= 9 ? opts.nextPhase : opts.completedPhase;
+  const phaseForUrl =
+    opts.nextPhase !== null && opts.nextPhase <= 9 ? opts.nextPhase : opts.completedPhase;
   const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=${phaseForUrl}`;
 
   const isLastPhase = opts.nextPhase === null || opts.nextPhase > 9;
-  const nextLabel = isLastPhase ? null : (PHASE_LABELS[opts.nextPhase!] ?? `Phase ${opts.nextPhase}`);
+  const nextLabel = isLastPhase
+    ? null
+    : (PHASE_LABELS[opts.nextPhase!] ?? `Phase ${opts.nextPhase}`);
 
   // 다음 Phase 담당 봇 + CC 봇 (예: InfraClaw) — 프리셋에 따라 skip 가능
   const nextAssignee = isLastPhase ? null : getPhaseAssignee(opts.nextPhase!);
   const { shouldSkipCc } = await import('./gfp-presets');
   const ccBots = isLastPhase
     ? []
-    : (opts.metadata && shouldSkipCc(opts.metadata, opts.nextPhase!))
+    : opts.metadata && shouldSkipCc(opts.metadata, opts.nextPhase!)
       ? []
       : getPhaseCc(opts.nextPhase!);
 
   // 멘션 목록: 담당 봇 + CC 봇 + 오너
   const ownerMention = opts.ownerSlackId ? ` <@${opts.ownerSlackId}>` : '';
   const assigneeMention = nextAssignee ? `<@${nextAssignee.slackId}>` : '';
-  const ccMentions = ccBots.map(b => `<@${b.slackId}>`).join(' ');
+  const ccMentions = ccBots.map((b) => `<@${b.slackId}>`).join(' ');
   const allMentions = [assigneeMention, ccMentions, ownerMention].filter(Boolean).join(' ');
 
   const textFallback = isLastPhase
@@ -227,14 +230,24 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
     ? [{ type: 'mrkdwn', text: `*오너:*\n<@${opts.ownerSlackId}>` }]
     : [];
 
-  const ccField = ccBots.length > 0
-    ? [{ type: 'mrkdwn', text: `*참조:*\n${ccBots.map(b => `<@${b.slackId}> (${b.reason})`).join(', ')}` }]
-    : [];
+  const ccField =
+    ccBots.length > 0
+      ? [
+          {
+            type: 'mrkdwn',
+            text: `*참조:*\n${ccBots.map((b) => `<@${b.slackId}> (${b.reason})`).join(', ')}`,
+          },
+        ]
+      : [];
 
   const blocks = [
     {
       type: 'header',
-      text: { type: 'plain_text', text: isLastPhase ? '🎉 GFP 전체 Phase 완료' : '🟢 GFP Phase 완료', emoji: true },
+      text: {
+        type: 'plain_text',
+        text: isLastPhase ? '🎉 GFP 전체 Phase 완료' : '🟢 GFP Phase 완료',
+        emoji: true,
+      },
     },
     {
       type: 'section',
@@ -251,17 +264,24 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
             ]),
       ],
     },
-    ...(isLastPhase ? [] : [{
-      type: 'section',
-      text: {
-        type: 'mrkdwn',
-        text: `다음 Phase 섹션을 작성해주세요. <${dashboardUrl}|대시보드에서 확인>\nKB 참조: \`semo kb get semicolon process/gfp-phases\`${opts.serviceDomain ? ` | \`semo kb get ${opts.serviceDomain} gfp-status\`` : ''}`,
-      },
-    }]),
+    ...(isLastPhase
+      ? []
+      : [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `다음 Phase 섹션을 작성해주세요. <${dashboardUrl}|대시보드에서 확인>\nKB 참조: \`semo kb get semicolon process/gfp-phases\`${opts.serviceDomain ? ` | \`semo kb get ${opts.serviceDomain} gfp-status\`` : ''}`,
+            },
+          },
+        ]),
     {
       type: 'context',
       elements: [
-        { type: 'mrkdwn', text: `GFP ID: \`${opts.gfpId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>` },
+        {
+          type: 'mrkdwn',
+          text: `GFP ID: \`${opts.gfpId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>`,
+        },
       ],
     },
   ];
@@ -341,7 +361,10 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
     {
       type: 'context',
       elements: [
-        { type: 'mrkdwn', text: `GFP ID: \`${opts.gfpId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>` },
+        {
+          type: 'mrkdwn',
+          text: `GFP ID: \`${opts.gfpId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>`,
+        },
       ],
     },
   ];
@@ -401,7 +424,10 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
             {
               type: 'context',
               elements: [
-                { type: 'mrkdwn', text: `이 스레드에 \`Q1: 답변\` 형식으로 답변 | <${sectionUrl}|Dashboard>` },
+                {
+                  type: 'mrkdwn',
+                  text: `이 스레드에 \`Q1: 답변\` 형식으로 답변 | <${sectionUrl}|Dashboard>`,
+                },
               ],
             },
           ],
@@ -416,7 +442,9 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
       }
     }
 
-    console.log(`[GFP Slack] Q&A delivered: ${opts.sections.length} categories to channel ${opts.channelId}`);
+    console.log(
+      `[GFP Slack] Q&A delivered: ${opts.sections.length} categories to channel ${opts.channelId}`,
+    );
   } catch (err) {
     console.error('Slack Q&A delivery failed:', err);
   }
@@ -471,9 +499,7 @@ export async function sendGfpProjectCreatedSlack(opts: GfpProjectCreatedOpts): P
     },
     {
       type: 'context',
-      elements: [
-        { type: 'mrkdwn', text: `<${dashboardUrl}|Dashboard에서 확인>` },
-      ],
+      elements: [{ type: 'mrkdwn', text: `<${dashboardUrl}|Dashboard에서 확인>` }],
     },
   ];
 
@@ -551,7 +577,10 @@ export async function sendGfpTrackForkSlack(opts: GfpTrackForkOpts): Promise<boo
           {
             type: 'context',
             elements: [
-              { type: 'mrkdwn', text: `온보딩 완료 → 기획/인프라 병렬 트랙 시작 | <${dashboardUrl}?phase=1|Dashboard>` },
+              {
+                type: 'mrkdwn',
+                text: `온보딩 완료 → 기획/인프라 병렬 트랙 시작 | <${dashboardUrl}?phase=1|Dashboard>`,
+              },
             ],
           },
         ],
@@ -584,7 +613,10 @@ export async function sendGfpTrackForkSlack(opts: GfpTrackForkOpts): Promise<boo
           {
             type: 'context',
             elements: [
-              { type: 'mrkdwn', text: `레포, CI/CD, DNS, 호스팅 기본 세팅 | <${dashboardUrl}?track=infra|Dashboard>` },
+              {
+                type: 'mrkdwn',
+                text: `레포, CI/CD, DNS, 호스팅 기본 세팅 | <${dashboardUrl}?track=infra|Dashboard>`,
+              },
             ],
           },
         ],
@@ -638,14 +670,21 @@ export async function sendGfpInfraRequestSlack(opts: GfpInfraRequestSlackOpts): 
               { type: 'mrkdwn', text: `*우선순위:*\n${opts.request.priority}` },
             ],
           },
-          ...(opts.request.description ? [{
-            type: 'section' as const,
-            text: { type: 'mrkdwn' as const, text: `*설명:*\n${opts.request.description}` },
-          }] : []),
+          ...(opts.request.description
+            ? [
+                {
+                  type: 'section' as const,
+                  text: { type: 'mrkdwn' as const, text: `*설명:*\n${opts.request.description}` },
+                },
+              ]
+            : []),
           {
             type: 'context',
             elements: [
-              { type: 'mrkdwn', text: `출처: Phase ${opts.request.source_phase} | <${dashboardUrl}|대시보드>` },
+              {
+                type: 'mrkdwn',
+                text: `출처: Phase ${opts.request.source_phase} | <${dashboardUrl}|대시보드>`,
+              },
             ],
           },
         ],
@@ -675,12 +714,17 @@ export interface GfpInfraPhaseCompletedOpts {
   ownerSlackId?: string | null;
 }
 
-export async function sendGfpInfraPhaseCompletedSlack(opts: GfpInfraPhaseCompletedOpts): Promise<boolean> {
+export async function sendGfpInfraPhaseCompletedSlack(
+  opts: GfpInfraPhaseCompletedOpts,
+): Promise<boolean> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
 
-  const completedLabel = INFRA_PHASE_LABELS[opts.completedPhase] ?? `Infra Phase ${opts.completedPhase}`;
+  const completedLabel =
+    INFRA_PHASE_LABELS[opts.completedPhase] ?? `Infra Phase ${opts.completedPhase}`;
   const isLast = opts.nextPhase === null || opts.nextPhase > 2;
-  const nextLabel = isLast ? null : (INFRA_PHASE_LABELS[opts.nextPhase!] ?? `Infra Phase ${opts.nextPhase}`);
+  const nextLabel = isLast
+    ? null
+    : (INFRA_PHASE_LABELS[opts.nextPhase!] ?? `Infra Phase ${opts.nextPhase}`);
   const nextAssignee = isLast ? null : getPhaseAssignee(opts.nextPhase!, 'infra');
   const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?track=infra`;
   const ownerMention = opts.ownerSlackId ? ` <@${opts.ownerSlackId}>` : '';
@@ -688,7 +732,11 @@ export async function sendGfpInfraPhaseCompletedSlack(opts: GfpInfraPhaseComplet
   const blocks = [
     {
       type: 'header',
-      text: { type: 'plain_text', text: isLast ? 'Track B: 인프라 트랙 완료' : 'Track B: 인프라 Phase 완료', emoji: true },
+      text: {
+        type: 'plain_text',
+        text: isLast ? 'Track B: 인프라 트랙 완료' : 'Track B: 인프라 Phase 완료',
+        emoji: true,
+      },
     },
     {
       type: 'section',
@@ -698,16 +746,14 @@ export async function sendGfpInfraPhaseCompletedSlack(opts: GfpInfraPhaseComplet
         ...(isLast
           ? [{ type: 'mrkdwn', text: '*상태:*\n인프라 트랙 완료' }]
           : [
-            { type: 'mrkdwn', text: `*다음:*\nInfra ${opts.nextPhase} — ${nextLabel}` },
-            { type: 'mrkdwn', text: `*담당:*\n<@${nextAssignee!.slackId}>` },
-          ]),
+              { type: 'mrkdwn', text: `*다음:*\nInfra ${opts.nextPhase} — ${nextLabel}` },
+              { type: 'mrkdwn', text: `*담당:*\n<@${nextAssignee!.slackId}>` },
+            ]),
       ],
     },
     {
       type: 'context',
-      elements: [
-        { type: 'mrkdwn', text: `<${dashboardUrl}|Dashboard>` },
-      ],
+      elements: [{ type: 'mrkdwn', text: `<${dashboardUrl}|Dashboard>` }],
     },
   ];
 
@@ -744,6 +790,7 @@ export interface DeployVerificationRequiredOpts {
   gfpId: string;
   infraPhase: number;
   channelId: string;
+  failedChecks?: string[];
 }
 
 export async function sendDeployVerificationRequiredSlack(
@@ -774,6 +821,17 @@ export async function sendDeployVerificationRequiredSlack(
         text: '모든 섹션이 승인되었으나, 배포 검증 결과가 없거나 실패 상태입니다.\n배포 검증(`0c-verify`)을 완료하고 결과를 API로 전송해주세요.',
       },
     },
+    ...(opts.failedChecks && opts.failedChecks.length > 0
+      ? [
+          {
+            type: 'section' as const,
+            text: {
+              type: 'mrkdwn' as const,
+              text: `*실패 항목:*\n${opts.failedChecks.map((c) => `• ${c}`).join('\n')}`,
+            },
+          },
+        ]
+      : []),
     {
       type: 'context',
       elements: [{ type: 'mrkdwn', text: `<${dashboardUrl}|Dashboard에서 확인>` }],
@@ -844,9 +902,7 @@ export async function sendDesignSystemSlack(opts: GfpDesignSystemSlackOpts): Pro
     },
     {
       type: 'context',
-      elements: [
-        { type: 'mrkdwn', text: `<${dashboardUrl}|대시보드에서 확인>` },
-      ],
+      elements: [{ type: 'mrkdwn', text: `<${dashboardUrl}|대시보드에서 확인>` }],
     },
   ];
 
@@ -905,10 +961,9 @@ export function verifySlackSignature(
   if (parseInt(timestamp, 10) < fiveMinutesAgo) return false; // replay attack prevention
 
   const sigBasestring = `v0:${timestamp}:${rawBody}`;
-  const mySignature = 'v0=' + crypto
-    .createHmac('sha256', SLACK_SIGNING_SECRET)
-    .update(sigBasestring, 'utf8')
-    .digest('hex');
+  const mySignature =
+    'v0=' +
+    crypto.createHmac('sha256', SLACK_SIGNING_SECRET).update(sigBasestring, 'utf8').digest('hex');
 
   const myBuf = Buffer.from(mySignature, 'utf8');
   const theirBuf = Buffer.from(signature, 'utf8');
@@ -999,11 +1054,13 @@ export async function sendGfpSectionPendingReviewSlack(
 ): Promise<string | null> {
   if (!SLACK_BOT_TOKEN) return null;
   const phaseLabel = PHASE_LABELS[opts.phase] ?? `Phase ${opts.phase}`;
-  const preview = opts.contentPreview.length > 200
-    ? opts.contentPreview.slice(0, 200) + '…'
-    : opts.contentPreview;
+  const preview =
+    opts.contentPreview.length > 200
+      ? opts.contentPreview.slice(0, 200) + '…'
+      : opts.contentPreview;
 
-  const isVisualSection = opts.sectionKey.startsWith('ds-') || opts.sectionKey.startsWith('impl-screen-');
+  const isVisualSection =
+    opts.sectionKey.startsWith('ds-') || opts.sectionKey.startsWith('impl-screen-');
   const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=${opts.phase}&section=${opts.sectionKey}`;
 
   const actionValue = JSON.stringify({
@@ -1034,9 +1091,7 @@ export async function sendGfpSectionPendingReviewSlack(
   if (isVisualSection) {
     blocks.push({
       type: 'context',
-      elements: [
-        { type: 'mrkdwn', text: '🎨 _시각적 산출물은 대시보드에서 확인을 권장합니다_' },
-      ],
+      elements: [{ type: 'mrkdwn', text: '🎨 _시각적 산출물은 대시보드에서 확인을 권장합니다_' }],
     });
   }
 
@@ -1071,9 +1126,7 @@ export async function sendGfpSectionPendingReviewSlack(
     },
     {
       type: 'context',
-      elements: [
-        { type: 'mrkdwn', text: `섹션 ID: \`${opts.sectionId.slice(0, 8)}...\`` },
-      ],
+      elements: [{ type: 'mrkdwn', text: `섹션 ID: \`${opts.sectionId.slice(0, 8)}...\`` }],
     },
   );
 
@@ -1152,7 +1205,11 @@ const DESIGN_STEP_GUIDES: Record<number, string> = {
 };
 
 const DESIGN_STEP_LABELS: Record<number, string> = {
-  1: '레퍼런스 탐색', 2: '디자인 시스템', 3: '구현', 4: '리뷰', 5: '핸드오프',
+  1: '레퍼런스 탐색',
+  2: '디자인 시스템',
+  3: '구현',
+  4: '리뷰',
+  5: '핸드오프',
 };
 
 const DESIGNCLAW_SLACK_ID = 'U0AFC0MK2TY';
@@ -1183,7 +1240,10 @@ export async function sendGfpDesignStepAdvanceSlack(opts: {
       blocks: [
         {
           type: 'header',
-          text: { type: 'plain_text', text: `🎨 [${opts.projectName}] 디자인 Step ${opts.toStep}: ${toLabel}` },
+          text: {
+            type: 'plain_text',
+            text: `🎨 [${opts.projectName}] 디자인 Step ${opts.toStep}: ${toLabel}`,
+          },
         },
         {
           type: 'section',
@@ -1198,7 +1258,7 @@ export async function sendGfpDesignStepAdvanceSlack(opts: {
         },
       ],
     }),
-  }).catch(err => console.error('Design step advance Slack failed:', err));
+  }).catch((err) => console.error('Design step advance Slack failed:', err));
 }
 
 // ── Stitch Result Notification ──
@@ -1223,7 +1283,10 @@ export async function sendGfpStitchResultSlack(opts: {
     },
     {
       type: 'section',
-      text: { type: 'mrkdwn', text: `*${opts.sectionTitle}*\n프로토타입이 생성되어 리뷰 대기 중입니다.` },
+      text: {
+        type: 'mrkdwn',
+        text: `*${opts.sectionTitle}*\n프로토타입이 생성되어 리뷰 대기 중입니다.`,
+      },
     },
   ];
 
@@ -1264,7 +1327,7 @@ export async function sendGfpStitchResultSlack(opts: {
       text: `🎨 [${opts.projectName}] Stitch 디자인 생성 완료 — ${opts.sectionTitle}`,
       blocks,
     }),
-  }).catch(err => console.error('Stitch result Slack failed:', err));
+  }).catch((err) => console.error('Stitch result Slack failed:', err));
 }
 
 // ── Stitch Fallback Notification ──
@@ -1285,7 +1348,10 @@ export async function sendGfpStitchFallbackSlack(opts: {
   const blocks: Record<string, unknown>[] = [
     {
       type: 'header',
-      text: { type: 'plain_text', text: `[${opts.projectName}] Stitch 미사용 — 직접 디자인 fallback` },
+      text: {
+        type: 'plain_text',
+        text: `[${opts.projectName}] Stitch 미사용 — 직접 디자인 fallback`,
+      },
     },
     {
       type: 'section',
@@ -1293,7 +1359,9 @@ export async function sendGfpStitchFallbackSlack(opts: {
         type: 'mrkdwn',
         text: [
           `*${opts.screenName}* 화면이 Stitch 없이 직접 생성되었습니다.`,
-          opts.reason ? `*사유:* ${opts.reason}` : '*사유:* Stitch MCP 미가용 (API 키 미설정 또는 도구 없음)',
+          opts.reason
+            ? `*사유:* ${opts.reason}`
+            : '*사유:* Stitch MCP 미가용 (API 키 미설정 또는 도구 없음)',
           `*섹션:* \`${opts.sectionKey}\``,
           `*봇:* ${opts.botId}`,
         ].join('\n'),
@@ -1302,7 +1370,10 @@ export async function sendGfpStitchFallbackSlack(opts: {
     {
       type: 'context',
       elements: [
-        { type: 'mrkdwn', text: 'Stitch 프롬프트/결과 없이 design-prototype 콜백이 사용되었습니다. 디자인 품질을 대시보드에서 확인해주세요.' },
+        {
+          type: 'mrkdwn',
+          text: 'Stitch 프롬프트/결과 없이 design-prototype 콜백이 사용되었습니다. 디자인 품질을 대시보드에서 확인해주세요.',
+        },
       ],
     },
     {
@@ -1328,7 +1399,7 @@ export async function sendGfpStitchFallbackSlack(opts: {
       text: `[${opts.projectName}] Stitch fallback — ${opts.screenName} 직접 디자인 생성`,
       blocks,
     }),
-  }).catch(err => console.error('Stitch fallback Slack failed:', err));
+  }).catch((err) => console.error('Stitch fallback Slack failed:', err));
 }
 
 // ── Feature Spec Review (ops mode) ──
@@ -1343,7 +1414,9 @@ interface FeatureSpecReviewOpts {
   channelId: string;
 }
 
-export async function sendFeatureSpecReviewSlack(opts: FeatureSpecReviewOpts): Promise<string | null> {
+export async function sendFeatureSpecReviewSlack(
+  opts: FeatureSpecReviewOpts,
+): Promise<string | null> {
   if (!SLACK_BOT_TOKEN) return null;
 
   const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.projectId}`;
@@ -1418,14 +1491,19 @@ interface FeatureWorkCompleteOpts {
   channelId: string;
 }
 
-export async function sendFeatureWorkCompleteSlack(opts: FeatureWorkCompleteOpts): Promise<boolean> {
+export async function sendFeatureWorkCompleteSlack(
+  opts: FeatureWorkCompleteOpts,
+): Promise<boolean> {
   if (!SLACK_BOT_TOKEN) return false;
 
   const issueLink = opts.issueUrl ? `\n<${opts.issueUrl}|GitHub Issue>` : '';
   const blocks = [
     {
       type: 'section',
-      text: { type: 'mrkdwn', text: `*[${opts.projectName}]* 기능 구현 완료: *${opts.featureName}*${issueLink}` },
+      text: {
+        type: 'mrkdwn',
+        text: `*[${opts.projectName}]* 기능 구현 완료: *${opts.featureName}*${issueLink}`,
+      },
     },
   ];
 
@@ -1499,7 +1577,10 @@ export async function sendFeatureDiscoveryCompleteSlack(opts: {
     },
     {
       type: 'section',
-      text: { type: 'mrkdwn', text: `*${opts.candidateCount}개 기능* 후보가 발견되었습니다.\n대시보드에서 검토하고 등록하세요.` },
+      text: {
+        type: 'mrkdwn',
+        text: `*${opts.candidateCount}개 기능* 후보가 발견되었습니다.\n대시보드에서 검토하고 등록하세요.`,
+      },
     },
     {
       type: 'actions',
@@ -1518,10 +1599,16 @@ export async function sendFeatureDiscoveryCompleteSlack(opts: {
     await fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SLACK_BOT_TOKEN}` },
-      body: JSON.stringify({ channel: opts.channelId, text: `[${opts.projectName}] 기능 스캔 완료 — ${opts.candidateCount}개 발견`, blocks }),
+      body: JSON.stringify({
+        channel: opts.channelId,
+        text: `[${opts.projectName}] 기능 스캔 완료 — ${opts.candidateCount}개 발견`,
+        blocks,
+      }),
     });
     return true;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 export async function sendFeatureConversationStartSlack(opts: {
@@ -1543,5 +1630,7 @@ export async function sendFeatureConversationStartSlack(opts: {
     });
     const data = await res.json();
     return data.ts ?? null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }

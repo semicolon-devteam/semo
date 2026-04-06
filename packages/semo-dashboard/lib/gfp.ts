@@ -44,10 +44,7 @@ export async function listProjects(status?: string): Promise<GfpProject[]> {
 }
 
 export async function getProject(gfpId: string): Promise<GfpProject | null> {
-  const res = await query<GfpProject>(
-    'SELECT * FROM semo.services WHERE service_id =$1',
-    [gfpId]
-  );
+  const res = await query<GfpProject>('SELECT * FROM semo.services WHERE service_id =$1', [gfpId]);
   return res.rows[0] ?? null;
 }
 
@@ -73,29 +70,28 @@ export async function createProject(data: {
       data.owner_contact ?? null,
       data.service_domain ?? null,
       JSON.stringify({ preset: 'parallel', ...data.metadata }),
-    ]
+    ],
   );
   const project = res.rows[0];
 
   // parallel 프리셋: infra_phase = 0 초기화 (Track B 활성화)
   if (data.metadata?.preset === 'parallel') {
-    await query(
-      'UPDATE semo.services SET infra_phase = 0 WHERE service_id =$1',
-      [project.service_id]
-    );
+    await query('UPDATE semo.services SET infra_phase = 0 WHERE service_id =$1', [
+      project.service_id,
+    ]);
     project.infra_phase = 0;
   }
 
   // KB에 gfp_id 저장 (service_domain이 있을 때)
   if (data.service_domain) {
     writeGfpIdToKB(data.service_domain, project).catch((err) =>
-      console.error('[PM] KB gfp-id write failed:', err)
+      console.error('[PM] KB gfp-id write failed:', err),
     );
 
     // infra-ready 프리셋: 인프라 정보를 KB에 별도 기록
     if (data.metadata?.preset === 'infra-ready') {
       writeInfraToKB(data.service_domain, data.metadata).catch((err) =>
-        console.error('[PM] KB infra write failed:', err)
+        console.error('[PM] KB infra write failed:', err),
       );
     }
   }
@@ -107,17 +103,14 @@ export async function createProject(data: {
  * 온톨로지에 도메인이 없으면 자동 등록 (service 타입)
  */
 async function ensureOntologyDomain(domain: string, projectName: string): Promise<void> {
-  const check = await query(
-    'SELECT 1 FROM semo.ontology WHERE domain = $1',
-    [domain]
-  );
+  const check = await query('SELECT 1 FROM semo.ontology WHERE domain = $1', [domain]);
   if (check.rows.length > 0) return;
 
   await query(
     `INSERT INTO semo.ontology (domain, schema, entity_type, service, description, tags)
      VALUES ($1, '{}', 'service', $1, $2, $3)
      ON CONFLICT (domain) DO NOTHING`,
-    [domain, `${projectName} — GFP 프로젝트`, ['gfp', 'incubator']]
+    [domain, `${projectName} — GFP 프로젝트`, ['gfp', 'incubator']],
   );
   console.log(`[PM] Ontology domain '${domain}' auto-registered for project '${projectName}'`);
 }
@@ -149,14 +142,19 @@ async function writeGfpIdToKB(serviceDomain: string, project: GfpProject): Promi
   lines.push(`created_at: ${project.created_at}`);
 
   await upsertItem(serviceDomain, 'gfp-id', lines.join('\n'), 'pm-pipeline');
-  console.log(`[PM] KB gfp-id written for domain '${serviceDomain}': ${project.service_id} (preset: ${presetId})`);
+  console.log(
+    `[PM] KB gfp-id written for domain '${serviceDomain}': ${project.service_id} (preset: ${presetId})`,
+  );
 }
 
 /**
  * infra-ready 프리셋: 사전 구축된 인프라 정보를 KB에 기록.
  * 봇이 `semo kb get {domain} infra`로 인프라 정보를 조회할 수 있음.
  */
-async function writeInfraToKB(serviceDomain: string, metadata: Record<string, unknown>): Promise<void> {
+async function writeInfraToKB(
+  serviceDomain: string,
+  metadata: Record<string, unknown>,
+): Promise<void> {
   const { upsertItem } = await import('./kb');
   const presetConfig = metadata.preset_config as Record<string, unknown> | undefined;
   const infra = presetConfig?.infra as Record<string, unknown> | undefined;
@@ -178,7 +176,18 @@ async function writeInfraToKB(serviceDomain: string, metadata: Record<string, un
 
 export async function updateProject(
   gfpId: string,
-  data: Partial<Pick<GfpProject, 'project_name' | 'current_phase' | 'infra_phase' | 'status' | 'lifecycle' | 'launched_at' | 'metadata'>>
+  data: Partial<
+    Pick<
+      GfpProject,
+      | 'project_name'
+      | 'current_phase'
+      | 'infra_phase'
+      | 'status'
+      | 'lifecycle'
+      | 'launched_at'
+      | 'metadata'
+    >
+  >,
 ): Promise<GfpProject | null> {
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -221,14 +230,18 @@ export async function updateProject(
   params.push(gfpId);
   const res = await query<GfpProject>(
     `UPDATE semo.services SET ${sets.join(', ')} WHERE service_id =$${idx} RETURNING *`,
-    params
+    params,
   );
   return res.rows[0] ?? null;
 }
 
 // ── Sections ──
 
-export async function listSections(gfpId: string, phase?: number, track?: GfpTrack): Promise<GfpPhaseSection[]> {
+export async function listSections(
+  gfpId: string,
+  phase?: number,
+  track?: GfpTrack,
+): Promise<GfpPhaseSection[]> {
   let sql = 'SELECT * FROM semo.service_sections WHERE service_id =$1';
   const params: unknown[] = [gfpId];
   let idx = 2;
@@ -283,7 +296,7 @@ export async function upsertSection(data: {
       data.source ?? 'manual',
       data.qa_items ? JSON.stringify(data.qa_items) : null,
       track,
-    ]
+    ],
   );
   return res.rows[0];
 }
@@ -291,14 +304,14 @@ export async function upsertSection(data: {
 export async function updateSectionStatus(
   sectionId: string,
   status: GfpSectionStatus,
-  reviewerNote?: string
+  reviewerNote?: string,
 ): Promise<GfpPhaseSection | null> {
   const res = await query<GfpPhaseSection>(
     `UPDATE semo.service_sections
      SET status = $1, reviewer_note = $2
      WHERE section_id = $3
      RETURNING *`,
-    [status, reviewerNote ?? null, sectionId]
+    [status, reviewerNote ?? null, sectionId],
   );
   return res.rows[0] ?? null;
 }
@@ -306,14 +319,14 @@ export async function updateSectionStatus(
 export async function updateSectionContent(
   sectionId: string,
   content: string,
-  status?: GfpSectionStatus
+  status?: GfpSectionStatus,
 ): Promise<GfpPhaseSection | null> {
   const res = await query<GfpPhaseSection>(
     `UPDATE semo.service_sections
      SET content = $1, status = COALESCE($2, status)
      WHERE section_id = $3
      RETURNING *`,
-    [content, status ?? null, sectionId]
+    [content, status ?? null, sectionId],
   );
   return res.rows[0] ?? null;
 }
@@ -343,18 +356,18 @@ export function renderQAContent(items: GfpQAItem[]): string {
 export async function answerQAItems(
   sectionId: string,
   answers: Array<{ id: string; answer: string }>,
-  via: 'dashboard' | 'slack'
+  via: 'dashboard' | 'slack',
 ): Promise<GfpPhaseSection | null> {
   const sectionRes = await query<GfpPhaseSection>(
     'SELECT * FROM semo.service_sections WHERE section_id = $1',
-    [sectionId]
+    [sectionId],
   );
   const section = sectionRes.rows[0];
   if (!section || !section.qa_items) return null;
 
-  const qaItems: GfpQAItem[] = (typeof section.qa_items === 'string'
-    ? JSON.parse(section.qa_items)
-    : section.qa_items) as GfpQAItem[];
+  const qaItems: GfpQAItem[] = (
+    typeof section.qa_items === 'string' ? JSON.parse(section.qa_items) : section.qa_items
+  ) as GfpQAItem[];
 
   const now = new Date().toISOString();
   for (const ans of answers) {
@@ -372,17 +385,20 @@ export async function answerQAItems(
      SET qa_items = $1, content = $2
      WHERE section_id = $3
      RETURNING *`,
-    [JSON.stringify(qaItems), content, sectionId]
+    [JSON.stringify(qaItems), content, sectionId],
   );
   return res.rows[0] ?? null;
 }
 
 // ── Section management (delete / move) ──
 
-export async function deleteSection(sectionId: string, gfpId: string): Promise<GfpPhaseSection | null> {
+export async function deleteSection(
+  sectionId: string,
+  gfpId: string,
+): Promise<GfpPhaseSection | null> {
   const res = await query<GfpPhaseSection>(
     'DELETE FROM semo.service_sections WHERE section_id = $1 AND service_id =$2 RETURNING *',
-    [sectionId, gfpId]
+    [sectionId, gfpId],
   );
   return res.rows[0] ?? null;
 }
@@ -391,12 +407,12 @@ export async function moveSection(
   sectionId: string,
   gfpId: string,
   targetPhase: number,
-  targetTrack?: GfpTrack
+  targetTrack?: GfpTrack,
 ): Promise<GfpPhaseSection | null> {
   // Fetch current section to check existence and get section_key for conflict check
   const current = await query<GfpPhaseSection>(
     'SELECT * FROM semo.service_sections WHERE section_id = $1 AND service_id =$2',
-    [sectionId, gfpId]
+    [sectionId, gfpId],
   );
   if (!current.rows[0]) return null;
 
@@ -407,7 +423,7 @@ export async function moveSection(
   const conflict = await query<GfpPhaseSection>(
     `SELECT section_id FROM semo.service_sections
      WHERE service_id =$1 AND track = $2 AND phase = $3 AND section_key = $4 AND section_id != $5`,
-    [gfpId, track, targetPhase, section.section_key, sectionId]
+    [gfpId, track, targetPhase, section.section_key, sectionId],
   );
   if (conflict.rows.length > 0) {
     throw new Error('CONFLICT');
@@ -418,7 +434,7 @@ export async function moveSection(
      SET phase = $1, track = $2
      WHERE section_id = $3 AND service_id =$4
      RETURNING *`,
-    [targetPhase, track, sectionId, gfpId]
+    [targetPhase, track, sectionId, gfpId],
   );
   return res.rows[0] ?? null;
 }
@@ -426,14 +442,11 @@ export async function moveSection(
 /**
  * Save Slack thread_ts on a section (for answer collection polling).
  */
-export async function updateSectionSlackThread(
-  sectionId: string,
-  threadTs: string
-): Promise<void> {
-  await query(
-    'UPDATE semo.service_sections SET slack_thread_ts = $1 WHERE section_id = $2',
-    [threadTs, sectionId]
-  );
+export async function updateSectionSlackThread(sectionId: string, threadTs: string): Promise<void> {
+  await query('UPDATE semo.service_sections SET slack_thread_ts = $1 WHERE section_id = $2', [
+    threadTs,
+    sectionId,
+  ]);
 }
 
 // ── Phase progress helpers ──
@@ -477,7 +490,7 @@ export async function createMaterial(data: {
     `INSERT INTO semo.service_materials (service_id, content, phase_mapping)
      VALUES ($1, $2, $3)
      RETURNING *`,
-    [data.service_id, data.content, data.phase_mapping ? JSON.stringify(data.phase_mapping) : null]
+    [data.service_id, data.content, data.phase_mapping ? JSON.stringify(data.phase_mapping) : null],
   );
   return res.rows[0];
 }
@@ -485,7 +498,7 @@ export async function createMaterial(data: {
 export async function listMaterials(gfpId: string): Promise<GfpMaterial[]> {
   const res = await query<GfpMaterial>(
     'SELECT * FROM semo.service_materials WHERE service_id =$1 ORDER BY created_at DESC',
-    [gfpId]
+    [gfpId],
   );
   return res.rows;
 }
@@ -502,7 +515,7 @@ export async function createStitchMaterial(data: {
     `INSERT INTO semo.service_materials (service_id, content, material_type)
      VALUES ($1, $2, $3)
      RETURNING *`,
-    [data.service_id, data.content, materialType]
+    [data.service_id, data.content, materialType],
   );
   return res.rows[0];
 }
@@ -520,7 +533,7 @@ export async function setDesignStep(gfpId: string, step: number): Promise<void> 
     `UPDATE semo.services
      SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb
      WHERE service_id =$2`,
-    [JSON.stringify({ design_step: step }), gfpId]
+    [JSON.stringify({ design_step: step }), gfpId],
   );
 }
 
@@ -572,7 +585,7 @@ export async function createResearchTask(data: {
     `INSERT INTO semo.service_research_tasks (service_id, task_type, reference_urls, input_prompt)
      VALUES ($1, $2, $3, $4)
      RETURNING *`,
-    [data.service_id, data.task_type, data.reference_urls, data.input_prompt]
+    [data.service_id, data.task_type, data.reference_urls, data.input_prompt],
   );
   return res.rows[0];
 }
@@ -580,14 +593,14 @@ export async function createResearchTask(data: {
 export async function listResearchTasks(gfpId: string): Promise<GfpResearchTask[]> {
   const res = await query<GfpResearchTask>(
     'SELECT * FROM semo.service_research_tasks WHERE service_id =$1 ORDER BY created_at DESC',
-    [gfpId]
+    [gfpId],
   );
   return res.rows;
 }
 
 export async function updateResearchTask(
   taskId: string,
-  data: Partial<Pick<GfpResearchTask, 'status' | 'result'>>
+  data: Partial<Pick<GfpResearchTask, 'status' | 'result'>>,
 ): Promise<GfpResearchTask | null> {
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -606,7 +619,7 @@ export async function updateResearchTask(
   params.push(taskId);
   const res = await query<GfpResearchTask>(
     `UPDATE semo.service_research_tasks SET ${sets.join(', ')} WHERE task_id = $${idx} RETURNING *`,
-    params
+    params,
   );
   return res.rows[0] ?? null;
 }
@@ -617,7 +630,7 @@ export async function writebackPhaseToKB(
   gfpId: string,
   phase: number,
   serviceDomain: string,
-  phaseName: string
+  phaseName: string,
 ): Promise<void> {
   // Dynamically import to avoid circular deps
   const { upsertItem } = await import('./kb');
@@ -635,11 +648,12 @@ export async function writebackPhaseToKB(
 
   // KB write-back 시각 기록
   const sectionIds = sections.map((s) => s.section_id);
-  await query(
-    `UPDATE semo.service_sections SET kb_written_at = NOW() WHERE section_id = ANY($1)`,
-    [sectionIds]
+  await query(`UPDATE semo.service_sections SET kb_written_at = NOW() WHERE section_id = ANY($1)`, [
+    sectionIds,
+  ]);
+  console.log(
+    `[PM] KB write-back: ${serviceDomain} spec/${phaseName} (${sectionIds.length} sections)`,
   );
-  console.log(`[PM] KB write-back: ${serviceDomain} spec/${phaseName} (${sectionIds.length} sections)`);
 }
 
 // ── KB Write-back (phase progress) ──
@@ -649,7 +663,7 @@ export async function writebackPhaseProgressToKB(
   serviceDomain: string,
   completedPhase: number,
   nextPhase: number | null,
-  track: GfpTrack = 'plan'
+  track: GfpTrack = 'plan',
 ): Promise<void> {
   const { upsertItem } = await import('./kb');
   const { PHASE_LABELS, INFRA_PHASE_LABELS, getPhaseAssignee } = await import('./gfp-phases');
@@ -663,23 +677,22 @@ export async function writebackPhaseProgressToKB(
     ].join('\n');
 
     await upsertItem(serviceDomain, 'infra-status', content, 'pm-pipeline');
-    console.log(`[PM] KB infra progress: ${serviceDomain}/infra-status → phase ${nextPhase ?? 'done'}`);
+    console.log(
+      `[PM] KB infra progress: ${serviceDomain}/infra-status → phase ${nextPhase ?? 'done'}`,
+    );
     return;
   }
 
-  const completedPhases = Array.from({ length: completedPhase + 1 }, (_, i) =>
-    `${i}-${(PHASE_LABELS[i] ?? 'unknown').toLowerCase().replace(/\s+/g, '-')}`
+  const completedPhases = Array.from(
+    { length: completedPhase + 1 },
+    (_, i) => `${i}-${(PHASE_LABELS[i] ?? 'unknown').toLowerCase().replace(/\s+/g, '-')}`,
   );
 
-  const nextAssignee = nextPhase !== null && nextPhase <= 9
-    ? getPhaseAssignee(nextPhase)
-    : null;
+  const nextAssignee = nextPhase !== null && nextPhase <= 9 ? getPhaseAssignee(nextPhase) : null;
 
   // Include infra track info if available
   const project = await getProject(gfpId);
-  const infraLines = project?.infra_phase !== null
-    ? [`infra_phase: ${project?.infra_phase}`]
-    : [];
+  const infraLines = project?.infra_phase !== null ? [`infra_phase: ${project?.infra_phase}`] : [];
 
   const content = [
     `service_id: ${gfpId}`,
@@ -706,7 +719,7 @@ export async function writebackPhaseProgressToKB(
 export async function createSectionsFromMapping(
   gfpId: string,
   mappings: GfpPhaseMapping[],
-  track: GfpTrack = 'plan'
+  track: GfpTrack = 'plan',
 ): Promise<number> {
   let count = 0;
   await transaction(async (client) => {
@@ -719,7 +732,17 @@ export async function createSectionsFromMapping(
            ON CONFLICT (service_id, track, phase, section_key) DO UPDATE SET
              title = EXCLUDED.title, content = EXCLUDED.content, ordinal = EXCLUDED.ordinal,
              status = EXCLUDED.status, source = EXCLUDED.source`,
-          [gfpId, mapping.phase, sec.key, sec.title, sec.content, i, 'pending-review', 'imported', track]
+          [
+            gfpId,
+            mapping.phase,
+            sec.key,
+            sec.title,
+            sec.content,
+            i,
+            'pending-review',
+            'imported',
+            track,
+          ],
         );
         count++;
       }
@@ -733,7 +756,7 @@ export async function createSectionsFromMapping(
 export async function listInfraRequests(gfpId: string): Promise<GfpInfraRequest[]> {
   const res = await query<GfpInfraRequest>(
     'SELECT * FROM semo.service_infra_requests WHERE service_id =$1 ORDER BY created_at DESC',
-    [gfpId]
+    [gfpId],
   );
   return res.rows;
 }
@@ -759,7 +782,7 @@ export async function createInfraRequest(data: {
       data.title,
       data.description ?? null,
       data.priority ?? 'normal',
-    ]
+    ],
   );
   return res.rows[0];
 }
@@ -767,14 +790,14 @@ export async function createInfraRequest(data: {
 export async function updateInfraRequest(
   requestId: string,
   status: GfpInfraRequestStatus,
-  slackThreadTs?: string
+  slackThreadTs?: string,
 ): Promise<GfpInfraRequest | null> {
   const res = await query<GfpInfraRequest>(
     `UPDATE semo.service_infra_requests
      SET status = $1, slack_thread_ts = COALESCE($2, slack_thread_ts), updated_at = NOW()
      WHERE request_id = $3
      RETURNING *`,
-    [status, slackThreadTs ?? null, requestId]
+    [status, slackThreadTs ?? null, requestId],
   );
   return res.rows[0] ?? null;
 }
@@ -798,9 +821,16 @@ export async function createDeployVerification(data: {
   checks: DeployVerificationChecks;
   verified_by: string;
 }): Promise<DeployVerification> {
-  const allPassed = Object.values(data.checks).every(
-    (c) => c.status === 'pass' || c.status === 'skip',
-  );
+  const isStrictPhase = data.infra_phase === 2;
+  const allPassed = Object.entries(data.checks).every(([key, c]) => {
+    if (c.status === 'pass') return true;
+    if (c.status === 'skip') {
+      // Phase 2: pod_status, health_endpoint는 skip 불가 — InfraClaw callback 필수
+      if (isStrictPhase && (key === 'pod_status' || key === 'health_endpoint')) return false;
+      return true;
+    }
+    return false;
+  });
   const overall = allPassed ? 'pass' : 'fail';
 
   const res = await query<DeployVerification>(
@@ -845,7 +875,7 @@ export interface ServiceFeature {
 export async function listFeatures(projectId: string): Promise<ServiceFeature[]> {
   const res = await query<ServiceFeature>(
     'SELECT * FROM semo.service_features WHERE service_id = $1 ORDER BY category, sort_order, name',
-    [projectId]
+    [projectId],
   );
   return res.rows;
 }
@@ -875,26 +905,59 @@ export async function createFeature(data: {
       data.iteration_id ?? null,
       data.sort_order ?? 0,
       JSON.stringify(data.metadata ?? {}),
-    ]
+    ],
   );
   return res.rows[0];
 }
 
 export async function updateFeature(
   featureId: string,
-  data: Partial<Pick<ServiceFeature, 'name' | 'description' | 'category' | 'status' | 'parent_id' | 'iteration_id' | 'sort_order' | 'metadata'>>
+  data: Partial<
+    Pick<
+      ServiceFeature,
+      | 'name'
+      | 'description'
+      | 'category'
+      | 'status'
+      | 'parent_id'
+      | 'iteration_id'
+      | 'sort_order'
+      | 'metadata'
+    >
+  >,
 ): Promise<ServiceFeature | null> {
   const sets: string[] = [];
   const params: unknown[] = [];
   let idx = 1;
 
-  if (data.name !== undefined) { sets.push(`name = $${idx++}`); params.push(data.name); }
-  if (data.description !== undefined) { sets.push(`description = $${idx++}`); params.push(data.description); }
-  if (data.category !== undefined) { sets.push(`category = $${idx++}`); params.push(data.category); }
-  if (data.status !== undefined) { sets.push(`status = $${idx++}`); params.push(data.status); }
-  if (data.parent_id !== undefined) { sets.push(`parent_id = $${idx++}`); params.push(data.parent_id); }
-  if (data.iteration_id !== undefined) { sets.push(`iteration_id = $${idx++}`); params.push(data.iteration_id); }
-  if (data.sort_order !== undefined) { sets.push(`sort_order = $${idx++}`); params.push(data.sort_order); }
+  if (data.name !== undefined) {
+    sets.push(`name = $${idx++}`);
+    params.push(data.name);
+  }
+  if (data.description !== undefined) {
+    sets.push(`description = $${idx++}`);
+    params.push(data.description);
+  }
+  if (data.category !== undefined) {
+    sets.push(`category = $${idx++}`);
+    params.push(data.category);
+  }
+  if (data.status !== undefined) {
+    sets.push(`status = $${idx++}`);
+    params.push(data.status);
+  }
+  if (data.parent_id !== undefined) {
+    sets.push(`parent_id = $${idx++}`);
+    params.push(data.parent_id);
+  }
+  if (data.iteration_id !== undefined) {
+    sets.push(`iteration_id = $${idx++}`);
+    params.push(data.iteration_id);
+  }
+  if (data.sort_order !== undefined) {
+    sets.push(`sort_order = $${idx++}`);
+    params.push(data.sort_order);
+  }
   if (data.metadata !== undefined) {
     sets.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${idx++}::jsonb`);
     params.push(JSON.stringify(data.metadata));
@@ -904,7 +967,7 @@ export async function updateFeature(
   params.push(featureId);
   const res = await query<ServiceFeature>(
     `UPDATE semo.service_features SET ${sets.join(', ')} WHERE feature_id = $${idx} RETURNING *`,
-    params
+    params,
   );
   return res.rows[0] ?? null;
 }
@@ -912,7 +975,7 @@ export async function updateFeature(
 export async function deleteFeature(featureId: string): Promise<boolean> {
   const res = await query(
     `UPDATE semo.service_features SET status = 'deprecated' WHERE feature_id = $1`,
-    [featureId]
+    [featureId],
   );
   return (res.rowCount ?? 0) > 0;
 }
@@ -933,14 +996,21 @@ export interface ServiceOverviewKB {
 
 export async function getServiceOverviewKB(serviceDomain: string): Promise<ServiceOverviewKB> {
   const keys = [
-    'base-information', 'po', 'tech-stack', 'service-url',
-    'repo', 'slack-channel', 'bm', 'current-situation', 'infra',
+    'base-information',
+    'po',
+    'tech-stack',
+    'service-url',
+    'repo',
+    'slack-channel',
+    'bm',
+    'current-situation',
+    'infra',
   ];
   const res = await query<{ key: string; content: string }>(
     `SELECT key, content FROM semo.knowledge_base
      WHERE domain = $1 AND key = ANY($2) AND sub_key = ''
      ORDER BY key`,
-    [serviceDomain, keys]
+    [serviceDomain, keys],
   );
   const map = new Map(res.rows.map((r) => [r.key, r.content]));
   return {
@@ -963,43 +1033,69 @@ export async function getServiceKPIData(serviceDomain: string, limit = 5) {
      FROM semo.knowledge_base
      WHERE domain = $1 AND key = 'kpi' AND sub_key != ''
      ORDER BY sub_key DESC LIMIT $2`,
-    [serviceDomain, limit]
+    [serviceDomain, limit],
   );
 
   // Action items — latest N
-  const actionRes = await query<{ key: string; sub_key: string; content: string; updated_at: string }>(
+  const actionRes = await query<{
+    key: string;
+    sub_key: string;
+    content: string;
+    updated_at: string;
+  }>(
     `SELECT key, sub_key, content, updated_at::text
      FROM semo.knowledge_base
      WHERE domain = $1 AND key = 'action-item' AND sub_key != ''
      ORDER BY sub_key DESC LIMIT $2`,
-    [serviceDomain, limit]
+    [serviceDomain, limit],
   );
 
   // Milestones
-  const milestoneRes = await query<{ key: string; sub_key: string; content: string; metadata: Record<string, unknown> }>(
+  const milestoneRes = await query<{
+    key: string;
+    sub_key: string;
+    content: string;
+    metadata: Record<string, unknown>;
+  }>(
     `SELECT key, sub_key, content, metadata
      FROM semo.knowledge_base
      WHERE domain = $1 AND key = 'milestone'
      ORDER BY sub_key`,
-    [serviceDomain]
+    [serviceDomain],
   );
 
   return {
-    kpiSnapshots: kpiRes.rows.map((r) => ({ subKey: r.sub_key, content: r.content, updatedAt: r.updated_at })),
-    actionItems: actionRes.rows.map((r) => ({ subKey: r.sub_key, content: r.content, updatedAt: r.updated_at })),
-    milestones: milestoneRes.rows.map((r) => ({ subKey: r.sub_key, content: r.content, metadata: r.metadata ?? {} })),
+    kpiSnapshots: kpiRes.rows.map((r) => ({
+      subKey: r.sub_key,
+      content: r.content,
+      updatedAt: r.updated_at,
+    })),
+    actionItems: actionRes.rows.map((r) => ({
+      subKey: r.sub_key,
+      content: r.content,
+      updatedAt: r.updated_at,
+    })),
+    milestones: milestoneRes.rows.map((r) => ({
+      subKey: r.sub_key,
+      content: r.content,
+      metadata: r.metadata ?? {},
+    })),
   };
 }
 
 // ── KPI Metrics (DB records) ──
 
-export async function listKPIMetrics(projectId: string, period?: string, limit = 50): Promise<ServiceKPIMetric[]> {
+export async function listKPIMetrics(
+  projectId: string,
+  period?: string,
+  limit = 50,
+): Promise<ServiceKPIMetric[]> {
   if (period) {
     const res = await query<ServiceKPIMetric>(
       `SELECT * FROM semo.service_kpi_metrics
        WHERE service_id = $1 AND period = $2::date
        ORDER BY category, metric_name`,
-      [projectId, period]
+      [projectId, period],
     );
     return res.rows;
   }
@@ -1008,7 +1104,7 @@ export async function listKPIMetrics(projectId: string, period?: string, limit =
      WHERE service_id = $1
      ORDER BY period DESC, category, metric_name
      LIMIT $2`,
-    [projectId, limit]
+    [projectId, limit],
   );
   return res.rows;
 }
@@ -1017,7 +1113,7 @@ export async function listKPIPeriods(projectId: string): Promise<string[]> {
   const res = await query<{ period: string }>(
     `SELECT DISTINCT period::text FROM semo.service_kpi_metrics
      WHERE service_id = $1 ORDER BY period DESC`,
-    [projectId]
+    [projectId],
   );
   return res.rows.map((r) => r.period);
 }
@@ -1026,7 +1122,12 @@ export async function batchCreateKPIMetrics(
   projectId: string,
   period: string,
   source: string,
-  metrics: Array<Omit<ServiceKPIMetric, 'metric_id' | 'service_id' | 'period' | 'source' | 'created_at' | 'updated_at'>>
+  metrics: Array<
+    Omit<
+      ServiceKPIMetric,
+      'metric_id' | 'service_id' | 'period' | 'source' | 'created_at' | 'updated_at'
+    >
+  >,
 ): Promise<ServiceKPIMetric[]> {
   return transaction(async (client) => {
     const results: ServiceKPIMetric[] = [];
@@ -1038,11 +1139,22 @@ export async function batchCreateKPIMetrics(
          VALUES ($1, $2, $3::date, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
          RETURNING *`,
         [
-          projectId, m.iteration_id ?? null, period, m.metric_name, m.metric_label ?? null, m.category ?? 'common',
-          m.current_value ?? null, m.baseline_value ?? null, m.target_value ?? null,
-          m.unit ?? null, m.wow_change ?? null, m.signal ?? 'neutral', m.achieved ?? false,
-          source, JSON.stringify(m.metadata ?? {}),
-        ]
+          projectId,
+          m.iteration_id ?? null,
+          period,
+          m.metric_name,
+          m.metric_label ?? null,
+          m.category ?? 'common',
+          m.current_value ?? null,
+          m.baseline_value ?? null,
+          m.target_value ?? null,
+          m.unit ?? null,
+          m.wow_change ?? null,
+          m.signal ?? 'neutral',
+          m.achieved ?? false,
+          source,
+          JSON.stringify(m.metadata ?? {}),
+        ],
       );
       results.push(res.rows[0]);
     }
@@ -1052,7 +1164,21 @@ export async function batchCreateKPIMetrics(
 
 export async function updateKPIMetric(
   metricId: string,
-  data: Partial<Pick<ServiceKPIMetric, 'current_value' | 'baseline_value' | 'target_value' | 'wow_change' | 'signal' | 'achieved' | 'metric_label' | 'category' | 'unit' | 'metadata'>>
+  data: Partial<
+    Pick<
+      ServiceKPIMetric,
+      | 'current_value'
+      | 'baseline_value'
+      | 'target_value'
+      | 'wow_change'
+      | 'signal'
+      | 'achieved'
+      | 'metric_label'
+      | 'category'
+      | 'unit'
+      | 'metadata'
+    >
+  >,
 ): Promise<ServiceKPIMetric | null> {
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -1072,7 +1198,7 @@ export async function updateKPIMetric(
   params.push(metricId);
   const res = await query<ServiceKPIMetric>(
     `UPDATE semo.service_kpi_metrics SET ${sets.join(', ')} WHERE metric_id = $${idx} RETURNING *`,
-    params
+    params,
   );
   return res.rows[0] ?? null;
 }
@@ -1084,13 +1210,16 @@ export async function deleteKPIMetric(metricId: string): Promise<boolean> {
 
 // ── Service Action Items (DB records) ──
 
-export async function listServiceActionItems(projectId: string, status?: string): Promise<ServiceActionItem[]> {
+export async function listServiceActionItems(
+  projectId: string,
+  status?: string,
+): Promise<ServiceActionItem[]> {
   if (status) {
     const res = await query<ServiceActionItem>(
       `SELECT * FROM semo.service_action_items
        WHERE service_id = $1 AND status = $2
        ORDER BY sort_order, created_at DESC`,
-      [projectId, status]
+      [projectId, status],
     );
     return res.rows;
   }
@@ -1098,7 +1227,7 @@ export async function listServiceActionItems(projectId: string, status?: string)
     `SELECT * FROM semo.service_action_items
      WHERE service_id = $1
      ORDER BY CASE status WHEN 'open' THEN 0 WHEN 'completed' THEN 1 ELSE 2 END, sort_order, created_at DESC`,
-    [projectId]
+    [projectId],
   );
   return res.rows;
 }
@@ -1123,18 +1252,39 @@ export async function createServiceActionItem(data: {
      VALUES ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12)
      RETURNING *`,
     [
-      data.service_id, data.iteration_id ?? null, data.description,
-      data.assignee ?? null, data.deadline ?? null, data.status ?? 'open',
-      data.priority ?? 'normal', data.category ?? null, data.source ?? 'manual',
-      data.related_url ?? null, data.sort_order ?? 0, JSON.stringify(data.metadata ?? {}),
-    ]
+      data.service_id,
+      data.iteration_id ?? null,
+      data.description,
+      data.assignee ?? null,
+      data.deadline ?? null,
+      data.status ?? 'open',
+      data.priority ?? 'normal',
+      data.category ?? null,
+      data.source ?? 'manual',
+      data.related_url ?? null,
+      data.sort_order ?? 0,
+      JSON.stringify(data.metadata ?? {}),
+    ],
   );
   return res.rows[0];
 }
 
 export async function updateServiceActionItem(
   itemId: string,
-  data: Partial<Pick<ServiceActionItem, 'description' | 'assignee' | 'deadline' | 'status' | 'priority' | 'category' | 'related_url' | 'sort_order' | 'metadata'>>
+  data: Partial<
+    Pick<
+      ServiceActionItem,
+      | 'description'
+      | 'assignee'
+      | 'deadline'
+      | 'status'
+      | 'priority'
+      | 'category'
+      | 'related_url'
+      | 'sort_order'
+      | 'metadata'
+    >
+  >,
 ): Promise<ServiceActionItem | null> {
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -1161,25 +1311,30 @@ export async function updateServiceActionItem(
   params.push(itemId);
   const res = await query<ServiceActionItem>(
     `UPDATE semo.service_action_items SET ${sets.join(', ')} WHERE action_item_id = $${idx} RETURNING *`,
-    params
+    params,
   );
   return res.rows[0] ?? null;
 }
 
 export async function deleteServiceActionItem(itemId: string): Promise<boolean> {
-  const res = await query('DELETE FROM semo.service_action_items WHERE action_item_id = $1', [itemId]);
+  const res = await query('DELETE FROM semo.service_action_items WHERE action_item_id = $1', [
+    itemId,
+  ]);
   return (res.rowCount ?? 0) > 0;
 }
 
 // ── Service Iterations (ops mode sprint management) ──
 
-export async function listIterations(projectId: string, status?: string): Promise<ServiceIteration[]> {
+export async function listIterations(
+  projectId: string,
+  status?: string,
+): Promise<ServiceIteration[]> {
   if (status) {
     const res = await query<ServiceIteration>(
       `SELECT * FROM semo.service_iterations
        WHERE service_id = $1 AND status = $2
        ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'planned' THEN 1 ELSE 2 END, created_at DESC`,
-      [projectId, status]
+      [projectId, status],
     );
     return res.rows;
   }
@@ -1187,7 +1342,7 @@ export async function listIterations(projectId: string, status?: string): Promis
     `SELECT * FROM semo.service_iterations
      WHERE service_id = $1
      ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'planned' THEN 1 ELSE 2 END, created_at DESC`,
-    [projectId]
+    [projectId],
   );
   return res.rows;
 }
@@ -1195,7 +1350,7 @@ export async function listIterations(projectId: string, status?: string): Promis
 export async function getIteration(iterationId: string): Promise<ServiceIteration | null> {
   const res = await query<ServiceIteration>(
     'SELECT * FROM semo.service_iterations WHERE iteration_id = $1',
-    [iterationId]
+    [iterationId],
   );
   return res.rows[0] ?? null;
 }
@@ -1217,31 +1372,54 @@ export async function createIteration(data: {
       data.goal ?? null,
       data.status ?? 'planned',
       data.started_at ?? null,
-    ]
+    ],
   );
   return res.rows[0];
 }
 
 export async function updateIteration(
   iterationId: string,
-  data: Partial<Pick<ServiceIteration, 'title' | 'goal' | 'status' | 'started_at' | 'completed_at' | 'retrospective'>>
+  data: Partial<
+    Pick<
+      ServiceIteration,
+      'title' | 'goal' | 'status' | 'started_at' | 'completed_at' | 'retrospective'
+    >
+  >,
 ): Promise<ServiceIteration | null> {
   const sets: string[] = [];
   const params: unknown[] = [];
   let idx = 1;
 
-  if (data.title !== undefined) { sets.push(`title = $${idx++}`); params.push(data.title); }
-  if (data.goal !== undefined) { sets.push(`goal = $${idx++}`); params.push(data.goal); }
-  if (data.status !== undefined) { sets.push(`status = $${idx++}`); params.push(data.status); }
-  if (data.started_at !== undefined) { sets.push(`started_at = $${idx++}`); params.push(data.started_at); }
-  if (data.completed_at !== undefined) { sets.push(`completed_at = $${idx++}`); params.push(data.completed_at); }
-  if (data.retrospective !== undefined) { sets.push(`retrospective = $${idx++}`); params.push(data.retrospective); }
+  if (data.title !== undefined) {
+    sets.push(`title = $${idx++}`);
+    params.push(data.title);
+  }
+  if (data.goal !== undefined) {
+    sets.push(`goal = $${idx++}`);
+    params.push(data.goal);
+  }
+  if (data.status !== undefined) {
+    sets.push(`status = $${idx++}`);
+    params.push(data.status);
+  }
+  if (data.started_at !== undefined) {
+    sets.push(`started_at = $${idx++}`);
+    params.push(data.started_at);
+  }
+  if (data.completed_at !== undefined) {
+    sets.push(`completed_at = $${idx++}`);
+    params.push(data.completed_at);
+  }
+  if (data.retrospective !== undefined) {
+    sets.push(`retrospective = $${idx++}`);
+    params.push(data.retrospective);
+  }
 
   if (sets.length === 0) return null;
   params.push(iterationId);
   const res = await query<ServiceIteration>(
     `UPDATE semo.service_iterations SET ${sets.join(', ')} WHERE iteration_id = $${idx} RETURNING *`,
-    params
+    params,
   );
   return res.rows[0] ?? null;
 }
@@ -1249,22 +1427,27 @@ export async function updateIteration(
 export async function activateIteration(iterationId: string): Promise<ServiceIteration | null> {
   const res = await query<ServiceIteration>(
     `UPDATE semo.service_iterations SET status = 'active', started_at = NOW() WHERE iteration_id = $1 RETURNING *`,
-    [iterationId]
+    [iterationId],
   );
   return res.rows[0] ?? null;
 }
 
-export async function completeIteration(iterationId: string, retrospective?: string): Promise<ServiceIteration | null> {
+export async function completeIteration(
+  iterationId: string,
+  retrospective?: string,
+): Promise<ServiceIteration | null> {
   const res = await query<ServiceIteration>(
     `UPDATE semo.service_iterations SET status = 'completed', completed_at = NOW(), retrospective = COALESCE($2, retrospective)
      WHERE iteration_id = $1 RETURNING *`,
-    [iterationId, retrospective ?? null]
+    [iterationId, retrospective ?? null],
   );
   return res.rows[0] ?? null;
 }
 
 export async function deleteIteration(iterationId: string): Promise<boolean> {
-  const res = await query('DELETE FROM semo.service_iterations WHERE iteration_id = $1', [iterationId]);
+  const res = await query('DELETE FROM semo.service_iterations WHERE iteration_id = $1', [
+    iterationId,
+  ]);
   return (res.rowCount ?? 0) > 0;
 }
 
@@ -1276,38 +1459,57 @@ export async function createDiscoverySession(data: {
 }): Promise<FeatureDiscoverySession> {
   const res = await query<FeatureDiscoverySession>(
     `INSERT INTO semo.feature_discovery_sessions (service_id, source_url) VALUES ($1, $2) RETURNING *`,
-    [data.service_id, data.source_url]
+    [data.service_id, data.source_url],
   );
   return res.rows[0];
 }
 
-export async function getDiscoverySession(sessionId: string): Promise<FeatureDiscoverySession | null> {
+export async function getDiscoverySession(
+  sessionId: string,
+): Promise<FeatureDiscoverySession | null> {
   const res = await query<FeatureDiscoverySession>(
     'SELECT * FROM semo.feature_discovery_sessions WHERE session_id = $1',
-    [sessionId]
+    [sessionId],
   );
   return res.rows[0] ?? null;
 }
 
 export async function updateDiscoverySession(
   sessionId: string,
-  data: Partial<Pick<FeatureDiscoverySession, 'status' | 'candidates' | 'confirmed' | 'screenshots' | 'error'>>
+  data: Partial<
+    Pick<FeatureDiscoverySession, 'status' | 'candidates' | 'confirmed' | 'screenshots' | 'error'>
+  >,
 ): Promise<FeatureDiscoverySession | null> {
   const sets: string[] = [];
   const params: unknown[] = [];
   let idx = 1;
 
-  if (data.status !== undefined) { sets.push(`status = $${idx++}`); params.push(data.status); }
-  if (data.candidates !== undefined) { sets.push(`candidates = $${idx++}::jsonb`); params.push(JSON.stringify(data.candidates)); }
-  if (data.confirmed !== undefined) { sets.push(`confirmed = $${idx++}::jsonb`); params.push(JSON.stringify(data.confirmed)); }
-  if (data.screenshots !== undefined) { sets.push(`screenshots = $${idx++}::jsonb`); params.push(JSON.stringify(data.screenshots)); }
-  if (data.error !== undefined) { sets.push(`error = $${idx++}`); params.push(data.error); }
+  if (data.status !== undefined) {
+    sets.push(`status = $${idx++}`);
+    params.push(data.status);
+  }
+  if (data.candidates !== undefined) {
+    sets.push(`candidates = $${idx++}::jsonb`);
+    params.push(JSON.stringify(data.candidates));
+  }
+  if (data.confirmed !== undefined) {
+    sets.push(`confirmed = $${idx++}::jsonb`);
+    params.push(JSON.stringify(data.confirmed));
+  }
+  if (data.screenshots !== undefined) {
+    sets.push(`screenshots = $${idx++}::jsonb`);
+    params.push(JSON.stringify(data.screenshots));
+  }
+  if (data.error !== undefined) {
+    sets.push(`error = $${idx++}`);
+    params.push(data.error);
+  }
 
   if (sets.length === 0) return null;
   params.push(sessionId);
   const res = await query<FeatureDiscoverySession>(
     `UPDATE semo.feature_discovery_sessions SET ${sets.join(', ')} WHERE session_id = $${idx} RETURNING *`,
-    params
+    params,
   );
   return res.rows[0] ?? null;
 }
@@ -1315,7 +1517,7 @@ export async function updateDiscoverySession(
 export async function listDiscoverySessions(serviceId: string): Promise<FeatureDiscoverySession[]> {
   const res = await query<FeatureDiscoverySession>(
     'SELECT * FROM semo.feature_discovery_sessions WHERE service_id = $1 ORDER BY created_at DESC LIMIT 10',
-    [serviceId]
+    [serviceId],
   );
   return res.rows;
 }
@@ -1331,35 +1533,48 @@ export async function createConversationSession(data: {
   const res = await query<FeatureConversationSession>(
     `INSERT INTO semo.feature_conversation_sessions (service_id, mode, slack_channel, slack_thread_ts)
      VALUES ($1, $2, $3, $4) RETURNING *`,
-    [data.service_id, data.mode ?? 'create', data.slack_channel ?? null, data.slack_thread_ts ?? null]
+    [
+      data.service_id,
+      data.mode ?? 'create',
+      data.slack_channel ?? null,
+      data.slack_thread_ts ?? null,
+    ],
   );
   return res.rows[0];
 }
 
-export async function getConversationSession(sessionId: string): Promise<FeatureConversationSession | null> {
+export async function getConversationSession(
+  sessionId: string,
+): Promise<FeatureConversationSession | null> {
   const res = await query<FeatureConversationSession>(
     'SELECT * FROM semo.feature_conversation_sessions WHERE session_id = $1',
-    [sessionId]
+    [sessionId],
   );
   return res.rows[0] ?? null;
 }
 
 export async function updateConversationSession(
   sessionId: string,
-  data: Partial<Pick<FeatureConversationSession, 'status' | 'features'>>
+  data: Partial<Pick<FeatureConversationSession, 'status' | 'features'>>,
 ): Promise<FeatureConversationSession | null> {
   const sets: string[] = [];
   const params: unknown[] = [];
   let idx = 1;
 
-  if (data.status !== undefined) { sets.push(`status = $${idx++}`); params.push(data.status); }
-  if (data.features !== undefined) { sets.push(`features = $${idx++}::jsonb`); params.push(JSON.stringify(data.features)); }
+  if (data.status !== undefined) {
+    sets.push(`status = $${idx++}`);
+    params.push(data.status);
+  }
+  if (data.features !== undefined) {
+    sets.push(`features = $${idx++}::jsonb`);
+    params.push(JSON.stringify(data.features));
+  }
 
   if (sets.length === 0) return null;
   params.push(sessionId);
   const res = await query<FeatureConversationSession>(
     `UPDATE semo.feature_conversation_sessions SET ${sets.join(', ')} WHERE session_id = $${idx} RETURNING *`,
-    params
+    params,
   );
   return res.rows[0] ?? null;
 }
@@ -1375,7 +1590,7 @@ export async function bulkCreateFeatures(
     status?: string;
     parent_id?: string;
     metadata?: Record<string, unknown>;
-  }>
+  }>,
 ): Promise<ServiceFeature[]> {
   if (features.length === 0) return [];
 
@@ -1385,10 +1600,14 @@ export async function bulkCreateFeatures(
       `INSERT INTO semo.service_features (service_id, name, description, category, status, parent_id, metadata)
        VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
       [
-        serviceId, f.name, f.description ?? null,
-        f.category ?? 'core', f.status ?? 'active',
-        f.parent_id ?? null, JSON.stringify(f.metadata ?? {}),
-      ]
+        serviceId,
+        f.name,
+        f.description ?? null,
+        f.category ?? 'core',
+        f.status ?? 'active',
+        f.parent_id ?? null,
+        JSON.stringify(f.metadata ?? {}),
+      ],
     );
     results.push(res.rows[0]);
   }

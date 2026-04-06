@@ -14,10 +14,7 @@ export const dynamic = 'force-dynamic';
 const SOURCE_REPO_TOKEN = process.env.SOURCE_REPO_TOKEN;
 const GITHUB_ORG = 'semicolon-devteam';
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const project = await getProject(id);
@@ -34,10 +31,7 @@ export async function GET(
   }
 }
 
-export async function POST(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const project = await getProject(id);
@@ -62,8 +56,12 @@ export async function POST(
       checks: {
         ci_build: ciResult,
         health_endpoint: healthResult,
-        pod_status: { status: 'skip', detail: 'kubectl 접근 불가 — InfraClaw callback으로 보완' },
-        tls_cert: { status: 'skip', detail: 'kubectl 접근 불가 — InfraClaw callback으로 보완' },
+        pod_status: {
+          status: 'skip',
+          detail:
+            'kubectl 접근 불가 — InfraClaw callback 필요. CreateContainerConfigError는 K8s Secret 미존재가 주원인.',
+        },
+        tls_cert: { status: 'skip', detail: 'kubectl 접근 불가 — InfraClaw callback 필요.' },
       },
       verified_by: 'dashboard-api',
     });

@@ -319,6 +319,7 @@ export interface DeployVerificationChecks {
   pod_status: DeployCheckResult;
   health_endpoint: DeployCheckResult;
   tls_cert: DeployCheckResult;
+  k8s_secret?: DeployCheckResult;
 }
 
 export type DeployVerificationOverall = 'pass' | 'fail';

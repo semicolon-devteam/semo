@@ -969,6 +969,31 @@ export async function kbUpsert(
     }
   }
 
+  // Metadata required fields validation by key type
+  {
+    const meta = (entry.metadata || {}) as Record<string, unknown>;
+    const requiredMetaByKey: Record<string, { fields: string[]; label: string }> = {
+      decision: {
+        fields: ['decided_at', 'decided_by'],
+        label: '의사결정',
+      },
+      incident: {
+        fields: ['occurred_at', 'severity', 'status'],
+        label: '인시던트',
+      },
+    };
+    const rule = requiredMetaByKey[key];
+    if (rule) {
+      const missing = rule.fields.filter((f) => !meta[f]);
+      if (missing.length > 0) {
+        return {
+          success: false,
+          error: `${rule.label} 엔트리(key='${key}')는 metadata에 [${missing.join(', ')}] 필드가 필수입니다. --metadata '{"${missing[0]}":"..."}' 형태로 전달하세요.`,
+        };
+      }
+    }
+  }
+
   // Generate embedding (mandatory)
   const fullKey = combineKey(key, subKey);
   const text = `${fullKey}: ${entry.content}`;

@@ -343,6 +343,11 @@ async function handleInfraTrackApproval(
   if (phase === 0 || phase === 2) {
     const verification = await getLatestVerification(gfpId, phase);
     if (!verification || verification.overall_status !== 'pass') {
+      const failedChecks = verification
+        ? Object.entries(verification.checks)
+            .filter(([, c]) => c.status === 'fail')
+            .map(([key, c]) => `${key}: ${c.detail}`)
+        : [];
       console.warn(
         `[GFP] Infra phase ${phase} approval blocked — deploy verification missing or failed for ${gfpId}`,
       );
@@ -351,6 +356,7 @@ async function handleInfraTrackApproval(
         gfpId,
         infraPhase: phase,
         channelId: slackCtx.channelId,
+        failedChecks,
       }).catch((err) => console.error('Deploy verification Slack failed:', err));
       return;
     }
