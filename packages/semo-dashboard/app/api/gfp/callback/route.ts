@@ -720,6 +720,44 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true, verification });
       }
 
+      case 'incubator-checkpoint': {
+        if (!body.service_id || body.checkpoint === undefined || !body.status) {
+          return NextResponse.json(
+            { error: 'service_id, checkpoint, and status are required for incubator-checkpoint' },
+            { status: 400 },
+          );
+        }
+
+        const incProject = await getProject(body.service_id);
+        if (!incProject) {
+          return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+        }
+
+        const incMetadata = { ...(incProject.metadata || {}) };
+        if (!incMetadata.incubator) {
+          incMetadata.incubator = { version: 1, checkpoints: {} };
+        }
+        incMetadata.incubator.current_cp = body.checkpoint;
+        if (!incMetadata.incubator.checkpoints) incMetadata.incubator.checkpoints = {};
+        incMetadata.incubator.checkpoints[body.checkpoint] = {
+          status: body.status,
+          summary: body.summary || '',
+          ...(body.status === 'completed' ? { completed_at: new Date().toISOString() } : {}),
+          ...(body.status === 'in-progress' ? { started_at: new Date().toISOString() } : {}),
+        };
+        incMetadata.incubator.last_activity = `CP-${body.checkpoint}: ${body.summary || body.status}`;
+
+        await query(
+          'UPDATE semo.services SET metadata = $1, updated_at = NOW() WHERE service_id = $2',
+          [JSON.stringify(incMetadata), body.service_id],
+        );
+
+        console.log(
+          `[GFP Callback] Incubator CP-${body.checkpoint} ${body.status} for ${body.service_id} by ${body.bot_id}`,
+        );
+        return NextResponse.json({ ok: true, checkpoint: body.checkpoint, status: body.status });
+      }
+
       default:
         return NextResponse.json(
           { error: `Unknown callback type: ${(body as CallbackPayload).type}` },
