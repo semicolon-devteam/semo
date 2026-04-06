@@ -139,6 +139,16 @@ interface DeployVerificationPayload {
   bot_id: string;
 }
 
+interface IncubatorCheckpointPayload {
+  type: 'incubator-checkpoint';
+  service_id: string;
+  checkpoint: number;
+  status: 'completed' | 'in-progress' | 'blocked';
+  summary?: string;
+  bot_id: string;
+  next_action?: string;
+}
+
 type CallbackPayload =
   | SectionRegenerationPayload
   | ResearchResultPayload
@@ -152,7 +162,8 @@ type CallbackPayload =
   | FeatureSpecEnrichedPayload
   | FeatureConversationCompletePayload
   | FeatureTestCompletePayload
-  | DeployVerificationPayload;
+  | DeployVerificationPayload
+  | IncubatorCheckpointPayload;
 
 export async function POST(request: NextRequest) {
   try {
@@ -733,19 +744,21 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: 'Project not found' }, { status: 404 });
         }
 
-        const incMetadata = { ...(incProject.metadata || {}) };
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const incMetadata: Record<string, any> = { ...(incProject.metadata || {}) };
         if (!incMetadata.incubator) {
           incMetadata.incubator = { version: 1, checkpoints: {} };
         }
-        incMetadata.incubator.current_cp = body.checkpoint;
-        if (!incMetadata.incubator.checkpoints) incMetadata.incubator.checkpoints = {};
-        incMetadata.incubator.checkpoints[body.checkpoint] = {
+        const inc = incMetadata.incubator;
+        inc.current_cp = body.checkpoint;
+        if (!inc.checkpoints) inc.checkpoints = {};
+        inc.checkpoints[body.checkpoint] = {
           status: body.status,
           summary: body.summary || '',
           ...(body.status === 'completed' ? { completed_at: new Date().toISOString() } : {}),
           ...(body.status === 'in-progress' ? { started_at: new Date().toISOString() } : {}),
         };
-        incMetadata.incubator.last_activity = `CP-${body.checkpoint}: ${body.summary || body.status}`;
+        inc.last_activity = `CP-${body.checkpoint}: ${body.summary || body.status}`;
 
         await query(
           'UPDATE semo.services SET metadata = $1, updated_at = NOW() WHERE service_id = $2',
