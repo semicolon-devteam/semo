@@ -969,6 +969,30 @@ export async function kbUpsert(
     }
   }
 
+  // Slug hygiene validation for decision/incident
+  if (key === 'decision' || key === 'incident') {
+    const slug = subKey.replace(/^\d{4}-\d{2}-\d{2}\//, ''); // strip date prefix
+    if (/^test/i.test(slug) || /test$/i.test(slug) || slug === 'test') {
+      return {
+        success: false,
+        error: `${key}의 sub_key에 'test'가 포함되어 있습니다. 테스트 데이터는 KB에 저장할 수 없습니다.`,
+      };
+    }
+    if (slug.length < 3) {
+      return {
+        success: false,
+        error: `${key}의 sub_key '${slug}'가 너무 짧습니다 (최소 3자). 구체적인 slug를 사용하세요 (예: 'github-seat-reduction').`,
+      };
+    }
+    const genericSlugs = ['결정사항', '검토된-대안', '변경사항', '결정', '메모', '임시'];
+    if (genericSlugs.includes(slug)) {
+      return {
+        success: false,
+        error: `${key}의 sub_key '${slug}'가 너무 일반적입니다. 구체적인 slug를 사용하세요 (예: 'github-seat-reduction').`,
+      };
+    }
+  }
+
   // Metadata required fields validation by key type
   {
     const meta = (entry.metadata || {}) as Record<string, unknown>;
