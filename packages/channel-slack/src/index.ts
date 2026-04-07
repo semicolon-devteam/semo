@@ -213,8 +213,9 @@ async function forwardToSession(event: {
   ts: string;
   thread_ts?: string;
 }) {
-  // 봇 자신의 메시지 무시
-  if (event.user === botUserId) return;
+  // 봇 자신의 메시지 무시 — 단, [Route:] 태그가 있으면 시스템 디스패치로 간주하여 통과
+  const isSystemDispatch = /\[Route:\s*\w+\]/.test(event.text);
+  if (event.user === botUserId && !isSystemDispatch) return;
 
   // 채널 필터: 지정된 채널만 처리
   if (SLACK_CHANNEL_ID && event.channel !== SLACK_CHANNEL_ID) return;
