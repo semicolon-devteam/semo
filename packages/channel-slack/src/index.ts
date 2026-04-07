@@ -73,6 +73,10 @@ const slackSocket = new SocketModeClient({ appToken: SLACK_APP_TOKEN });
 // Bot user ID (resolved at startup)
 let botUserId = '';
 
+// Pending ask_user responses: requestId → resolve function
+const pendingAskResponses = new Map<string, (value: string) => void>();
+let askRequestCounter = 0;
+
 // ============================================================
 // MCP Channel Server
 // ============================================================
@@ -97,6 +101,8 @@ ROUTING RULES:
 - Use the reply tool with the same thread_ts and pending_ts to post in-thread
 - ALWAYS pass pending_ts from meta to the reply tool — it deletes the "응답을 생성 중..." message
 - If thread_ts is empty, a new thread will be created
+- When you need user input (choosing between options), use the ask_user tool instead of AskUserQuestion
+- ask_user posts interactive buttons to Slack and blocks until the user clicks one (120s timeout)
 
 SERVICE_ID: ${SEMO_SERVICE_ID}`,
   },
@@ -131,6 +137,42 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
         },
         required: ['text', 'slack_channel'],
+      },
+    },
+    {
+      name: 'ask_user',
+      description:
+        'Post an interactive question to Slack with buttons. Blocks until the user clicks a button (timeout 120s). Returns the selected option value.',
+      inputSchema: {
+        type: 'object' as const,
+        properties: {
+          question: {
+            type: 'string',
+            description: 'The question to ask the user (Slack mrkdwn)',
+          },
+          options: {
+            type: 'array',
+            description:
+              'Array of option objects: [{label: "Display text", value: "return_value"}]. Max 4 options.',
+            items: {
+              type: 'object',
+              properties: {
+                label: { type: 'string' },
+                value: { type: 'string' },
+              },
+              required: ['label', 'value'],
+            },
+          },
+          slack_channel: {
+            type: 'string',
+            description: 'Slack channel ID to post in',
+          },
+          thread_ts: {
+            type: 'string',
+            description: 'Thread timestamp for in-thread posting',
+          },
+        },
+        required: ['question', 'options', 'slack_channel'],
       },
     },
     {
@@ -189,6 +231,60 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: 'text', text: `Slack error: ${msg}` }] };
+    }
+  }
+
+  if (name === 'ask_user') {
+    const { question, options, slack_channel, thread_ts } = args as {
+      question: string;
+      options: Array<{ label: string; value: string }>;
+      slack_channel: string;
+      thread_ts?: string;
+    };
+
+    const requestId = `ask_${++askRequestCounter}_${Date.now()}`;
+
+    try {
+      // Block Kit 버튼 메시지 구성
+      const buttons = options.slice(0, 4).map((opt, i) => ({
+        type: 'button' as const,
+        text: { type: 'plain_text' as const, text: opt.label },
+        action_id: `semo_ask_${requestId}_${i}`,
+        value: opt.value,
+      }));
+
+      await slackWeb.chat.postMessage({
+        channel: slack_channel,
+        thread_ts: thread_ts || undefined,
+        text: question,
+        blocks: [
+          {
+            type: 'section',
+            text: { type: 'mrkdwn', text: `:question: ${question}` },
+          },
+          {
+            type: 'actions',
+            block_id: `semo_ask_${requestId}`,
+            elements: buttons,
+          },
+        ],
+      });
+
+      // 응답 대기 (120초 타임아웃)
+      const userChoice = await new Promise<string>((resolve) => {
+        pendingAskResponses.set(requestId, resolve);
+        setTimeout(() => {
+          if (pendingAskResponses.has(requestId)) {
+            pendingAskResponses.delete(requestId);
+            resolve('(timeout — 120초 내 응답 없음)');
+          }
+        }, 120_000);
+      });
+
+      return { content: [{ type: 'text', text: userChoice }] };
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { content: [{ type: 'text', text: `ask_user error: ${msg}` }] };
     }
   }
 
@@ -326,7 +422,41 @@ async function start() {
     }
   });
 
-  // 4. Socket Mode 연결
+  // 4. Interactive 핸들러 (ask_user 버튼 클릭)
+  slackSocket.on('interactive', async ({ body, ack }) => {
+    await ack();
+
+    if (body.type === 'block_actions' && body.actions) {
+      for (const action of body.actions) {
+        const actionId: string = action.action_id || '';
+        // semo_ask_{requestId}_{optionIndex} 패턴 매칭
+        const match = actionId.match(/^semo_ask_(.+)_\d+$/);
+        if (match) {
+          const requestId = match[1];
+          const resolve = pendingAskResponses.get(requestId);
+          if (resolve) {
+            pendingAskResponses.delete(requestId);
+            resolve(action.value || action.text?.text || 'selected');
+
+            // 버튼 메시지 업데이트 — 선택 결과 표시
+            try {
+              const userName = body.user?.name || body.user?.username || 'User';
+              await slackWeb.chat.update({
+                channel: body.channel?.id || '',
+                ts: body.message?.ts || '',
+                text: `:white_check_mark: *${userName}* 선택: ${action.value || action.text?.text}`,
+                blocks: [],
+              });
+            } catch {
+              // 메시지 업데이트 실패해도 응답은 전달됨
+            }
+          }
+        }
+      }
+    }
+  });
+
+  // 5. Socket Mode 연결
   await slackSocket.start();
 }
 
