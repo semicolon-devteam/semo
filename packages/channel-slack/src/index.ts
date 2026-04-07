@@ -77,6 +77,17 @@ let botUserId = '';
 const pendingAskResponses = new Map<string, (value: string) => void>();
 let askRequestCounter = 0;
 
+// Busy state + message queue
+let isBusy = false;
+interface QueuedMessage {
+  text: string;
+  user: string;
+  channel: string;
+  ts: string;
+  thread_ts?: string;
+}
+const messageQueue: QueuedMessage[] = [];
+
 // ============================================================
 // MCP Channel Server
 // ============================================================
@@ -99,7 +110,9 @@ ROUTING RULES:
 - Based on the current project phase and message intent, use the appropriate Agent
 - Prefix every reply with [BotName] (e.g., [PlanClaw], [SemiClaw])
 - Use the reply tool with the same thread_ts and pending_ts to post in-thread
-- ALWAYS pass pending_ts from meta to the reply tool — it deletes the "응답을 생성 중..." message
+- ALWAYS pass pending_ts from meta to the reply tool — it deletes the pending status message
+- Before doing heavy work (KB queries, code reading), update the status with reply(mode="update", pending_ts=meta.pending_ts, text="_:mag: KB 조회 중..._")
+- Before writing the final response, update: reply(mode="update", text="_:pencil: 응답 작성 중..._")
 - If thread_ts is empty, a new thread will be created
 - When you need user input (choosing between options), use the ask_user tool instead of AskUserQuestion
 - ask_user posts interactive buttons to Slack and blocks until the user clicks one (120s timeout)
@@ -132,8 +145,12 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           pending_ts: {
             type: 'string',
+            description: 'Timestamp of the pending status message. Pass from meta.pending_ts.',
+          },
+          mode: {
+            type: 'string',
             description:
-              'Timestamp of the "응답을 생성 중..." pending message to delete after reply. Pass from meta.pending_ts.',
+              '"post" (default) = post new message + delete pending. "update" = update pending message text without deleting (for progress: "KB 조회 중..." → "응답 작성 중...").',
           },
         },
         required: ['text', 'slack_channel'],
@@ -204,15 +221,31 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args } = req.params;
 
   if (name === 'reply') {
-    const { text, slack_channel, thread_ts, pending_ts } = args as {
+    const { text, slack_channel, thread_ts, pending_ts, mode } = args as {
       text: string;
       slack_channel: string;
       thread_ts?: string;
       pending_ts?: string;
+      mode?: string;
     };
 
+    // update 모드: pending 메시지 텍스트만 변경 (삭제하지 않음, busy 유지)
+    if (mode === 'update' && pending_ts) {
+      try {
+        await slackWeb.chat.update({
+          channel: slack_channel,
+          ts: pending_ts,
+          text,
+        });
+        return { content: [{ type: 'text', text: 'Pending message updated' }] };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { content: [{ type: 'text', text: `Update error: ${msg}` }] };
+      }
+    }
+
     try {
-      // "응답을 생성 중..." 메시지 삭제
+      // pending 메시지 삭제
       if (pending_ts) {
         try {
           await slackWeb.chat.delete({ channel: slack_channel, ts: pending_ts });
@@ -227,8 +260,17 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         thread_ts: thread_ts || undefined,
         unfurl_links: false,
       });
+
+      // busy 해제 + 큐 처리
+      isBusy = false;
+      if (messageQueue.length > 0) {
+        const next = messageQueue.shift()!;
+        setImmediate(() => forwardToSession(next));
+      }
+
       return { content: [{ type: 'text', text: 'Message sent to Slack' }] };
     } catch (err) {
+      isBusy = false; // 에러 시에도 busy 해제
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: 'text', text: `Slack error: ${msg}` }] };
     }
@@ -349,13 +391,36 @@ async function forwardToSession(event: {
     // 이미 리액션된 경우 무시
   }
 
-  // 2. "응답을 생성 중..." 임시 메시지
+  // 2. Busy 체크 — 다른 요청 처리 중이면 큐에 추가
+  if (isBusy) {
+    try {
+      await slackWeb.chat.postMessage({
+        channel: event.channel,
+        thread_ts: event.thread_ts || event.ts,
+        text: ':hourglass: _다른 질문에 답변 중입니다. 잠시 후 응답합니다._',
+      });
+    } catch {
+      // 알림 실패해도 큐에는 추가
+    }
+    messageQueue.push({
+      text: event.text,
+      user: event.user,
+      channel: event.channel,
+      ts: event.ts,
+      thread_ts: event.thread_ts,
+    });
+    return;
+  }
+
+  isBusy = true;
+
+  // 3. 상태 메시지 — 질문 분석 중
   let pendingTs: string | undefined;
   try {
     const pendingMsg = await slackWeb.chat.postMessage({
       channel: event.channel,
       thread_ts: event.thread_ts || event.ts,
-      text: ':hourglass_flowing_sand: 응답을 생성 중...',
+      text: '_:mag: 질문을 분석하고 있어요..._',
     });
     pendingTs = pendingMsg.ts as string | undefined;
   } catch {
