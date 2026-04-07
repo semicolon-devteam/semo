@@ -325,8 +325,9 @@ async function forwardToSession(event: {
   ts: string;
   thread_ts?: string;
 }) {
-  // 봇 자신의 메시지 무시 — 단, [Route:] 태그가 있으면 시스템 디스패치로 간주하여 통과
+  // 봇 메시지 무시 — 단, [Route:] 태그가 있으면 시스템 디스패치로 간주하여 통과
   const isSystemDispatch = /\[Route:\s*\w+\]/.test(event.text);
+  if (event.bot_id && !isSystemDispatch) return; // 모든 봇 메시지 필터 (SemoBot 대시보드 알림 포함)
   if (event.user === botUserId && !isSystemDispatch) return;
 
   // 채널 필터: 지정된 채널만 처리
@@ -411,8 +412,9 @@ async function start() {
 
   slackSocket.on('message', async ({ event, ack }) => {
     await ack();
-    // DM, 스레드 내 메시지, 또는 [Route:] 시스템 디스패치 처리
+    // 봇 메시지 필터 — [Route:] 시스템 디스패치만 통과
     const isSystemDispatch = event.text && /\[Route:\s*\w+\]/.test(event.text);
+    if (event.bot_id && !isSystemDispatch) return;
     if (
       event.channel_type === 'im' ||
       (event.thread_ts && event.thread_ts !== event.ts) ||
