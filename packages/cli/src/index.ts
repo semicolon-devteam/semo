@@ -45,6 +45,7 @@ import { registerTestCommands } from './commands/test';
 import { registerCommitmentsCommands } from './commands/commitments';
 import { registerServiceCommands } from './commands/service';
 import { registerHarnessCommands } from './commands/harness';
+import { registerIncubatorCommands } from './commands/incubator';
 import { syncGlobalCache } from './global-cache';
 import {
   ensureSemoDir,
@@ -2699,6 +2700,7 @@ registerTestCommands(program);
 registerCommitmentsCommands(program);
 registerServiceCommands(program);
 registerHarnessCommands(program);
+registerIncubatorCommands(program);
 
 // === semo skills — DB 시딩 ===
 
