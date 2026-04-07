@@ -17,10 +17,40 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { SocketModeClient } from '@slack/socket-mode';
 import { WebClient } from '@slack/web-api';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 
 // ============================================================
-// Configuration
+// Configuration — ~/.claude/semo/.env 자동 로드
 // ============================================================
+
+function loadSemoEnv(): void {
+  const envFile = path.join(os.homedir(), '.claude', 'semo', '.env');
+  if (!fs.existsSync(envFile)) return;
+  try {
+    const content = fs.readFileSync(envFile, 'utf8');
+    for (const line of content.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const eqIdx = trimmed.indexOf('=');
+      if (eqIdx < 0) continue;
+      const key = trimmed.slice(0, eqIdx).trim();
+      let val = trimmed.slice(eqIdx + 1).trim();
+      if (
+        (val.startsWith("'") && val.endsWith("'")) ||
+        (val.startsWith('"') && val.endsWith('"'))
+      ) {
+        val = val.slice(1, -1);
+      }
+      if (!process.env[key]) process.env[key] = val;
+    }
+  } catch {
+    // .env 읽기 실패 시 무시
+  }
+}
+
+loadSemoEnv();
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN;
@@ -28,7 +58,8 @@ const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID || '';
 const SEMO_SERVICE_ID = process.env.SEMO_SERVICE_ID || 'unknown';
 
 if (!SLACK_BOT_TOKEN || !SLACK_APP_TOKEN) {
-  console.error('SLACK_BOT_TOKEN and SLACK_APP_TOKEN are required. Set them in environment.');
+  console.error('SLACK_BOT_TOKEN and SLACK_APP_TOKEN are required.');
+  console.error('Set them in ~/.claude/semo/.env or as environment variables.');
   process.exit(1);
 }
 

@@ -192,8 +192,6 @@ function writeSettingsJson(sessionDir: string, serviceId?: string, channel?: str
         command: 'npx',
         args: ['tsx', path.join(CHANNEL_SLACK_DIR, 'src', 'index.ts')],
         env: {
-          SLACK_BOT_TOKEN: '${SLACK_BOT_TOKEN}',
-          SLACK_APP_TOKEN: '${SLACK_APP_TOKEN}',
           SLACK_CHANNEL_ID: channel || '',
           SEMO_SERVICE_ID: serviceId || '',
         },
