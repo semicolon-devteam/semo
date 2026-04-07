@@ -189,12 +189,33 @@ export default function GfpDetailPage() {
       setResearchTasks(tasks);
       setInfraRequests(infraReqs);
       setInfraProgress(infraProg);
-      // Phase 4: fetch design step from project metadata (URL ?step= overrides)
+      // Phase 4: determine active design step
       if (targetPhase === 4 && initTrack === 'plan') {
-        const ds = stepParam
-          ? parseInt(stepParam, 10)
-          : ((proj.metadata?.design_step as number) ?? 1);
-        setActiveDesignStep((ds >= 1 && ds <= 5 ? ds : 1) as DesignStep);
+        let ds: number | null = null;
+
+        // 1. URL ?step= 직접 지정
+        if (stepParam) {
+          ds = parseInt(stepParam, 10);
+        }
+        // 2. URL ?section= prefix에서 추론
+        if (!ds && sectionParam) {
+          const matched = DESIGN_STEPS.find((def) => matchesStep(sectionParam, def));
+          if (matched) ds = matched.step;
+        }
+        // 3. project metadata에서
+        if (!ds) {
+          ds = (proj.metadata?.design_step as number) ?? null;
+        }
+        // 4. 폴백: 첫 번째 콘텐츠가 있는 step 찾기 (빈 Step 1 스킵)
+        if (!ds || ds < 1 || ds > 5) {
+          const firstActive = DESIGN_STEPS.find((def) => {
+            const stepSecs = secs.filter((s) => matchesStep(s.section_key, def));
+            return stepSecs.length > 0;
+          });
+          ds = firstActive?.step ?? 1;
+        }
+
+        setActiveDesignStep(ds as DesignStep);
       }
       setLoading(false);
 
@@ -256,8 +277,13 @@ export default function GfpDetailPage() {
     setActivePhase(phase);
     const secs = await fetchSectionsData(id, phase, activeTrack);
     setSections(secs);
-    if (phase === 4 && activeTrack === 'plan' && project) {
-      const ds = (project.metadata?.design_step as number) ?? 1;
+    if (phase === 4 && activeTrack === 'plan') {
+      // 첫 번째 콘텐츠가 있는 step으로 이동 (빈 Step 1 스킵)
+      const firstActive = DESIGN_STEPS.find((def) => {
+        const stepSecs = secs.filter((s) => matchesStep(s.section_key, def));
+        return stepSecs.length > 0;
+      });
+      const ds = firstActive?.step ?? ((project?.metadata?.design_step as number) || 1);
       setActiveDesignStep(ds as DesignStep);
     }
   }
@@ -372,8 +398,13 @@ export default function GfpDetailPage() {
 
   // Build step statuses for the nav
   const stepStatuses: Record<number, 'pending' | 'in-progress' | 'completed'> = {};
+  const skippedSteps = (project.metadata?.skipped_design_steps as number[]) ?? [];
   if (showStitch) {
     for (const def of DESIGN_STEPS) {
+      if (skippedSteps.includes(def.step)) {
+        stepStatuses[def.step] = 'completed'; // 스킵된 step은 완료로 표시
+        continue;
+      }
       const stepSecs = sections.filter((s) => matchesStep(s.section_key, def));
       if (stepSecs.length === 0) {
         stepStatuses[def.step] = 'pending';
