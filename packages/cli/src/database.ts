@@ -12,20 +12,20 @@
  *   - semo.skills / semo.agents / semo.commands 는 하위 호환 뷰
  */
 
-import { Pool, PoolClient } from "pg";
-import * as fs from "fs";
-import * as os from "os";
-import * as path from "path";
-import { parseEnvContent } from "./env-parser";
+import { Pool, PoolClient } from 'pg';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { parseEnvContent } from './env-parser';
 
 // ~/.claude/semo/.env 자동 로드 — LaunchAgent / Claude Code 앱 / cron 등
 // 인터랙티브 쉘이 아닌 환경에서 환경변수를 공급한다.
 // 이미 설정된 환경변수는 덮어쓰지 않는다 (env var > file).
 function loadSemoEnv(): void {
-  const envFile = path.join(os.homedir(), ".claude", "semo", ".env");
+  const envFile = path.join(os.homedir(), '.claude', 'semo', '.env');
   if (!fs.existsSync(envFile)) return;
   try {
-    const creds = parseEnvContent(fs.readFileSync(envFile, "utf8"));
+    const creds = parseEnvContent(fs.readFileSync(envFile, 'utf8'));
     for (const [key, val] of Object.entries(creds)) {
       if (!process.env[key]) process.env[key] = val;
     }
@@ -43,22 +43,24 @@ function buildDbConfig() {
   if (process.env.DATABASE_URL) {
     return {
       connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DATABASE_URL.includes("sslmode=require") ? { rejectUnauthorized: false } : false,
+      ssl: process.env.DATABASE_URL.includes('sslmode=require')
+        ? { rejectUnauthorized: false }
+        : false,
       connectionTimeoutMillis: 5000,
       idleTimeoutMillis: 30000,
     };
   }
   if (!process.env.SEMO_DB_HOST && !process.env.DATABASE_URL) {
     throw new Error(
-      "DB 연결 정보가 없습니다. DATABASE_URL 또는 SEMO_DB_HOST 환경변수를 설정하세요."
+      'DB 연결 정보가 없습니다. DATABASE_URL 또는 SEMO_DB_HOST 환경변수를 설정하세요.',
     );
   }
   return {
     host: process.env.SEMO_DB_HOST,
-    port: parseInt(process.env.SEMO_DB_PORT || "5432"),
-    user: process.env.SEMO_DB_USER || "app",
+    port: parseInt(process.env.SEMO_DB_PORT || '5432'),
+    user: process.env.SEMO_DB_USER || 'app',
     password: process.env.SEMO_DB_PASSWORD,
-    database: process.env.SEMO_DB_NAME || "appdb",
+    database: process.env.SEMO_DB_NAME || 'appdb',
     ssl: false,
     connectionTimeoutMillis: 5000,
     idleTimeoutMillis: 30000,
@@ -83,7 +85,7 @@ async function checkDbConnection(): Promise<boolean> {
 
   try {
     const client = await getPool().connect();
-    await client.query("SELECT 1");
+    await client.query('SELECT 1');
     client.release();
     dbAvailable = true;
   } catch {
@@ -104,6 +106,7 @@ export interface Skill {
   description: string | null;
   content: string;
   bot_ids: string[];
+  reference_files?: Record<string, string>;
   category: string;
   package: string;
   is_active: boolean;
@@ -197,18 +200,96 @@ const FALLBACK_SKILLS: Skill[] = [];
 const FALLBACK_COMMANDS: SemoCommand[] = [];
 
 const FALLBACK_AGENTS: Agent[] = [
-  { id: "agent-semiclaw", name: "semiclaw", display_name: "SemiClaw 🦀", content: "", package: "openclaw", is_active: true, install_order: 1 },
-  { id: "agent-workclaw", name: "workclaw", display_name: "WorkClaw 🛠️", content: "", package: "openclaw", is_active: true, install_order: 2 },
-  { id: "agent-reviewclaw", name: "reviewclaw", display_name: "ReviewClaw 🔍", content: "", package: "openclaw", is_active: true, install_order: 3 },
-  { id: "agent-planclaw", name: "planclaw", display_name: "PlanClaw 🗓️", content: "", package: "openclaw", is_active: true, install_order: 4 },
-  { id: "agent-designclaw", name: "designclaw", display_name: "DesignClaw 🎨", content: "", package: "openclaw", is_active: true, install_order: 5 },
-  { id: "agent-infraclaw", name: "infraclaw", display_name: "InfraClaw 🏗️", content: "", package: "openclaw", is_active: true, install_order: 6 },
-  { id: "agent-growthclaw", name: "growthclaw", display_name: "GrowthClaw 🌱", content: "", package: "openclaw", is_active: true, install_order: 7 },
+  {
+    id: 'agent-semiclaw',
+    name: 'semiclaw',
+    display_name: 'SemiClaw 🦀',
+    content: '',
+    package: 'openclaw',
+    is_active: true,
+    install_order: 1,
+  },
+  {
+    id: 'agent-workclaw',
+    name: 'workclaw',
+    display_name: 'WorkClaw 🛠️',
+    content: '',
+    package: 'openclaw',
+    is_active: true,
+    install_order: 2,
+  },
+  {
+    id: 'agent-reviewclaw',
+    name: 'reviewclaw',
+    display_name: 'ReviewClaw 🔍',
+    content: '',
+    package: 'openclaw',
+    is_active: true,
+    install_order: 3,
+  },
+  {
+    id: 'agent-planclaw',
+    name: 'planclaw',
+    display_name: 'PlanClaw 🗓️',
+    content: '',
+    package: 'openclaw',
+    is_active: true,
+    install_order: 4,
+  },
+  {
+    id: 'agent-designclaw',
+    name: 'designclaw',
+    display_name: 'DesignClaw 🎨',
+    content: '',
+    package: 'openclaw',
+    is_active: true,
+    install_order: 5,
+  },
+  {
+    id: 'agent-infraclaw',
+    name: 'infraclaw',
+    display_name: 'InfraClaw 🏗️',
+    content: '',
+    package: 'openclaw',
+    is_active: true,
+    install_order: 6,
+  },
+  {
+    id: 'agent-growthclaw',
+    name: 'growthclaw',
+    display_name: 'GrowthClaw 🌱',
+    content: '',
+    package: 'openclaw',
+    is_active: true,
+    install_order: 7,
+  },
 ];
 
 const FALLBACK_PACKAGES: Package[] = [
-  { id: "pkg-cli", name: "semo-cli", display_name: "SEMO CLI", description: "CLI 도구 (컨텍스트 동기화, 봇 관리)", layer: "standard", package_type: "standard", version: "4.2.0", is_active: true, is_required: true, install_order: 10 },
-  { id: "pkg-dashboard", name: "semo-dashboard", display_name: "SEMO Dashboard", description: "봇 상태/KB 대시보드", layer: "standard", package_type: "standard", version: "0.1.0", is_active: true, is_required: false, install_order: 30 },
+  {
+    id: 'pkg-cli',
+    name: 'semo-cli',
+    display_name: 'SEMO CLI',
+    description: 'CLI 도구 (컨텍스트 동기화, 봇 관리)',
+    layer: 'standard',
+    package_type: 'standard',
+    version: '4.2.0',
+    is_active: true,
+    is_required: true,
+    install_order: 10,
+  },
+  {
+    id: 'pkg-dashboard',
+    name: 'semo-dashboard',
+    display_name: 'SEMO Dashboard',
+    description: '봇 상태/KB 대시보드',
+    layer: 'standard',
+    package_type: 'standard',
+    version: '0.1.0',
+    is_active: true,
+    is_required: false,
+    install_order: 30,
+  },
 ];
 
 // ============================================================
@@ -223,7 +304,7 @@ export async function getActiveSkills(): Promise<Skill[]> {
   const isConnected = await checkDbConnection();
 
   if (!isConnected) {
-    console.warn("⚠️ DB 연결 실패, 폴백 스킬 목록 사용");
+    console.warn('⚠️ DB 연결 실패, 폴백 스킬 목록 사용');
     return FALLBACK_SKILLS.filter((s) => s.is_active);
   }
 
@@ -235,6 +316,7 @@ export async function getActiveSkills(): Promise<Skill[]> {
                ARRAY(SELECT jsonb_array_elements_text(metadata->'bot_ids')),
                ARRAY[]::text[]
              ) AS bot_ids,
+             metadata->'reference_files' AS reference_files,
              category, package, is_active, is_required, install_order, version
       FROM semo.skill_definitions
       WHERE is_active = true AND office_id IS NULL
@@ -242,7 +324,7 @@ export async function getActiveSkills(): Promise<Skill[]> {
     `);
     return result.rows;
   } catch (error) {
-    console.warn("⚠️ 스킬 조회 실패, 폴백 데이터 사용:", error);
+    console.warn('⚠️ 스킬 조회 실패, 폴백 데이터 사용:', error);
     return FALLBACK_SKILLS.filter((s) => s.is_active);
   }
 }
@@ -263,7 +345,7 @@ export async function getActiveSkillsForBot(botId: string): Promise<Skill[]> {
   const isConnected = await checkDbConnection();
 
   if (!isConnected) {
-    console.warn("⚠️ DB 연결 실패, 폴백 스킬 목록 사용");
+    console.warn('⚠️ DB 연결 실패, 폴백 스킬 목록 사용');
     return FALLBACK_SKILLS.filter((s) => s.is_active);
   }
 
@@ -275,6 +357,7 @@ export async function getActiveSkillsForBot(botId: string): Promise<Skill[]> {
                 ARRAY(SELECT jsonb_array_elements_text(sd.metadata->'bot_ids')),
                 ARRAY[]::text[]
               ) AS bot_ids,
+              sd.metadata->'reference_files' AS reference_files,
               sd.category, sd.package, sd.is_active, sd.is_required,
               sd.install_order, sd.version
        FROM semo.skill_definitions sd
@@ -284,11 +367,11 @@ export async function getActiveSkillsForBot(botId: string): Promise<Skill[]> {
        ORDER BY
          CASE WHEN sd.metadata->'bot_ids' ? $1 THEN 0 ELSE 1 END,
          sd.install_order`,
-      [botId]
+      [botId],
     );
     return result.rows;
   } catch (error) {
-    console.warn("⚠️ 봇 스킬 조회 실패, 폴백 데이터 사용:", error);
+    console.warn('⚠️ 봇 스킬 조회 실패, 폴백 데이터 사용:', error);
     return FALLBACK_SKILLS.filter((s) => s.is_active);
   }
 }
@@ -301,7 +384,7 @@ export async function getCommands(): Promise<SemoCommand[]> {
   const isConnected = await checkDbConnection();
 
   if (!isConnected) {
-    console.warn("⚠️ DB 연결 실패, 폴백 커맨드 목록 사용");
+    console.warn('⚠️ DB 연결 실패, 폴백 커맨드 목록 사용');
     return FALLBACK_COMMANDS.filter((c) => c.is_active);
   }
 
@@ -315,7 +398,7 @@ export async function getCommands(): Promise<SemoCommand[]> {
     `);
     return result.rows;
   } catch (error) {
-    console.warn("⚠️ 커맨드 조회 실패, 폴백 데이터 사용:", error);
+    console.warn('⚠️ 커맨드 조회 실패, 폴백 데이터 사용:', error);
     return FALLBACK_COMMANDS.filter((c) => c.is_active);
   }
 }
@@ -328,7 +411,7 @@ export async function getAgents(): Promise<Agent[]> {
   const isConnected = await checkDbConnection();
 
   if (!isConnected) {
-    console.warn("⚠️ DB 연결 실패, 폴백 에이전트 목록 사용");
+    console.warn('⚠️ DB 연결 실패, 폴백 에이전트 목록 사용');
     return FALLBACK_AGENTS.filter((a) => a.is_active);
   }
 
@@ -344,7 +427,7 @@ export async function getAgents(): Promise<Agent[]> {
     `);
     return result.rows;
   } catch (error) {
-    console.warn("⚠️ 에이전트 조회 실패, 폴백 데이터 사용:", error);
+    console.warn('⚠️ 에이전트 조회 실패, 폴백 데이터 사용:', error);
     return FALLBACK_AGENTS.filter((a) => a.is_active);
   }
 }
@@ -356,7 +439,7 @@ export async function getPackages(layer?: string): Promise<Package[]> {
   const isConnected = await checkDbConnection();
 
   if (!isConnected) {
-    console.warn("⚠️ DB 연결 실패, 폴백 패키지 목록 사용");
+    console.warn('⚠️ DB 연결 실패, 폴백 패키지 목록 사용');
     const fallback = FALLBACK_PACKAGES.filter((p) => p.is_active);
     return layer ? fallback.filter((p) => p.layer === layer) : fallback;
   }
@@ -380,7 +463,7 @@ export async function getPackages(layer?: string): Promise<Package[]> {
     const result = await getPool().query(query, params);
     return result.rows;
   } catch (error) {
-    console.warn("⚠️ 패키지 조회 실패, 폴백 데이터 사용:", error);
+    console.warn('⚠️ 패키지 조회 실패, 폴백 데이터 사용:', error);
     const fallback = FALLBACK_PACKAGES.filter((p) => p.is_active);
     return layer ? fallback.filter((p) => p.layer === layer) : fallback;
   }
@@ -485,7 +568,7 @@ export async function getActiveBotIds(): Promise<string[]> {
 
   try {
     const result = await getPool().query(
-      `SELECT bot_id FROM semo.bot_status WHERE status != 'retired' ORDER BY bot_id`
+      `SELECT bot_id FROM semo.bot_status WHERE status != 'retired' ORDER BY bot_id`,
     );
     return result.rows.map((r: { bot_id: string }) => r.bot_id);
   } catch {
@@ -503,7 +586,7 @@ export async function getBotWorkspaceFiles(botId: string): Promise<BotWorkspaceF
   try {
     const result = await getPool().query(
       `SELECT file_path, content FROM semo.bot_workspace_files WHERE bot_id = $1 ORDER BY file_path`,
-      [botId]
+      [botId],
     );
     return result.rows;
   } catch {

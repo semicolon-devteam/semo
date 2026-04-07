@@ -5,10 +5,10 @@
  * 기존 디렉토리를 전체 교체(full replace)하며, DB 실패 시 기존 파일 유지.
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import { execSync } from "child_process";
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import { execSync } from 'child_process';
 import {
   getActiveSkills,
   getCommands,
@@ -18,7 +18,7 @@ import {
   SemoCommand,
   Agent,
   BotDelegation,
-} from "./database";
+} from './database';
 
 export interface GlobalCacheSyncResult {
   skills: number;
@@ -26,7 +26,7 @@ export interface GlobalCacheSyncResult {
   agents: number;
 }
 
-const isWindows = process.platform === "win32";
+const isWindows = process.platform === 'win32';
 
 function removeRecursive(targetPath: string): void {
   if (!fs.existsSync(targetPath)) return;
@@ -35,15 +35,15 @@ function removeRecursive(targetPath: string): void {
     try {
       const stats = fs.lstatSync(targetPath);
       if (stats.isSymbolicLink()) {
-        execSync(`cmd /c "rmdir "${targetPath}""`, { stdio: "pipe" });
+        execSync(`cmd /c "rmdir "${targetPath}""`, { stdio: 'pipe' });
       } else {
-        execSync(`cmd /c "rd /s /q "${targetPath}""`, { stdio: "pipe" });
+        execSync(`cmd /c "rd /s /q "${targetPath}""`, { stdio: 'pipe' });
       }
     } catch {
       fs.rmSync(targetPath, { recursive: true, force: true });
     }
   } else {
-    execSync(`rm -rf "${targetPath}"`, { stdio: "pipe" });
+    execSync(`rm -rf "${targetPath}"`, { stdio: 'pipe' });
   }
 }
 
@@ -72,9 +72,7 @@ function injectAgentInfo(content: string, botIds: string[]): string {
       const lineEnd = content.indexOf('\n', absDescStart);
       if (lineEnd !== -1) {
         return (
-          content.slice(0, lineEnd) +
-          `\n  Agents: ${botIds.join(', ')}` +
-          content.slice(lineEnd)
+          content.slice(0, lineEnd) + `\n  Agents: ${botIds.join(', ')}` + content.slice(lineEnd)
         );
       }
     }
@@ -88,10 +86,8 @@ function injectAgentInfo(content: string, botIds: string[]): string {
   return content + agentLine;
 }
 
-export async function syncGlobalCache(
-  claudeDir?: string
-): Promise<GlobalCacheSyncResult> {
-  const dir = claudeDir || path.join(os.homedir(), ".claude");
+export async function syncGlobalCache(claudeDir?: string): Promise<GlobalCacheSyncResult> {
+  const dir = claudeDir || path.join(os.homedir(), '.claude');
   fs.mkdirSync(dir, { recursive: true });
 
   // 병렬 조회
@@ -103,7 +99,7 @@ export async function syncGlobalCache(
   ]);
 
   // 1. 스킬 설치 (전체 교체)
-  const skillsDir = path.join(dir, "skills");
+  const skillsDir = path.join(dir, 'skills');
   removeRecursive(skillsDir);
   fs.mkdirSync(skillsDir, { recursive: true });
 
@@ -114,14 +110,30 @@ export async function syncGlobalCache(
       skippedSkills++;
       continue;
     }
+    if (!skill.content) continue; // skip skills with null/empty content
     const skillFolder = path.join(skillsDir, skill.name);
     fs.mkdirSync(skillFolder, { recursive: true });
     const finalContent = injectAgentInfo(skill.content, skill.bot_ids);
-    fs.writeFileSync(path.join(skillFolder, "SKILL.md"), finalContent);
+    fs.writeFileSync(path.join(skillFolder, 'SKILL.md'), finalContent);
+
+    // Write reference files if present
+    if (
+      skill.reference_files &&
+      typeof skill.reference_files === 'object' &&
+      Object.keys(skill.reference_files).length > 0
+    ) {
+      const refsDir = path.join(skillFolder, 'references');
+      fs.mkdirSync(refsDir, { recursive: true });
+      for (const [filename, refContent] of Object.entries(skill.reference_files)) {
+        if (typeof refContent === 'string') {
+          fs.writeFileSync(path.join(refsDir, filename), refContent);
+        }
+      }
+    }
   }
 
   // 2. 커맨드 설치 (전체 교체)
-  const commandsDir = path.join(dir, "commands");
+  const commandsDir = path.join(dir, 'commands');
   removeRecursive(commandsDir);
   fs.mkdirSync(commandsDir, { recursive: true });
 
@@ -144,7 +156,7 @@ export async function syncGlobalCache(
   }
 
   // 3. 에이전트 설치 (전체 교체, 대소문자 중복 제거)
-  const agentsDir = path.join(dir, "agents");
+  const agentsDir = path.join(dir, 'agents');
   removeRecursive(agentsDir);
   fs.mkdirSync(agentsDir, { recursive: true });
 
@@ -165,16 +177,11 @@ export async function syncGlobalCache(
     let content = agent.content;
 
     // 위임 매트릭스 주입
-    const agentDelegations = delegations.filter(
-      (d) => d.from_bot_id === agent.name
-    );
+    const agentDelegations = delegations.filter((d) => d.from_bot_id === agent.name);
     if (agentDelegations.length > 0) {
       const delegationLines = agentDelegations
-        .map(
-          (d) =>
-            `- → ${d.to_bot_id}: ${d.domains.join(", ")} (via ${d.method})`
-        )
-        .join("\n");
+        .map((d) => `- → ${d.to_bot_id}: ${d.domains.join(', ')} (via ${d.method})`)
+        .join('\n');
       content += `\n\n## 위임 매트릭스\n${delegationLines}\n`;
     }
 

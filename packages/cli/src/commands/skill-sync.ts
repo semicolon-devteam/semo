@@ -9,15 +9,16 @@
  * 동일 스킬명이 여러 봇에 존재하면 bot_ids를 머지.
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import { Pool, PoolClient } from "pg";
+import * as fs from 'fs';
+import * as path from 'path';
+import { Pool, PoolClient } from 'pg';
 
 export interface ScannedSkill {
   name: string;
   prompt: string;
   package: string;
   botId: string;
+  referenceFiles?: Record<string, string>;
 }
 
 export interface SkillSyncResult {
@@ -36,7 +37,7 @@ export function scanSkills(botIds: string[]): ScannedSkill[];
  */
 export function scanSkills(semoSystemDir: string): ScannedSkill[];
 export function scanSkills(arg: string | string[]): ScannedSkill[] {
-  if (typeof arg === "string") {
+  if (typeof arg === 'string') {
     return scanSkillsLegacy(arg);
   }
   return scanSkillsV2(arg);
@@ -44,33 +45,59 @@ export function scanSkills(arg: string | string[]): ScannedSkill[] {
 
 function scanSkillsV2(botIds: string[]): ScannedSkill[] {
   const skills: ScannedSkill[] = [];
-  const home = process.env.HOME || "/Users/reus";
+  const home = process.env.HOME || '/Users/reus';
 
   for (const botId of botIds) {
-    const skillsDir = path.join(home, `.openclaw-${botId}`, "workspace", "skills");
+    const skillsDir = path.join(home, `.openclaw-${botId}`, 'workspace', 'skills');
     if (!fs.existsSync(skillsDir)) continue;
 
     let skillEntries: fs.Dirent[];
     try {
       skillEntries = fs.readdirSync(skillsDir, { withFileTypes: true });
-    } catch { continue; }
+    } catch {
+      continue;
+    }
 
     for (const skillEntry of skillEntries) {
       if (!skillEntry.isDirectory()) continue;
-      if (skillEntry.name.endsWith(".skill")) continue;
-      if (skillEntry.name.startsWith("_") || skillEntry.name.startsWith(".")) continue;
+      if (skillEntry.name.endsWith('.skill')) continue;
+      if (skillEntry.name.startsWith('_') || skillEntry.name.startsWith('.')) continue;
 
-      const skillMdPath = path.join(skillsDir, skillEntry.name, "SKILL.md");
+      const skillMdPath = path.join(skillsDir, skillEntry.name, 'SKILL.md');
       if (!fs.existsSync(skillMdPath)) continue;
 
       try {
+        // Scan references/ subdirectory
+        let referenceFiles: Record<string, string> | undefined;
+        const refsDir = path.join(skillsDir, skillEntry.name, 'references');
+        if (fs.existsSync(refsDir)) {
+          try {
+            const refs: Record<string, string> = {};
+            for (const refFile of fs.readdirSync(refsDir)) {
+              const refPath = path.join(refsDir, refFile);
+              try {
+                if (!fs.statSync(refPath).isFile()) continue;
+                refs[refFile] = fs.readFileSync(refPath, 'utf-8');
+              } catch {
+                /* skip unreadable */
+              }
+            }
+            if (Object.keys(refs).length > 0) referenceFiles = refs;
+          } catch {
+            /* skip unreadable refs dir */
+          }
+        }
+
         skills.push({
           name: skillEntry.name,
-          prompt: fs.readFileSync(skillMdPath, "utf-8"),
-          package: "openclaw",
+          prompt: fs.readFileSync(skillMdPath, 'utf-8'),
+          package: 'openclaw',
           botId,
+          referenceFiles,
         });
-      } catch { /* skip unreadable */ }
+      } catch {
+        /* skip unreadable */
+      }
     }
   }
 
@@ -81,29 +108,53 @@ function scanSkillsV2(botIds: string[]): ScannedSkill[] {
 function scanSkillsLegacy(semoSystemDir: string): ScannedSkill[] {
   const skills: ScannedSkill[] = [];
 
-  const workspacesDir = path.join(semoSystemDir, "bot-workspaces");
+  const workspacesDir = path.join(semoSystemDir, 'bot-workspaces');
   if (!fs.existsSync(workspacesDir)) return skills;
 
   const botEntries = fs.readdirSync(workspacesDir, { withFileTypes: true });
   for (const botEntry of botEntries) {
     if (!botEntry.isDirectory()) continue;
-    const skillsDir = path.join(workspacesDir, botEntry.name, "skills");
+    const skillsDir = path.join(workspacesDir, botEntry.name, 'skills');
     if (!fs.existsSync(skillsDir)) continue;
 
     const skillEntries = fs.readdirSync(skillsDir, { withFileTypes: true });
     for (const skillEntry of skillEntries) {
       if (!skillEntry.isDirectory()) continue;
-      if (skillEntry.name.endsWith(".skill")) continue;
-      const skillMdPath = path.join(skillsDir, skillEntry.name, "SKILL.md");
+      if (skillEntry.name.endsWith('.skill')) continue;
+      const skillMdPath = path.join(skillsDir, skillEntry.name, 'SKILL.md');
       if (!fs.existsSync(skillMdPath)) continue;
       try {
+        // Scan references/ subdirectory
+        let referenceFiles: Record<string, string> | undefined;
+        const refsDir = path.join(skillsDir, skillEntry.name, 'references');
+        if (fs.existsSync(refsDir)) {
+          try {
+            const refs: Record<string, string> = {};
+            for (const refFile of fs.readdirSync(refsDir)) {
+              const refPath = path.join(refsDir, refFile);
+              try {
+                if (!fs.statSync(refPath).isFile()) continue;
+                refs[refFile] = fs.readFileSync(refPath, 'utf-8');
+              } catch {
+                /* skip unreadable */
+              }
+            }
+            if (Object.keys(refs).length > 0) referenceFiles = refs;
+          } catch {
+            /* skip unreadable refs dir */
+          }
+        }
+
         skills.push({
           name: skillEntry.name,
-          prompt: fs.readFileSync(skillMdPath, "utf-8"),
-          package: "openclaw",
+          prompt: fs.readFileSync(skillMdPath, 'utf-8'),
+          package: 'openclaw',
           botId: botEntry.name,
+          referenceFiles,
         });
-      } catch { /* skip unreadable */ }
+      } catch {
+        /* skip unreadable */
+      }
     }
   }
 
@@ -115,29 +166,31 @@ function scanSkillsLegacy(semoSystemDir: string): ScannedSkill[] {
  */
 export async function getBotIds(pool: Pool): Promise<string[]> {
   try {
-    const result = await pool.query(
-      "SELECT bot_id FROM semo.bot_status ORDER BY bot_id",
-    );
+    const result = await pool.query('SELECT bot_id FROM semo.bot_status ORDER BY bot_id');
     if (result.rows.length > 0) {
       return result.rows.map((r: { bot_id: string }) => r.bot_id);
     }
-  } catch { /* fallback to local scan */ }
+  } catch {
+    /* fallback to local scan */
+  }
 
   // Fallback: scan ~/.openclaw-*/workspace/ directories
-  const home = process.env.HOME || "/Users/reus";
+  const home = process.env.HOME || '/Users/reus';
   const botIds: string[] = [];
   try {
     const entries = fs.readdirSync(home);
     for (const entry of entries) {
       const match = entry.match(/^\.openclaw-(.+)$/);
       if (match) {
-        const wsDir = path.join(home, entry, "workspace");
+        const wsDir = path.join(home, entry, 'workspace');
         if (fs.existsSync(wsDir)) {
           botIds.push(match[1]);
         }
       }
     }
-  } catch { /* skip */ }
+  } catch {
+    /* skip */
+  }
 
   return botIds.sort();
 }
@@ -146,14 +199,14 @@ export async function getBotIds(pool: Pool): Promise<string[]> {
  * 스캔된 스킬을 skill_definitions에 upsert
  * flat name + metadata.bot_ids 배열 사용, 동일 스킬명은 bot_ids 머지
  */
-export async function syncSkillsToDB(
-  client: PoolClient,
-  pool: Pool,
-): Promise<SkillSyncResult> {
+export async function syncSkillsToDB(client: PoolClient, pool: Pool): Promise<SkillSyncResult> {
   const botIds = await getBotIds(pool);
   const skills = scanSkills(botIds);
 
   for (const skill of skills) {
+    const metadata: Record<string, unknown> = { bot_ids: [skill.botId] };
+    if (skill.referenceFiles) metadata.reference_files = skill.referenceFiles;
+
     await client.query(
       `INSERT INTO semo.skill_definitions (name, prompt, package, metadata, is_active, office_id)
        VALUES ($1, $2, $3, $4, true, NULL)
@@ -161,7 +214,11 @@ export async function syncSkillsToDB(
          prompt = EXCLUDED.prompt,
          package = EXCLUDED.package,
          metadata = jsonb_set(
-           skill_definitions.metadata,
+           CASE
+             WHEN EXCLUDED.metadata ? 'reference_files'
+             THEN jsonb_set(skill_definitions.metadata, '{reference_files}', EXCLUDED.metadata->'reference_files')
+             ELSE skill_definitions.metadata
+           END,
            '{bot_ids}',
            (SELECT jsonb_agg(DISTINCT v)
             FROM jsonb_array_elements(
@@ -170,7 +227,7 @@ export async function syncSkillsToDB(
             ) AS v)
          ),
          updated_at = NOW()`,
-      [skill.name, skill.prompt, skill.package, JSON.stringify({ bot_ids: [skill.botId] })]
+      [skill.name, skill.prompt, skill.package, JSON.stringify(metadata)],
     );
   }
 
