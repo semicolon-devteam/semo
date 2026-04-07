@@ -94,7 +94,8 @@ ROUTING RULES:
 - Otherwise, read CLAUDE.md for Phase→Bot routing table
 - Based on the current project phase and message intent, use the appropriate Agent
 - Prefix every reply with [BotName] (e.g., [PlanClaw], [SemiClaw])
-- Use the reply tool with the same thread_ts to post in-thread
+- Use the reply tool with the same thread_ts and pending_ts to post in-thread
+- ALWAYS pass pending_ts from meta to the reply tool — it deletes the "응답을 생성 중..." message
 - If thread_ts is empty, a new thread will be created
 
 SERVICE_ID: ${SEMO_SERVICE_ID}`,
@@ -122,6 +123,11 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
           thread_ts: {
             type: 'string',
             description: 'Thread timestamp to reply in-thread. Empty string for new message.',
+          },
+          pending_ts: {
+            type: 'string',
+            description:
+              'Timestamp of the "응답을 생성 중..." pending message to delete after reply. Pass from meta.pending_ts.',
           },
         },
         required: ['text', 'slack_channel'],
@@ -156,13 +162,23 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args } = req.params;
 
   if (name === 'reply') {
-    const { text, slack_channel, thread_ts } = args as {
+    const { text, slack_channel, thread_ts, pending_ts } = args as {
       text: string;
       slack_channel: string;
       thread_ts?: string;
+      pending_ts?: string;
     };
 
     try {
+      // "응답을 생성 중..." 메시지 삭제
+      if (pending_ts) {
+        try {
+          await slackWeb.chat.delete({ channel: slack_channel, ts: pending_ts });
+        } catch {
+          // 이미 삭제되었거나 권한 없음 — 무시
+        }
+      }
+
       await slackWeb.chat.postMessage({
         channel: slack_channel,
         text,
@@ -225,6 +241,30 @@ async function forwardToSession(event: {
 
   if (!cleanText) return;
 
+  // 1. 즉시 :eyes: 리액션 — 수신 확인
+  try {
+    await slackWeb.reactions.add({
+      name: 'eyes',
+      channel: event.channel,
+      timestamp: event.ts,
+    });
+  } catch {
+    // 이미 리액션된 경우 무시
+  }
+
+  // 2. "응답을 생성 중..." 임시 메시지
+  let pendingTs: string | undefined;
+  try {
+    const pendingMsg = await slackWeb.chat.postMessage({
+      channel: event.channel,
+      thread_ts: event.thread_ts || event.ts,
+      text: ':hourglass_flowing_sand: 응답을 생성 중...',
+    });
+    pendingTs = pendingMsg.ts as string | undefined;
+  } catch {
+    // 임시 메시지 실패해도 계속 진행
+  }
+
   // 유저 정보 조회 (캐시 가능)
   let senderName = event.user;
   try {
@@ -245,6 +285,7 @@ async function forwardToSession(event: {
         sender_id: event.user,
         thread_ts: event.thread_ts || event.ts,
         message_ts: event.ts,
+        pending_ts: pendingTs || '',
       },
     },
   });
