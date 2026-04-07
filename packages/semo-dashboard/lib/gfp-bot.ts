@@ -69,6 +69,7 @@ export async function dispatchRegeneration(
   phase: number = 0,
   projectMetadata?: Record<string, unknown>,
   track: GfpTrack = 'plan',
+  channelId?: string,
 ): Promise<void> {
   const assignee = getPhaseAssignee(phase, track);
 
@@ -92,7 +93,7 @@ ${reviewerNote}
 
 Please regenerate the section addressing the rejection reason above.`;
 
-  await dispatchBotMessage(assignee.botId, message);
+  await dispatchBotMessage(assignee.botId, message, channelId);
 }
 
 export async function dispatchFeatureSpecRequest(

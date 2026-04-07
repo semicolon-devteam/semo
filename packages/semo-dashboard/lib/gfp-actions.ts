@@ -126,6 +126,7 @@ export async function executeSectionAction(
       section.phase,
       (proj?.metadata as Record<string, unknown>) ?? undefined,
       sectionTrack,
+      slackCtx.channelId || undefined,
     ).catch((err) => console.error('Bot dispatch failed:', err));
 
     if (proj) {
