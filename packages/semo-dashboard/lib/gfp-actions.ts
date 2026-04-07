@@ -98,6 +98,9 @@ export async function executeSectionAction(
   }
 
   const slackCtx = await resolveGfpSlackContext(gfpId);
+  if (!slackCtx.channelId) {
+    console.warn(`[GFP] No Slack channel for project ${gfpId} — notifications will be skipped`);
+  }
   const sectionTrack: GfpTrack = section.track ?? 'plan';
 
   // ── Rejection: 봇 regeneration + Slack 알림 ──
@@ -189,17 +192,24 @@ export async function executeSectionAction(
 
     if (!allApproved) return { section };
 
-    // Phase 4: design sub-steps가 완료될 때까지 phase advance 차단
-    // ds-* 전체 승인이 phase 완료가 아님 — handoff(step 5)까지 완료되어야 함
+    // Phase 4: 5-step design process 사용 프로젝트만 step/handoff 가드 적용
+    // 5-step 미사용 프로젝트 (screen-*/ds-* 만 있는 경우) → 전 섹션 approved면 바로 완료
     if (section.phase === 4) {
-      const designStep = await getDesignStep(gfpId);
-      if (designStep < 5) {
-        return { section };
-      }
-      // step 5이고 handoff-* 섹션도 전부 approved일 때만 phase advance
-      const handoffSections = allSections.filter((s) => s.section_key.startsWith('handoff-'));
-      if (handoffSections.length === 0 || !handoffSections.every((s) => s.status === 'approved')) {
-        return { section };
+      const hasDesignSteps = allSections.some((s) =>
+        ['ref-', 'impl-', 'stitch-', 'review-', 'handoff-'].some((p) =>
+          s.section_key.startsWith(p),
+        ),
+      );
+
+      if (hasDesignSteps) {
+        const designStep = await getDesignStep(gfpId);
+        if (designStep < 5) {
+          return { section };
+        }
+        const handoffSections = allSections.filter((s) => s.section_key.startsWith('handoff-'));
+        if (handoffSections.length > 0 && !handoffSections.every((s) => s.status === 'approved')) {
+          return { section };
+        }
       }
     }
 
