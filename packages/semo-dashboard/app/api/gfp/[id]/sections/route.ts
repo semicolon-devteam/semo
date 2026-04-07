@@ -12,10 +12,7 @@ import { executeSectionAction } from '@/lib/gfp-actions';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const { searchParams } = new URL(request.url);
@@ -30,10 +27,7 @@ export async function GET(
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const body = await request.json();
@@ -42,8 +36,25 @@ export async function POST(
     if (phase === undefined || !section_key || !title) {
       return NextResponse.json(
         { error: 'phase, section_key, and title are required' },
-        { status: 400 }
+        { status: 400 },
       );
+    }
+
+    // Phase 4 디자인 섹션 content 형식 경고
+    let warning: string | undefined;
+    if (phase === 4 && content) {
+      const hexCount = (content.match(/#[0-9a-fA-F]{6}/g) || []).length;
+      if (section_key.startsWith('ds-color') && hexCount >= 3 && !content.includes('{')) {
+        warning =
+          '⚠️ ds-color 섹션 content가 구조화된 형식이 아닙니다. ColorPaletteSummary 파싱이 불가능할 수 있습니다.';
+      }
+      if (
+        (section_key.includes('component') || section_key.startsWith('impl-')) &&
+        !content.includes('```html') &&
+        !content.includes('<div')
+      ) {
+        warning = '⚠️ 컴포넌트/구현 섹션에 HTML 코드블록이 없습니다. 시각적 프리뷰가 불가능합니다.';
+      }
     }
 
     const section = await upsertSection({
@@ -58,17 +69,14 @@ export async function POST(
       qa_items,
       track: track ?? 'plan',
     });
-    return NextResponse.json(section, { status: 201 });
+    return NextResponse.json({ ...section, warning }, { status: 201 });
   } catch (error) {
     console.error('GFP section upsert error:', error);
     return NextResponse.json({ error: 'Failed to upsert section' }, { status: 500 });
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const body = await request.json();
@@ -82,7 +90,10 @@ export async function PATCH(
     if (action === 'answer-qa' && qa_answers) {
       const section = await answerQAItems(section_id, qa_answers, 'dashboard');
       if (!section) {
-        return NextResponse.json({ error: 'Section not found or has no Q&A items' }, { status: 404 });
+        return NextResponse.json(
+          { error: 'Section not found or has no Q&A items' },
+          { status: 404 },
+        );
       }
       return NextResponse.json(section);
     }
@@ -91,7 +102,10 @@ export async function PATCH(
     if (action === 'move') {
       const { target_phase, target_track } = body;
       if (target_phase === undefined) {
-        return NextResponse.json({ error: 'target_phase is required for move action' }, { status: 400 });
+        return NextResponse.json(
+          { error: 'target_phase is required for move action' },
+          { status: 400 },
+        );
       }
       try {
         const moved = await moveSection(section_id, id, target_phase, target_track);
@@ -103,7 +117,7 @@ export async function PATCH(
         if (err instanceof Error && err.message === 'CONFLICT') {
           return NextResponse.json(
             { error: 'Target phase already has a section with the same key' },
-            { status: 409 }
+            { status: 409 },
           );
         }
         throw err;
@@ -157,7 +171,7 @@ export async function PATCH(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const { id } = await params;
@@ -165,7 +179,10 @@ export async function DELETE(
     const sectionId = searchParams.get('section_id');
 
     if (!sectionId) {
-      return NextResponse.json({ error: 'section_id query parameter is required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'section_id query parameter is required' },
+        { status: 400 },
+      );
     }
 
     const deleted = await deleteSection(sectionId, id);
@@ -179,4 +196,3 @@ export async function DELETE(
     return NextResponse.json({ error: 'Failed to delete section' }, { status: 500 });
   }
 }
-

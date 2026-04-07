@@ -106,10 +106,23 @@ export async function executeSectionAction(
   // ── Rejection: 봇 regeneration + Slack 알림 ──
   if (status === 'rejected' && reviewerNote) {
     const proj = await getProject(gfpId);
+
+    // Phase 4 디자인 섹션 reject 시 시각화 지침 자동 추가
+    let enrichedNote = reviewerNote;
+    if (
+      section.phase === 4 &&
+      (section.section_key.startsWith('ds-') ||
+        section.section_key.startsWith('impl-') ||
+        section.section_key.includes('component'))
+    ) {
+      enrichedNote +=
+        '\n\n[시스템 지침] 디자인 섹션은 시각적 프리뷰를 포함해야 합니다. 컬러는 palette-preview API로 프리뷰 생성, 컴포넌트는 design-prototype 콜백으로 HTML 프로토타입을 제출하세요. 텍스트 나열만으로 제출 금지.';
+    }
+
     dispatchRegeneration(
       sectionId,
       section.content,
-      reviewerNote,
+      enrichedNote,
       section.phase,
       (proj?.metadata as Record<string, unknown>) ?? undefined,
       sectionTrack,

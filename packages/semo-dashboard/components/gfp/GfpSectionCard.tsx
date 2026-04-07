@@ -19,10 +19,26 @@ import { shouldShowCode } from '@/lib/po-profile';
 import type { GfpPhaseSection, GfpSectionStatus, GfpQAItem } from '@/types';
 
 const STATUS_STYLES: Record<GfpSectionStatus, { bg: string; text: string; label: string }> = {
-  draft: { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-600 dark:text-gray-400', label: '초안' },
-  'pending-review': { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-400', label: '검토 대기' },
-  approved: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400', label: '승인됨' },
-  rejected: { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-400', label: '거절됨' },
+  draft: {
+    bg: 'bg-gray-100 dark:bg-gray-700',
+    text: 'text-gray-600 dark:text-gray-400',
+    label: '초안',
+  },
+  'pending-review': {
+    bg: 'bg-yellow-100 dark:bg-yellow-900/30',
+    text: 'text-yellow-700 dark:text-yellow-400',
+    label: '검토 대기',
+  },
+  approved: {
+    bg: 'bg-green-100 dark:bg-green-900/30',
+    text: 'text-green-700 dark:text-green-400',
+    label: '승인됨',
+  },
+  rejected: {
+    bg: 'bg-red-100 dark:bg-red-900/30',
+    text: 'text-red-700 dark:text-red-400',
+    label: '거절됨',
+  },
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -42,7 +58,15 @@ interface GfpSectionCardProps {
   onQASaved?: () => void;
 }
 
-export default function GfpSectionCard({ section, gfpId, focused, onApprove, onReject, onUndoReject, onQASaved }: GfpSectionCardProps) {
+export default function GfpSectionCard({
+  section,
+  gfpId,
+  focused,
+  onApprove,
+  onReject,
+  onUndoReject,
+  onQASaved,
+}: GfpSectionCardProps) {
   const ref = useRef<HTMLDivElement>(null);
   const poProfile = usePoProfile();
   const [showRejectModal, setShowRejectModal] = useState(false);
@@ -99,9 +123,7 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
       ref={ref}
       style={{ scrollMarginTop: '80px' }}
       className={`bg-white dark:bg-gray-800 rounded-lg border overflow-hidden transition-all duration-500 ${
-        highlight
-          ? 'ring-2 ring-blue-500 border-blue-400'
-          : 'border-gray-200 dark:border-gray-700'
+        highlight ? 'ring-2 ring-blue-500 border-blue-400' : 'border-gray-200 dark:border-gray-700'
       }`}
     >
       {/* Header */}
@@ -113,7 +135,9 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
           <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
             {section.title}
           </span>
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}>
+          <span
+            className={`text-xs font-medium px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}
+          >
             {style.label}
           </span>
           <span className="text-xs text-gray-400 dark:text-gray-500">
@@ -133,9 +157,7 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
           >
             {copied ? '✓' : '🔗'}
           </button>
-          <span className="text-gray-400 text-sm">
-            {expanded ? '\u25B2' : '\u25BC'}
-          </span>
+          <span className="text-gray-400 text-sm">{expanded ? '\u25B2' : '\u25BC'}</span>
         </div>
       </div>
 
@@ -147,9 +169,13 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
             <div className="mb-3 p-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800 rounded-lg">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="text-xs font-medium text-red-600 dark:text-red-400 mb-1">거절 사유</p>
+                  <p className="text-xs font-medium text-red-600 dark:text-red-400 mb-1">
+                    거절 사유
+                  </p>
                   {section.reviewer_note && (
-                    <p className="text-sm text-red-700 dark:text-red-300">{section.reviewer_note}</p>
+                    <p className="text-sm text-red-700 dark:text-red-300">
+                      {section.reviewer_note}
+                    </p>
                   )}
                 </div>
                 {onUndoReject && (
@@ -201,16 +227,21 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
               />
               <CodeAccordion content={section.content} />
             </div>
-          ) : (section.section_key.startsWith('impl-screen-') || section.section_key.startsWith('stitch-result-')) && extractHtmlFromContent(section.content) ? (
+          ) : section.section_key === 'design-system' && hasMultipleColors(section.content) ? (
+            <div className="mb-4">
+              <ColorPaletteSummary content={section.content} />
+              <CodeAccordion content={section.content} />
+            </div>
+          ) : (section.section_key.startsWith('impl-screen-') ||
+              section.section_key.startsWith('stitch-result-')) &&
+            extractHtmlFromContent(section.content) ? (
             <div className="mb-4 space-y-3">
               {/* Description text above the preview */}
               {(() => {
                 const descPart = section.content.split('```html')[0].trim();
                 return descPart ? (
                   <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {descPart}
-                    </ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{descPart}</ReactMarkdown>
                   </div>
                 ) : null;
               })()}
@@ -229,15 +260,23 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
                   </p>
                 </div>
               )}
-              <div className={`prose prose-sm dark:prose-invert max-w-none gfp-prose ${
-                poProfile.tech_level === 'non-technical' && section.phase >= 7 ? 'max-h-[200px] overflow-hidden relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-12 after:bg-gradient-to-t after:from-white dark:after:from-gray-800' : ''
-              }`}>
+              <div
+                className={`prose prose-sm dark:prose-invert max-w-none gfp-prose ${
+                  poProfile.tech_level === 'non-technical' && section.phase >= 7
+                    ? 'max-h-[200px] overflow-hidden relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-12 after:bg-gradient-to-t after:from-white dark:after:from-gray-800'
+                    : ''
+                }`}
+              >
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
                   rehypePlugins={[rehypeHighlight]}
                   components={{
                     a({ href, children, ...props }) {
-                      return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>;
+                      return (
+                        <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
+                          {children}
+                        </a>
+                      );
                     },
                     code({ className, children, ...props }) {
                       if (/language-mermaid/.test(className || '')) {
@@ -247,7 +286,11 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
                       if (hasMultipleColors(text)) {
                         return <ColorCodeBlock className={className}>{children}</ColorCodeBlock>;
                       }
-                      return <code className={className} {...props}>{children}</code>;
+                      return (
+                        <code className={className} {...props}>
+                          {children}
+                        </code>
+                      );
                     },
                   }}
                 >
@@ -265,7 +308,11 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
                       rehypePlugins={[rehypeHighlight]}
                       components={{
                         a({ href, children, ...props }) {
-                          return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>;
+                          return (
+                            <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
+                              {children}
+                            </a>
+                          );
                         },
                         code({ className, children, ...props }) {
                           if (/language-mermaid/.test(className || '')) {
@@ -273,9 +320,15 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
                           }
                           const text = String(children);
                           if (hasMultipleColors(text)) {
-                            return <ColorCodeBlock className={className}>{children}</ColorCodeBlock>;
+                            return (
+                              <ColorCodeBlock className={className}>{children}</ColorCodeBlock>
+                            );
                           }
-                          return <code className={className} {...props}>{children}</code>;
+                          return (
+                            <code className={className} {...props}>
+                              {children}
+                            </code>
+                          );
                         },
                       }}
                     >
@@ -288,58 +341,58 @@ export default function GfpSectionCard({ section, gfpId, focused, onApprove, onR
           )}
 
           {/* Actions */}
-          {(section.status === 'pending-review' || section.status === 'draft') && (() => {
-            const qaItems = section.qa_items as GfpQAItem[] | null;
-            const unansweredCount = qaItems
-              ? qaItems.filter((q) => !q.answer).length
-              : 0;
-            const approveDisabled = unansweredCount > 0;
+          {(section.status === 'pending-review' || section.status === 'draft') &&
+            (() => {
+              const qaItems = section.qa_items as GfpQAItem[] | null;
+              const unansweredCount = qaItems ? qaItems.filter((q) => !q.answer).length : 0;
+              const approveDisabled = unansweredCount > 0;
 
-            return (
-              <div className="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onApprove(section.section_id);
-                  }}
-                  disabled={approveDisabled}
-                  className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors"
-                  title={approveDisabled ? `${unansweredCount}개 미답변 질문` : undefined}
-                >
-                  승인
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowRejectModal(true);
-                  }}
-                  className="px-4 py-1.5 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 text-sm font-medium rounded-md transition-colors"
-                >
-                  거절
-                </button>
-                {approveDisabled && (
-                  <span className="text-xs text-amber-600 dark:text-amber-400">
-                    {unansweredCount}개 미답변
-                  </span>
-                )}
-              </div>
-            );
-          })()}
+              return (
+                <div className="flex items-center gap-2 pt-3 border-t border-gray-100 dark:border-gray-700">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onApprove(section.section_id);
+                    }}
+                    disabled={approveDisabled}
+                    className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors"
+                    title={approveDisabled ? `${unansweredCount}개 미답변 질문` : undefined}
+                  >
+                    승인
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowRejectModal(true);
+                    }}
+                    className="px-4 py-1.5 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 text-red-600 dark:text-red-400 border border-red-300 dark:border-red-700 text-sm font-medium rounded-md transition-colors"
+                  >
+                    거절
+                  </button>
+                  {approveDisabled && (
+                    <span className="text-xs text-amber-600 dark:text-amber-400">
+                      {unansweredCount}개 미답변
+                    </span>
+                  )}
+                </div>
+              );
+            })()}
         </div>
       )}
 
       {/* Reject Modal */}
       {showRejectModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={() => setShowRejectModal(false)}>
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          onClick={() => setShowRejectModal(false)}
+        >
           <div className="absolute inset-0 bg-black/50" />
           <div
             className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                섹션 거절
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">섹션 거절</h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
                 사유를 입력하세요 — PlanClaw가 피드백을 반영하여 재생성합니다.
               </p>
@@ -392,7 +445,11 @@ function CodeAccordion({ content }: { content: string }) {
           rehypePlugins={[rehypeHighlight]}
           components={{
             a({ href, children, ...props }) {
-              return <a href={href} target="_blank" rel="noopener noreferrer" {...props}>{children}</a>;
+              return (
+                <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
+                  {children}
+                </a>
+              );
             },
             code({ className, children, ...props }) {
               if (/language-mermaid/.test(className || '')) {
@@ -402,7 +459,11 @@ function CodeAccordion({ content }: { content: string }) {
               if (hasMultipleColors(text)) {
                 return <ColorCodeBlock className={className}>{children}</ColorCodeBlock>;
               }
-              return <code className={className} {...props}>{children}</code>;
+              return (
+                <code className={className} {...props}>
+                  {children}
+                </code>
+              );
             },
           }}
         >
