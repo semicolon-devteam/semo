@@ -389,7 +389,12 @@ export const DESIGN_STEPS = [
     prefixes: ['ref-'] as const,
     icon: 'magnifying-glass',
   },
-  { step: 2 as const, label: '디자인 시스템', prefixes: ['ds-'] as const, icon: 'palette' },
+  {
+    step: 2 as const,
+    label: '디자인 시스템',
+    prefixes: ['ds-', 'screen-', 'design-'] as const,
+    icon: 'palette',
+  },
   {
     step: 3 as const,
     label: '구현',
