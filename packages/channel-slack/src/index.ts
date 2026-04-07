@@ -90,7 +90,8 @@ const mcp = new Server(
 Messages arrive as <channel source="semo-channel-slack" slack_channel="..." sender="..." thread_ts="...">
 
 ROUTING RULES:
-- Read CLAUDE.md for Phase→Bot routing table
+- If the message contains [Route: {botId}], use Agent({botId}) directly
+- Otherwise, read CLAUDE.md for Phase→Bot routing table
 - Based on the current project phase and message intent, use the appropriate Agent
 - Prefix every reply with [BotName] (e.g., [PlanClaw], [SemiClaw])
 - Use the reply tool with the same thread_ts to post in-thread

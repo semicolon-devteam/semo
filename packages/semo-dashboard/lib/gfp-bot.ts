@@ -1,24 +1,53 @@
 /**
- * GFP Bot Dispatch — OpenClaw gateway wrapper for phase-specific bots
+ * GFP Bot Dispatch — Slack → Channel Plugin → Claude Code 세션
+ *
+ * 통합봇(SEMO Incubator)에게 Slack 메시지를 전송하면,
+ * Channel 플러그인이 수신하여 Claude Code 세션 내에서
+ * Agent({botId})로 라우팅한다.
  */
 
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { getPhaseAssignee } from './gfp-phases';
 import { getPoProfile, buildProfileContext } from './po-profile';
 import type { GfpTrack } from '@/types';
 
-const execAsync = promisify(exec);
+const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
+const SEMO_INCUBATOR_BOT_ID = 'U0AR4719LGM'; // @SEMO Incubator
 
 export async function dispatchBotMessage(
   botId: string,
-  message: string
-): Promise<{ sessionKey: string } | null> {
+  message: string,
+  channelId?: string,
+): Promise<{ ok: boolean } | null> {
+  if (!SLACK_BOT_TOKEN) {
+    console.warn('SLACK_BOT_TOKEN not set — skipping bot dispatch');
+    return null;
+  }
+
+  // 프로젝트 채널이 없으면 #semo-incubator 폴백
+  const targetChannel = channelId || process.env.SEMO_INCUBATOR_CHANNEL || 'C0APG495ABZ';
+
   try {
-    const { stdout } = await execAsync(
-      `openclaw send --bot ${botId} --json --message ${JSON.stringify(message)}`
-    );
-    return JSON.parse(stdout);
+    const slackMessage = `<@${SEMO_INCUBATOR_BOT_ID}> [Route: ${botId}]\n\n${message}`;
+
+    const res = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        channel: targetChannel,
+        text: slackMessage,
+        unfurl_links: false,
+      }),
+    });
+
+    const data = await res.json();
+    if (!data.ok) {
+      console.error(`GFP bot dispatch Slack error (${botId}):`, data.error);
+      return null;
+    }
+    return { ok: true };
   } catch (error) {
     console.error(`GFP bot dispatch error (${botId}):`, error);
     return null;
@@ -28,7 +57,7 @@ export async function dispatchBotMessage(
 export async function dispatchResearch(
   taskId: string,
   botId: string,
-  message: string
+  message: string,
 ): Promise<void> {
   await dispatchBotMessage(botId, `[GFP Research Task: ${taskId}]\n\n${message}`);
 }
@@ -39,7 +68,7 @@ export async function dispatchRegeneration(
   reviewerNote: string,
   phase: number = 0,
   projectMetadata?: Record<string, unknown>,
-  track: GfpTrack = 'plan'
+  track: GfpTrack = 'plan',
 ): Promise<void> {
   const assignee = getPhaseAssignee(phase, track);
 
@@ -173,9 +202,10 @@ export async function dispatchFeatureConversation(
   projectName: string,
   mode: string,
 ): Promise<void> {
-  const modeDesc = mode === 'enrich'
-    ? '기존 기능의 스펙(AC, 유저스토리, 테스트시나리오)을 보강'
-    : '신규 기능을 기획하고 구조화된 스펙 생성';
+  const modeDesc =
+    mode === 'enrich'
+      ? '기존 기능의 스펙(AC, 유저스토리, 테스트시나리오)을 보강'
+      : '신규 기능을 기획하고 구조화된 스펙 생성';
 
   const message = `[Feature Conversation: ${sessionId}]
 
@@ -214,7 +244,7 @@ export async function dispatchSpecEnrichment(
 ): Promise<void> {
   const hasAc = existingSpec.acceptance_criteria.length > 0;
   const existingContext = hasAc
-    ? `\n## 기존 AC\n${existingSpec.acceptance_criteria.map(ac => `- [${ac.id}] ${ac.criterion}`).join('\n')}`
+    ? `\n## 기존 AC\n${existingSpec.acceptance_criteria.map((ac) => `- [${ac.id}] ${ac.criterion}`).join('\n')}`
     : '';
 
   const message = `[Feature Spec Enrichment: ${featureId}]

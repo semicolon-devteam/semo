@@ -20,25 +20,28 @@ export interface PhaseCcBot {
   reason: string; // 멘션 사유
 }
 
-// Track A (plan) Phase 할당
+// SEMO Incubator 통합봇 Slack User ID
+const SEMO_BOT_SLACK_ID = 'U0AR4719LGM';
+
+// Track A (plan) Phase 할당 — slackId는 통합봇, botId는 내부 라우팅용
 export const PHASE_ASSIGNEES: Record<number, PhaseAssignee> = {
-  0: { botId: 'semiclaw', slackId: 'U0AFNMGKURX' },    // Onboarding (SemiClaw)
-  1: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },    // Discovery
-  2: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },    // PRD
-  3: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },    // Clarification (Q&A)
-  4: { botId: 'designclaw', slackId: 'U0AFC0MK2TY' },   // Design System
-  5: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },    // Epic
-  6: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },    // Functional Spec
-  7: { botId: 'workclaw', slackId: 'U0AFECSJHK3' },     // Technical Plan
-  8: { botId: 'workclaw', slackId: 'U0AFECSJHK3' },     // Task Breakdown
-  9: { botId: 'planclaw', slackId: 'U0AFNMGKURX' },    // Handoff
+  0: { botId: 'semiclaw', slackId: SEMO_BOT_SLACK_ID }, // Onboarding
+  1: { botId: 'planclaw', slackId: SEMO_BOT_SLACK_ID }, // Discovery
+  2: { botId: 'planclaw', slackId: SEMO_BOT_SLACK_ID }, // PRD
+  3: { botId: 'planclaw', slackId: SEMO_BOT_SLACK_ID }, // Clarification (Q&A)
+  4: { botId: 'designclaw', slackId: SEMO_BOT_SLACK_ID }, // Design System
+  5: { botId: 'planclaw', slackId: SEMO_BOT_SLACK_ID }, // Epic
+  6: { botId: 'planclaw', slackId: SEMO_BOT_SLACK_ID }, // Functional Spec
+  7: { botId: 'workclaw', slackId: SEMO_BOT_SLACK_ID }, // Technical Plan
+  8: { botId: 'workclaw', slackId: SEMO_BOT_SLACK_ID }, // Task Breakdown
+  9: { botId: 'planclaw', slackId: SEMO_BOT_SLACK_ID }, // Handoff
 };
 
 // Track B (infra) Phase 할당
 export const INFRA_PHASE_ASSIGNEES: Record<number, PhaseAssignee> = {
-  0: { botId: 'infraclaw', slackId: 'U0AFPDMCGHX' },
-  1: { botId: 'infraclaw', slackId: 'U0AFPDMCGHX' },
-  2: { botId: 'infraclaw', slackId: 'U0AFPDMCGHX' },
+  0: { botId: 'infraclaw', slackId: SEMO_BOT_SLACK_ID },
+  1: { botId: 'infraclaw', slackId: SEMO_BOT_SLACK_ID },
+  2: { botId: 'infraclaw', slackId: SEMO_BOT_SLACK_ID },
 };
 
 // Phase 완료 후 다음 Phase 시작 시 추가 멘션할 봇 (레거시 호환 — 병렬 트랙에서는 비어 있음)
