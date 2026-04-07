@@ -274,8 +274,13 @@ async function start() {
 
   slackSocket.on('message', async ({ event, ack }) => {
     await ack();
-    // DM이거나 스레드 내 메시지만 처리 (채널 일반 메시지는 app_mention으로 처리)
-    if (event.channel_type === 'im' || (event.thread_ts && event.thread_ts !== event.ts)) {
+    // DM, 스레드 내 메시지, 또는 [Route:] 시스템 디스패치 처리
+    const isSystemDispatch = event.text && /\[Route:\s*\w+\]/.test(event.text);
+    if (
+      event.channel_type === 'im' ||
+      (event.thread_ts && event.thread_ts !== event.ts) ||
+      isSystemDispatch
+    ) {
       await forwardToSession(event);
     }
   });
