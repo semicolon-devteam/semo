@@ -1,41 +1,52 @@
+import type { Pool } from 'pg';
 import type { BotId } from './bot-config';
 
-interface CostEntry {
-  botId: string;
-  costUsd: number;
-  timestamp: number;
-  serviceId?: string;
-}
-
 export class CostTracker {
-  private entries: CostEntry[] = [];
+  private pool: Pool;
+  private insertFailures = 0;
 
-  record(botId: BotId, costUsd: number, serviceId?: string) {
-    this.entries.push({ botId, costUsd, timestamp: Date.now(), serviceId });
+  constructor(pool: Pool) {
+    this.pool = pool;
   }
 
-  // 봇별 일일 비용 집계
-  getDailySummary(): Record<string, number> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayTs = today.getTime();
+  record(botId: BotId, costUsd: number, serviceId?: string, model?: string) {
+    if (costUsd <= 0) return; // 0 또는 음수는 무시 (리펀드 케이스 없음)
+    this.pool
+      .query(
+        `INSERT INTO semo.bot_cost_log (bot_id, cost_usd, service_id, model) VALUES ($1, $2, $3, $4)`,
+        [botId, costUsd, serviceId || null, model || null],
+      )
+      .catch((err) => {
+        this.insertFailures++;
+        console.error(`[cost-tracker] INSERT failed (#${this.insertFailures}):`, err.message);
+      });
+  }
 
+  async getDailySummary(): Promise<Record<string, number>> {
+    const { rows } = await this.pool.query<{ bot_id: string; total: string }>(
+      `SELECT bot_id, SUM(cost_usd) AS total
+       FROM semo.bot_cost_log
+       WHERE created_at >= CURRENT_DATE
+       GROUP BY bot_id
+       ORDER BY total DESC`,
+    );
     const summary: Record<string, number> = {};
-    for (const e of this.entries) {
-      if (e.timestamp >= todayTs) {
-        summary[e.botId] = (summary[e.botId] || 0) + e.costUsd;
-      }
-    }
+    for (const r of rows) summary[r.bot_id] = parseFloat(r.total);
     return summary;
   }
 
-  getTotalToday(): number {
-    return Object.values(this.getDailySummary()).reduce((a, b) => a + b, 0);
+  async getTotalToday(): Promise<number> {
+    const { rows } = await this.pool.query<{ total: string }>(
+      `SELECT COALESCE(SUM(cost_usd), 0) AS total
+       FROM semo.bot_cost_log
+       WHERE created_at >= CURRENT_DATE`,
+    );
+    return parseFloat(rows[0].total);
   }
 
-  formatReport(): string {
-    const summary = this.getDailySummary();
-    const total = this.getTotalToday();
+  async formatReport(): Promise<string> {
+    const summary = await this.getDailySummary();
+    const total = Object.values(summary).reduce((a, b) => a + b, 0);
     const lines = Object.entries(summary)
       .sort((a, b) => b[1] - a[1])
       .map(([bot, cost]) => `  ${bot}: $${cost.toFixed(4)}`);

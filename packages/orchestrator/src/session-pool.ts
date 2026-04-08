@@ -221,7 +221,7 @@ export class SessionPool {
       }
 
       // 비용 추적
-      this.costTracker.record(botId, costUsd, context.route.serviceId);
+      this.costTracker.record(botId, costUsd, context.route.serviceId, config.model);
 
       // 에스컬레이션 감지
       const escalation = detectEscalation(responseText);

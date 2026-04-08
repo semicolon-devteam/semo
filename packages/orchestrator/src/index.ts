@@ -100,7 +100,7 @@ async function main() {
   console.log(`[orchestrator] Loaded ${botConfigs.size} bot configs`);
 
   // 4. Components
-  const costTracker = new CostTracker();
+  const costTracker = new CostTracker(pool);
   const router = new Router(pool);
   const sessionPool = new SessionPool(botConfigs, costTracker);
   const slack = new SlackGateway(SLACK_BOT_TOKEN, SLACK_APP_TOKEN);
