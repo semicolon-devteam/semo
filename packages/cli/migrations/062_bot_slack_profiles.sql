@@ -18,4 +18,4 @@ DO UPDATE SET content = EXCLUDED.content, updated_at = now();
 -- slack_config scheme의 value_hint 업데이트 (username, icon_emoji 필드 명시)
 UPDATE semo.kb_type_schema
 SET value_hint = 'YAML: username, icon_emoji, channels[]'
-WHERE entity_type = 'bot' AND scheme_key = 'slack_config';
+WHERE type_key = 'bot' AND scheme_key = 'slack-config';
