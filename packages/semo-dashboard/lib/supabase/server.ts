@@ -6,6 +6,7 @@ export async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: { flowType: 'pkce' },
     cookies: {
       getAll() {
         return cookieStore.getAll();
