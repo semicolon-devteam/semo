@@ -44,7 +44,7 @@ export function registerAgentFlushCommands(program: Command): void {
         // 1. 해당 봇의 active/pending commitment → done 처리
         const commitResult = await pool.query(
           `UPDATE semo.bot_commitments
-           SET status = 'done', completed_at = NOW(), updated_at = NOW()
+           SET status = 'done'
            WHERE bot_id = $1
              AND status IN ('pending', 'active')
              AND ($2 = '' OR assigned_session = $2)

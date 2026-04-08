@@ -1038,10 +1038,10 @@ export async function kbUpsert(
   try {
     if (entry.expect_version !== undefined) {
       // Optimistic locking: version 불일치 시 실패
+      // version/updated_at는 트리거(trg_kb_updated_at)가 자동 처리하므로 명시하지 않음
       const result = await writeClient.query(
         `UPDATE semo.knowledge_base
-         SET content = $1, metadata = $2, embedding = $3::vector,
-             version = version + 1, updated_at = NOW()
+         SET content = $1, metadata = $2, embedding = $3::vector
          WHERE domain = $4 AND key = $5 AND sub_key = $6 AND version = $7
          RETURNING version`,
         [
