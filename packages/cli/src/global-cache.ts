@@ -155,9 +155,8 @@ export async function syncGlobalCache(claudeDir?: string): Promise<GlobalCacheSy
     }
   }
 
-  // 3. 에이전트 설치 (전체 교체, 대소문자 중복 제거)
+  // 3. 에이전트 설치 (머지 모드 — 로컬 YAML frontmatter 보존)
   const agentsDir = path.join(dir, 'agents');
-  removeRecursive(agentsDir);
   fs.mkdirSync(agentsDir, { recursive: true });
 
   const seenAgentNames = new Set<string>();
@@ -170,11 +169,38 @@ export async function syncGlobalCache(claudeDir?: string): Promise<GlobalCacheSy
     }
   }
 
+  // 기존 로컬 파일의 frontmatter 캐싱 (덮어쓰기 전)
+  const existingFrontmatters = new Map<string, string>();
+  for (const folder of fs.readdirSync(agentsDir).filter((f) => !f.startsWith('.'))) {
+    const filePath = path.join(agentsDir, folder, `${folder}.md`);
+    if (fs.existsSync(filePath)) {
+      const existing = fs.readFileSync(filePath, 'utf8');
+      const fmMatch = existing.match(/^---\n([\s\S]*?)\n---\n/);
+      if (fmMatch) {
+        existingFrontmatters.set(folder.toLowerCase(), fmMatch[1]);
+      }
+    }
+  }
+
+  // DB에 없는 에이전트 폴더 정리 (orphan 제거)
+  const dbAgentNames = new Set(dedupedAgents.map((a) => a.name.toLowerCase()));
+  for (const folder of fs.readdirSync(agentsDir).filter((f) => !f.startsWith('.'))) {
+    const folderPath = path.join(agentsDir, folder);
+    if (!dbAgentNames.has(folder.toLowerCase()) && fs.statSync(folderPath).isDirectory()) {
+      removeRecursive(folderPath);
+    }
+  }
+
   for (const agent of dedupedAgents) {
     const agentFolder = path.join(agentsDir, agent.name);
     fs.mkdirSync(agentFolder, { recursive: true });
 
-    let content = agent.content;
+    // DB content에서 frontmatter 제거 (body만 추출)
+    let dbBody = agent.content;
+    const dbFmMatch = agent.content.match(/^---\n[\s\S]*?\n---\n([\s\S]*)$/);
+    if (dbFmMatch) {
+      dbBody = dbFmMatch[1].trim();
+    }
 
     // 위임 매트릭스 주입
     const agentDelegations = delegations.filter((d) => d.from_bot_id === agent.name);
@@ -182,19 +208,24 @@ export async function syncGlobalCache(claudeDir?: string): Promise<GlobalCacheSy
       const delegationLines = agentDelegations
         .map((d) => `- → ${d.to_bot_id}: ${d.domains.join(', ')} (via ${d.method})`)
         .join('\n');
-      content += `\n\n## 위임 매트릭스\n${delegationLines}\n`;
+      dbBody += `\n\n## 위임 매트릭스\n${delegationLines}\n`;
     }
 
-    // metadata에 model/description이 있으면 YAML frontmatter 주입
-    if (agent.metadata && (agent.metadata.model || agent.metadata.description)) {
-      const hasFrontmatter = content.trimStart().startsWith('---');
-      if (!hasFrontmatter) {
-        const fm = ['---'];
-        if (agent.metadata.description) fm.push(`description: "${agent.metadata.description}"`);
-        if (agent.metadata.model) fm.push(`model: "${agent.metadata.model}"`);
-        fm.push('---', '');
-        content = fm.join('\n') + content;
-      }
+    // 로컬 frontmatter 보존 (있으면) → DB body와 합침
+    const localFm = existingFrontmatters.get(agent.name.toLowerCase());
+    let content: string;
+    if (localFm) {
+      // 로컬 frontmatter 우선 보존 + DB body 업데이트
+      content = `---\n${localFm}\n---\n${dbBody}`;
+    } else if (agent.metadata && (agent.metadata.model || agent.metadata.description)) {
+      // 로컬 frontmatter 없으면 metadata에서 생성
+      const fm = ['---'];
+      if (agent.metadata.description) fm.push(`description: "${agent.metadata.description}"`);
+      if (agent.metadata.model) fm.push(`model: "${agent.metadata.model}"`);
+      fm.push('---', '');
+      content = fm.join('\n') + dbBody;
+    } else {
+      content = dbBody;
     }
 
     fs.writeFileSync(path.join(agentFolder, `${agent.name}.md`), content);

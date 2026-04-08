@@ -73,12 +73,25 @@ const slackSocket = new SocketModeClient({ appToken: SLACK_APP_TOKEN });
 // Bot user ID (resolved at startup)
 let botUserId = '';
 
+// Bot identity profiles for customized Slack sender
+const BOT_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
+  semiclaw: { username: 'SemiClaw', icon_emoji: ':clipboard:' },
+  planclaw: { username: 'PlanClaw', icon_emoji: ':bar_chart:' },
+  designclaw: { username: 'DesignClaw', icon_emoji: ':art:' },
+  workclaw: { username: 'WorkClaw', icon_emoji: ':hammer_and_wrench:' },
+  reviewclaw: { username: 'ReviewClaw', icon_emoji: ':mag:' },
+  infraclaw: { username: 'InfraClaw', icon_emoji: ':gear:' },
+  growthclaw: { username: 'GrowthClaw', icon_emoji: ':chart_with_upwards_trend:' },
+};
+
 // Pending ask_user responses: requestId → resolve function
 const pendingAskResponses = new Map<string, (value: string) => void>();
 let askRequestCounter = 0;
 
 // Busy state + message queue
 let isBusy = false;
+let busyTimer: ReturnType<typeof setTimeout> | null = null;
+const BUSY_TIMEOUT_MS = 3 * 60 * 1000; // 3분 후 자동 해제
 interface QueuedMessage {
   text: string;
   user: string;
@@ -87,6 +100,27 @@ interface QueuedMessage {
   thread_ts?: string;
 }
 const messageQueue: QueuedMessage[] = [];
+
+function clearBusy() {
+  isBusy = false;
+  if (busyTimer) {
+    clearTimeout(busyTimer);
+    busyTimer = null;
+  }
+  if (messageQueue.length > 0) {
+    const next = messageQueue.shift()!;
+    setImmediate(() => forwardToSession(next));
+  }
+}
+
+function setBusy() {
+  isBusy = true;
+  if (busyTimer) clearTimeout(busyTimer);
+  busyTimer = setTimeout(() => {
+    console.error('[channel-slack] busy timeout — auto-clearing after 3 minutes');
+    clearBusy();
+  }, BUSY_TIMEOUT_MS);
+}
 
 // ============================================================
 // MCP Channel Server
@@ -104,11 +138,18 @@ const mcp = new Server(
     instructions: `You are receiving messages from Slack via the semo-channel-slack channel.
 Messages arrive as <channel source="semo-channel-slack" slack_channel="..." sender="..." thread_ts="...">
 
+CRITICAL RULE — ALWAYS REPLY:
+- Every channel message MUST end with a reply() tool call. No exceptions.
+- Even if the request was already handled, reply with a short acknowledgment (e.g., "이미 처리 완료된 요청입니다.")
+- Skipping reply() permanently blocks the message queue — subsequent Slack messages will never be delivered.
+
 ROUTING RULES:
 - If the message contains [Route: {botId}], use Agent({botId}) directly
 - Otherwise, read CLAUDE.md for Phase→Bot routing table
 - Based on the current project phase and message intent, use the appropriate Agent
-- Prefix every reply with [BotName] (e.g., [PlanClaw], [SemiClaw])
+- Pass bot_id in every reply() and ask_user() call to display the bot's identity in Slack (e.g., bot_id="planclaw")
+- Available bot_ids: semiclaw, planclaw, designclaw, workclaw, reviewclaw, infraclaw, growthclaw
+- Do NOT prefix replies with [BotName] — the bot_id parameter handles identity display automatically
 - Use the reply tool with the same thread_ts and pending_ts to post in-thread
 - A typing indicator shows automatically when you receive a message
 - Before heavy work (KB queries, code reading), update status: reply(mode="update", thread_ts=meta.thread_ts, text="KB 조회 중...")
@@ -143,6 +184,11 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
           thread_ts: {
             type: 'string',
             description: 'Thread timestamp to reply in-thread. Empty string for new message.',
+          },
+          bot_id: {
+            type: 'string',
+            description:
+              'Bot ID for customized sender identity (e.g., "planclaw", "designclaw"). Changes the displayed username and icon in Slack. Requires chat:write.customize scope.',
           },
           mode: {
             type: 'string',
@@ -185,6 +231,10 @@ mcp.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: 'string',
             description: 'Thread timestamp for in-thread posting',
           },
+          bot_id: {
+            type: 'string',
+            description: 'Bot ID for customized sender identity (e.g., "planclaw")',
+          },
         },
         required: ['question', 'options', 'slack_channel'],
       },
@@ -218,10 +268,11 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args } = req.params;
 
   if (name === 'reply') {
-    const { text, slack_channel, thread_ts, mode } = args as {
+    const { text, slack_channel, thread_ts, bot_id, mode } = args as {
       text: string;
       slack_channel: string;
       thread_ts?: string;
+      bot_id?: string;
       mode?: string;
     };
 
@@ -242,34 +293,39 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
 
     try {
       // 메시지 전송 (타이핑 인디케이터는 자동 해제됨)
+      const profile = bot_id ? BOT_PROFILES[bot_id] : undefined;
       await slackWeb.chat.postMessage({
         channel: slack_channel,
         text,
         thread_ts: thread_ts || undefined,
         unfurl_links: false,
+        ...(profile && { username: profile.username, icon_emoji: profile.icon_emoji }),
       });
 
       // busy 해제 + 큐 처리
-      isBusy = false;
-      if (messageQueue.length > 0) {
-        const next = messageQueue.shift()!;
-        setImmediate(() => forwardToSession(next));
-      }
+      clearBusy();
 
       return { content: [{ type: 'text', text: 'Message sent to Slack' }] };
     } catch (err) {
-      isBusy = false;
+      clearBusy();
       const msg = err instanceof Error ? err.message : String(err);
       return { content: [{ type: 'text', text: `Slack error: ${msg}` }] };
     }
   }
 
   if (name === 'ask_user') {
-    const { question, options, slack_channel, thread_ts } = args as {
+    const {
+      question,
+      options,
+      slack_channel,
+      thread_ts,
+      bot_id: askBotId,
+    } = args as {
       question: string;
       options: Array<{ label: string; value: string }>;
       slack_channel: string;
       thread_ts?: string;
+      bot_id?: string;
     };
 
     const requestId = `ask_${++askRequestCounter}_${Date.now()}`;
@@ -283,10 +339,12 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         value: opt.value,
       }));
 
+      const askProfile = askBotId ? BOT_PROFILES[askBotId] : undefined;
       await slackWeb.chat.postMessage({
         channel: slack_channel,
         thread_ts: thread_ts || undefined,
         text: question,
+        ...(askProfile && { username: askProfile.username, icon_emoji: askProfile.icon_emoji }),
         blocks: [
           {
             type: 'section',
@@ -353,6 +411,7 @@ async function forwardToSession(event: {
   user: string;
   channel: string;
   ts: string;
+  bot_id?: string;
   thread_ts?: string;
 }) {
   // 봇 메시지 무시 — 단, [Route:] 태그가 있으면 시스템 디스패치로 간주하여 통과
@@ -400,7 +459,7 @@ async function forwardToSession(event: {
     return;
   }
 
-  isBusy = true;
+  setBusy();
 
   // 3. 타이핑 인디케이터 — 질문 분석 중
   const threadTs = event.thread_ts || event.ts;
@@ -424,19 +483,24 @@ async function forwardToSession(event: {
   }
 
   // Claude Code 세션으로 알림 전송
-  await mcp.notification({
-    method: 'notifications/claude/channel',
-    params: {
-      content: cleanText,
-      meta: {
-        slack_channel: event.channel,
-        sender: senderName,
-        sender_id: event.user,
-        thread_ts: threadTs,
-        message_ts: event.ts,
+  try {
+    await mcp.notification({
+      method: 'notifications/claude/channel',
+      params: {
+        content: cleanText,
+        meta: {
+          slack_channel: event.channel,
+          sender: senderName,
+          sender_id: event.user,
+          thread_ts: threadTs,
+          message_ts: event.ts,
+        },
       },
-    },
-  });
+    });
+  } catch (err) {
+    console.error('[channel-slack] notification dispatch failed:', err);
+    clearBusy();
+  }
 }
 
 // ============================================================
@@ -458,7 +522,12 @@ async function start() {
   // 3. Socket Mode 이벤트 핸들러
   slackSocket.on('app_mention', async ({ event, ack }) => {
     await ack();
-    await forwardToSession(event);
+    try {
+      await forwardToSession(event);
+    } catch (err) {
+      console.error('[channel-slack] app_mention handler error:', err);
+      clearBusy();
+    }
   });
 
   slackSocket.on('message', async ({ event, ack }) => {
@@ -471,7 +540,12 @@ async function start() {
       (event.thread_ts && event.thread_ts !== event.ts) ||
       isSystemDispatch
     ) {
-      await forwardToSession(event);
+      try {
+        await forwardToSession(event);
+      } catch (err) {
+        console.error('[channel-slack] message handler error:', err);
+        clearBusy();
+      }
     }
   });
 
