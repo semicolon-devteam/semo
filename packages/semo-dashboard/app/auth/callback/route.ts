@@ -28,11 +28,17 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    console.log(
+      '[auth/callback] result:',
+      error ? `ERROR: ${error.message}` : `OK: ${data.session?.user?.email}`,
+    );
     if (!error) {
+      // 설정된 쿠키 확인
+      const cookies = redirectResponse.headers.getSetCookie();
+      console.log('[auth/callback] cookies set:', cookies.length, 'cookies');
       return redirectResponse;
     }
-    console.error('[auth/callback] exchangeCodeForSession error:', error.message);
   }
 
   return NextResponse.redirect(`${origin}/login`);
