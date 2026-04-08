@@ -126,20 +126,30 @@ type TranscriptTarget =
 
 let transcriptTarget: TranscriptTarget = { kind: 'session' };
 
-/** TTS → telephony 송신 공통 헬퍼. ask_user/end_call/reply 모두 사용. */
+/** TTS → telephony 송신 공통 헬퍼. Half-duplex: TTS 재생 중 STT/VAD mute → echo 방지 */
+let echoGuardTimer: ReturnType<typeof setTimeout> | null = null;
+let echoMuted = false;
+const ECHO_GUARD_MS = 800; // TTS 재생 완료 후 추가 mute 시간 (echo tail 방지)
+
 async function speakToCall(text: string): Promise<Buffer> {
-  console.error(`[channel-voice] speakToCall: "${text.slice(0, 30)}" activeCall=${!!activeCall}`);
   const audio = await ttsAdapter.speak(text);
-  console.error(`[channel-voice] speakToCall: TTS returned ${audio.length} bytes`);
   if (activeCall && audio.length > 0) {
-    console.error(
-      `[channel-voice] speakToCall: sending ${audio.length} bytes to WebRTC (callId=${activeCall.callId})`,
-    );
+    // Half-duplex: TTS 전송 시작 → STT/VAD mute
+    echoMuted = true;
+    if (echoGuardTimer) clearTimeout(echoGuardTimer);
+
     telephonyAdapter.sendAudio(activeCall.callId, audio);
-  } else {
-    console.error(
-      `[channel-voice] speakToCall: SKIPPED — activeCall=${!!activeCall} audioLen=${audio.length}`,
-    );
+
+    // TTS PCM duration 계산 (24kHz 16bit mono → bytes / 2 / 24000 = seconds)
+    const ttsDurationMs = (audio.length / 2 / 24000) * 1000;
+    // 48kHz 업샘플링 + 10ms pacing → 실제 전송 시간 ≈ duration
+    const totalMuteMs = ttsDurationMs + ECHO_GUARD_MS;
+
+    echoGuardTimer = setTimeout(() => {
+      echoMuted = false;
+      echoGuardTimer = null;
+      console.error(`[channel-voice] echo guard released after ${Math.round(totalMuteMs)}ms`);
+    }, totalMuteMs);
   }
   return audio;
 }
@@ -603,9 +613,12 @@ async function start() {
     audioFrameCount++;
     if (audioFrameCount <= 3 || audioFrameCount % 500 === 0) {
       console.error(
-        `[channel-voice] audio frame #${audioFrameCount} size=${chunk.length} turnState=${turnManager.getState()}`,
+        `[channel-voice] audio frame #${audioFrameCount} size=${chunk.length} turnState=${turnManager.getState()} echoMuted=${echoMuted}`,
       );
     }
+    // Half-duplex echo guard: TTS 재생 중 + 여유 시간 동안 STT/VAD 완전 mute
+    if (echoMuted) return;
+
     vad.processFrame(chunk);
     if (turnManager.shouldAcceptAudio()) {
       sttAdapter.feedAudio(chunk);
