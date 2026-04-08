@@ -154,6 +154,10 @@ export class SessionPool {
             permissionMode: 'acceptEdits',
             systemPrompt: { type: 'preset', preset: 'claude_code', append: config.soulPrompt },
             ...(lastSession?.sessionId ? { resume: lastSession.sessionId } : {}),
+            env: {
+              ...process.env,
+              CLAUDE_CONFIG_DIR: path.join(os.homedir(), '.claude-orchestrator'),
+            },
           },
         })) {
           if (msg.type === 'result') {
