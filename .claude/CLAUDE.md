@@ -7,7 +7,7 @@
 
 ## SEMO란?
 
-**SEMO (Semicolon Orchestrate)** 는 [OpenClaw 봇팀] ↔ [Core DB] ↔ [로컬 Claude Code 세션]의 3자 컨텍스트 동기화 시스템이다. 이 디렉토리는 SEMO 시스템 자체의 소스코드.
+**SEMO (Semicolon Orchestrate)** 는 [Agent SDK Orchestrator] ↔ [Core DB] ↔ [Slack Gateway + Channel Plugins]의 3자 컨텍스트 동기화 시스템이다. 이 디렉토리는 SEMO 시스템 자체의 소스코드.
 
 ---
 

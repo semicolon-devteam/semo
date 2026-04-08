@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#e94560">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>SEMO Voice — Softphone</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .phone {
+      background: #16213e;
+      border-radius: 24px;
+      padding: 40px 32px;
+      width: 340px;
+      max-width: 100%;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+      text-align: center;
+    }
+    @media (max-width: 400px) {
+      body { padding: 8px; align-items: flex-start; padding-top: env(safe-area-inset-top, 16px); }
+      .phone { border-radius: 16px; padding: 24px 16px; width: 100%; box-shadow: none; }
+      .btn { padding: 14px; font-size: 15px; border-radius: 12px; }
+    }
+    @media (display-mode: standalone) {
+      body { padding-top: env(safe-area-inset-top, 40px); }
+    }
+    .phone h1 {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #e94560;
+    }
+    .phone .subtitle { font-size: 12px; color: #888; margin-bottom: 24px; }
+    .status {
+      font-size: 14px;
+      padding: 12px;
+      border-radius: 12px;
+      background: #0f3460;
+      margin-bottom: 24px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .status.connected { background: #1b4332; }
+    .status.error { background: #5a1a1a; }
+    .status .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      margin-right: 8px; display: inline-block;
+    }
+    .dot.off { background: #666; }
+    .dot.connecting { background: #f0ad4e; animation: pulse 1s infinite; }
+    .dot.on { background: #4ade80; }
+    .dot.err { background: #ef4444; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .btn {
+      width: 100%;
+      padding: 16px;
+      border: none;
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      margin-bottom: 12px;
+    }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-call { background: #4ade80; color: #1a1a2e; }
+    .btn-call:hover:not(:disabled) { background: #22c55e; }
+    .btn-hangup { background: #ef4444; color: #fff; }
+    .btn-hangup:hover:not(:disabled) { background: #dc2626; }
+    .settings {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #333;
+      text-align: left;
+    }
+    .settings summary {
+      font-size: 12px;
+      color: #888;
+      cursor: pointer;
+      margin-bottom: 8px;
+    }
+    .settings label {
+      display: flex;
+      align-items: center;
+      font-size: 12px;
+      color: #aaa;
+      margin: 6px 0;
+    }
+    .settings input[type="checkbox"] { margin-right: 8px; }
+    .settings input[type="text"] {
+      background: #0f3460;
+      border: 1px solid #333;
+      color: #eee;
+      padding: 6px 10px;
+      border-radius: 8px;
+      width: 100%;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    .log {
+      margin-top: 16px;
+      max-height: 120px;
+      overflow-y: auto;
+      font-size: 11px;
+      color: #666;
+      text-align: left;
+      font-family: monospace;
+      padding: 8px;
+      background: #111;
+      border-radius: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="phone">
+    <h1>SEMO Voice</h1>
+    <p class="subtitle">AI Agent Softphone</p>
+
+    <div class="status" id="status">
+      <span class="dot off" id="dot"></span>
+      <span id="statusText">연결 대기</span>
+    </div>
+
+    <button class="btn btn-call" id="btnCall">전화 걸기</button>
+    <button class="btn btn-call" id="btnStandby" style="background:#60a5fa;color:#1a1a2e;">대기 모드</button>
+    <button class="btn btn-hangup" id="btnHangup" disabled>전화 끊기</button>
+    <button class="btn" id="btnTtsTest" disabled style="background:#8b5cf6;color:#fff;">TTS 테스트</button>
+
+    <!-- Incoming call ring overlay -->
+    <div id="ringOverlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.8);z-index:100;display:none;justify-content:center;align-items:center;">
+      <div style="background:#16213e;border-radius:24px;padding:40px;text-align:center;max-width:300px;">
+        <div style="font-size:48px;margin-bottom:16px;">📞</div>
+        <div style="font-size:18px;font-weight:600;margin-bottom:8px;">SemoBot 전화</div>
+        <div id="ringReason" style="font-size:14px;color:#aaa;margin-bottom:24px;"></div>
+        <button class="btn btn-call" id="btnAccept" style="margin-bottom:8px;">수락</button>
+        <button class="btn btn-hangup" id="btnReject">거절</button>
+      </div>
+    </div>
+
+    <details class="settings">
+      <summary>설정</summary>
+      <label>
+        서버: <input type="text" id="serverUrl" value="ws://localhost:8922/signal?token=semo-voice-dev-token">
+      </label>
+      <label><input type="checkbox" id="echoCancellation" checked> Echo Cancellation</label>
+      <label><input type="checkbox" id="noiseSuppression" checked> Noise Suppression</label>
+      <label><input type="checkbox" id="autoGainControl" checked> Auto Gain Control</label>
+    </details>
+
+    <details class="settings" open>
+      <summary>Debug</summary>
+      <pre class="log" id="debugPanel" style="min-height:60px;color:#4ade80;">Loading...</pre>
+    </details>
+
+    <div class="log" id="log"></div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js').catch(() => {});
+    }
+  </script>
+</body>
+</html>
