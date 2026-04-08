@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { href: '/kb', label: '지식', key: 'kb' },
   { href: '/system', label: '시스템', key: 'system' },
   { href: '/tests', label: '테스트', key: 'tests' },
-  { href: '/gfp', label: '인큐베이터', key: 'incubator' },
+  { href: '/projects', label: '인큐베이터', key: 'incubator' },
   { href: '/meetings', label: '회의', key: 'meetings' },
   { href: '/voice', label: '음성', key: 'voice' },
 ];
@@ -29,7 +29,9 @@ export default function GlobalNav() {
   const { user, profile, menuAccess, isAdmin, loading, signOut } = useAuth();
 
   // Filter menu items based on access
-  const visibleItems = NAV_ITEMS.filter((item) => isAdmin || menuAccess.includes(item.key));
+  // admin이거나 프로필 미로드 시(fallback) 전체 메뉴 표시
+  const visibleItems =
+    isAdmin || !profile ? NAV_ITEMS : NAV_ITEMS.filter((item) => menuAccess.includes(item.key));
 
   // Close on route change
   useEffect(() => {
