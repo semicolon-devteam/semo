@@ -174,8 +174,44 @@ export class SessionPool {
         }
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
-        console.error(`[session-pool] ${botId} dispatch error:`, errMsg);
-        responseText = `(봇 실행 오류: ${errMsg})`;
+
+        // resume 실패 시 새 세션으로 재시도
+        if (errMsg.includes('No conversation found') && lastSession?.sessionId) {
+          console.log(`[session-pool] ${botId} session not found, retrying without resume...`);
+          delete this.sessionState[botId];
+          saveSessionState(this.sessionState);
+          try {
+            for await (const msg of query({
+              prompt: contextPrompt,
+              options: {
+                cwd,
+                model: config.model,
+                allowedTools: config.tools,
+                maxTurns: config.maxTurns,
+                maxBudgetUsd: config.maxBudgetPerMessage,
+                permissionMode: 'acceptEdits',
+                systemPrompt: { type: 'preset', preset: 'claude_code', append: config.soulPrompt },
+                env: {
+                  ...process.env,
+                  CLAUDE_CONFIG_DIR: path.join(os.homedir(), '.claude-orchestrator'),
+                },
+              },
+            })) {
+              if (msg.type === 'result') {
+                if (msg.subtype === 'success') responseText = msg.result || '';
+                costUsd = (msg as any).total_cost_usd || 0;
+                sessionId = (msg as any).session_id || '';
+              }
+            }
+          } catch (retryErr) {
+            const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+            console.error(`[session-pool] ${botId} retry also failed:`, retryMsg);
+            responseText = `(봇 실행 오류: ${retryMsg})`;
+          }
+        } else {
+          console.error(`[session-pool] ${botId} dispatch error:`, errMsg);
+          responseText = `(봇 실행 오류: ${errMsg})`;
+        }
       }
 
       // 세션 ID 저장 (다음 resume용)
