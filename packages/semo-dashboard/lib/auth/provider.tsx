@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import type { User } from '@supabase/supabase-js';
 import type { AuthContextType, UserProfile } from './types';
 
 const AuthContext = createContext<AuthContextType>({
@@ -16,7 +15,7 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [menuAccess, setMenuAccess] = useState<string[]>([]);
   const [projectAccess, setProjectAccess] = useState<string[]>([]);
@@ -24,66 +23,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const supabase = createClient();
 
-  const fetchPermissions = useCallback(
-    async (userId: string) => {
-      const [profileRes, menuRes, projectRes] = await Promise.all([
-        supabase.from('user_profiles').select('*').eq('id', userId).single(),
-        supabase.from('user_menu_access').select('menu_key').eq('user_id', userId),
-        supabase.from('user_project_access').select('service_id').eq('user_id', userId),
-      ]);
+  const fetchSession = useCallback(async () => {
+    try {
+      // 서버 API를 통해 세션 확인 (httpOnly 쿠키를 서버에서 읽음)
+      const res = await fetch('/api/auth/me');
+      if (!res.ok) {
+        setLoading(false);
+        return;
+      }
+      const data = await res.json();
 
-      if (profileRes.error) {
-        console.error('[AuthProvider] profile fetch error:', profileRes.error);
+      if (data.user) {
+        setUser(data.user);
+        setProfile(data.profile);
+        setMenuAccess(data.menuAccess || []);
+        setProjectAccess(data.projectAccess || []);
       }
-      if (profileRes.data) {
-        setProfile(profileRes.data as UserProfile);
-      }
-
-      if (menuRes.data) {
-        setMenuAccess(menuRes.data.map((r) => r.menu_key));
-      }
-
-      if (projectRes.data) {
-        setProjectAccess(projectRes.data.map((r) => r.service_id));
-      }
-    },
-    [supabase],
-  );
+    } catch (e) {
+      console.error('[AuthProvider] session fetch error:', e);
+    }
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    const init = async () => {
-      const {
-        data: { user: currentUser },
-        error,
-      } = await supabase.auth.getUser();
-      console.log('[AuthProvider] getUser:', currentUser?.email, error?.message);
-      setUser(currentUser);
-      if (currentUser) {
-        await fetchPermissions(currentUser.id);
-        console.log('[AuthProvider] permissions loaded');
-      }
-      setLoading(false);
-    };
-
-    init();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const newUser = session?.user ?? null;
-      setUser(newUser);
-      if (newUser) {
-        await fetchPermissions(newUser.id);
-      } else {
-        setProfile(null);
-        setMenuAccess([]);
-        setProjectAccess([]);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, [supabase, fetchPermissions]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchSession();
+  }, [fetchSession]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
@@ -94,7 +59,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, profile, menuAccess, projectAccess, isAdmin, loading, signOut }}
+      value={{
+        user: user as AuthContextType['user'],
+        profile,
+        menuAccess,
+        projectAccess,
+        isAdmin,
+        loading,
+        signOut,
+      }}
     >
       {children}
     </AuthContext.Provider>
