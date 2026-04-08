@@ -19,7 +19,7 @@ describe('bot-config', () => {
     it('should load semiclaw config with correct model', () => {
       const config = loadBotConfig('semiclaw');
       expect(config.botId).toBe('semiclaw');
-      expect(config.model).toBe('claude-opus-4-6'); // inherit → opus
+      expect(config.model).toBe('claude-sonnet-4-6'); // sonnet (PM/라우팅 위주)
       expect(config.maxTurns).toBe(50);
       expect(config.tools).toContain('Read');
       expect(config.tools).toContain('Bash');

@@ -53,6 +53,25 @@ function resolveModel(model: string): string {
   return model; // full model ID
 }
 
+// ── 동적 모델 업그레이드 ──
+
+const OPUS_UPGRADE_TRIGGERS: Partial<Record<BotId, RegExp>> = {
+  semiclaw: /의사결정|전략|로드맵|분쟁|에스컬|판단|우선순위\s*조정|리스크/i,
+  reviewclaw: /보안|취약점|성능\s*병목|아키텍처|마이그레이션|리팩토링\s*전략/i,
+  infraclaw: /마이그레이션|아키텍처|재설계|무중단|롤백\s*전략|DR/i,
+  designclaw: /브랜딩|디자인\s*시스템\s*설계|사용성\s*분석|전체\s*리디자인/i,
+};
+
+export function resolveModelForMessage(botId: BotId, baseModel: string, message: string): string {
+  if (baseModel === 'claude-opus-4-6') return baseModel;
+  const trigger = OPUS_UPGRADE_TRIGGERS[botId];
+  if (trigger?.test(message)) return 'claude-opus-4-6';
+  const isLong = message.length > 300;
+  const hasGenKeyword = /작성해|만들어|설계해|분석해|계획.*세워/i.test(message);
+  if (isLong && hasGenKeyword) return 'claude-opus-4-6';
+  return baseModel;
+}
+
 // Bot Slack profiles — KB 기반 동적 로드, 하드코딩 fallback
 const FALLBACK_SLACK_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
   semiclaw: { username: 'SemiClaw', icon_emoji: ':clipboard:' },

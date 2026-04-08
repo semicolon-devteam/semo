@@ -14,6 +14,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { BotConfig, DispatchContext, DispatchResult } from './types';
 import type { BotId } from './bot-config';
+import { resolveModelForMessage } from './bot-config';
 import { CostTracker } from './cost-tracker';
 import { buildGfpContext } from './gfp-context';
 
@@ -134,8 +135,12 @@ export class SessionPool {
         .filter(Boolean)
         .join('\n');
 
+      const actualModel = resolveModelForMessage(botId, config.model, message);
+      if (actualModel !== config.model) {
+        console.log(`[session-pool] Model upgrade: ${botId} ${config.model} → ${actualModel}`);
+      }
       console.log(
-        `[session-pool] Dispatching to ${botId} (resume: ${lastSession?.sessionId || 'new'})`,
+        `[session-pool] Dispatching to ${botId} (resume: ${lastSession?.sessionId || 'new'}, model: ${actualModel})`,
       );
 
       let responseText = '';
@@ -147,7 +152,7 @@ export class SessionPool {
           prompt: contextPrompt,
           options: {
             cwd,
-            model: config.model,
+            model: actualModel,
             allowedTools: config.tools,
             maxTurns: config.maxTurns,
             maxBudgetUsd: config.maxBudgetPerMessage,
@@ -185,7 +190,7 @@ export class SessionPool {
               prompt: contextPrompt,
               options: {
                 cwd,
-                model: config.model,
+                model: actualModel,
                 allowedTools: config.tools,
                 maxTurns: config.maxTurns,
                 maxBudgetUsd: config.maxBudgetPerMessage,
@@ -221,7 +226,7 @@ export class SessionPool {
       }
 
       // 비용 추적
-      this.costTracker.record(botId, costUsd, context.route.serviceId, config.model);
+      this.costTracker.record(botId, costUsd, context.route.serviceId, actualModel);
 
       // 에스컬레이션 감지
       const escalation = detectEscalation(responseText);
