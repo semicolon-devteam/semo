@@ -1,0 +1,616 @@
+/**
+ * Telephony Adapter Interface
+ *
+ * 구현체:
+ * - ConsoleTelephonyAdapter: 터미널 stdin/stdout (Phase 1 시뮬레이션)
+ * - WebRTCTelephonyAdapter: 브라우저/앱 WebRTC P2P
+ * - TwilioTelephonyAdapter: PSTN 전화 (Twilio Programmable Voice)
+ * - SIPTelephonyAdapter: FreeSWITCH SIP trunk
+ */
+
+import { EventEmitter } from 'events';
+import { Server as HTTPServer, createServer } from 'http';
+import WebSocket, { WebSocketServer } from 'ws';
+
+export interface CallInfo {
+  callId: string;
+  direction: 'inbound' | 'outbound';
+  callerId: string;
+  callerName?: string;
+  startedAt: Date;
+}
+
+export interface TelephonyAdapter extends EventEmitter {
+  /** 통화 수신 대기 시작 */
+  listen(): Promise<void>;
+
+  /** 아웃바운드 전화 걸기 */
+  dial(target: string): Promise<CallInfo>;
+
+  /** 현재 통화 종료 */
+  hangup(callId: string): Promise<void>;
+
+  /** 음성 데이터 전송 (TTS 출력 → 상대방) */
+  sendAudio(callId: string, audio: Buffer): void;
+
+  /** Events:
+   * 'call:incoming' — CallInfo (수신 전화)
+   * 'call:connected' — CallInfo (통화 연결)
+   * 'call:ended' — { callId: string, reason: string }
+   * 'audio' — { callId: string, chunk: Buffer } (상대방 음성 수신)
+   * 'error' — Error
+   */
+}
+
+// ============================================================
+// Console Telephony (Phase 1 텍스트 시뮬레이션용)
+// ============================================================
+
+export class ConsoleTelephonyAdapter extends EventEmitter implements TelephonyAdapter {
+  private activeCallId: string | null = null;
+
+  async listen(): Promise<void> {
+    // Console 모드: 즉시 "통화 연결" 시뮬레이션
+    const callInfo: CallInfo = {
+      callId: `console-${Date.now()}`,
+      direction: 'inbound',
+      callerId: 'console-user',
+      callerName: 'Console User',
+      startedAt: new Date(),
+    };
+    this.activeCallId = callInfo.callId;
+
+    // 약간의 지연 후 통화 연결 이벤트 발생
+    setImmediate(() => {
+      this.emit('call:incoming', callInfo);
+      this.emit('call:connected', callInfo);
+    });
+  }
+
+  async dial(target: string): Promise<CallInfo> {
+    const callInfo: CallInfo = {
+      callId: `console-out-${Date.now()}`,
+      direction: 'outbound',
+      callerId: target,
+      callerName: target,
+      startedAt: new Date(),
+    };
+    this.activeCallId = callInfo.callId;
+    this.emit('call:connected', callInfo);
+    return callInfo;
+  }
+
+  async hangup(callId: string): Promise<void> {
+    if (this.activeCallId === callId) {
+      this.activeCallId = null;
+      this.emit('call:ended', { callId, reason: 'local_hangup' });
+    }
+  }
+
+  sendAudio(_callId: string, _audio: Buffer): void {
+    // Console 모드에서는 TTS 텍스트 출력이 이미 ConsoleTTSAdapter에서 처리됨
+  }
+}
+
+// ============================================================
+// WebRTC Telephony (Phase 3A)
+// @roamhq/wrtc 기반 1:1 audio-only P2P
+// 시그널링 서버 내장 (WebSocket)
+// ============================================================
+
+const SIGNALING_PORT = parseInt(process.env.VOICE_SIGNALING_PORT || '8922', 10);
+const SIGNALING_TOKEN = process.env.VOICE_SIGNALING_TOKEN || '';
+const OFFER_TIMEOUT_MS = 10000; // signaling 연결 후 offer 대기 최대 10초
+const SESSION_MAX_DURATION_MS = 60 * 60 * 1000; // 최대 세션 1시간
+const ICE_RESTART_MAX = 2;
+
+type CallState = 'connecting' | 'connected' | 'reconnecting' | 'disconnecting' | 'failed';
+
+interface WebRTCCallSession {
+  callId: string;
+  pc: InstanceType<typeof import('@roamhq/wrtc').RTCPeerConnection>;
+  audioSource: unknown;
+  audioSink: unknown;
+  signalingWs: WebSocket;
+  state: CallState;
+  iceRestartCount: number;
+  offerTimer: ReturnType<typeof setTimeout> | null;
+  maxDurationTimer: ReturnType<typeof setTimeout> | null;
+}
+
+export class WebRTCTelephonyAdapter extends EventEmitter implements TelephonyAdapter {
+  private httpServer: HTTPServer | null = null;
+  private wss: WebSocketServer | null = null;
+  private activeSession: WebRTCCallSession | null = null;
+
+  // Lazy-loaded wrtc module (native addon)
+  private wrtcMod: typeof import('@roamhq/wrtc') | null = null;
+
+  private async loadWrtc() {
+    if (!this.wrtcMod) {
+      const mod = await import('@roamhq/wrtc');
+      // ESM dynamic import: nonstandard는 mod.default에 위치
+      this.wrtcMod = (mod.default || mod) as typeof import('@roamhq/wrtc');
+    }
+    return this.wrtcMod;
+  }
+
+  async listen(): Promise<void> {
+    // HTTP server for signaling WebSocket + softphone static files
+    this.httpServer = createServer((req, res) => {
+      // Health check
+      if (req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, activeCall: !!this.activeSession }));
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+
+    this.wss = new WebSocketServer({ server: this.httpServer, path: '/signal' });
+
+    this.wss.on('connection', (ws, req) => {
+      // Token 인증
+      if (!SIGNALING_TOKEN) {
+        console.error(
+          '[webrtc] WARNING: VOICE_SIGNALING_TOKEN not set — rejecting all connections',
+        );
+        ws.close(4001, 'No token configured');
+        return;
+      }
+      const url = new URL(req.url || '/', `http://${req.headers.host}`);
+      const token = url.searchParams.get('token');
+      if (token !== SIGNALING_TOKEN) {
+        ws.close(4001, 'Unauthorized');
+        return;
+      }
+
+      // 1:1 — 이미 활성 세션이 있으면 거부
+      if (this.activeSession) {
+        ws.close(4002, 'Already in call');
+        return;
+      }
+
+      console.error('[webrtc] Signaling client connected');
+
+      // standby 모드: 클라이언트가 접속만 하고 대기 (outbound ring 수신 대기)
+      // 클라이언트가 offer를 보내면 inbound → handleSignaling
+      // 서버가 incoming-call을 보내면 outbound → dial() 흐름
+      this.pendingClient = ws;
+
+      // 첫 메시지에서 분기: offer면 inbound call 시작
+      const firstMessageHandler = async (data: Buffer | string) => {
+        try {
+          const msg = JSON.parse(data.toString());
+          if (msg.type === 'offer' && msg.sdp) {
+            ws.removeListener('message', firstMessageHandler);
+            this.pendingClient = null;
+            // offer SDP를 handleSignaling에 직접 전달 — re-emit 방식 제거
+            await this.handleSignaling(ws, msg.sdp);
+          }
+        } catch (err) {
+          console.error('[webrtc] firstMessageHandler ERROR:', err);
+        }
+      };
+      ws.on('message', firstMessageHandler);
+
+      ws.on('close', () => {
+        if (this.pendingClient === ws) {
+          this.pendingClient = null;
+        }
+      });
+    });
+
+    await new Promise<void>((resolve) => {
+      this.httpServer!.listen(SIGNALING_PORT, () => {
+        console.error(`[webrtc] Signaling server listening on port ${SIGNALING_PORT}`);
+        resolve();
+      });
+    });
+  }
+
+  private async handleSignaling(
+    ws: WebSocket,
+    initialOffer?: { type: string; sdp: string },
+  ): Promise<void> {
+    const wrtc = await this.loadWrtc();
+    const { RTCPeerConnection, RTCSessionDescription, nonstandard } = wrtc;
+    const { RTCAudioSource, RTCAudioSink } = nonstandard;
+
+    const callId = `webrtc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    let connectedEmitted = false; // P0 fix: 중복 call:connected 방지
+    const pendingCandidates: unknown[] = []; // P0 fix: remoteDescription 전 candidate 큐
+    let remoteDescSet = false;
+
+    const pc = new RTCPeerConnection({
+      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+    });
+
+    // Outbound audio source — TTS 결과를 브라우저로 전송
+    const audioSource = new RTCAudioSource();
+    const outTrack = audioSource.createTrack();
+    pc.addTrack(outTrack);
+
+    // 세션 객체 먼저 생성 (ontrack에서 audioSink 직접 세팅하기 위해)
+    const session: WebRTCCallSession = {
+      callId,
+      pc,
+      audioSource,
+      audioSink: null,
+      signalingWs: ws,
+      state: 'connecting',
+      iceRestartCount: 0,
+      offerTimer: null,
+      maxDurationTimer: null,
+    };
+    this.activeSession = session;
+
+    // Offer timeout — signaling 연결 후 offer 미수신 시 세션 정리
+    session.offerTimer = setTimeout(() => {
+      if (session.state === 'connecting') {
+        console.error(`[webrtc] Offer timeout after ${OFFER_TIMEOUT_MS}ms — closing`);
+        this.cleanupSession(callId, 'offer_timeout');
+      }
+    }, OFFER_TIMEOUT_MS);
+
+    // Max session duration — 1시간 후 자동 종료
+    session.maxDurationTimer = setTimeout(() => {
+      console.error(`[webrtc] Max session duration reached — closing`);
+      this.cleanupSession(callId, 'max_duration');
+    }, SESSION_MAX_DURATION_MS);
+
+    // ICE candidate → 클라이언트에 전송
+    pc.onicecandidate = (event: { candidate: unknown }) => {
+      if (event.candidate && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'ice-candidate', candidate: event.candidate }));
+      }
+    };
+
+    pc.oniceconnectionstatechange = async () => {
+      const state = pc.iceConnectionState;
+      this.emit('log', { event: 'ice_state_change', state, callId });
+
+      if ((state === 'connected' || state === 'completed') && !connectedEmitted) {
+        connectedEmitted = true;
+        session.state = 'connected';
+        const callInfo: CallInfo = {
+          callId,
+          direction: 'inbound',
+          callerId: 'webrtc-user',
+          callerName: 'WebRTC User',
+          startedAt: new Date(),
+        };
+        this.emit('call:connected', callInfo);
+      }
+
+      if (state === 'disconnected') {
+        // ICE restart 시도
+        if (session.iceRestartCount < ICE_RESTART_MAX) {
+          session.iceRestartCount++;
+          session.state = 'reconnecting';
+          this.emit('log', {
+            event: 'ice_restart_attempt',
+            attempt: session.iceRestartCount,
+            callId,
+          });
+          try {
+            const offer = await pc.createOffer({ iceRestart: true });
+            await pc.setLocalDescription(offer);
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ type: 'offer', sdp: pc.localDescription }));
+            }
+          } catch (err) {
+            console.error('[webrtc] ICE restart failed:', err);
+            this.cleanupSession(callId, 'ice_restart_failed');
+          }
+        } else {
+          this.cleanupSession(callId, 'ice_disconnected_max_retry');
+        }
+      }
+
+      if (state === 'failed' || state === 'closed') {
+        this.cleanupSession(callId, `ice_${state}`);
+      }
+    };
+
+    // Inbound audio — 브라우저 마이크 수신
+    // P0 fix: audioSink를 session 객체에 직접 세팅
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pc.ontrack = (event: any) => {
+      if (event.track?.kind === 'audio') {
+        const { RTCAudioSink: Sink } = nonstandard;
+        const sink = new Sink(event.track);
+        session.audioSink = sink;
+        sink.ondata = (data: {
+          samples: Int16Array;
+          sampleRate: number;
+          channelCount: number;
+          numberOfFrames: number;
+        }) => {
+          // P0 fix: 48kHz → 16kHz 다운샘플링 (간이 linear decimation)
+          const targetRate = 16000;
+          let outBuf: Buffer;
+          if (data.sampleRate !== targetRate) {
+            const ratio = data.sampleRate / targetRate;
+            const outLen = Math.floor(data.numberOfFrames / ratio);
+            const mono = data.channelCount > 1;
+            const out = new Int16Array(outLen);
+            for (let i = 0; i < outLen; i++) {
+              const srcIdx = Math.floor(i * ratio);
+              out[i] = mono ? data.samples[srcIdx * data.channelCount] : data.samples[srcIdx];
+            }
+            outBuf = Buffer.from(out.buffer, out.byteOffset, out.byteLength);
+          } else {
+            outBuf = Buffer.from(
+              data.samples.buffer,
+              data.samples.byteOffset,
+              data.samples.byteLength,
+            );
+          }
+          this.emit('audio', { callId, chunk: outBuf, sampleRate: targetRate, channels: 1 });
+        };
+      }
+    };
+
+    this.emit('call:incoming', {
+      callId,
+      direction: 'inbound' as const,
+      callerId: 'webrtc-user',
+      callerName: 'WebRTC User',
+      startedAt: new Date(),
+    });
+
+    // Signaling messages
+    ws.on('message', async (data) => {
+      try {
+        const msg = JSON.parse(data.toString());
+        if (typeof msg !== 'object' || !msg.type) return;
+
+        if (msg.type === 'offer' && msg.sdp?.type === 'offer') {
+          if (session.offerTimer) {
+            clearTimeout(session.offerTimer);
+            session.offerTimer = null;
+          }
+          await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp));
+          remoteDescSet = true;
+          // P0 fix: 큐잉된 ICE candidate flush
+          for (const c of pendingCandidates) {
+            await pc.addIceCandidate(c as RTCIceCandidateInit);
+          }
+          pendingCandidates.length = 0;
+          const answer = await pc.createAnswer();
+          await pc.setLocalDescription(answer);
+          ws.send(JSON.stringify({ type: 'answer', sdp: pc.localDescription }));
+        }
+
+        if (msg.type === 'ice-candidate' && msg.candidate) {
+          // P0 fix: remoteDescription 미설정 시 큐잉
+          if (remoteDescSet) {
+            await pc.addIceCandidate(msg.candidate);
+          } else {
+            pendingCandidates.push(msg.candidate);
+          }
+        }
+
+        if (msg.type === 'hangup') {
+          this.cleanupSession(callId, 'remote_hangup');
+        }
+
+        if (msg.type === 'tts-test') {
+          this.emit('tts-test');
+        }
+      } catch (err) {
+        console.error('[webrtc] Signaling message error:', err);
+      }
+    });
+
+    ws.on('close', () => {
+      this.cleanupSession(callId, 'signaling_closed');
+    });
+
+    // 초기 offer가 전달된 경우 즉시 처리 (firstMessageHandler에서 전달)
+    if (initialOffer) {
+      try {
+        if (session.offerTimer) {
+          clearTimeout(session.offerTimer);
+          session.offerTimer = null;
+        }
+        await pc.setRemoteDescription(
+          new RTCSessionDescription(initialOffer as RTCSessionDescriptionInit),
+        );
+        remoteDescSet = true;
+        for (const c of pendingCandidates) {
+          await pc.addIceCandidate(c as RTCIceCandidateInit);
+        }
+        pendingCandidates.length = 0;
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'answer', sdp: pc.localDescription }));
+        }
+      } catch (err) {
+        console.error('[webrtc] Initial offer processing error:', err);
+        this.cleanupSession(callId, 'initial_offer_failed');
+      }
+    }
+  }
+
+  // 접속 중이지만 아직 통화 안 한 signaling client (outbound ring 대기용)
+  private pendingClient: WebSocket | null = null;
+
+  /** 아웃바운드 전화 — 접속 중인 softphone에 ring 시그널 전송 */
+  async dial(target: string): Promise<CallInfo> {
+    const callId = `outbound-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const RING_TIMEOUT_MS = 30000;
+
+    // softphone이 접속 중인지 확인
+    if (!this.pendingClient || this.pendingClient.readyState !== WebSocket.OPEN) {
+      throw new Error('No softphone connected — cannot place outbound call');
+    }
+
+    const ws = this.pendingClient;
+    this.pendingClient = null;
+
+    // ring 시그널 전송
+    ws.send(
+      JSON.stringify({
+        type: 'incoming-call',
+        callId,
+        caller: 'SemoBot',
+        reason: target, // reminder 내용 등
+      }),
+    );
+    this.emit('log', { event: 'outbound_ring', callId, target });
+
+    // 사용자 수락 대기
+    return new Promise<CallInfo>((resolve, reject) => {
+      const ringTimer = setTimeout(() => {
+        ws.removeAllListeners('message');
+        reject(new Error('Ring timeout — user did not answer'));
+        this.emit('log', { event: 'outbound_ring_timeout', callId });
+      }, RING_TIMEOUT_MS);
+
+      const onMessage = async (data: Buffer | string) => {
+        try {
+          const msg = JSON.parse(data.toString());
+          if (msg.type === 'accept-call' && msg.callId === callId) {
+            clearTimeout(ringTimer);
+            ws.removeListener('message', onMessage);
+            // 수락 → handleSignaling으로 정상 통화 시작
+            await this.handleSignaling(ws);
+            const callInfo: CallInfo = {
+              callId: this.activeSession?.callId || callId,
+              direction: 'outbound',
+              callerId: target,
+              callerName: target,
+              startedAt: new Date(),
+            };
+            resolve(callInfo);
+          }
+          if (msg.type === 'reject-call' && msg.callId === callId) {
+            clearTimeout(ringTimer);
+            ws.removeListener('message', onMessage);
+            reject(new Error('Call rejected by user'));
+            this.emit('log', { event: 'outbound_rejected', callId });
+          }
+        } catch {
+          /* ignore parse errors */
+        }
+      };
+
+      ws.on('message', onMessage);
+
+      ws.on('close', () => {
+        clearTimeout(ringTimer);
+        reject(new Error('Softphone disconnected during ring'));
+      });
+    });
+  }
+
+  async hangup(callId: string): Promise<void> {
+    if (this.activeSession?.callId === callId) {
+      // 클라이언트에 hangup 알림
+      try {
+        if (this.activeSession.signalingWs.readyState === WebSocket.OPEN) {
+          this.activeSession.signalingWs.send(JSON.stringify({ type: 'hangup' }));
+        }
+      } catch {
+        /* ignore */
+      }
+      this.cleanupSession(callId, 'local_hangup');
+    }
+  }
+
+  sendAudio(callId: string, audio: Buffer, inputSampleRate = 24000): void {
+    if (!this.activeSession || this.activeSession.callId !== callId) return;
+    const ws = this.activeSession.signalingWs;
+    if (ws.readyState !== WebSocket.OPEN) return;
+
+    const OUTPUT_RATE = 48000;
+    const FRAME_SIZE = OUTPUT_RATE / 100; // 480 samples = 10ms
+
+    // 입력 PCM Int16 → 48kHz로 리샘플링
+    const inputSamples = new Int16Array(audio.buffer, audio.byteOffset, audio.byteLength / 2);
+    let samples: Int16Array;
+
+    if (inputSampleRate !== OUTPUT_RATE) {
+      const ratio = OUTPUT_RATE / inputSampleRate;
+      const outLen = Math.floor(inputSamples.length * ratio);
+      samples = new Int16Array(outLen);
+      for (let i = 0; i < outLen; i++) {
+        const srcIdx = i / ratio;
+        const lo = Math.floor(srcIdx);
+        const hi = Math.min(lo + 1, inputSamples.length - 1);
+        const frac = srcIdx - lo;
+        samples[i] = Math.round(inputSamples[lo] * (1 - frac) + inputSamples[hi] * frac);
+      }
+    } else {
+      samples = inputSamples;
+    }
+
+    // WebSocket 바이너리로 10ms 청크씩 pacing 전송
+    // (RTCAudioSource outbound가 작동하지 않아 WS binary + AudioContext 방식 사용)
+    let offset = 0;
+    const sendNextChunk = () => {
+      if (!this.activeSession || this.activeSession.callId !== callId) return;
+      if (ws.readyState !== WebSocket.OPEN) return;
+      if (offset >= samples.length) return;
+
+      const end = Math.min(offset + FRAME_SIZE, samples.length);
+      const chunk = samples.slice(offset, end);
+      ws.send(Buffer.from(chunk.buffer, chunk.byteOffset, chunk.byteLength));
+
+      offset += FRAME_SIZE;
+      if (offset < samples.length) {
+        setTimeout(sendNextChunk, 10);
+      }
+    };
+
+    sendNextChunk();
+  }
+
+  private cleanupSession(callId: string, reason: string): void {
+    if (!this.activeSession || this.activeSession.callId !== callId) return;
+
+    const session = this.activeSession;
+    session.state = 'disconnecting';
+    this.activeSession = null;
+
+    if (session.offerTimer) {
+      clearTimeout(session.offerTimer);
+      session.offerTimer = null;
+    }
+    if (session.maxDurationTimer) {
+      clearTimeout(session.maxDurationTimer);
+      session.maxDurationTimer = null;
+    }
+
+    try {
+      if (
+        session.audioSink &&
+        typeof (session.audioSink as { stop: () => void }).stop === 'function'
+      ) {
+        (session.audioSink as { stop: () => void }).stop();
+      }
+    } catch {
+      /* ignore */
+    }
+
+    try {
+      session.pc.close();
+    } catch {
+      /* ignore */
+    }
+
+    try {
+      if (session.signalingWs.readyState === WebSocket.OPEN) {
+        session.signalingWs.close();
+      }
+    } catch {
+      /* ignore */
+    }
+
+    this.emit('call:ended', { callId, reason });
+  }
+}

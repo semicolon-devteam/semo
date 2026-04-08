@@ -1,0 +1,21 @@
+{
+  "name": "@team-semicolon/semo-channel-voice",
+  "version": "0.1.0",
+  "description": "Claude Code Channel plugin — Voice Call ↔ Session bridge (STT/TTS)",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "npx tsx src/index.ts",
+    "dev": "npx tsx --watch src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.4.0",
+    "@roamhq/wrtc": "^0.10.0",
+    "msedge-tts": "^2.0.4",
+    "ws": "^8.20.0",
+    "zod": "^3.22.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.21.0"
+  }
+}
