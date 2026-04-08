@@ -15,6 +15,7 @@ import * as fs from 'fs';
 import type { BotConfig, DispatchContext, DispatchResult } from './types';
 import type { BotId } from './bot-config';
 import { CostTracker } from './cost-tracker';
+import { buildGfpContext } from './gfp-context';
 
 const SESSIONS_DIR = path.join(os.homedir(), '.semo-bot-sessions');
 
@@ -76,7 +77,12 @@ export class SessionPool {
     this.sessionState = loadSessionState();
   }
 
-  async dispatch(botId: BotId, message: string, context: DispatchContext): Promise<DispatchResult> {
+  async dispatch(
+    botId: BotId,
+    message: string,
+    context: DispatchContext,
+    images?: import('./types').SlackImage[],
+  ): Promise<DispatchResult> {
     const config = this.configs.get(botId);
     if (!config) {
       return { response: `봇 ${botId} 설정을 찾을 수 없습니다.`, botId, costUsd: 0 };
@@ -97,7 +103,19 @@ export class SessionPool {
         ].join('\n')
       : '';
 
-    // 컨텍스트 프롬프트: 서비스 정보 + 발신자 정보 + 스레드 히스토리
+    // GFP 프로젝트 컨텍스트 (Phase별 선택적 주입)
+    const gfpContext = buildGfpContext(context.route, botId);
+
+    // 이미지 첨부 안내 (Read 도구로 파일 확인 가능)
+    const imageBlock =
+      images && images.length > 0
+        ? [
+            `[첨부 이미지 ${images.length}개 — Read 도구로 확인 가능]`,
+            ...images.map((img) => `- ${img.name}: ${img.localPath}`),
+          ].join('\n')
+        : '';
+
+    // 컨텍스트 프롬프트: 서비스 정보 + GFP 컨텍스트 + 스레드 히스토리
     const contextPrompt = [
       `[Slack 메시지]`,
       `채널: ${context.channel}`,
@@ -106,6 +124,8 @@ export class SessionPool {
         ? `프로젝트: ${context.route.serviceDomain} (Phase ${context.route.phase})`
         : '',
       `스레드: ${context.threadTs}`,
+      gfpContext,
+      imageBlock,
       historyBlock,
       message,
     ]

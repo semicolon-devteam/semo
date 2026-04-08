@@ -1,3 +1,9 @@
+export interface SlackImage {
+  name: string;
+  media_type: string;
+  localPath: string; // 다운로드된 임시 파일 경로
+}
+
 export interface SlackMessage {
   text: string;
   user: string;
@@ -5,6 +11,7 @@ export interface SlackMessage {
   ts: string;
   thread_ts?: string;
   bot_id?: string;
+  images?: SlackImage[];
 }
 
 export interface RouteResult {

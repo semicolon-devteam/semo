@@ -1,8 +1,13 @@
 import { SocketModeClient } from '@slack/socket-mode';
 import { WebClient } from '@slack/web-api';
-import type { SlackMessage, AskOption } from './types';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import type { SlackMessage, SlackImage, AskOption } from './types';
 import { SLACK_PROFILES } from './bot-config';
 import type { BotId } from './bot-config';
+
+const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || '';
 
 /** 봇 메시지 중 오케스트레이터가 처리해야 할 시스템 메시지 패턴 */
 const SYSTEM_MESSAGE_PATTERNS = [
@@ -125,6 +130,32 @@ export class SlackGateway {
       /* fallback to user ID */
     }
 
+    // 이미지 파일 다운로드
+    const images: SlackImage[] = [];
+    if (event.files && Array.isArray(event.files)) {
+      const tmpDir = path.join(os.tmpdir(), 'semo-slack-images');
+      fs.mkdirSync(tmpDir, { recursive: true });
+      for (const file of event.files) {
+        const mime = file.mimetype || '';
+        if (!mime.startsWith('image/')) continue;
+        const downloadUrl = file.url_private_download || file.url_private;
+        if (!downloadUrl) continue;
+        try {
+          const res = await fetch(downloadUrl, {
+            headers: { Authorization: `Bearer ${SLACK_BOT_TOKEN}` },
+          });
+          if (res.ok) {
+            const ext = mime.split('/')[1] || 'png';
+            const localPath = path.join(tmpDir, `${event.ts}-${file.id}.${ext}`);
+            fs.writeFileSync(localPath, Buffer.from(await res.arrayBuffer()));
+            images.push({ name: file.name || 'image', media_type: mime, localPath });
+          }
+        } catch {
+          // 다운로드 실패 시 skip
+        }
+      }
+    }
+
     const msg: SlackMessage = {
       text: cleanText,
       user: event.user,
@@ -132,6 +163,7 @@ export class SlackGateway {
       ts: event.ts,
       thread_ts: event.thread_ts,
       bot_id: event.bot_id,
+      ...(images.length > 0 && { images }),
     };
 
     const threadKey = event.thread_ts || event.ts;

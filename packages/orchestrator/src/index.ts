@@ -144,7 +144,12 @@ async function main() {
           threadHistory,
         };
 
-        const result = await sessionPool.dispatch(currentBotId, currentMessage, context);
+        const result = await sessionPool.dispatch(
+          currentBotId,
+          currentMessage,
+          context,
+          depth === 0 ? msg.images : undefined,
+        );
 
         if (result.escalation && depth < MAX_ESCALATION_DEPTH - 1) {
           // 에스컬레이션: 다음 봇으로 재디스패치
