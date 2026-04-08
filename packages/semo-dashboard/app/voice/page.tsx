@@ -66,9 +66,11 @@ export default function VoicePage() {
       }
       const { token, expiresAt } = await res.json();
 
-      // iframe에 token 전달
+      // iframe에 token + signaling URL 전달
+      const signalingUrl =
+        process.env.NEXT_PUBLIC_VOICE_SIGNALING_URL || 'ws://localhost:8922/signal';
       iframeRef.current?.contentWindow?.postMessage(
-        { type: 'VOICE_AUTH', token, expiresAt },
+        { type: 'VOICE_AUTH', token, expiresAt, signalingUrl },
         window.location.origin,
       );
       setTokenReady(true);

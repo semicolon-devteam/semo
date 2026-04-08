@@ -11,11 +11,11 @@
     "@modelcontextprotocol/sdk": "^1.4.0",
     "@roamhq/wrtc": "^0.10.0",
     "msedge-tts": "^2.0.4",
+    "tsx": "^4.21.0",
     "ws": "^8.20.0",
     "zod": "^3.22.0"
   },
   "devDependencies": {
-    "@types/ws": "^8.18.1",
-    "tsx": "^4.21.0"
+    "@types/ws": "^8.18.1"
   }
 }

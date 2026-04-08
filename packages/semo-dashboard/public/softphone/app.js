@@ -50,10 +50,11 @@ if (isEmbedded()) {
 
     if (msg.type === 'VOICE_AUTH' && msg.token) {
       authToken = msg.token;
-      // 서버 URL에 token 주입
       const serverInput = document.getElementById('serverUrl');
       if (serverInput) {
-        const base = serverInput.value.split('?')[0];
+        // signalingUrl이 있으면 사용, 없으면 기존 base 유지
+        const base =
+          msg.signalingUrl || serverInput.value.split('?')[0] || 'ws://localhost:8922/signal';
         serverInput.value = base + '?token=' + encodeURIComponent(msg.token);
       }
       log('Dashboard에서 인증 토큰 수신');
