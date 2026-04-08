@@ -39,6 +39,14 @@ const PHASE_GUIDES: Record<number, string> = {
   2: `## Phase 2: PRD — 기능/비기능 요구사항, 우선순위 매트릭스`,
   3: `## Phase 3: 명확화 — PO에게 불명확 사항 Q&A`,
   4: `## Phase 4: 디자인 시스템 (5-Step)
+
+⚠️ 필수 선행: 작업 시작 전 이전 Phase 산출물을 반드시 조회하라.
+- \`semo kb get {serviceDomain} spec/discovery\` (Phase 1 디스커버리)
+- \`semo kb get {serviceDomain} spec/prd\` (Phase 2 PRD — 기능/비기능 요구사항)
+- \`semo kb get {serviceDomain} spec/clarification\` (Phase 3 명확화 — PO Q&A 결과)
+이전 Phase에서 확정된 기능 목록, 기술 결정사항, PO 응답을 기반으로 디자인 작업을 수행해야 한다.
+KB 조회 없이 base-information만으로 작업하면 안 된다.
+
 | Step | prefix | 설명 |
 |------|--------|------|
 | 1 | ref-* | 레퍼런스 탐색 |
@@ -47,7 +55,8 @@ const PHASE_GUIDES: Record<number, string> = {
 | 4 | review-* | 리뷰 |
 | 5 | handoff-* | 핸드오프 |
 section_key에 prefix 없으면 대시보드 미표시. 반드시 해당 Step prefix 사용.`,
-  5: `## Phase 5: 에픽 — 디스커버리+PRD 기반 에픽 구조화, 유저스토리`,
+  5: `## Phase 5: 에픽 — 디스커버리+PRD 기반 에픽 구조화, 유저스토리
+⚠️ 필수 선행: \`semo kb get {serviceDomain} spec/prd\` + \`semo kb get {serviceDomain} spec/clarification\` 조회 후 작업.`,
   6: `## Phase 6: 기능 스펙 — 에픽 내 기능별 상세 (입출력, 비즈니스 룰)`,
   7: `## Phase 7: 기술 설계 — 아키텍처, 기술 스택, API/DB 스키마`,
   8: `## Phase 8: 태스크 분해 — GitHub 이슈 단위 분해, 스프린트 배치`,
@@ -63,7 +72,10 @@ export function buildGfpContext(route: RouteResult, botId: string): string {
     return '';
   }
 
-  return [commonBlock(route), callbackBlock(route, botId), PHASE_GUIDES[route.phase] || '']
-    .filter(Boolean)
-    .join('\n\n');
+  const guide = (PHASE_GUIDES[route.phase] || '').replace(
+    /\{serviceDomain\}/g,
+    route.serviceDomain,
+  );
+
+  return [commonBlock(route), callbackBlock(route, botId), guide].filter(Boolean).join('\n\n');
 }

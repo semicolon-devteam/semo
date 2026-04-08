@@ -88,6 +88,8 @@ class BotSession {
     // 전체 Sonnet + effort low (쿼터 절감은 thinking 토큰 최소화로)
     const sessionModel = 'claude-sonnet-4-6';
 
+    const hooksDir = path.join(os.homedir(), '.openclaw-shared', 'hooks');
+
     this.queryHandle = query({
       prompt: this.inputQueue,
       options: {
@@ -98,6 +100,37 @@ class BotSession {
         effort: 'low',
         systemPrompt: { type: 'preset', preset: 'claude_code', append: config.soulPrompt },
         persistSession: false,
+        settings: {
+          hooks: {
+            Stop: [
+              {
+                matcher: '',
+                hooks: [
+                  {
+                    type: 'command' as const,
+                    command: `bash ${hooksDir}/kb-first-guard.sh`,
+                    timeout: 10,
+                  },
+                  {
+                    type: 'command' as const,
+                    command: `bash ${hooksDir}/url-validator-guard.sh`,
+                    timeout: 5,
+                  },
+                  {
+                    type: 'command' as const,
+                    command: `bash ${hooksDir}/response-length-guard.sh`,
+                    timeout: 5,
+                  },
+                  {
+                    type: 'command' as const,
+                    command: `bash ${hooksDir}/decision-reminder.sh`,
+                    timeout: 10,
+                  },
+                ],
+              },
+            ],
+          },
+        },
         env: {
           ...process.env,
           CLAUDE_CONFIG_DIR: path.join(os.homedir(), '.claude-orchestrator'),
