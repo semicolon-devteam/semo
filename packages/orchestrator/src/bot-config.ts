@@ -78,8 +78,8 @@ export async function loadSlackProfilesFromAPI(): Promise<void> {
       SLACK_PROFILES = data;
       console.log(`[bot-config] Loaded ${Object.keys(data).length} bot profiles from KB`);
     }
-  } catch (err) {
-    console.error('[bot-config] Failed to load bot profiles from API, using fallback:', err);
+  } catch {
+    // API 미구현 시 하드코딩 프로필 사용 — 정상 동작
   }
 }
 
