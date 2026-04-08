@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useAuth } from '@/lib/auth/provider';
 import type { GfpProject, ServiceLifecycle } from '@/types';
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
@@ -25,6 +26,7 @@ export default function GfpListPage() {
   const [projects, setProjects] = useState<GfpProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>('all');
+  const { isAdmin, projectAccess } = useAuth();
 
   useEffect(() => {
     fetch('/api/gfp')
@@ -32,10 +34,18 @@ export default function GfpListPage() {
         if (!r.ok) return [];
         return r.json();
       })
-      .then((data) => setProjects(Array.isArray(data) ? data : []))
+      .then((data) => {
+        const all = Array.isArray(data) ? data : [];
+        // member는 접근 허용된 프로젝트만 표시
+        if (isAdmin) {
+          setProjects(all);
+        } else {
+          setProjects(all.filter((p: GfpProject) => projectAccess.includes(p.service_id)));
+        }
+      })
       .catch(() => setProjects([]))
       .finally(() => setLoading(false));
-  }, []);
+  }, [isAdmin, projectAccess]);
 
   const filtered = filter === 'all' ? projects : projects.filter((p) => p.lifecycle === filter);
 
