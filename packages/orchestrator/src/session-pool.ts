@@ -70,6 +70,7 @@ export class SessionPool {
   private configs: Map<BotId, BotConfig>;
   private sessionState: SessionState;
   private costTracker: CostTracker;
+  private activeDispatches = 0;
 
   constructor(configs: Map<BotId, BotConfig>, costTracker: CostTracker) {
     this.configs = configs;
@@ -87,104 +88,120 @@ export class SessionPool {
     if (!config) {
       return { response: `봇 ${botId} 설정을 찾을 수 없습니다.`, botId, costUsd: 0 };
     }
+    this.activeDispatches++;
+    try {
+      const cwd = path.join(SESSIONS_DIR, botId);
+      fs.mkdirSync(path.join(cwd, '.claude'), { recursive: true });
+      const lastSession = this.sessionState[botId];
 
-    const cwd = path.join(SESSIONS_DIR, botId);
-    fs.mkdirSync(path.join(cwd, '.claude'), { recursive: true });
-    const lastSession = this.sessionState[botId];
-
-    // 스레드 히스토리 포매팅
-    const historyBlock = context.threadHistory?.length
-      ? [
-          '',
-          `[스레드 이전 대화 (${context.threadHistory.length}건)]`,
-          ...context.threadHistory.map((m) => `${m.displayName}: ${m.text}`),
-          `[/스레드 이전 대화]`,
-          '',
-        ].join('\n')
-      : '';
-
-    // GFP 프로젝트 컨텍스트 (Phase별 선택적 주입)
-    const gfpContext = buildGfpContext(context.route, botId);
-
-    // 이미지 첨부 안내 (Read 도구로 파일 확인 가능)
-    const imageBlock =
-      images && images.length > 0
+      // 스레드 히스토리 포매팅
+      const historyBlock = context.threadHistory?.length
         ? [
-            `[첨부 이미지 ${images.length}개 — Read 도구로 확인 가능]`,
-            ...images.map((img) => `- ${img.name}: ${img.localPath}`),
+            '',
+            `[스레드 이전 대화 (${context.threadHistory.length}건)]`,
+            ...context.threadHistory.map((m) => `${m.displayName}: ${m.text}`),
+            `[/스레드 이전 대화]`,
+            '',
           ].join('\n')
         : '';
 
-    // 컨텍스트 프롬프트: 서비스 정보 + GFP 컨텍스트 + 스레드 히스토리
-    const contextPrompt = [
-      `[Slack 메시지]`,
-      `채널: ${context.channel}`,
-      `발신자: ${context.sender} (${context.senderId})`,
-      context.route.serviceDomain
-        ? `프로젝트: ${context.route.serviceDomain} (Phase ${context.route.phase})`
-        : '',
-      `스레드: ${context.threadTs}`,
-      gfpContext,
-      imageBlock,
-      historyBlock,
-      message,
-    ]
-      .filter(Boolean)
-      .join('\n');
+      // GFP 프로젝트 컨텍스트 (Phase별 선택적 주입)
+      const gfpContext = buildGfpContext(context.route, botId);
 
-    console.log(
-      `[session-pool] Dispatching to ${botId} (resume: ${lastSession?.sessionId || 'new'})`,
-    );
+      // 이미지 첨부 안내 (Read 도구로 파일 확인 가능)
+      const imageBlock =
+        images && images.length > 0
+          ? [
+              `[첨부 이미지 ${images.length}개 — Read 도구로 확인 가능]`,
+              ...images.map((img) => `- ${img.name}: ${img.localPath}`),
+            ].join('\n')
+          : '';
 
-    let responseText = '';
-    let costUsd = 0;
-    let sessionId = '';
+      // 컨텍스트 프롬프트: 서비스 정보 + GFP 컨텍스트 + 스레드 히스토리
+      const contextPrompt = [
+        `[Slack 메시지]`,
+        `채널: ${context.channel}`,
+        `발신자: ${context.sender} (${context.senderId})`,
+        context.route.serviceDomain
+          ? `프로젝트: ${context.route.serviceDomain} (Phase ${context.route.phase})`
+          : '',
+        `스레드: ${context.threadTs}`,
+        gfpContext,
+        imageBlock,
+        historyBlock,
+        message,
+      ]
+        .filter(Boolean)
+        .join('\n');
 
-    try {
-      for await (const msg of query({
-        prompt: contextPrompt,
-        options: {
-          cwd,
-          model: config.model,
-          allowedTools: config.tools,
-          maxTurns: config.maxTurns,
-          maxBudgetUsd: config.maxBudgetPerMessage,
-          permissionMode: 'acceptEdits',
-          systemPrompt: { type: 'preset', preset: 'claude_code', append: config.soulPrompt },
-          ...(lastSession?.sessionId ? { resume: lastSession.sessionId } : {}),
-        },
-      })) {
-        if (msg.type === 'result') {
-          if (msg.subtype === 'success') {
-            responseText = msg.result || '';
-          } else if (msg.subtype === 'error_max_budget_usd') {
-            responseText = '(비용 한도 초과 — 응답이 잘렸을 수 있습니다)';
-          } else if (msg.subtype === 'error_during_execution') {
-            responseText = `(오류 발생: ${(msg as any).errors?.join(', ') || 'unknown'})`;
+      console.log(
+        `[session-pool] Dispatching to ${botId} (resume: ${lastSession?.sessionId || 'new'})`,
+      );
+
+      let responseText = '';
+      let costUsd = 0;
+      let sessionId = '';
+
+      try {
+        for await (const msg of query({
+          prompt: contextPrompt,
+          options: {
+            cwd,
+            model: config.model,
+            allowedTools: config.tools,
+            maxTurns: config.maxTurns,
+            maxBudgetUsd: config.maxBudgetPerMessage,
+            permissionMode: 'acceptEdits',
+            systemPrompt: { type: 'preset', preset: 'claude_code', append: config.soulPrompt },
+            ...(lastSession?.sessionId ? { resume: lastSession.sessionId } : {}),
+          },
+        })) {
+          if (msg.type === 'result') {
+            if (msg.subtype === 'success') {
+              responseText = msg.result || '';
+            } else if (msg.subtype === 'error_max_budget_usd') {
+              responseText = '(비용 한도 초과 — 응답이 잘렸을 수 있습니다)';
+            } else if (msg.subtype === 'error_during_execution') {
+              responseText = `(오류 발생: ${(msg as any).errors?.join(', ') || 'unknown'})`;
+            }
+            costUsd = (msg as any).total_cost_usd || 0;
+            sessionId = (msg as any).session_id || '';
           }
-          costUsd = (msg as any).total_cost_usd || 0;
-          sessionId = (msg as any).session_id || '';
         }
+      } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        console.error(`[session-pool] ${botId} dispatch error:`, errMsg);
+        responseText = `(봇 실행 오류: ${errMsg})`;
       }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : String(err);
-      console.error(`[session-pool] ${botId} dispatch error:`, errMsg);
-      responseText = `(봇 실행 오류: ${errMsg})`;
+
+      // 세션 ID 저장 (다음 resume용)
+      if (sessionId) {
+        this.sessionState[botId] = { sessionId, lastActive: Date.now() };
+        saveSessionState(this.sessionState);
+      }
+
+      // 비용 추적
+      this.costTracker.record(botId, costUsd, context.route.serviceId);
+
+      // 에스컬레이션 감지
+      const escalation = detectEscalation(responseText);
+
+      return { response: responseText, botId, costUsd, escalation: escalation || undefined };
+    } finally {
+      this.activeDispatches--;
     }
+  }
 
-    // 세션 ID 저장 (다음 resume용)
-    if (sessionId) {
-      this.sessionState[botId] = { sessionId, lastActive: Date.now() };
-      saveSessionState(this.sessionState);
+  async drainAndShutdown(timeoutMs: number): Promise<void> {
+    const deadline = Date.now() + timeoutMs;
+    while (this.activeDispatches > 0 && Date.now() < deadline) {
+      console.log(`[session-pool] Draining ${this.activeDispatches} active dispatches...`);
+      await new Promise((r) => setTimeout(r, 500));
     }
-
-    // 비용 추적
-    this.costTracker.record(botId, costUsd, context.route.serviceId);
-
-    // 에스컬레이션 감지
-    const escalation = detectEscalation(responseText);
-
-    return { response: responseText, botId, costUsd, escalation: escalation || undefined };
+    if (this.activeDispatches > 0) {
+      console.warn(`[session-pool] Force shutdown with ${this.activeDispatches} active dispatches`);
+    }
+    this.shutdown();
   }
 
   shutdown() {

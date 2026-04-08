@@ -200,11 +200,19 @@ async function main() {
   console.log('[orchestrator] Ready — listening for Slack messages');
 
   // 7. Graceful shutdown
+  let shuttingDown = false;
   const shutdown = async (signal: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.log(`[orchestrator] ${signal} received, shutting down...`);
-    sessionPool.shutdown();
-    await slack.stop();
-    await pool.end();
+    try {
+      await sessionPool.drainAndShutdown(10_000);
+    } catch (err) {
+      console.error('[orchestrator] Drain error:', err);
+    } finally {
+      await slack.stop().catch((e: unknown) => console.error('Slack stop error:', e));
+      await pool.end().catch((e: unknown) => console.error('DB pool end error:', e));
+    }
     console.log('[orchestrator] Shutdown complete');
     process.exit(0);
   };
@@ -218,7 +226,48 @@ async function main() {
   process.on('SIGINT', () => onSignal('SIGINT'));
 }
 
-main().catch((err) => {
+// ── Crash notification ──
+
+async function notifyCrash(error: Error | string): Promise<void> {
+  const webhookUrl = process.env.SLACK_WEBHOOK;
+  if (!webhookUrl) {
+    console.warn('[orchestrator] SLACK_WEBHOOK not set — crash alert skipped');
+    return;
+  }
+  const timestamp = new Date().toISOString();
+  const errorStr =
+    error instanceof Error
+      ? `${error.message}\n${(error.stack || '').slice(0, 800)}`
+      : String(error).slice(0, 500);
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: `🚨 *SEMO Orchestrator Crashed*\nTime: ${timestamp}\nError: \`\`\`${errorStr}\`\`\``,
+      }),
+      signal: AbortSignal.timeout(5000),
+    });
+  } catch {
+    /* 알림 실패는 무시 */
+  }
+}
+
+main().catch(async (err) => {
   console.error('[orchestrator] Fatal:', err);
+  await notifyCrash(err);
   process.exit(1);
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[orchestrator] Uncaught exception:', err);
+  notifyCrash(err).finally(() => process.exit(1));
+  setTimeout(() => process.exit(1), 3000);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[orchestrator] Unhandled rejection:', reason);
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  notifyCrash(err).finally(() => process.exit(1));
+  setTimeout(() => process.exit(1), 3000);
 });

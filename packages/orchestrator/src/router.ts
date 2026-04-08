@@ -129,9 +129,9 @@ export class Router {
 
       const { service_id, service_name } = sessionResult.rows[0];
 
-      // services에서 현재 Phase 조회
+      // services에서 현재 Phase 조회 (incubator_sessions의 service_id가 short hash일 수 있으므로 LIKE 매칭)
       const serviceResult = await this.pool.query(
-        `SELECT current_phase, COALESCE(infra_phase, 0) as infra_phase, COALESCE(service_domain, $2) as service_domain FROM semo.services WHERE service_id = $1`,
+        `SELECT current_phase, COALESCE(infra_phase, 0) as infra_phase, COALESCE(service_domain, $2) as service_domain FROM semo.services WHERE service_id::text LIKE $1 || '%'`,
         [service_id, service_name.toLowerCase().replace(/\s+/g, '-')],
       );
 
