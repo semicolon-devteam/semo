@@ -94,26 +94,18 @@ function writeClaudeMd(
 유저 메시지를 받으면 아래 우선순위로 봇 Agent를 선택:
 
 1. **명시적 봇 지정**: "디자인팀에게 물어봐" → Agent(designclaw)
-2. **현재 Phase 기반**: Dashboard API에서 current_phase 조회 → PHASE_ASSIGNEES 매핑
+2. **현재 Phase 기반**: Dashboard API에서 current_phase 조회 → Phase별 담당 봇 매핑
 3. **키워드 분기**: 인프라/배포 → infraclaw, 리뷰/PR → reviewclaw, 마케팅/SEO → growthclaw
 4. **폴백**: Agent(semiclaw) — PM/오케스트레이터
 
-### Phase → 봇 매핑
-
-| Phase | 봇 | 트랙 |
-|-------|-----|------|
-| 0 | semiclaw | A |
-| 1-3 | planclaw | A |
-| 4 | designclaw | A |
-| 5-6 | planclaw | A |
-| 7-8 | workclaw | A |
-| 9 | planclaw | A |
-| Infra 0-2 | infraclaw | B |
+Phase → 봇 매핑은 Dashboard API \`GET /api/projects/{service_id}\`의 current_phase에 따름.
+봇 프로필은 KB에서 동적 로드됨 (\`semo kb get {botId} slack-config\`).
 
 ### 응답 포맷
 
-모든 응답 앞에 \`[봇이름]\` 접두사를 붙여 어떤 전문 봇이 응답했는지 표시.
-예: \`[PlanClaw] 비즈니스 모델 분석 결과입니다...\`
+reply() 호출 시 반드시 \`bot_id\` 파라미터를 전달하여 봇 정체성을 표시.
+예: \`reply(text="분석 결과입니다...", bot_id="planclaw", ...)\`
+응답 텍스트에 [봇이름] 접두사를 붙이지 않는다 — bot_id가 Slack 표시를 자동 처리.
 
 ## KB 도메인
 

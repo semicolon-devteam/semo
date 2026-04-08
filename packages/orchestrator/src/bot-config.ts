@@ -53,7 +53,8 @@ function resolveModel(model: string): string {
   return model; // full model ID
 }
 
-export const SLACK_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
+// Bot Slack profiles — KB 기반 동적 로드, 하드코딩 fallback
+const FALLBACK_SLACK_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
   semiclaw: { username: 'SemiClaw', icon_emoji: ':clipboard:' },
   planclaw: { username: 'PlanClaw', icon_emoji: ':bar_chart:' },
   designclaw: { username: 'DesignClaw', icon_emoji: ':art:' },
@@ -62,6 +63,25 @@ export const SLACK_PROFILES: Record<string, { username: string; icon_emoji: stri
   infraclaw: { username: 'InfraClaw', icon_emoji: ':gear:' },
   growthclaw: { username: 'GrowthClaw', icon_emoji: ':chart_with_upwards_trend:' },
 };
+export let SLACK_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
+  ...FALLBACK_SLACK_PROFILES,
+};
+
+const SEMO_DASHBOARD_URL = process.env.SEMO_DASHBOARD_URL || 'https://semo.semi-colon.space';
+
+export async function loadSlackProfilesFromAPI(): Promise<void> {
+  try {
+    const res = await fetch(`${SEMO_DASHBOARD_URL}/api/bots/profiles`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = (await res.json()) as Record<string, { username: string; icon_emoji: string }>;
+    if (Object.keys(data).length > 0) {
+      SLACK_PROFILES = data;
+      console.log(`[bot-config] Loaded ${Object.keys(data).length} bot profiles from KB`);
+    }
+  } catch (err) {
+    console.error('[bot-config] Failed to load bot profiles from API, using fallback:', err);
+  }
+}
 
 // 봇별 KB 접근 도메인 — semicolon(공통)은 모든 봇에 허용
 const KB_DOMAINS: Record<string, string[]> = {

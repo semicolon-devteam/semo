@@ -16,7 +16,7 @@ import { SlackGateway } from './slack-gateway';
 import { Router } from './router';
 import { SessionPool } from './session-pool';
 import { CostTracker } from './cost-tracker';
-import { loadAllBotConfigs } from './bot-config';
+import { loadAllBotConfigs, loadSlackProfilesFromAPI } from './bot-config';
 import type { BotId } from './bot-config';
 import type { SlackMessage, DispatchContext } from './types';
 
@@ -92,7 +92,10 @@ async function main() {
     process.exit(1);
   }
 
-  // 3. Bot configs
+  // 3. Bot Slack profiles (KB 기반 동적 로드)
+  await loadSlackProfilesFromAPI();
+
+  // 4. Bot configs
   const botConfigs = loadAllBotConfigs();
   console.log(`[orchestrator] Loaded ${botConfigs.size} bot configs`);
 

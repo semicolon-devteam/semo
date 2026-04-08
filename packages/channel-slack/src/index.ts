@@ -56,6 +56,7 @@ const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN;
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID || '';
 const SEMO_SERVICE_ID = process.env.SEMO_SERVICE_ID || 'unknown';
+const SEMO_DASHBOARD_URL = process.env.SEMO_DASHBOARD_URL || 'https://semo.semi-colon.space';
 
 if (!SLACK_BOT_TOKEN || !SLACK_APP_TOKEN) {
   console.error('SLACK_BOT_TOKEN and SLACK_APP_TOKEN are required.');
@@ -73,8 +74,8 @@ const slackSocket = new SocketModeClient({ appToken: SLACK_APP_TOKEN });
 // Bot user ID (resolved at startup)
 let botUserId = '';
 
-// Bot identity profiles for customized Slack sender
-const BOT_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
+// Bot identity profiles — KB 기반 동적 로드, 하드코딩 fallback
+const FALLBACK_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
   semiclaw: { username: 'SemiClaw', icon_emoji: ':clipboard:' },
   planclaw: { username: 'PlanClaw', icon_emoji: ':bar_chart:' },
   designclaw: { username: 'DesignClaw', icon_emoji: ':art:' },
@@ -83,6 +84,23 @@ const BOT_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
   infraclaw: { username: 'InfraClaw', icon_emoji: ':gear:' },
   growthclaw: { username: 'GrowthClaw', icon_emoji: ':chart_with_upwards_trend:' },
 };
+let botProfiles: Record<string, { username: string; icon_emoji: string }> = {
+  ...FALLBACK_PROFILES,
+};
+
+async function loadBotProfiles(): Promise<void> {
+  try {
+    const res = await fetch(`${SEMO_DASHBOARD_URL}/api/bots/profiles`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = (await res.json()) as Record<string, { username: string; icon_emoji: string }>;
+    if (Object.keys(data).length > 0) {
+      botProfiles = data;
+      console.error(`[channel-slack] Loaded ${Object.keys(data).length} bot profiles from KB`);
+    }
+  } catch (err) {
+    console.error('[channel-slack] Failed to load bot profiles from API, using fallback:', err);
+  }
+}
 
 // Pending ask_user responses: requestId → resolve function
 const pendingAskResponses = new Map<string, (value: string) => void>();
@@ -293,7 +311,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
 
     try {
       // 메시지 전송 (타이핑 인디케이터는 자동 해제됨)
-      const profile = bot_id ? BOT_PROFILES[bot_id] : undefined;
+      const profile = bot_id ? botProfiles[bot_id] : undefined;
       await slackWeb.chat.postMessage({
         channel: slack_channel,
         text,
@@ -339,7 +357,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
         value: opt.value,
       }));
 
-      const askProfile = askBotId ? BOT_PROFILES[askBotId] : undefined;
+      const askProfile = askBotId ? botProfiles[askBotId] : undefined;
       await slackWeb.chat.postMessage({
         channel: slack_channel,
         thread_ts: thread_ts || undefined,
@@ -511,7 +529,11 @@ async function start() {
   // 1. MCP 연결 (stdio transport — Claude Code가 프로세스를 스폰)
   await mcp.connect(new StdioServerTransport());
 
-  // 2. Bot User ID 조회
+  // 2. Bot profiles — KB 기반 동적 로드
+  await loadBotProfiles();
+  setInterval(loadBotProfiles, 5 * 60 * 1000); // 5분 갱신
+
+  // 3. Bot User ID 조회
   try {
     const authResult = await slackWeb.auth.test();
     botUserId = authResult.user_id || '';

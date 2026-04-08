@@ -6,12 +6,66 @@
 import crypto from 'crypto';
 import { query } from './db';
 import { getPhaseAssignee, getPhaseCc, PHASE_LABELS, INFRA_PHASE_LABELS } from './gfp-phases';
+import { getBotSlackProfiles } from './bot-profiles';
 import type { GfpQAItem, GfpInfraRequest } from '@/types';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const DASHBOARD_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space';
 const REUS_DM_CHANNEL = 'D0AEBL7AK4H'; // Reus DM
 const REUS_SLACK_ID = 'URSQYUNQJ';
+
+// ── Shared Slack Post Helper ──
+
+interface SlackPostResult {
+  ok: boolean;
+  ts?: string;
+  error?: string;
+}
+
+async function postSlackMessage(
+  channel: string,
+  text: string,
+  extra?: {
+    blocks?: unknown[];
+    attachments?: unknown[];
+    thread_ts?: string;
+    botId?: string;
+    unfurl_links?: boolean;
+  },
+): Promise<SlackPostResult> {
+  if (!SLACK_BOT_TOKEN) return { ok: false, error: 'no token' };
+
+  let profileOverride: Record<string, string> = {};
+  if (extra?.botId) {
+    const profiles = await getBotSlackProfiles();
+    const p = profiles[extra.botId];
+    if (p) profileOverride = { username: p.username, icon_emoji: p.icon_emoji };
+  }
+
+  try {
+    const res = await fetch('https://slack.com/api/chat.postMessage', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+      },
+      body: JSON.stringify({
+        channel,
+        text,
+        ...(extra?.blocks && { blocks: extra.blocks }),
+        ...(extra?.attachments && { attachments: extra.attachments }),
+        ...(extra?.thread_ts && { thread_ts: extra.thread_ts }),
+        ...(extra?.unfurl_links !== undefined && { unfurl_links: extra.unfurl_links }),
+        ...profileOverride,
+      }),
+    });
+    return await res.json();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('[Slack] postSlackMessage failed:', msg);
+    return { ok: false, error: msg };
+  }
+}
 
 // Re-export for backward compat (removed local PHASE_LABELS, now from gfp-phases)
 export { PHASE_LABELS } from './gfp-phases';
@@ -59,17 +113,11 @@ export async function resolveGfpSlackContext(gfpId: string): Promise<GfpSlackCon
       // 채널 없으면 Reus에게 DM으로 설정 요청
       if (!channelId && SLACK_BOT_TOKEN) {
         const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${gfpId}`;
-        await fetch('https://slack.com/api/chat.postMessage', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-          },
-          body: JSON.stringify({
-            channel: REUS_DM_CHANNEL,
-            text: `[GFP] ${projectName} (domain: ${domain || 'N/A'}) 프로젝트에 Slack 채널이 설정되지 않았습니다.\n\nKB에 채널을 등록해주세요:\n\`semo kb upsert ${domain || 'DOMAIN'} slack-channel --content "C채널ID"\`\n\n프로젝트: <${dashboardUrl}|${projectName}>`,
-          }),
-        }).catch((err) => console.error('Channel missing DM failed:', err));
+        await postSlackMessage(
+          REUS_DM_CHANNEL,
+          `[GFP] ${projectName} (domain: ${domain || 'N/A'}) 프로젝트에 Slack 채널이 설정되지 않았습니다.\n\nKB에 채널을 등록해주세요:\n\`semo kb upsert ${domain || 'DOMAIN'} slack-channel --content "C채널ID"\`\n\n프로젝트: <${dashboardUrl}|${projectName}>`,
+          { botId: 'semiclaw' },
+        );
         // DM 보냈으므로 null 반환 — 호출자가 알림 skip
         return { channelId: '', ownerSlackId };
       }
@@ -147,30 +195,16 @@ export async function sendGfpRejectionSlack(opts: GfpRejectionNotifyOpts): Promi
     },
   ];
 
-  try {
-    const res = await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      },
-      body: JSON.stringify({
-        channel,
-        text: `<@${assignee.slackId}> [GFP Rejection] ${opts.projectName} — ${opts.sectionKey} 섹션 거절됨\nReason: ${opts.reviewerNote}`,
-        blocks,
-      }),
-    });
-
-    const data = await res.json();
-    if (!data.ok) {
-      console.error('Slack API error:', data.error);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error('Slack notification failed:', err);
+  const data = await postSlackMessage(
+    channel,
+    `<@${assignee.slackId}> [GFP Rejection] ${opts.projectName} — ${opts.sectionKey} 섹션 거절됨\nReason: ${opts.reviewerNote}`,
+    { blocks, botId: assignee.botId },
+  );
+  if (!data.ok) {
+    console.error('Slack API error:', data.error);
     return false;
   }
+  return true;
 }
 
 // ── GFP Phase Completed Notification ──
@@ -286,26 +320,15 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
     },
   ];
 
-  try {
-    const res = await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      },
-      body: JSON.stringify({ channel, text: textFallback, blocks }),
-    });
-
-    const data = await res.json();
-    if (!data.ok) {
-      console.error('Slack phase complete error:', data.error);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error('Slack phase complete failed:', err);
+  const data = await postSlackMessage(channel, textFallback, {
+    blocks,
+    botId: isLastPhase ? 'semiclaw' : nextAssignee!.botId,
+  });
+  if (!data.ok) {
+    console.error('Slack phase complete error:', data.error);
     return false;
   }
+  return true;
 }
 
 // ── GFP Q&A Slack Delivery ──
@@ -370,19 +393,11 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
   ];
 
   try {
-    const parentRes = await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      },
-      body: JSON.stringify({
-        channel: opts.channelId,
-        text: `[GFP] ${opts.projectName} — Phase 3 명확화 (${totalQuestions}개 질문)`,
-        blocks: parentBlocks,
-      }),
-    });
-    const parentData = await parentRes.json();
+    const parentData = await postSlackMessage(
+      opts.channelId,
+      `[GFP] ${opts.projectName} — Phase 3 명확화 (${totalQuestions}개 질문)`,
+      { blocks: parentBlocks, botId: 'planclaw' },
+    );
     if (!parentData.ok) {
       console.error('Slack Q&A parent message failed:', parentData.error);
       return threadMap;
@@ -403,16 +418,10 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
 
       const sectionUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=3&section=${section.section_key}`;
 
-      const threadRes = await fetch('https://slack.com/api/chat.postMessage', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-        },
-        body: JSON.stringify({
-          channel: opts.channelId,
-          thread_ts: parentTs,
-          text: `[${section.title}] ${section.qa_items.length} questions`,
+      const threadData = await postSlackMessage(
+        opts.channelId,
+        `[${section.title}] ${section.qa_items.length} questions`,
+        {
           blocks: [
             {
               type: 'section',
@@ -431,10 +440,10 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
               ],
             },
           ],
-        }),
-      });
-
-      const threadData = await threadRes.json();
+          thread_ts: parentTs,
+          botId: 'planclaw',
+        },
+      );
       if (threadData.ok) {
         threadMap.set(section.section_id, threadData.ts as string);
       } else {
@@ -503,31 +512,17 @@ export async function sendGfpProjectCreatedSlack(opts: GfpProjectCreatedOpts): P
     },
   ];
 
-  try {
-    const res = await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      },
-      body: JSON.stringify({
-        channel: opts.channelId,
-        text: `<@${assignee.slackId}> [GFP] ${opts.projectName} — Phase 0 온보딩을 시작해주세요.`,
-        blocks,
-      }),
-    });
-
-    const data = await res.json();
-    if (!data.ok) {
-      console.error('Slack project created error:', data.error);
-      return false;
-    }
-    console.log(`[GFP Slack] Project created notification sent for ${opts.projectName}`);
-    return true;
-  } catch (err) {
-    console.error('Slack project created failed:', err);
+  const data = await postSlackMessage(
+    opts.channelId,
+    `<@${assignee.slackId}> [GFP] ${opts.projectName} — Phase 0 온보딩을 시작해주세요.`,
+    { blocks, botId: assignee.botId },
+  );
+  if (!data.ok) {
+    console.error('Slack project created error:', data.error);
     return false;
   }
+  console.log(`[GFP Slack] Project created notification sent for ${opts.projectName}`);
+  return true;
 }
 
 // ── GFP Track Fork Notification ──
@@ -552,15 +547,10 @@ export async function sendGfpTrackForkSlack(opts: GfpTrackForkOpts): Promise<boo
 
   try {
     // Message 1: Track A — PlanClaw
-    await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      },
-      body: JSON.stringify({
-        channel: opts.channelId,
-        text: `<@${planAssignee.slackId}>${ownerMention} [GFP Track A] ${opts.projectName} — Phase 1 (디스커버리) 시작해주세요.`,
+    await postSlackMessage(
+      opts.channelId,
+      `<@${planAssignee.slackId}>${ownerMention} [GFP Track A] ${opts.projectName} — Phase 1 (디스커버리) 시작해주세요.`,
+      {
         blocks: [
           {
             type: 'header',
@@ -584,19 +574,15 @@ export async function sendGfpTrackForkSlack(opts: GfpTrackForkOpts): Promise<boo
             ],
           },
         ],
-      }),
-    });
+        botId: planAssignee.botId,
+      },
+    );
 
     // Message 2: Track B — InfraClaw
-    await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      },
-      body: JSON.stringify({
-        channel: opts.channelId,
-        text: `<@${infraAssignee.slackId}>${ownerMention} [GFP Track B] ${opts.projectName} — 기본 인프라 세팅을 시작해주세요.`,
+    await postSlackMessage(
+      opts.channelId,
+      `<@${infraAssignee.slackId}>${ownerMention} [GFP Track B] ${opts.projectName} — 기본 인프라 세팅을 시작해주세요.`,
+      {
         blocks: [
           {
             type: 'header',
@@ -620,8 +606,9 @@ export async function sendGfpTrackForkSlack(opts: GfpTrackForkOpts): Promise<boo
             ],
           },
         ],
-      }),
-    });
+        botId: infraAssignee.botId,
+      },
+    );
 
     console.log(`[GFP Slack] Track fork notifications sent for ${opts.projectName}`);
     return true;
@@ -646,61 +633,50 @@ export async function sendGfpInfraRequestSlack(opts: GfpInfraRequestSlackOpts): 
   const infraAssignee = getPhaseAssignee(0, 'infra');
   const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?track=infra`;
 
-  try {
-    const res = await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      },
-      body: JSON.stringify({
-        channel: opts.channelId,
-        text: `<@${infraAssignee.slackId}> [GFP Infra Request] ${opts.projectName} — ${opts.request.title}`,
-        blocks: [
-          {
-            type: 'header',
-            text: { type: 'plain_text', text: '🔧 인프라 요청', emoji: true },
-          },
-          {
-            type: 'section',
-            fields: [
-              { type: 'mrkdwn', text: `*프로젝트:*\n${opts.projectName}` },
-              { type: 'mrkdwn', text: `*카테고리:*\n${opts.request.category}` },
-              { type: 'mrkdwn', text: `*제목:*\n${opts.request.title}` },
-              { type: 'mrkdwn', text: `*우선순위:*\n${opts.request.priority}` },
-            ],
-          },
-          ...(opts.request.description
-            ? [
-                {
-                  type: 'section' as const,
-                  text: { type: 'mrkdwn' as const, text: `*설명:*\n${opts.request.description}` },
-                },
-              ]
-            : []),
-          {
-            type: 'context',
-            elements: [
+  const data = await postSlackMessage(
+    opts.channelId,
+    `<@${infraAssignee.slackId}> [GFP Infra Request] ${opts.projectName} — ${opts.request.title}`,
+    {
+      blocks: [
+        {
+          type: 'header',
+          text: { type: 'plain_text', text: '🔧 인프라 요청', emoji: true },
+        },
+        {
+          type: 'section',
+          fields: [
+            { type: 'mrkdwn', text: `*프로젝트:*\n${opts.projectName}` },
+            { type: 'mrkdwn', text: `*카테고리:*\n${opts.request.category}` },
+            { type: 'mrkdwn', text: `*제목:*\n${opts.request.title}` },
+            { type: 'mrkdwn', text: `*우선순위:*\n${opts.request.priority}` },
+          ],
+        },
+        ...(opts.request.description
+          ? [
               {
-                type: 'mrkdwn',
-                text: `출처: Phase ${opts.request.source_phase} | <${dashboardUrl}|대시보드>`,
+                type: 'section' as const,
+                text: { type: 'mrkdwn' as const, text: `*설명:*\n${opts.request.description}` },
               },
-            ],
-          },
-        ],
-      }),
-    });
-
-    const data = await res.json();
-    if (!data.ok) {
-      console.error('Slack infra request error:', data.error);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error('Slack infra request failed:', err);
+            ]
+          : []),
+        {
+          type: 'context',
+          elements: [
+            {
+              type: 'mrkdwn',
+              text: `출처: Phase ${opts.request.source_phase} | <${dashboardUrl}|대시보드>`,
+            },
+          ],
+        },
+      ],
+      botId: infraAssignee.botId,
+    },
+  );
+  if (!data.ok) {
+    console.error('Slack infra request error:', data.error);
     return false;
   }
+  return true;
 }
 
 // ── GFP Infra Phase Completed Notification ──
@@ -761,26 +737,15 @@ export async function sendGfpInfraPhaseCompletedSlack(
     ? `${ownerMention.trim()} [GFP] ${opts.projectName} — Track B 인프라 트랙 완료!`
     : `<@${nextAssignee!.slackId}>${ownerMention} [GFP] ${opts.projectName} — Infra Phase ${opts.completedPhase} 완료. Infra Phase ${opts.nextPhase} (${nextLabel}) 시작해주세요.`;
 
-  try {
-    const res = await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      },
-      body: JSON.stringify({ channel: opts.channelId, text: textFallback, blocks }),
-    });
-
-    const data = await res.json();
-    if (!data.ok) {
-      console.error('Slack infra phase complete error:', data.error);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error('Slack infra phase complete failed:', err);
+  const data = await postSlackMessage(opts.channelId, textFallback, {
+    blocks,
+    botId: isLast ? 'infraclaw' : nextAssignee!.botId,
+  });
+  if (!data.ok) {
+    console.error('Slack infra phase complete error:', data.error);
     return false;
   }
+  return true;
 }
 
 // ── Deploy Verification Required Notification ──
@@ -841,25 +806,15 @@ export async function sendDeployVerificationRequiredSlack(
   const mention = assignee ? `<@${assignee.slackId}>` : '';
   const text = `${mention} [GFP] ${opts.projectName} — Infra Phase ${opts.infraPhase} 배포 검증이 필요합니다.`;
 
-  try {
-    const res = await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      },
-      body: JSON.stringify({ channel: opts.channelId, text, blocks }),
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      console.error('Slack deploy verification required error:', data.error);
-      return false;
-    }
-    return true;
-  } catch (err) {
-    console.error('Slack deploy verification required failed:', err);
+  const data = await postSlackMessage(opts.channelId, text, {
+    blocks,
+    botId: 'infraclaw',
+  });
+  if (!data.ok) {
+    console.error('Slack deploy verification required error:', data.error);
     return false;
   }
+  return true;
 }
 
 // ── GFP Design System Notification (Color Palette) ──
@@ -912,32 +867,21 @@ export async function sendDesignSystemSlack(opts: GfpDesignSystemSlackOpts): Pro
     text: `${c.name}: ${c.hex}`,
   }));
 
-  try {
-    const res = await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      },
-      body: JSON.stringify({
-        channel: opts.channelId,
-        text: `[GFP] ${opts.projectName} — 디자인 시스템 완성 🎨`,
-        blocks,
-        ...(attachments.length > 0 ? { attachments } : {}),
-      }),
-    });
-
-    const data = await res.json();
-    if (!data.ok) {
-      console.error('Slack design system notify error:', data.error);
-      return false;
-    }
-    console.log(`[GFP Slack] Design system notification sent for ${opts.projectName}`);
-    return true;
-  } catch (err) {
-    console.error('Slack design system notify failed:', err);
+  const data = await postSlackMessage(
+    opts.channelId,
+    `[GFP] ${opts.projectName} — 디자인 시스템 완성 🎨`,
+    {
+      blocks,
+      attachments: attachments.length > 0 ? attachments : undefined,
+      botId: 'designclaw',
+    },
+  );
+  if (!data.ok) {
+    console.error('Slack design system notify error:', data.error);
     return false;
   }
+  console.log(`[GFP Slack] Design system notification sent for ${opts.projectName}`);
+  return true;
 }
 
 // ── Slack Interactivity Utilities ──
@@ -1130,29 +1074,16 @@ export async function sendGfpSectionPendingReviewSlack(
     },
   );
 
-  try {
-    const res = await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        channel: opts.channelId,
-        text: `📋 GFP 섹션 검토 요청: ${opts.sectionTitle}`,
-        blocks,
-      }),
-    });
-    const data = await res.json();
-    if (!data.ok) {
-      console.error('[Slack] pending-review notify failed:', data.error);
-      return null;
-    }
-    return data.ts as string;
-  } catch (err) {
-    console.error('[Slack] pending-review notify error:', err);
+  const data = await postSlackMessage(
+    opts.channelId,
+    `📋 GFP 섹션 검토 요청: ${opts.sectionTitle}`,
+    { blocks, botId: getPhaseAssignee(opts.phase).botId },
+  );
+  if (!data.ok) {
+    console.error('[Slack] pending-review notify failed:', data.error);
     return null;
   }
+  return data.ts as string;
 }
 
 /**
@@ -1212,8 +1143,6 @@ const DESIGN_STEP_LABELS: Record<number, string> = {
   5: '핸드오프',
 };
 
-const DESIGNCLAW_SLACK_ID = 'U0AFC0MK2TY';
-
 export async function sendGfpDesignStepAdvanceSlack(opts: {
   projectName: string;
   gfpId: string;
@@ -1227,16 +1156,12 @@ export async function sendGfpDesignStepAdvanceSlack(opts: {
   const fromLabel = DESIGN_STEP_LABELS[opts.fromStep] || `Step ${opts.fromStep}`;
   const toLabel = DESIGN_STEP_LABELS[opts.toStep] || `Step ${opts.toStep}`;
   const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=4&step=${opts.toStep}`;
+  const designAssignee = getPhaseAssignee(4);
 
-  await fetch('https://slack.com/api/chat.postMessage', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-    },
-    body: JSON.stringify({
-      channel: opts.channelId,
-      text: `🎨 [${opts.projectName}] 디자인 Step ${opts.toStep} (${toLabel}) 시작`,
+  await postSlackMessage(
+    opts.channelId,
+    `🎨 [${opts.projectName}] 디자인 Step ${opts.toStep} (${toLabel}) 시작`,
+    {
       blocks: [
         {
           type: 'header',
@@ -1247,7 +1172,7 @@ export async function sendGfpDesignStepAdvanceSlack(opts: {
         },
         {
           type: 'section',
-          text: { type: 'mrkdwn', text: `<@${DESIGNCLAW_SLACK_ID}> ${guide}` },
+          text: { type: 'mrkdwn', text: `<@${designAssignee.slackId}> ${guide}` },
         },
         {
           type: 'context',
@@ -1257,8 +1182,9 @@ export async function sendGfpDesignStepAdvanceSlack(opts: {
           ],
         },
       ],
-    }),
-  }).catch((err) => console.error('Design step advance Slack failed:', err));
+      botId: 'designclaw',
+    },
+  );
 }
 
 // ── Stitch Result Notification ──
@@ -1316,18 +1242,11 @@ export async function sendGfpStitchResultSlack(opts: {
 
   blocks.push({ type: 'actions', elements: actions });
 
-  await fetch('https://slack.com/api/chat.postMessage', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-    },
-    body: JSON.stringify({
-      channel: opts.channelId,
-      text: `🎨 [${opts.projectName}] Stitch 디자인 생성 완료 — ${opts.sectionTitle}`,
-      blocks,
-    }),
-  }).catch((err) => console.error('Stitch result Slack failed:', err));
+  await postSlackMessage(
+    opts.channelId,
+    `🎨 [${opts.projectName}] Stitch 디자인 생성 완료 — ${opts.sectionTitle}`,
+    { blocks, botId: 'designclaw' },
+  );
 }
 
 // ── Stitch Fallback Notification ──
@@ -1388,18 +1307,11 @@ export async function sendGfpStitchFallbackSlack(opts: {
     },
   ];
 
-  await fetch('https://slack.com/api/chat.postMessage', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-    },
-    body: JSON.stringify({
-      channel: opts.channelId,
-      text: `[${opts.projectName}] Stitch fallback — ${opts.screenName} 직접 디자인 생성`,
-      blocks,
-    }),
-  }).catch((err) => console.error('Stitch fallback Slack failed:', err));
+  await postSlackMessage(
+    opts.channelId,
+    `[${opts.projectName}] Stitch fallback — ${opts.screenName} 직접 디자인 생성`,
+    { blocks, botId: 'designclaw' },
+  );
 }
 
 // ── Feature Spec Review (ops mode) ──
@@ -1464,24 +1376,12 @@ export async function sendFeatureSpecReviewSlack(
     },
   ];
 
-  try {
-    const res = await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      },
-      body: JSON.stringify({
-        channel: opts.channelId,
-        text: `[${opts.projectName}] 기능 스펙 검토 필요: ${opts.featureName}`,
-        blocks,
-      }),
-    });
-    const data = await res.json();
-    return data.ts ?? null;
-  } catch {
-    return null;
-  }
+  const data = await postSlackMessage(
+    opts.channelId,
+    `[${opts.projectName}] 기능 스펙 검토 필요: ${opts.featureName}`,
+    { blocks, botId: 'planclaw' },
+  );
+  return data.ts ?? null;
 }
 
 interface FeatureWorkCompleteOpts {
@@ -1507,23 +1407,12 @@ export async function sendFeatureWorkCompleteSlack(
     },
   ];
 
-  try {
-    await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
-      },
-      body: JSON.stringify({
-        channel: opts.channelId,
-        text: `[${opts.projectName}] 기능 구현 완료: ${opts.featureName}`,
-        blocks,
-      }),
-    });
-    return true;
-  } catch {
-    return false;
-  }
+  const data = await postSlackMessage(
+    opts.channelId,
+    `[${opts.projectName}] 기능 구현 완료: ${opts.featureName}`,
+    { blocks, botId: 'workclaw' },
+  );
+  return data.ok;
 }
 
 export function buildFeatureSpecRejectionModalView(params: {
@@ -1595,20 +1484,12 @@ export async function sendFeatureDiscoveryCompleteSlack(opts: {
     },
   ];
 
-  try {
-    await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SLACK_BOT_TOKEN}` },
-      body: JSON.stringify({
-        channel: opts.channelId,
-        text: `[${opts.projectName}] 기능 스캔 완료 — ${opts.candidateCount}개 발견`,
-        blocks,
-      }),
-    });
-    return true;
-  } catch {
-    return false;
-  }
+  const data = await postSlackMessage(
+    opts.channelId,
+    `[${opts.projectName}] 기능 스캔 완료 — ${opts.candidateCount}개 발견`,
+    { blocks, botId: 'semiclaw' },
+  );
+  return data.ok;
 }
 
 export async function sendFeatureConversationStartSlack(opts: {
@@ -1619,18 +1500,10 @@ export async function sendFeatureConversationStartSlack(opts: {
   if (!SLACK_BOT_TOKEN) return null;
 
   const modeLabel = opts.mode === 'enrich' ? '스펙 보강' : '신규 기능 기획';
-  try {
-    const res = await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${SLACK_BOT_TOKEN}` },
-      body: JSON.stringify({
-        channel: opts.channelId,
-        text: `[${opts.projectName}] ${modeLabel} 대화를 시작합니다.`,
-      }),
-    });
-    const data = await res.json();
-    return data.ts ?? null;
-  } catch {
-    return null;
-  }
+  const data = await postSlackMessage(
+    opts.channelId,
+    `[${opts.projectName}] ${modeLabel} 대화를 시작합니다.`,
+    { botId: 'semiclaw' },
+  );
+  return data.ts ?? null;
 }
