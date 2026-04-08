@@ -25,10 +25,11 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Invalid role' }, { status: 400 });
   }
 
-  const { error } = await supabase
-    .from('user_profiles')
-    .update({ role, updated_at: new Date().toISOString() })
-    .eq('id', id);
+  const updates: Record<string, string> = { role, updated_at: new Date().toISOString() };
+  // admin 승격 시 온보딩도 자동 승인
+  if (role === 'admin') updates.onboarding_status = 'approved';
+
+  const { error } = await supabase.from('user_profiles').update(updates).eq('id', id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

@@ -100,6 +100,8 @@ export default function GlobalNav() {
 
   // 로딩 중이거나 미인증이면 nav 숨김
   if (loading || !user) return null;
+  // 온보딩 미완료 사용자는 nav 숨김 (어드민 제외)
+  if (profile && !isAdmin && profile.onboarding_status !== 'approved') return null;
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
@@ -156,12 +158,20 @@ export default function GlobalNav() {
                     </p>
                   </div>
                   {isAdmin && (
-                    <Link
-                      href="/admin/permissions"
-                      className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-                    >
-                      권한 설정
-                    </Link>
+                    <>
+                      <Link
+                        href="/admin/permissions"
+                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      >
+                        권한 설정
+                      </Link>
+                      <Link
+                        href="/admin/onboarding"
+                        className="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      >
+                        가입 승인
+                      </Link>
+                    </>
                   )}
                   <button
                     onClick={signOut}
