@@ -3,6 +3,7 @@ import { WebClient } from '@slack/web-api';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { convertMarkdownToBlocks } from './markdown-to-slack.js';
 import type { SlackMessage, SlackImage, AskOption } from './types';
 import { SLACK_PROFILES } from './bot-config';
 import type { BotId } from './bot-config';
@@ -10,7 +11,7 @@ import type { BotId } from './bot-config';
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || '';
 
 /** 봇 메시지 중 오케스트레이터가 처리해야 할 시스템 메시지 패턴 */
-const SYSTEM_MESSAGE_PATTERNS = [
+export const SYSTEM_MESSAGE_PATTERNS = [
   /\[Route:\s*\w+\]/, // 명시적 라우팅 태그
   /\[GFP:/, // GFP 파이프라인 콜백
   /\[Dashboard:/, // 대시보드 알림
@@ -18,7 +19,7 @@ const SYSTEM_MESSAGE_PATTERNS = [
   /\[Dispatch:/, // 디스패치 메시지
 ];
 
-function isSystemMessage(text: string | undefined): boolean {
+export function isSystemMessage(text: string | undefined): boolean {
   if (!text) return false;
   return SYSTEM_MESSAGE_PATTERNS.some((p) => p.test(text));
 }
@@ -241,13 +242,18 @@ export class SlackGateway {
 
   async postAsBot(botId: string, channel: string, text: string, threadTs?: string): Promise<void> {
     const profile = SLACK_PROFILES[botId];
-    await this.web.chat.postMessage({
-      channel,
-      text,
-      thread_ts: threadTs || undefined,
-      unfurl_links: false,
-      ...(profile && { username: profile.username, icon_emoji: profile.icon_emoji }),
-    });
+    const payloads = convertMarkdownToBlocks(text);
+
+    for (const payload of payloads) {
+      await this.web.chat.postMessage({
+        channel,
+        text: payload.text,
+        ...(payload.blocks.length > 0 && { blocks: payload.blocks }),
+        thread_ts: threadTs || undefined,
+        unfurl_links: false,
+        ...(profile && { username: profile.username, icon_emoji: profile.icon_emoji }),
+      });
+    }
   }
 
   async setTypingStatus(channel: string, threadTs: string, status: string): Promise<void> {

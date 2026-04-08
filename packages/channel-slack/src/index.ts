@@ -20,6 +20,7 @@ import { WebClient } from '@slack/web-api';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { convertMarkdownToBlocks } from './markdown-to-slack.js';
 
 // ============================================================
 // Configuration — ~/.claude/semo/.env 자동 로드
@@ -320,13 +321,18 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
     try {
       // 메시지 전송 (타이핑 인디케이터는 자동 해제됨)
       const profile = bot_id ? botProfiles[bot_id] : undefined;
-      await slackWeb.chat.postMessage({
-        channel: slack_channel,
-        text,
-        thread_ts: thread_ts || undefined,
-        unfurl_links: false,
-        ...(profile && { username: profile.username, icon_emoji: profile.icon_emoji }),
-      });
+      const payloads = convertMarkdownToBlocks(text);
+
+      for (const payload of payloads) {
+        await slackWeb.chat.postMessage({
+          channel: slack_channel,
+          text: payload.text,
+          ...(payload.blocks.length > 0 && { blocks: payload.blocks }),
+          thread_ts: thread_ts || undefined,
+          unfurl_links: false,
+          ...(profile && { username: profile.username, icon_emoji: profile.icon_emoji }),
+        });
+      }
 
       // busy 해제 + 큐 처리
       clearBusy();
