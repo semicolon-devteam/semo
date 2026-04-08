@@ -116,6 +116,14 @@ interface QueuedMessage {
   channel: string;
   ts: string;
   thread_ts?: string;
+  files?: Array<{
+    id: string;
+    mimetype?: string;
+    name?: string;
+    url_private?: string;
+    url_private_download?: string;
+    permalink?: string;
+  }>;
 }
 const messageQueue: QueuedMessage[] = [];
 
@@ -431,6 +439,14 @@ async function forwardToSession(event: {
   ts: string;
   bot_id?: string;
   thread_ts?: string;
+  files?: Array<{
+    id: string;
+    mimetype?: string;
+    name?: string;
+    url_private?: string;
+    url_private_download?: string;
+    permalink?: string;
+  }>;
 }) {
   // 봇 메시지 무시 — 단, [Route:] 태그가 있으면 시스템 디스패치로 간주하여 통과
   const isSystemDispatch = /\[Route:\s*\w+\]/.test(event.text);
@@ -473,6 +489,7 @@ async function forwardToSession(event: {
       channel: event.channel,
       ts: event.ts,
       thread_ts: event.thread_ts,
+      files: event.files,
     });
     return;
   }
@@ -500,18 +517,51 @@ async function forwardToSession(event: {
     // 조회 실패 시 user ID 사용
   }
 
+  // 4. 이미지 파일 처리 — Slack 파일을 다운로드하여 base64 인라인
+  const imageAttachments: Array<{ name: string; media_type: string; data: string }> = [];
+  if (event.files && event.files.length > 0) {
+    for (const file of event.files) {
+      const mime = file.mimetype || '';
+      if (!mime.startsWith('image/')) continue;
+      const downloadUrl = file.url_private_download || file.url_private;
+      if (!downloadUrl) continue;
+      try {
+        const res = await fetch(downloadUrl, {
+          headers: { Authorization: `Bearer ${SLACK_BOT_TOKEN}` },
+        });
+        if (res.ok) {
+          const buf = Buffer.from(await res.arrayBuffer());
+          imageAttachments.push({
+            name: file.name || 'image',
+            media_type: mime,
+            data: buf.toString('base64'),
+          });
+        }
+      } catch {
+        // 다운로드 실패 시 skip
+      }
+    }
+  }
+
+  // 이미지가 있으면 텍스트에 안내 추가
+  const contentWithImages =
+    imageAttachments.length > 0
+      ? `${cleanText}\n\n[${imageAttachments.length}개 이미지 첨부됨 — 아래 images 배열 참조]`
+      : cleanText;
+
   // Claude Code 세션으로 알림 전송
   try {
     await mcp.notification({
       method: 'notifications/claude/channel',
       params: {
-        content: cleanText,
+        content: contentWithImages,
         meta: {
           slack_channel: event.channel,
           sender: senderName,
           sender_id: event.user,
           thread_ts: threadTs,
           message_ts: event.ts,
+          ...(imageAttachments.length > 0 && { images: imageAttachments }),
         },
       },
     });
