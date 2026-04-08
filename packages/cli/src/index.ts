@@ -43,6 +43,8 @@ import { registerDbCommands } from './commands/db';
 import { registerMemoryCommands } from './commands/memory';
 import { registerTestCommands } from './commands/test';
 import { registerCommitmentsCommands } from './commands/commitments';
+import { registerAgentFlushCommands } from './commands/agent-flush';
+import { registerContextPreserveCommands } from './commands/context-preserve';
 import { registerServiceCommands } from './commands/service';
 import { registerHarnessCommands } from './commands/harness';
 import { registerIncubatorCommands } from './commands/incubator';
@@ -1025,6 +1027,18 @@ async function setupHooks(isUpdate: boolean = false) {
         ],
       },
     ],
+    PreCompact: [
+      {
+        matcher: 'auto',
+        hooks: [
+          {
+            type: 'command',
+            command: '. ~/.claude/semo/.env 2>/dev/null; semo context-preserve 2>/dev/null || true',
+            timeout: 10000,
+          },
+        ],
+      },
+    ],
   };
 
   // 기존 설정 로드 또는 새로 생성
@@ -1929,6 +1943,7 @@ kbCmd
   .requiredOption('--content <text>', '항목 본문')
   .option('--metadata <json>', '추가 메타데이터 (JSON 문자열)')
   .option('--created-by <name>', '작성자 식별자', 'semo-cli')
+  .option('--expect-version <n>', 'Optimistic locking — 기대 version (불일치 시 실패)')
   .action(async (domain, key, subKey, options) => {
     const spinner = ora('KB upsert 중...').start();
     try {
@@ -1941,6 +1956,7 @@ kbCmd
         content: options.content,
         metadata,
         created_by: options.createdBy,
+        expect_version: options.expectVersion ? parseInt(options.expectVersion) : undefined,
       });
 
       if (result.success) {
@@ -2701,6 +2717,8 @@ registerCommitmentsCommands(program);
 registerServiceCommands(program);
 registerHarnessCommands(program);
 registerIncubatorCommands(program);
+registerAgentFlushCommands(program);
+registerContextPreserveCommands(program);
 
 // === semo skills — DB 시딩 ===
 

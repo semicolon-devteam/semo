@@ -859,6 +859,7 @@ export async function kbUpsert(
     content: string;
     metadata?: Record<string, unknown>;
     created_by?: string;
+    expect_version?: number;
   },
 ): Promise<{ success: boolean; error?: string; warnings?: string[] }> {
   let key: string;
@@ -1035,23 +1036,49 @@ export async function kbUpsert(
 
   const writeClient = await pool.connect();
   try {
-    await writeClient.query(
-      `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, embedding)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::vector)
-       ON CONFLICT (domain, key, sub_key) DO UPDATE SET
-         content = EXCLUDED.content,
-         metadata = EXCLUDED.metadata,
-         embedding = EXCLUDED.embedding`,
-      [
-        entry.domain,
-        key,
-        subKey,
-        entry.content,
-        JSON.stringify(entry.metadata || {}),
-        entry.created_by || 'semo-cli',
-        embeddingStr,
-      ],
-    );
+    if (entry.expect_version !== undefined) {
+      // Optimistic locking: version 불일치 시 실패
+      const result = await writeClient.query(
+        `UPDATE semo.knowledge_base
+         SET content = $1, metadata = $2, embedding = $3::vector,
+             version = version + 1, updated_at = NOW()
+         WHERE domain = $4 AND key = $5 AND sub_key = $6 AND version = $7
+         RETURNING version`,
+        [
+          entry.content,
+          JSON.stringify(entry.metadata || {}),
+          embeddingStr,
+          entry.domain,
+          key,
+          subKey,
+          entry.expect_version,
+        ],
+      );
+      if (result.rowCount === 0) {
+        return {
+          success: false,
+          error: `version 충돌: 다른 세션이 이미 수정했습니다 (expected version ${entry.expect_version}). 다시 조회 후 재시도하세요.`,
+        };
+      }
+    } else {
+      await writeClient.query(
+        `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, embedding)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::vector)
+         ON CONFLICT (domain, key, sub_key) DO UPDATE SET
+           content = EXCLUDED.content,
+           metadata = EXCLUDED.metadata,
+           embedding = EXCLUDED.embedding`,
+        [
+          entry.domain,
+          key,
+          subKey,
+          entry.content,
+          JSON.stringify(entry.metadata || {}),
+          entry.created_by || 'semo-cli',
+          embeddingStr,
+        ],
+      );
+    }
 
     // KB→DB 동기화: Dashboard API에 위임 (파서 단일화)
     if ((key === 'kpi' || key === 'action-item') && subKey) {
