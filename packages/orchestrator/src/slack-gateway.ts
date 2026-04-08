@@ -10,6 +10,31 @@ import type { BotId } from './bot-config';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || '';
 
+/** magic bytes로 실제 이미지 파일인지 검증 */
+function isValidImageMagic(buf: Buffer): boolean {
+  if (buf.length < 4) return false;
+  // PNG: 89 50 4E 47
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) return true;
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true;
+  // GIF: 47 49 46 38
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38) return true;
+  // WebP: 52 49 46 46 ... 57 45 42 50
+  if (
+    buf[0] === 0x52 &&
+    buf[1] === 0x49 &&
+    buf[2] === 0x46 &&
+    buf[3] === 0x46 &&
+    buf.length >= 12 &&
+    buf[8] === 0x57 &&
+    buf[9] === 0x45 &&
+    buf[10] === 0x42 &&
+    buf[11] === 0x50
+  )
+    return true;
+  return false;
+}
+
 /** 봇 메시지 중 오케스트레이터가 처리해야 할 시스템 메시지 패턴 */
 export const SYSTEM_MESSAGE_PATTERNS = [
   /\[Route:\s*\w+\]/, // 명시적 라우팅 태그
@@ -131,26 +156,40 @@ export class SlackGateway {
       /* fallback to user ID */
     }
 
-    // 이미지 파일 다운로드
+    // 이미지 파일 다운로드 (API 지원 포맷만, 5MB 이하)
+    const SUPPORTED_IMAGE_MIMES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+    const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB — Claude API 제한
     const images: SlackImage[] = [];
     if (event.files && Array.isArray(event.files)) {
       const tmpDir = path.join(os.tmpdir(), 'semo-slack-images');
       fs.mkdirSync(tmpDir, { recursive: true });
       for (const file of event.files) {
         const mime = file.mimetype || '';
-        if (!mime.startsWith('image/')) continue;
-        const downloadUrl = file.url_private_download || file.url_private;
+        if (!SUPPORTED_IMAGE_MIMES.has(mime)) continue;
+        // url_private_download만 사용 — url_private는 HTML 미리보기일 수 있음
+        const downloadUrl = file.url_private_download;
         if (!downloadUrl) continue;
         try {
           const res = await fetch(downloadUrl, {
             headers: { Authorization: `Bearer ${SLACK_BOT_TOKEN}` },
           });
-          if (res.ok) {
-            const ext = mime.split('/')[1] || 'png';
-            const localPath = path.join(tmpDir, `${event.ts}-${file.id}.${ext}`);
-            fs.writeFileSync(localPath, Buffer.from(await res.arrayBuffer()));
-            images.push({ name: file.name || 'image', media_type: mime, localPath });
+          if (!res.ok) continue;
+          const buf = Buffer.from(await res.arrayBuffer());
+          if (buf.length > MAX_IMAGE_BYTES) {
+            console.log(
+              `[slack-gw] Skipping oversized image: ${file.name} (${(buf.length / 1024 / 1024).toFixed(1)}MB)`,
+            );
+            continue;
           }
+          // magic bytes 검증 — 실제 이미지인지 확인
+          if (!isValidImageMagic(buf)) {
+            console.log(`[slack-gw] Skipping invalid image data: ${file.name}`);
+            continue;
+          }
+          const ext = mime.split('/')[1] || 'png';
+          const localPath = path.join(tmpDir, `${event.ts}-${file.id}.${ext}`);
+          fs.writeFileSync(localPath, buf);
+          images.push({ name: file.name || 'image', media_type: mime, localPath });
         } catch {
           // 다운로드 실패 시 skip
         }

@@ -105,7 +105,10 @@ async function main() {
   const sessionPool = new SessionPool(botConfigs, costTracker);
   const slack = new SlackGateway(SLACK_BOT_TOKEN, SLACK_APP_TOKEN);
 
-  // 5. Message handler
+  // 5. 봇 세션 프리웜 (Slack 수신 전 프로세스 기동)
+  sessionPool.warmUp().catch((err) => console.warn('[orchestrator] Warm-up partial failure:', err));
+
+  // 6. Message handler
   slack.setMessageHandler(async (msg: SlackMessage, senderName: string) => {
     const threadTs = msg.thread_ts || msg.ts;
 
@@ -195,11 +198,11 @@ async function main() {
     }
   });
 
-  // 6. Start Slack
+  // 7. Start Slack
   await slack.start();
   console.log('[orchestrator] Ready — listening for Slack messages');
 
-  // 7. Graceful shutdown
+  // 8. Graceful shutdown
   let shuttingDown = false;
   const shutdown = async (signal: string) => {
     if (shuttingDown) return;
