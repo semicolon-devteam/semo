@@ -67,8 +67,11 @@ export default function VoicePage() {
       const { token, expiresAt } = await res.json();
 
       // iframe에 token + signaling URL 전달
+      // 배포 환경: wss, 로컬: ws. hostname 기반 자동 결정
+      const isLocal = typeof window !== 'undefined' && window.location.hostname === 'localhost';
       const signalingUrl =
-        process.env.NEXT_PUBLIC_VOICE_SIGNALING_URL || 'ws://localhost:8922/signal';
+        process.env.NEXT_PUBLIC_VOICE_SIGNALING_URL ||
+        (isLocal ? 'ws://localhost:8922/signal' : 'wss://voice.semi-colon.space/signal');
       iframeRef.current?.contentWindow?.postMessage(
         { type: 'VOICE_AUTH', token, expiresAt, signalingUrl },
         window.location.origin,
