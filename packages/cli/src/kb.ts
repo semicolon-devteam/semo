@@ -633,6 +633,28 @@ export async function ontoListTypes(pool: Pool): Promise<OntologyType[]> {
 }
 
 /**
+ * List child domains of a parent domain (e.g., modules under a platform).
+ */
+export async function ontoListChildren(
+  pool: Pool,
+  parentDomain: string,
+): Promise<OntologyDomain[]> {
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `SELECT domain, schema, description, version,
+              service, entity_type, parent, tags,
+              updated_at::text
+       FROM semo.ontology WHERE parent = $1 ORDER BY domain`,
+      [parentDomain],
+    );
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Resolve a service name to its associated domain list.
  * Uses ontology.service column + dot-notation domain detection.
  */
@@ -1267,6 +1289,7 @@ export interface OntoRegisterOptions {
   entity_type: string;
   description?: string;
   service?: string;
+  parent?: string;
   tags?: string[];
   init_required?: boolean; // 필수 KB entry 자동 생성 (default: true)
 }
@@ -1315,15 +1338,29 @@ export async function ontoRegister(
       return { success: false, error: `도메인 '${opts.domain}'은(는) 이미 등록되어 있습니다.` };
     }
 
+    // 2b. Validate parent domain exists (if provided)
+    if (opts.parent) {
+      const parentCheck = await client.query('SELECT domain FROM semo.ontology WHERE domain = $1', [
+        opts.parent,
+      ]);
+      if (parentCheck.rows.length === 0) {
+        return {
+          success: false,
+          error: `상위 도메인 '${opts.parent}'이(가) 존재하지 않습니다.`,
+        };
+      }
+    }
+
     // 3. INSERT into ontology
     await client.query(
-      `INSERT INTO semo.ontology (domain, entity_type, description, service, tags, schema)
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+      `INSERT INTO semo.ontology (domain, entity_type, description, service, parent, tags, schema)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         opts.domain,
         opts.entity_type,
         opts.description || null,
         opts.service || '_global',
+        opts.parent || null,
         opts.tags || [opts.entity_type],
         JSON.stringify({}),
       ],

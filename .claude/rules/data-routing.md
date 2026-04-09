@@ -26,6 +26,18 @@
 - `{service} infra-status` — 인프라 트랙 상태
 - `{service} pm-summary` — 라이프사이클 요약
 
+## 모듈 도메인 라우팅 (v067+)
+SEMO 플랫폼 하위 모듈(`module` 타입)은 자체 KB 도메인을 가진다. `parent` 컬럼으로 상위 서비스와 연결.
+
+| 정보 | 조회 방법 | 이유 |
+|------|-----------|------|
+| 모듈 개요 (인큐베이터, 보이스 등) | KB: `semo kb get {module} base-information` | 모듈 자체 도메인이 SoT |
+| 모듈 기능 스펙/레퍼런스 | KB: `semo kb get {module} spec/{feature}` 또는 `reference/{feature}` | projection 아님, 수동 관리 |
+| 모듈 의사결정 | KB: `semo kb get {module} decision {slug}` | 모듈 레벨 의사결정 |
+| 상위 서비스 → 모듈 탐색 | `semo kb ontology --action children --domain {service}` | parent 계층 조회 |
+
+현재 등록된 모듈: `semo-incubator` (parent: `semo`). 향후: `semo-voice`, `semo-meeting`, `semo-agents`.
+
 ## 테이블 매핑 (v052+)
 | 테이블 | 설명 |
 |--------|------|

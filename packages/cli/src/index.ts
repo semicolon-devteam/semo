@@ -1586,6 +1586,7 @@ import {
   ontoListServices,
   ontoListInstances,
   ontoRegister,
+  ontoListChildren,
   ontoCreateType,
   ontoAddKey,
   ontoRemoveKey,
@@ -2049,10 +2050,10 @@ kbCmd
   .description('온톨로지 조회 — 도메인/타입/스키마/라우팅 테이블')
   .option(
     '--action <type>',
-    '동작 (list|show|services|types|instances|schema|routing-table|register|unregister|create-type|add-key|remove-key)',
+    '동작 (list|show|services|types|instances|schema|routing-table|register|unregister|children|create-type|add-key|remove-key)',
     'list',
   )
-  .option('--domain <name>', 'action=show|register 시 도메인')
+  .option('--domain <name>', 'action=show|register|children 시 도메인')
   .option('--type <name>', 'action=schema|register|add-key|remove-key 시 타입 키')
   .option('--key <name>', 'action=add-key|remove-key 시 스키마 키')
   .option('--key-type <type>', 'action=add-key 시 키 유형 (singleton|collection)', 'singleton')
@@ -2060,6 +2061,7 @@ kbCmd
   .option('--hint <text>', 'action=add-key 시 값 힌트')
   .option('--description <text>', 'action=register|add-key 시 설명')
   .option('--service <name>', 'action=register 시 서비스 그룹')
+  .option('--parent <name>', 'action=register 시 상위 도메인 (모듈인 경우)')
   .option('--tags <tags>', 'action=register 시 태그 (쉼표 구분)')
   .option('--no-init', 'action=register 시 필수 KB entry 자동 생성 건너뛰기')
   .option('--force', 'action=unregister 시 잔존 KB 항목도 모두 삭제')
@@ -2079,7 +2081,8 @@ kbCmd
           for (const d of domains) {
             const typeStr = d.entity_type ? chalk.gray(` [${d.entity_type}]`) : '';
             const svcStr = d.service ? chalk.gray(` (${d.service})`) : '';
-            console.log(chalk.cyan(`  ${d.domain}`) + typeStr + svcStr);
+            const parentStr = d.parent ? chalk.gray(` ← ${d.parent}`) : '';
+            console.log(chalk.cyan(`  ${d.domain}`) + typeStr + svcStr + parentStr);
             if (d.description) console.log(chalk.gray(`    ${d.description}`));
           }
           console.log();
@@ -2099,6 +2102,10 @@ kbCmd
         } else {
           console.log(chalk.cyan.bold(`\n📐 온톨로지: ${onto.domain}\n`));
           if (onto.description) console.log(chalk.white(`  ${onto.description}`));
+          if (onto.entity_type) console.log(chalk.gray(`  타입: ${onto.entity_type}`));
+          if (onto.service && onto.service !== '_global')
+            console.log(chalk.gray(`  서비스: ${onto.service}`));
+          if (onto.parent) console.log(chalk.gray(`  상위: ${onto.parent}`));
           console.log(chalk.gray(`  버전: ${onto.version}`));
           console.log(chalk.gray(`  스키마:\n`));
           console.log(
@@ -2219,6 +2226,7 @@ kbCmd
           entity_type: options.type,
           description: options.description,
           service: options.service,
+          parent: options.parent,
           tags,
           init_required: options.init !== false,
         });
@@ -2227,8 +2235,11 @@ kbCmd
           console.log(JSON.stringify(result, null, 2));
         } else {
           if (result.success) {
+            const parentStr = options.parent ? `, parent: ${options.parent}` : '';
             console.log(
-              chalk.green(`\n✅ 도메인 '${options.domain}' 등록 완료 (타입: ${options.type})`),
+              chalk.green(
+                `\n✅ 도메인 '${options.domain}' 등록 완료 (타입: ${options.type}${parentStr})`,
+              ),
             );
             if (result.created_entries && result.created_entries.length > 0) {
               console.log(chalk.gray(`  초기 KB entry ${result.created_entries.length}건 생성:`));
@@ -2308,6 +2319,28 @@ kbCmd
         } else {
           console.log(chalk.red(`\n❌ 스키마 키 삭제 실패: ${result.error}\n`));
           process.exit(1);
+        }
+      } else if (action === 'children') {
+        if (!options.domain) {
+          console.log(chalk.red('--domain 옵션이 필요합니다.'));
+          process.exit(1);
+        }
+        const children = await ontoListChildren(pool, options.domain);
+        if (options.format === 'json') {
+          console.log(JSON.stringify(children, null, 2));
+        } else {
+          if (children.length === 0) {
+            console.log(chalk.gray(`\n  '${options.domain}'의 하위 모듈이 없습니다.\n`));
+          } else {
+            console.log(
+              chalk.white.bold(`\n📦 ${options.domain} 하위 모듈 (${children.length}건)\n`),
+            );
+            for (const c of children) {
+              console.log(chalk.cyan(`  ${c.domain}`) + chalk.gray(` [${c.entity_type}]`));
+              if (c.description) console.log(chalk.gray(`    ${c.description}`));
+            }
+            console.log();
+          }
         }
       } else if (action === 'unregister') {
         if (!options.domain) {

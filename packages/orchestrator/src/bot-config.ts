@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import type { Pool } from 'pg';
 import type { BotConfig } from './types';
 
 const AGENTS_DIR = path.join(os.homedir(), '.claude', 'agents');
@@ -160,6 +161,85 @@ export function loadAllBotConfigs(): Map<BotId, BotConfig> {
   for (const botId of BOT_IDS) {
     try {
       configs.set(botId, loadBotConfig(botId));
+    } catch (err) {
+      console.error(`[bot-config] Failed to load ${botId}:`, err);
+    }
+  }
+  return configs;
+}
+
+// ── Parent-based KB domain expansion ──
+
+// Cache: parent domain → child domains (populated once at boot)
+const childDomainCache = new Map<string, string[]>();
+
+/**
+ * Expand KB domains by including child domains (modules) of each parent.
+ * Queries semo.ontology.parent at boot time, caches the result.
+ */
+export async function expandKBDomainsWithChildren(
+  pool: Pool,
+  domains: string[],
+): Promise<string[]> {
+  const expanded = [...domains];
+  const uncached = domains.filter((d) => !childDomainCache.has(d));
+
+  if (uncached.length > 0) {
+    try {
+      const res = await pool.query(
+        'SELECT domain, parent FROM semo.ontology WHERE parent = ANY($1)',
+        [uncached],
+      );
+      // Initialize cache for all queried domains
+      for (const d of uncached) childDomainCache.set(d, []);
+      for (const row of res.rows) {
+        childDomainCache.get(row.parent)!.push(row.domain);
+      }
+    } catch (err) {
+      console.error('[bot-config] Failed to expand child domains:', err);
+      // Non-fatal: bots still work with base domains
+    }
+  }
+
+  for (const d of domains) {
+    const children = childDomainCache.get(d);
+    if (children) expanded.push(...children);
+  }
+
+  return [...new Set(expanded)];
+}
+
+/**
+ * Load all bot configs with parent-based KB domain expansion.
+ * Async version — call after DB pool is ready.
+ */
+export async function loadAllBotConfigsAsync(pool: Pool): Promise<Map<BotId, BotConfig>> {
+  const configs = new Map<BotId, BotConfig>();
+
+  // Pre-expand all unique base domains across bots
+  const allBaseDomains = new Set<string>();
+  for (const domains of Object.values(KB_DOMAINS)) {
+    for (const d of domains) allBaseDomains.add(d);
+  }
+  await expandKBDomainsWithChildren(pool, [...allBaseDomains]);
+
+  for (const botId of BOT_IDS) {
+    try {
+      const def = parseAgentDefinition(botId);
+      const baseDomains = KB_DOMAINS[botId] || [];
+      const kbDomains =
+        baseDomains.length > 0 ? await expandKBDomainsWithChildren(pool, baseDomains) : [];
+
+      configs.set(botId, {
+        botId,
+        model: resolveModel(def.model),
+        tools: def.tools,
+        maxTurns: def.maxTurns,
+        maxBudgetPerMessage: BUDGET_PER_MESSAGE[botId] || 1.0,
+        soulPrompt: def.body,
+        kbDomains,
+        slackProfile: SLACK_PROFILES[botId] || { username: botId, icon_emoji: ':robot_face:' },
+      });
     } catch (err) {
       console.error(`[bot-config] Failed to load ${botId}:`, err);
     }

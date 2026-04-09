@@ -17,7 +17,7 @@ import { Router } from './router';
 import { SessionPool } from './session-pool';
 import { CostTracker } from './cost-tracker';
 import { CommitmentTracker } from './commitment-tracker';
-import { loadAllBotConfigs, loadSlackProfilesFromAPI } from './bot-config';
+import { loadAllBotConfigsAsync, loadSlackProfilesFromAPI } from './bot-config';
 import type { BotId } from './bot-config';
 import type { SlackMessage, DispatchContext } from './types';
 
@@ -96,8 +96,8 @@ async function main() {
   // 3. Bot Slack profiles (KB 기반 동적 로드)
   await loadSlackProfilesFromAPI();
 
-  // 4. Bot configs
-  const botConfigs = loadAllBotConfigs();
+  // 4. Bot configs (parent 기반 KB 도메인 확장 포함)
+  const botConfigs = await loadAllBotConfigsAsync(pool);
   console.log(`[orchestrator] Loaded ${botConfigs.size} bot configs`);
 
   // 4. Components
