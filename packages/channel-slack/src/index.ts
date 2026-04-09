@@ -65,6 +65,11 @@ if (!SLACK_BOT_TOKEN || !SLACK_APP_TOKEN) {
   process.exit(1);
 }
 
+if (!SLACK_CHANNEL_ID) {
+  console.error('SLACK_CHANNEL_ID is required — channel-slack must be scoped to a single channel.');
+  process.exit(1);
+}
+
 // ============================================================
 // Slack clients
 // ============================================================
@@ -320,7 +325,8 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
 
     try {
       // 메시지 전송 (타이핑 인디케이터는 자동 해제됨)
-      const profile = bot_id ? botProfiles[bot_id] : undefined;
+      const effectiveBotId = bot_id || 'semiclaw';
+      const profile = botProfiles[effectiveBotId];
       const payloads = convertMarkdownToBlocks(text);
 
       for (const payload of payloads) {

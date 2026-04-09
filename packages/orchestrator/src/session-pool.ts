@@ -511,13 +511,15 @@ export class SessionPool {
           : '';
 
       // 컨텍스트 프롬프트 조립
+      const channelScope = context.route.serviceDomain
+        ? `프로젝트: ${context.route.serviceDomain} (Phase ${context.route.phase})\n[채널 스코프] 이 채널은 ${context.route.serviceDomain} 프로젝트 전용입니다. "전체" 또는 다른 프로젝트를 명시하지 않는 한, ${context.route.serviceDomain} 관련 정보만 응답하세요.`
+        : '';
+
       const contextPrompt = [
         `[Slack 메시지]`,
         `채널: ${context.channel}`,
         `발신자: ${context.sender} (${context.senderId})`,
-        context.route.serviceDomain
-          ? `프로젝트: ${context.route.serviceDomain} (Phase ${context.route.phase})`
-          : '',
+        channelScope,
         `스레드: ${context.threadTs}`,
         gfpContext,
         imageBlock,

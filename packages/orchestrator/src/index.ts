@@ -12,7 +12,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { Pool } from 'pg';
-import { SlackGateway } from './slack-gateway';
+import { SlackGateway, isSystemMessage } from './slack-gateway';
 import { Router } from './router';
 import { SessionPool } from './session-pool';
 import { CostTracker } from './cost-tracker';
@@ -20,6 +20,38 @@ import { CommitmentTracker } from './commitment-tracker';
 import { loadAllBotConfigsAsync, loadSlackProfilesFromAPI } from './bot-config';
 import type { BotId } from './bot-config';
 import type { SlackMessage, DispatchContext } from './types';
+
+// ── Incubator Channel Check (중복 응답 방지) ──
+
+const incubatorChannelCache = new Map<string, { active: boolean; expiry: number }>();
+
+// 만료된 캐시 엔트리 주기적 정리 (5분마다)
+setInterval(
+  () => {
+    const now = Date.now();
+    for (const [key, val] of incubatorChannelCache) {
+      if (now >= val.expiry) incubatorChannelCache.delete(key);
+    }
+  },
+  5 * 60 * 1000,
+).unref();
+
+async function isIncubatorChannel(pool: Pool, channelId: string): Promise<boolean> {
+  const cached = incubatorChannelCache.get(channelId);
+  if (cached && Date.now() < cached.expiry) return cached.active;
+
+  try {
+    const result = await pool.query(
+      `SELECT 1 FROM semo.incubator_sessions WHERE channel = $1 AND status = 'active' LIMIT 1`,
+      [channelId],
+    );
+    const active = result.rows.length > 0;
+    incubatorChannelCache.set(channelId, { active, expiry: Date.now() + 60_000 });
+    return active;
+  } catch {
+    return false; // DB 에러 시 안전하게 오케스트레이터가 처리
+  }
+}
 
 // ── Env Loading ──
 
@@ -117,6 +149,15 @@ async function main() {
     let commitmentId = '';
 
     try {
+      // 인큐베이터 채널 중복 응답 방지 — channel-slack이 처리하는 채널은 스킵
+      // 시스템 디스패치([Route:], [GFP:] 등)는 항상 오케스트레이터가 처리
+      if (!isSystemMessage(msg.text) && (await isIncubatorChannel(pool, msg.channel))) {
+        console.log(
+          `[orchestrator] Skipping ${msg.channel} — active incubator session (channel-slack handles)`,
+        );
+        return;
+      }
+
       // Route
       const route = await router.route(msg.channel, msg.text);
       console.log(

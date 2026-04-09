@@ -3,7 +3,7 @@ name: 1. 개발 CI / CD
 on:
   workflow_dispatch:
   push:
-    branches: ["dev"]
+    branches: ['dev']
 
 permissions:
   id-token: write
@@ -116,7 +116,7 @@ jobs:
         uses: slackapi/slack-github-action@v2
         with:
           method: chat.postMessage
-          token: ${{ secrets.INFRACLAW_TOKEN }}
+          token: ${{ secrets.SEMO_SLACK_BOT_TOKEN }}
           payload: |
             {
               "channel": "C0AKZRPKJU8",
@@ -153,11 +153,11 @@ jobs:
         uses: slackapi/slack-github-action@v2
         with:
           method: chat.postMessage
-          token: ${{ secrets.INFRACLAW_TOKEN }}
+          token: ${{ secrets.SEMO_SLACK_BOT_TOKEN }}
           payload: |
             {
               "channel": "C0AKZRPKJU8",
-              "text": "🔨 [semo] 개발환경 빌드 ${{ steps.status.outputs.result }} — <@U0AF1RK0E67> 빌드 실패 확인 필요",
+              "text": "🔨 [semo] 개발환경 빌드 ${{ steps.status.outputs.result }} — 빌드 실패 확인 필요",
               "blocks": [
                 {
                   "type": "header",
@@ -188,7 +188,7 @@ jobs:
                 },
                 {
                   "type": "section",
-                  "text": { "type": "mrkdwn", "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|워크플로우 보기>\n\n<@U0AF1RK0E67> 빌드 실패 확인 필요" }
+                  "text": { "type": "mrkdwn", "text": "<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|워크플로우 보기>\n\n빌드 실패 확인 필요" }
                 }
               ]
             }
