@@ -52,6 +52,12 @@ interface TurnResult {
   responseText: string;
   costUsd: number;
   sessionId: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+  numTurns: number;
+  durationMs: number;
 }
 
 class BotSession {
@@ -239,6 +245,12 @@ class BotSession {
     let turnText = '';
     let turnCostUsd = 0;
     let turnSessionId = '';
+    let turnInputTokens = 0;
+    let turnOutputTokens = 0;
+    let turnCacheReadTokens = 0;
+    let turnCacheCreationTokens = 0;
+    let turnNumTurns = 1;
+    let turnDurationMs = 0;
     try {
       for await (const msg of this.queryHandle) {
         // 첫 메시지 수신 = 프로세스 준비 완료
@@ -273,7 +285,22 @@ class BotSession {
           }
           turnCostUsd = resultMsg.total_cost_usd || 0;
           turnSessionId = resultMsg.session_id || '';
-          this.resolveTurn(turnText, turnCostUsd, turnSessionId);
+          // 토큰 데이터 추출
+          const apiUsage = (resultMsg as any).usage?.apiUsage;
+          turnInputTokens = apiUsage?.input_tokens ?? 0;
+          turnOutputTokens = apiUsage?.output_tokens ?? 0;
+          turnCacheReadTokens = apiUsage?.cache_read_input_tokens ?? 0;
+          turnCacheCreationTokens = apiUsage?.cache_creation_input_tokens ?? 0;
+          turnNumTurns = (resultMsg as any).num_turns ?? 1;
+          turnDurationMs = (resultMsg as any).duration_ms ?? 0;
+          this.resolveTurn(turnText, turnCostUsd, turnSessionId, {
+            inputTokens: turnInputTokens,
+            outputTokens: turnOutputTokens,
+            cacheReadTokens: turnCacheReadTokens,
+            cacheCreationTokens: turnCacheCreationTokens,
+            numTurns: turnNumTurns,
+            durationMs: turnDurationMs,
+          });
           turnText = '';
           turnCostUsd = 0;
         }
@@ -285,7 +312,14 @@ class BotSession {
           (msg as any).state === 'idle'
         ) {
           turnSessionId = (msg as any).session_id || turnSessionId;
-          this.resolveTurn(turnText, turnCostUsd, turnSessionId);
+          this.resolveTurn(turnText, turnCostUsd, turnSessionId, {
+            inputTokens: turnInputTokens,
+            outputTokens: turnOutputTokens,
+            cacheReadTokens: turnCacheReadTokens,
+            cacheCreationTokens: turnCacheCreationTokens,
+            numTurns: turnNumTurns,
+            durationMs: turnDurationMs,
+          });
           turnText = '';
           turnCostUsd = 0;
         }
@@ -298,9 +332,31 @@ class BotSession {
     }
   }
 
-  private resolveTurn(text: string, costUsd: number, sessionId: string): void {
+  private resolveTurn(
+    text: string,
+    costUsd: number,
+    sessionId: string,
+    tokens?: {
+      inputTokens: number;
+      outputTokens: number;
+      cacheReadTokens: number;
+      cacheCreationTokens: number;
+      numTurns: number;
+      durationMs: number;
+    },
+  ): void {
     if (!this.pendingTurn) return;
-    const turn: TurnResult = { responseText: text, costUsd, sessionId };
+    const turn: TurnResult = {
+      responseText: text,
+      costUsd,
+      sessionId,
+      inputTokens: tokens?.inputTokens ?? 0,
+      outputTokens: tokens?.outputTokens ?? 0,
+      cacheReadTokens: tokens?.cacheReadTokens ?? 0,
+      cacheCreationTokens: tokens?.cacheCreationTokens ?? 0,
+      numTurns: tokens?.numTurns ?? 1,
+      durationMs: tokens?.durationMs ?? 0,
+    };
     if (this.pendingTurn.timer) clearTimeout(this.pendingTurn.timer);
     this.pendingTurn.resolve(turn);
     this.pendingTurn = null;
@@ -498,14 +554,18 @@ export class SessionPool {
         }
       }
 
-      // 비용 추적 (commitment 연동)
-      this.costTracker.record(
-        botId,
-        turnResult.costUsd,
-        context.route.serviceId,
-        actualModel,
+      // 비용 + 토큰 추적 (commitment 연동)
+      this.costTracker.record(botId, turnResult.costUsd, {
+        serviceId: context.route.serviceId,
+        model: actualModel,
         commitmentId,
-      );
+        inputTokens: turnResult.inputTokens,
+        outputTokens: turnResult.outputTokens,
+        cacheReadTokens: turnResult.cacheReadTokens,
+        cacheCreationTokens: turnResult.cacheCreationTokens,
+        numTurns: turnResult.numTurns,
+        durationMs: turnResult.durationMs,
+      });
 
       // 에스컬레이션 감지
       const escalation = detectEscalation(turnResult.responseText);
