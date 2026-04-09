@@ -15,13 +15,13 @@ const SAFE_ID = /^[a-z0-9-]{1,64}$/;
 
 function commonBlock(route: RouteResult): string {
   const url = getDashboardUrl();
-  return `[GFP 프로젝트 컨텍스트]
-대시보드: ${url}/gfp/${encodeURIComponent(route.serviceId)}
-콜백 API: POST ${url}/api/gfp/callback
+  return `[프로젝트 파이프라인 컨텍스트]
+대시보드: ${url}/projects/${encodeURIComponent(route.serviceId)}
+콜백 API: POST ${url}/api/projects/callback
 
 ## Data Routing
 - 읽기: 프로젝트 상태 → Dashboard API, 서비스 정보 → semo kb get ${route.serviceDomain}
-- 쓰기: 섹션 제출/재생성 → POST /api/gfp/callback (KB spec/* 직접 쓰기 금지)
+- 쓰기: 섹션 제출/재생성 → POST /api/projects/callback (KB spec/* 직접 쓰기 금지)
 
 ## Slack-First 원칙
 - 섹션 제출 완료 시: "Slack에서 바로 승인/거절 가능합니다. 시각 산출물은 대시보드에서 확인하세요."`;
@@ -51,10 +51,17 @@ KB 조회 없이 base-information만으로 작업하면 안 된다.
 |------|--------|------|
 | 1 | ref-* | 레퍼런스 탐색 |
 | 2 | ds-*, screen-*, design-* | 디자인 시스템 |
-| 3 | impl-*, stitch-prompt-*, stitch-result-* | 구현 |
+| 3 | impl-*, stitch-prompt-*, stitch-result-* | 구현 (Stitch MCP 사용) |
 | 4 | review-* | 리뷰 |
 | 5 | handoff-* | 핸드오프 |
-section_key에 prefix 없으면 대시보드 미표시. 반드시 해당 Step prefix 사용.`,
+section_key에 prefix 없으면 대시보드 미표시. 반드시 해당 Step prefix 사용.
+
+### Step 3 Stitch MCP 도구 (자동 연동)
+이전 Phase 산출물(PRD, 명확화)을 기반으로 Stitch에 UI 생성을 요청하라.
+- \`mcp__stitch__build_site\` — 스크린을 라우트 구조로 빌드, 각 페이지 HTML 반환
+- \`mcp__stitch__get_screen_code\` — 특정 스크린의 HTML/Tailwind CSS 코드 조회
+- \`mcp__stitch__get_screen_image\` — 스크린샷 base64 다운로드
+결과물은 콜백 API(type: stitch-export)로 대시보드에 저장.`,
   5: `## Phase 5: 에픽 — 디스커버리+PRD 기반 에픽 구조화, 유저스토리
 ⚠️ 필수 선행: \`semo kb get {serviceDomain} spec/prd\` + \`semo kb get {serviceDomain} spec/clarification\` 조회 후 작업.`,
   6: `## Phase 6: 기능 스펙 — 에픽 내 기능별 상세 (입출력, 비즈니스 룰)`,

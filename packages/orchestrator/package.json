@@ -10,6 +10,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@_davideast/stitch-mcp": "^0.5.3",
     "@anthropic-ai/claude-agent-sdk": "~0.2.96",
     "@slack/socket-mode": "^2.0.0",
     "@slack/web-api": "^7.0.0",

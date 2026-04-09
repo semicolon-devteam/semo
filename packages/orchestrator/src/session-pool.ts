@@ -415,9 +415,11 @@ export class SessionPool {
       console.log(`[session-pool] Dispatching to ${botId} (streaming, model: ${actualModel})`);
 
       // 디스패치 — 세션 장애 시 1회 재시도
+      // DesignClaw: Stitch MCP 호출이 느려서 타임아웃 확장
+      const dispatchTimeout = botId === 'designclaw' ? 300_000 : 180_000;
       let turnResult: TurnResult;
       try {
-        turnResult = await session.dispatch(contextPrompt, actualModel);
+        turnResult = await session.dispatch(contextPrompt, actualModel, dispatchTimeout);
       } catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err);
         console.warn(`[session-pool] ${botId} dispatch failed, recreating: ${errMsg}`);
