@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { href: '/kb', label: '지식', key: 'kb' },
   { href: '/system', label: '시스템', key: 'system' },
   { href: '/tests', label: '테스트', key: 'tests' },
-  { href: '/projects', label: '인큐베이터', key: 'incubator' },
+  { href: '/projects', label: '서비스', key: 'incubator' },
   { href: '/meetings', label: '회의', key: 'meetings' },
   { href: '/voice', label: '음성', key: 'voice' },
 ];
