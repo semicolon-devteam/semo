@@ -38,6 +38,18 @@ SEMO 플랫폼 하위 모듈(`module` 타입)은 자체 KB 도메인을 가진�
 
 현재 등록된 모듈: `semo-incubator` (parent: `semo`). 향후: `semo-voice`, `semo-meeting`, `semo-agents`.
 
+## DB 전용 데이터 타입 (v069+)
+
+아래 데이터는 **KB가 아닌 전용 DB 테이블**이 SoT. `semo kb`로 접근하면 guard가 차단한다.
+
+| 데이터 타입 | SoT 테이블 | 읽기 | 쓰기 |
+|------------|-----------|------|------|
+| 액션 아이템 | `action_items` | `semo action-items list [--owner {domain}] [--status open]` | `semo action-items create --owner {domain} --description "..."` |
+| 커밋먼트 | `bot_commitments` | `semo commitments list [--bot-id {botId}]` | `semo commitments create --bot-id {botId} --title "..."` |
+| KPI 메트릭 | `service_kpi_metrics` | `GET /api/projects/{id}/kpi-metrics` | KB upsert → 자동 DB sync |
+
+**`semo kb`로 접근하면 안 되는 키**: `action-item` (kb_type_schema에서 제거됨)
+
 ## 테이블 매핑 (v052+)
 | 테이블 | 설명 |
 |--------|------|

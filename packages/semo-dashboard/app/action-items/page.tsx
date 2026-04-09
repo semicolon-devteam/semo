@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { ActionItem } from '@/lib/action-items';
+import type { ActionItem } from '@/types';
 import { useActionItems } from '@/components/action-items/useActionItems';
 import ActionItemList from '@/components/action-items/ActionItemList';
 import ActionItemKanban from '@/components/action-items/ActionItemKanban';
@@ -10,25 +10,43 @@ import ActionItemFormModal, { type FormData } from '@/components/action-items/Ac
 
 export default function ActionItemsPage() {
   const {
-    filtered, groups, stats, loading, teamMembers, serviceDomains,
-    activeTab, setActiveTab,
-    statusFilter, setStatusFilter,
-    viewMode, setViewMode,
-    toggling, handleToggle, handleCreate, handleUpdate, handleDelete,
+    filtered,
+    groups,
+    stats,
+    loading,
+    teamMembers,
+    serviceDomains,
+    activeTab,
+    setActiveTab,
+    statusFilter,
+    setStatusFilter,
+    viewMode,
+    setViewMode,
+    toggling,
+    handleToggle,
+    handleCreate,
+    handleUpdate,
+    handleDelete,
   } = useActionItems();
 
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<ActionItem | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
 
-  const openCreate = () => { setEditItem(null); setShowForm(true); };
-  const openEdit = (item: ActionItem) => { setEditItem(item); setShowForm(true); };
+  const openCreate = () => {
+    setEditItem(null);
+    setShowForm(true);
+  };
+  const openEdit = (item: ActionItem) => {
+    setEditItem(item);
+    setShowForm(true);
+  };
   const confirmDelete = (item: ActionItem) => {
-    if (deleteConfirm === item.id) {
+    if (deleteConfirm === item.action_item_id) {
       handleDelete(item);
       setDeleteConfirm(null);
     } else {
-      setDeleteConfirm(item.id);
+      setDeleteConfirm(item.action_item_id);
       setTimeout(() => setDeleteConfirm(null), 3000);
     }
   };
@@ -46,9 +64,7 @@ export default function ActionItemsPage() {
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            액션 아이템
-          </h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">액션 아이템</h1>
           <p className="text-gray-600 dark:text-gray-400">
             {stats.open}개 진행 중 · {stats.completed}개 완료
           </p>
@@ -79,19 +95,46 @@ export default function ActionItemsPage() {
 
           {/* View switcher */}
           <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5">
-            <ViewButton active={viewMode === 'list'} onClick={() => setViewMode('list')} title="리스트">
+            <ViewButton
+              active={viewMode === 'list'}
+              onClick={() => setViewMode('list')}
+              title="리스트"
+            >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 6h16M4 12h16M4 18h16"
+                />
               </svg>
             </ViewButton>
-            <ViewButton active={viewMode === 'kanban'} onClick={() => setViewMode('kanban')} title="칸반">
+            <ViewButton
+              active={viewMode === 'kanban'}
+              onClick={() => setViewMode('kanban')}
+              title="칸반"
+            >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"
+                />
               </svg>
             </ViewButton>
-            <ViewButton active={viewMode === 'timeline'} onClick={() => setViewMode('timeline')} title="타임라인">
+            <ViewButton
+              active={viewMode === 'timeline'}
+              onClick={() => setViewMode('timeline')}
+              title="타임라인"
+            >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                />
               </svg>
             </ViewButton>
           </div>
@@ -105,7 +148,10 @@ export default function ActionItemsPage() {
           <FilterButton active={statusFilter === 'open'} onClick={() => setStatusFilter('open')}>
             진행 중
           </FilterButton>
-          <FilterButton active={statusFilter === 'completed'} onClick={() => setStatusFilter('completed')}>
+          <FilterButton
+            active={statusFilter === 'completed'}
+            onClick={() => setStatusFilter('completed')}
+          >
             완료
           </FilterButton>
         </div>
@@ -157,7 +203,15 @@ export default function ActionItemsPage() {
   );
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       onClick={onClick}
@@ -172,7 +226,17 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
   );
 }
 
-function ViewButton({ active, onClick, title, children }: { active: boolean; onClick: () => void; title: string; children: React.ReactNode }) {
+function ViewButton({
+  active,
+  onClick,
+  title,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
   return (
     <button
       onClick={onClick}
@@ -188,7 +252,15 @@ function ViewButton({ active, onClick, title, children }: { active: boolean; onC
   );
 }
 
-function FilterButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function FilterButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       onClick={onClick}

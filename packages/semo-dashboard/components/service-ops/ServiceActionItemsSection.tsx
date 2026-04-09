@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import type { ServiceActionItem } from '@/types';
+import type { ActionItem } from '@/types';
 
 interface Props {
-  items: ServiceActionItem[];
-  projectId: string;
+  items: ActionItem[];
+  serviceDomain: string;
   onRefresh?: () => void;
 }
 
@@ -16,7 +16,7 @@ const priorityColors: Record<string, string> = {
   low: 'border-l-zinc-700',
 };
 
-export default function ServiceActionItemsSection({ items, projectId, onRefresh }: Props) {
+export default function ServiceActionItemsSection({ items, serviceDomain, onRefresh }: Props) {
   const [adding, setAdding] = useState(false);
   const [newDesc, setNewDesc] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -24,35 +24,42 @@ export default function ServiceActionItemsSection({ items, projectId, onRefresh 
   const openItems = items.filter((i) => i.status === 'open');
   const completedItems = items.filter((i) => i.status === 'completed');
 
-  const handleToggle = async (item: ServiceActionItem) => {
+  const handleToggle = async (item: ActionItem) => {
     const newStatus = item.status === 'completed' ? 'open' : 'completed';
-    await fetch(`/api/gfp/${projectId}/service-action-items`, {
+    const res = await fetch('/api/action-items', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action_item_id: item.action_item_id, status: newStatus }),
     });
-    onRefresh?.();
+    if (res.ok) onRefresh?.();
   };
 
   const handleAdd = async () => {
     if (!newDesc.trim()) return;
     setSubmitting(true);
-    await fetch(`/api/gfp/${projectId}/service-action-items`, {
+    const res = await fetch('/api/action-items', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ description: newDesc.trim(), source: 'dashboard' }),
+      body: JSON.stringify({
+        owner_domain: serviceDomain,
+        target_domain: serviceDomain,
+        description: newDesc.trim(),
+        source: 'dashboard',
+      }),
     });
-    setNewDesc('');
-    setAdding(false);
+    if (res.ok) {
+      setNewDesc('');
+      setAdding(false);
+      onRefresh?.();
+    }
     setSubmitting(false);
-    onRefresh?.();
   };
 
   const handleDelete = async (itemId: string) => {
-    await fetch(`/api/gfp/${projectId}/service-action-items?action_item_id=${itemId}`, {
+    const res = await fetch(`/api/action-items?action_item_id=${itemId}`, {
       method: 'DELETE',
     });
-    onRefresh?.();
+    if (res.ok) onRefresh?.();
   };
 
   return (
@@ -102,7 +109,12 @@ export default function ServiceActionItemsSection({ items, projectId, onRefresh 
         <div className="space-y-1.5">
           {/* Open items first */}
           {openItems.map((item) => (
-            <ActionItemRow key={item.action_item_id} item={item} onToggle={handleToggle} onDelete={handleDelete} />
+            <ActionItemRow
+              key={item.action_item_id}
+              item={item}
+              onToggle={handleToggle}
+              onDelete={handleDelete}
+            />
           ))}
           {/* Completed items (collapsible if many) */}
           {completedItems.length > 0 && (
@@ -112,7 +124,12 @@ export default function ServiceActionItemsSection({ items, projectId, onRefresh 
               </summary>
               <div className="mt-1 space-y-1.5">
                 {completedItems.map((item) => (
-                  <ActionItemRow key={item.action_item_id} item={item} onToggle={handleToggle} onDelete={handleDelete} />
+                  <ActionItemRow
+                    key={item.action_item_id}
+                    item={item}
+                    onToggle={handleToggle}
+                    onDelete={handleDelete}
+                  />
                 ))}
               </div>
             </details>
@@ -128,8 +145,8 @@ function ActionItemRow({
   onToggle,
   onDelete,
 }: {
-  item: ServiceActionItem;
-  onToggle: (item: ServiceActionItem) => void;
+  item: ActionItem;
+  onToggle: (item: ActionItem) => void;
   onDelete: (id: string) => void;
 }) {
   const isCompleted = item.status === 'completed';
@@ -144,13 +161,17 @@ function ActionItemRow({
       <button
         onClick={() => onToggle(item)}
         className={`mt-0.5 w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-colors ${
-          isCompleted
-            ? 'bg-green-600 border-green-600'
-            : 'border-zinc-500 hover:border-zinc-300'
+          isCompleted ? 'bg-green-600 border-green-600' : 'border-zinc-500 hover:border-zinc-300'
         }`}
       >
         {isCompleted && (
-          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <svg
+            className="w-3 h-3 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={3}
+          >
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
           </svg>
         )}
@@ -162,9 +183,7 @@ function ActionItemRow({
           {item.description}
         </p>
         <div className="flex items-center gap-2 mt-1">
-          {item.assignee && (
-            <span className="text-xs text-zinc-500">@{item.assignee}</span>
-          )}
+          {item.assignee && <span className="text-xs text-zinc-500">@{item.assignee}</span>}
           {item.deadline && (
             <span className={`text-xs ${isOverdue ? 'text-red-400' : 'text-zinc-500'}`}>
               {item.deadline}
@@ -184,7 +203,13 @@ function ActionItemRow({
         className="text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all shrink-0 mt-0.5"
         title="삭제"
       >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+        <svg
+          className="w-3.5 h-3.5"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>

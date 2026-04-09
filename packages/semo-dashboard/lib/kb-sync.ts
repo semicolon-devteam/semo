@@ -1,16 +1,14 @@
 /**
  * KB→DB 동기화 — 유일한 진입점
  *
- * KB upsert 후 특정 key 패턴(kpi, action-item)에 대해
- * 기존 파서(action-items.ts)를 재사용하여 DB에 동기화.
+ * KB upsert 후 특정 key 패턴(kpi)에 대해 DB에 동기화.
+ * action-item은 DB가 SoT이므로 동기화 불요 (migration 069).
  *
  * 호출 경로:
  * 1. CLI: semo kb upsert 성공 후 → POST /api/kb-sync
- * 2. Dashboard: 액션 탭 토글 후 → syncKBToDb() 직접 호출
  */
 
 import { query } from './db';
-import { parseActionItems, type ActionItem } from './action-items';
 
 // ── Main Entry ──
 
@@ -20,116 +18,10 @@ export async function syncKBToDb(
   subKey: string,
   content: string,
 ): Promise<{ synced: number; errors: string[] }> {
-  if (key === 'action-item') {
-    return syncActionItems(domain, subKey, content);
-  }
   if (key === 'kpi') {
     return syncKPIMetrics(domain, subKey, content);
   }
   return { synced: 0, errors: [`Unsupported key: ${key}`] };
-}
-
-// ── Action Items ──
-
-async function syncActionItems(
-  domain: string,
-  subKey: string,
-  content: string,
-): Promise<{ synced: number; errors: string[] }> {
-  const errors: string[] = [];
-
-  // 1. ontology에서 domain type 조회
-  const ontoRes = await query<{ entity_type: string; description: string }>(
-    `SELECT entity_type, COALESCE(description, domain) as description FROM semo.ontology WHERE domain = $1`,
-    [domain],
-  );
-  if (!ontoRes.rows[0]) return { synced: 0, errors: [`Domain '${domain}' not in ontology`] };
-
-  const domainType =
-    ontoRes.rows[0].entity_type === 'team' ? ('team' as const) : ('service' as const);
-  const domainLabel = ontoRes.rows[0].description;
-
-  // 2. 기존 파서로 파싱 (3포맷 모두 지원)
-  const items = parseActionItems(content, domain, subKey, domainType, domainLabel);
-  if (items.length === 0) return { synced: 0, errors: [] };
-
-  // 3. service_id 결정
-  const serviceIdMap = await resolveServiceIds(domain, domainType, items);
-
-  // 4. 기존 kb-sync 레코드 삭제 (같은 domain + sub_key)
-  await query(
-    `DELETE FROM semo.service_action_items WHERE source = 'kb-sync' AND metadata->>'kb_domain' = $1 AND metadata->>'kb_sub_key' = $2`,
-    [domain, subKey],
-  );
-
-  // 5. 삽입
-  let synced = 0;
-  for (const item of items) {
-    const serviceId = serviceIdMap.get(item.service ?? '') ?? serviceIdMap.get('_default') ?? null;
-    try {
-      await query(
-        `INSERT INTO semo.service_action_items
-          (service_id, description, assignee, deadline, status, priority, source, metadata)
-         VALUES ($1, $2, $3, $4::date, $5, 'normal', 'kb-sync', $6)`,
-        [
-          serviceId,
-          item.description,
-          item.assignee || item.resolvedAssignee || domain,
-          item.deadline,
-          item.status,
-          JSON.stringify({
-            kb_domain: domain,
-            kb_sub_key: subKey,
-            kb_item_index: item.itemIndex,
-            service_hint: item.service,
-            source: item.source,
-          }),
-        ],
-      );
-      synced++;
-    } catch (err) {
-      errors.push(`Item ${item.itemIndex}: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-
-  if (synced > 0) {
-    console.log(`[KB-Sync] action-item: ${domain}/${subKey} → ${synced} items synced`);
-  }
-  return { synced, errors };
-}
-
-async function resolveServiceIds(
-  domain: string,
-  domainType: 'team' | 'service',
-  items: ActionItem[],
-): Promise<Map<string, string | null>> {
-  const map = new Map<string, string | null>();
-
-  if (domainType === 'service') {
-    // 서비스 도메인 → 직접 매칭
-    const res = await query<{ service_id: string }>(
-      `SELECT service_id FROM semo.services WHERE service_domain = $1 LIMIT 1`,
-      [domain],
-    );
-    const id = res.rows[0]?.service_id ?? null;
-    map.set('_default', id);
-    return map;
-  }
-
-  // 멤버 도메인 → 아이템의 service 필드로 매칭
-  const serviceNames = [...new Set(items.map((i) => i.service).filter(Boolean))] as string[];
-  for (const svcName of serviceNames) {
-    const svcDomain = svcName.toLowerCase().replace(/\s+/g, '-');
-    const res = await query<{ service_id: string }>(
-      `SELECT service_id FROM semo.services WHERE service_domain = $1 OR LOWER(project_name) LIKE $2 LIMIT 1`,
-      [svcDomain, `%${svcName.toLowerCase()}%`],
-    );
-    map.set(svcName, res.rows[0]?.service_id ?? null);
-  }
-
-  // 기본값: null (미분류) — 잘못된 폴백보다 나음
-  map.set('_default', null);
-  return map;
 }
 
 // ── KPI Metrics ──

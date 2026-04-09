@@ -25,8 +25,21 @@ export interface MeetingAnalysis {
   meeting_time: string;
   meeting_type_label: string;
   agenda_items: string;
-  decisions: { title: string; content: string; background: string; assignee: string; related_project?: string }[];
-  kpi_changes: { project: string; kpi: string; change: string; before: string; after: string; note: string }[];
+  decisions: {
+    title: string;
+    content: string;
+    background: string;
+    assignee: string;
+    related_project?: string;
+  }[];
+  kpi_changes: {
+    project: string;
+    kpi: string;
+    change: string;
+    before: string;
+    after: string;
+    note: string;
+  }[];
   action_items: { assignee: string; item: string; deadline: string }[];
   next_meeting: string;
   additional_notes: string;
@@ -70,8 +83,7 @@ Extract the following as JSON:
 }`;
 
 async function analyzeTranscript(meeting: Meeting): Promise<MeetingAnalysis> {
-  const userPrompt = USER_PROMPT_TEMPLATE
-    .replace('{meeting_type}', meeting.meeting_type)
+  const userPrompt = USER_PROMPT_TEMPLATE.replace('{meeting_type}', meeting.meeting_type)
     .replace('{meeting_date}', meeting.meeting_date)
     .replace('{title}', meeting.title)
     .replace('{attendees}', meeting.attendees.join(', '))
@@ -97,15 +109,18 @@ async function analyzeTranscript(meeting: Meeting): Promise<MeetingAnalysis> {
     throw new Error(`Anthropic API failed (${response.status}): ${text}`);
   }
 
-  const data = await response.json() as {
+  const data = (await response.json()) as {
     content: { type: string; text: string }[];
   };
 
-  const rawText = data.content.find(c => c.type === 'text')?.text;
+  const rawText = data.content.find((c) => c.type === 'text')?.text;
   if (!rawText) throw new Error('No text content in Anthropic response');
 
   // Strip markdown code block fencing if present (```json ... ```)
-  const text = rawText.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
+  const text = rawText
+    .replace(/^```(?:json)?\s*\n?/i, '')
+    .replace(/\n?```\s*$/i, '')
+    .trim();
 
   return JSON.parse(text) as MeetingAnalysis;
 }
@@ -121,24 +136,30 @@ function buildDiscussionBody(meeting: Meeting, analysis: MeetingAnalysis): strin
   sections.push(`### 📝 회의 안건\n\n${analysis.agenda_items}`);
 
   if (analysis.decisions.length > 0) {
-    const decisionsText = analysis.decisions.map((d, i) =>
-      `- **결정 ${i + 1}**: ${d.content}\n  - 배경: ${d.background}\n  - 담당: ${d.assignee}`
-    ).join('\n\n');
+    const decisionsText = analysis.decisions
+      .map(
+        (d, i) =>
+          `- **결정 ${i + 1}**: ${d.content}\n  - 배경: ${d.background}\n  - 담당: ${d.assignee}`,
+      )
+      .join('\n\n');
     sections.push(`### ✅ 의사결정\n\n${decisionsText}`);
   }
 
   if (analysis.kpi_changes.length > 0) {
-    const header = '| 프로젝트 | KPI | 변경 | 이전 | 이후 | 비고 |\n|----------|-----|------|------|------|------|';
-    const rows = analysis.kpi_changes.map(k =>
-      `| ${k.project} | ${k.kpi} | ${k.change} | ${k.before} | ${k.after} | ${k.note} |`
-    ).join('\n');
+    const header =
+      '| 프로젝트 | KPI | 변경 | 이전 | 이후 | 비고 |\n|----------|-----|------|------|------|------|';
+    const rows = analysis.kpi_changes
+      .map(
+        (k) => `| ${k.project} | ${k.kpi} | ${k.change} | ${k.before} | ${k.after} | ${k.note} |`,
+      )
+      .join('\n');
     sections.push(`### 📊 KPI 변경사항\n\n${header}\n${rows}`);
   }
 
   if (analysis.action_items.length > 0) {
-    const items = analysis.action_items.map(a =>
-      `- [ ] @${a.assignee}: ${a.item} (기한: ${a.deadline})`
-    ).join('\n');
+    const items = analysis.action_items
+      .map((a) => `- [ ] @${a.assignee}: ${a.item} (기한: ${a.deadline})`)
+      .join('\n');
     sections.push(`### 📌 액션 아이템\n\n${items}`);
   }
 
@@ -159,7 +180,7 @@ async function loadMemberDomainMap(): Promise<Record<string, string>> {
   const { query: dbQuery } = await import('./db');
   const result = await dbQuery<{ sub_key: string; content: string }>(
     `SELECT sub_key, content FROM semo.knowledge_base
-     WHERE domain = 'semicolon' AND key = 'team' AND sub_key != ''`
+     WHERE domain = 'semicolon' AND key = 'team' AND sub_key != ''`,
   );
   const map: Record<string, string> = {};
   for (const row of result.rows) {
@@ -192,7 +213,7 @@ export interface KBEntry {
   key: string;
   sub_key: string;
   content: string;
-  type: 'decision' | 'action-item' | 'kpi';
+  type: 'decision' | 'kpi';
   action: 'create' | 'skip';
 }
 
@@ -211,7 +232,7 @@ async function loadDomainList(): Promise<{ domain: string; description?: string 
 /** related_project를 온톨로지 도메인으로 매칭 */
 function resolveProjectDomain(
   relatedProject: string | undefined,
-  domainList: { domain: string; description?: string }[]
+  domainList: { domain: string; description?: string }[],
 ): string {
   if (!relatedProject) return 'semicolon';
   const lower = relatedProject.toLowerCase().replace(/\s+/g, '-');
@@ -220,15 +241,12 @@ function resolveProjectDomain(
   if (exact) return exact.domain;
   // 부분 매칭 (도메인이 프로젝트명을 포함하거나, description에 포함)
   const partial = domainList.find(
-    (d) => d.domain.includes(lower) || (d.description ?? '').toLowerCase().includes(lower)
+    (d) => d.domain.includes(lower) || (d.description ?? '').toLowerCase().includes(lower),
   );
   return partial?.domain ?? 'semicolon';
 }
 
-async function buildKBEntries(
-  analysis: MeetingAnalysis,
-  meeting: Meeting
-): Promise<KBEntry[]> {
+async function buildKBEntries(analysis: MeetingAnalysis, meeting: Meeting): Promise<KBEntry[]> {
   const entries: KBEntry[] = [];
   const date = formatDate(meeting.meeting_date);
   const domainList = await loadDomainList();
@@ -241,10 +259,12 @@ async function buildKBEntries(
     decisionsByDomain[domain].push(decision);
   }
   for (const [domain, decisions] of Object.entries(decisionsByDomain)) {
-    const content = decisions.map((d, i) => {
-      const prefix = decisions.length > 1 ? `## 결정 ${i + 1}: ${d.title}` : `## ${d.title}`;
-      return `${prefix}\n\n### 배경\n${d.background}\n\n### 결정\n${d.content}\n\n### 담당\n${d.assignee}`;
-    }).join('\n\n---\n\n');
+    const content = decisions
+      .map((d, i) => {
+        const prefix = decisions.length > 1 ? `## 결정 ${i + 1}: ${d.title}` : `## ${d.title}`;
+        return `${prefix}\n\n### 배경\n${d.background}\n\n### 결정\n${d.content}\n\n### 담당\n${d.assignee}`;
+      })
+      .join('\n\n---\n\n');
 
     entries.push({
       domain,
@@ -256,23 +276,8 @@ async function buildKBEntries(
     });
   }
 
-  // Action items (grouped by assignee)
-  const byAssignee: Record<string, typeof analysis.action_items> = {};
-  for (const item of analysis.action_items) {
-    const domain = await resolveMemberDomain(item.assignee);
-    if (!byAssignee[domain]) byAssignee[domain] = [];
-    byAssignee[domain].push(item);
-  }
-  for (const [domain, items] of Object.entries(byAssignee)) {
-    entries.push({
-      domain,
-      key: 'action-item',
-      sub_key: date,
-      content: items.map(a => `- [ ] ${a.item} (기한: ${a.deadline})`).join('\n'),
-      type: 'action-item',
-      action: 'create',
-    });
-  }
+  // Action items are now stored in DB directly (see generateMeetingNotes)
+  // They are not part of KB entries anymore.
 
   // KPI changes (grouped by project)
   const byProject: Record<string, typeof analysis.kpi_changes> = {};
@@ -283,9 +288,9 @@ async function buildKBEntries(
   for (const [project, items] of Object.entries(byProject)) {
     const domain = project.toLowerCase().replace(/\s+/g, '-');
     const header = '| KPI | 변경 | 이전 | 이후 | 비고 |\n|-----|------|------|------|------|';
-    const rows = items.map(k =>
-      `| ${k.kpi} | ${k.change} | ${k.before} | ${k.after} | ${k.note} |`
-    ).join('\n');
+    const rows = items
+      .map((k) => `| ${k.kpi} | ${k.change} | ${k.before} | ${k.after} | ${k.note} |`)
+      .join('\n');
     entries.push({
       domain,
       key: 'kpi',
@@ -325,9 +330,16 @@ export async function previewMeetingNotes(meeting: Meeting): Promise<PreviewResu
 
 // ── Generate (Commit) ──
 
+export interface ActionItemInput {
+  assignee: string;
+  item: string;
+  deadline: string;
+}
+
 export interface EditedGenerationInput {
   discussion: { title: string; body: string };
   kbEntries: KBEntry[];
+  actionItems?: ActionItemInput[];
 }
 
 export interface GenerationResult {
@@ -345,16 +357,18 @@ async function sendSlackNotification(title: string, discussionUrl: string): Prom
 
   let channelId: string | null = null;
   try {
-    const kb = await import('./db').then(db =>
+    const kb = await import('./db').then((db) =>
       db.query<{ content: string }>(
-        `SELECT content FROM semo.knowledge_base WHERE domain = 'semicolon' AND key = 'team' AND sub_key = 'slack-channels' LIMIT 1`
-      )
+        `SELECT content FROM semo.knowledge_base WHERE domain = 'semicolon' AND key = 'team' AND sub_key = 'slack-channels' LIMIT 1`,
+      ),
     );
     if (kb.rows.length > 0) {
       const match = kb.rows[0].content.match(/개발사업팀[^C]*?(C[A-Z0-9]+)/);
       if (match) channelId = match[1];
     }
-  } catch { /* KB unavailable */ }
+  } catch {
+    /* KB unavailable */
+  }
 
   if (!channelId) {
     console.warn('Could not resolve 개발사업팀 channel ID, skipping Slack');
@@ -376,17 +390,19 @@ async function sendSlackNotification(title: string, discussionUrl: string): Prom
 
 export async function generateMeetingNotes(
   meeting: Meeting,
-  editedData?: EditedGenerationInput
+  editedData?: EditedGenerationInput,
 ): Promise<GenerationResult> {
   let title: string;
   let body: string;
   let kbEntries: KBEntry[];
+  let actionItemInputs: ActionItemInput[] = [];
 
   if (editedData) {
     // Use user-edited data
     title = editedData.discussion.title;
     body = editedData.discussion.body;
     kbEntries = editedData.kbEntries;
+    actionItemInputs = editedData.actionItems ?? [];
   } else {
     // Auto-generate (legacy path)
     if (!meeting.mapped_transcript) {
@@ -396,13 +412,15 @@ export async function generateMeetingNotes(
     title = preview.discussion.title;
     body = preview.discussion.body;
     kbEntries = preview.kbEntries;
+    actionItemInputs = preview.analysis.action_items;
   }
 
   // 1. Create GitHub Discussion
   const discussion = await createMeetingDiscussion(title, body);
 
   // 2. Write KB entries (only those with action: 'create')
-  let decisions = 0, actions = 0, kpi = 0;
+  let decisions = 0,
+    kpi = 0;
   for (const entry of kbEntries) {
     if (entry.action === 'skip') continue;
     const dateStr = formatDate(meeting.meeting_date);
@@ -411,15 +429,36 @@ export async function generateMeetingNotes(
     try {
       await upsertItem(entry.domain, kbKey, contentWithSource, 'dashboard-meeting');
       if (entry.type === 'decision') decisions++;
-      else if (entry.type === 'action-item') actions++;
       else if (entry.type === 'kpi') kpi++;
     } catch (err) {
       console.warn(`KB write failed for ${entry.domain}/${kbKey}:`, err);
     }
   }
 
+  // 2b. Write action items to DB (SoT = action_items table)
+  let actions = 0;
+  if (actionItemInputs.length > 0) {
+    const { createActionItem } = await import('./service');
+    for (const item of actionItemInputs) {
+      try {
+        const ownerDomain = await resolveMemberDomain(item.assignee);
+        await createActionItem({
+          owner_domain: ownerDomain,
+          description: item.item,
+          assignee: item.assignee,
+          deadline: item.deadline,
+          source: 'meeting',
+          related_url: discussion.url,
+        });
+        actions++;
+      } catch (err) {
+        console.warn(`Action item DB write failed for "${item.item}":`, err);
+      }
+    }
+  }
+
   // 3. Slack notification
-  await sendSlackNotification(title, discussion.url).catch(err => {
+  await sendSlackNotification(title, discussion.url).catch((err) => {
     console.warn('Slack notification failed:', err);
   });
 

@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { query } from '@/lib/db';
 import {
-  listServiceActionItems,
-  createServiceActionItem,
-  updateServiceActionItem,
-  deleteServiceActionItem,
+  listActionItems,
+  createActionItem,
+  updateActionItem,
+  deleteActionItem,
 } from '@/lib/service';
 
 export const dynamic = 'force-dynamic';
+
+/** service_id(UUID) → service_domain(문자열) 변환 */
+async function resolveServiceDomain(serviceId: string): Promise<string | null> {
+  const res = await query<{ service_domain: string }>(
+    `SELECT service_domain FROM semo.services WHERE service_id = $1 LIMIT 1`,
+    [serviceId],
+  );
+  return res.rows[0]?.service_domain ?? null;
+}
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -14,7 +24,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') ?? undefined;
 
-    const items = await listServiceActionItems(id, status);
+    const domain = await resolveServiceDomain(id);
+    if (!domain) {
+      return NextResponse.json([], { status: 404 });
+    }
+
+    const items = await listActionItems({ target_domain: domain, status });
     return NextResponse.json(items);
   } catch (error) {
     console.error('Service action items list error:', error);
@@ -26,37 +41,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   try {
     const { id } = await params;
     const body = await request.json();
-    const {
-      description,
-      assignee,
-      deadline,
-      status,
-      priority,
-      category,
-      source,
-      related_url,
-      sort_order,
-      iteration_id,
-      metadata,
-    } = body;
 
-    if (!description) {
+    const domain = await resolveServiceDomain(id);
+    if (!domain) {
+      return NextResponse.json({ error: 'Service not found' }, { status: 404 });
+    }
+
+    if (!body.description) {
       return NextResponse.json({ error: 'description is required' }, { status: 400 });
     }
 
-    const item = await createServiceActionItem({
-      service_id: id,
-      description,
-      assignee,
-      deadline,
-      status,
-      priority,
-      category,
-      source,
-      related_url,
-      sort_order,
-      iteration_id,
-      metadata,
+    const item = await createActionItem({
+      owner_domain: body.owner_domain || domain,
+      target_domain: domain,
+      description: body.description,
+      assignee: body.assignee,
+      deadline: body.deadline,
+      status: body.status,
+      priority: body.priority,
+      category: body.category,
+      source: body.source || 'dashboard',
+      related_url: body.related_url,
+      sort_order: body.sort_order,
+      iteration_id: body.iteration_id,
+      metadata: body.metadata,
     });
     return NextResponse.json(item, { status: 201 });
   } catch (error) {
@@ -75,7 +83,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return NextResponse.json({ error: 'action_item_id is required' }, { status: 400 });
     }
 
-    const item = await updateServiceActionItem(action_item_id, data);
+    const item = await updateActionItem(action_item_id, data);
     if (!item) {
       return NextResponse.json({ error: 'Action item not found' }, { status: 404 });
     }
@@ -99,7 +107,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'action_item_id is required' }, { status: 400 });
     }
 
-    const deleted = await deleteServiceActionItem(itemId);
+    const deleted = await deleteActionItem(itemId);
     if (!deleted) {
       return NextResponse.json({ error: 'Action item not found' }, { status: 404 });
     }

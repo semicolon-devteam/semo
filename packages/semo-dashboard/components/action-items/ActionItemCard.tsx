@@ -1,6 +1,6 @@
 'use client';
 
-import type { ActionItem } from '@/lib/action-items';
+import type { ActionItem } from '@/types';
 import type { Tab } from './useActionItems';
 import { isOverdue, formatRelativeDate } from './useActionItems';
 
@@ -13,7 +13,14 @@ interface Props {
   onDelete?: (item: ActionItem) => void;
 }
 
-export default function ActionItemCard({ item, activeTab, toggling, onToggle, onEdit, onDelete }: Props) {
+export default function ActionItemCard({
+  item,
+  activeTab,
+  toggling,
+  onToggle,
+  onEdit,
+  onDelete,
+}: Props) {
   return (
     <div className="group flex items-start gap-3 px-5 py-3 border-b border-gray-50 dark:border-gray-700/50 last:border-b-0">
       {/* Checkbox */}
@@ -35,33 +42,35 @@ export default function ActionItemCard({ item, activeTab, toggling, onToggle, on
 
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <div className={`text-sm ${item.status === 'completed' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+        <div
+          className={`text-sm ${item.status === 'completed' ? 'line-through text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}
+        >
           {item.description}
         </div>
         <div className="flex flex-wrap items-center gap-2 mt-1">
           {/* Assignee (shown in service tab) */}
           {activeTab === 'service' && item.assignee && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
-              {item.isTeamMember && item.resolvedLabel
-                ? item.resolvedLabel.split(' — ')[0]
-                : item.assignee}
+              {item.owner_label || item.assignee}
             </span>
           )}
           {/* Service (shown in person tab) */}
-          {activeTab === 'person' && (item.service || (item.domainType === 'service' && item.domain)) && (
+          {activeTab === 'person' && item.target_domain && (
             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-purple-50 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
-              {item.service || item.domain}
+              {item.target_label || item.target_domain}
             </span>
           )}
           {/* Deadline */}
           {item.deadline && (
-            <span className={`text-xs ${isOverdue(item) ? 'text-red-500 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+            <span
+              className={`text-xs ${isOverdue(item) ? 'text-red-500 font-medium' : 'text-gray-500 dark:text-gray-400'}`}
+            >
               ~ {item.deadline}
             </span>
           )}
           {/* Date */}
           <span className="text-xs text-gray-400 dark:text-gray-500">
-            {formatRelativeDate(item.date)}
+            {formatRelativeDate(item.created_at)}
           </span>
         </div>
       </div>
@@ -76,7 +85,12 @@ export default function ActionItemCard({ item, activeTab, toggling, onToggle, on
               title="수정"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"
+                />
               </svg>
             </button>
           )}
@@ -87,7 +101,12 @@ export default function ActionItemCard({ item, activeTab, toggling, onToggle, on
               title="삭제"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
               </svg>
             </button>
           )}

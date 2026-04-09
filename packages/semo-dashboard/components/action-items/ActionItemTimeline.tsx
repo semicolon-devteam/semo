@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useRef } from 'react';
-import type { ActionItem } from '@/lib/action-items';
+import type { ActionItem } from '@/types';
 import type { GroupedItems, Tab } from './useActionItems';
 
 interface Props {
@@ -14,7 +14,20 @@ interface Props {
 const MONTH_WIDTH = 150;
 const ROW_HEIGHT = 36;
 const LABEL_WIDTH = 180;
-const MONTH_LABELS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
+const MONTH_LABELS = [
+  '1월',
+  '2월',
+  '3월',
+  '4월',
+  '5월',
+  '6월',
+  '7월',
+  '8월',
+  '9월',
+  '10월',
+  '11월',
+  '12월',
+];
 
 function daysBetween(a: Date, b: Date): number {
   return Math.round((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24));
@@ -59,15 +72,16 @@ export default function ActionItemTimeline({ groups, activeTab, toggling, onTogg
     for (const group of groups) {
       const rowItems: TimelineRow['items'] = [];
       for (const item of group.items) {
-        const startDate = parseDate(item.date);
+        const startDate = parseDate(item.created_at);
         if (!startDate) continue;
         const endDate = item.deadline ? parseDate(item.deadline) : null;
         rowItems.push({ item, start: startDate, end: endDate });
       }
       if (rowItems.length > 0) {
-        const label = activeTab === 'person'
-          ? (group.label.split(' — ')[0] || group.key)
-          : group.label.split(' — ')[0];
+        const label =
+          activeTab === 'person'
+            ? group.label.split(' — ')[0] || group.key
+            : group.label.split(' — ')[0];
         timelineRows.push({ label, items: rowItems });
       }
     }
@@ -75,11 +89,15 @@ export default function ActionItemTimeline({ groups, activeTab, toggling, onTogg
     return { rows: timelineRows, timelineStart: start, months: monthList };
   }, [groups, activeTab]);
 
-  const totalDays = daysBetween(timelineStart, new Date(timelineStart.getFullYear(), timelineStart.getMonth() + months.length, 0));
+  const totalDays = daysBetween(
+    timelineStart,
+    new Date(timelineStart.getFullYear(), timelineStart.getMonth() + months.length, 0),
+  );
   const totalWidth = months.length * MONTH_WIDTH;
 
   const today = new Date();
-  const todayOffset = totalDays > 0 ? (daysBetween(timelineStart, today) / totalDays) * totalWidth : -1;
+  const todayOffset =
+    totalDays > 0 ? (daysBetween(timelineStart, today) / totalDays) * totalWidth : -1;
   const showToday = todayOffset >= 0 && todayOffset <= totalWidth;
 
   if (rows.length === 0) {
@@ -94,7 +112,10 @@ export default function ActionItemTimeline({ groups, activeTab, toggling, onTogg
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden bg-white dark:bg-gray-800">
       <div className="flex">
         {/* Left labels */}
-        <div className="shrink-0 border-r border-gray-200 dark:border-gray-700" style={{ width: LABEL_WIDTH }}>
+        <div
+          className="shrink-0 border-r border-gray-200 dark:border-gray-700"
+          style={{ width: LABEL_WIDTH }}
+        >
           <div className="h-10 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800" />
           {rows.map((row, i) => (
             <div
@@ -155,7 +176,7 @@ export default function ActionItemTimeline({ groups, activeTab, toggling, onTogg
 
                   return (
                     <div
-                      key={item.id}
+                      key={item.action_item_id}
                       className={`absolute top-1/2 -translate-y-1/2 rounded-sm cursor-pointer hover:opacity-80 transition-opacity ${barColor} ${isCompleted ? 'opacity-60' : ''}`}
                       style={{
                         left: barLeft,

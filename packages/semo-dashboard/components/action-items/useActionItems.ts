@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import type { ActionItem } from '@/lib/action-items';
+import type { ActionItem } from '@/types';
 
 export type Tab = 'person' | 'service';
 export type StatusFilter = 'all' | 'open' | 'completed';
@@ -38,7 +38,11 @@ export function useActionItems() {
   const reload = useCallback(() => {
     setLoading(true);
     fetch('/api/action-items')
-      .then((r) => (r.ok ? r.json() : { items: [], teamMembers: [], stats: { total: 0, open: 0, completed: 0 } }))
+      .then((r) =>
+        r.ok
+          ? r.json()
+          : { items: [], teamMembers: [], stats: { total: 0, open: 0, completed: 0 } },
+      )
       .then((data: APIResponse) => {
         setItems(data.items);
         setTeamMembers(data.teamMembers || []);
@@ -48,16 +52,21 @@ export function useActionItems() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  // team member domain set for identifying team members
+  const teamDomainSet = useMemo(() => new Set(teamMembers.map((m) => m.domain)), [teamMembers]);
 
   const filtered = useMemo(() => {
     let list: ActionItem[];
     if (activeTab === 'person') {
-      // 사람별: resolvedAssignee가 있는 모든 아이템
-      list = items.filter((i) => i.resolvedAssignee);
+      // 사람별: owner가 team 타입인 모든 아이템
+      list = items.filter((i) => i.owner_entity_type === 'team');
     } else {
-      // 프로젝트별: service 도메인 아이템
-      list = items.filter((i) => i.domainType === 'service');
+      // 서비스별: target_domain이 있는 아이템
+      list = items.filter((i) => i.target_domain);
     }
     if (statusFilter !== 'all') {
       list = list.filter((i) => i.status === statusFilter);
@@ -73,11 +82,11 @@ export function useActionItems() {
       let groupLabel: string;
 
       if (activeTab === 'person') {
-        groupKey = item.resolvedAssignee || '_unknown';
-        groupLabel = item.resolvedLabel || item.assignee || '미지정';
+        groupKey = item.owner_domain;
+        groupLabel = item.owner_label || item.owner_domain;
       } else {
-        groupKey = item.domain;
-        groupLabel = item.domainLabel;
+        groupKey = item.target_domain || '_none';
+        groupLabel = item.target_label || item.target_domain || '미지정';
       }
 
       let group = map.get(groupKey);
@@ -88,14 +97,8 @@ export function useActionItems() {
       group.items.push(item);
     }
 
-    // 사람별: 팀원을 먼저, 외부/기타는 뒤로
     return Array.from(map.entries())
-      .sort(([keyA, a], [keyB, b]) => {
-        if (activeTab === 'person') {
-          const aTeam = a.items.some(i => i.isTeamMember);
-          const bTeam = b.items.some(i => i.isTeamMember);
-          if (aTeam !== bTeam) return aTeam ? -1 : 1;
-        }
+      .sort(([, a], [, b]) => {
         const aOpen = a.items.filter((i) => i.status === 'open').length;
         const bOpen = b.items.filter((i) => i.status === 'open').length;
         return bOpen - aOpen;
@@ -105,11 +108,13 @@ export function useActionItems() {
 
   const handleToggle = useCallback(async (item: ActionItem) => {
     const newCompleted = item.status === 'open';
-    setToggling((prev) => new Set(prev).add(item.id));
+    setToggling((prev) => new Set(prev).add(item.action_item_id));
 
     setItems((prev) =>
       prev.map((i) =>
-        i.id === item.id ? { ...i, status: newCompleted ? 'completed' : 'open' } : i,
+        i.action_item_id === item.action_item_id
+          ? { ...i, status: newCompleted ? 'completed' : 'open' }
+          : i,
       ),
     );
     setStats((prev) => ({
@@ -123,17 +128,15 @@ export function useActionItems() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          domain: item.domain,
-          subKey: item.subKey,
-          itemIndex: item.itemIndex,
-          completed: newCompleted,
+          action_item_id: item.action_item_id,
+          status: newCompleted ? 'completed' : 'open',
         }),
       });
       if (!res.ok) throw new Error();
     } catch {
       setItems((prev) =>
         prev.map((i) =>
-          i.id === item.id ? { ...i, status: item.status } : i,
+          i.action_item_id === item.action_item_id ? { ...i, status: item.status } : i,
         ),
       );
       setStats((prev) => ({
@@ -144,97 +147,115 @@ export function useActionItems() {
     } finally {
       setToggling((prev) => {
         const next = new Set(prev);
-        next.delete(item.id);
+        next.delete(item.action_item_id);
         return next;
       });
     }
   }, []);
 
-  const handleCreate = useCallback(async (data: { domain: string; description: string; assignee: string; deadline: string }) => {
-    const res = await fetch('/api/action-items', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    if (!res.ok) throw new Error('Create failed');
-    reload();
-  }, [reload]);
-
-  const handleUpdate = useCallback(async (item: ActionItem, data: { description: string; assignee: string; deadline: string }) => {
-    const res = await fetch('/api/action-items', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        domain: item.domain,
-        subKey: item.subKey,
-        itemIndex: item.itemIndex,
-        ...data,
-      }),
-    });
-    if (!res.ok) throw new Error('Update failed');
-    reload();
-  }, [reload]);
-
-  const handleDelete = useCallback(async (item: ActionItem) => {
-    // optimistic removal
-    setItems((prev) => prev.filter((i) => i.id !== item.id));
-    setStats((prev) => ({
-      ...prev,
-      total: prev.total - 1,
-      open: prev.open - (item.status === 'open' ? 1 : 0),
-      completed: prev.completed - (item.status === 'completed' ? 1 : 0),
-    }));
-
-    try {
+  const handleCreate = useCallback(
+    async (data: {
+      owner_domain: string;
+      target_domain?: string;
+      description: string;
+      assignee?: string;
+      deadline?: string;
+    }) => {
       const res = await fetch('/api/action-items', {
-        method: 'DELETE',
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Create failed');
+      reload();
+    },
+    [reload],
+  );
+
+  const handleUpdate = useCallback(
+    async (
+      item: ActionItem,
+      data: {
+        description?: string;
+        assignee?: string;
+        deadline?: string;
+      },
+    ) => {
+      const res = await fetch('/api/action-items', {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          domain: item.domain,
-          subKey: item.subKey,
-          itemIndex: item.itemIndex,
+          action_item_id: item.action_item_id,
+          ...data,
         }),
       });
-      if (!res.ok) throw new Error('Delete failed');
-    } catch {
-      reload(); // revert by reloading
-    }
-  }, [reload]);
+      if (!res.ok) throw new Error('Update failed');
+      reload();
+    },
+    [reload],
+  );
+
+  const handleDelete = useCallback(
+    async (item: ActionItem) => {
+      // optimistic removal
+      setItems((prev) => prev.filter((i) => i.action_item_id !== item.action_item_id));
+      setStats((prev) => ({
+        ...prev,
+        total: prev.total - 1,
+        open: prev.open - (item.status === 'open' ? 1 : 0),
+        completed: prev.completed - (item.status === 'completed' ? 1 : 0),
+      }));
+
+      try {
+        const res = await fetch(`/api/action-items?action_item_id=${item.action_item_id}`, {
+          method: 'DELETE',
+        });
+        if (!res.ok) throw new Error('Delete failed');
+      } catch {
+        reload(); // revert by reloading
+      }
+    },
+    [reload],
+  );
 
   // service 도메인 목록 추출 (생성 폼용)
   const serviceDomains = useMemo(() => {
     const seen = new Map<string, string>();
     for (const item of items) {
-      if (item.domainType === 'service' && !seen.has(item.domain)) {
-        seen.set(item.domain, item.domainLabel);
+      if (item.target_domain && !seen.has(item.target_domain)) {
+        seen.set(item.target_domain, item.target_label || item.target_domain);
       }
     }
     return Array.from(seen.entries()).map(([domain, label]) => ({ domain, label }));
   }, [items]);
 
   return {
-    items, filtered, groups, stats, loading, teamMembers, serviceDomains,
-    activeTab, setActiveTab,
-    statusFilter, setStatusFilter,
-    viewMode, setViewMode,
-    toggling, handleToggle, handleCreate, handleUpdate, handleDelete, reload,
+    items,
+    filtered,
+    groups,
+    stats,
+    loading,
+    teamMembers,
+    serviceDomains,
+    activeTab,
+    setActiveTab,
+    statusFilter,
+    setStatusFilter,
+    viewMode,
+    setViewMode,
+    toggling,
+    handleToggle,
+    handleCreate,
+    handleUpdate,
+    handleDelete,
+    reload,
   };
 }
 
 export function isOverdue(item: ActionItem): boolean {
   if (item.status === 'completed' || !item.deadline) return false;
-  let d: Date | null = null;
-  const isoMatch = item.deadline.match(/(\d{4}-\d{2}-\d{2})/);
-  if (isoMatch) {
-    d = new Date(isoMatch[1]);
-  } else {
-    const mdMatch = item.deadline.match(/^(\d{2})\/(\d{2})/);
-    if (mdMatch) {
-      const year = new Date().getFullYear();
-      d = new Date(year, parseInt(mdMatch[1]) - 1, parseInt(mdMatch[2]));
-    }
-  }
-  if (!d) return false;
+  const d = new Date(item.deadline);
+  if (isNaN(d.getTime())) return false;
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return d < today;

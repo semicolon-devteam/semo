@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { ServiceProject, ServiceFeature, ServiceKPIMetric, ServiceActionItem } from '@/types';
+import type { ServiceProject, ServiceFeature, ServiceKPIMetric, ActionItem } from '@/types';
 import type { ServiceOverviewKB } from '@/lib/service';
 import ServiceOverviewTab from './ServiceOverviewTab';
 import ServiceSprintTab from './ServiceSprintTab';
@@ -37,7 +37,7 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
   const [overview, setOverview] = useState<OverviewData | null>(null);
   const [kbKpiData, setKbKpiData] = useState<KBKPIData | null>(null);
   const [dbMetrics, setDbMetrics] = useState<DBKPIMetricsData | null>(null);
-  const [dbActionItems, setDbActionItems] = useState<ServiceActionItem[]>([]);
+  const [dbActionItems, setDbActionItems] = useState<ActionItem[]>([]);
   const [features, setFeatures] = useState<ServiceFeature[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -48,13 +48,16 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
         fetch(`/api/gfp/${projectId}/overview`),
         fetch(`/api/gfp/${projectId}/kpi?limit=10`),
         fetch(`/api/gfp/${projectId}/kpi-metrics`),
-        fetch(`/api/gfp/${projectId}/service-action-items`),
+        fetch(`/api/action-items?target_domain=${projectId}`),
         fetch(`/api/gfp/${projectId}/features`),
       ]);
       if (ovRes.ok) setOverview(await ovRes.json());
       if (kpiRes.ok) setKbKpiData(await kpiRes.json());
       if (metricsRes.ok) setDbMetrics(await metricsRes.json());
-      if (actionsRes.ok) setDbActionItems(await actionsRes.json());
+      if (actionsRes.ok) {
+        const actionsData = await actionsRes.json();
+        setDbActionItems(actionsData.items ?? actionsData);
+      }
       if (featRes.ok) setFeatures(await featRes.json());
     } catch (err) {
       console.error('Failed to load ops data:', err);
@@ -158,12 +161,12 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
               metrics: dbMetrics?.metrics,
               periods: dbMetrics?.periods,
               latestPeriod: dbMetrics?.latestPeriod,
-              actionItems: dbActionItems.length > 0 ? dbActionItems : undefined,
+              actionItems: dbActionItems,
               kpiSnapshots: kbKpiData.kpiSnapshots,
-              actionItemsRaw: kbKpiData.actionItems,
               milestones: kbKpiData.milestones,
               incidents: kbKpiData.incidents,
               projectId,
+              serviceDomain: overview.project.service_domain || projectId,
             } satisfies SprintTabData
           }
           onRefresh={loadData}

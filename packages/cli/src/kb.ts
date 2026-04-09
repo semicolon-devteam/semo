@@ -1103,7 +1103,7 @@ export async function kbUpsert(
     }
 
     // KB→DB 동기화: Dashboard API에 위임 (파서 단일화)
-    if ((key === 'kpi' || key === 'action-item') && subKey) {
+    if (key === 'kpi' && subKey) {
       try {
         const baseUrl =
           process.env.DASHBOARD_URL ||

@@ -1,7 +1,7 @@
 'use client';
 
 import ReactMarkdown from 'react-markdown';
-import type { ServiceKPIMetric, ServiceActionItem } from '@/types';
+import type { ServiceKPIMetric, ActionItem } from '@/types';
 import ServiceKPISection from './ServiceKPISection';
 import ServiceActionItemsSection from './ServiceActionItemsSection';
 
@@ -23,14 +23,14 @@ export interface SprintTabData {
   metrics?: ServiceKPIMetric[];
   periods?: string[];
   latestPeriod?: string | null;
-  actionItems?: ServiceActionItem[];
+  actionItems?: ActionItem[];
   // KB-sourced fallback (legacy)
   kpiSnapshots: KBSnapshot[];
-  actionItemsRaw: KBSnapshot[];
   milestones: KBMilestone[];
   incidents: Array<Record<string, unknown>>;
   // Context
   projectId: string;
+  serviceDomain: string;
 }
 
 interface Props {
@@ -40,7 +40,6 @@ interface Props {
 
 export default function ServiceSprintTab({ data, onRefresh }: Props) {
   const hasDBMetrics = data.metrics && data.metrics.length > 0;
-  const hasDBActions = data.actionItems && data.actionItems.length > 0;
 
   return (
     <div className="space-y-8">
@@ -55,26 +54,18 @@ export default function ServiceSprintTab({ data, onRefresh }: Props) {
         <KPIMarkdownFallback snapshots={data.kpiSnapshots} />
       )}
 
-      {/* Action Items — DB structured or KB markdown fallback */}
-      {hasDBActions ? (
-        <ServiceActionItemsSection
-          items={data.actionItems!}
-          projectId={data.projectId}
-          onRefresh={onRefresh}
-        />
-      ) : (
-        <ActionItemsMarkdownFallback items={data.actionItemsRaw} />
-      )}
+      {/* Action Items — DB structured */}
+      <ServiceActionItemsSection
+        items={data.actionItems ?? []}
+        serviceDomain={data.serviceDomain}
+        onRefresh={onRefresh}
+      />
 
       {/* Milestones (KB-based, already structured) */}
-      {data.milestones.length > 0 && (
-        <MilestonesSection milestones={data.milestones} />
-      )}
+      {data.milestones.length > 0 && <MilestonesSection milestones={data.milestones} />}
 
       {/* Incidents (DB-based, already structured) */}
-      {data.incidents.length > 0 && (
-        <IncidentsSection incidents={data.incidents} />
-      )}
+      {data.incidents.length > 0 && <IncidentsSection incidents={data.incidents} />}
     </div>
   );
 }
@@ -87,7 +78,9 @@ function KPIMarkdownFallback({ snapshots }: { snapshots: KBSnapshot[] }) {
     <div>
       <h2 className="text-lg font-semibold text-white mb-3">
         KPI 지표
-        {latest && <span className="text-sm font-normal text-zinc-400 ml-2">최신: {latest.subKey}</span>}
+        {latest && (
+          <span className="text-sm font-normal text-zinc-400 ml-2">최신: {latest.subKey}</span>
+        )}
       </h2>
       {latest ? (
         <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-5">
@@ -121,29 +114,6 @@ function KPIMarkdownFallback({ snapshots }: { snapshots: KBSnapshot[] }) {
   );
 }
 
-function ActionItemsMarkdownFallback({ items }: { items: KBSnapshot[] }) {
-  const latest = items[0];
-  return (
-    <div>
-      <h2 className="text-lg font-semibold text-white mb-3">
-        액션 아이템
-        {latest && <span className="text-sm font-normal text-zinc-400 ml-2">최신: {latest.subKey}</span>}
-      </h2>
-      {latest ? (
-        <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-5">
-          <div className="prose prose-sm prose-invert max-w-none text-zinc-300">
-            <ReactMarkdown>{latest.content}</ReactMarkdown>
-          </div>
-        </div>
-      ) : (
-        <div className="bg-zinc-800/30 border border-zinc-700/50 rounded-lg p-6 text-center text-zinc-500">
-          액션 아이템이 없습니다.
-        </div>
-      )}
-    </div>
-  );
-}
-
 function MilestonesSection({ milestones }: { milestones: KBMilestone[] }) {
   const statusColors: Record<string, string> = {
     planned: 'bg-zinc-600',
@@ -158,8 +128,13 @@ function MilestonesSection({ milestones }: { milestones: KBMilestone[] }) {
           const meta = m.metadata || {};
           const status = (meta.status as string) || 'planned';
           return (
-            <div key={m.subKey} className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 flex items-center gap-3">
-              <span className={`px-2 py-0.5 rounded text-xs text-white ${statusColors[status] || 'bg-zinc-600'}`}>
+            <div
+              key={m.subKey}
+              className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 flex items-center gap-3"
+            >
+              <span
+                className={`px-2 py-0.5 rounded text-xs text-white ${statusColors[status] || 'bg-zinc-600'}`}
+              >
                 {status}
               </span>
               <div className="flex-1 min-w-0">

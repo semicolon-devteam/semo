@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import type { ActionItem } from '@/lib/action-items';
+import type { ActionItem } from '@/types';
 import type { GroupedItems, Tab } from './useActionItems';
 import ActionItemCard from './ActionItemCard';
 
@@ -14,7 +14,14 @@ interface Props {
   onDelete?: (item: ActionItem) => void;
 }
 
-export default function ActionItemList({ groups, activeTab, toggling, onToggle, onEdit, onDelete }: Props) {
+export default function ActionItemList({
+  groups,
+  activeTab,
+  toggling,
+  onToggle,
+  onEdit,
+  onDelete,
+}: Props) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggleExpand = (key: string) => {
@@ -38,16 +45,19 @@ export default function ActionItemList({ groups, activeTab, toggling, onToggle, 
       {groups.map((group) => {
         const isExp = expanded.has(group.key);
         const openCount = group.items.filter((i) => i.status === 'open').length;
-        const isExternalGroup = activeTab === 'person' && group.items.every(i => !i.isTeamMember);
+        const isExternalGroup =
+          activeTab === 'person' && group.items.every((i) => i.owner_entity_type !== 'team');
 
         return (
           <div key={group.key}>
             {/* 외부/기타 섹션 구분 */}
-            {isExternalGroup && group === groups.find(g => g.items.every(i => !i.isTeamMember)) && (
-              <div className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-6 mb-2 px-1 col-span-full">
-                외부 / 기타
-              </div>
-            )}
+            {isExternalGroup &&
+              group ===
+                groups.find((g) => g.items.every((i) => i.owner_entity_type !== 'team')) && (
+                <div className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-6 mb-2 px-1 col-span-full">
+                  외부 / 기타
+                </div>
+              )}
             <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
               <button
                 onClick={() => toggleExpand(group.key)}
@@ -68,10 +78,10 @@ export default function ActionItemList({ groups, activeTab, toggling, onToggle, 
                 <div className="border-t border-gray-100 dark:border-gray-700">
                   {group.items.map((item) => (
                     <ActionItemCard
-                      key={item.id}
+                      key={item.action_item_id}
                       item={item}
                       activeTab={activeTab}
-                      toggling={toggling.has(item.id)}
+                      toggling={toggling.has(item.action_item_id)}
                       onToggle={onToggle}
                       onEdit={onEdit}
                       onDelete={onDelete}
