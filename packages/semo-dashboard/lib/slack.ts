@@ -22,7 +22,7 @@ interface SlackPostResult {
   error?: string;
 }
 
-async function postSlackMessage(
+export async function postSlackMessage(
   channel: string,
   text: string,
   extra?: {

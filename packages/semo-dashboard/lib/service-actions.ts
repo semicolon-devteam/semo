@@ -121,6 +121,18 @@ export async function executeSectionAction(
         '\n\n[시스템 지침] 디자인 섹션은 시각적 프리뷰를 포함해야 합니다. 컬러는 palette-preview API로 프리뷰 생성, 컴포넌트는 design-prototype 콜백으로 HTML 프로토타입을 제출하세요. 텍스트 나열만으로 제출 금지.';
     }
 
+    // Phase 4 stitch-result reject 시 Stitch 직접 수정 지침 추가
+    if (section.phase === 4 && section.section_key.startsWith('stitch-result-')) {
+      const stitchProjectId = (proj?.metadata as Record<string, unknown>)?.stitch_project_id;
+      if (stitchProjectId) {
+        enrichedNote +=
+          `\n\n[Stitch 수정] 프로젝트 ID: ${stitchProjectId}. ` +
+          `mcp__stitch__edit_screens로 PO 피드백을 직접 반영한 후, ` +
+          `mcp__stitch__get_screen으로 HTML을 재추출하여 stitch-export 콜백으로 재제출하세요. ` +
+          `전체 재생성 대신 edit_screens를 사용하세요.`;
+      }
+    }
+
     dispatchRegeneration(
       sectionId,
       section.content,

@@ -24,6 +24,7 @@ import {
 } from '@/lib/service';
 import { query } from '@/lib/db';
 import {
+  postSlackMessage,
   sendServiceQASlack,
   sendServiceSectionPendingReviewSlack,
   sendServiceStitchResultSlack,
@@ -149,6 +150,15 @@ interface IncubatorCheckpointPayload {
   next_action?: string;
 }
 
+interface DesignSystemConfirmedPayload {
+  type: 'design-system-confirmed';
+  service_id: string;
+  stitch_project_id: string;
+  stitch_design_system_id: string;
+  design_tokens_summary?: string;
+  bot_id: string;
+}
+
 type CallbackPayload =
   | SectionRegenerationPayload
   | ResearchResultPayload
@@ -163,7 +173,8 @@ type CallbackPayload =
   | FeatureConversationCompletePayload
   | FeatureTestCompletePayload
   | DeployVerificationPayload
-  | IncubatorCheckpointPayload;
+  | IncubatorCheckpointPayload
+  | DesignSystemConfirmedPayload;
 
 export async function POST(request: NextRequest) {
   try {
@@ -289,6 +300,47 @@ export async function POST(request: NextRequest) {
           `[GFP Callback] Stitch export saved: material=${material.material_id}, section=${resultSection.section_id} by ${body.bot_id}`,
         );
         return NextResponse.json({ ok: true, material, section: resultSection });
+      }
+
+      case 'design-system-confirmed': {
+        if (!body.service_id || !body.stitch_project_id || !body.stitch_design_system_id) {
+          return NextResponse.json(
+            {
+              error:
+                'service_id, stitch_project_id, and stitch_design_system_id are required for design-system-confirmed',
+            },
+            { status: 400 },
+          );
+        }
+
+        // services.metadata에 Stitch 프로젝트/디자인시스템 ID 저장
+        await query(
+          `UPDATE semo.services
+           SET metadata = COALESCE(metadata, '{}'::jsonb)
+             || jsonb_build_object(
+                  'stitch_project_id', $2::text,
+                  'stitch_design_system_id', $3::text
+                )
+           WHERE service_id::text LIKE $1 || '%'`,
+          [body.service_id, body.stitch_project_id, body.stitch_design_system_id],
+        );
+
+        // Slack 알림
+        const dsProject = await getProject(body.service_id);
+        if (dsProject) {
+          const dsSlackCtx = await resolveServiceSlackContext(body.service_id);
+          if (dsSlackCtx.channelId) {
+            postSlackMessage(
+              dsSlackCtx.channelId,
+              `[${dsProject.project_name}] 디자인 시스템이 확정되어 Stitch에 동기화되었습니다. Stitch에서 UI 생성이 진행됩니다.`,
+            ).catch((err: unknown) => console.error('DS confirmed Slack failed:', err));
+          }
+        }
+
+        console.log(
+          `[GFP Callback] Design system confirmed: stitch_project=${body.stitch_project_id}, ds=${body.stitch_design_system_id} by ${body.bot_id}`,
+        );
+        return NextResponse.json({ ok: true });
       }
 
       case 'clarification-ready': {
