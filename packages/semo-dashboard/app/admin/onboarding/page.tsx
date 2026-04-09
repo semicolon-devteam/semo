@@ -110,7 +110,7 @@ export default function AdminOnboardingPage() {
                     </span>
                   ) : (
                     <span className="text-amber-600 dark:text-amber-400">
-                      기타 (미지정) — 승인 후 권한 설정에서 멤버 매핑 필요
+                      기타 (미지정) — 승인 후 어드민이 수동으로 멤버 확인
                     </span>
                   )
                 ) : (
