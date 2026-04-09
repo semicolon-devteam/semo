@@ -216,6 +216,10 @@ class BotSession {
           : {}),
         env: {
           ...process.env,
+          // 봇 프로세스가 직접 Slack API 호출하는 것을 방지 (이중 응답 원인)
+          SLACK_BOT_TOKEN: '',
+          SLACK_APP_TOKEN: '',
+          SLACK_WEBHOOK: '',
           CLAUDE_CONFIG_DIR: path.join(os.homedir(), '.claude-orchestrator'),
         },
       },
