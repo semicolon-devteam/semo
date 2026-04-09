@@ -33,6 +33,7 @@ export async function updateSession(request: NextRequest) {
     publicPaths.some((p) => pathname.startsWith(p)) ||
     pathname.startsWith('/api/gfp/callback') ||
     pathname.startsWith('/api/projects/callback') ||
+    pathname.startsWith('/api/kb-sync') ||
     pathname.startsWith('/api/slack/') ||
     pathname.startsWith('/api/bots/profiles') ||
     // 서버 컴포넌트가 자기 API를 호출할 때 쿠키 미전달 이슈 방지 (read-only GET만)
