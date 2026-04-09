@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import crypto from 'crypto';
-
-const VOICE_TOKEN_SECRET = process.env.VOICE_TOKEN_SECRET || crypto.randomBytes(32).toString('hex');
 
 /**
  * Voice signaling token 발급
- * 현재 로그인 세션 검증 후 HMAC 서명된 short-lived token 반환
+ * 로그인 세션 검증 후 서버의 VOICE_SIGNALING_TOKEN을 그대로 반환.
+ * 인증 게이트: Supabase auth → 통과해야만 토큰 획득 가능.
  */
 export async function GET() {
   const supabase = await createClient();
@@ -19,48 +17,8 @@ export async function GET() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const payload = {
-    sub: user.id,
-    scope: 'voice:connect',
-    iat: Math.floor(Date.now() / 1000),
-    exp: Math.floor(Date.now() / 1000) + 15 * 60,
-    nonce: crypto.randomBytes(8).toString('hex'),
-  };
+  // voice signaling 서버와 동일한 토큰 (K8s secret에서 주입)
+  const token = process.env.VOICE_SIGNALING_TOKEN || 'semo-voice-dev-token';
 
-  const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signature = crypto
-    .createHmac('sha256', VOICE_TOKEN_SECRET)
-    .update(payloadB64)
-    .digest('base64url');
-
-  const token = `${payloadB64}.${signature}`;
-
-  return NextResponse.json({ token, expiresAt: payload.exp * 1000 });
-}
-
-/** 토큰 검증 유틸리티 (signaling 서버에서 사용) */
-export function verifyVoiceToken(token: string): {
-  valid: boolean;
-  payload?: Record<string, unknown>;
-} {
-  const parts = token.split('.');
-  if (parts.length !== 2) return { valid: false };
-
-  const [payloadB64, sig] = parts;
-  const expectedSig = crypto
-    .createHmac('sha256', VOICE_TOKEN_SECRET)
-    .update(payloadB64)
-    .digest('base64url');
-
-  if (sig !== expectedSig) return { valid: false };
-
-  try {
-    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
-    if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
-      return { valid: false };
-    }
-    return { valid: true, payload };
-  } catch {
-    return { valid: false };
-  }
+  return NextResponse.json({ token, expiresAt: Date.now() + 15 * 60 * 1000 });
 }
