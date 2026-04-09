@@ -13,8 +13,7 @@
    - 로컬: SubagentStop 훅 → `semo agent-flush` → bot_sessions terminated
    - 오케스트레이터: `CommitmentTracker.registerSessions()` / `terminateSessions()`
 
-3. **동시 점유 금지**: 같은 commitment를 두 세션이 동시에 claim할 수 없음
-   - `assigned_session`이 이미 설정된 commitment는 다른 세션이 claim 불가
+3. **단일 점유**: commitment claim 시 `assigned_session`을 확인하고, 이미 점유된 경우 skip
    - 소프트 락: `UPDATE ... WHERE assigned_session IS NULL OR assigned_session = $me`
 
 4. **환경 식별 필수**: `session_owner` 필드로 환경 구분

@@ -17,7 +17,7 @@
 npm run lint && npx tsc --noEmit && npm run build
 ```
 
-`--no-verify` 사용 금지. 브랜치: `dev` (기본, PR 타겟).
+커밋 시 항상 pre-commit 훅을 통과시킨다. 브랜치: `dev` (기본, PR 타겟).
 
 ### CLI 배포 (팀 전파)
 

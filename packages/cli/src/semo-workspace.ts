@@ -217,7 +217,7 @@ ${dispatchTable || '_위임 대상 없음 (DB에서 bot_delegation 조회 실패
 
 ## Constraints
 
-- \`~/.claude/semo/bots/\` 내부 파일은 DB 미러이므로 직접 수정 금지
+- \`~/.claude/semo/bots/\`는 DB 미러. 변경은 DB 수정 후 \`semo context sync\`로 반영
 - 봇 에이전트 호출 시 \`~/.claude/agents/\`의 정의를 사용
 - 스킬 실행 시 \`~/.claude/skills/\`의 정의를 사용
 
@@ -352,8 +352,8 @@ ${kbFirstBlock}
 3. **봇 파일 변경** → KB에 기록할 사항이 있는가? 소스코드와 정합성이 맞는가?
 
 **추가 규칙**:
-- SoT 위치: DB → DB에서 읽기 (하드코딩 금지). KB → \`semo kb get/search\` 조회.
-- KB 쓰기: 반드시 \`semo kb upsert\` CLI 사용 (임베딩 + 스키마 검증 포함). raw SQL INSERT 금지.
+- SoT는 DB. 값이 필요하면 DB/KB에서 동적으로 읽는다.
+- KB 쓰기는 \`semo kb upsert\` CLI를 사용한다 (임베딩 + 스키마 검증 포함).
 
 ---
 
