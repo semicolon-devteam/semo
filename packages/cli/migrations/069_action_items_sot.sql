@@ -42,11 +42,11 @@ ALTER TABLE semo.service_action_items
 -- B. 기존 데이터 마이그레이션
 -- ============================================================
 
--- B1: target_domain ← project_id → services.service_domain
+-- B1: target_domain ← service_id → services.service_domain
 UPDATE semo.service_action_items ai
 SET target_domain = s.service_domain
 FROM semo.services s
-WHERE ai.project_id = s.service_id
+WHERE ai.service_id = s.service_id
   AND ai.target_domain IS NULL;
 
 -- B2: owner_domain ← assignee가 ontology domain과 직접 매칭 (team 타입)
@@ -96,16 +96,16 @@ ALTER TABLE semo.service_action_items
     FOREIGN KEY (target_domain) REFERENCES semo.ontology(domain);
 
 -- ============================================================
--- D. project_id 컬럼 및 깨진 FK 제거
+-- D. service_id 컬럼 및 FK 제거 (owner_domain + target_domain으로 대체)
 -- ============================================================
 
 ALTER TABLE semo.service_action_items
-  DROP CONSTRAINT IF EXISTS service_action_items_project_id_fkey;
+  DROP CONSTRAINT IF EXISTS service_action_items_service_id_fkey;
 
-DROP INDEX IF EXISTS semo.idx_service_action_items_project_status;
+DROP INDEX IF EXISTS semo.idx_sai_project_status;
 
 ALTER TABLE semo.service_action_items
-  DROP COLUMN IF EXISTS project_id;
+  DROP COLUMN IF EXISTS service_id;
 
 -- ============================================================
 -- E. 테이블 리네이밍
@@ -120,7 +120,7 @@ EXCEPTION WHEN undefined_object THEN NULL;
 END $$;
 
 DO $$ BEGIN
-  ALTER INDEX semo.idx_service_action_items_assignee
+  ALTER INDEX semo.idx_sai_assignee
     RENAME TO idx_action_items_assignee;
 EXCEPTION WHEN undefined_object THEN NULL;
 END $$;

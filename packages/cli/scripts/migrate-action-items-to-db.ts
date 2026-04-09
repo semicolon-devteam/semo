@@ -215,6 +215,21 @@ async function main() {
         }
       }
 
+      // deadline 파싱: MM/DD → YYYY-MM-DD, 무효하면 null
+      let parsedDeadline: string | null = null;
+      if (item.deadline) {
+        const isoMatch = item.deadline.match(/(\d{4}-\d{2}-\d{2})/);
+        if (isoMatch) {
+          parsedDeadline = isoMatch[1];
+        } else {
+          const mdMatch = item.deadline.match(/(\d{1,2})\/(\d{1,2})/);
+          if (mdMatch) {
+            const year = new Date().getFullYear();
+            parsedDeadline = `${year}-${mdMatch[1].padStart(2, '0')}-${mdMatch[2].padStart(2, '0')}`;
+          }
+        }
+      }
+
       // date 추출
       const dateMatch = row.sub_key.match(/^\d{4}-\d{2}-\d{2}/);
 
@@ -226,13 +241,13 @@ async function main() {
         await pool.query(
           `INSERT INTO semo.action_items
             (owner_domain, target_domain, description, assignee, deadline, status, priority, source, metadata, created_at)
-           VALUES ($1, $2, $3, $4, $5::date, $6, 'normal', 'kb-migration', $7, $8)`,
+           VALUES ($1, $2, $3, $4, $5, $6, 'normal', 'kb-migration', $7, $8)`,
           [
             ownerDomain,
             targetDomain,
             item.description,
             item.assignee || (domainType === 'team' ? row.domain : null),
-            item.deadline,
+            parsedDeadline,
             item.status,
             JSON.stringify({
               kb_domain: row.domain,
