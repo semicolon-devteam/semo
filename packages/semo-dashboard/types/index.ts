@@ -528,6 +528,8 @@ export interface SandboxConfig {
     section_delay_ms: number;
   };
   run_stats?: SandboxRunStats;
+  notify_channel?: string;
+  notify_thread_ts?: string;
 }
 
 export interface SandboxPersona {
@@ -691,15 +693,23 @@ export interface ServiceKPIMetric {
   updated_at: string;
 }
 
-// ── Service Action Items ──
+// ── Action Items ──
 
 export type ActionItemStatus = 'open' | 'completed' | 'cancelled';
 export type ActionItemPriority = 'low' | 'normal' | 'high' | 'urgent';
-export type ActionItemSource = 'manual' | 'bot' | 'dashboard' | 'import';
+export type ActionItemSource =
+  | 'manual'
+  | 'bot'
+  | 'dashboard'
+  | 'import'
+  | 'meeting'
+  | 'slack-digest'
+  | 'kb-migration';
 
-export interface ServiceActionItem {
+export interface ActionItem {
   action_item_id: string;
-  service_id: string;
+  owner_domain: string;
+  target_domain: string | null;
   iteration_id: string | null;
   description: string;
   assignee: string | null;
@@ -707,14 +717,21 @@ export interface ServiceActionItem {
   status: ActionItemStatus;
   priority: ActionItemPriority;
   category: string | null;
-  source: ActionItemSource;
+  source: string;
   related_url: string | null;
   sort_order: number;
   completed_at: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  // Joined display fields
+  owner_label?: string;
+  owner_entity_type?: string;
+  target_label?: string;
 }
+
+/** @deprecated Use ActionItem instead */
+export type ServiceActionItem = ActionItem;
 
 // ── Feature Spec (구조화된 기능 명세) ──
 

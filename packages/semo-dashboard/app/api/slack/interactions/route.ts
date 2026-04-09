@@ -343,6 +343,91 @@ async function handleSandboxAction(
     }
     return;
   }
+
+  // ── Sandbox Section Review (Slack Interactive) ──
+
+  if (actionId.startsWith('sandbox_section_approve_')) {
+    const { serviceId, sectionId } = value as { serviceId: string; sectionId: string };
+    const result = await executeSectionAction({
+      serviceId,
+      sectionId,
+      action: 'approve',
+      actionSource: 'slack',
+    });
+
+    if (channel && messageTs) {
+      const project = await getProject(serviceId);
+      if (result.phaseAdvanced) {
+        await updateSlackMessage(channel, messageTs, [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `✅ *${result.section?.title}* 승인됨\n\n🎉 *Phase ${result.section?.phase ?? 0} 완료!* 다음 Phase 섹션을 주입합니다...`,
+            },
+          },
+        ]);
+      } else {
+        const { listSections } = await import('@/lib/service');
+        const remaining = (await listSections(serviceId)).filter(
+          (s) => s.status === 'pending-review',
+        ).length;
+        await updateSlackMessage(channel, messageTs, [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `✅ *${result.section?.title}* 승인됨 (잔여 ${remaining}개)\n${result.error ? `⚠️ ${result.error}` : ''}`,
+            },
+          },
+        ]);
+      }
+    }
+    return;
+  }
+
+  if (actionId.startsWith('sandbox_section_reject_')) {
+    const { serviceId, sectionId, phase } = value as {
+      serviceId: string;
+      sectionId: string;
+      phase: number;
+    };
+    const phaseLabel = PHASE_LABELS[phase] ?? `Phase ${phase}`;
+    await openSlackModal(
+      (payload.trigger_id as string) || '',
+      buildRejectionModalView({ serviceId, sectionId, sectionTitle: `${phaseLabel} 섹션`, phase }),
+    );
+    return;
+  }
+
+  if (actionId === 'sandbox_approve_all_pending') {
+    const { serviceId } = value as { serviceId: string };
+    const { listSections } = await import('@/lib/service');
+    const sections = (await listSections(serviceId)).filter((s) => s.status === 'pending-review');
+
+    let approved = 0;
+    let lastResult: Awaited<ReturnType<typeof executeSectionAction>> | null = null;
+    for (const s of sections) {
+      lastResult = await executeSectionAction({
+        serviceId,
+        sectionId: s.section_id,
+        action: 'approve',
+        actionSource: 'slack',
+      });
+      approved++;
+    }
+
+    if (channel && messageTs) {
+      const phaseAdvanced = lastResult?.phaseAdvanced;
+      const statusText = phaseAdvanced
+        ? `⚡ ${approved}개 섹션 전체 승인 — Phase 완료! 다음 Phase 주입 중...`
+        : `⚡ ${approved}개 섹션 전체 승인 완료`;
+      await updateSlackMessage(channel, messageTs, [
+        { type: 'section', text: { type: 'mrkdwn', text: statusText } },
+      ]);
+    }
+    return;
+  }
 }
 
 // ── Sandbox Slack Block Builders ──

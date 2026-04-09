@@ -394,7 +394,9 @@ export function triggerSandboxAdvance(
   metadata: Record<string, unknown>,
 ): void {
   const sandbox = metadata?.sandbox as SandboxConfig | undefined;
-  if (!sandbox?.enabled || !sandbox.auto_advance) return;
+  if (!sandbox?.enabled) return;
+  // interactive 모드에서도 mock 주입은 진행 (auto_advance=false라도)
+  if (!sandbox.auto_advance && sandbox.virtual_po.mode !== 'interactive') return;
 
   scheduleSandboxNextPhase(serviceId, nextPhase, metadata).catch((err) =>
     console.error('[SANDBOX] Auto-advance trigger failed:', err),
@@ -426,7 +428,8 @@ export async function scheduleSandboxNextPhase(
   metadata: Record<string, unknown>,
 ): Promise<void> {
   const sandbox = metadata.sandbox as SandboxConfig | undefined;
-  if (!sandbox?.enabled || !sandbox.auto_advance) return;
+  if (!sandbox?.enabled) return;
+  if (!sandbox.auto_advance && sandbox.virtual_po.mode !== 'interactive') return;
   if (sandbox.mode !== 'mock') return; // live 모드는 실제 봇이 처리
 
   const maxPhase = getMaxPhaseForDepth(sandbox.depth);
@@ -461,6 +464,24 @@ export async function scheduleSandboxNextPhase(
             ),
           sandbox.timing.section_delay_ms,
         );
+      }
+
+      // interactive 모드 + notify_channel → 다음 Phase Slack 버튼 메시지 자동 발송
+      if (sandbox.virtual_po.mode === 'interactive' && sandbox.notify_channel) {
+        try {
+          const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space';
+          await fetch(`${baseUrl}/api/projects/sandbox/slack-review`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              service_id: serviceId,
+              channel_id: sandbox.notify_channel,
+              thread_ts: sandbox.notify_thread_ts,
+            }),
+          });
+        } catch (err) {
+          console.error('[SANDBOX] Slack review notification failed:', err);
+        }
       }
     } catch (err) {
       console.error(`[SANDBOX] Mock injection failed for Phase ${nextPhase}:`, err);

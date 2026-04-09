@@ -43,6 +43,7 @@ import { registerDbCommands } from './commands/db';
 import { registerMemoryCommands } from './commands/memory';
 import { registerTestCommands } from './commands/test';
 import { registerCommitmentsCommands } from './commands/commitments';
+import { registerActionItemsCommands } from './commands/action-items';
 import { registerAgentFlushCommands } from './commands/agent-flush';
 import { registerContextPreserveCommands } from './commands/context-preserve';
 import { registerServiceCommands } from './commands/service';
@@ -611,6 +612,20 @@ const SEMO_CREDENTIALS: CredentialDef[] = [
     sensitive: false,
     description: 'Slack 알림 Webhook (선택)',
     promptMessage: 'SLACK_WEBHOOK (없으면 Enter):',
+  },
+  {
+    key: 'SLACK_BOT_TOKEN',
+    required: false,
+    sensitive: true,
+    description: 'SemoBot Slack Bot Token (오케스트레이터용)',
+    promptMessage: 'SLACK_BOT_TOKEN (없으면 Enter):',
+  },
+  {
+    key: 'SLACK_APP_TOKEN',
+    required: false,
+    sensitive: true,
+    description: 'SemoBot Slack App Token (Socket Mode용)',
+    promptMessage: 'SLACK_APP_TOKEN (없으면 Enter):',
   },
 ];
 
@@ -2752,6 +2767,7 @@ registerDbCommands(program);
 registerMemoryCommands(program);
 registerTestCommands(program);
 registerCommitmentsCommands(program);
+registerActionItemsCommands(program);
 registerServiceCommands(program);
 registerHarnessCommands(program);
 registerIncubatorCommands(program);

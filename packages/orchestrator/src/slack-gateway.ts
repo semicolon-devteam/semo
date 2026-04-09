@@ -81,6 +81,7 @@ export class SlackGateway {
     // app_mention events
     this.socket.on('app_mention', async ({ event, ack }) => {
       await ack();
+      if (event.bot_id) return; // 봇이 자기 자신을 멘션한 경우 무시
       await this.handleEvent(event);
     });
 
