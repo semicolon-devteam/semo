@@ -87,7 +87,8 @@ export default function OnboardingPage() {
         setError(data.error || '제출에 실패했습니다.');
         return;
       }
-      router.replace('/onboarding/pending');
+      // full reload로 AuthProvider 상태 초기화 후 pending 페이지로
+      window.location.href = '/onboarding/pending';
     } catch {
       setError('네트워크 오류가 발생했습니다.');
     } finally {
