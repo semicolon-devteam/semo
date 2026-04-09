@@ -5,8 +5,9 @@
 ## 읽기 라우팅
 | 정보 | 조회 방법 | 이유 |
 |------|-----------|------|
+| 서비스 구조화 메타 (status, po, tech-stack, url, repo, slack, BM) | DB: `semo service get {domain}` | **services 테이블이 SoT** (v070+) |
 | 프로젝트 실행 상태 (phase, sections, approvals) | PM API: `GET /api/projects/{id}` | 실시간 워크플로우 상태 |
-| 서비스 정체성 (base-info, po, tech-stack) | KB: `semo kb get {service} base-information` | 서비스 메타데이터 SoT |
+| 서비스 자유형 지식 (base-info, 소개, 현황) | KB: `semo kb get {service} base-information` | 자유형 마크다운 |
 | 완료된 스펙 (discovery, prd 등) | KB: `semo kb get {service} spec/{phase}` | PM 파이프라인이 자동 동기화 |
 | 의사결정/프로세스 | KB: `semo kb get semicolon decision {slug}` | 조직 지식 SoT |
 | 인시던트/장애 기록 | KB: `semo kb get {service} incident {slug}` | 서비스별 장애 이력 |
@@ -14,10 +15,13 @@
 ## 쓰기 라우팅
 | 작업 | 쓰기 대상 |
 |------|-----------|
+| 서비스 구조화 메타 변경 (status, tech-stack, url, repo 등) | DB: `semo service update --domain {domain} ...` |
 | 섹션 제출/재생성 | PM API: `POST /api/projects/callback` |
-| 서비스 정보 변경 | KB: `semo kb upsert {service} {key}` |
+| 서비스 자유형 지식 변경 (base-info, decision, process 등) | KB: `semo kb upsert {service} {key}` |
 | 인시던트/장애 기록 | KB: `semo kb upsert {service} incident {slug} --metadata '{"occurred_at":"...","severity":"...","status":"..."}'` |
 | 진행 상태 요약 | (자동) PM 파이프라인 → KB projection |
+
+> **v070+**: `status`, `po`, `tech-stack`, `service-url`, `bm`, `repo`, `slack-channel`은 KB 스키마에서 제거됨. `semo kb upsert`로 이 키에 쓰기 시도하면 거부됨.
 
 ## Projection Key (읽기 전용)
 아래 KB 키는 PM 파이프라인(`pm-pipeline`)이 자동 동기화. 읽기만 가능하며 CLI가 직접 쓰기를 거부한다:

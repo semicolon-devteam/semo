@@ -20,7 +20,9 @@ function commonBlock(route: RouteResult): string {
 콜백 API: POST ${url}/api/projects/callback
 
 ## Data Routing
-- 읽기: 프로젝트 상태 → Dashboard API, 서비스 정보 → semo kb get ${route.serviceDomain}
+- 읽기: 서비스 구조화 메타(status, po, tech-stack, url, repo) → semo service get ${route.serviceDomain}
+- 읽기: 서비스 자유형 지식(base-info, decision, process) → semo kb get ${route.serviceDomain}
+- 읽기: 프로젝트 실행 상태(phase, sections) → Dashboard API
 - 쓰기: 섹션 제출/재생성 → POST /api/projects/callback (KB spec/* 직접 쓰기 금지)
 
 ## Slack-First 원칙
