@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import ColorPaletteSummary from '@/components/gfp/ColorPaletteSummary';
+import ColorPaletteSummary from '@/components/service/ColorPaletteSummary';
 import type { ColorGroup } from '@/lib/design-system-parser';
 
 interface PreviewData {
@@ -27,7 +27,10 @@ export default function PalettePreviewPage() {
   useEffect(() => {
     fetch(`/api/design/palette-preview/${previewId}`)
       .then((res) => {
-        if (!res.ok) throw new Error(res.status === 404 ? '프리뷰를 찾을 수 없거나 만료되었습니다.' : '로드 실패');
+        if (!res.ok)
+          throw new Error(
+            res.status === 404 ? '프리뷰를 찾을 수 없거나 만료되었습니다.' : '로드 실패',
+          );
         return res.json();
       })
       .then(setData)
@@ -45,10 +48,7 @@ export default function PalettePreviewPage() {
   // ColorGroup[]을 Tailwind config 형식 텍스트로 변환
   const colorsToContent = (colors: ColorGroup[]): string => {
     return colors
-      .map(
-        (g) =>
-          `${g.name}: { ${g.shades.map((s) => `${s.shade}: '${s.hex}'`).join(', ')} }`
-      )
+      .map((g) => `${g.name}: { ${g.shades.map((s) => `${s.shade}: '${s.hex}'`).join(', ')} }`)
       .join('\n');
   };
 

@@ -3,11 +3,11 @@
  * 승인된 섹션에서 기능을 추출하여 service_features에 자동 등록
  */
 
-import { createFeature, updateFeature, listFeatures } from './gfp';
+import { createFeature, updateFeature, listFeatures } from './service';
 import { normalizeSpec, mergeSpecs, nextAcId, nextUsId, nextTsId } from './feature-spec';
 import type {
-  GfpPhaseSection,
-  GfpProject,
+  ServiceSection,
+  ServiceProject,
   FeatureSpec,
   AcceptanceCriterion,
   UserStory,
@@ -15,16 +15,15 @@ import type {
 } from '@/types';
 
 export async function extractAndCreateFeaturesFromPhase(
-  gfpId: string,
+  serviceId: string,
   phase: number,
-  sections: GfpPhaseSection[],
-  project: GfpProject,
+  sections: ServiceSection[],
+  project: ServiceProject,
 ): Promise<{ created: number; enriched: number; errors: string[] }> {
   const errors: string[] = [];
   let created = 0;
   let enriched = 0;
 
-  const serviceId = project.service_id;
   const existing = await listFeatures(serviceId);
   const existingNames = new Map(existing.map((f) => [f.name.toLowerCase(), f]));
 
@@ -113,7 +112,7 @@ export async function extractAndCreateFeaturesFromPhase(
 
 // ── 헬퍼 함수 ──
 
-function extractFeatureName(section: GfpPhaseSection): string {
+function extractFeatureName(section: ServiceSection): string {
   // 섹션 제목에서 기능명 추출 (에픽 번호 등 제거)
   let name = section.title;
   // "Epic 1: 포트폴리오" → "포트폴리오"

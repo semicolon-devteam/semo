@@ -20,7 +20,7 @@ import type { BotConfig, DispatchContext, DispatchResult } from './types';
 import type { BotId } from './bot-config';
 // resolveModelForMessage 보류 — 쿼터 절감 기간 중 전체 Sonnet 고정
 import { CostTracker } from './cost-tracker';
-import { buildGfpContext } from './gfp-context';
+import { buildGfpContext } from './service-context';
 import { AsyncQueue } from './async-queue';
 
 const SESSIONS_DIR = path.join(os.homedir(), '.semo-bot-sessions');
@@ -103,11 +103,16 @@ class BotSession {
             ? [
                 'mcp__stitch__list_projects',
                 'mcp__stitch__create_project',
-                'mcp__stitch__generate_screen_from_text',
+                'mcp__stitch__get_project',
+                'mcp__stitch__list_screens',
                 'mcp__stitch__get_screen',
-                'mcp__stitch__get_screen_code',
-                'mcp__stitch__get_screen_image',
-                'mcp__stitch__build_site',
+                'mcp__stitch__generate_screen_from_text',
+                'mcp__stitch__edit_screens',
+                'mcp__stitch__generate_variants',
+                'mcp__stitch__list_design_systems',
+                'mcp__stitch__create_design_system',
+                'mcp__stitch__apply_design_system',
+                'mcp__stitch__update_design_system',
               ]
             : []),
         ],

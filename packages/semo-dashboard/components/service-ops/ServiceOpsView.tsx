@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { GfpProject, ServiceFeature, ServiceKPIMetric, ServiceActionItem } from '@/types';
-import type { ServiceOverviewKB } from '@/lib/gfp';
+import type { ServiceProject, ServiceFeature, ServiceKPIMetric, ServiceActionItem } from '@/types';
+import type { ServiceOverviewKB } from '@/lib/service';
 import ServiceOverviewTab from './ServiceOverviewTab';
 import ServiceSprintTab from './ServiceSprintTab';
 import type { SprintTabData } from './ServiceSprintTab';
@@ -15,7 +15,7 @@ interface ServiceOpsViewProps {
 }
 
 interface OverviewData {
-  project: GfpProject;
+  project: ServiceProject;
   kb: ServiceOverviewKB;
 }
 
@@ -86,14 +86,18 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
   }
 
   const project = overview.project;
-  const lifecycleBadge = project.lifecycle === 'ops'
-    ? { label: '운영 중', color: 'bg-green-600' }
-    : { label: '종료', color: 'bg-zinc-600' };
+  const lifecycleBadge =
+    project.lifecycle === 'ops'
+      ? { label: '운영 중', color: 'bg-green-600' }
+      : { label: '종료', color: 'bg-zinc-600' };
 
   const tabs: { key: OpsTab; label: string }[] = [
     { key: 'overview', label: '개요' },
     { key: 'sprint', label: '스프린트 & KPI' },
-    { key: 'features', label: `기능 관리 (${features.filter(f => f.status !== 'deprecated').length})` },
+    {
+      key: 'features',
+      label: `기능 관리 (${features.filter((f) => f.status !== 'deprecated').length})`,
+    },
   ];
 
   return (
@@ -101,12 +105,16 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-zinc-400 mb-1">
-          <a href="/gfp" className="hover:text-zinc-200">서비스</a>
+          <a href="/gfp" className="hover:text-zinc-200">
+            서비스
+          </a>
           <span>/</span>
         </div>
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-white">{project.project_name}</h1>
-          <span className={`px-2 py-0.5 rounded text-xs font-medium text-white ${lifecycleBadge.color}`}>
+          <span
+            className={`px-2 py-0.5 rounded text-xs font-medium text-white ${lifecycleBadge.color}`}
+          >
             {lifecycleBadge.label}
           </span>
           {project.status === 'paused' && (
@@ -118,7 +126,9 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
         <p className="text-sm text-zinc-400 mt-1">
           오너: {project.owner_name}
           {project.service_domain && <> | 도메인: {project.service_domain}</>}
-          {project.launched_at && <> | 운영 시작: {new Date(project.launched_at).toLocaleDateString('ko-KR')}</>}
+          {project.launched_at && (
+            <> | 운영 시작: {new Date(project.launched_at).toLocaleDateString('ko-KR')}</>
+          )}
         </p>
       </div>
 
@@ -140,22 +150,22 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'overview' && (
-        <ServiceOverviewTab project={project} kb={overview.kb} />
-      )}
+      {activeTab === 'overview' && <ServiceOverviewTab project={project} kb={overview.kb} />}
       {activeTab === 'sprint' && kbKpiData && (
         <ServiceSprintTab
-          data={{
-            metrics: dbMetrics?.metrics,
-            periods: dbMetrics?.periods,
-            latestPeriod: dbMetrics?.latestPeriod,
-            actionItems: dbActionItems.length > 0 ? dbActionItems : undefined,
-            kpiSnapshots: kbKpiData.kpiSnapshots,
-            actionItemsRaw: kbKpiData.actionItems,
-            milestones: kbKpiData.milestones,
-            incidents: kbKpiData.incidents,
-            projectId,
-          } satisfies SprintTabData}
+          data={
+            {
+              metrics: dbMetrics?.metrics,
+              periods: dbMetrics?.periods,
+              latestPeriod: dbMetrics?.latestPeriod,
+              actionItems: dbActionItems.length > 0 ? dbActionItems : undefined,
+              kpiSnapshots: kbKpiData.kpiSnapshots,
+              actionItemsRaw: kbKpiData.actionItems,
+              milestones: kbKpiData.milestones,
+              incidents: kbKpiData.incidents,
+              projectId,
+            } satisfies SprintTabData
+          }
           onRefresh={loadData}
         />
       )}

@@ -6,8 +6,8 @@ import remarkGfm from 'remark-gfm';
 import rehypeHighlight from 'rehype-highlight';
 import 'highlight.js/styles/github-dark.css';
 import MermaidBlock from './MermaidBlock';
-import GfpQAForm from './ProjectQAForm';
-import GfpDesignPreview, { extractHtmlFromContent } from './GfpDesignPreview';
+import ServiceQAForm from './ProjectQAForm';
+import ServiceDesignPreview, { extractHtmlFromContent } from '../service/ServiceDesignPreview';
 import ColorCodeBlock from './ColorCodeBlock';
 import ColorPaletteSummary from './ColorPaletteSummary';
 import TypographyPreviewFull from './TypographyPreviewFull';
@@ -16,9 +16,9 @@ import ComponentStylePicker from './ComponentStylePicker';
 import { hasMultipleColors } from '@/lib/design-system-parser';
 import { usePoProfile } from './PoProfileContext';
 import { shouldShowCode } from '@/lib/po-profile';
-import type { GfpPhaseSection, GfpSectionStatus, GfpQAItem } from '@/types';
+import type { ServiceSection, ServiceSectionStatus, ServiceQAItem } from '@/types';
 
-const STATUS_STYLES: Record<GfpSectionStatus, { bg: string; text: string; label: string }> = {
+const STATUS_STYLES: Record<ServiceSectionStatus, { bg: string; text: string; label: string }> = {
   draft: {
     bg: 'bg-gray-100 dark:bg-gray-700',
     text: 'text-gray-600 dark:text-gray-400',
@@ -53,8 +53,8 @@ const SOURCE_LABELS: Record<string, string> = {
 };
 
 interface GfpSectionCardProps {
-  section: GfpPhaseSection;
-  gfpId: string;
+  section: ServiceSection;
+  serviceId: string;
   focused?: boolean;
   onApprove: (sectionId: string) => void;
   onReject: (sectionId: string, note: string) => void;
@@ -64,7 +64,7 @@ interface GfpSectionCardProps {
 
 export default function GfpSectionCard({
   section,
-  gfpId,
+  serviceId,
   focused,
   onApprove,
   onReject,
@@ -200,10 +200,10 @@ export default function GfpSectionCard({
           {/* Content: Q&A form, Design Preview, or Markdown */}
           {section.qa_items && Array.isArray(section.qa_items) && section.qa_items.length > 0 ? (
             <div className="mb-4">
-              <GfpQAForm
+              <ServiceQAForm
                 sectionId={section.section_id}
-                gfpId={gfpId}
-                qaItems={section.qa_items as GfpQAItem[]}
+                serviceId={serviceId}
+                qaItems={section.qa_items as ServiceQAItem[]}
                 onSaved={onQASaved ?? (() => {})}
               />
             </div>
@@ -227,7 +227,7 @@ export default function GfpSectionCard({
               <ComponentStylePicker
                 content={section.content}
                 sectionId={section.section_id}
-                gfpId={gfpId}
+                serviceId={serviceId}
               />
               <CodeAccordion content={section.content} />
             </div>
@@ -249,7 +249,7 @@ export default function GfpSectionCard({
                   </div>
                 ) : null;
               })()}
-              <GfpDesignPreview
+              <ServiceDesignPreview
                 htmlContent={extractHtmlFromContent(section.content)!}
                 title={section.title}
               />
@@ -265,7 +265,7 @@ export default function GfpSectionCard({
                 </div>
               )}
               <div
-                className={`prose prose-sm dark:prose-invert max-w-none gfp-prose ${
+                className={`prose prose-sm dark:prose-invert max-w-none service-prose ${
                   poProfile.tech_level === 'non-technical' && section.phase >= 7
                     ? 'max-h-[200px] overflow-hidden relative after:absolute after:bottom-0 after:left-0 after:right-0 after:h-12 after:bg-gradient-to-t after:from-white dark:after:from-gray-800'
                     : ''
@@ -306,7 +306,7 @@ export default function GfpSectionCard({
                   <summary className="text-xs text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600">
                     전체 내용 보기
                   </summary>
-                  <div className="mt-2 prose prose-sm dark:prose-invert max-w-none gfp-prose">
+                  <div className="mt-2 prose prose-sm dark:prose-invert max-w-none service-prose">
                     <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
                       rehypePlugins={[rehypeHighlight]}
@@ -347,7 +347,7 @@ export default function GfpSectionCard({
           {/* Actions */}
           {(section.status === 'pending-review' || section.status === 'draft') &&
             (() => {
-              const qaItems = section.qa_items as GfpQAItem[] | null;
+              const qaItems = section.qa_items as ServiceQAItem[] | null;
               const unansweredCount = qaItems ? qaItems.filter((q) => !q.answer).length : 0;
               const approveDisabled = unansweredCount > 0;
 
@@ -443,7 +443,7 @@ function CodeAccordion({ content }: { content: string }) {
       <summary className="text-xs text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-300 select-none">
         코드 보기
       </summary>
-      <div className="mt-2 prose prose-sm dark:prose-invert max-w-none gfp-prose">
+      <div className="mt-2 prose prose-sm dark:prose-invert max-w-none service-prose">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
           rehypePlugins={[rehypeHighlight]}

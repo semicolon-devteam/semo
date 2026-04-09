@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/provider';
 import { ALL_MENU_KEYS } from '@/lib/auth/types';
-import type { GfpProject } from '@/types';
+import type { ServiceProject } from '@/types';
 
 interface UserWithAccess {
   id: string;
@@ -34,7 +34,7 @@ export default function PermissionsPage() {
   const { isAdmin, loading: authLoading } = useAuth();
   const router = useRouter();
   const [users, setUsers] = useState<UserWithAccess[]>([]);
-  const [projects, setProjects] = useState<GfpProject[]>([]);
+  const [projects, setProjects] = useState<ServiceProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);

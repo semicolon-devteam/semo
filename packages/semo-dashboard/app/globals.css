@@ -27,12 +27,12 @@ body {
 }
 
 /* GFP Section card prose 조정 */
-.gfp-prose h1 { font-size: 1.25rem; margin-top: 1.5rem; }
-.gfp-prose h2 { font-size: 1.1rem; margin-top: 1.25rem; }
-.gfp-prose h3 { font-size: 1rem; margin-top: 1rem; }
-.gfp-prose table { font-size: 0.85rem; }
-.gfp-prose ul, .gfp-prose ol { padding-left: 1.25rem; }
-.gfp-prose blockquote { border-left-width: 3px; }
+.service-prose h1 { font-size: 1.25rem; margin-top: 1.5rem; }
+.service-prose h2 { font-size: 1.1rem; margin-top: 1.25rem; }
+.service-prose h3 { font-size: 1rem; margin-top: 1rem; }
+.service-prose table { font-size: 0.85rem; }
+.service-prose ul, .service-prose ol { padding-left: 1.25rem; }
+.service-prose blockquote { border-left-width: 3px; }
 
 /* Mobile nav slide-in animation */
 @keyframes slide-in-right {

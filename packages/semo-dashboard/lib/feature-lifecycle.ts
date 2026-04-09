@@ -9,11 +9,11 @@
  */
 
 import { query } from './db';
-import { updateFeature, getProject } from './gfp';
-import { dispatchBotMessage } from './gfp-bot';
+import { updateFeature, getProject } from './service';
+import { dispatchBotMessage } from './service-bot';
 import { getItem } from './kb';
 import type { ServiceFeatureStatus } from '@/types';
-import type { ServiceFeature } from './gfp';
+import type { ServiceFeature } from './service';
 
 // ── Transition Rules ──
 

@@ -5,9 +5,9 @@
 
 import crypto from 'crypto';
 import { query } from './db';
-import { getPhaseAssignee, getPhaseCc, PHASE_LABELS, INFRA_PHASE_LABELS } from './gfp-phases';
+import { getPhaseAssignee, getPhaseCc, PHASE_LABELS, INFRA_PHASE_LABELS } from './service-phases';
 import { getBotSlackProfiles } from './bot-profiles';
-import type { GfpQAItem, GfpInfraRequest } from '@/types';
+import type { ServiceQAItem, GfpInfraRequest } from '@/types';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const DASHBOARD_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space';
@@ -68,7 +68,7 @@ async function postSlackMessage(
 }
 
 // Re-export for backward compat (removed local PHASE_LABELS, now from gfp-phases)
-export { PHASE_LABELS } from './gfp-phases';
+export { PHASE_LABELS } from './service-phases';
 
 // ── Channel Resolution ──
 
@@ -77,19 +77,25 @@ export interface GfpSlackContext {
   ownerSlackId: string | null;
 }
 
-export async function resolveGfpSlackContext(gfpId: string): Promise<GfpSlackContext> {
+export async function resolveServiceSlackContext(serviceId: string): Promise<GfpSlackContext> {
   let channelId: string | null = null;
   let ownerSlackId: string | null = null;
 
   try {
     const project = await query(
       `SELECT metadata, service_domain, project_name FROM semo.services WHERE service_id = $1`,
-      [gfpId],
+      [serviceId],
     );
     if (project.rows.length > 0) {
       const meta = project.rows[0].metadata as Record<string, unknown>;
       const domain = project.rows[0].service_domain as string;
       const projectName = project.rows[0].project_name as string;
+
+      // Sandbox suppress: sandbox 프로젝트는 Slack 알림 차단
+      if ((meta?.sandbox as Record<string, unknown>)?.slack_suppress) {
+        console.log(`[SANDBOX-SLACK] Suppressed notifications for project ${serviceId}`);
+        return { channelId: '', ownerSlackId: null };
+      }
 
       // Owner Slack ID
       if (meta?.ownerSlackId && typeof meta.ownerSlackId === 'string') {
@@ -112,10 +118,10 @@ export async function resolveGfpSlackContext(gfpId: string): Promise<GfpSlackCon
 
       // 채널 없으면 Reus에게 DM으로 설정 요청
       if (!channelId && SLACK_BOT_TOKEN) {
-        const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${gfpId}`;
+        const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${serviceId}`;
         await postSlackMessage(
           REUS_DM_CHANNEL,
-          `[GFP] ${projectName} (domain: ${domain || 'N/A'}) 프로젝트에 Slack 채널이 설정되지 않았습니다.\n\nKB에 채널을 등록해주세요:\n\`semo kb upsert ${domain || 'DOMAIN'} slack-channel --content "C채널ID"\`\n\n프로젝트: <${dashboardUrl}|${projectName}>`,
+          `[Service] ${projectName} (domain: ${domain || 'N/A'}) 프로젝트에 Slack 채널이 설정되지 않았습니다.\n\nKB에 채널을 등록해주세요:\n\`semo kb upsert ${domain || 'DOMAIN'} slack-channel --content "C채널ID"\`\n\n프로젝트: <${dashboardUrl}|${projectName}>`,
           { botId: 'semiclaw' },
         );
         // DM 보냈으므로 null 반환 — 호출자가 알림 skip
@@ -130,8 +136,8 @@ export async function resolveGfpSlackContext(gfpId: string): Promise<GfpSlackCon
 }
 
 // 하위 호환
-export async function resolveGfpSlackChannel(gfpId: string): Promise<string> {
-  const ctx = await resolveGfpSlackContext(gfpId);
+export async function resolveServiceSlackChannel(serviceId: string): Promise<string> {
+  const ctx = await resolveServiceSlackContext(serviceId);
   return ctx.channelId;
 }
 
@@ -139,7 +145,7 @@ export async function resolveGfpSlackChannel(gfpId: string): Promise<string> {
 
 export interface GfpRejectionNotifyOpts {
   projectName: string;
-  gfpId: string;
+  serviceId: string;
   sectionId: string;
   sectionKey: string;
   sectionTitle: string;
@@ -148,25 +154,25 @@ export interface GfpRejectionNotifyOpts {
   channelId?: string;
 }
 
-export async function sendGfpRejectionSlack(opts: GfpRejectionNotifyOpts): Promise<boolean> {
+export async function sendServiceRejectionSlack(opts: GfpRejectionNotifyOpts): Promise<boolean> {
   if (!SLACK_BOT_TOKEN) {
     console.warn('SLACK_BOT_TOKEN not set — skipping GFP rejection notification');
     return false;
   }
 
-  const channel = opts.channelId || (await resolveGfpSlackChannel(opts.gfpId));
+  const channel = opts.channelId || (await resolveServiceSlackChannel(opts.serviceId));
   if (!channel) {
     console.warn('No Slack channel resolved — DM sent to Reus');
     return false;
   }
   const assignee = getPhaseAssignee(opts.phase);
   const phaseLabel = PHASE_LABELS[opts.phase] ?? `Phase ${opts.phase}`;
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=${opts.phase}&section=${opts.sectionKey}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=${opts.phase}&section=${opts.sectionKey}`;
 
   const blocks = [
     {
       type: 'header',
-      text: { type: 'plain_text', text: '🔴 GFP 섹션 거절', emoji: true },
+      text: { type: 'plain_text', text: '🔴 서비스 섹션 거절', emoji: true },
     },
     {
       type: 'section',
@@ -207,11 +213,11 @@ export async function sendGfpRejectionSlack(opts: GfpRejectionNotifyOpts): Promi
   return true;
 }
 
-// ── GFP Phase Completed Notification ──
+// ── Service Phase Completed Notification ──
 
 export interface GfpPhaseCompletedOpts {
   projectName: string;
-  gfpId: string;
+  serviceId: string;
   completedPhase: number;
   nextPhase: number | null; // null = 마지막 phase 완료
   channelId?: string;
@@ -220,13 +226,15 @@ export interface GfpPhaseCompletedOpts {
   metadata?: Record<string, unknown>; // 프리셋 CC skip 판별용
 }
 
-export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): Promise<boolean> {
+export async function sendServicePhaseCompletedSlack(
+  opts: GfpPhaseCompletedOpts,
+): Promise<boolean> {
   if (!SLACK_BOT_TOKEN) {
     console.warn('SLACK_BOT_TOKEN not set — skipping GFP phase complete notification');
     return false;
   }
 
-  const channel = opts.channelId || (await resolveGfpSlackChannel(opts.gfpId));
+  const channel = opts.channelId || (await resolveServiceSlackChannel(opts.serviceId));
   if (!channel) {
     console.warn('No Slack channel resolved — DM sent to Reus');
     return false;
@@ -234,7 +242,7 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
   const completedLabel = PHASE_LABELS[opts.completedPhase] ?? `Phase ${opts.completedPhase}`;
   const phaseForUrl =
     opts.nextPhase !== null && opts.nextPhase <= 9 ? opts.nextPhase : opts.completedPhase;
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=${phaseForUrl}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=${phaseForUrl}`;
 
   const isLastPhase = opts.nextPhase === null || opts.nextPhase > 9;
   const nextLabel = isLastPhase
@@ -243,7 +251,7 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
 
   // 다음 Phase 담당 봇 + CC 봇 (예: InfraClaw) — 프리셋에 따라 skip 가능
   const nextAssignee = isLastPhase ? null : getPhaseAssignee(opts.nextPhase!);
-  const { shouldSkipCc } = await import('./gfp-presets');
+  const { shouldSkipCc } = await import('./service-presets');
   const ccBots = isLastPhase
     ? []
     : opts.metadata && shouldSkipCc(opts.metadata, opts.nextPhase!)
@@ -258,7 +266,7 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
 
   const textFallback = isLastPhase
     ? `${ownerMention.trim()} [GFP Complete] ${opts.projectName} — 모든 Phase 완료!`
-    : `${allMentions} [GFP Phase Complete] ${opts.projectName} — Phase ${opts.completedPhase} (${completedLabel}) 전체 승인. Phase ${opts.nextPhase} (${nextLabel}) 섹션 작성을 시작해주세요.`;
+    : `${allMentions} [Service Phase Complete] ${opts.projectName} — Phase ${opts.completedPhase} (${completedLabel}) 전체 승인. Phase ${opts.nextPhase} (${nextLabel}) 섹션 작성을 시작해주세요.`;
 
   const ownerField = opts.ownerSlackId
     ? [{ type: 'mrkdwn', text: `*오너:*\n<@${opts.ownerSlackId}>` }]
@@ -279,7 +287,7 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
       type: 'header',
       text: {
         type: 'plain_text',
-        text: isLastPhase ? '🎉 GFP 전체 Phase 완료' : '🟢 GFP Phase 완료',
+        text: isLastPhase ? '🎉 GFP 전체 Phase 완료' : '🟢 Service Phase 완료',
         emoji: true,
       },
     },
@@ -314,7 +322,7 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
       elements: [
         {
           type: 'mrkdwn',
-          text: `GFP ID: \`${opts.gfpId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>`,
+          text: `GFP ID: \`${opts.serviceId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>`,
         },
       ],
     },
@@ -335,12 +343,12 @@ export async function sendGfpPhaseCompletedSlack(opts: GfpPhaseCompletedOpts): P
 
 export interface GfpQASlackOpts {
   projectName: string;
-  gfpId: string;
+  serviceId: string;
   sections: Array<{
     section_id: string;
     section_key: string;
     title: string;
-    qa_items: GfpQAItem[];
+    qa_items: ServiceQAItem[];
   }>;
   channelId: string;
 }
@@ -349,12 +357,12 @@ export interface GfpQASlackOpts {
  * Send Phase 3 Q&A questions to Slack — one parent message + one threaded reply per category.
  * Returns a map of section_id → Slack thread_ts for answer collection.
  */
-export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, string>> {
+export async function sendServiceQASlack(opts: GfpQASlackOpts): Promise<Map<string, string>> {
   const threadMap = new Map<string, string>();
 
   if (!SLACK_BOT_TOKEN || !opts.channelId) return threadMap;
 
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=3`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=3`;
   const totalQuestions = opts.sections.reduce((sum, s) => sum + s.qa_items.length, 0);
 
   const categoryList = opts.sections
@@ -386,7 +394,7 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
       elements: [
         {
           type: 'mrkdwn',
-          text: `GFP ID: \`${opts.gfpId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>`,
+          text: `GFP ID: \`${opts.serviceId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>`,
         },
       ],
     },
@@ -395,7 +403,7 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
   try {
     const parentData = await postSlackMessage(
       opts.channelId,
-      `[GFP] ${opts.projectName} — Phase 3 명확화 (${totalQuestions}개 질문)`,
+      `[Service] ${opts.projectName} — Phase 3 명확화 (${totalQuestions}개 질문)`,
       { blocks: parentBlocks, botId: 'planclaw' },
     );
     if (!parentData.ok) {
@@ -416,7 +424,7 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
         })
         .join('\n\n');
 
-      const sectionUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=3&section=${section.section_key}`;
+      const sectionUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=3&section=${section.section_key}`;
 
       const threadData = await postSlackMessage(
         opts.channelId,
@@ -463,9 +471,9 @@ export async function sendGfpQASlack(opts: GfpQASlackOpts): Promise<Map<string, 
 
 // ── GFP Project Created — Phase 0 Bot Mention ──
 
-export interface GfpProjectCreatedOpts {
+export interface ServiceProjectCreatedOpts {
   projectName: string;
-  gfpId: string;
+  serviceId: string;
   ownerName: string;
   channelId: string;
   preset: string;
@@ -476,17 +484,19 @@ export interface GfpProjectCreatedOpts {
  * parallel 프리셋 → SemiClaw, 그 외 → PlanClaw.
  * 봇이 Slack 멘션을 감지하여 자동으로 Phase 0 작업을 시작함.
  */
-export async function sendGfpProjectCreatedSlack(opts: GfpProjectCreatedOpts): Promise<boolean> {
+export async function sendServiceProjectCreatedSlack(
+  opts: ServiceProjectCreatedOpts,
+): Promise<boolean> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
 
   const assignee = getPhaseAssignee(0, 'plan');
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=0`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=0`;
   const isParallel = opts.preset === 'parallel';
 
   const blocks = [
     {
       type: 'header',
-      text: { type: 'plain_text', text: 'GFP 프로젝트 생성', emoji: true },
+      text: { type: 'plain_text', text: '서비스 프로젝트 생성', emoji: true },
     },
     {
       type: 'section',
@@ -514,7 +524,7 @@ export async function sendGfpProjectCreatedSlack(opts: GfpProjectCreatedOpts): P
 
   const data = await postSlackMessage(
     opts.channelId,
-    `<@${assignee.slackId}> [GFP] ${opts.projectName} — Phase 0 온보딩을 시작해주세요.`,
+    `<@${assignee.slackId}> [Service] ${opts.projectName} — Phase 0 온보딩을 시작해주세요.`,
     { blocks, botId: assignee.botId },
   );
   if (!data.ok) {
@@ -527,9 +537,9 @@ export async function sendGfpProjectCreatedSlack(opts: GfpProjectCreatedOpts): P
 
 // ── GFP Track Fork Notification ──
 
-export interface GfpTrackForkOpts {
+export interface ServiceTrackForkOpts {
   projectName: string;
-  gfpId: string;
+  serviceId: string;
   channelId: string;
   ownerSlackId?: string | null;
 }
@@ -537,10 +547,10 @@ export interface GfpTrackForkOpts {
 /**
  * Phase 0 완료 후 Track A/B 포크 알림 (메시지 2개)
  */
-export async function sendGfpTrackForkSlack(opts: GfpTrackForkOpts): Promise<boolean> {
+export async function sendServiceTrackForkSlack(opts: ServiceTrackForkOpts): Promise<boolean> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
 
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=1`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=1`;
   const planAssignee = getPhaseAssignee(1, 'plan');
   const infraAssignee = getPhaseAssignee(0, 'infra');
   const ownerMention = opts.ownerSlackId ? ` <@${opts.ownerSlackId}>` : '';
@@ -622,16 +632,18 @@ export async function sendGfpTrackForkSlack(opts: GfpTrackForkOpts): Promise<boo
 
 export interface GfpInfraRequestSlackOpts {
   projectName: string;
-  gfpId: string;
+  serviceId: string;
   channelId: string;
   request: GfpInfraRequest;
 }
 
-export async function sendGfpInfraRequestSlack(opts: GfpInfraRequestSlackOpts): Promise<boolean> {
+export async function sendServiceInfraRequestSlack(
+  opts: GfpInfraRequestSlackOpts,
+): Promise<boolean> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
 
   const infraAssignee = getPhaseAssignee(0, 'infra');
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?track=infra`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?track=infra`;
 
   const data = await postSlackMessage(
     opts.channelId,
@@ -683,14 +695,14 @@ export async function sendGfpInfraRequestSlack(opts: GfpInfraRequestSlackOpts): 
 
 export interface GfpInfraPhaseCompletedOpts {
   projectName: string;
-  gfpId: string;
+  serviceId: string;
   completedPhase: number;
   nextPhase: number | null;
   channelId: string;
   ownerSlackId?: string | null;
 }
 
-export async function sendGfpInfraPhaseCompletedSlack(
+export async function sendServiceInfraPhaseCompletedSlack(
   opts: GfpInfraPhaseCompletedOpts,
 ): Promise<boolean> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
@@ -702,7 +714,7 @@ export async function sendGfpInfraPhaseCompletedSlack(
     ? null
     : (INFRA_PHASE_LABELS[opts.nextPhase!] ?? `Infra Phase ${opts.nextPhase}`);
   const nextAssignee = isLast ? null : getPhaseAssignee(opts.nextPhase!, 'infra');
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?track=infra`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?track=infra`;
   const ownerMention = opts.ownerSlackId ? ` <@${opts.ownerSlackId}>` : '';
 
   const blocks = [
@@ -734,8 +746,8 @@ export async function sendGfpInfraPhaseCompletedSlack(
   ];
 
   const textFallback = isLast
-    ? `${ownerMention.trim()} [GFP] ${opts.projectName} — Track B 인프라 트랙 완료!`
-    : `<@${nextAssignee!.slackId}>${ownerMention} [GFP] ${opts.projectName} — Infra Phase ${opts.completedPhase} 완료. Infra Phase ${opts.nextPhase} (${nextLabel}) 시작해주세요.`;
+    ? `${ownerMention.trim()} [Service] ${opts.projectName} — Track B 인프라 트랙 완료!`
+    : `<@${nextAssignee!.slackId}>${ownerMention} [Service] ${opts.projectName} — Infra Phase ${opts.completedPhase} 완료. Infra Phase ${opts.nextPhase} (${nextLabel}) 시작해주세요.`;
 
   const data = await postSlackMessage(opts.channelId, textFallback, {
     blocks,
@@ -752,7 +764,7 @@ export async function sendGfpInfraPhaseCompletedSlack(
 
 export interface DeployVerificationRequiredOpts {
   projectName: string;
-  gfpId: string;
+  serviceId: string;
   infraPhase: number;
   channelId: string;
   failedChecks?: string[];
@@ -765,7 +777,7 @@ export async function sendDeployVerificationRequiredSlack(
 
   const infraLabel = INFRA_PHASE_LABELS[opts.infraPhase] ?? `Infra Phase ${opts.infraPhase}`;
   const assignee = getPhaseAssignee(opts.infraPhase, 'infra');
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?track=infra`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?track=infra`;
 
   const blocks = [
     {
@@ -804,7 +816,7 @@ export async function sendDeployVerificationRequiredSlack(
   ];
 
   const mention = assignee ? `<@${assignee.slackId}>` : '';
-  const text = `${mention} [GFP] ${opts.projectName} — Infra Phase ${opts.infraPhase} 배포 검증이 필요합니다.`;
+  const text = `${mention} [Service] ${opts.projectName} — Infra Phase ${opts.infraPhase} 배포 검증이 필요합니다.`;
 
   const data = await postSlackMessage(opts.channelId, text, {
     blocks,
@@ -821,7 +833,7 @@ export async function sendDeployVerificationRequiredSlack(
 
 export interface GfpDesignSystemSlackOpts {
   projectName: string;
-  gfpId: string;
+  serviceId: string;
   channelId: string;
   /** Parsed primary colors for attachment color bars */
   primaryColors?: Array<{ name: string; hex: string }>;
@@ -835,8 +847,8 @@ export interface GfpDesignSystemSlackOpts {
 export async function sendDesignSystemSlack(opts: GfpDesignSystemSlackOpts): Promise<boolean> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
 
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=4`;
-  const paletteImageUrl = `${DASHBOARD_BASE_URL}/api/gfp/${opts.gfpId}/design-palette-image`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=4`;
+  const paletteImageUrl = `${DASHBOARD_BASE_URL}/api/gfp/${opts.serviceId}/design-palette-image`;
 
   const blocks = [
     {
@@ -869,7 +881,7 @@ export async function sendDesignSystemSlack(opts: GfpDesignSystemSlackOpts): Pro
 
   const data = await postSlackMessage(
     opts.channelId,
-    `[GFP] ${opts.projectName} — 디자인 시스템 완성 🎨`,
+    `[Service] ${opts.projectName} — 디자인 시스템 완성 🎨`,
     {
       blocks,
       attachments: attachments.length > 0 ? attachments : undefined,
@@ -964,7 +976,7 @@ export async function updateSlackMessage(
         channel: channelId,
         ts: messageTs,
         blocks,
-        text: text ?? 'GFP 섹션 상태 업데이트',
+        text: text ?? '서비스 섹션 상태 업데이트',
       }),
     });
     const data = await res.json();
@@ -976,11 +988,11 @@ export async function updateSlackMessage(
   }
 }
 
-// ── GFP Section Pending Review Notification ──
+// ── Service Section Pending Review Notification ──
 
 export interface GfpSectionPendingReviewOpts {
   projectName: string;
-  gfpId: string;
+  serviceId: string;
   sectionId: string;
   sectionKey: string;
   sectionTitle: string;
@@ -993,7 +1005,7 @@ export interface GfpSectionPendingReviewOpts {
  * 봇이 섹션을 제출(pending-review)할 때 PO에게 승인/거절 버튼 포함 Slack 알림.
  * 반환: 전송된 메시지의 ts (양방향 싱크용) 또는 null.
  */
-export async function sendGfpSectionPendingReviewSlack(
+export async function sendServiceSectionPendingReviewSlack(
   opts: GfpSectionPendingReviewOpts,
 ): Promise<string | null> {
   if (!SLACK_BOT_TOKEN) return null;
@@ -1005,10 +1017,10 @@ export async function sendGfpSectionPendingReviewSlack(
 
   const isVisualSection =
     opts.sectionKey.startsWith('ds-') || opts.sectionKey.startsWith('impl-screen-');
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=${opts.phase}&section=${opts.sectionKey}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=${opts.phase}&section=${opts.sectionKey}`;
 
   const actionValue = JSON.stringify({
-    gfpId: opts.gfpId,
+    serviceId: opts.serviceId,
     sectionId: opts.sectionId,
     phase: opts.phase,
   });
@@ -1016,7 +1028,7 @@ export async function sendGfpSectionPendingReviewSlack(
   const blocks: unknown[] = [
     {
       type: 'header',
-      text: { type: 'plain_text', text: '📋 GFP 섹션 검토 요청', emoji: true },
+      text: { type: 'plain_text', text: '📋 서비스 섹션 검토 요청', emoji: true },
     },
     {
       type: 'section',
@@ -1039,8 +1051,8 @@ export async function sendGfpSectionPendingReviewSlack(
     });
   }
 
-  const approveUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?action=approve&sectionId=${opts.sectionId}&phase=${opts.phase}&section=${opts.sectionKey}`;
-  const rejectUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?action=reject&sectionId=${opts.sectionId}&phase=${opts.phase}&section=${opts.sectionKey}`;
+  const approveUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?action=approve&sectionId=${opts.sectionId}&phase=${opts.phase}&section=${opts.sectionKey}`;
+  const rejectUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?action=reject&sectionId=${opts.sectionId}&phase=${opts.phase}&section=${opts.sectionKey}`;
 
   blocks.push(
     {
@@ -1051,14 +1063,14 @@ export async function sendGfpSectionPendingReviewSlack(
           text: { type: 'plain_text', text: '승인', emoji: true },
           style: 'primary',
           url: approveUrl,
-          action_id: `gfp_approve_${opts.sectionId}`,
+          action_id: `service_approve_${opts.sectionId}`,
         },
         {
           type: 'button',
           text: { type: 'plain_text', text: '거절', emoji: true },
           style: 'danger',
           url: rejectUrl,
-          action_id: `gfp_reject_${opts.sectionId}`,
+          action_id: `service_reject_${opts.sectionId}`,
         },
         {
           type: 'button',
@@ -1076,7 +1088,7 @@ export async function sendGfpSectionPendingReviewSlack(
 
   const data = await postSlackMessage(
     opts.channelId,
-    `📋 GFP 섹션 검토 요청: ${opts.sectionTitle}`,
+    `📋 서비스 섹션 검토 요청: ${opts.sectionTitle}`,
     { blocks, botId: getPhaseAssignee(opts.phase).botId },
   );
   if (!data.ok) {
@@ -1090,7 +1102,7 @@ export async function sendGfpSectionPendingReviewSlack(
  * 거절 사유 입력 모달 View 생성.
  */
 export function buildRejectionModalView(params: {
-  gfpId: string;
+  serviceId: string;
   sectionId: string;
   sectionTitle: string;
   phase: number;
@@ -1099,11 +1111,11 @@ export function buildRejectionModalView(params: {
     type: 'modal',
     callback_id: 'gfp_rejection_modal',
     private_metadata: JSON.stringify({
-      gfpId: params.gfpId,
+      serviceId: params.serviceId,
       sectionId: params.sectionId,
       phase: params.phase,
     }),
-    title: { type: 'plain_text', text: 'GFP 섹션 거절' },
+    title: { type: 'plain_text', text: '서비스 섹션 거절' },
     submit: { type: 'plain_text', text: '거절' },
     close: { type: 'plain_text', text: '취소' },
     blocks: [
@@ -1143,9 +1155,9 @@ const DESIGN_STEP_LABELS: Record<number, string> = {
   5: '핸드오프',
 };
 
-export async function sendGfpDesignStepAdvanceSlack(opts: {
+export async function sendServiceDesignStepAdvanceSlack(opts: {
   projectName: string;
-  gfpId: string;
+  serviceId: string;
   fromStep: number;
   toStep: number;
   channelId: string;
@@ -1155,7 +1167,7 @@ export async function sendGfpDesignStepAdvanceSlack(opts: {
   const guide = DESIGN_STEP_GUIDES[opts.toStep] || `Step ${opts.toStep} 작업을 시작해주세요.`;
   const fromLabel = DESIGN_STEP_LABELS[opts.fromStep] || `Step ${opts.fromStep}`;
   const toLabel = DESIGN_STEP_LABELS[opts.toStep] || `Step ${opts.toStep}`;
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=4&step=${opts.toStep}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=4&step=${opts.toStep}`;
   const designAssignee = getPhaseAssignee(4);
 
   await postSlackMessage(
@@ -1189,9 +1201,9 @@ export async function sendGfpDesignStepAdvanceSlack(opts: {
 
 // ── Stitch Result Notification ──
 
-export async function sendGfpStitchResultSlack(opts: {
+export async function sendServiceStitchResultSlack(opts: {
   projectName: string;
-  gfpId: string;
+  serviceId: string;
   sectionKey: string;
   sectionTitle: string;
   screenshotUrl?: string;
@@ -1200,7 +1212,7 @@ export async function sendGfpStitchResultSlack(opts: {
 }): Promise<void> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return;
 
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=4&step=3&section=${opts.sectionKey}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=4&step=3&section=${opts.sectionKey}`;
 
   const blocks: Record<string, unknown>[] = [
     {
@@ -1251,9 +1263,9 @@ export async function sendGfpStitchResultSlack(opts: {
 
 // ── Stitch Fallback Notification ──
 
-export async function sendGfpStitchFallbackSlack(opts: {
+export async function sendServiceStitchFallbackSlack(opts: {
   projectName: string;
-  gfpId: string;
+  serviceId: string;
   screenName: string;
   sectionKey: string;
   reason?: string;
@@ -1262,7 +1274,7 @@ export async function sendGfpStitchFallbackSlack(opts: {
 }): Promise<void> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return;
 
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.gfpId}?phase=4&step=3`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=4&step=3`;
 
   const blocks: Record<string, unknown>[] = [
     {
