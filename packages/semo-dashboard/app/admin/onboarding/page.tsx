@@ -100,13 +100,19 @@ export default function AdminOnboardingPage() {
 
               <div className="mt-3 rounded-lg bg-gray-50 p-3 text-sm dark:bg-gray-700/50">
                 {u.onboarding_role === 'team-member' ? (
-                  <span>
-                    선택한 멤버:{' '}
-                    <strong>{u.linked_nickname || u.linked_real_name || u.linked_domain}</strong>
-                    {u.linked_real_name && u.linked_nickname && (
-                      <span className="text-gray-500"> ({u.linked_real_name})</span>
-                    )}
-                  </span>
+                  u.linked_domain ? (
+                    <span>
+                      선택한 멤버:{' '}
+                      <strong>{u.linked_nickname || u.linked_real_name || u.linked_domain}</strong>
+                      {u.linked_real_name && u.linked_nickname && (
+                        <span className="text-gray-500"> ({u.linked_real_name})</span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="text-amber-600 dark:text-amber-400">
+                      기타 (미지정) — 승인 후 권한 설정에서 멤버 매핑 필요
+                    </span>
+                  )
                 ) : (
                   <span>
                     선택한 프로젝트: <strong>{u.linked_project_name || u.linked_service_id}</strong>

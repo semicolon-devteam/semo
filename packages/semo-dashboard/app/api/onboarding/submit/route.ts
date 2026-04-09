@@ -38,28 +38,33 @@ export async function POST(request: Request) {
     if (!body.domain) {
       return NextResponse.json({ error: '팀 멤버 도메인을 선택해주세요.' }, { status: 400 });
     }
-    // 유효성: ontology에 존재하는지
-    const check = await query(
-      `SELECT 1 FROM semo.ontology WHERE domain = $1 AND entity_type = 'team'`,
-      [body.domain],
-    );
-    if (check.rowCount === 0) {
-      return NextResponse.json({ error: '존재하지 않는 팀 멤버입니다.' }, { status: 400 });
-    }
-    // 중복: 이미 다른 사용자가 선택했는지
-    const { data: dup } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('linked_domain', body.domain)
-      .neq('id', user.id)
-      .limit(1);
-    if (dup && dup.length > 0) {
-      return NextResponse.json(
-        { error: '이미 다른 사용자가 선택한 팀 멤버입니다.' },
-        { status: 409 },
+    // "기타" 선택 시 linked_domain을 null로 — 어드민이 수동 매핑
+    if (body.domain === '__other__') {
+      linkedDomain = null;
+    } else {
+      // 유효성: ontology에 존재하는지
+      const check = await query(
+        `SELECT 1 FROM semo.ontology WHERE domain = $1 AND entity_type = 'team'`,
+        [body.domain],
       );
+      if (check.rowCount === 0) {
+        return NextResponse.json({ error: '존재하지 않는 팀 멤버입니다.' }, { status: 400 });
+      }
+      // 중복: 이미 다른 사용자가 선택했는지
+      const { data: dup } = await supabase
+        .from('user_profiles')
+        .select('id')
+        .eq('linked_domain', body.domain)
+        .neq('id', user.id)
+        .limit(1);
+      if (dup && dup.length > 0) {
+        return NextResponse.json(
+          { error: '이미 다른 사용자가 선택한 팀 멤버입니다.' },
+          { status: 409 },
+        );
+      }
+      linkedDomain = body.domain;
     }
-    linkedDomain = body.domain;
   } else {
     if (!body.serviceId) {
       return NextResponse.json({ error: '프로젝트를 선택해주세요.' }, { status: 400 });

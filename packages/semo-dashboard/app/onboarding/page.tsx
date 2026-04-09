@@ -186,6 +186,16 @@ export default function OnboardingPage() {
                         )}
                       </button>
                     ))}
+                    <button
+                      onClick={() => setSelectedDomain('__other__')}
+                      className={`w-full rounded-lg border-2 border-dashed p-3 text-left transition ${
+                        selectedDomain === '__other__'
+                          ? 'border-blue-500 bg-blue-50 dark:border-blue-400 dark:bg-blue-900/20'
+                          : 'border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-500'
+                      }`}
+                    >
+                      <span className="text-gray-500 dark:text-gray-400">기타 (목록에 없음)</span>
+                    </button>
                   </div>
                 )}
               </div>

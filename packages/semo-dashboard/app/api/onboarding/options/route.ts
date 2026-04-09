@@ -26,11 +26,11 @@ export async function GET() {
        WHERE o.entity_type = 'team'
        ORDER BY o.domain`,
     ),
-    // 3) 인큐베이터 프로젝트 — active만 노출, 최소 필드 (core DB)
+    // 3) 인큐베이터 프로젝트 — build 라이프사이클(인큐베이터)만 노출 (core DB)
     query<{ service_id: string; project_name: string; service_domain: string }>(
       `SELECT service_id, project_name, service_domain
        FROM semo.services
-       WHERE status = 'active'
+       WHERE status = 'active' AND lifecycle = 'build'
        ORDER BY project_name`,
     ),
   ]);
