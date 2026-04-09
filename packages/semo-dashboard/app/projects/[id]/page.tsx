@@ -35,7 +35,7 @@ interface ProjectWithProgress extends ServiceProject {
 
 async function fetchProjectData(id: string): Promise<ProjectWithProgress | null> {
   try {
-    const res = await fetch(`/api/gfp/${id}`);
+    const res = await fetch(`/api/projects/${id}`);
     if (!res.ok) return null;
     return res.json();
   } catch {
@@ -49,7 +49,7 @@ async function fetchSectionsData(
   track: ServiceTrack = 'plan',
 ): Promise<ServiceSection[]> {
   try {
-    const res = await fetch(`/api/gfp/${id}/sections?phase=${phase}&track=${track}`);
+    const res = await fetch(`/api/projects/${id}/sections?phase=${phase}&track=${track}`);
     if (!res.ok) return [];
     return res.json();
   } catch {
@@ -59,7 +59,7 @@ async function fetchSectionsData(
 
 async function fetchResearchData(id: string): Promise<GfpResearchTask[]> {
   try {
-    const res = await fetch(`/api/gfp/${id}/research`);
+    const res = await fetch(`/api/projects/${id}/research`);
     if (!res.ok) return [];
     return res.json();
   } catch {
@@ -69,7 +69,7 @@ async function fetchResearchData(id: string): Promise<GfpResearchTask[]> {
 
 async function fetchInfraRequests(id: string): Promise<GfpInfraRequest[]> {
   try {
-    const res = await fetch(`/api/gfp/${id}/infra-requests`);
+    const res = await fetch(`/api/projects/${id}/infra-requests`);
     if (!res.ok) return [];
     return res.json();
   } catch {
@@ -80,7 +80,7 @@ async function fetchInfraRequests(id: string): Promise<GfpInfraRequest[]> {
 async function fetchInfraProgress(id: string): Promise<PhaseProgress[]> {
   try {
     // Fetch all sections for infra track and compute progress client-side
-    const res = await fetch(`/api/gfp/${id}/sections?track=infra`);
+    const res = await fetch(`/api/projects/${id}/sections?track=infra`);
     if (!res.ok) return [];
     const sections: ServiceSection[] = await res.json();
     const phaseMap = new Map<number, PhaseProgress>();
@@ -225,7 +225,7 @@ export default function GfpDetailPage() {
         if (actionParam === 'approve') {
           if (window.confirm(`이 섹션을 승인하시겠습니까?`)) {
             try {
-              const res = await fetch(`/api/gfp/${id}/sections`, {
+              const res = await fetch(`/api/projects/${id}/sections`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sectionId: sectionIdParam, action: 'approve' }),
@@ -244,7 +244,7 @@ export default function GfpDetailPage() {
           const reason = window.prompt('거절 사유를 입력해주세요:');
           if (reason !== null) {
             try {
-              const res = await fetch(`/api/gfp/${id}/sections`, {
+              const res = await fetch(`/api/projects/${id}/sections`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -298,7 +298,7 @@ export default function GfpDetailPage() {
   }
 
   async function handleApprove(sectionId: string) {
-    await fetch(`/api/gfp/${id}/sections`, {
+    await fetch(`/api/projects/${id}/sections`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ section_id: sectionId, status: 'approved' }),
@@ -307,7 +307,7 @@ export default function GfpDetailPage() {
   }
 
   async function handleReject(sectionId: string, note: string) {
-    await fetch(`/api/gfp/${id}/sections`, {
+    await fetch(`/api/projects/${id}/sections`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ section_id: sectionId, status: 'rejected', reviewer_note: note }),
@@ -316,7 +316,7 @@ export default function GfpDetailPage() {
   }
 
   async function handleUndoReject(sectionId: string) {
-    await fetch(`/api/gfp/${id}/sections`, {
+    await fetch(`/api/projects/${id}/sections`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ section_id: sectionId, status: 'pending-review' }),
@@ -329,7 +329,7 @@ export default function GfpDetailPage() {
     if (targets.length === 0) return;
     setApprovingAll(true);
     for (const s of targets) {
-      await fetch(`/api/gfp/${id}/sections`, {
+      await fetch(`/api/projects/${id}/sections`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ section_id: s.section_id, status: 'approved' }),
@@ -341,7 +341,7 @@ export default function GfpDetailPage() {
 
   async function handleAddSection() {
     if (!newSection.section_key.trim() || !newSection.title.trim()) return;
-    await fetch(`/api/gfp/${id}/sections`, {
+    await fetch(`/api/projects/${id}/sections`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

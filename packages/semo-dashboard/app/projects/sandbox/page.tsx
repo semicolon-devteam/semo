@@ -228,7 +228,7 @@ export default function SandboxPage() {
               >
                 <div className="flex items-start justify-between mb-3">
                   <Link
-                    href={`/gfp/${project.service_id}`}
+                    href={`/projects/${project.service_id}`}
                     className="text-lg font-semibold text-gray-900 dark:text-white truncate hover:text-blue-600"
                   >
                     {project.project_name}
@@ -256,7 +256,7 @@ export default function SandboxPage() {
                 </div>
                 <div className="flex gap-2">
                   <Link
-                    href={`/gfp/${project.service_id}`}
+                    href={`/projects/${project.service_id}`}
                     className="text-xs text-blue-600 hover:underline"
                   >
                     상세 보기

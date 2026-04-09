@@ -42,7 +42,7 @@ export default function PermissionsPage() {
   const fetchData = useCallback(async () => {
     const [usersRes, projectsRes] = await Promise.all([
       fetch('/api/admin/users'),
-      fetch('/api/gfp'),
+      fetch('/api/projects'),
     ]);
     if (usersRes.ok) setUsers(await usersRes.json());
     if (projectsRes.ok) {

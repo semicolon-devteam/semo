@@ -29,7 +29,7 @@ export default function GfpListPage() {
   const { isAdmin, projectAccess } = useAuth();
 
   useEffect(() => {
-    fetch('/api/gfp')
+    fetch('/api/projects')
       .then((r) => {
         if (!r.ok) return [];
         return r.json();
@@ -73,7 +73,7 @@ export default function GfpListPage() {
           </p>
         </div>
         <Link
-          href="/gfp/new"
+          href="/projects/new"
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
         >
           + 새 프로젝트
@@ -122,7 +122,7 @@ export default function GfpListPage() {
             return (
               <Link
                 key={project.service_id}
-                href={`/gfp/${project.service_id}`}
+                href={`/projects/${project.service_id}`}
                 className="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-700 transition-all"
               >
                 <div className="flex items-start justify-between mb-3">
