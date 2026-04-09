@@ -7,31 +7,26 @@
  * v4.5.0: onboarding/init 통합 — 글로벌 단일 설정
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import chalk from "chalk";
-import {
-  getPool,
-  getActiveBotIds,
-  getBotWorkspaceFiles,
-  getDelegations,
-} from "./database";
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import chalk from 'chalk';
+import { getPool, getActiveBotIds, getBotWorkspaceFiles, getDelegations } from './database';
 
 // ============================================================
 // Constants
 // ============================================================
 
-const SEMO_DIR = path.join(os.homedir(), ".claude", "semo");
-const BOTS_DIR = path.join(SEMO_DIR, "bots");
+const SEMO_DIR = path.join(os.homedir(), '.claude', 'semo');
+const BOTS_DIR = path.join(SEMO_DIR, 'bots');
 
 function getCliVersion(): string {
   try {
-    const pkgPath = path.join(__dirname, "..", "package.json");
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8"));
-    return pkg.version || "unknown";
+    const pkgPath = path.join(__dirname, '..', 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+    return pkg.version || 'unknown';
   } catch {
-    return "unknown";
+    return 'unknown';
   }
 }
 
@@ -90,9 +85,9 @@ export async function populateBotMirrors(): Promise<{ bots: number; files: numbe
 
   // 봇 디렉토리 중 DB에 없는 것 정리
   if (fs.existsSync(BOTS_DIR)) {
-    const localBotDirs = fs.readdirSync(BOTS_DIR).filter(f =>
-      fs.statSync(path.join(BOTS_DIR, f)).isDirectory()
-    );
+    const localBotDirs = fs
+      .readdirSync(BOTS_DIR)
+      .filter((f) => fs.statSync(path.join(BOTS_DIR, f)).isDirectory());
     for (const dir of localBotDirs) {
       if (!botIds.includes(dir)) {
         fs.rmSync(path.join(BOTS_DIR, dir), { recursive: true, force: true });
@@ -117,7 +112,9 @@ function cleanOrphans(baseDir: string, currentDir: string, validPaths: Set<strin
       try {
         const remaining = fs.readdirSync(fullPath);
         if (remaining.length === 0) fs.rmdirSync(fullPath);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     } else if (!validPaths.has(relativePath)) {
       fs.unlinkSync(fullPath);
     }
@@ -136,37 +133,39 @@ export async function generateSoulMd(): Promise<void> {
   const version = getCliVersion();
 
   // 봇 로스터 생성
-  let botRoster = "";
+  let botRoster = '';
   try {
     const pool = getPool();
     const result = await pool.query(
       `SELECT bot_id, name, emoji, role, status
        FROM semo.bot_status
        WHERE status != 'retired'
-       ORDER BY bot_id`
+       ORDER BY bot_id`,
     );
     if (result.rows.length > 0) {
-      botRoster = "| Bot | Name | Role | Status |\n|-----|------|------|--------|\n";
+      botRoster = '| Bot | Name | Role | Status |\n|-----|------|------|--------|\n';
       for (const row of result.rows) {
-        botRoster += `| ${row.emoji || ""} ${row.bot_id} | ${row.name || row.bot_id} | ${row.role || "-"} | ${row.status || "-"} |\n`;
+        botRoster += `| ${row.emoji || ''} ${row.bot_id} | ${row.name || row.bot_id} | ${row.role || '-'} | ${row.status || '-'} |\n`;
       }
     }
   } catch {
-    botRoster = "_DB 연결 실패 — 봇 정보를 가져올 수 없습니다._\n";
+    botRoster = '_DB 연결 실패 — 봇 정보를 가져올 수 없습니다._\n';
   }
 
   // 위임 매트릭스
-  let delegationMatrix = "";
+  let delegationMatrix = '';
   try {
     const delegations = await getDelegations();
     if (delegations.length > 0) {
-      delegationMatrix = "\n## Delegation Matrix\n\n";
-      delegationMatrix += "| From | To | Type | Domains |\n|------|-----|------|--------|\n";
+      delegationMatrix = '\n## Delegation Matrix\n\n';
+      delegationMatrix += '| From | To | Type | Domains |\n|------|-----|------|--------|\n';
       for (const d of delegations) {
-        delegationMatrix += `| ${d.from_bot_id} | ${d.to_bot_id} | ${d.delegation_type} | ${d.domains.join(", ")} |\n`;
+        delegationMatrix += `| ${d.from_bot_id} | ${d.to_bot_id} | ${d.delegation_type} | ${d.domains.join(', ')} |\n`;
       }
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 
   const content = `# SEMO Local Orchestrator — SOUL
 
@@ -174,19 +173,40 @@ export async function generateSoulMd(): Promise<void> {
 
 ## Identity
 
-- **Name**: SEMO Local Session
-- **Role**: Human-AI orchestration interface for Semicolon team
-- **Type**: Local Claude Code session (not an OpenClaw bot)
+- **Name**: SemiClaw (로컬 세션)
+- **Emoji**: :clipboard:
+- **Role**: Semicolon 팀 PM/오케스트레이터 — 허브-앤-스포크 멀티에이전트 시스템의 허브
+- **Type**: 로컬 Claude Code 세션에서 동작하는 SemiClaw 인스턴스
+
+이 세션은 **SemiClaw**이다. 사용자의 작업 요청을 직접 처리하거나, 전문 봇 에이전트에 위임한다.
 
 ## Mission
 
-사용자의 작업 요청을 적절한 봇 에이전트에 위임하거나 직접 처리한다.
-로컬 세션, KB, 봇 팀 간 컨텍스트 동기화를 유지한다.
+1. 사용자의 작업 요청을 분석하고 적절한 봇 에이전트에 위임 (Hub-and-Spoke)
+2. 직접 처리 가능한 PM/오케스트레이션 업무는 직접 수행
+3. 봇 팀 간 컨텍스트 동기화를 KB 기반으로 유지
+4. commitment 기반으로 작업 상태를 추적
 
 ## Bot Roster
 
 ${botRoster}
 ${delegationMatrix}
+## Sub-Agent Dispatch Protocol
+
+| 작업 유형 | 봇 | subagent_type |
+|----------|-----|--------------|
+| 기획/스펙/PRD | PlanClaw | planclaw |
+| UI/UX 디자인 | DesignClaw | designclaw |
+| 코딩/구현/버그수정 | WorkClaw | workclaw |
+| 코드 리뷰/QA | ReviewClaw | reviewclaw |
+| 인프라/배포/CI-CD | InfraClaw | infraclaw |
+| 마케팅/SEO | GrowthClaw | growthclaw |
+
+디스패치 절차:
+1. commitment 생성 → 서브에이전트 spawn → 결과 수령
+2. 서브에이전트에게는 commitment ID + 서비스 도메인 + 한 줄 설명만 전달
+3. 나머지는 서브에이전트가 KB에서 직접 조회
+
 ## Operating Procedures
 
 1. **KB-First**: 도메인 질문은 항상 \`semo kb search/get\`으로 KB 조회 후 답변
@@ -195,16 +215,16 @@ ${delegationMatrix}
 
 ## Constraints
 
-- \`~/.claude/semo/bots/\` 내부 파일은 DB 미러이므로 직접 수정 금지 (sync 시 덮어씀)
+- \`~/.claude/semo/bots/\` 내부 파일은 DB 미러이므로 직접 수정 금지
 - 봇 에이전트 호출 시 \`~/.claude/agents/\`의 정의를 사용
 - 스킬 실행 시 \`~/.claude/skills/\`의 정의를 사용
 
 ---
 
-*Last updated: ${new Date().toISOString().split("T")[0]}*
+*Last updated: ${new Date().toISOString().split('T')[0]}*
 `;
 
-  fs.writeFileSync(path.join(SEMO_DIR, "SOUL.md"), content);
+  fs.writeFileSync(path.join(SEMO_DIR, 'SOUL.md'), content);
 }
 
 /**
@@ -236,14 +256,14 @@ export function generateMemoryMd(): void {
 *Auto-generated by semo onboarding*
 `;
 
-  fs.writeFileSync(path.join(SEMO_DIR, "MEMORY.md"), content);
+  fs.writeFileSync(path.join(SEMO_DIR, 'MEMORY.md'), content);
 }
 
 /**
  * 사용자 프로필 플레이스홀더
  */
 export function generateUserMd(): void {
-  const userMdPath = path.join(SEMO_DIR, "USER.md");
+  const userMdPath = path.join(SEMO_DIR, 'USER.md');
 
   // 이미 존재하면 덮어쓰지 않음 (사용자가 커스텀할 수 있음)
   if (fs.existsSync(userMdPath)) return;
@@ -279,7 +299,7 @@ export function generateUserMd(): void {
  */
 export function generateThinRouter(kbFirstBlock: string): void {
   const version = getCliVersion();
-  const globalClaudeMd = path.join(os.homedir(), ".claude", "CLAUDE.md");
+  const globalClaudeMd = path.join(os.homedir(), '.claude', 'CLAUDE.md');
 
   const content = `# Global Claude Code Configuration
 
@@ -365,10 +385,10 @@ ${kbFirstBlock}
 
   // 기존 파일 백업 (마이그레이션)
   if (fs.existsSync(globalClaudeMd)) {
-    const existing = fs.readFileSync(globalClaudeMd, "utf-8");
+    const existing = fs.readFileSync(globalClaudeMd, 'utf-8');
     // 이미 thin router인지 확인
-    if (!existing.includes("Orchestrator profile:")) {
-      const backupPath = globalClaudeMd + ".bak";
+    if (!existing.includes('Orchestrator profile:')) {
+      const backupPath = globalClaudeMd + '.bak';
       fs.writeFileSync(backupPath, existing);
       console.log(chalk.gray(`  기존 CLAUDE.md 백업: ${backupPath}`));
     }
