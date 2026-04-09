@@ -1,3 +1,49 @@
 {
-  "mcpServers": {}
+  "mcpServers": {},
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ". /Users/reus/.claude/semo/.env 2>/dev/null; semo context sync 2>/dev/null || true",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ". /Users/reus/.claude/semo/.env 2>/dev/null; semo context push 2>/dev/null || true",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/reus/.openclaw-shared/hooks/kb-first-guard.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/reus/.openclaw-shared/hooks/url-validator-guard.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/reus/.openclaw-shared/hooks/response-length-guard.sh",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash /Users/reus/.openclaw-shared/hooks/decision-reminder.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
 }

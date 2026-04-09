@@ -89,6 +89,7 @@ class BotSession {
     const sessionModel = 'claude-sonnet-4-6';
 
     const hooksDir = path.join(os.homedir(), '.openclaw-shared', 'hooks');
+    const envFile = path.join(os.homedir(), '.claude', 'semo', '.env');
 
     this.queryHandle = query({
       prompt: this.inputQueue,
@@ -116,10 +117,40 @@ class BotSession {
         persistSession: false,
         settings: {
           hooks: {
+            // 로컬 세션과 동일한 훅 구성 — 4단계 양방향 동기화
+            SessionStart: [
+              {
+                matcher: '',
+                hooks: [
+                  {
+                    type: 'command' as const,
+                    command: `. ${envFile} 2>/dev/null; semo context sync --no-skills 2>/dev/null || true`,
+                    timeout: 30,
+                  },
+                ],
+              },
+            ],
+            UserPromptSubmit: [
+              {
+                matcher: '',
+                hooks: [
+                  {
+                    type: 'command' as const,
+                    command: `bash ${hooksDir}/context-router.sh`,
+                    timeout: 10,
+                  },
+                ],
+              },
+            ],
             Stop: [
               {
                 matcher: '',
                 hooks: [
+                  {
+                    type: 'command' as const,
+                    command: `. ${envFile} 2>/dev/null; semo context push 2>/dev/null || true`,
+                    timeout: 30,
+                  },
                   {
                     type: 'command' as const,
                     command: `bash ${hooksDir}/kb-first-guard.sh`,
@@ -139,6 +170,18 @@ class BotSession {
                     type: 'command' as const,
                     command: `bash ${hooksDir}/decision-reminder.sh`,
                     timeout: 10,
+                  },
+                ],
+              },
+            ],
+            PreCompact: [
+              {
+                matcher: '',
+                hooks: [
+                  {
+                    type: 'command' as const,
+                    command: `. ${envFile} 2>/dev/null; semo context-preserve 2>/dev/null || true`,
+                    timeout: 15,
                   },
                 ],
               },
