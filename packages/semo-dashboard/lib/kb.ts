@@ -29,7 +29,7 @@ const pool = new Pool(
         database: process.env.KB_DB_NAME || 'appdb',
         ssl: false,
         connectionTimeoutMillis: 5000,
-      }
+      },
 );
 
 export interface KBItem {
@@ -64,11 +64,7 @@ export interface KBStats {
 /**
  * 텍스트 검색 fallback (ILIKE) — 임베딩 키 없을 때 사용
  */
-async function textSearch(
-  query: string,
-  limit: number,
-  createdBy?: string
-): Promise<KBItem[]> {
+async function textSearch(query: string, limit: number, createdBy?: string): Promise<KBItem[]> {
   const pattern = `%${query}%`;
 
   let sql = `
@@ -87,7 +83,10 @@ async function textSearch(
   params.push(limit);
 
   const res = await pool.query(sql, params);
-  return res.rows.map((r: KBItem & { sub_key?: string }) => ({ ...r, key: combineKey(r.key, r.sub_key ?? '') }));
+  return res.rows.map((r: KBItem & { sub_key?: string }) => ({
+    ...r,
+    key: combineKey(r.key, r.sub_key ?? ''),
+  }));
 }
 
 /**
@@ -96,7 +95,7 @@ async function textSearch(
 export async function search(
   query: string,
   limit: number = 10,
-  createdBy?: string
+  createdBy?: string,
 ): Promise<KBItem[]> {
   if (!process.env.OPENAI_API_KEY) {
     return textSearch(query, limit, createdBy);
@@ -121,16 +120,16 @@ export async function search(
   params.push(limit);
 
   const res = await pool.query(sql, params);
-  return res.rows.map((r: KBItem & { sub_key?: string }) => ({ ...r, key: combineKey(r.key, r.sub_key ?? '') }));
+  return res.rows.map((r: KBItem & { sub_key?: string }) => ({
+    ...r,
+    key: combineKey(r.key, r.sub_key ?? ''),
+  }));
 }
 
 /**
  * KB 목록 조회 (domain 또는 bot_id 필터 지원)
  */
-export async function list(
-  domain?: string,
-  createdBy?: string
-): Promise<KBItem[]> {
+export async function list(domain?: string, createdBy?: string): Promise<KBItem[]> {
   // domain 필터 시 full content + metadata 반환 (milestone 등에서 필요)
   // 전체 목록: LEFT(content, N)이 일부 한글 데이터에서 UTF-8 깨짐 → JS truncate
   const cols = domain
@@ -207,10 +206,7 @@ export async function listByKey(key: string): Promise<KBItem[]> {
 /**
  * 특정 KB 항목 조회
  */
-export async function getItem(
-  domain: string,
-  rawKey: string
-): Promise<KBItem | null> {
+export async function getItem(domain: string, rawKey: string): Promise<KBItem | null> {
   const { key, subKey } = splitKey(rawKey);
   const sql = `
     SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at
@@ -230,40 +226,45 @@ export async function upsertItem(
   domain: string,
   rawKey: string,
   content: string,
-  createdBy?: string
+  createdBy?: string,
 ): Promise<KBItem> {
   const { key, subKey } = splitKey(rawKey);
 
   // Domain validation: check ontology before write
-  const domainCheck = await pool.query(
-    'SELECT 1 FROM semo.ontology WHERE domain = $1',
-    [domain]
-  );
+  const domainCheck = await pool.query('SELECT 1 FROM semo.ontology WHERE domain = $1', [domain]);
   if (domainCheck.rows.length === 0) {
     const knownDomains = await pool.query('SELECT domain FROM semo.ontology ORDER BY domain');
     const known = knownDomains.rows.map((r: { domain: string }) => r.domain);
-    throw new Error(`도메인 '${domain}'은(는) 온톨로지에 등록되지 않았습니다. 등록된 도메인: [${known.join(', ')}]`);
+    throw new Error(
+      `도메인 '${domain}'은(는) 온톨로지에 등록되지 않았습니다. 등록된 도메인: [${known.join(', ')}]`,
+    );
   }
 
   // Type schema validation + projection key 차단 (CLI kbUpsert와 동일 enforcement)
   const typeResult = await pool.query(
     'SELECT entity_type FROM semo.ontology WHERE domain = $1 AND entity_type IS NOT NULL',
-    [domain]
+    [domain],
   );
   if (typeResult.rows.length > 0) {
     const entityType = typeResult.rows[0].entity_type;
     const schemaResult = await pool.query(
       "SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source FROM semo.kb_type_schema WHERE type_key = $1",
-      [entityType]
+      [entityType],
     );
-    const schemas = schemaResult.rows as Array<{ scheme_key: string; key_type: string; source: string }>;
+    const schemas = schemaResult.rows as Array<{
+      scheme_key: string;
+      key_type: string;
+      source: string;
+    }>;
     if (schemas.length > 0) {
-      const match = schemas.find(s => s.scheme_key === key);
+      const match = schemas.find((s) => s.scheme_key === key);
       // Projection key 차단: pm-pipeline/gfp-pipeline만 쓰기 허용
       if (match?.source === 'projection') {
         const cb = createdBy ?? '';
         if (!cb.startsWith('pm-') && !cb.startsWith('gfp-')) {
-          throw new Error(`키 '${key}'은(는) projection 키입니다 (PM 파이프라인에서 자동 동기화). 직접 쓰기가 차단됩니다.`);
+          throw new Error(
+            `키 '${key}'은(는) projection 키입니다 (PM 파이프라인에서 자동 동기화). 직접 쓰기가 차단됩니다.`,
+          );
         }
       }
     }
@@ -283,7 +284,14 @@ export async function upsertItem(
       updated_at = NOW()
     RETURNING kb_id, domain, key, sub_key, content, created_by, updated_at
   `;
-  const res = await pool.query(sql, [domain, key, subKey, content, createdBy ?? 'dashboard', embeddingStr]);
+  const res = await pool.query(sql, [
+    domain,
+    key,
+    subKey,
+    content,
+    createdBy ?? 'dashboard',
+    embeddingStr,
+  ]);
   const item = res.rows[0];
 
   return { ...item, key: combineKey(item.key, item.sub_key) };
@@ -296,9 +304,14 @@ export async function deleteItemByKey(domain: string, rawKey: string): Promise<b
   const { key, subKey } = splitKey(rawKey);
   const res = await pool.query(
     'DELETE FROM semo.knowledge_base WHERE domain = $1 AND key = $2 AND sub_key = $3',
-    [domain, key, subKey]
+    [domain, key, subKey],
   );
   return (res.rowCount ?? 0) > 0;
+}
+
+export async function deleteItemsByDomain(domain: string): Promise<number> {
+  const res = await pool.query('DELETE FROM semo.knowledge_base WHERE domain = $1', [domain]);
+  return res.rowCount ?? 0;
 }
 
 /**
@@ -309,11 +322,11 @@ export async function stats(): Promise<KBStats> {
     `SELECT domain, count(*) as cnt, count(embedding) as emb_cnt
      FROM semo.knowledge_base
      GROUP BY domain
-     ORDER BY domain`
+     ORDER BY domain`,
   );
 
   const totKb = await pool.query(
-    'SELECT count(*) as total, count(embedding) as emb FROM semo.knowledge_base'
+    'SELECT count(*) as total, count(embedding) as emb FROM semo.knowledge_base',
   );
 
   return {

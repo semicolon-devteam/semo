@@ -598,4 +598,187 @@ export function registerIncubatorCommands(program: Command): void {
         await closeConnection();
       }
     });
+
+  // ============================================================
+  // Sandbox subcommands
+  // ============================================================
+
+  const SANDBOX_BASE_URL = process.env.SEMO_DASHBOARD_URL || 'https://semo.semi-colon.space';
+
+  function sandboxHeaders(): Record<string, string> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const secret = process.env.SANDBOX_API_SECRET;
+    if (secret) headers['x-sandbox-secret'] = secret;
+    return headers;
+  }
+
+  const sandbox = incubator
+    .command('sandbox')
+    .description('인큐베이션 샌드박스 — 파이프라인 검증용 가상 프로젝트 관리');
+
+  sandbox
+    .command('create')
+    .description('샌드박스 프로젝트 생성')
+    .requiredOption(
+      '--scenario <id>',
+      '시나리오 ID (minicafe, creator-pulse, quickdrop, office-hub, petcare)',
+    )
+    .requiredOption('--depth <depth>', '검증 범위 (plan-only, full, e2e)')
+    .option('--po-mode <mode>', '가상 PO 모드 (auto-pilot, semi-auto, interactive)', 'auto-pilot')
+    .option('--live', '실제 봇 실행 모드 (기본: mock)')
+    .action(async (options) => {
+      const spinner = ora('샌드박스 생성 중...').start();
+      try {
+        const res = await fetch(`${SANDBOX_BASE_URL}/api/projects/sandbox`, {
+          method: 'POST',
+          headers: sandboxHeaders(),
+          body: JSON.stringify({
+            scenario_id: options.scenario,
+            depth: options.depth,
+            virtual_po_mode: options.poMode,
+            mode: options.live ? 'live' : 'mock',
+          }),
+          signal: AbortSignal.timeout(15000),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+          spinner.fail(`생성 실패: ${err.error}`);
+          return;
+        }
+
+        const project = await res.json();
+        spinner.succeed('샌드박스 생성 완료');
+        console.log();
+        console.log(`  프로젝트: ${chalk.cyan(project.project_name)}`);
+        console.log(`  ID: ${chalk.gray(project.service_id)}`);
+        console.log(
+          `  대시보드: ${chalk.underline(`${SANDBOX_BASE_URL}/gfp/${project.service_id}`)}`,
+        );
+        console.log(`  관리: ${chalk.underline(`${SANDBOX_BASE_URL}/projects/sandbox`)}`);
+      } catch (err) {
+        spinner.fail(`생성 실패: ${err instanceof Error ? err.message : err}`);
+      }
+    });
+
+  sandbox
+    .command('list')
+    .description('활성 샌드박스 목록')
+    .action(async () => {
+      const spinner = ora('목록 조회 중...').start();
+      try {
+        const res = await fetch(`${SANDBOX_BASE_URL}/api/projects/sandbox`, {
+          headers: sandboxHeaders(),
+          signal: AbortSignal.timeout(10000),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+          spinner.fail(`목록 조회 실패: ${err.error}`);
+          return;
+        }
+
+        const projects = await res.json();
+        spinner.stop();
+
+        if (!Array.isArray(projects) || projects.length === 0) {
+          console.log(chalk.gray('활성 샌드박스 없음'));
+          return;
+        }
+
+        console.log(chalk.bold(`활성 샌드박스 ${projects.length}개\n`));
+        for (const p of projects) {
+          const sb = p.metadata?.sandbox;
+          const stats = sb?.run_stats;
+          const status = stats?.completed_at ? chalk.green('완료') : chalk.yellow('진행중');
+          console.log(
+            `  ${status} ${chalk.cyan(p.project_name)} — ${sb?.scenario_id || '?'} | Phase ${p.current_phase}/9 | ${sb?.virtual_po?.mode || '?'}`,
+          );
+          console.log(`       ${chalk.gray(p.service_id)}`);
+        }
+      } catch (err) {
+        spinner.fail(`조회 실패: ${err instanceof Error ? err.message : err}`);
+      }
+    });
+
+  sandbox
+    .command('report')
+    .description('샌드박스 런 리포트')
+    .requiredOption('--service-id <uuid>', '서비스 UUID')
+    .action(async (options) => {
+      const spinner = ora('리포트 조회 중...').start();
+      try {
+        const res = await fetch(
+          `${SANDBOX_BASE_URL}/api/projects/sandbox/report?service_id=${encodeURIComponent(options.serviceId)}`,
+          { headers: sandboxHeaders(), signal: AbortSignal.timeout(10000) },
+        );
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+          spinner.fail(`리포트 조회 실패: ${err.error}`);
+          return;
+        }
+
+        const report = await res.json();
+        spinner.stop();
+
+        const stats = report.run_stats;
+        console.log(chalk.bold(`\n샌드박스 리포트: ${report.project.project_name}\n`));
+        console.log(`  시나리오: ${report.config.scenario_id}`);
+        console.log(`  모드: ${report.config.mode} | PO: ${report.config.virtual_po.mode}`);
+        console.log(`  Phase 완료: ${stats?.phases_completed ?? 0}`);
+        console.log(`  섹션 리뷰: ${stats?.sections_reviewed ?? 0}`);
+        console.log(`  거절: ${stats?.rejections ?? 0}`);
+        console.log(
+          `  상태: ${stats?.completed_at ? chalk.green('완료') : chalk.yellow('진행중')}`,
+        );
+
+        const v = report.verification;
+        if (v) {
+          console.log(
+            `\n  검증: ${v.passed ? chalk.green('PASS') : chalk.red(`FAIL (${v.issues.length}건)`)}`,
+          );
+          if (!v.passed) {
+            for (const issue of v.issues) {
+              console.log(`    - ${issue}`);
+            }
+          }
+        }
+      } catch (err) {
+        spinner.fail(`조회 실패: ${err instanceof Error ? err.message : err}`);
+      }
+    });
+
+  sandbox
+    .command('teardown')
+    .description('샌드박스 정리 (삭제)')
+    .option('--service-id <uuid>', '특정 서비스 UUID')
+    .option('--all', '모든 샌드박스 정리')
+    .action(async (options) => {
+      if (!options.serviceId && !options.all) {
+        console.log(chalk.red('--service-id 또는 --all 필요'));
+        return;
+      }
+
+      const spinner = ora('샌드박스 정리 중...').start();
+      try {
+        const qs = options.all ? 'all=true' : `service_id=${encodeURIComponent(options.serviceId)}`;
+        const res = await fetch(`${SANDBOX_BASE_URL}/api/projects/sandbox?${qs}`, {
+          method: 'DELETE',
+          headers: sandboxHeaders(),
+          signal: AbortSignal.timeout(15000),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+          spinner.fail(`정리 실패: ${err.error}`);
+          return;
+        }
+
+        const result = await res.json();
+        spinner.succeed(result.message || '정리 완료');
+      } catch (err) {
+        spinner.fail(`정리 실패: ${err instanceof Error ? err.message : err}`);
+      }
+    });
 }

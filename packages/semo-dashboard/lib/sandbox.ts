@@ -1,0 +1,469 @@
+/**
+ * Sandbox Core — 인큐베이션 샌드박스 핵심 모듈.
+ * 프로젝트 생성, teardown, 목록, 리포트, Phase 리셋.
+ */
+
+import { query } from './db';
+import {
+  createProject,
+  getProject,
+  listProjects,
+  listSections,
+  updateProject,
+  upsertSection,
+} from './service';
+import { getScenario, generatePlaceholderSection } from './sandbox-scenarios';
+import { getPersona } from './sandbox-personas';
+import type {
+  ServiceProject,
+  ServiceSection,
+  SandboxConfig,
+  SandboxDepth,
+  SandboxMode,
+  SandboxVirtualPOMode,
+  ServiceSectionSource,
+} from '@/types';
+
+const MAX_CONCURRENT_SANDBOXES = 3;
+
+// ── Create ──
+
+export interface CreateSandboxParams {
+  scenario_id: string;
+  depth: SandboxDepth;
+  mode?: SandboxMode;
+  virtual_po_mode: SandboxVirtualPOMode;
+  rejection_rate?: number;
+  auto_advance?: boolean;
+  phase_delay_ms?: number;
+  section_delay_ms?: number;
+}
+
+export interface CreateSandboxResult {
+  project: ServiceProject;
+  error?: string;
+}
+
+export async function createSandboxProject(
+  params: CreateSandboxParams,
+): Promise<CreateSandboxResult> {
+  // 동시 실행 제한 체크
+  const active = await listSandboxProjects();
+  if (active.length >= MAX_CONCURRENT_SANDBOXES) {
+    return {
+      project: null as unknown as ServiceProject,
+      error: `동시 실행 가능한 샌드박스는 최대 ${MAX_CONCURRENT_SANDBOXES}개입니다. 기존 샌드박스를 정리해주세요.`,
+    };
+  }
+
+  const scenario = getScenario(params.scenario_id);
+  if (!scenario) {
+    return {
+      project: null as unknown as ServiceProject,
+      error: `시나리오 '${params.scenario_id}'를 찾을 수 없습니다.`,
+    };
+  }
+
+  const persona = getPersona(scenario.persona_id);
+  if (!persona) {
+    return {
+      project: null as unknown as ServiceProject,
+      error: `페르소나 '${scenario.persona_id}'를 찾을 수 없습니다.`,
+    };
+  }
+
+  const shortId = Math.random().toString(36).slice(2, 6);
+  const serviceDomain = `sandbox-${params.scenario_id}-${shortId}`;
+
+  // Phase별 거절 가중치 (디자인/기술설계 집중)
+  const defaultPhaseWeights: Record<number, number> = {
+    0: 0.1,
+    1: 0.5,
+    2: 0.5,
+    3: 0.3,
+    4: 2.0, // 디자인 — 거절 집중
+    5: 0.5,
+    6: 0.8,
+    7: 1.8, // 기술 설계 — 거절 집중
+    8: 0.5,
+    9: 0.3,
+  };
+
+  const sandboxConfig: SandboxConfig = {
+    enabled: true,
+    depth: params.depth,
+    mode: params.mode ?? 'mock',
+    virtual_po: {
+      mode: params.virtual_po_mode,
+      persona_id: scenario.persona_id,
+      rejection_rate: params.rejection_rate ?? 0.15,
+      phase_rejection_weights:
+        params.virtual_po_mode === 'semi-auto' ? defaultPhaseWeights : undefined,
+    },
+    scenario_id: params.scenario_id,
+    auto_advance: params.auto_advance ?? params.virtual_po_mode !== 'interactive',
+    slack_suppress: true,
+    timing: {
+      phase_delay_ms: params.phase_delay_ms ?? 500,
+      section_delay_ms: params.section_delay_ms ?? 300,
+    },
+    run_stats: {
+      started_at: new Date().toISOString(),
+      phases_completed: 0,
+      sections_generated: 0,
+      sections_reviewed: 0,
+      rejections: 0,
+    },
+  };
+
+  const project = await createProject({
+    project_name: `[SANDBOX] ${scenario.project_name}`,
+    owner_name: `${persona.name} (Virtual PO)`,
+    owner_contact: 'sandbox@semo.internal',
+    service_domain: serviceDomain,
+    metadata: {
+      preset: scenario.preset,
+      po_profile: persona.po_profile,
+      sandbox: sandboxConfig,
+      preset_config: scenario.infra_config ? { infra: scenario.infra_config } : undefined,
+    },
+  });
+
+  console.log(
+    `[SANDBOX] Created project "${project.project_name}" (${project.service_id}) — scenario: ${params.scenario_id}, depth: ${params.depth}, po: ${params.virtual_po_mode}`,
+  );
+
+  return { project };
+}
+
+// ── Mock Section Injection ──
+
+/**
+ * 특정 Phase의 Mock 섹션을 주입.
+ * 시나리오에 사전 콘텐츠가 있으면 사용, 없으면 placeholder 생성.
+ */
+export async function injectMockSections(
+  serviceId: string,
+  phase: number,
+  scenarioId: string,
+): Promise<ServiceSection[]> {
+  const scenario = getScenario(scenarioId);
+  if (!scenario) return [];
+
+  const mockSections = scenario.mock_sections[phase];
+  const sections: ServiceSection[] = [];
+
+  if (mockSections && mockSections.length > 0) {
+    for (let i = 0; i < mockSections.length; i++) {
+      const mock = mockSections[i];
+      const section = await upsertSection({
+        service_id: serviceId,
+        phase,
+        track: 'plan',
+        section_key: mock.section_key,
+        title: mock.title,
+        content: mock.content,
+        ordinal: i,
+        status: 'pending-review',
+        source: mock.source as ServiceSectionSource,
+      });
+      sections.push(section);
+    }
+  } else {
+    // Placeholder 생성
+    const placeholder = generatePlaceholderSection(phase, scenarioId);
+    const section = await upsertSection({
+      service_id: serviceId,
+      phase,
+      track: 'plan',
+      section_key: placeholder.section_key,
+      title: placeholder.title,
+      content: placeholder.content,
+      ordinal: 0,
+      status: 'pending-review',
+      source: placeholder.source as ServiceSectionSource,
+    });
+    sections.push(section);
+  }
+
+  // run_stats 업데이트
+  await incrementRunStat(serviceId, 'sections_generated', sections.length);
+
+  return sections;
+}
+
+// ── Teardown ──
+
+export async function teardownSandboxProject(serviceId: string): Promise<{ error?: string }> {
+  const project = await getProject(serviceId);
+  if (!project) return { error: '프로젝트를 찾을 수 없습니다.' };
+
+  const sandbox = (project.metadata as Record<string, unknown>)?.sandbox as
+    | SandboxConfig
+    | undefined;
+  if (!sandbox?.enabled) return { error: '이 프로젝트는 샌드박스가 아닙니다.' };
+
+  // 1. DB cascade delete (sections, materials, research_tasks, infra_requests, etc.)
+  await query('DELETE FROM semo.services WHERE service_id = $1', [serviceId]);
+
+  // 2. KB namespace 정리
+  if (project.service_domain) {
+    try {
+      const { deleteItemsByDomain } = await import('./kb');
+      await deleteItemsByDomain(project.service_domain);
+      console.log(`[SANDBOX] KB domain '${project.service_domain}' cleaned up`);
+    } catch (err) {
+      console.error('[SANDBOX] KB cleanup failed:', err);
+    }
+
+    // Ontology domain 정리
+    await query('DELETE FROM semo.ontology WHERE domain = $1', [project.service_domain]).catch(
+      (err) => console.error('[SANDBOX] Ontology cleanup failed:', err),
+    );
+  }
+
+  console.log(`[SANDBOX] Torn down project "${project.project_name}" (${serviceId})`);
+  return {};
+}
+
+export async function teardownAllSandboxProjects(): Promise<{
+  count: number;
+  errors: string[];
+}> {
+  const projects = await listSandboxProjects();
+  const errors: string[] = [];
+
+  for (const p of projects) {
+    const result = await teardownSandboxProject(p.service_id);
+    if (result.error) errors.push(`${p.project_name}: ${result.error}`);
+  }
+
+  return { count: projects.length - errors.length, errors };
+}
+
+// ── List & Query ──
+
+export async function listSandboxProjects(): Promise<ServiceProject[]> {
+  const res = await query<ServiceProject>(
+    `SELECT * FROM semo.services
+     WHERE metadata->'sandbox'->>'enabled' = 'true'
+     ORDER BY created_at DESC`,
+  );
+  return res.rows;
+}
+
+export interface SandboxReport {
+  project: ServiceProject;
+  config: SandboxConfig;
+  sections_by_phase: Record<number, { total: number; approved: number; rejected: number }>;
+  run_stats: SandboxConfig['run_stats'];
+  verification: { passed: boolean; issues: string[] };
+}
+
+export async function getSandboxReport(serviceId: string): Promise<SandboxReport | null> {
+  const project = await getProject(serviceId);
+  if (!project) return null;
+
+  const sandbox = (project.metadata as Record<string, unknown>)?.sandbox as
+    | SandboxConfig
+    | undefined;
+  if (!sandbox?.enabled) return null;
+
+  // Phase별 섹션 집계
+  const allSections = await listSections(serviceId);
+  const sectionsByPhase: Record<number, { total: number; approved: number; rejected: number }> = {};
+
+  for (const s of allSections) {
+    if (!sectionsByPhase[s.phase]) {
+      sectionsByPhase[s.phase] = { total: 0, approved: 0, rejected: 0 };
+    }
+    sectionsByPhase[s.phase].total++;
+    if (s.status === 'approved') sectionsByPhase[s.phase].approved++;
+    if (s.status === 'rejected') sectionsByPhase[s.phase].rejected++;
+  }
+
+  // 간단한 검증
+  const issues: string[] = [];
+  const scenario = getScenario(sandbox.scenario_id);
+  if (scenario) {
+    for (const [phase, expected] of Object.entries(scenario.expected_section_counts)) {
+      const phaseNum = Number(phase);
+      const actual = sectionsByPhase[phaseNum]?.total ?? 0;
+      if (actual < (expected as number)) {
+        issues.push(`Phase ${phaseNum}: 예상 ${expected}개, 실제 ${actual}개 섹션`);
+      }
+    }
+  }
+
+  return {
+    project,
+    config: sandbox,
+    sections_by_phase: sectionsByPhase,
+    run_stats: sandbox.run_stats,
+    verification: { passed: issues.length === 0, issues },
+  };
+}
+
+// ── Phase Reset ──
+
+export async function resetToPhase(
+  serviceId: string,
+  targetPhase: number,
+): Promise<{ error?: string }> {
+  const project = await getProject(serviceId);
+  if (!project) return { error: '프로젝트를 찾을 수 없습니다.' };
+
+  const sandbox = (project.metadata as Record<string, unknown>)?.sandbox as
+    | SandboxConfig
+    | undefined;
+  if (!sandbox?.enabled) return { error: '이 프로젝트는 샌드박스가 아닙니다.' };
+
+  // targetPhase 이후의 섹션 삭제
+  await query(
+    'DELETE FROM semo.service_sections WHERE service_id = $1 AND phase > $2 AND track = $3',
+    [serviceId, targetPhase, 'plan'],
+  );
+
+  // current_phase 롤백
+  await updateProject(serviceId, { current_phase: targetPhase });
+
+  // run_stats 리셋
+  const updatedStats = {
+    ...sandbox.run_stats,
+    completed_at: undefined,
+    phases_completed: targetPhase,
+  };
+  await updateProject(serviceId, {
+    metadata: { sandbox: { ...sandbox, run_stats: updatedStats } },
+  });
+
+  console.log(`[SANDBOX] Reset project ${serviceId} to Phase ${targetPhase}`);
+  return {};
+}
+
+// ── Run Stats Helper ──
+
+type RunStatKey = 'sections_generated' | 'sections_reviewed' | 'rejections' | 'phases_completed';
+
+const RUN_STAT_PATHS: Record<RunStatKey, { jsonPath: string; jsonQuery: string }> = {
+  sections_generated: {
+    jsonPath: '{sandbox,run_stats,sections_generated}',
+    jsonQuery: "metadata->'sandbox'->'run_stats'->>'sections_generated'",
+  },
+  sections_reviewed: {
+    jsonPath: '{sandbox,run_stats,sections_reviewed}',
+    jsonQuery: "metadata->'sandbox'->'run_stats'->>'sections_reviewed'",
+  },
+  rejections: {
+    jsonPath: '{sandbox,run_stats,rejections}',
+    jsonQuery: "metadata->'sandbox'->'run_stats'->>'rejections'",
+  },
+  phases_completed: {
+    jsonPath: '{sandbox,run_stats,phases_completed}',
+    jsonQuery: "metadata->'sandbox'->'run_stats'->>'phases_completed'",
+  },
+};
+
+async function incrementRunStat(
+  serviceId: string,
+  stat: RunStatKey,
+  amount: number = 1,
+): Promise<void> {
+  const paths = RUN_STAT_PATHS[stat];
+  await query(
+    `UPDATE semo.services
+     SET metadata = jsonb_set(
+       metadata,
+       '${paths.jsonPath}',
+       (COALESCE((${paths.jsonQuery})::int, 0) + $1)::text::jsonb
+     )
+     WHERE service_id = $2`,
+    [amount, serviceId],
+  );
+}
+
+export { incrementRunStat };
+
+/**
+ * Sandbox auto-advance 트리거 (gfp-actions.ts에서 호출).
+ * phase complete 시 다음 phase로 자동 진행.
+ */
+export function triggerSandboxAdvance(
+  serviceId: string,
+  nextPhase: number,
+  metadata: Record<string, unknown>,
+): void {
+  const sandbox = metadata?.sandbox as SandboxConfig | undefined;
+  if (!sandbox?.enabled || !sandbox.auto_advance) return;
+
+  scheduleSandboxNextPhase(serviceId, nextPhase, metadata).catch((err) =>
+    console.error('[SANDBOX] Auto-advance trigger failed:', err),
+  );
+}
+
+// ── Depth → Max Phase mapping ──
+
+export function getMaxPhaseForDepth(depth: SandboxDepth): number {
+  switch (depth) {
+    case 'plan-only':
+      return 9;
+    case 'full':
+      return 9; // plan phases만, 구현은 Track B
+    case 'e2e':
+      return 9; // plan + ops simulation
+    default:
+      return 9;
+  }
+}
+
+/**
+ * 샌드박스 auto-advance: 다음 Phase Mock 주입 스케줄.
+ * project-actions.ts의 phase complete 훅에서 호출됨.
+ */
+export async function scheduleSandboxNextPhase(
+  serviceId: string,
+  nextPhase: number,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  const sandbox = metadata.sandbox as SandboxConfig | undefined;
+  if (!sandbox?.enabled || !sandbox.auto_advance) return;
+  if (sandbox.mode !== 'mock') return; // live 모드는 실제 봇이 처리
+
+  const maxPhase = getMaxPhaseForDepth(sandbox.depth);
+  if (nextPhase > maxPhase) {
+    // 완료
+    await query(
+      `UPDATE semo.services
+       SET metadata = jsonb_set(metadata, '{sandbox,run_stats,completed_at}', $1::jsonb)
+       WHERE service_id = $2`,
+      [JSON.stringify(new Date().toISOString()), serviceId],
+    );
+    console.log(`[SANDBOX] Run completed for ${serviceId}`);
+    return;
+  }
+
+  const delay = sandbox.timing.phase_delay_ms;
+
+  setTimeout(async () => {
+    try {
+      const sections = await injectMockSections(serviceId, nextPhase, sandbox.scenario_id);
+      console.log(
+        `[SANDBOX] Injected ${sections.length} mock sections for Phase ${nextPhase} of ${serviceId}`,
+      );
+
+      // auto-pilot/semi-auto → 가상 PO 자동 리뷰 트리거
+      if (sandbox.virtual_po.mode !== 'interactive') {
+        const { processVirtualPOReviewBatch } = await import('./sandbox-virtual-po');
+        setTimeout(
+          () =>
+            processVirtualPOReviewBatch(serviceId, sections, sandbox).catch((err) =>
+              console.error('[SANDBOX] Virtual PO batch review failed:', err),
+            ),
+          sandbox.timing.section_delay_ms,
+        );
+      }
+    } catch (err) {
+      console.error(`[SANDBOX] Mock injection failed for Phase ${nextPhase}:`, err);
+    }
+  }, delay);
+}

@@ -281,24 +281,24 @@ export interface TestResult {
   duration_ms: number | null;
 }
 
-// GFP Preset Types
+// Service Preset Types
 
-export type GfpPresetId = 'standard' | 'infra-ready' | 'parallel';
+export type ServicePresetId = 'standard' | 'infra-ready' | 'parallel';
 
-export type GfpTrack = 'plan' | 'infra';
-export type GfpInfraRequestStatus = 'pending' | 'acknowledged' | 'in-progress' | 'completed';
-export type GfpInfraCategory = 'oauth' | 'push' | 'api' | 'storage' | 'dns' | 'cicd' | 'other';
+export type ServiceTrack = 'plan' | 'infra';
+export type ServiceInfraRequestStatus = 'pending' | 'acknowledged' | 'in-progress' | 'completed';
+export type ServiceInfraCategory = 'oauth' | 'push' | 'api' | 'storage' | 'dns' | 'cicd' | 'other';
 
-export interface GfpInfraRequest {
+export interface ServiceInfraRequest {
   request_id: string;
   service_id: string;
   source_phase: number;
   source_section_id: string | null;
-  category: GfpInfraCategory;
+  category: ServiceInfraCategory;
   title: string;
   description: string | null;
   priority: 'low' | 'normal' | 'high';
-  status: GfpInfraRequestStatus;
+  status: ServiceInfraRequestStatus;
   slack_thread_ts: string | null;
   created_at: string;
   updated_at: string;
@@ -334,7 +334,7 @@ export interface DeployVerification {
   created_at: string;
 }
 
-export interface GfpInfraConfig {
+export interface ServiceInfraConfig {
   repo_url: string;
   live_url: string;
   deploy_pipeline?: string;
@@ -343,15 +343,15 @@ export interface GfpInfraConfig {
   provisioned_at?: string;
 }
 
-export interface GfpPresetConfig {
-  infra?: GfpInfraConfig;
+export interface ServicePresetConfig {
+  infra?: ServiceInfraConfig;
   skip_cc?: number[];
   bot_hints?: Partial<Record<number, string>>;
 }
 
-// GFP (Greenfield Project Pipeline) Types
+// Service Pipeline Types (formerly GFP — Greenfield Project Pipeline)
 
-export interface GfpQAItem {
+export interface ServiceQAItem {
   id: string; // e.g., "q01", "q02"
   question: string;
   sub_bullets?: string[];
@@ -360,24 +360,25 @@ export interface GfpQAItem {
   answered_via: 'dashboard' | 'slack' | null;
 }
 
-export type GfpProjectStatus = 'active' | 'paused' | 'completed';
-export type GfpSectionStatus = 'draft' | 'pending-review' | 'approved' | 'rejected';
-export type GfpSectionSource =
+export type ServiceProjectStatus = 'active' | 'paused' | 'completed';
+export type ServiceSectionStatus = 'draft' | 'pending-review' | 'approved' | 'rejected';
+export type ServiceSectionSource =
   | 'planclaw'
   | 'imported'
   | 'growthclaw'
   | 'manual'
   | 'designclaw'
   | 'semiclaw'
-  | 'infraclaw';
-export type GfpMaterialType = 'planning-doc' | 'stitch-export' | 'design-prototype';
-export type GfpResearchTaskType =
+  | 'infraclaw'
+  | 'workclaw';
+export type ServiceMaterialType = 'planning-doc' | 'stitch-export' | 'design-prototype';
+export type ServiceResearchTaskType =
   | 'competitor-analysis'
   | 'market-research'
   | 'ux-pattern'
   | 'keyword-research'
   | 'design-reference';
-export type GfpResearchStatus = 'queued' | 'dispatched' | 'completed';
+export type ServiceResearchStatus = 'queued' | 'dispatched' | 'completed';
 
 // GFP Phase 4 Design Sub-Steps
 export type DesignStep = 1 | 2 | 3 | 4 | 5;
@@ -412,7 +413,7 @@ export function matchesStep(sectionKey: string, step: (typeof DESIGN_STEPS)[numb
 
 export type ServiceLifecycle = 'build' | 'ops' | 'sunset';
 
-export interface GfpProject {
+export interface ServiceProject {
   service_id: string;
   project_name: string;
   service_domain: string | null;
@@ -420,7 +421,7 @@ export interface GfpProject {
   owner_contact: string | null;
   current_phase: number;
   infra_phase: number | null;
-  status: GfpProjectStatus;
+  status: ServiceProjectStatus;
   lifecycle: ServiceLifecycle;
   launched_at: string | null;
   metadata: Record<string, unknown>;
@@ -428,48 +429,48 @@ export interface GfpProject {
   updated_at: string;
 }
 
-export interface GfpPhaseSection {
+export interface ServiceSection {
   section_id: string;
   service_id: string;
   phase: number;
-  track: GfpTrack;
+  track: ServiceTrack;
   section_key: string;
   title: string;
   content: string;
   ordinal: number;
-  status: GfpSectionStatus;
+  status: ServiceSectionStatus;
   reviewer_note: string | null;
-  source: GfpSectionSource;
+  source: ServiceSectionSource;
   kb_written_at: string | null;
-  qa_items: GfpQAItem[] | null;
+  qa_items: ServiceQAItem[] | null;
   slack_thread_ts: string | null;
   created_at: string;
   updated_at: string;
 }
 
-export interface GfpMaterial {
+export interface ServiceMaterial {
   material_id: string;
   service_id: string;
   content: string;
-  phase_mapping: GfpPhaseMapping[] | null;
-  material_type: GfpMaterialType;
+  phase_mapping: ServicePhaseMapping[] | null;
+  material_type: ServiceMaterialType;
   created_at: string;
 }
 
-export interface GfpPhaseMapping {
+export interface ServicePhaseMapping {
   phase: number;
   coverage: number;
   sections: { key: string; title: string; content: string }[];
   gaps: string[];
 }
 
-export interface GfpResearchTask {
+export interface ServiceResearchTask {
   task_id: string;
   service_id: string;
-  task_type: GfpResearchTaskType;
+  task_type: ServiceResearchTaskType;
   reference_urls: string[];
   input_prompt: string;
-  status: GfpResearchStatus;
+  status: ServiceResearchStatus;
   result: string | null;
   created_at: string;
   updated_at: string;
@@ -490,23 +491,113 @@ export interface PoProfile {
   decision_style: PoDecisionStyle;
 }
 
-// ── Service* type aliases (canonical names, Gfp* retained for backward compat) ──
+// ── Sandbox Types ──
 
-export type ServiceProject = GfpProject;
-export type ServiceSection = GfpPhaseSection;
-export type ServiceMaterial = GfpMaterial;
-export type ServiceResearchTask = GfpResearchTask;
-export type ServiceInfraRequest = GfpInfraRequest;
-export type ServicePresetId = GfpPresetId;
-export type ServiceTrack = GfpTrack;
-export type ServiceProjectStatus = GfpProjectStatus;
-export type ServiceSectionStatus = GfpSectionStatus;
-export type ServiceSectionSource = GfpSectionSource;
-export type ServiceInfraCategory = GfpInfraCategory;
-export type ServiceInfraRequestStatus = GfpInfraRequestStatus;
-export type ServicePresetConfig = GfpPresetConfig;
-export type ServiceInfraConfig = GfpInfraConfig;
-export type ServiceQAItem = GfpQAItem;
+export type SandboxDepth = 'plan-only' | 'full' | 'e2e';
+export type SandboxMode = 'mock' | 'live';
+export type SandboxVirtualPOMode = 'auto-pilot' | 'semi-auto' | 'interactive';
+
+export interface SandboxVirtualPO {
+  mode: SandboxVirtualPOMode;
+  persona_id: string;
+  rejection_rate?: number;
+  /** Phase별 거절 가중치 (기본 1.0, 높을수록 해당 phase에서 거절 확률 상승) */
+  phase_rejection_weights?: Partial<Record<number, number>>;
+}
+
+export interface SandboxRunStats {
+  started_at: string;
+  completed_at?: string;
+  phases_completed: number;
+  sections_generated: number;
+  sections_reviewed: number;
+  rejections: number;
+  cost_usd?: number;
+}
+
+export interface SandboxConfig {
+  enabled: true;
+  depth: SandboxDepth;
+  mode: SandboxMode;
+  virtual_po: SandboxVirtualPO;
+  scenario_id: string;
+  auto_advance: boolean;
+  slack_suppress: boolean;
+  timing: {
+    phase_delay_ms: number;
+    section_delay_ms: number;
+  };
+  run_stats?: SandboxRunStats;
+}
+
+export interface SandboxPersona {
+  id: string;
+  name: string;
+  po_profile: PoProfile;
+  domain_context: string;
+}
+
+export interface SandboxScenarioMockSection {
+  section_key: string;
+  title: string;
+  content: string;
+  source: ServiceSectionSource;
+}
+
+export interface SandboxScenario {
+  id: string;
+  project_name: string;
+  persona_id: string;
+  preset: ServicePresetId;
+  initial_description: string;
+  /** Phase별 Mock 섹션 콘텐츠 */
+  mock_sections: Partial<Record<number, SandboxScenarioMockSection[]>>;
+  /** Phase별 예상 최소 섹션 수 (검증용) */
+  expected_section_counts: Partial<Record<number, number>>;
+  /** infra-ready 프리셋용 인프라 설정 */
+  infra_config?: ServiceInfraConfig;
+}
+
+// ── Gfp* backward-compat aliases (deprecated — use Service* instead) ──
+
+/** @deprecated Use ServiceProject */
+export type GfpProject = ServiceProject;
+/** @deprecated Use ServiceSection */
+export type GfpPhaseSection = ServiceSection;
+/** @deprecated Use ServiceMaterial */
+export type GfpMaterial = ServiceMaterial;
+/** @deprecated Use ServiceResearchTask */
+export type GfpResearchTask = ServiceResearchTask;
+/** @deprecated Use ServiceInfraRequest */
+export type GfpInfraRequest = ServiceInfraRequest;
+/** @deprecated Use ServicePresetId */
+export type GfpPresetId = ServicePresetId;
+/** @deprecated Use ServiceTrack */
+export type GfpTrack = ServiceTrack;
+/** @deprecated Use ServiceProjectStatus */
+export type GfpProjectStatus = ServiceProjectStatus;
+/** @deprecated Use ServiceSectionStatus */
+export type GfpSectionStatus = ServiceSectionStatus;
+/** @deprecated Use ServiceSectionSource */
+export type GfpSectionSource = ServiceSectionSource;
+/** @deprecated Use ServiceInfraCategory */
+export type GfpInfraCategory = ServiceInfraCategory;
+/** @deprecated Use ServiceInfraRequestStatus */
+export type GfpInfraRequestStatus = ServiceInfraRequestStatus;
+/** @deprecated Use ServicePresetConfig */
+export type GfpPresetConfig = ServicePresetConfig;
+/** @deprecated Use ServiceInfraConfig */
+export type GfpInfraConfig = ServiceInfraConfig;
+/** @deprecated Use ServiceQAItem */
+export type GfpQAItem = ServiceQAItem;
+/** @deprecated Use ServicePhaseMapping */
+export type GfpPhaseMapping = ServicePhaseMapping;
+/** @deprecated Use ServiceMaterialType */
+export type GfpMaterialType = ServiceMaterialType;
+/** @deprecated Use ServiceResearchTaskType */
+export type GfpResearchTaskType = ServiceResearchTaskType;
+/** @deprecated Use ServiceResearchStatus */
+export type GfpResearchStatus = ServiceResearchStatus;
 
 // ── Service Iterations (ops mode) ──
 
