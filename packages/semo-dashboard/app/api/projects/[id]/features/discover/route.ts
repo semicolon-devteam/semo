@@ -58,15 +58,18 @@ async function handleStartScan(serviceId: string, body: Record<string, unknown>)
     return NextResponse.json({ error: 'Project not found or no service_domain' }, { status: 404 });
   }
 
-  // URL 결정: body.url > KB service-url
+  // URL 결정: body.url > services.service_url > KB fallback
   let sourceUrl = body.url as string | undefined;
+  if (!sourceUrl) {
+    sourceUrl = project.service_url ?? undefined;
+  }
   if (!sourceUrl) {
     const urlEntry = await getItem(project.service_domain, 'service-url');
     sourceUrl = urlEntry?.content?.trim();
   }
   if (!sourceUrl) {
     return NextResponse.json(
-      { error: 'URL이 필요합니다. body.url을 지정하거나 KB에 service-url을 등록하세요.' },
+      { error: 'URL이 필요합니다. body.url을 지정하거나 서비스에 service_url을 등록하세요.' },
       { status: 400 },
     );
   }

@@ -6,18 +6,15 @@ BEGIN;
 
 -- 1. 컬럼 추가
 ALTER TABLE semo.services
-  ADD COLUMN IF NOT EXISTS tech_stack TEXT[],
+  ADD COLUMN IF NOT EXISTS tech_stack TEXT,
   ADD COLUMN IF NOT EXISTS service_url TEXT,
   ADD COLUMN IF NOT EXISTS bm TEXT,
   ADD COLUMN IF NOT EXISTS repo TEXT,
   ADD COLUMN IF NOT EXISTS slack_channel TEXT;
 
--- 2. KB → DB 데이터 이전 (tech-stack)
+-- 2. KB → DB 데이터 이전 (tech-stack — 원문 그대로 저장, 마크다운/리스트 혼재)
 UPDATE semo.services s SET tech_stack = (
-  SELECT string_to_array(
-    regexp_replace(kb.content, E'\\s*,\\s*', ',', 'g'),
-    ','
-  )
+  SELECT TRIM(kb.content)
   FROM semo.knowledge_base kb
   WHERE kb.domain = s.service_domain
     AND kb.key = 'tech-stack' AND kb.sub_key = ''

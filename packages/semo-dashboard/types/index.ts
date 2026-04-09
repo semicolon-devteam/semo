@@ -427,6 +427,11 @@ export interface ServiceProject {
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;
+  tech_stack: string | null;
+  service_url: string | null;
+  bm: string | null;
+  repo: string | null;
+  slack_channel: string | null;
 }
 
 export interface ServiceSection {

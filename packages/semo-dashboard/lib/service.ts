@@ -1000,32 +1000,40 @@ export interface ServiceOverviewKB {
 }
 
 export async function getServiceOverviewKB(serviceDomain: string): Promise<ServiceOverviewKB> {
-  const keys = [
-    'base-information',
-    'po',
-    'tech-stack',
-    'service-url',
-    'repo',
-    'slack-channel',
-    'bm',
-    'current-situation',
-    'infra',
-  ];
-  const res = await query<{ key: string; content: string }>(
-    `SELECT key, content FROM semo.knowledge_base
-     WHERE domain = $1 AND key = ANY($2) AND sub_key = ''
-     ORDER BY key`,
-    [serviceDomain, keys],
+  // 1) services 테이블에서 SoT 컬럼 조회
+  const svcRes = await query<{
+    owner_name: string | null;
+    tech_stack: string | null;
+    service_url: string | null;
+    repo: string | null;
+    slack_channel: string | null;
+    bm: string | null;
+    status: string | null;
+  }>(
+    `SELECT owner_name, tech_stack, service_url, repo, slack_channel, bm, status
+     FROM semo.services WHERE service_domain = $1 LIMIT 1`,
+    [serviceDomain],
   );
-  const map = new Map(res.rows.map((r) => [r.key, r.content]));
+  const svc = svcRes.rows[0];
+
+  // 2) KB에서 자유형 텍스트 키만 조회
+  const kbKeys = ['base-information', 'current-situation', 'infra'];
+  const kbRes = await query<{ key: string; content: string }>(
+    `SELECT key, content FROM semo.knowledge_base
+     WHERE domain = $1 AND key = ANY($2) AND (sub_key = '' OR sub_key IS NULL)
+     ORDER BY key`,
+    [serviceDomain, kbKeys],
+  );
+  const map = new Map(kbRes.rows.map((r) => [r.key, r.content]));
+
   return {
     baseInformation: map.get('base-information') ?? null,
-    po: map.get('po') ?? null,
-    techStack: map.get('tech-stack') ?? null,
-    serviceUrl: map.get('service-url') ?? null,
-    repo: map.get('repo') ?? null,
-    slackChannel: map.get('slack-channel') ?? null,
-    bm: map.get('bm') ?? null,
+    po: svc?.owner_name ?? null,
+    techStack: svc?.tech_stack ?? null,
+    serviceUrl: svc?.service_url ?? null,
+    repo: svc?.repo ?? null,
+    slackChannel: svc?.slack_channel ?? null,
+    bm: svc?.bm ?? null,
     currentSituation: map.get('current-situation') ?? null,
     infra: map.get('infra') ?? null,
   };

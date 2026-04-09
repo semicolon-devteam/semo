@@ -83,13 +83,14 @@ export async function resolveServiceSlackContext(serviceId: string): Promise<Gfp
 
   try {
     const project = await query(
-      `SELECT metadata, service_domain, project_name FROM semo.services WHERE service_id = $1`,
+      `SELECT metadata, service_domain, project_name, slack_channel FROM semo.services WHERE service_id = $1`,
       [serviceId],
     );
     if (project.rows.length > 0) {
       const meta = project.rows[0].metadata as Record<string, unknown>;
       const domain = project.rows[0].service_domain as string;
       const projectName = project.rows[0].project_name as string;
+      const dbSlackChannel = project.rows[0].slack_channel as string | null;
 
       // Sandbox suppress: sandbox 프로젝트는 Slack 알림 차단
       if ((meta?.sandbox as Record<string, unknown>)?.slack_suppress) {
@@ -102,15 +103,21 @@ export async function resolveServiceSlackContext(serviceId: string): Promise<Gfp
         ownerSlackId = meta.ownerSlackId;
       }
 
-      // KB SoT: {service_domain} slack-channel
-      if (domain) {
+      // SoT: services.slack_channel 컬럼 우선
+      if (dbSlackChannel) {
+        const raw = dbSlackChannel.trim();
+        const match = raw.match(/\b(C[A-Z0-9]{8,})\b/);
+        if (match) channelId = match[1];
+      }
+
+      // KB fallback (마이그레이션 전 데이터 호환)
+      if (!channelId && domain) {
         const kb = await query(
           `SELECT content FROM semo.knowledge_base WHERE domain = $1 AND key = 'slack-channel' LIMIT 1`,
           [domain],
         );
         if (kb.rows.length > 0) {
           const raw = (kb.rows[0].content as string).trim();
-          // Support both pure ID ("C0A5MLV4BL7") and "#name (C0A5MLV4BL7)" formats
           const match = raw.match(/\b(C[A-Z0-9]{8,})\b/);
           if (match) channelId = match[1];
         }
@@ -121,7 +128,7 @@ export async function resolveServiceSlackContext(serviceId: string): Promise<Gfp
         const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${serviceId}`;
         await postSlackMessage(
           REUS_DM_CHANNEL,
-          `[Service] ${projectName} (domain: ${domain || 'N/A'}) 프로젝트에 Slack 채널이 설정되지 않았습니다.\n\nKB에 채널을 등록해주세요:\n\`semo kb upsert ${domain || 'DOMAIN'} slack-channel --content "C채널ID"\`\n\n프로젝트: <${dashboardUrl}|${projectName}>`,
+          `[Service] ${projectName} (domain: ${domain || 'N/A'}) 프로젝트에 Slack 채널이 설정되지 않았습니다.\n\nDB에 채널을 등록해주세요:\n\`semo service update --domain ${domain || 'DOMAIN'} --slack-channel "C채널ID"\`\n\n프로젝트: <${dashboardUrl}|${projectName}>`,
           { botId: 'semiclaw' },
         );
         // DM 보냈으므로 null 반환 — 호출자가 알림 skip
