@@ -118,7 +118,11 @@ class BotSession {
         ],
         permissionMode: 'acceptEdits',
         effort: 'low',
-        systemPrompt: { type: 'preset', preset: 'claude_code', append: config.soulPrompt },
+        systemPrompt: {
+          type: 'preset',
+          preset: 'claude_code',
+          append: `${config.soulPrompt}\n\n## Agent SDK 세션 제약 (NON-NEGOTIABLE)\n- EnterPlanMode 도구 사용 금지. 이 세션은 interactive 승인이 불가능하므로 plan mode에 진입하면 세션이 영구 block됩니다.\n- 계획이 필요하면 마크다운 텍스트로 응답하세요. plan mode 도구를 호출하지 마세요.`,
+        },
         persistSession: false,
         settings: {
           hooks: {
