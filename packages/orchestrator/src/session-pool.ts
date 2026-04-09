@@ -194,13 +194,18 @@ class BotSession {
           },
         },
         // DesignClaw만 Stitch MCP 서버 연동 (Phase 4 UI 생성 자동화)
+        // 인증: STITCH_API_KEY는 활성화 게이트, 실제 인증은 gcloud OAuth (~/.stitch-mcp/config/)
         ...(botId === 'designclaw' && process.env.STITCH_API_KEY
           ? {
               mcpServers: {
                 stitch: {
                   command: 'npx',
                   args: ['@_davideast/stitch-mcp', 'proxy'],
-                  env: { STITCH_API_KEY: process.env.STITCH_API_KEY },
+                  env: {
+                    STITCH_API_KEY: process.env.STITCH_API_KEY,
+                    CLOUDSDK_CONFIG: path.join(os.homedir(), '.stitch-mcp', 'config'),
+                    GOOGLE_CLOUD_PROJECT: 'gen-lang-client-0353417824',
+                  },
                 },
               },
             }
