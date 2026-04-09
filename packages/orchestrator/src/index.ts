@@ -16,6 +16,7 @@ import { SlackGateway } from './slack-gateway';
 import { Router } from './router';
 import { SessionPool } from './session-pool';
 import { CostTracker } from './cost-tracker';
+import { CommitmentTracker } from './commitment-tracker';
 import { loadAllBotConfigs, loadSlackProfilesFromAPI } from './bot-config';
 import type { BotId } from './bot-config';
 import type { SlackMessage, DispatchContext } from './types';
@@ -101,16 +102,19 @@ async function main() {
 
   // 4. Components
   const costTracker = new CostTracker(pool);
+  const commitmentTracker = new CommitmentTracker(pool);
   const router = new Router(pool);
   const sessionPool = new SessionPool(botConfigs, costTracker);
   const slack = new SlackGateway(SLACK_BOT_TOKEN, SLACK_APP_TOKEN);
 
   // 5. 봇 세션 프리웜 (Slack 수신 전 프로세스 기동)
   sessionPool.warmUp().catch((err) => console.warn('[orchestrator] Warm-up partial failure:', err));
+  await commitmentTracker.registerSessions(Array.from(botConfigs.keys()));
 
   // 6. Message handler
   slack.setMessageHandler(async (msg: SlackMessage, senderName: string) => {
     const threadTs = msg.thread_ts || msg.ts;
+    let commitmentId = '';
 
     try {
       // Route
@@ -132,10 +136,17 @@ async function main() {
         `${botConfigs.get(route.botId as BotId)?.slackProfile.username || route.botId}가 처리 중...`,
       );
 
-      // Dispatch with escalation chain
+      // Dispatch with escalation chain + commitment tracking
       let currentBotId = route.botId as BotId;
       let currentMessage = msg.text;
       let depth = 0;
+      commitmentId = await commitmentTracker.claimForDispatch({
+        botId: currentBotId,
+        title: msg.text.slice(0, 100),
+        serviceId: route.serviceId,
+        sessionOwner: 'agent-sdk',
+        pipelineContext: { channel: msg.channel, phase: route.phase },
+      });
 
       while (depth < MAX_ESCALATION_DEPTH) {
         const context: DispatchContext = {
@@ -152,12 +163,19 @@ async function main() {
           currentMessage,
           context,
           depth === 0 ? msg.images : undefined,
+          commitmentId,
         );
 
         if (result.escalation && depth < MAX_ESCALATION_DEPTH - 1) {
-          // 에스컬레이션: 다음 봇으로 재디스패치
+          // 에스컬레이션: 이전 commitment done + 새 commitment claim
           console.log(
             `[orchestrator] Escalation: ${currentBotId} → ${result.escalation.targetBotId} (${result.escalation.reason})`,
+          );
+          commitmentId = await commitmentTracker.escalate(
+            commitmentId,
+            result.escalation.targetBotId,
+            msg.text.slice(0, 100),
+            route.serviceId,
           );
           await slack.setTypingStatus(
             msg.channel,
@@ -170,7 +188,9 @@ async function main() {
           continue;
         }
 
-        // 최종 응답 발송
+        // 최종 응답 — commitment done
+        commitmentTracker.markDone(commitmentId);
+
         if (result.response) {
           await slack.postAsBot(currentBotId, msg.channel, result.response, threadTs);
         } else {
@@ -189,6 +209,7 @@ async function main() {
       }
     } catch (err) {
       console.error('[orchestrator] Handler error:', err);
+      if (commitmentId) commitmentTracker.markFailed(commitmentId, String(err));
       await slack.postAsBot(
         'semiclaw',
         msg.channel,
@@ -210,6 +231,7 @@ async function main() {
     console.log(`[orchestrator] ${signal} received, shutting down...`);
     try {
       await sessionPool.drainAndShutdown(10_000);
+      await commitmentTracker.terminateSessions(Array.from(botConfigs.keys()));
     } catch (err) {
       console.error('[orchestrator] Drain error:', err);
     } finally {

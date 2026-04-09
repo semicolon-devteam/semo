@@ -21,7 +21,7 @@ describe('CostTracker (DB)', () => {
       tracker.record('planclaw', 0.42, 'svc-1', 'claude-opus-4-6');
       expect(pool.query).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO semo.bot_cost_log'),
-        ['planclaw', 0.42, 'svc-1', 'claude-opus-4-6'],
+        ['planclaw', 0.42, 'svc-1', 'claude-opus-4-6', null, 0],
       );
     });
 
@@ -32,7 +32,14 @@ describe('CostTracker (DB)', () => {
 
     it('should handle null serviceId and model', () => {
       tracker.record('workclaw', 0.5);
-      expect(pool.query).toHaveBeenCalledWith(expect.any(String), ['workclaw', 0.5, null, null]);
+      expect(pool.query).toHaveBeenCalledWith(expect.any(String), [
+        'workclaw',
+        0.5,
+        null,
+        null,
+        null,
+        0,
+      ]);
     });
 
     it('should not throw on INSERT failure (fire-and-forget)', () => {

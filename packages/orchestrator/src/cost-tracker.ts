@@ -9,12 +9,26 @@ export class CostTracker {
     this.pool = pool;
   }
 
-  record(botId: BotId, costUsd: number, serviceId?: string, model?: string) {
+  record(
+    botId: BotId,
+    costUsd: number,
+    serviceId?: string,
+    model?: string,
+    commitmentId?: string,
+    dispatchDepth?: number,
+  ) {
     if (costUsd <= 0) return; // 0 또는 음수는 무시 (리펀드 케이스 없음)
     this.pool
       .query(
-        `INSERT INTO semo.bot_cost_log (bot_id, cost_usd, service_id, model) VALUES ($1, $2, $3, $4)`,
-        [botId, costUsd, serviceId || null, model || null],
+        `INSERT INTO semo.bot_cost_log (bot_id, cost_usd, service_id, model, commitment_id, dispatch_depth) VALUES ($1, $2, $3, $4, $5, $6)`,
+        [
+          botId,
+          costUsd,
+          serviceId || null,
+          model || null,
+          commitmentId || null,
+          dispatchDepth ?? 0,
+        ],
       )
       .catch((err) => {
         this.insertFailures++;

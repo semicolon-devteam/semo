@@ -95,7 +95,21 @@ class BotSession {
       options: {
         cwd,
         model: sessionModel,
-        allowedTools: config.tools,
+        allowedTools: [
+          ...config.tools,
+          // DesignClaw: Stitch MCP 도구 자동 승인
+          ...(botId === 'designclaw'
+            ? [
+                'mcp__stitch__list_projects',
+                'mcp__stitch__create_project',
+                'mcp__stitch__generate_screen_from_text',
+                'mcp__stitch__get_screen',
+                'mcp__stitch__get_screen_code',
+                'mcp__stitch__get_screen_image',
+                'mcp__stitch__build_site',
+              ]
+            : []),
+        ],
         permissionMode: 'acceptEdits',
         effort: 'low',
         systemPrompt: { type: 'preset', preset: 'claude_code', append: config.soulPrompt },
@@ -131,6 +145,18 @@ class BotSession {
             ],
           },
         },
+        // DesignClaw만 Stitch MCP 서버 연동 (Phase 4 UI 생성 자동화)
+        ...(botId === 'designclaw' && process.env.STITCH_API_KEY
+          ? {
+              mcpServers: {
+                stitch: {
+                  command: 'npx',
+                  args: ['@_davideast/stitch-mcp', 'proxy'],
+                  env: { STITCH_API_KEY: process.env.STITCH_API_KEY },
+                },
+              },
+            }
+          : {}),
         env: {
           ...process.env,
           CLAUDE_CONFIG_DIR: path.join(os.homedir(), '.claude-orchestrator'),
@@ -330,6 +356,7 @@ export class SessionPool {
     message: string,
     context: DispatchContext,
     images?: import('./types').SlackImage[],
+    commitmentId?: string,
   ): Promise<DispatchResult> {
     const config = this.configs.get(botId);
     if (!config) {
@@ -408,8 +435,14 @@ export class SessionPool {
         }
       }
 
-      // 비용 추적
-      this.costTracker.record(botId, turnResult.costUsd, context.route.serviceId, actualModel);
+      // 비용 추적 (commitment 연동)
+      this.costTracker.record(
+        botId,
+        turnResult.costUsd,
+        context.route.serviceId,
+        actualModel,
+        commitmentId,
+      );
 
       // 에스컬레이션 감지
       const escalation = detectEscalation(turnResult.responseText);
