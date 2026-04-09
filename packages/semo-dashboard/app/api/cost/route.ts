@@ -8,6 +8,29 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const botId = searchParams.get('botId');
     const period = searchParams.get('period') || 'monthly'; // monthly | daily
+    const groupBy = searchParams.get('groupBy'); // 'project' for project-level view
+
+    // 프로젝트별 집계
+    if (groupBy === 'project') {
+      const result = await query(`
+        SELECT s.service_id, s.project_name, s.service_domain,
+               COUNT(*) AS query_count,
+               COALESCE(SUM(c.input_tokens), 0) AS total_input_tokens,
+               COALESCE(SUM(c.output_tokens), 0) AS total_output_tokens,
+               ROUND(COALESCE(SUM(c.cost_usd), 0)::numeric, 6) AS total_cost_usd,
+               COALESCE(AVG(c.duration_ms), 0)::int AS avg_latency_ms,
+               STRING_AGG(DISTINCT c.bot_id, ', ') AS bots_used,
+               MIN(c.created_at)::date AS first_activity,
+               MAX(c.created_at)::date AS last_activity
+        FROM semo.bot_cost_log c
+        JOIN semo.services s ON s.service_id::text = c.service_id
+                              OR LEFT(s.service_id::text, 8) = c.service_id
+        WHERE c.service_id IS NOT NULL
+        GROUP BY s.service_id, s.project_name, s.service_domain
+        ORDER BY total_cost_usd DESC
+      `);
+      return NextResponse.json({ projects: result.rows });
+    }
 
     if (period === 'daily') {
       // 일별 트렌드 (최근 30일)
@@ -28,9 +51,12 @@ export async function GET(request: NextRequest) {
 
     // 예산 정보 조인
     const budgets = await query(
-      `SELECT bot_id, monthly_budget_usd, alert_threshold_pct, auto_pause FROM semo.bot_budgets`
+      `SELECT bot_id, monthly_budget_usd, alert_threshold_pct, auto_pause FROM semo.bot_budgets`,
     );
-    const budgetMap: Record<string, { monthly_budget_usd: number; alert_threshold_pct: number; auto_pause: boolean }> = {};
+    const budgetMap: Record<
+      string,
+      { monthly_budget_usd: number; alert_threshold_pct: number; auto_pause: boolean }
+    > = {};
     for (const b of budgets.rows) {
       budgetMap[b.bot_id as string] = {
         monthly_budget_usd: Number(b.monthly_budget_usd),
@@ -41,7 +67,7 @@ export async function GET(request: NextRequest) {
 
     // 봇 이름/이모지 조인
     const botsResult = await query(
-      `SELECT bot_id, name, emoji, status FROM semo.bot_status WHERE status != 'retired' ORDER BY bot_id`
+      `SELECT bot_id, name, emoji, status FROM semo.bot_status WHERE status != 'retired' ORDER BY bot_id`,
     );
     const botMap: Record<string, { name: string; emoji: string; status: string }> = {};
     for (const b of botsResult.rows) {
