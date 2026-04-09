@@ -28,8 +28,22 @@ npm run lint && npx tsc --noEmit && npm run build
 
 ---
 
+## No Hardcoded Bot Lists (NON-NEGOTIABLE)
+
+봇 목록, 위임 대상, 디스패치 테이블 등을 **로컬 파일에 하드코딩하지 않는다.** DB(`semo.bot_status`, `semo.bot_delegation`)가 SoT이며, 로컬 파일은 `semo onboarding` 또는 `semo context sync` 시 DB에서 동적 생성된다.
+
+- 봇 추가/제거 → DB 테이블 수정 → `semo onboarding -f`로 로컬 반영
+- SOUL.md, CLAUDE.md의 봇 테이블은 `generateSoulMd()` 등이 DB에서 동적 생성
+- 에이전트 정의(`~/.claude/agents/`)는 DB `agent_definitions`에서 동기화
+
+**위반 예시**: SOUL.md에 `| PlanClaw | planclaw |` 같은 정적 테이블 직접 삽입
+**올바른 방법**: `getDelegations()` → 템플릿에 `${dispatchTable}` 변수로 주입
+
+---
+
 ## 상세 규칙 (필요 시 참조)
 
-GFP 파이프라인 작업 시 → `.claude/rules/gfp-slack-first.md` (Slack-First 원칙)
+GFP 파이프라인 작업 시 → `.claude/rules/pipeline-slack-first.md` (Slack-First 원칙)
 PM 데이터 읽기/쓰기 시 → `.claude/rules/data-routing.md` (Data Routing)
 빌드/배포 상세 → `.claude/rules/quality-gate.md` (CLI 배포 포함)
+세션 동기화 → `.claude/rules/session-sync.md` (로컬↔Agent SDK 동기화)

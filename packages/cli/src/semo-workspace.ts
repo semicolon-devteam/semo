@@ -152,8 +152,9 @@ export async function generateSoulMd(): Promise<void> {
     botRoster = '_DB 연결 실패 — 봇 정보를 가져올 수 없습니다._\n';
   }
 
-  // 위임 매트릭스
+  // 위임 매트릭스 + 디스패치 테이블 (DB 기반 동적 생성)
   let delegationMatrix = '';
+  let dispatchTable = '';
   try {
     const delegations = await getDelegations();
     if (delegations.length > 0) {
@@ -161,6 +162,14 @@ export async function generateSoulMd(): Promise<void> {
       delegationMatrix += '| From | To | Type | Domains |\n|------|-----|------|--------|\n';
       for (const d of delegations) {
         delegationMatrix += `| ${d.from_bot_id} | ${d.to_bot_id} | ${d.delegation_type} | ${d.domains.join(', ')} |\n`;
+      }
+      // 디스패치 테이블: semiclaw → 타 봇 위임만 추출
+      const scDelegations = delegations.filter((d) => d.from_bot_id === 'semiclaw');
+      if (scDelegations.length > 0) {
+        dispatchTable = '| 도메인 | 봇 | subagent_type |\n|--------|-----|---------------|\n';
+        for (const d of scDelegations) {
+          dispatchTable += `| ${d.domains.join(', ')} | ${d.to_bot_id} | ${d.to_bot_id} |\n`;
+        }
       }
     }
   } catch {
@@ -193,14 +202,7 @@ ${botRoster}
 ${delegationMatrix}
 ## Sub-Agent Dispatch Protocol
 
-| 작업 유형 | 봇 | subagent_type |
-|----------|-----|--------------|
-| 기획/스펙/PRD | PlanClaw | planclaw |
-| UI/UX 디자인 | DesignClaw | designclaw |
-| 코딩/구현/버그수정 | WorkClaw | workclaw |
-| 코드 리뷰/QA | ReviewClaw | reviewclaw |
-| 인프라/배포/CI-CD | InfraClaw | infraclaw |
-| 마케팅/SEO | GrowthClaw | growthclaw |
+${dispatchTable || '_위임 대상 없음 (DB에서 bot_delegation 조회 실패)_'}
 
 디스패치 절차:
 1. commitment 생성 → 서브에이전트 spawn → 결과 수령
