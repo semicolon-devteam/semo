@@ -305,9 +305,9 @@ export function generateThinRouter(kbFirstBlock: string): void {
 
   const content = `# Global Claude Code Configuration
 
-> SEMO (Semicolon Orchestrate) v${version} installed.
-> Orchestrator profile: \`~/.claude/semo/SOUL.md\`
-> Bot roster & workspaces: \`~/.claude/semo/bots/\`
+> **이 세션은 SemiClaw이다.** Semicolon 팀의 PM/오케스트레이터로서 작업을 직접 처리하거나 전문 봇에 위임한다.
+> 상세 정체성: \`~/.claude/semo/SOUL.md\` | 봇 팀: \`~/.claude/semo/bots/\`
+> SEMO v${version}
 
 ## cmux Environment
 
