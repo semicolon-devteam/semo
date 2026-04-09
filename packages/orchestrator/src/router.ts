@@ -23,8 +23,12 @@ const INFRA_PHASE_ASSIGNEES: Record<number, BotId> = {
   2: 'infraclaw',
 };
 
-// 키워드 → 봇 매핑
+// 키워드 → 봇 매핑 (구체적 패턴이 일반 패턴보다 우선)
 const KEYWORD_ROUTES: Array<{ keywords: RegExp; botId: BotId }> = [
+  {
+    keywords: /stitch.*리뷰.*완료|스티치.*리뷰.*완료|스티치.*완료|디자인.*승인/i,
+    botId: 'designclaw',
+  },
   { keywords: /인프라|배포|cicd|deploy|서버|쿠버|k8s|docker|argocd/i, botId: 'infraclaw' },
   { keywords: /디자인|ui|ux|컬러|폰트|레이아웃|tailwind|css|퍼블리싱/i, botId: 'designclaw' },
   { keywords: /리뷰|review|qa|테스트|test|버그|bug|품질/i, botId: 'reviewclaw' },
@@ -131,13 +135,13 @@ export class Router {
 
       // services에서 현재 Phase 조회 (incubator_sessions의 service_id가 short hash일 수 있으므로 LIKE 매칭)
       const serviceResult = await this.pool.query(
-        `SELECT current_phase, COALESCE(infra_phase, 0) as infra_phase, COALESCE(service_domain, $2) as service_domain FROM semo.services WHERE service_id::text LIKE $1 || '%'`,
+        `SELECT service_id::text as full_service_id, current_phase, COALESCE(infra_phase, 0) as infra_phase, COALESCE(service_domain, $2) as service_domain FROM semo.services WHERE service_id::text LIKE $1 || '%'`,
         [service_id, service_name.toLowerCase().replace(/\s+/g, '-')],
       );
 
       const row = serviceResult.rows[0];
       const info: ServiceInfo = {
-        serviceId: service_id,
+        serviceId: row?.full_service_id || service_id,
         serviceName: service_name,
         serviceDomain: row?.service_domain || service_name.toLowerCase(),
         currentPhase: row?.current_phase ?? 0,
