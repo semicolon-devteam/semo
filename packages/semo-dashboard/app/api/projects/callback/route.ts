@@ -159,6 +159,16 @@ interface DesignSystemConfirmedPayload {
   bot_id: string;
 }
 
+interface SandboxSectionSubmitPayload {
+  type: 'sandbox-section-submit';
+  service_id: string;
+  phase: number;
+  section_key: string;
+  title: string;
+  content: string;
+  bot_id: string;
+}
+
 type CallbackPayload =
   | SectionRegenerationPayload
   | ResearchResultPayload
@@ -174,7 +184,8 @@ type CallbackPayload =
   | FeatureTestCompletePayload
   | DeployVerificationPayload
   | IncubatorCheckpointPayload
-  | DesignSystemConfirmedPayload;
+  | DesignSystemConfirmedPayload
+  | SandboxSectionSubmitPayload;
 
 export async function POST(request: NextRequest) {
   try {
@@ -821,6 +832,63 @@ export async function POST(request: NextRequest) {
           `[GFP Callback] Incubator CP-${body.checkpoint} ${body.status} for ${body.service_id} by ${body.bot_id}`,
         );
         return NextResponse.json({ ok: true, checkpoint: body.checkpoint, status: body.status });
+      }
+
+      case 'sandbox-section-submit': {
+        if (!body.service_id || !body.section_key || !body.title || !body.content) {
+          return NextResponse.json(
+            { error: 'service_id, section_key, title, content are required' },
+            { status: 400 },
+          );
+        }
+
+        // run_generation 검증: stale callback 방지
+        const sbProject = await getProject(body.service_id);
+        if (!sbProject) {
+          return NextResponse.json({ error: 'Project not found' }, { status: 404 });
+        }
+        const sbMeta = sbProject.metadata as Record<string, unknown>;
+        const sbSandbox = sbMeta?.sandbox as import('@/types').SandboxConfig | undefined;
+        if (!sbSandbox?.enabled || sbSandbox.mode !== 'live') {
+          return NextResponse.json({ error: 'Not a live sandbox project' }, { status: 400 });
+        }
+
+        const existingSections = await listSections(body.service_id, body.phase, 'plan');
+        const section = await upsertSection({
+          service_id: body.service_id,
+          phase: body.phase,
+          track: 'plan',
+          section_key: body.section_key,
+          title: body.title,
+          content: body.content,
+          ordinal: existingSections.length,
+          status: 'pending-review',
+          source: body.bot_id as import('@/types').ServiceSectionSource,
+        });
+
+        const { incrementRunStat, incrementSandboxCost } = await import('@/lib/sandbox');
+        await incrementRunStat(body.service_id, 'sections_generated');
+        await incrementSandboxCost(body.service_id, 0.05);
+
+        // Slack pending-review 알림
+        const sbSlackCtx = await resolveServiceSlackContext(body.service_id);
+        if (sbSlackCtx.channelId) {
+          sendServiceSectionPendingReviewSlack({
+            projectName: sbProject.project_name,
+            serviceId: body.service_id,
+            sectionId: section.section_id,
+            sectionKey: section.section_key,
+            sectionTitle: section.title,
+            phase: section.phase,
+            contentPreview: section.content.slice(0, 300),
+            channelId: sbSlackCtx.channelId,
+          }).catch((err) => console.error('Sandbox section Slack notify failed:', err));
+        }
+
+        console.log(
+          `[GFP Callback] Sandbox section "${body.section_key}" (Phase ${body.phase}) submitted by ${body.bot_id}`,
+        );
+        return NextResponse.json({ ok: true, section });
       }
 
       default:

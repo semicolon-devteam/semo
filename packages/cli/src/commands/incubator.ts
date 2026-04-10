@@ -781,4 +781,45 @@ export function registerIncubatorCommands(program: Command): void {
         spinner.fail(`정리 실패: ${err instanceof Error ? err.message : err}`);
       }
     });
+
+  sandbox
+    .command('reinit')
+    .description('샌드박스 초기화 (같은 프로젝트 ID 유지, Phase 0부터 재시작)')
+    .requiredOption('--service-id <uuid>', '서비스 UUID')
+    .option('--scenario <id>', '시나리오 변경')
+    .option('--po-mode <mode>', 'PO 모드 변경 (auto-pilot, semi-auto, interactive)')
+    .option('--rejection-rate <rate>', '거절률 변경 (0.0-1.0)', parseFloat)
+    .action(async (options) => {
+      const spinner = ora('샌드박스 초기화 중...').start();
+      try {
+        const body: Record<string, unknown> = {
+          service_id: options.serviceId,
+          action: 'reinitialize',
+        };
+        if (options.scenario) body.scenario_id = options.scenario;
+        if (options.poMode) body.po_mode = options.poMode;
+        if (options.rejectionRate !== undefined) body.rejection_rate = options.rejectionRate;
+
+        const res = await fetch(`${SANDBOX_BASE_URL}/api/projects/sandbox/advance`, {
+          method: 'POST',
+          headers: sandboxHeaders(),
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(15000),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+          spinner.fail(`초기화 실패: ${err.error}`);
+          return;
+        }
+
+        const result = await res.json();
+        spinner.succeed(result.message || '초기화 완료');
+        if (result.scenario_id) {
+          console.log(`  시나리오: ${chalk.cyan(result.scenario_id)}`);
+        }
+      } catch (err) {
+        spinner.fail(`초기화 실패: ${err instanceof Error ? err.message : err}`);
+      }
+    });
 }

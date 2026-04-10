@@ -378,6 +378,59 @@ export default function GfpDetailPage() {
     );
   }
 
+  // service_type='platform' → 플랫폼 전용 뷰
+  if (project.service_type === 'platform') {
+    const children =
+      (project as ProjectWithProgress & { children?: ServiceProject[] }).children ?? [];
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-6">
+          <Link href="/projects" className="text-sm text-blue-600 hover:underline">
+            &larr; 서비스 목록
+          </Link>
+        </div>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            {project.project_name}
+          </h1>
+          <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-400">
+            <span>오너: {project.owner_name}</span>
+            {project.bm && <span>BM: {project.bm}</span>}
+            {project.tech_stack && <span>스택: {project.tech_stack}</span>}
+          </div>
+        </div>
+
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          소속 서비스 ({children.length}개)
+        </h2>
+        {children.length === 0 ? (
+          <p className="text-gray-500 dark:text-gray-400">소속 서비스가 없습니다.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {children.map((child) => (
+              <Link
+                key={child.service_id}
+                href={`/projects/${child.service_id}`}
+                className="block bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-5 hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700 transition-all"
+              >
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  {child.project_name}
+                </h3>
+                <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
+                  <p>오너: {child.owner_name}</p>
+                  {child.service_domain && <p>도메인: {child.service_domain}</p>}
+                  <p>
+                    상태: {child.status} ({child.lifecycle})
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // lifecycle='ops' or 'sunset' → 운영 대시보드 렌더
   if (project.lifecycle === 'ops' || project.lifecycle === 'sunset') {
     const ServiceOpsView = require('@/components/service-ops/ServiceOpsView').default;

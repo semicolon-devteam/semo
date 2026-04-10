@@ -92,10 +92,15 @@ export async function resolveServiceSlackContext(serviceId: string): Promise<Gfp
       const projectName = project.rows[0].project_name as string;
       const dbSlackChannel = project.rows[0].slack_channel as string | null;
 
-      // Sandbox suppress: sandbox 프로젝트는 Slack 알림 차단
-      if ((meta?.sandbox as Record<string, unknown>)?.slack_suppress) {
-        console.log(`[SANDBOX-SLACK] Suppressed notifications for project ${serviceId}`);
-        return { channelId: '', ownerSlackId: null };
+      // Sandbox: 전용 채널로 리다이렉트 (#proj-si-sandbox)
+      const sandbox = meta?.sandbox as Record<string, unknown> | undefined;
+      if (sandbox?.enabled) {
+        const sandboxChannel =
+          (sandbox.notify_channel as string) || process.env.SANDBOX_SLACK_CHANNEL || 'C0ARK2M9NPM'; // #proj-si-sandbox
+        console.log(
+          `[SANDBOX-SLACK] Routing notifications to sandbox channel for project ${serviceId}`,
+        );
+        return { channelId: sandboxChannel, ownerSlackId: null };
       }
 
       // Owner Slack ID

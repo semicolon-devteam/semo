@@ -75,21 +75,41 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
 
-    // Phase 0 Mock 주입 + 가상 PO 리뷰 (mock 모드인 경우)
+    // Phase 0 주입 (모드별 분기)
     const sandbox = (result.project.metadata as Record<string, unknown>)?.sandbox as
       | import('@/types').SandboxConfig
       | undefined;
 
-    if (sandbox?.mode === 'mock') {
-      const sections = await injectMockSections(result.project.service_id, 0, sandbox.scenario_id);
-
-      // Phase 0 리뷰 → approve → triggerSandboxAdvance(Phase 1) 체인 시작
-      if (sandbox.virtual_po.mode !== 'interactive') {
-        const { processVirtualPOReviewBatch } = await import('@/lib/sandbox-virtual-po');
-        // fire-and-forget: 응답 반환 후 비동기 실행
-        processVirtualPOReviewBatch(result.project.service_id, sections, sandbox).catch((err) =>
-          console.error('[SANDBOX API] Phase 0 auto-review failed:', err),
+    if (sandbox?.mode === 'live') {
+      // Live: 봇에게 Phase 0 디스패치
+      const { dispatchLiveSandboxPhase } = await import('@/lib/sandbox');
+      const { getScenario } = await import('@/lib/sandbox-scenarios');
+      const scenario = getScenario(sandbox.scenario_id);
+      if (scenario) {
+        dispatchLiveSandboxPhase(result.project.service_id, 0, scenario, sandbox).catch((err) =>
+          console.error('[SANDBOX API] Live Phase 0 dispatch failed:', err),
         );
+      }
+    } else if (sandbox?.mode === 'mock') {
+      if (sandbox.progressive_reveal !== false) {
+        // Progressive: draft 등록 후 순차 리뷰 (fire-and-forget)
+        const { injectAndReviewProgressive } = await import('@/lib/sandbox');
+        injectAndReviewProgressive(result.project.service_id, 0, sandbox).catch((err) =>
+          console.error('[SANDBOX API] Progressive Phase 0 failed:', err),
+        );
+      } else {
+        // 기존 일괄 주입
+        const sections = await injectMockSections(
+          result.project.service_id,
+          0,
+          sandbox.scenario_id,
+        );
+        if (sandbox.virtual_po.mode !== 'interactive') {
+          const { processVirtualPOReviewBatch } = await import('@/lib/sandbox-virtual-po');
+          processVirtualPOReviewBatch(result.project.service_id, sections, sandbox).catch((err) =>
+            console.error('[SANDBOX API] Phase 0 auto-review failed:', err),
+          );
+        }
       }
     }
 

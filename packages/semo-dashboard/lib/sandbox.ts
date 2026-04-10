@@ -102,7 +102,9 @@ export async function createSandboxProject(
     },
     scenario_id: params.scenario_id,
     auto_advance: params.auto_advance ?? params.virtual_po_mode !== 'interactive',
-    slack_suppress: true,
+    slack_suppress: false,
+    progressive_reveal: (params.mode ?? 'mock') !== 'live',
+    phase_timeout_ms: (params.mode ?? 'mock') === 'live' ? 300000 : undefined,
     timing: {
       phase_delay_ms: params.phase_delay_ms ?? 500,
       section_delay_ms: params.section_delay_ms ?? 300,
@@ -192,6 +194,82 @@ export async function injectMockSections(
   await incrementRunStat(serviceId, 'sections_generated', sections.length);
 
   return sections;
+}
+
+/**
+ * Progressive Mock: 전체 섹션을 draft로 등록 후, 하나씩 pending-review → PO 리뷰.
+ * Phase complete 조기 트리거 방지: draft 섹션이 남아있으므로 every(approved)가 false 유지.
+ */
+export async function injectAndReviewProgressive(
+  serviceId: string,
+  phase: number,
+  sandbox: SandboxConfig,
+): Promise<void> {
+  const scenario = getScenario(sandbox.scenario_id);
+  if (!scenario) return;
+
+  const mockSections = scenario.mock_sections[phase];
+  const items =
+    mockSections && mockSections.length > 0
+      ? mockSections
+      : [generatePlaceholderSection(phase, sandbox.scenario_id)];
+
+  // 1. 모든 섹션을 draft로 한꺼번에 등록
+  const sections: ServiceSection[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const mock = items[i];
+    const section = await upsertSection({
+      service_id: serviceId,
+      phase,
+      track: 'plan',
+      section_key: mock.section_key,
+      title: mock.title,
+      content: mock.content,
+      ordinal: i,
+      status: 'draft',
+      source: (mock.source ?? 'imported') as ServiceSectionSource,
+    });
+    sections.push(section);
+  }
+  await incrementRunStat(serviceId, 'sections_generated', sections.length);
+
+  // 2. Slack: Phase 시작 알림
+  const { postSlackMessage } = await import('./slack');
+  const { PHASE_LABELS } = await import('./service-phases');
+  const sandboxChannel =
+    sandbox.notify_channel || process.env.SANDBOX_SLACK_CHANNEL || 'C0ARK2M9NPM';
+  const phaseLabel = PHASE_LABELS[phase] ?? `Phase ${phase}`;
+  await postSlackMessage(
+    sandboxChannel,
+    `Phase ${phase} (${phaseLabel}) 시작 — ${sections.length}개 섹션 생성 중`,
+    { botId: 'semiclaw' },
+  ).catch(() => {});
+
+  // 3. 순차 reveal + PO 리뷰
+  const delay = sandbox.timing.section_delay_ms;
+  const { processVirtualPOReview } = await import('./sandbox-virtual-po');
+
+  for (let i = 0; i < sections.length; i++) {
+    if (i > 0 && delay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+
+    // draft → pending-review (섹션 "도착" 연출)
+    await query(
+      `UPDATE semo.service_sections SET status = 'pending-review' WHERE section_id = $1`,
+      [sections[i].section_id],
+    );
+    sections[i].status = 'pending-review';
+
+    // auto-pilot/semi-auto → 즉시 PO 리뷰
+    if (sandbox.virtual_po.mode !== 'interactive') {
+      await processVirtualPOReview(serviceId, sections[i], sandbox);
+    }
+  }
+
+  console.log(
+    `[SANDBOX] Progressive: injected & reviewed ${sections.length} sections for Phase ${phase} of ${serviceId}`,
+  );
 }
 
 // ── Teardown ──
@@ -529,7 +607,15 @@ export async function scheduleSandboxNextPhase(
   const sandbox = metadata.sandbox as SandboxConfig | undefined;
   if (!sandbox?.enabled) return;
   if (!sandbox.auto_advance && sandbox.virtual_po.mode !== 'interactive') return;
-  if (sandbox.mode !== 'mock') return; // live 모드는 실제 봇이 처리
+
+  // Live 모드: 실제 봇에게 디스패치
+  if (sandbox.mode === 'live') {
+    const scenario = getScenario(sandbox.scenario_id);
+    if (scenario) {
+      await dispatchLiveSandboxPhase(serviceId, nextPhase, scenario, sandbox);
+    }
+    return;
+  }
 
   const maxPhase = getMaxPhaseForDepth(sandbox.depth);
   if (nextPhase > maxPhase) {
@@ -562,6 +648,31 @@ export async function scheduleSandboxNextPhase(
         return;
       }
 
+      // Progressive reveal: 섹션 단위 시간차 주입 + PO 리뷰 인터리브
+      if (sandbox.progressive_reveal !== false) {
+        await injectAndReviewProgressive(serviceId, nextPhase, sandbox);
+
+        // interactive 모드 + notify_channel → Slack 버튼 메시지
+        if (sandbox.virtual_po.mode === 'interactive' && sandbox.notify_channel) {
+          try {
+            const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space';
+            await fetch(`${baseUrl}/api/projects/sandbox/slack-review`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                service_id: serviceId,
+                channel_id: sandbox.notify_channel,
+                thread_ts: sandbox.notify_thread_ts,
+              }),
+            });
+          } catch (err) {
+            console.error('[SANDBOX] Slack review notification failed:', err);
+          }
+        }
+        return;
+      }
+
+      // 기존 일괄 주입 (progressive_reveal=false, backward compat)
       const sections = await injectMockSections(serviceId, nextPhase, sandbox.scenario_id);
       console.log(
         `[SANDBOX] Injected ${sections.length} mock sections for Phase ${nextPhase} of ${serviceId}`,
@@ -600,4 +711,108 @@ export async function scheduleSandboxNextPhase(
       console.error(`[SANDBOX] Mock injection failed for Phase ${nextPhase}:`, err);
     }
   }, delay);
+}
+
+// ── Live Mode: Bot Dispatch ──
+
+/**
+ * Live 모드: 실제 봇에게 Phase 섹션 생성을 디스패치.
+ * 봇은 callback API(sandbox-section-submit)로 섹션 제출.
+ */
+export async function dispatchLiveSandboxPhase(
+  serviceId: string,
+  phase: number,
+  scenario: ReturnType<typeof getScenario> & {},
+  sandbox: SandboxConfig,
+): Promise<void> {
+  const { getPhaseAssignee, PHASE_LABELS } = await import('./service-phases');
+  const { dispatchBotMessage } = await import('./service-bot');
+  const { postSlackMessage } = await import('./slack');
+
+  const assignee = getPhaseAssignee(phase);
+  const phaseLabel = PHASE_LABELS[phase] ?? `Phase ${phase}`;
+  const persona = getPersona(sandbox.virtual_po.persona_id);
+  const sandboxChannel =
+    sandbox.notify_channel || process.env.SANDBOX_SLACK_CHANNEL || 'C0ARK2M9NPM';
+
+  // 이전 Phase 승인 콘텐츠 수집 (Phase 1+ 컨텍스트)
+  let prevContext = '';
+  if (phase > 0) {
+    const prevSections = await listSections(serviceId, phase - 1, 'plan');
+    const approved = prevSections.filter((s) => s.status === 'approved');
+    if (approved.length > 0) {
+      prevContext = `\n## Previous Phase (${phase - 1}) Approved Content\n${approved.map((s) => `### ${s.title}\n${s.content.slice(0, 500)}`).join('\n\n')}\n`;
+    }
+  }
+
+  const profileCtx = persona
+    ? `\n## PO Profile\nTech: ${persona.po_profile.tech_level}, Design: ${persona.po_profile.design_sensitivity}, Domain: ${persona.po_profile.domain_area}\n`
+    : '';
+
+  const message = `[Sandbox Live Phase: ${serviceId}]
+
+## Phase ${phase} — ${phaseLabel}
+${scenario.initial_description}
+${profileCtx}${prevContext}
+## Instructions
+Generate sections for Phase ${phase} (${phaseLabel}).
+Submit each section via POST /api/projects/callback with:
+\`\`\`json
+{
+  "type": "sandbox-section-submit",
+  "service_id": "${serviceId}",
+  "phase": ${phase},
+  "section_key": "...",
+  "title": "...",
+  "content": "...",
+  "bot_id": "${assignee.botId}"
+}
+\`\`\``;
+
+  await dispatchBotMessage(assignee.botId, message, sandboxChannel);
+
+  // Slack: Phase 시작 알림
+  await postSlackMessage(
+    sandboxChannel,
+    `[Live] Phase ${phase} (${phaseLabel}) — ${assignee.botId}에게 디스패치 완료`,
+    { botId: 'semiclaw' },
+  ).catch(() => {});
+
+  // Phase timeout 등록
+  const timeoutMs = sandbox.phase_timeout_ms ?? 300000;
+  setTimeout(async () => {
+    try {
+      const project = await getProject(serviceId);
+      if (!project) return;
+      if (project.current_phase > phase) return; // 이미 진행됨
+      const sections = await listSections(serviceId, phase, 'plan');
+      if (sections.length > 0) return; // 섹션 도착함
+
+      console.warn(`[SANDBOX] Live phase ${phase} timeout for ${serviceId}`);
+      await postSlackMessage(
+        sandboxChannel,
+        `⚠️ Phase ${phase} (${phaseLabel}) 타임아웃 — 봇 응답 없음 (${Math.round(timeoutMs / 1000)}초)`,
+        { botId: 'semiclaw' },
+      );
+    } catch {
+      // ignore
+    }
+  }, timeoutMs);
+
+  console.log(`[SANDBOX] Live dispatch: Phase ${phase} → ${assignee.botId} for ${serviceId}`);
+}
+
+// ── Cost Tracking ──
+
+export async function incrementSandboxCost(serviceId: string, costDelta: number): Promise<void> {
+  await query(
+    `UPDATE semo.services
+     SET metadata = jsonb_set(
+       metadata,
+       '{sandbox,run_stats,cost_usd}',
+       (COALESCE((metadata->'sandbox'->'run_stats'->>'cost_usd')::numeric, 0) + $1)::text::jsonb
+     )
+     WHERE service_id = $2`,
+    [costDelta, serviceId],
+  );
 }

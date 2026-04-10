@@ -535,6 +535,8 @@ export interface SandboxConfig {
     phase_delay_ms: number;
     section_delay_ms: number;
   };
+  progressive_reveal?: boolean;
+  phase_timeout_ms?: number;
   run_stats?: SandboxRunStats;
   notify_channel?: string;
   notify_thread_ts?: string;

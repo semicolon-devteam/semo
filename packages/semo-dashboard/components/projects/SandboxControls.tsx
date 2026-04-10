@@ -74,13 +74,19 @@ export function SandboxControls({
         <span className="text-xs text-gray-500 dark:text-gray-400">
           {sandbox.scenario_id} | {depthLabels[sandbox.depth] ?? sandbox.depth} |{' '}
           {modeLabels[sandbox.virtual_po.mode] ?? sandbox.virtual_po.mode} |{' '}
-          {sandbox.mode === 'live' ? 'Live 봇' : 'Mock'}
+          {sandbox.mode === 'live'
+            ? 'Live 봇'
+            : sandbox.progressive_reveal !== false
+              ? 'Progressive'
+              : 'Mock'}
         </span>
       </div>
 
       {/* Run Stats */}
       {sandbox.run_stats && (
-        <div className="grid grid-cols-4 gap-2 text-center text-xs">
+        <div
+          className={`grid ${sandbox.mode === 'live' ? 'grid-cols-5' : 'grid-cols-4'} gap-2 text-center text-xs`}
+        >
           <div className="bg-white dark:bg-gray-800 rounded p-2">
             <div className="font-bold text-lg text-blue-600">
               {sandbox.run_stats.phases_completed}
@@ -103,6 +109,14 @@ export function SandboxControls({
             </div>
             <div className="text-gray-500">상태</div>
           </div>
+          {sandbox.mode === 'live' && (
+            <div className="bg-white dark:bg-gray-800 rounded p-2">
+              <div className="font-bold text-lg text-amber-600">
+                ${(sandbox.run_stats.cost_usd ?? 0).toFixed(2)}
+              </div>
+              <div className="text-gray-500">비용</div>
+            </div>
+          )}
         </div>
       )}
 
@@ -120,7 +134,9 @@ export function SandboxControls({
           disabled={loading !== null || currentPhase >= 9}
           className="px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded disabled:opacity-50"
         >
-          {loading === 'advance-phase' ? '...' : `Phase ${currentPhase + 1} 주입`}
+          {loading === 'advance-phase'
+            ? '...'
+            : `Phase ${currentPhase + 1} ${sandbox.mode === 'live' ? '디스패치' : '주입'}`}
         </button>
 
         {/* Phase Reset Dropdown */}
@@ -165,6 +181,17 @@ export function SandboxControls({
             수동 모드로 전환
           </button>
         )}
+
+        <button
+          onClick={() => {
+            if (!confirm('샌드박스를 초기화하시겠습니까? 모든 진행 상태가 리셋됩니다.')) return;
+            callAdvance({ action: 'reinitialize' });
+          }}
+          disabled={loading !== null}
+          className="px-3 py-1.5 text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white rounded disabled:opacity-50"
+        >
+          {loading === 'reinitialize' ? '...' : '초기화'}
+        </button>
 
         <button
           onClick={handleTeardown}
