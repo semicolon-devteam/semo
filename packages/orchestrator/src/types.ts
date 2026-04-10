@@ -20,7 +20,7 @@ export interface RouteResult {
   serviceDomain: string;
   phase: number;
   track: 'plan' | 'infra';
-  routeReason: 'route-tag' | 'keyword' | 'phase-based' | 'fallback';
+  routeReason: 'route-tag' | 'thread-sticky' | 'keyword' | 'phase-based' | 'fallback';
 }
 
 export interface ThreadMessage {

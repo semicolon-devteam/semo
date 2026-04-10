@@ -182,8 +182,10 @@ async function main() {
         return;
       }
 
-      // Route
-      const route = await router.route(msg.channel, msg.text);
+      // Route: msg.thread_ts만 전달 — 부모 메시지는 thread-sticky 스킵, 답글만 캐시 히트.
+      // setThreadBot은 threadTs(=thread_ts||ts)로 저장 — 답글의 thread_ts와 매칭됨.
+      const route = await router.route(msg.channel, msg.text, msg.thread_ts);
+      router.setThreadBot(threadTs, route.botId as import('./bot-config').BotId);
       console.log(
         `[orchestrator] ${senderName} → ${route.botId} (${route.routeReason}, phase=${route.phase})`,
       );

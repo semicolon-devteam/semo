@@ -270,7 +270,7 @@ export class SlackGateway {
       // 마지막 메시지(현재 메시지) 제외, 부모 메시지는 포함
       const history = messages.slice(0, -1);
       return history.map((m) => ({
-        displayName: m.username || m.user || 'unknown',
+        displayName: ((m as Record<string, unknown>).username as string) || m.user || 'unknown',
         text:
           (m.text || '').length > 500 ? (m.text || '').slice(0, 500) + '...(잘림)' : m.text || '',
         isBotMessage: !!m.bot_id,

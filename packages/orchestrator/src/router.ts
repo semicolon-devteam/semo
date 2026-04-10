@@ -32,7 +32,11 @@ const KEYWORD_ROUTES: Array<{ keywords: RegExp; botId: BotId }> = [
   { keywords: /인프라|배포|cicd|deploy|서버|쿠버|k8s|docker|argocd/i, botId: 'infraclaw' },
   { keywords: /디자인|ui|ux|컬러|폰트|레이아웃|tailwind|css|퍼블리싱/i, botId: 'designclaw' },
   { keywords: /리뷰|review|qa|테스트|test|버그|bug|품질/i, botId: 'reviewclaw' },
-  { keywords: /마케팅|seo|그로스|트래픽|전환율|키워드|콘텐츠|광고/i, botId: 'growthclaw' },
+  {
+    keywords:
+      /마케팅|seo|그로스|트래픽|전환율|키워드|콘텐츠|광고|트래킹|커뮤니티.*게시|백링크|조회수/i,
+    botId: 'growthclaw',
+  },
   { keywords: /코딩|구현|개발|코드|fix|feature|pr\b|풀리퀘/i, botId: 'workclaw' },
   { keywords: /기획|스펙|prd|요구사항|epic|유저스토리|플로우/i, botId: 'planclaw' },
 ];
@@ -52,12 +56,31 @@ export class Router {
   private cacheExpiry = new Map<string, number>();
   private readonly CACHE_TTL = 60_000; // 1분
 
+  // Thread stickiness: 같은 스레드 내 후속 메시지는 이전 봇으로 라우팅
+  private threadBotCache = new Map<string, { botId: BotId; expiresAt: number }>();
+  private readonly THREAD_TTL = 30 * 60_000; // 30분
+
   constructor(pool: Pool) {
     this.pool = pool;
   }
 
-  async route(channelId: string, text: string): Promise<RouteResult> {
-    // 1. [Route: botId] 태그 직접 라우팅
+  /** 스레드 → 봇 매핑 저장 (dispatch 후 호출) */
+  setThreadBot(threadTs: string, botId: BotId): void {
+    this.threadBotCache.set(threadTs, {
+      botId,
+      expiresAt: Date.now() + this.THREAD_TTL,
+    });
+    // TTL 만료된 캐시 정리 (100개 초과 시)
+    if (this.threadBotCache.size > 100) {
+      const now = Date.now();
+      for (const [key, val] of this.threadBotCache) {
+        if (now >= val.expiresAt) this.threadBotCache.delete(key);
+      }
+    }
+  }
+
+  async route(channelId: string, text: string, threadTs?: string): Promise<RouteResult> {
+    // 1. [Route: botId] 태그 직접 라우팅 (최우선)
     const routeTag = text.match(/\[Route:\s*(\w+)\]/);
     if (routeTag) {
       const candidate = routeTag[1].toLowerCase();
@@ -75,10 +98,26 @@ export class Router {
       };
     }
 
-    // 2. 채널 → 서비스 조회
+    // 2. 스레드 캐시: 같은 스레드 후속 메시지는 이전 봇 유지
+    if (threadTs) {
+      const cached = this.threadBotCache.get(threadTs);
+      if (cached && Date.now() < cached.expiresAt) {
+        const service = await this.getServiceInfo(channelId);
+        return {
+          botId: cached.botId,
+          serviceId: service?.serviceId || '',
+          serviceDomain: service?.serviceDomain || '',
+          phase: service?.currentPhase ?? -1,
+          track: 'plan',
+          routeReason: 'thread-sticky',
+        };
+      }
+    }
+
+    // 3. 채널 → 서비스 조회
     const service = await this.getServiceInfo(channelId);
 
-    // 3. 키워드 분기
+    // 4. 키워드 분기
     for (const { keywords, botId } of KEYWORD_ROUTES) {
       if (keywords.test(text)) {
         return {

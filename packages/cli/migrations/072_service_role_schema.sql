@@ -38,7 +38,7 @@ RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.key = 'role' AND NEW.sub_key = 'po' THEN
     UPDATE semo.services
-    SET owner_name = TRIM(NEW.content)
+    SET owner_name = TRIM(SPLIT_PART(NEW.content, ',', 1))
     WHERE service_domain = NEW.domain;
   END IF;
   RETURN NEW;
