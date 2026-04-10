@@ -188,6 +188,7 @@ export function registerServiceCommands(program: Command): void {
           `SELECT service_id, project_name, service_domain, owner_name, owner_contact,
                   status, lifecycle, current_phase, infra_phase,
                   tech_stack, service_url, bm, repo, slack_channel,
+                  service_type, parent_service_id,
                   metadata, created_at::text, updated_at::text
            FROM semo.services WHERE service_domain = $1`,
           [domain],
@@ -206,6 +207,8 @@ export function registerServiceCommands(program: Command): void {
           console.log(chalk.gray(`  도메인: ${row.service_domain}`));
           console.log(chalk.gray(`  오너: ${row.owner_name}`));
           console.log(chalk.gray(`  상태: ${row.status} (${row.lifecycle})`));
+          console.log(chalk.gray(`  타입: ${row.service_type}`));
+          if (row.parent_service_id) console.log(chalk.gray(`  상위: ${row.parent_service_id}`));
           console.log(
             chalk.gray(`  Phase: ${row.current_phase} / Infra: ${row.infra_phase ?? '-'}`),
           );
@@ -309,6 +312,8 @@ export function registerServiceCommands(program: Command): void {
     .option('--bm <model>', '비즈니스 모델')
     .option('--repo <repo>', '레포지토리')
     .option('--slack-channel <channel>', 'Slack 채널 ID')
+    .option('--service-type <type>', '서비스 타입 (incubator|general|external|platform)')
+    .option('--parent <domain>', '상위 플랫폼 도메인')
     .action(
       async (options: {
         domain: string;
@@ -322,6 +327,8 @@ export function registerServiceCommands(program: Command): void {
         bm?: string;
         repo?: string;
         slackChannel?: string;
+        serviceType?: string;
+        parent?: string;
       }) => {
         const pool = getPool();
         const spinner = ora('서비스 업데이트 중...').start();
@@ -350,6 +357,15 @@ export function registerServiceCommands(program: Command): void {
             return;
           }
 
+          const validServiceTypes = ['incubator', 'general', 'external', 'platform'];
+          if (options.serviceType && !validServiceTypes.includes(options.serviceType)) {
+            spinner.fail(
+              `잘못된 service-type: '${options.serviceType}' (허용: ${validServiceTypes.join(', ')})`,
+            );
+            await closeConnection();
+            return;
+          }
+
           const updates: Record<string, unknown> = {};
           if (options.status) updates.status = options.status;
           if (options.lifecycle) updates.lifecycle = options.lifecycle;
@@ -361,6 +377,21 @@ export function registerServiceCommands(program: Command): void {
           if (options.bm !== undefined) updates.bm = options.bm;
           if (options.repo !== undefined) updates.repo = options.repo;
           if (options.slackChannel !== undefined) updates.slack_channel = options.slackChannel;
+          if (options.serviceType) updates.service_type = options.serviceType;
+
+          // --parent: 도메인 → service_id 변환
+          if (options.parent) {
+            const parentResult = await pool.query(
+              'SELECT service_id FROM semo.services WHERE service_domain = $1',
+              [options.parent],
+            );
+            if (parentResult.rows.length === 0) {
+              spinner.fail(`상위 플랫폼 '${options.parent}'을 찾을 수 없습니다.`);
+              await closeConnection();
+              return;
+            }
+            updates.parent_service_id = parentResult.rows[0].service_id;
+          }
 
           if (Object.keys(updates).length === 0) {
             spinner.info(
@@ -385,6 +416,7 @@ export function registerServiceCommands(program: Command): void {
               `  project_name: ${result.project_name}\n` +
                 `  owner_name: ${result.owner_name}\n` +
                 `  lifecycle: ${result.lifecycle}\n` +
+                `  service_type: ${result.service_type}\n` +
                 `  current_phase: ${result.current_phase}\n` +
                 `  status: ${result.status}\n` +
                 `  launched_at: ${result.launched_at ?? '(없음)'}\n` +

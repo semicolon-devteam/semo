@@ -114,6 +114,8 @@ export async function createSandboxProject(
       sections_reviewed: 0,
       rejections: 0,
     },
+    run_generation: 0,
+    reinit_count: 0,
   };
 
   const project = await createProject({
@@ -341,6 +343,103 @@ export async function resetToPhase(
   return {};
 }
 
+// ── Reinitialize ──
+
+export interface ReinitializeSandboxParams {
+  scenario_id?: string;
+  virtual_po_mode?: SandboxVirtualPOMode;
+  rejection_rate?: number;
+  auto_advance?: boolean;
+  depth?: SandboxDepth;
+}
+
+export async function reinitializeSandbox(
+  serviceId: string,
+  params?: ReinitializeSandboxParams,
+): Promise<{ error?: string }> {
+  const project = await getProject(serviceId);
+  if (!project) return { error: '프로젝트를 찾을 수 없습니다.' };
+
+  const sandbox = (project.metadata as Record<string, unknown>)?.sandbox as
+    | SandboxConfig
+    | undefined;
+  if (!sandbox?.enabled) return { error: '이 프로젝트는 샌드박스가 아닙니다.' };
+
+  // 시나리오 변경 시 유효성 체크
+  const newScenarioId = params?.scenario_id ?? sandbox.scenario_id;
+  if (params?.scenario_id && params.scenario_id !== sandbox.scenario_id) {
+    const scenario = getScenario(params.scenario_id);
+    if (!scenario) return { error: `시나리오 '${params.scenario_id}'를 찾을 수 없습니다.` };
+  }
+
+  // 1. 전체 plan-track 섹션 삭제
+  await query('DELETE FROM semo.service_sections WHERE service_id = $1 AND track = $2', [
+    serviceId,
+    'plan',
+  ]);
+
+  // 2. KB 도메인 엔트리 정리
+  if (project.service_domain) {
+    try {
+      const { deleteItemsByDomain } = await import('./kb');
+      await deleteItemsByDomain(project.service_domain);
+    } catch (err) {
+      console.error('[SANDBOX] KB cleanup on reinit failed:', err);
+    }
+  }
+
+  // 3. SandboxConfig 머지 (오버라이드 적용)
+  const updatedConfig: SandboxConfig = {
+    ...sandbox,
+    scenario_id: newScenarioId,
+    depth: params?.depth ?? sandbox.depth,
+    auto_advance: params?.auto_advance ?? sandbox.auto_advance,
+    virtual_po: {
+      ...sandbox.virtual_po,
+      mode: params?.virtual_po_mode ?? sandbox.virtual_po.mode,
+      rejection_rate: params?.rejection_rate ?? sandbox.virtual_po.rejection_rate,
+    },
+    run_generation: (sandbox.run_generation ?? 0) + 1,
+    reinit_count: (sandbox.reinit_count ?? 0) + 1,
+    run_stats: {
+      started_at: new Date().toISOString(),
+      phases_completed: 0,
+      sections_generated: 0,
+      sections_reviewed: 0,
+      rejections: 0,
+    },
+  };
+
+  // 4. 프로젝트 업데이트
+  await updateProject(serviceId, {
+    current_phase: 0,
+    metadata: { sandbox: updatedConfig },
+  });
+
+  // 5. KB gfp-id 재작성 (fire-and-forget)
+  if (project.service_domain) {
+    try {
+      const { upsertItem } = await import('./kb');
+      const updated = await getProject(serviceId);
+      if (updated) {
+        await upsertItem(
+          project.service_domain,
+          'gfp-id',
+          `service_id: ${updated.service_id}\nproject_name: ${updated.project_name}\nowner: ${updated.owner_name}`,
+          'pm-pipeline',
+        );
+      }
+    } catch (err) {
+      console.error('[SANDBOX] KB gfp-id rewrite on reinit failed:', err);
+    }
+  }
+
+  console.log(
+    `[SANDBOX] Reinitialized project ${serviceId} (generation: ${updatedConfig.run_generation})`,
+  );
+  return {};
+}
+
 // ── Run Stats Helper ──
 
 type RunStatKey = 'sections_generated' | 'sections_reviewed' | 'rejections' | 'phases_completed';
@@ -446,9 +545,23 @@ export async function scheduleSandboxNextPhase(
   }
 
   const delay = sandbox.timing.phase_delay_ms;
+  const scheduledGeneration = sandbox.run_generation ?? 0;
 
   setTimeout(async () => {
     try {
+      // Generation guard: reinitialize 됐으면 이 체인은 무효
+      const fresh = await getProject(serviceId);
+      if (!fresh) return;
+      const freshSandbox = (fresh.metadata as Record<string, unknown>)?.sandbox as
+        | SandboxConfig
+        | undefined;
+      if ((freshSandbox?.run_generation ?? 0) !== scheduledGeneration) {
+        console.log(
+          `[SANDBOX] Stale advance for ${serviceId} (gen ${scheduledGeneration} vs ${freshSandbox?.run_generation}), skipping`,
+        );
+        return;
+      }
+
       const sections = await injectMockSections(serviceId, nextPhase, sandbox.scenario_id);
       console.log(
         `[SANDBOX] Injected ${sections.length} mock sections for Phase ${nextPhase} of ${serviceId}`,

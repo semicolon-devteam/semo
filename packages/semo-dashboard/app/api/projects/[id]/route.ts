@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getProject, updateProject, getPhaseProgress } from '@/lib/service';
+import { getProject, updateProject, getPhaseProgress, getChildServices } from '@/lib/service';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +11,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
     const progress = await getPhaseProgress(id);
-    return NextResponse.json({ ...project, progress });
+    const children = project.service_type === 'platform' ? await getChildServices(id) : undefined;
+    return NextResponse.json({ ...project, progress, children });
   } catch (error) {
     console.error('GFP get error:', error);
     return NextResponse.json({ error: 'Failed to get project' }, { status: 500 });

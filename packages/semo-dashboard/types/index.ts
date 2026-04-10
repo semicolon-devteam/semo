@@ -412,6 +412,7 @@ export function matchesStep(sectionKey: string, step: (typeof DESIGN_STEPS)[numb
 }
 
 export type ServiceLifecycle = 'build' | 'ops' | 'sunset';
+export type ServiceType = 'incubator' | 'general' | 'external' | 'platform';
 
 export interface ServiceProject {
   service_id: string;
@@ -432,6 +433,8 @@ export interface ServiceProject {
   bm: string | null;
   repo: string | null;
   slack_channel: string | null;
+  service_type: ServiceType;
+  parent_service_id: string | null;
 }
 
 export interface ServiceSection {
@@ -535,6 +538,8 @@ export interface SandboxConfig {
   run_stats?: SandboxRunStats;
   notify_channel?: string;
   notify_thread_ts?: string;
+  run_generation?: number;
+  reinit_count?: number;
 }
 
 export interface SandboxPersona {

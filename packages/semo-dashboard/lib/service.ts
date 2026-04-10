@@ -50,6 +50,14 @@ export async function getProject(serviceId: string): Promise<ServiceProject | nu
   return res.rows[0] ?? null;
 }
 
+export async function getChildServices(parentId: string): Promise<ServiceProject[]> {
+  const res = await query<ServiceProject>(
+    'SELECT * FROM semo.services WHERE parent_service_id = $1 ORDER BY project_name',
+    [parentId],
+  );
+  return res.rows;
+}
+
 export async function createProject(data: {
   project_name: string;
   owner_name: string;
@@ -63,8 +71,8 @@ export async function createProject(data: {
   }
 
   const res = await query<ServiceProject>(
-    `INSERT INTO semo.services (project_name, owner_name, owner_contact, service_domain, metadata)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO semo.services (project_name, owner_name, owner_contact, service_domain, metadata, service_type)
+     VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
     [
       data.project_name,
@@ -72,6 +80,7 @@ export async function createProject(data: {
       data.owner_contact ?? null,
       data.service_domain ?? null,
       JSON.stringify({ preset: 'parallel', ...data.metadata }),
+      'incubator',
     ],
   );
   const project = res.rows[0];

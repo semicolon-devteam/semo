@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useAuth } from '@/lib/auth/provider';
 import { LeaderboardTrack } from '@/components/service/LeaderboardTrack';
 import type { SubPhaseProgress } from '@/components/service/LeaderboardTrack';
-import type { ServiceProject, ServiceLifecycle } from '@/types';
+import type { ServiceProject, ServiceLifecycle, ServiceType } from '@/types';
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   active: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
@@ -22,8 +22,19 @@ const LIFECYCLE_BADGES: Record<string, { label: string; color: string }> = {
   sunset: { label: '종료', color: 'bg-zinc-600 text-white' },
 };
 
+const SERVICE_TYPE_BADGES: Record<string, { label: string; color: string }> = {
+  external: {
+    label: '외부',
+    color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+  },
+  platform: {
+    label: '플랫폼',
+    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  },
+};
+
 type FilterTab = 'all' | ServiceLifecycle;
-type PrimaryView = 'general' | 'incubator';
+type PrimaryView = 'general' | 'incubator' | 'platforms';
 
 interface ProjectCost {
   total_cost_usd: number;
@@ -87,11 +98,12 @@ export default function GfpListPage() {
       .catch(() => {});
   }, [isAdmin, projectAccess]);
 
-  // 1차 뷰 기반 필터링: 인큐베이터 = PM 파이프라인 또는 인큐베이터 CP 진행 중
-  const isIncubator = (p: ServiceProject) =>
-    p.lifecycle === 'build' && (p.metadata?.preset != null || p.metadata?.incubator != null);
-  const incubatorProjects = projects.filter(isIncubator);
-  const generalProjects = projects.filter((p) => !isIncubator(p));
+  // 1차 뷰 기반 필터링: service_type 컬럼 기반
+  const incubatorProjects = projects.filter((p) => p.service_type === 'incubator');
+  const platformProjects = projects.filter((p) => p.service_type === 'platform');
+  const generalProjects = projects.filter(
+    (p) => p.service_type === 'general' || p.service_type === 'external',
+  );
 
   // 2차 필터 (일반 탭 내부)
   const filteredGeneral =
@@ -112,6 +124,14 @@ export default function GfpListPage() {
       label: `종료 (${generalProjects.filter((p) => p.lifecycle === 'sunset').length})`,
     },
   ];
+
+  // 플랫폼별 하위 서비스 매핑
+  const childrenByPlatform: Record<string, ServiceProject[]> = {};
+  for (const platform of platformProjects) {
+    childrenByPlatform[platform.service_id] = projects.filter(
+      (p) => p.parent_service_id === platform.service_id,
+    );
+  }
 
   const displayedProjects = activeView === 'general' ? filteredGeneral : incubatorProjects;
 
@@ -134,13 +154,14 @@ export default function GfpListPage() {
         )}
       </div>
 
-      {/* 1차 탭: 일반 / 인큐베이터 (세미콜론 멤버만 표시) */}
+      {/* 1차 탭: 일반 / 인큐베이터 / 플랫폼 (세미콜론 멤버만 표시) */}
       {showBothTabs && (
         <div className="flex gap-1 border-b border-gray-200 dark:border-gray-700 mb-4">
           {(
             [
               { key: 'general', label: `일반 (${generalProjects.length})` },
               { key: 'incubator', label: `인큐베이터 (${incubatorProjects.length})` },
+              { key: 'platforms', label: `플랫폼 (${platformProjects.length})` },
             ] as const
           ).map((tab) => (
             <button
@@ -236,6 +257,107 @@ export default function GfpListPage() {
             </div>
           )}
         </div>
+      ) : activeView === 'platforms' ? (
+        /* 플랫폼 탭: 플랫폼별 그룹 카드 */
+        <div className="space-y-6">
+          {platformProjects.length === 0 ? (
+            <div className="text-center py-16 text-gray-500 dark:text-gray-400">
+              <p className="text-lg mb-2">등록된 플랫폼이 없습니다</p>
+            </div>
+          ) : (
+            platformProjects.map((platform) => {
+              const children = childrenByPlatform[platform.service_id] ?? [];
+              const style = STATUS_STYLES[platform.status] ?? STATUS_STYLES.active;
+              const lcBadge = LIFECYCLE_BADGES[platform.lifecycle] ?? LIFECYCLE_BADGES.build;
+
+              return (
+                <div
+                  key={platform.service_id}
+                  className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+                >
+                  {/* 플랫폼 헤더 */}
+                  <Link
+                    href={`/projects/${platform.service_id}`}
+                    className="block p-5 hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors border-b border-gray-100 dark:border-gray-700"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                          {platform.project_name}
+                        </h2>
+                        <span
+                          className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${lcBadge.color}`}
+                        >
+                          {lcBadge.label}
+                        </span>
+                        <span
+                          className={`text-xs font-medium px-2 py-0.5 rounded-full ${style.bg} ${style.text}`}
+                        >
+                          {platform.status}
+                        </span>
+                      </div>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {children.length}개 서비스
+                      </span>
+                    </div>
+                    <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+                      오너: {platform.owner_name}
+                      {platform.bm && <span className="ml-4">BM: {platform.bm}</span>}
+                    </div>
+                  </Link>
+
+                  {/* 하위 서비스 그리드 */}
+                  {children.length > 0 && (
+                    <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {children.map((child) => {
+                        const childStyle = STATUS_STYLES[child.status] ?? STATUS_STYLES.active;
+                        const childLc = LIFECYCLE_BADGES[child.lifecycle] ?? LIFECYCLE_BADGES.build;
+                        const typeBadge = SERVICE_TYPE_BADGES[child.service_type];
+
+                        return (
+                          <Link
+                            key={child.service_id}
+                            href={`/projects/${child.service_id}`}
+                            className="block bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md hover:border-purple-300 dark:hover:border-purple-700 transition-all"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <h3 className="text-base font-semibold text-gray-900 dark:text-white truncate">
+                                {child.project_name}
+                              </h3>
+                              <div className="flex items-center gap-1 shrink-0 ml-2">
+                                {typeBadge && (
+                                  <span
+                                    className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${typeBadge.color}`}
+                                  >
+                                    {typeBadge.label}
+                                  </span>
+                                )}
+                                <span
+                                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${childLc.color}`}
+                                >
+                                  {childLc.label}
+                                </span>
+                                <span
+                                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${childStyle.bg} ${childStyle.text}`}
+                                >
+                                  {child.status}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              <p>오너: {child.owner_name}</p>
+                              {child.service_domain && <p>도메인: {child.service_domain}</p>}
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
       ) : displayedProjects.length === 0 ? (
         <div className="text-center py-16 text-gray-500 dark:text-gray-400">
           <p className="text-lg mb-2">해당 서비스가 없습니다</p>
@@ -246,6 +368,7 @@ export default function GfpListPage() {
           {displayedProjects.map((project) => {
             const style = STATUS_STYLES[project.status] ?? STATUS_STYLES.active;
             const lcBadge = LIFECYCLE_BADGES[project.lifecycle] ?? LIFECYCLE_BADGES.build;
+            const typeBadge = SERVICE_TYPE_BADGES[project.service_type];
 
             return (
               <Link
@@ -258,6 +381,13 @@ export default function GfpListPage() {
                     {project.project_name}
                   </h2>
                   <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    {typeBadge && (
+                      <span
+                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${typeBadge.color}`}
+                      >
+                        {typeBadge.label}
+                      </span>
+                    )}
                     <span
                       className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${lcBadge.color}`}
                     >
