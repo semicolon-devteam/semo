@@ -50,6 +50,7 @@ import { registerContextPreserveCommands } from './commands/context-preserve';
 import { registerServiceCommands } from './commands/service';
 import { registerHarnessCommands } from './commands/harness';
 import { registerIncubatorCommands } from './commands/incubator';
+import { registerSkillCommands } from './commands/skill';
 import { syncGlobalCache } from './global-cache';
 import {
   ensureSemoDir,
@@ -2773,6 +2774,7 @@ registerSlackCommands(program);
 registerServiceCommands(program);
 registerHarnessCommands(program);
 registerIncubatorCommands(program);
+registerSkillCommands(program);
 registerAgentFlushCommands(program);
 registerContextPreserveCommands(program);
 

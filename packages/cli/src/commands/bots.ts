@@ -265,7 +265,7 @@ const BINARY_EXTS = new Set([
 ]);
 const MAX_FILE_SIZE = 512 * 1024; // 512KB
 
-async function syncWorkspaceFiles(
+export async function syncWorkspaceFiles(
   client: {
     query(sql: string, params?: unknown[]): Promise<{ rows: unknown[]; rowCount?: number | null }>;
   },
