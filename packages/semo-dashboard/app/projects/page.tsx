@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth/provider';
 import { LeaderboardTrack } from '@/components/service/LeaderboardTrack';
+import type { SubPhaseProgress } from '@/components/service/LeaderboardTrack';
 import type { ServiceProject, ServiceLifecycle } from '@/types';
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
@@ -35,6 +36,7 @@ export default function GfpListPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>('all');
   const [costMap, setCostMap] = useState<Record<string, ProjectCost>>({});
+  const [phaseProgress, setPhaseProgress] = useState<Record<string, SubPhaseProgress[]>>({});
   const { isAdmin, projectAccess, profile } = useAuth();
 
   const isTeamMember = profile?.onboarding_role === 'team-member';
@@ -76,6 +78,12 @@ export default function GfpListPage() {
         }
         setCostMap(map);
       })
+      .catch(() => {});
+
+    // Sub-phase 정밀도 데이터 (리더보드용)
+    fetch('/api/projects/phase-progress?lifecycle=build')
+      .then((r) => (r.ok ? r.json() : {}))
+      .then((data: Record<string, SubPhaseProgress[]>) => setPhaseProgress(data))
       .catch(() => {});
   }, [isAdmin, projectAccess]);
 
@@ -170,7 +178,11 @@ export default function GfpListPage() {
       ) : activeView === 'incubator' ? (
         /* 인큐베이터 탭: 리더보드 + 프로젝트 카드 */
         <div className="space-y-8">
-          <LeaderboardTrack projects={incubatorProjects} costMap={costMap} />
+          <LeaderboardTrack
+            projects={incubatorProjects}
+            costMap={costMap}
+            phaseProgress={phaseProgress}
+          />
 
           {incubatorProjects.length > 0 && (
             <div>

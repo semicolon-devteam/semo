@@ -669,6 +669,37 @@ async function start() {
 
   // 5. Socket Mode 연결
   await slackSocket.start();
+
+  // 6. Heartbeat — Dashboard에 주기적으로 세션 활성 상태 전송
+  const HEARTBEAT_INTERVAL = 60_000; // 60초
+  const HEARTBEAT_SECRET = process.env.SEMO_HEARTBEAT_SECRET || '';
+  const heartbeatHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(HEARTBEAT_SECRET && { 'x-heartbeat-token': HEARTBEAT_SECRET }),
+  };
+  const heartbeatBody = JSON.stringify({ service_id: SEMO_SERVICE_ID });
+
+  const heartbeatTimer = setInterval(async () => {
+    try {
+      await fetch(`${SEMO_DASHBOARD_URL}/api/incubator/heartbeat`, {
+        method: 'POST',
+        headers: heartbeatHeaders,
+        body: heartbeatBody,
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch {
+      console.error('[channel-slack] heartbeat failed');
+    }
+  }, HEARTBEAT_INTERVAL);
+  heartbeatTimer.unref();
+
+  // 초기 heartbeat 즉시 전송
+  fetch(`${SEMO_DASHBOARD_URL}/api/incubator/heartbeat`, {
+    method: 'POST',
+    headers: heartbeatHeaders,
+    body: heartbeatBody,
+    signal: AbortSignal.timeout(5000),
+  }).catch(() => {});
 }
 
 start().catch((err) => {

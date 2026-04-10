@@ -37,6 +37,7 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/api/slack/') ||
     pathname.startsWith('/api/bots/profiles') ||
     pathname.startsWith('/api/projects/sandbox') ||
+    pathname.startsWith('/api/incubator/heartbeat') ||
     // 서버 컴포넌트가 자기 API를 호출할 때 쿠키 미전달 이슈 방지 (read-only GET만)
     (request.method === 'GET' && ['/api/bots', '/api/tests', '/api/org'].includes(pathname));
 

@@ -42,11 +42,35 @@ async function isIncubatorChannel(pool: Pool, channelId: string): Promise<boolea
 
   try {
     const result = await pool.query(
-      `SELECT 1 FROM semo.incubator_sessions WHERE channel = $1 AND status = 'active' LIMIT 1`,
+      `SELECT 1 FROM semo.incubator_sessions
+       WHERE channel = $1 AND status = 'active'
+       AND (
+         -- heartbeat가 있고 신선한 경우
+         (last_heartbeat IS NOT NULL AND (NOW() - last_heartbeat) <= make_interval(secs => COALESCE(heartbeat_stale_threshold_sec, 180)))
+         OR
+         -- grace period: 생성 후 5분 이내면 heartbeat 없어도 허용
+         (last_heartbeat IS NULL AND (NOW() - created_at) <= INTERVAL '5 minutes')
+       )
+       LIMIT 1`,
       [channelId],
     );
     const active = result.rows.length > 0;
     incubatorChannelCache.set(channelId, { active, expiry: Date.now() + 60_000 });
+
+    if (!active) {
+      // stale 세션 자동 정리 (non-blocking)
+      pool
+        .query(
+          `UPDATE semo.incubator_sessions
+           SET status = 'stopped', stopped_reason = 'heartbeat_timeout', updated_at = NOW()
+           WHERE channel = $1 AND status = 'active'
+           AND last_heartbeat IS NOT NULL
+           AND (NOW() - last_heartbeat) > make_interval(secs => COALESCE(heartbeat_stale_threshold_sec, 180))`,
+          [channelId],
+        )
+        .catch(() => {});
+    }
+
     return active;
   } catch {
     return false; // DB 에러 시 안전하게 오케스트레이터가 처리

@@ -13,9 +13,16 @@ interface ProjectCost {
   total_output_tokens: number;
 }
 
+export interface SubPhaseProgress {
+  phase: number;
+  total: number;
+  approved: number;
+}
+
 interface LeaderboardTrackProps {
   projects: ServiceProject[];
   costMap: Record<string, ProjectCost>;
+  phaseProgress?: Record<string, SubPhaseProgress[]>;
 }
 
 // ── Constants ──
@@ -66,23 +73,50 @@ interface RunnerLaneProps {
   project: ServiceProject;
   index: number;
   cost: ProjectCost | undefined;
+  phaseData?: SubPhaseProgress[];
+}
+
+/** Sub-phase 정밀도 기반 진행률 (0-100%) */
+function computeProgressPct(currentPhase: number, phaseData?: SubPhaseProgress[]): number {
+  if (!phaseData || phaseData.length === 0) {
+    return (currentPhase / MAX_PHASE) * 100; // fallback
+  }
+  let position = 0;
+  for (const p of phaseData) {
+    if (p.phase < currentPhase) {
+      position += 1; // 완료 phase
+    } else if (p.phase === currentPhase) {
+      position += p.total > 0 ? p.approved / p.total : 0; // 현재 phase 승인율
+    }
+  }
+  return (position / MAX_PHASE) * 100;
 }
 
 /** Phase 진행도 + 토큰 사용량 → 점수화 */
-function computeScore(phase: number, cost: ProjectCost | undefined): number {
-  // Phase 진행 (0-9) → 최대 900pt (Phase당 100pt)
-  const phasePt = phase * 100;
+function computeScore(
+  phase: number,
+  cost: ProjectCost | undefined,
+  phaseData?: SubPhaseProgress[],
+): number {
+  // Phase 진행 (완료 Phase * 100 + 현재 Phase 승인율 * 100)
+  let phasePt = phase * 100;
+  if (phaseData) {
+    const current = phaseData.find((p) => p.phase === phase);
+    if (current && current.total > 0) {
+      phasePt += Math.round((current.approved / current.total) * 100);
+    }
+  }
   // 토큰 활용도 → 최대 100pt (10만 토큰 기준 cap)
   const totalTokens = cost ? cost.total_input_tokens + cost.total_output_tokens : 0;
   const tokenPt = Math.min(Math.round((totalTokens / 100_000) * 100), 100);
   return phasePt + tokenPt;
 }
 
-function RunnerLane({ project, index, cost }: RunnerLaneProps) {
+function RunnerLane({ project, index, cost, phaseData }: RunnerLaneProps) {
   const isPaused = project.status === 'paused';
-  const progressPct = (project.current_phase / MAX_PHASE) * 100;
+  const progressPct = computeProgressPct(project.current_phase, phaseData);
   const avatar = getAvatar(project, index);
-  const score = computeScore(project.current_phase, cost);
+  const score = computeScore(project.current_phase, cost, phaseData);
 
   return (
     <div className={`flex items-center gap-0 group ${isPaused ? 'opacity-40' : ''}`}>
@@ -160,7 +194,7 @@ function RunnerLane({ project, index, cost }: RunnerLaneProps) {
 
 // ── LeaderboardTrack (main) ──
 
-export function LeaderboardTrack({ projects, costMap }: LeaderboardTrackProps) {
+export function LeaderboardTrack({ projects, costMap, phaseProgress }: LeaderboardTrackProps) {
   const sorted = useMemo(() => {
     return [...projects].sort((a, b) => {
       if (b.current_phase !== a.current_phase) return b.current_phase - a.current_phase;
@@ -187,6 +221,7 @@ export function LeaderboardTrack({ projects, costMap }: LeaderboardTrackProps) {
               project={project}
               index={i}
               cost={costMap[project.service_id]}
+              phaseData={phaseProgress?.[project.service_id]}
             />
           ))}
         </div>
