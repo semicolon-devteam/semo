@@ -8,16 +8,37 @@
  *   bot_id, session_key, label, kind, chat_type, last_activity, message_count, synced_at
  */
 
-import { Command } from "commander";
-import chalk from "chalk";
-import ora from "ora";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import { getPool, closeConnection, isDbConnected, getDelegations, getActiveSkills } from "../database";
-import { syncBotSessions } from "./sessions";
-import { auditBot, auditBotFromDb, auditBotDb, auditBotKb, mergeDbChecks, fixBot, fixBotFromDb, syncBotFromDb, auditSkillStructure, loadCheckDefs, storeAuditResults, formatAuditSlack, BotAuditResult, WorkspaceStandardRow } from "./audit";
-import { syncCronJobs } from "./context";
+import { Command } from 'commander';
+import chalk from 'chalk';
+import ora from 'ora';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import {
+  getPool,
+  closeConnection,
+  isDbConnected,
+  getDelegations,
+  getActiveSkills,
+} from '../database';
+import { syncBotSessions } from './sessions';
+import {
+  auditBot,
+  auditBotFromDb,
+  auditBotDb,
+  auditBotKb,
+  mergeDbChecks,
+  fixBot,
+  fixBotFromDb,
+  syncBotFromDb,
+  auditSkillStructure,
+  loadCheckDefs,
+  storeAuditResults,
+  formatAuditSlack,
+  BotAuditResult,
+  WorkspaceStandardRow,
+} from './audit';
+import { syncCronJobs } from './context';
 
 // ============================================================
 // Types (matches actual DB schema)
@@ -102,15 +123,23 @@ interface ScannedBot {
   workspacePath: string;
 }
 
-const KNOWN_BOTS = ["semiclaw", "workclaw", "reviewclaw", "planclaw", "designclaw", "infraclaw", "growthclaw"];
+const KNOWN_BOTS = [
+  'semiclaw',
+  'workclaw',
+  'reviewclaw',
+  'planclaw',
+  'designclaw',
+  'infraclaw',
+  'growthclaw',
+];
 
 function scanBotWorkspaces(_semoSystemDir?: string): ScannedBot[] {
-  const home = process.env.HOME || "/Users/reus";
+  const home = process.env.HOME || '/Users/reus';
   const bots: ScannedBot[] = [];
 
   for (const botId of KNOWN_BOTS) {
     // v2.0 SoT: ~/.openclaw-{bot}/workspace/
-    const botDir = path.join(home, `.openclaw-${botId}`, "workspace");
+    const botDir = path.join(home, `.openclaw-${botId}`, 'workspace');
     if (!fs.existsSync(botDir)) continue;
 
     // Most recent file mtime
@@ -118,22 +147,28 @@ function scanBotWorkspaces(_semoSystemDir?: string): ScannedBot[] {
     try {
       const times = getAllFileMtimes(botDir);
       if (times.length > 0) {
-        lastActive = new Date(Math.max(...times.map(t => t.getTime())));
+        lastActive = new Date(Math.max(...times.map((t) => t.getTime())));
       }
-    } catch { /* skip */ }
+    } catch {
+      /* skip */
+    }
 
     // v2.0: SOUL.md에서 Identity 파싱 (IDENTITY.md fallback)
     let identity: BotIdentity = { name: null, emoji: null, role: null };
-    const soulPath = path.join(botDir, "SOUL.md");
-    const identityPath = path.join(botDir, "IDENTITY.md");
+    const soulPath = path.join(botDir, 'SOUL.md');
+    const identityPath = path.join(botDir, 'IDENTITY.md');
     if (fs.existsSync(soulPath)) {
       try {
-        identity = parseSoulIdentity(fs.readFileSync(soulPath, "utf-8"), botId);
-      } catch { /* skip */ }
+        identity = parseSoulIdentity(fs.readFileSync(soulPath, 'utf-8'), botId);
+      } catch {
+        /* skip */
+      }
     } else if (fs.existsSync(identityPath)) {
       try {
-        identity = parseIdentityMd(fs.readFileSync(identityPath, "utf-8"));
-      } catch { /* skip */ }
+        identity = parseIdentityMd(fs.readFileSync(identityPath, 'utf-8'));
+      } catch {
+        /* skip */
+      }
     }
 
     bots.push({ botId, ...identity, lastActive, workspacePath: botDir });
@@ -151,11 +186,13 @@ function getAllFileMtimes(dir: string, depth = 0): Date[] {
       const fullPath = path.join(dir, entry.name);
       if (entry.isFile()) {
         times.push(fs.statSync(fullPath).mtime);
-      } else if (entry.isDirectory() && !entry.name.startsWith(".")) {
+      } else if (entry.isDirectory() && !entry.name.startsWith('.')) {
         times.push(...getAllFileMtimes(fullPath, depth + 1));
       }
     }
-  } catch { /* skip */ }
+  } catch {
+    /* skip */
+  }
   return times;
 }
 
@@ -185,21 +222,53 @@ async function detectGatewayStatus(botId: string): Promise<'online' | 'offline'>
 // Workspace files sync → bot_workspace_files
 // ============================================================
 
-import * as crypto from "crypto";
+import * as crypto from 'crypto';
 
 const BINARY_EXTS = new Set([
-  '.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.bmp', '.svg',
-  '.woff', '.woff2', '.ttf', '.eot', '.otf',
-  '.zip', '.tar', '.gz', '.bz2', '.7z', '.rar',
-  '.pdf', '.doc', '.docx', '.xls', '.xlsx',
-  '.exe', '.dll', '.so', '.dylib', '.bin',
-  '.mp3', '.mp4', '.wav', '.avi', '.mov',
-  '.db', '.sqlite', '.sqlite3',
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.ico',
+  '.webp',
+  '.bmp',
+  '.svg',
+  '.woff',
+  '.woff2',
+  '.ttf',
+  '.eot',
+  '.otf',
+  '.zip',
+  '.tar',
+  '.gz',
+  '.bz2',
+  '.7z',
+  '.rar',
+  '.pdf',
+  '.doc',
+  '.docx',
+  '.xls',
+  '.xlsx',
+  '.exe',
+  '.dll',
+  '.so',
+  '.dylib',
+  '.bin',
+  '.mp3',
+  '.mp4',
+  '.wav',
+  '.avi',
+  '.mov',
+  '.db',
+  '.sqlite',
+  '.sqlite3',
 ]);
 const MAX_FILE_SIZE = 512 * 1024; // 512KB
 
 async function syncWorkspaceFiles(
-  client: { query(sql: string, params?: unknown[]): Promise<{ rows: unknown[]; rowCount?: number | null }> },
+  client: {
+    query(sql: string, params?: unknown[]): Promise<{ rows: unknown[]; rowCount?: number | null }>;
+  },
   botId: string,
   workspaceDir: string,
 ): Promise<number> {
@@ -210,7 +279,9 @@ async function syncWorkspaceFiles(
     let entries: fs.Dirent[];
     try {
       entries = fs.readdirSync(dir, { withFileTypes: true });
-    } catch { return; }
+    } catch {
+      return;
+    }
 
     for (const entry of entries) {
       if (entry.name.startsWith('.')) continue;
@@ -220,7 +291,9 @@ async function syncWorkspaceFiles(
       // Skip symlinks
       try {
         if (fs.lstatSync(fullPath).isSymbolicLink()) continue;
-      } catch { continue; }
+      } catch {
+        continue;
+      }
 
       if (entry.isDirectory()) {
         scan(fullPath, relPath, depth + 1);
@@ -229,11 +302,19 @@ async function syncWorkspaceFiles(
         if (BINARY_EXTS.has(ext)) continue;
 
         let stat: fs.Stats;
-        try { stat = fs.statSync(fullPath); } catch { continue; }
+        try {
+          stat = fs.statSync(fullPath);
+        } catch {
+          continue;
+        }
         if (stat.size > MAX_FILE_SIZE) continue;
 
         let content: string;
-        try { content = fs.readFileSync(fullPath, 'utf-8'); } catch { continue; }
+        try {
+          content = fs.readFileSync(fullPath, 'utf-8');
+        } catch {
+          continue;
+        }
 
         // Skip files with NULL bytes (binary masquerading as text)
         if (content.includes('\0')) continue;
@@ -257,7 +338,7 @@ async function syncWorkspaceFiles(
          file_hash = EXCLUDED.file_hash,
          synced_at = NOW()
        WHERE semo.bot_workspace_files.file_hash IS DISTINCT FROM EXCLUDED.file_hash`,
-      [botId, f.relPath, f.content, f.size, f.hash]
+      [botId, f.relPath, f.content, f.size, f.hash],
     );
     if (result.rowCount && result.rowCount > 0) {
       upserted++;
@@ -267,14 +348,14 @@ async function syncWorkspaceFiles(
   // Delete files in DB but not on disk (for this bot_id)
   const dbFiles = await client.query(
     `SELECT file_path FROM semo.bot_workspace_files WHERE bot_id = $1`,
-    [botId]
+    [botId],
   );
-  const diskPaths = new Set(files.map(f => f.relPath));
+  const diskPaths = new Set(files.map((f) => f.relPath));
   for (const row of dbFiles.rows as { file_path: string }[]) {
     if (!diskPaths.has(row.file_path)) {
       await client.query(
         `DELETE FROM semo.bot_workspace_files WHERE bot_id = $1 AND file_path = $2`,
-        [botId, row.file_path]
+        [botId, row.file_path],
       );
     }
   }
@@ -287,22 +368,20 @@ async function syncWorkspaceFiles(
 // ============================================================
 
 export function registerBotsCommands(program: Command): void {
-  const botsCmd = program
-    .command("bots")
-    .description("봇 상태 조회 및 관리 (semo.bot_status)");
+  const botsCmd = program.command('bots').description('봇 상태 조회 및 관리 (semo.bot_status)');
 
   // ── semo bots status ────────────────────────────────────────
   botsCmd
-    .command("status")
-    .description("모든 봇의 현재 상태 조회")
-    .option("--status <filter>", "상태 필터 (online|offline)")
-    .option("--format <type>", "출력 형식 (table|json)", "table")
+    .command('status')
+    .description('모든 봇의 현재 상태 조회')
+    .option('--status <filter>', '상태 필터 (online|offline)')
+    .option('--format <type>', '출력 형식 (table|json)', 'table')
     .action(async (options) => {
-      const spinner = ora("봇 상태 조회 중...").start();
+      const spinner = ora('봇 상태 조회 중...').start();
 
       const connected = await isDbConnected();
       if (!connected) {
-        spinner.fail("DB 연결 실패");
+        spinner.fail('DB 연결 실패');
         await closeConnection();
         process.exit(1);
       }
@@ -318,10 +397,10 @@ export function registerBotsCommands(program: Command): void {
         `;
         const params: string[] = [];
         if (options.status) {
-          query += " WHERE status = $1";
+          query += ' WHERE status = $1';
           params.push(options.status);
         }
-        query += " ORDER BY bot_id";
+        query += ' ORDER BY bot_id';
 
         const result = await client.query(query, params);
         client.release();
@@ -329,31 +408,34 @@ export function registerBotsCommands(program: Command): void {
         const bots: BotStatus[] = result.rows;
         spinner.stop();
 
-        if (options.format === "json") {
+        if (options.format === 'json') {
           console.log(JSON.stringify(bots, null, 2));
         } else {
-          console.log(chalk.cyan.bold("\n🤖 봇 상태\n"));
+          console.log(chalk.cyan.bold('\n🤖 봇 상태\n'));
 
           if (bots.length === 0) {
-            console.log(chalk.yellow("  봇 상태 데이터가 없습니다."));
+            console.log(chalk.yellow('  봇 상태 데이터가 없습니다.'));
             console.log(chalk.gray("  'semo bots sync'로 초기 데이터를 적재하세요."));
           } else {
-            console.log(chalk.gray("  봇              이름                    상태       마지막 활동"));
-            console.log(chalk.gray("  " + "─".repeat(75)));
+            console.log(
+              chalk.gray('  봇              이름                    상태       마지막 활동'),
+            );
+            console.log(chalk.gray('  ' + '─'.repeat(75)));
             for (const b of bots) {
-              const statusIcon = b.status === "online" ? chalk.green("● online ") : chalk.red("○ offline");
+              const statusIcon =
+                b.status === 'online' ? chalk.green('● online ') : chalk.red('○ offline');
               const lastActive = b.last_active
-                ? new Date(b.last_active).toLocaleString("ko-KR")
-                : "-";
-              const displayName = `${b.emoji || ""} ${b.name || b.bot_id}`.trim();
+                ? new Date(b.last_active).toLocaleString('ko-KR')
+                : '-';
+              const displayName = `${b.emoji || ''} ${b.name || b.bot_id}`.trim();
               console.log(
-                `  ${b.bot_id.padEnd(16)}${displayName.padEnd(24)}${String(statusIcon).padEnd(12)}${lastActive}`
+                `  ${b.bot_id.padEnd(16)}${displayName.padEnd(24)}${String(statusIcon).padEnd(12)}${lastActive}`,
               );
             }
           }
 
           console.log();
-          const online = bots.filter(b => b.status === "online").length;
+          const online = bots.filter((b) => b.status === 'online').length;
           console.log(chalk.gray(`  총 ${bots.length}개 봇 (온라인: ${online}개)\n`));
         }
       } catch (err) {
@@ -366,17 +448,17 @@ export function registerBotsCommands(program: Command): void {
 
   // ── semo bots sessions ──────────────────────────────────────
   botsCmd
-    .command("sessions")
-    .description("봇 세션 히스토리 조회")
-    .option("--bot <name>", "특정 봇만")
-    .option("--limit <n>", "최대 조회 수", "20")
-    .option("--format <type>", "출력 형식 (table|json)", "table")
+    .command('sessions')
+    .description('봇 세션 히스토리 조회')
+    .option('--bot <name>', '특정 봇만')
+    .option('--limit <n>', '최대 조회 수', '20')
+    .option('--format <type>', '출력 형식 (table|json)', 'table')
     .action(async (options) => {
-      const spinner = ora("세션 조회 중...").start();
+      const spinner = ora('세션 조회 중...').start();
 
       const connected = await isDbConnected();
       if (!connected) {
-        spinner.fail("DB 연결 실패");
+        spinner.fail('DB 연결 실패');
         await closeConnection();
         process.exit(1);
       }
@@ -406,22 +488,22 @@ export function registerBotsCommands(program: Command): void {
         const sessions: BotSession[] = result.rows;
         spinner.stop();
 
-        if (options.format === "json") {
+        if (options.format === 'json') {
           console.log(JSON.stringify(sessions, null, 2));
         } else {
-          console.log(chalk.cyan.bold("\n📋 봇 세션 히스토리\n"));
+          console.log(chalk.cyan.bold('\n📋 봇 세션 히스토리\n'));
           if (sessions.length === 0) {
-            console.log(chalk.yellow("  세션 데이터가 없습니다."));
+            console.log(chalk.yellow('  세션 데이터가 없습니다.'));
           } else {
             for (const s of sessions) {
               const lastActivity = s.last_activity
-                ? new Date(s.last_activity).toLocaleString("ko-KR")
-                : "-";
+                ? new Date(s.last_activity).toLocaleString('ko-KR')
+                : '-';
               console.log(
                 chalk.cyan(`  ${s.bot_id}`) +
-                chalk.gray(` [${s.session_key}]`) +
-                (s.label ? chalk.white(` "${s.label}"`) : "") +
-                chalk.gray(` ${lastActivity} (${s.message_count}msg)`)
+                  chalk.gray(` [${s.session_key}]`) +
+                  (s.label ? chalk.white(` "${s.label}"`) : '') +
+                  chalk.gray(` ${lastActivity} (${s.message_count}msg)`),
               );
             }
           }
@@ -437,15 +519,15 @@ export function registerBotsCommands(program: Command): void {
 
   // ── semo bots sync ──────────────────────────────────────────
   botsCmd
-    .command("sync")
-    .description("bot-workspaces/ 스캔 → semo.bot_status DB upsert")
-    .option("--dry-run", "실제 upsert 없이 미리보기")
+    .command('sync')
+    .description('bot-workspaces/ 스캔 → semo.bot_status DB upsert')
+    .option('--dry-run', '실제 upsert 없이 미리보기')
     .action(async (options) => {
-      const spinner = ora("bot-workspaces 스캔 중...").start();
+      const spinner = ora('bot-workspaces 스캔 중...').start();
       const bots = scanBotWorkspaces();
 
       if (bots.length === 0) {
-        spinner.warn("봇 워크스페이스가 없습니다.");
+        spinner.warn('봇 워크스페이스가 없습니다.');
         return;
       }
 
@@ -453,13 +535,13 @@ export function registerBotsCommands(program: Command): void {
 
       if (options.dryRun) {
         spinner.stop();
-        console.log(chalk.cyan.bold("\n[dry-run] 감지된 봇:\n"));
+        console.log(chalk.cyan.bold('\n[dry-run] 감지된 봇:\n'));
         for (const bot of bots) {
-          const display = [bot.emoji, bot.name].filter(Boolean).join(" ") || bot.botId;
+          const display = [bot.emoji, bot.name].filter(Boolean).join(' ') || bot.botId;
           console.log(
             chalk.gray(`  ${bot.botId.padEnd(16)}`) +
-            chalk.white(display.padEnd(24)) +
-            chalk.gray(bot.lastActive?.toLocaleString("ko-KR") || "-")
+              chalk.white(display.padEnd(24)) +
+              chalk.gray(bot.lastActive?.toLocaleString('ko-KR') || '-'),
           );
         }
         console.log();
@@ -470,7 +552,7 @@ export function registerBotsCommands(program: Command): void {
 
       const connected = await isDbConnected();
       if (!connected) {
-        spinner.fail("DB 연결 실패");
+        spinner.fail('DB 연결 실패');
         await closeConnection();
         process.exit(1);
       }
@@ -481,7 +563,7 @@ export function registerBotsCommands(program: Command): void {
       const errors: string[] = [];
 
       try {
-        await client.query("BEGIN");
+        await client.query('BEGIN');
 
         // Detect gateway status for all bots in parallel
         const statusMap = new Map<string, 'online' | 'offline'>();
@@ -489,13 +571,13 @@ export function registerBotsCommands(program: Command): void {
           bots.map(async (bot) => ({
             botId: bot.botId,
             status: await detectGatewayStatus(bot.botId),
-          }))
+          })),
         );
         for (const { botId, status } of statusResults) {
           statusMap.set(botId, status);
         }
 
-        const onlineCount = statusResults.filter(r => r.status === 'online').length;
+        const onlineCount = statusResults.filter((r) => r.status === 'online').length;
         spinner.text = `${bots.length}개 봇 DB 반영 중... (게이트웨이: ${onlineCount}개 online)`;
 
         for (const bot of bots) {
@@ -527,7 +609,7 @@ export function registerBotsCommands(program: Command): void {
                 bot.lastActive?.toISOString() || null,
                 bot.workspacePath,
                 detectedStatus,
-              ]
+              ],
             );
             upserted++;
           } catch (err) {
@@ -535,16 +617,16 @@ export function registerBotsCommands(program: Command): void {
           }
         }
 
-        await client.query("COMMIT");
+        await client.query('COMMIT');
         spinner.succeed(`bots sync 완료: ${upserted}개 봇 업서트`);
         if (errors.length > 0) {
-          errors.forEach(e => console.log(chalk.red(`  ❌ ${e}`)));
+          errors.forEach((e) => console.log(chalk.red(`  ❌ ${e}`)));
         }
 
         // P2-1: sessions sync 연동 — spawnSync 대신 같은 프로세스에서 직접 호출
         try {
-          const botIds = bots.map(b => b.botId);
-          console.log(chalk.gray("  → sessions sync 실행 중..."));
+          const botIds = bots.map((b) => b.botId);
+          console.log(chalk.gray('  → sessions sync 실행 중...'));
           const sessionsClient = await pool.connect();
           const { total } = await syncBotSessions(botIds, sessionsClient);
           sessionsClient.release();
@@ -552,39 +634,43 @@ export function registerBotsCommands(program: Command): void {
             console.log(chalk.green(`  → sessions sync 완료: ${total}건 upsert`));
           }
         } catch {
-          console.log(chalk.yellow("  ⚠ sessions sync 실패 (무시)"));
+          console.log(chalk.yellow('  ⚠ sessions sync 실패 (무시)'));
         }
 
         // Cron jobs piggyback — sync 후 크론잡 동기화
         try {
-          console.log(chalk.gray("  → cron sync 실행 중..."));
+          console.log(chalk.gray('  → cron sync 실행 중...'));
           const cronResult = await syncCronJobs(pool);
           if (cronResult.jobs > 0) {
-            console.log(chalk.green(`  → cron sync 완료: ${cronResult.bots}개 봇, ${cronResult.jobs}개 잡`));
+            console.log(
+              chalk.green(`  → cron sync 완료: ${cronResult.bots}개 봇, ${cronResult.jobs}개 잡`),
+            );
           }
         } catch {
-          console.log(chalk.yellow("  ⚠ cron sync 실패 (무시)"));
+          console.log(chalk.yellow('  ⚠ cron sync 실패 (무시)'));
         }
 
         // Audit piggyback — sync 후 자동 audit 실행
         try {
-          console.log(chalk.gray("  → audit 실행 중..."));
-          let auditResults = await Promise.all(bots.map(b => auditBotFromDb(b.workspacePath, b.botId, pool)));
+          console.log(chalk.gray('  → audit 실행 중...'));
+          let auditResults = await Promise.all(
+            bots.map((b) => auditBotFromDb(b.workspacePath, b.botId, pool)),
+          );
           // KB 도메인 체크 merge (팀 레벨 — 한 번 조회 후 전체 적용)
           const kbChecks = await auditBotKb(pool);
-          auditResults = auditResults.map(r => mergeDbChecks(r, kbChecks));
+          auditResults = auditResults.map((r) => mergeDbChecks(r, kbChecks));
           const auditClient = await pool.connect();
           await storeAuditResults(auditResults, auditClient);
           auditClient.release();
-          const good = auditResults.filter(r => r.rating === "GOOD").length;
+          const good = auditResults.filter((r) => r.rating === 'GOOD').length;
           console.log(chalk.green(`  → audit 완료: ${auditResults.length}개 봇 (GOOD: ${good})`));
         } catch {
-          console.log(chalk.yellow("  ⚠ audit 저장 실패 (무시)"));
+          console.log(chalk.yellow('  ⚠ audit 저장 실패 (무시)'));
         }
 
         // Files piggyback — 워크스페이스 파일 → bot_workspace_files 동기화
         try {
-          console.log(chalk.gray("  → files sync 실행 중..."));
+          console.log(chalk.gray('  → files sync 실행 중...'));
           const filesClient = await pool.connect();
           try {
             let totalFiles = 0;
@@ -592,7 +678,7 @@ export function registerBotsCommands(program: Command): void {
               totalFiles += await syncWorkspaceFiles(filesClient, bot.botId, bot.workspacePath);
             }
             // Shared files
-            const sharedDir = path.join(os.homedir(), '.openclaw-shared');
+            const sharedDir = path.join(os.homedir(), '.semo', 'shared');
             if (fs.existsSync(sharedDir)) {
               totalFiles += await syncWorkspaceFiles(filesClient, '_shared', sharedDir);
             }
@@ -604,7 +690,7 @@ export function registerBotsCommands(program: Command): void {
           console.log(chalk.yellow(`  ⚠ files sync 실패 (무시): ${filesErr}`));
         }
       } catch (err) {
-        await client.query("ROLLBACK");
+        await client.query('ROLLBACK');
         spinner.fail(`sync 실패: ${err}`);
         process.exit(1);
       } finally {
@@ -615,30 +701,30 @@ export function registerBotsCommands(program: Command): void {
 
   // ── semo bots audit ───────────────────────────────────────────
   botsCmd
-    .command("audit")
-    .description("봇 워크스페이스 표준 구조 audit")
-    .option("--format <type>", "출력 형식 (table|json|slack)", "table")
-    .option("--fix", "누락 파일/디렉토리 자동 생성 (DB fix_action 활용)")
-    .option("--sync", "DB required 항목 proactive 보장 (누락 파일 생성)")
-    .option("--force", "delete fix_action 실행 허용 (--fix와 함께 사용)")
-    .option("--no-db", "DB 저장 건너뛰기")
-    .option("--local", "~/.claude/semo/bots/ 로컬 미러 audit")
+    .command('audit')
+    .description('봇 워크스페이스 표준 구조 audit')
+    .option('--format <type>', '출력 형식 (table|json|slack)', 'table')
+    .option('--fix', '누락 파일/디렉토리 자동 생성 (DB fix_action 활용)')
+    .option('--sync', 'DB required 항목 proactive 보장 (누락 파일 생성)')
+    .option('--force', 'delete fix_action 실행 허용 (--fix와 함께 사용)')
+    .option('--no-db', 'DB 저장 건너뛰기')
+    .option('--local', '~/.claude/semo/bots/ 로컬 미러 audit')
     .action(async (options) => {
-      const home = process.env.HOME || "/Users/reus";
+      const home = process.env.HOME || '/Users/reus';
 
       const isLocal = options.local === true;
-      const sourceLabel = isLocal ? "~/.claude/semo/bots/" : "~/.openclaw-*/workspace/";
+      const sourceLabel = isLocal ? '~/.claude/semo/bots/' : '~/.openclaw-*/workspace/';
       const spinner = ora(`bot-workspaces audit 중... (${sourceLabel})`).start();
 
       const botEntries: { botId: string; botDir: string }[] = [];
 
       if (isLocal) {
         // 로컬 미러: ~/.claude/semo/bots/{botId}/
-        const semoBotsDir = path.join(home, ".claude", "semo", "bots");
+        const semoBotsDir = path.join(home, '.claude', 'semo', 'bots');
         if (fs.existsSync(semoBotsDir)) {
-          const dirs = fs.readdirSync(semoBotsDir).filter(f =>
-            fs.statSync(path.join(semoBotsDir, f)).isDirectory()
-          );
+          const dirs = fs
+            .readdirSync(semoBotsDir)
+            .filter((f) => fs.statSync(path.join(semoBotsDir, f)).isDirectory());
           for (const botId of dirs) {
             botEntries.push({ botId, botDir: path.join(semoBotsDir, botId) });
           }
@@ -646,7 +732,7 @@ export function registerBotsCommands(program: Command): void {
       } else {
         // v2.0: SoT는 ~/.openclaw-{bot}/workspace/
         for (const botId of KNOWN_BOTS) {
-          const botDir = path.join(home, `.openclaw-${botId}`, "workspace");
+          const botDir = path.join(home, `.openclaw-${botId}`, 'workspace');
           if (fs.existsSync(botDir)) {
             botEntries.push({ botId, botDir });
           }
@@ -654,7 +740,7 @@ export function registerBotsCommands(program: Command): void {
       }
 
       if (botEntries.length === 0) {
-        spinner.warn("봇 워크스페이스가 없습니다.");
+        spinner.warn('봇 워크스페이스가 없습니다.');
         return;
       }
 
@@ -668,9 +754,11 @@ export function registerBotsCommands(program: Command): void {
         try {
           const { rows } = await loadCheckDefs(pool);
           dbRules = rows;
-        } catch { /* DB rules load failed, will use fallback */ }
+        } catch {
+          /* DB rules load failed, will use fallback */
+        }
         results = await Promise.all(
-          botEntries.map(({ botId, botDir }) => auditBotFromDb(botDir, botId, pool))
+          botEntries.map(({ botId, botDir }) => auditBotFromDb(botDir, botId, pool)),
         );
       } else {
         results = botEntries.map(({ botId, botDir }) => auditBot(botDir, botId));
@@ -692,9 +780,9 @@ export function registerBotsCommands(program: Command): void {
         const allViolations: string[] = [];
         for (const { botId, botDir } of botEntries) {
           const botSpecificRules = dbRules.filter((row) => {
-            if (row.bot_scope === "all") return true;
-            if (row.bot_scope === "include") return row.bot_ids.includes(botId);
-            if (row.bot_scope === "exclude") return !row.bot_ids.includes(botId);
+            if (row.bot_scope === 'all') return true;
+            if (row.bot_scope === 'include') return row.bot_ids.includes(botId);
+            if (row.bot_scope === 'exclude') return !row.bot_ids.includes(botId);
             return true;
           });
           const { created, violations } = syncBotFromDb(botDir, botId, botSpecificRules);
@@ -718,7 +806,7 @@ export function registerBotsCommands(program: Command): void {
           if (dbConnected) {
             const pool = getPool();
             results = await Promise.all(
-              botEntries.map(({ botId, botDir }) => auditBotFromDb(botDir, botId, pool))
+              botEntries.map(({ botId, botDir }) => auditBotFromDb(botDir, botId, pool)),
             );
           } else {
             results = botEntries.map(({ botId, botDir }) => auditBot(botDir, botId));
@@ -737,19 +825,21 @@ export function registerBotsCommands(program: Command): void {
         let totalFixed = 0;
         for (const r of results) {
           const botDir = isLocal
-            ? path.join(home, ".claude", "semo", "bots", r.botId)
-            : path.join(home, `.openclaw-${r.botId}`, "workspace");
+            ? path.join(home, '.claude', 'semo', 'bots', r.botId)
+            : path.join(home, `.openclaw-${r.botId}`, 'workspace');
 
           let fixed: number;
           if (dbRules.length > 0) {
             // DB-based fix
             const botSpecificRules = dbRules.filter((row) => {
-              if (row.bot_scope === "all") return true;
-              if (row.bot_scope === "include") return row.bot_ids.includes(r.botId);
-              if (row.bot_scope === "exclude") return !row.bot_ids.includes(r.botId);
+              if (row.bot_scope === 'all') return true;
+              if (row.bot_scope === 'include') return row.bot_ids.includes(r.botId);
+              if (row.bot_scope === 'exclude') return !row.bot_ids.includes(r.botId);
               return true;
             });
-            const result = fixBotFromDb(botDir, r.botId, r.checks, botSpecificRules, { force: options.force });
+            const result = fixBotFromDb(botDir, r.botId, r.checks, botSpecificRules, {
+              force: options.force,
+            });
             fixed = result.fixed;
             if (result.skipped.length > 0) {
               for (const s of result.skipped) {
@@ -772,7 +862,7 @@ export function registerBotsCommands(program: Command): void {
           if (dbConnected) {
             const pool = getPool();
             results = await Promise.all(
-              botEntries.map(({ botId, botDir }) => auditBotFromDb(botDir, botId, pool))
+              botEntries.map(({ botId, botDir }) => auditBotFromDb(botDir, botId, pool)),
             );
           } else {
             results = botEntries.map(({ botId, botDir }) => auditBot(botDir, botId));
@@ -831,58 +921,62 @@ export function registerBotsCommands(program: Command): void {
       }
 
       // Output
-      if (options.format === "json") {
+      if (options.format === 'json') {
         console.log(JSON.stringify(results, null, 2));
-      } else if (options.format === "slack") {
+      } else if (options.format === 'slack') {
         console.log(formatAuditSlack(results));
       } else {
-        console.log(chalk.cyan.bold("\n🔍 Bot Workspace Audit\n"));
-        console.log(chalk.gray("  봇              Score  Rating       Passed"));
-        console.log(chalk.gray("  " + "─".repeat(55)));
+        console.log(chalk.cyan.bold('\n🔍 Bot Workspace Audit\n'));
+        console.log(chalk.gray('  봇              Score  Rating       Passed'));
+        console.log(chalk.gray('  ' + '─'.repeat(55)));
 
         for (const r of results) {
           const ratingColor =
-            r.rating === "GOOD" ? chalk.green :
-            r.rating === "NEEDS-WORK" ? chalk.yellow :
-            chalk.red;
-          const passed = r.checks.filter(c => c.passed).length;
+            r.rating === 'GOOD'
+              ? chalk.green
+              : r.rating === 'NEEDS-WORK'
+                ? chalk.yellow
+                : chalk.red;
+          const passed = r.checks.filter((c) => c.passed).length;
           console.log(
-            `  ${r.botId.padEnd(16)}${String(r.score).padStart(3)}%   ${ratingColor(r.rating.padEnd(12))} ${passed}/${r.checks.length}`
+            `  ${r.botId.padEnd(16)}${String(r.score).padStart(3)}%   ${ratingColor(r.rating.padEnd(12))} ${passed}/${r.checks.length}`,
           );
         }
 
         const avgScore = Math.round(results.reduce((s, r) => s + r.score, 0) / results.length);
-        const good = results.filter(r => r.rating === "GOOD").length;
+        const good = results.filter((r) => r.rating === 'GOOD').length;
         console.log(chalk.gray(`\n  ${results.length}개 봇, 평균 ${avgScore}%, GOOD: ${good}개\n`));
       }
     });
 
   // ── semo bots seed ──────────────────────────────────────────
   botsCmd
-    .command("seed")
-    .description("[deprecated] 스킬/에이전트 SoT는 DB 직접 관리로 전환됨")
+    .command('seed')
+    .description('[deprecated] 스킬/에이전트 SoT는 DB 직접 관리로 전환됨')
     .action(async () => {
       console.log(chalk.yellow("\n⚠ 'semo bots seed'는 더 이상 사용되지 않습니다."));
-      console.log(chalk.gray("  스킬/에이전트 SoT는 DB(skill_definitions, agent_definitions)로 이전되었습니다."));
-      console.log(chalk.gray("  수정은 직접 DB UPDATE 또는 마이그레이션을 사용하세요.\n"));
+      console.log(
+        chalk.gray(
+          '  스킬/에이전트 SoT는 DB(skill_definitions, agent_definitions)로 이전되었습니다.',
+        ),
+      );
+      console.log(chalk.gray('  수정은 직접 DB UPDATE 또는 마이그레이션을 사용하세요.\n'));
     });
 
   // ── semo bots cron ──────────────────────────────────────────
-  const cronCmd = botsCmd
-    .command("cron")
-    .description("봇 크론잡 조회 및 동기화");
+  const cronCmd = botsCmd.command('cron').description('봇 크론잡 조회 및 동기화');
 
   cronCmd
-    .command("list")
-    .description("DB에서 봇 크론잡 조회")
-    .option("--bot <name>", "특정 봇만")
-    .option("--format <type>", "출력 형식 (table|json)", "table")
+    .command('list')
+    .description('DB에서 봇 크론잡 조회')
+    .option('--bot <name>', '특정 봇만')
+    .option('--format <type>', '출력 형식 (table|json)', 'table')
     .action(async (options) => {
-      const spinner = ora("크론잡 조회 중...").start();
+      const spinner = ora('크론잡 조회 중...').start();
 
       const connected = await isDbConnected();
       if (!connected) {
-        spinner.fail("DB 연결 실패");
+        spinner.fail('DB 연결 실패');
         await closeConnection();
         process.exit(1);
       }
@@ -898,35 +992,35 @@ export function registerBotsCommands(program: Command): void {
         `;
         const params: string[] = [];
         if (options.bot) {
-          query += " WHERE bot_id = $1";
+          query += ' WHERE bot_id = $1';
           params.push(options.bot);
         }
-        query += " ORDER BY bot_id, name";
+        query += ' ORDER BY bot_id, name';
 
         const result = await client.query(query, params);
         client.release();
         spinner.stop();
 
-        if (options.format === "json") {
+        if (options.format === 'json') {
           console.log(JSON.stringify(result.rows, null, 2));
         } else {
-          console.log(chalk.cyan.bold("\n⏰ 봇 크론잡\n"));
+          console.log(chalk.cyan.bold('\n⏰ 봇 크론잡\n'));
 
           if (result.rows.length === 0) {
-            console.log(chalk.yellow("  크론잡 데이터가 없습니다."));
-            console.log(chalk.gray("  'semo bots cron sync' 또는 'semo context sync'로 동기화하세요."));
+            console.log(chalk.yellow('  크론잡 데이터가 없습니다.'));
+            console.log(
+              chalk.gray("  'semo bots cron sync' 또는 'semo context sync'로 동기화하세요."),
+            );
           } else {
-            let currentBot = "";
+            let currentBot = '';
             for (const row of result.rows) {
               if (row.bot_id !== currentBot) {
                 currentBot = row.bot_id;
                 console.log(chalk.white.bold(`  ${currentBot}`));
               }
-              const status = row.enabled ? chalk.green("●") : chalk.red("○");
-              const nextRun = row.next_run ? new Date(row.next_run).toLocaleString("ko-KR") : "-";
-              console.log(
-                `    ${status} ${(row.name || row.job_id).padEnd(30)} next: ${nextRun}`
-              );
+              const status = row.enabled ? chalk.green('●') : chalk.red('○');
+              const nextRun = row.next_run ? new Date(row.next_run).toLocaleString('ko-KR') : '-';
+              console.log(`    ${status} ${(row.name || row.job_id).padEnd(30)} next: ${nextRun}`);
             }
           }
 
@@ -943,14 +1037,14 @@ export function registerBotsCommands(program: Command): void {
     });
 
   cronCmd
-    .command("sync")
-    .description("로컬 크론잡 → DB 수동 동기화")
+    .command('sync')
+    .description('로컬 크론잡 → DB 수동 동기화')
     .action(async () => {
-      const spinner = ora("크론잡 동기화 중...").start();
+      const spinner = ora('크론잡 동기화 중...').start();
 
       const connected = await isDbConnected();
       if (!connected) {
-        spinner.fail("DB 연결 실패");
+        spinner.fail('DB 연결 실패');
         await closeConnection();
         process.exit(1);
       }
@@ -969,16 +1063,16 @@ export function registerBotsCommands(program: Command): void {
 
   // ── semo bots delegation ─────────────────────────────────────
   botsCmd
-    .command("delegation")
-    .description("봇 간 위임 매트릭스 조회")
-    .option("--bot <name>", "특정 봇의 위임 관계만")
-    .option("--format <type>", "출력 형식 (table|json)", "table")
+    .command('delegation')
+    .description('봇 간 위임 매트릭스 조회')
+    .option('--bot <name>', '특정 봇의 위임 관계만')
+    .option('--format <type>', '출력 형식 (table|json)', 'table')
     .action(async (options) => {
-      const spinner = ora("위임 매트릭스 조회 중...").start();
+      const spinner = ora('위임 매트릭스 조회 중...').start();
 
       const connected = await isDbConnected();
       if (!connected) {
-        spinner.fail("DB 연결 실패");
+        spinner.fail('DB 연결 실패');
         await closeConnection();
         process.exit(1);
       }
@@ -987,27 +1081,27 @@ export function registerBotsCommands(program: Command): void {
         const delegations = await getDelegations(options.bot || undefined);
         spinner.stop();
 
-        if (options.format === "json") {
+        if (options.format === 'json') {
           console.log(JSON.stringify(delegations, null, 2));
         } else {
-          console.log(chalk.cyan.bold("\n🔗 봇 위임 매트릭스\n"));
+          console.log(chalk.cyan.bold('\n🔗 봇 위임 매트릭스\n'));
 
           if (delegations.length === 0) {
-            console.log(chalk.yellow("  위임 데이터가 없습니다."));
+            console.log(chalk.yellow('  위임 데이터가 없습니다.'));
             console.log(chalk.gray("  'semo bots seed'로 위임 매트릭스를 시딩하세요."));
           } else {
-            let currentFrom = "";
+            let currentFrom = '';
             for (const d of delegations) {
               if (d.from_bot_id !== currentFrom) {
                 currentFrom = d.from_bot_id;
                 console.log(chalk.white.bold(`  ${currentFrom}`));
               }
-              const domains = d.domains.join(", ");
+              const domains = d.domains.join(', ');
               console.log(
                 chalk.gray(`    → ${d.to_bot_id.padEnd(14)}`) +
-                chalk.white(`[${d.delegation_type}] `) +
-                chalk.cyan(domains) +
-                chalk.gray(` (via ${d.method})`)
+                  chalk.white(`[${d.delegation_type}] `) +
+                  chalk.cyan(domains) +
+                  chalk.gray(` (via ${d.method})`),
               );
             }
           }
@@ -1025,17 +1119,17 @@ export function registerBotsCommands(program: Command): void {
 
   // ── semo bots skill-deploy ──────────────────────────────────
   botsCmd
-    .command("skill-deploy")
-    .description("DB skill_definitions → 봇 워크스페이스 SKILL.md 역배포")
-    .option("--bot <botId>", "특정 봇에만 배포")
-    .option("--dry-run", "파일 쓰기 없이 계획만 출력")
-    .option("--force", "기존 SKILL.md와 내용이 달라도 덮어쓰기")
+    .command('skill-deploy')
+    .description('DB skill_definitions → 봇 워크스페이스 SKILL.md 역배포')
+    .option('--bot <botId>', '특정 봇에만 배포')
+    .option('--dry-run', '파일 쓰기 없이 계획만 출력')
+    .option('--force', '기존 SKILL.md와 내용이 달라도 덮어쓰기')
     .action(async (options) => {
-      const spinner = ora("스킬 배포 준비 중...").start();
+      const spinner = ora('스킬 배포 준비 중...').start();
 
       const connected = await isDbConnected();
       if (!connected) {
-        spinner.fail("DB 연결 실패");
+        spinner.fail('DB 연결 실패');
         await closeConnection();
         process.exit(1);
       }
@@ -1046,16 +1140,16 @@ export function registerBotsCommands(program: Command): void {
 
         // Filter skills that have bot_ids assigned and content
         const deployable = skills.filter(
-          (s) => s.bot_ids && s.bot_ids.length > 0 && s.content && s.content.trim()
+          (s) => s.bot_ids && s.bot_ids.length > 0 && s.content && s.content.trim(),
         );
 
         if (deployable.length === 0) {
-          console.log(chalk.yellow("배포 가능한 스킬이 없습니다."));
+          console.log(chalk.yellow('배포 가능한 스킬이 없습니다.'));
           return;
         }
 
         // Build (skill, botId) pairs
-        type Action = "CREATE" | "OVERWRITE" | "SKIP_SAME" | "SKIP_EXISTS";
+        type Action = 'CREATE' | 'OVERWRITE' | 'SKIP_SAME' | 'SKIP_EXISTS';
         interface DeployEntry {
           skillName: string;
           botId: string;
@@ -1072,25 +1166,31 @@ export function registerBotsCommands(program: Command): void {
             : skill.bot_ids;
 
           for (const botId of targetBots) {
-            const wsDir = path.join(os.homedir(), `.openclaw-${botId}`, "workspace");
-            const skillDir = path.join(wsDir, "skills", skill.name);
-            const filePath = path.join(skillDir, "SKILL.md");
+            const wsDir = path.join(os.homedir(), `.openclaw-${botId}`, 'workspace');
+            const skillDir = path.join(wsDir, 'skills', skill.name);
+            const filePath = path.join(skillDir, 'SKILL.md');
 
             let action: Action;
             if (!fs.existsSync(filePath)) {
-              action = "CREATE";
+              action = 'CREATE';
             } else {
-              const existing = fs.readFileSync(filePath, "utf-8");
+              const existing = fs.readFileSync(filePath, 'utf-8');
               if (existing === skill.content) {
-                action = "SKIP_SAME";
+                action = 'SKIP_SAME';
               } else if (options.force) {
-                action = "OVERWRITE";
+                action = 'OVERWRITE';
               } else {
-                action = "SKIP_EXISTS";
+                action = 'SKIP_EXISTS';
               }
             }
 
-            entries.push({ skillName: skill.name, botId, action, filePath, content: skill.content });
+            entries.push({
+              skillName: skill.name,
+              botId,
+              action,
+              filePath,
+              content: skill.content,
+            });
           }
         }
 
@@ -1102,30 +1202,30 @@ export function registerBotsCommands(program: Command): void {
           SKIP_EXISTS: chalk.cyan,
         };
 
-        console.log("\n" + chalk.bold("배포 계획:"));
-        console.log("─".repeat(70));
+        console.log('\n' + chalk.bold('배포 계획:'));
+        console.log('─'.repeat(70));
         for (const e of entries) {
           const tag = actionColor[e.action](e.action.padEnd(12));
           console.log(`  ${tag} ${e.botId}/${e.skillName}`);
         }
-        console.log("─".repeat(70));
+        console.log('─'.repeat(70));
 
-        const creates = entries.filter((e) => e.action === "CREATE").length;
-        const overwrites = entries.filter((e) => e.action === "OVERWRITE").length;
-        const skipSame = entries.filter((e) => e.action === "SKIP_SAME").length;
-        const skipExists = entries.filter((e) => e.action === "SKIP_EXISTS").length;
+        const creates = entries.filter((e) => e.action === 'CREATE').length;
+        const overwrites = entries.filter((e) => e.action === 'OVERWRITE').length;
+        const skipSame = entries.filter((e) => e.action === 'SKIP_SAME').length;
+        const skipExists = entries.filter((e) => e.action === 'SKIP_EXISTS').length;
         console.log(
-          `  CREATE: ${creates}  OVERWRITE: ${overwrites}  동일: ${skipSame}  스킵(--force 필요): ${skipExists}`
+          `  CREATE: ${creates}  OVERWRITE: ${overwrites}  동일: ${skipSame}  스킵(--force 필요): ${skipExists}`,
         );
 
         if (options.dryRun) {
-          console.log(chalk.yellow("\n--dry-run: 파일 쓰기를 건너뜁니다."));
+          console.log(chalk.yellow('\n--dry-run: 파일 쓰기를 건너뜁니다.'));
           return;
         }
 
-        const toWrite = entries.filter((e) => e.action === "CREATE" || e.action === "OVERWRITE");
+        const toWrite = entries.filter((e) => e.action === 'CREATE' || e.action === 'OVERWRITE');
         if (toWrite.length === 0) {
-          console.log(chalk.green("\n변경할 파일이 없습니다."));
+          console.log(chalk.green('\n변경할 파일이 없습니다.'));
           return;
         }
 
@@ -1134,7 +1234,7 @@ export function registerBotsCommands(program: Command): void {
         for (const e of toWrite) {
           const dir = path.dirname(e.filePath);
           fs.mkdirSync(dir, { recursive: true });
-          fs.writeFileSync(e.filePath, e.content, "utf-8");
+          fs.writeFileSync(e.filePath, e.content, 'utf-8');
         }
         writeSpinner.succeed(`SKILL.md ${toWrite.length}개 배포 완료`);
 
@@ -1144,7 +1244,7 @@ export function registerBotsCommands(program: Command): void {
         const client = await pool.connect();
         try {
           for (const botId of affectedBots) {
-            const wsDir = path.join(os.homedir(), `.openclaw-${botId}`, "workspace");
+            const wsDir = path.join(os.homedir(), `.openclaw-${botId}`, 'workspace');
             if (fs.existsSync(wsDir)) {
               const syncSpinner = ora(`${botId} 워크스페이스 DB 싱크 중...`).start();
               const count = await syncWorkspaceFiles(client, botId, wsDir);
@@ -1157,7 +1257,7 @@ export function registerBotsCommands(program: Command): void {
 
         console.log(chalk.green(`\n✔ 스킬 역배포 완료`));
       } catch (err) {
-        spinner.isSpinning && spinner.fail("스킬 배포 실패");
+        spinner.isSpinning && spinner.fail('스킬 배포 실패');
         console.error(chalk.red(`❌ ${err}`));
         process.exit(1);
       } finally {
@@ -1167,17 +1267,17 @@ export function registerBotsCommands(program: Command): void {
 
   // ── semo bots set-status ─────────────────────────────────────
   botsCmd
-    .command("set-status <bot_id> <status>")
-    .description("봇 온라인 상태 수동 설정 (online|offline)")
+    .command('set-status <bot_id> <status>')
+    .description('봇 온라인 상태 수동 설정 (online|offline)')
     .action(async (botId: string, status: string) => {
-      if (status !== "online" && status !== "offline") {
+      if (status !== 'online' && status !== 'offline') {
         console.log(chalk.red("❌ status는 'online' 또는 'offline'만 가능합니다."));
         process.exit(1);
       }
 
       const connected = await isDbConnected();
       if (!connected) {
-        console.log(chalk.red("❌ DB 연결 실패"));
+        console.log(chalk.red('❌ DB 연결 실패'));
         await closeConnection();
         process.exit(1);
       }
@@ -1191,7 +1291,7 @@ export function registerBotsCommands(program: Command): void {
            ON CONFLICT (bot_id) DO UPDATE SET
              status = EXCLUDED.status,
              synced_at = NOW()`,
-          [botId, status]
+          [botId, status],
         );
         client.release();
         console.log(chalk.green(`✔ ${botId} → ${status}`));

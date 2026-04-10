@@ -374,7 +374,7 @@ ${kbFirstBlock}
 
 ## 공통 Enforcement Hooks
 
-아래 훅은 \`~/.openclaw-shared/hooks/\`에 위치하며, 봇 + 로컬 세션 양쪽에서 사용:
+아래 훅은 \`~/.semo/shared/hooks/\`에 위치하며, 봇 + 로컬 세션 양쪽에서 사용:
 
 | 훅 | 트리거 | 역할 |
 |----|--------|------|

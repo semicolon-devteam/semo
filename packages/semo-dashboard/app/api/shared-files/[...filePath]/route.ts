@@ -7,7 +7,7 @@ import * as crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
 
-const SHARED_DIR = path.join(os.homedir(), '.openclaw-shared');
+const SHARED_DIR = path.join(os.homedir(), '.semo', 'shared');
 
 function resolveAndValidate(filePath: string): string | null {
   const resolved = path.resolve(SHARED_DIR, filePath);
@@ -17,10 +17,7 @@ function resolveAndValidate(filePath: string): string | null {
   return resolved;
 }
 
-export async function GET(
-  _req: Request,
-  { params }: { params: Promise<{ filePath: string[] }> }
-) {
+export async function GET(_req: Request, { params }: { params: Promise<{ filePath: string[] }> }) {
   try {
     const { filePath } = await params;
     const requestedPath = filePath.join('/');
@@ -33,12 +30,14 @@ export async function GET(
     try {
       const result = await query<{ content: string }>(
         `SELECT content FROM semo.bot_workspace_files WHERE bot_id = '_shared' AND file_path = $1`,
-        [requestedPath]
+        [requestedPath],
       );
       if (result.rows.length > 0) {
         return NextResponse.json({ path: requestedPath, content: result.rows[0].content });
       }
-    } catch { /* DB unavailable */ }
+    } catch {
+      /* DB unavailable */
+    }
 
     // Fallback: read from local filesystem
     const resolved = resolveAndValidate(requestedPath);
@@ -58,10 +57,7 @@ export async function GET(
   }
 }
 
-export async function PUT(
-  req: Request,
-  { params }: { params: Promise<{ filePath: string[] }> }
-) {
+export async function PUT(req: Request, { params }: { params: Promise<{ filePath: string[] }> }) {
   try {
     const { filePath } = await params;
     const requestedPath = filePath.join('/');
@@ -99,9 +95,11 @@ export async function PUT(
            file_size = EXCLUDED.file_size,
            file_hash = EXCLUDED.file_hash,
            synced_at = NOW()`,
-        [requestedPath, content, fileSize, fileHash]
+        [requestedPath, content, fileSize, fileHash],
       );
-    } catch { /* DB update best-effort */ }
+    } catch {
+      /* DB update best-effort */
+    }
 
     return NextResponse.json({ path: requestedPath, updated: true });
   } catch (error) {

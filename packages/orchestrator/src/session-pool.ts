@@ -94,7 +94,7 @@ class BotSession {
     // 전체 Sonnet + effort low (쿼터 절감은 thinking 토큰 최소화로)
     const sessionModel = 'claude-sonnet-4-6';
 
-    const hooksDir = path.join(os.homedir(), '.openclaw-shared', 'hooks');
+    const hooksDir = path.join(os.homedir(), '.semo', 'shared', 'hooks');
     const envFile = path.join(os.homedir(), '.claude', 'semo', '.env');
 
     this.queryHandle = query({

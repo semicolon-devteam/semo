@@ -1004,7 +1004,7 @@ async function setupHooks(isUpdate: boolean = false) {
   const settingsPath = path.join(homeDir, '.claude', 'settings.local.json');
 
   // hooks 설정 객체 — semo CLI + enforcement hooks (프로젝트 경로 무관)
-  const sharedHooksDir = path.join(homeDir, '.openclaw-shared', 'hooks');
+  const sharedHooksDir = path.join(homeDir, '.semo', 'shared', 'hooks');
   const hooksConfig = {
     SessionStart: [
       {

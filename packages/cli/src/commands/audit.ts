@@ -12,10 +12,10 @@
  * 레거시 파일은 --fix로 생성하지 않음 (v1→v2 전환 완료).
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import { Pool, PoolClient } from "pg";
-import { randomUUID } from "crypto";
+import * as fs from 'fs';
+import * as path from 'path';
+import { Pool, PoolClient } from 'pg';
+import { randomUUID } from 'crypto';
 
 // ============================================================
 // Types
@@ -29,7 +29,7 @@ export interface AuditCheck {
 
 export interface BotAuditResult {
   botId: string;
-  rating: "GOOD" | "NEEDS-WORK" | "POOR";
+  rating: 'GOOD' | 'NEEDS-WORK' | 'POOR';
   score: number;
   checks: AuditCheck[];
 }
@@ -80,14 +80,11 @@ function dirExistsCheck(name: string, relativePath: string): CheckDef {
     name,
     check: (botDir) => {
       const fullPath = path.join(botDir, relativePath);
-      const exists =
-        fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory();
+      const exists = fs.existsSync(fullPath) && fs.statSync(fullPath).isDirectory();
       return {
         name,
         passed: exists,
-        detail: exists
-          ? `${relativePath}/ exists`
-          : `${relativePath}/ missing`,
+        detail: exists ? `${relativePath}/ exists` : `${relativePath}/ missing`,
       };
     },
   };
@@ -95,16 +92,16 @@ function dirExistsCheck(name: string, relativePath: string): CheckDef {
 
 function memorySlimCheck(): CheckDef {
   return {
-    name: "memory/slim",
+    name: 'memory/slim',
     check: (botDir) => {
-      const memoryPath = path.join(botDir, "MEMORY.md");
+      const memoryPath = path.join(botDir, 'MEMORY.md');
       if (!fs.existsSync(memoryPath)) {
-        return { name: "memory/slim", passed: true, detail: "MEMORY.md not present (N/A)" };
+        return { name: 'memory/slim', passed: true, detail: 'MEMORY.md not present (N/A)' };
       }
-      const lines = fs.readFileSync(memoryPath, "utf-8").split("\n").length;
+      const lines = fs.readFileSync(memoryPath, 'utf-8').split('\n').length;
       const passed = lines <= 30;
       return {
-        name: "memory/slim",
+        name: 'memory/slim',
         passed,
         detail: passed
           ? `MEMORY.md is ${lines} lines (≤ 30)`
@@ -140,29 +137,30 @@ function symlinkCheck(name: string, relativePath: string, expectedTarget: string
 }
 
 const SHARED_AGENTS_PATH = path.join(
-  process.env.HOME || "/Users/reus",
-  ".openclaw-shared",
-  "AGENTS.md"
+  process.env.HOME || '/Users/reus',
+  '.semo',
+  'shared',
+  'AGENTS.md',
 );
 
 const CHECK_DEFS: CheckDef[] = [
   // v2.0 필수 파일
-  fileExistsCheck("root/SOUL.md", "SOUL.md"),
-  fileExistsCheck("root/AGENTS.md", "AGENTS.md"),
-  symlinkCheck("root/AGENTS.md-symlink", "AGENTS.md", SHARED_AGENTS_PATH),
-  fileExistsCheck("root/USER.md", "USER.md"),
-  fileExistsCheck("root/MEMORY.md", "MEMORY.md"),
+  fileExistsCheck('root/SOUL.md', 'SOUL.md'),
+  fileExistsCheck('root/AGENTS.md', 'AGENTS.md'),
+  symlinkCheck('root/AGENTS.md-symlink', 'AGENTS.md', SHARED_AGENTS_PATH),
+  fileExistsCheck('root/USER.md', 'USER.md'),
+  fileExistsCheck('root/MEMORY.md', 'MEMORY.md'),
   // v2.0 필수 디렉토리
-  dirExistsCheck(".claude/", ".claude"),
-  dirExistsCheck("hooks/", "hooks"),
-  dirExistsCheck("memory/", "memory"),
-  dirExistsCheck("skills/", "skills"),
+  dirExistsCheck('.claude/', '.claude'),
+  dirExistsCheck('hooks/', 'hooks'),
+  dirExistsCheck('memory/', 'memory'),
+  dirExistsCheck('skills/', 'skills'),
   // Memory slim
   memorySlimCheck(),
   // v2.0 레거시 파일 부재 확인
-  fileAbsentCheck("legacy/IDENTITY.md", "IDENTITY.md"),
-  fileAbsentCheck("legacy/TOOLS.md", "TOOLS.md"),
-  fileAbsentCheck("legacy/RULES.md", "RULES.md"),
+  fileAbsentCheck('legacy/IDENTITY.md', 'IDENTITY.md'),
+  fileAbsentCheck('legacy/TOOLS.md', 'TOOLS.md'),
+  fileAbsentCheck('legacy/RULES.md', 'RULES.md'),
 ];
 
 // ============================================================
@@ -188,41 +186,45 @@ function buildChecksFromRow(row: WorkspaceStandardRow): CheckDef[] {
   const defs: CheckDef[] = [];
   const name = `${row.category}/${row.path_pattern}`;
 
-  if (row.level === "required") {
-    if (row.entry_type === "symlink") {
-      const target = row.symlink_target?.replace("$HOME", process.env.HOME || "/Users/reus") || "";
+  if (row.level === 'required') {
+    if (row.entry_type === 'symlink') {
+      const target = row.symlink_target?.replace('$HOME', process.env.HOME || '/Users/reus') || '';
       defs.push(symlinkCheck(`${name}-symlink`, row.path_pattern, target));
       defs.push(fileExistsCheck(name, row.path_pattern));
-    } else if (row.entry_type === "dir") {
-      const dirPath = row.path_pattern.endsWith("/")
+    } else if (row.entry_type === 'dir') {
+      const dirPath = row.path_pattern.endsWith('/')
         ? row.path_pattern.slice(0, -1)
         : row.path_pattern;
       defs.push(dirExistsCheck(name, dirPath));
     } else {
       defs.push(fileExistsCheck(name, row.path_pattern));
     }
-  } else if (row.level === "forbidden") {
-    if (row.entry_type === "glob") {
+  } else if (row.level === 'forbidden') {
+    if (row.entry_type === 'glob') {
       // Glob forbidden checks require special handling — skip for basic audit
       // (covered by hygiene checks in shell scripts)
     } else {
-      defs.push(fileAbsentCheck(name, row.path_pattern.replace(/\/$/, "")));
+      defs.push(fileAbsentCheck(name, row.path_pattern.replace(/\/$/, '')));
     }
   }
 
   // Content rules: line count check
-  if (row.content_rules && typeof row.content_rules === "object") {
+  if (row.content_rules && typeof row.content_rules === 'object') {
     const rules = row.content_rules as Record<string, unknown>;
     const maxLines = rules.max_lines as number | undefined;
-    if (maxLines && row.entry_type !== "dir") {
+    if (maxLines && row.entry_type !== 'dir') {
       defs.push({
         name: `${name}/lines`,
         check: (botDir) => {
           const fullPath = path.join(botDir, row.path_pattern);
           if (!fs.existsSync(fullPath)) {
-            return { name: `${name}/lines`, passed: true, detail: `${row.path_pattern} not present (N/A)` };
+            return {
+              name: `${name}/lines`,
+              passed: true,
+              detail: `${row.path_pattern} not present (N/A)`,
+            };
           }
-          const lines = fs.readFileSync(fullPath, "utf-8").split("\n").length;
+          const lines = fs.readFileSync(fullPath, 'utf-8').split('\n').length;
           const passed = lines <= maxLines;
           return {
             name: `${name}/lines`,
@@ -240,13 +242,15 @@ function buildChecksFromRow(row: WorkspaceStandardRow): CheckDef[] {
 }
 
 function botMatchesRow(row: WorkspaceStandardRow, botId: string): boolean {
-  if (row.bot_scope === "all") return true;
-  if (row.bot_scope === "include") return row.bot_ids.includes(botId);
-  if (row.bot_scope === "exclude") return !row.bot_ids.includes(botId);
+  if (row.bot_scope === 'all') return true;
+  if (row.bot_scope === 'include') return row.bot_ids.includes(botId);
+  if (row.bot_scope === 'exclude') return !row.bot_ids.includes(botId);
   return true;
 }
 
-export async function loadCheckDefs(pool: Pool): Promise<{ defs: CheckDef[]; rows: WorkspaceStandardRow[] }> {
+export async function loadCheckDefs(
+  pool: Pool,
+): Promise<{ defs: CheckDef[]; rows: WorkspaceStandardRow[] }> {
   const client = await pool.connect();
   try {
     const result = await client.query(
@@ -322,16 +326,16 @@ function computeRating(botId: string, checks: AuditCheck[]): BotAuditResult {
   const total = checks.length;
   const score = total > 0 ? Math.round((passed / total) * 100) : 100;
 
-  const memorySlim = checks.find((c) => c.name.includes("/lines") && c.name.includes("MEMORY"));
+  const memorySlim = checks.find((c) => c.name.includes('/lines') && c.name.includes('MEMORY'));
   const isMemorySlim = memorySlim ? memorySlim.passed : true;
 
-  let rating: BotAuditResult["rating"];
+  let rating: BotAuditResult['rating'];
   if (score >= 80 && isMemorySlim) {
-    rating = "GOOD";
+    rating = 'GOOD';
   } else if (score >= 50) {
-    rating = "NEEDS-WORK";
+    rating = 'NEEDS-WORK';
   } else {
-    rating = "POOR";
+    rating = 'POOR';
   }
 
   return { botId, rating, score, checks };
@@ -342,29 +346,25 @@ function computeRating(botId: string, checks: AuditCheck[]): BotAuditResult {
 // ============================================================
 
 const FIXABLE_FILES: Record<string, string> = {
-  "root/SOUL.md": "SOUL.md",
-  "root/USER.md": "USER.md",
-  "root/MEMORY.md": "MEMORY.md",
+  'root/SOUL.md': 'SOUL.md',
+  'root/USER.md': 'USER.md',
+  'root/MEMORY.md': 'MEMORY.md',
 };
 
 const FIXABLE_DIRS: Record<string, string> = {
-  ".claude/": ".claude",
-  "hooks/": "hooks",
-  "memory/": "memory",
-  "skills/": "skills",
+  '.claude/': '.claude',
+  'hooks/': 'hooks',
+  'memory/': 'memory',
+  'skills/': 'skills',
 };
 
 const FILE_TEMPLATES: Record<string, (botId: string) => string> = {
-  "SOUL.md": (botId) =>
+  'SOUL.md': (botId) =>
     `# ${botId} — SOUL\n\n## Identity\n\n> TODO\n\n## R&R\n\n> TODO\n\n## KB Lookup Protocol\n\n> semo kb get/search로 팀 정보 조회\n\n## Operating Procedures\n\n> TODO\n\n## NON-NEGOTIABLE\n\n1. TODO\n`,
 };
 
 /** Legacy hardcoded fix — used when DB is unavailable */
-export function fixBot(
-  botDir: string,
-  botId: string,
-  checks: AuditCheck[]
-): number {
+export function fixBot(botDir: string, botId: string, checks: AuditCheck[]): number {
   let fixed = 0;
 
   for (const check of checks) {
@@ -380,10 +380,8 @@ export function fixBot(
       }
       const filename = path.basename(relPath);
       const templateFn = FILE_TEMPLATES[relPath];
-      const content = templateFn
-        ? templateFn(botId)
-        : `# ${filename}\n\n> TODO: ${botId}\n`;
-      fs.writeFileSync(fullPath, content, "utf-8");
+      const content = templateFn ? templateFn(botId) : `# ${filename}\n\n> TODO: ${botId}\n`;
+      fs.writeFileSync(fullPath, content, 'utf-8');
       fixed++;
     }
 
@@ -398,8 +396,8 @@ export function fixBot(
     }
 
     // Fix AGENTS.md symlink
-    if (check.name === "root/AGENTS.md" || check.name === "root/AGENTS.md-symlink") {
-      const agentsPath = path.join(botDir, "AGENTS.md");
+    if (check.name === 'root/AGENTS.md' || check.name === 'root/AGENTS.md-symlink') {
+      const agentsPath = path.join(botDir, 'AGENTS.md');
       if (fs.existsSync(SHARED_AGENTS_PATH)) {
         // 기존 일반 파일이면 삭제 후 심링크 생성
         if (fs.existsSync(agentsPath)) {
@@ -444,42 +442,38 @@ export function fixBotFromDb(
 ): { fixed: number; skipped: string[] } {
   let fixed = 0;
   const skipped: string[] = [];
-  const home = process.env.HOME || "/Users/reus";
+  const home = process.env.HOME || '/Users/reus';
 
   // Build a map of check name → row for quick lookup
-  const failedCheckNames = new Set(
-    checks.filter((c) => !c.passed).map((c) => c.name),
-  );
+  const failedCheckNames = new Set(checks.filter((c) => !c.passed).map((c) => c.name));
 
   for (const row of dbRules) {
     if (!row.fix_action || !row.fix_template) continue;
 
     const checkName = `${row.category}/${row.path_pattern}`;
     // Check if any of the failed checks relate to this row
-    const isRelevant = failedCheckNames.has(checkName) ||
-      failedCheckNames.has(`${checkName}-symlink`);
+    const isRelevant =
+      failedCheckNames.has(checkName) || failedCheckNames.has(`${checkName}-symlink`);
     if (!isRelevant) continue;
 
     // Variable substitution in fix_template
-    const resolvedTemplate = row.fix_template
-      .replace(/\$BOT_ID/g, botId)
-      .replace(/\$HOME/g, home);
+    const resolvedTemplate = row.fix_template.replace(/\$BOT_ID/g, botId).replace(/\$HOME/g, home);
 
     const targetPath = path.join(botDir, row.path_pattern);
 
     switch (row.fix_action) {
-      case "create_file": {
+      case 'create_file': {
         if (fs.existsSync(targetPath)) break;
         const dir = path.dirname(targetPath);
         if (!fs.existsSync(dir)) {
           fs.mkdirSync(dir, { recursive: true });
         }
-        fs.writeFileSync(targetPath, resolvedTemplate, "utf-8");
+        fs.writeFileSync(targetPath, resolvedTemplate, 'utf-8');
         fixed++;
         break;
       }
-      case "create_dir": {
-        const dirPath = row.path_pattern.endsWith("/")
+      case 'create_dir': {
+        const dirPath = row.path_pattern.endsWith('/')
           ? path.join(botDir, row.path_pattern.slice(0, -1))
           : targetPath;
         if (!fs.existsSync(dirPath)) {
@@ -488,7 +482,7 @@ export function fixBotFromDb(
         }
         break;
       }
-      case "create_symlink": {
+      case 'create_symlink': {
         const symlinkTarget = resolvedTemplate;
         if (!fs.existsSync(symlinkTarget)) break;
         if (fs.existsSync(targetPath)) {
@@ -505,7 +499,7 @@ export function fixBotFromDb(
         fixed++;
         break;
       }
-      case "delete": {
+      case 'delete': {
         if (!fs.existsSync(targetPath)) break;
         if (!options.force) {
           skipped.push(`${row.path_pattern} (delete requires --force)`);
@@ -541,29 +535,27 @@ export function syncBotFromDb(
 ): { created: number; violations: string[] } {
   let created = 0;
   const violations: string[] = [];
-  const home = process.env.HOME || "/Users/reus";
+  const home = process.env.HOME || '/Users/reus';
 
   for (const row of dbRules) {
-    if (row.level !== "required") continue;
-    if (row.path_pattern.includes("*")) continue; // glob patterns handled separately
+    if (row.level !== 'required') continue;
+    if (row.path_pattern.includes('*')) continue; // glob patterns handled separately
 
     const targetPath = path.join(botDir, row.path_pattern);
 
-    if (row.entry_type === "dir") {
-      const dirPath = row.path_pattern.endsWith("/")
+    if (row.entry_type === 'dir') {
+      const dirPath = row.path_pattern.endsWith('/')
         ? path.join(botDir, row.path_pattern.slice(0, -1))
         : targetPath;
       if (!fs.existsSync(dirPath)) {
-        if (row.fix_action === "create_dir") {
+        if (row.fix_action === 'create_dir') {
           fs.mkdirSync(dirPath, { recursive: true });
           created++;
         }
       }
-    } else if (row.entry_type === "symlink") {
-      if (!fs.existsSync(targetPath) && row.fix_action === "create_symlink" && row.fix_template) {
-        const symlinkTarget = row.fix_template
-          .replace(/\$BOT_ID/g, botId)
-          .replace(/\$HOME/g, home);
+    } else if (row.entry_type === 'symlink') {
+      if (!fs.existsSync(targetPath) && row.fix_action === 'create_symlink' && row.fix_template) {
+        const symlinkTarget = row.fix_template.replace(/\$BOT_ID/g, botId).replace(/\$HOME/g, home);
         if (fs.existsSync(symlinkTarget)) {
           const dir = path.dirname(targetPath);
           if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -574,13 +566,11 @@ export function syncBotFromDb(
     } else {
       // file
       if (!fs.existsSync(targetPath)) {
-        if (row.fix_action === "create_file" && row.fix_template) {
-          const content = row.fix_template
-            .replace(/\$BOT_ID/g, botId)
-            .replace(/\$HOME/g, home);
+        if (row.fix_action === 'create_file' && row.fix_template) {
+          const content = row.fix_template.replace(/\$BOT_ID/g, botId).replace(/\$HOME/g, home);
           const dir = path.dirname(targetPath);
           if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-          fs.writeFileSync(targetPath, content, "utf-8");
+          fs.writeFileSync(targetPath, content, 'utf-8');
           created++;
         }
       } else if (row.content_rules) {
@@ -589,11 +579,13 @@ export function syncBotFromDb(
         const maxLines = rules.max_lines as number | undefined;
         if (maxLines) {
           try {
-            const lines = fs.readFileSync(targetPath, "utf-8").split("\n").length;
+            const lines = fs.readFileSync(targetPath, 'utf-8').split('\n').length;
             if (lines > maxLines) {
               violations.push(`${row.path_pattern}: ${lines} lines (max ${maxLines})`);
             }
-          } catch { /* skip unreadable */ }
+          } catch {
+            /* skip unreadable */
+          }
         }
       }
     }
@@ -615,7 +607,7 @@ export interface SkillAuditCheck extends AuditCheck {
  */
 export function auditSkillStructure(botDir: string, botId: string): SkillAuditCheck[] {
   const checks: SkillAuditCheck[] = [];
-  const skillsDir = path.join(botDir, "skills");
+  const skillsDir = path.join(botDir, 'skills');
 
   if (!fs.existsSync(skillsDir) || !fs.statSync(skillsDir).isDirectory()) {
     return checks;
@@ -630,12 +622,12 @@ export function auditSkillStructure(botDir: string, botId: string): SkillAuditCh
 
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
-    if (entry.name.startsWith("_") || entry.name.startsWith(".")) continue;
-    if (entry.name.endsWith(".skill")) continue;
+    if (entry.name.startsWith('_') || entry.name.startsWith('.')) continue;
+    if (entry.name.endsWith('.skill')) continue;
 
     const skillName = entry.name;
     const skillDir = path.join(skillsDir, skillName);
-    const skillMdPath = path.join(skillDir, "SKILL.md");
+    const skillMdPath = path.join(skillDir, 'SKILL.md');
 
     // SKILL.md 존재 여부
     if (!fs.existsSync(skillMdPath)) {
@@ -651,7 +643,7 @@ export function auditSkillStructure(botDir: string, botId: string): SkillAuditCh
     // SKILL.md 내용 검증
     let content: string;
     try {
-      content = fs.readFileSync(skillMdPath, "utf-8");
+      content = fs.readFileSync(skillMdPath, 'utf-8');
     } catch {
       checks.push({
         name: `skill/${skillName}/SKILL.md`,
@@ -671,13 +663,14 @@ export function auditSkillStructure(botDir: string, botId: string): SkillAuditCh
     });
 
     // Line count check (max 500)
-    const lines = content.split("\n").length;
+    const lines = content.split('\n').length;
     checks.push({
       name: `skill/${skillName}/lines`,
       passed: lines <= 500,
-      detail: lines <= 500
-        ? `skills/${skillName}/SKILL.md: ${lines} lines (≤ 500)`
-        : `skills/${skillName}/SKILL.md: ${lines} lines (> 500, too long)`,
+      detail:
+        lines <= 500
+          ? `skills/${skillName}/SKILL.md: ${lines} lines (≤ 500)`
+          : `skills/${skillName}/SKILL.md: ${lines} lines (> 500, too long)`,
       skillName,
     });
 
@@ -726,7 +719,7 @@ export function auditSkillStructure(botDir: string, botId: string): SkillAuditCh
     }
 
     // Forbidden files check
-    const forbiddenFiles = ["README.md", "CHANGELOG.md", "INSTALL.md", "LICENSE", "LICENSE.md"];
+    const forbiddenFiles = ['README.md', 'CHANGELOG.md', 'INSTALL.md', 'LICENSE', 'LICENSE.md'];
     for (const forbidden of forbiddenFiles) {
       if (fs.existsSync(path.join(skillDir, forbidden))) {
         checks.push({
@@ -746,11 +739,9 @@ export function auditSkillStructure(botDir: string, botId: string): SkillAuditCh
 // KB domain checks (async, requires pool)
 // ============================================================
 
-const KB_REQUIRED_DOMAINS = ["semicolon"] as const;
+const KB_REQUIRED_DOMAINS = ['semicolon'] as const;
 
-export async function auditBotKb(
-  pool: Pool
-): Promise<AuditCheck[]> {
+export async function auditBotKb(pool: Pool): Promise<AuditCheck[]> {
   const checks: AuditCheck[] = [];
 
   try {
@@ -759,11 +750,11 @@ export async function auditBotKb(
        FROM semo.knowledge_base
        WHERE domain = ANY($1)
        GROUP BY domain`,
-      [KB_REQUIRED_DOMAINS]
+      [KB_REQUIRED_DOMAINS],
     );
 
     const counts = new Map<string, number>(
-      result.rows.map((r: { domain: string; cnt: number }) => [r.domain, r.cnt])
+      result.rows.map((r: { domain: string; cnt: number }) => [r.domain, r.cnt]),
     );
 
     for (const domain of KB_REQUIRED_DOMAINS) {
@@ -771,9 +762,8 @@ export async function auditBotKb(
       checks.push({
         name: `kb/${domain}`,
         passed: cnt > 0,
-        detail: cnt > 0
-          ? `KB ${domain} 도메인: ${cnt}개 엔트리`
-          : `KB ${domain} 도메인: 엔트리 없음`,
+        detail:
+          cnt > 0 ? `KB ${domain} 도메인: ${cnt}개 엔트리` : `KB ${domain} 도메인: 엔트리 없음`,
       });
     }
   } catch (err) {
@@ -795,82 +785,73 @@ export async function auditBotKb(
 
 const SYNC_STALE_HOURS = 24;
 
-export async function auditBotDb(
-  botId: string,
-  pool: Pool
-): Promise<AuditCheck[]> {
+export async function auditBotDb(botId: string, pool: Pool): Promise<AuditCheck[]> {
   const checks: AuditCheck[] = [];
 
   try {
-    const result = await pool.query(
-      "SELECT synced_at FROM semo.bot_status WHERE bot_id = $1",
-      [botId]
-    );
+    const result = await pool.query('SELECT synced_at FROM semo.bot_status WHERE bot_id = $1', [
+      botId,
+    ]);
     const registered = result.rows.length > 0;
 
     checks.push({
-      name: "db/registered",
+      name: 'db/registered',
       passed: registered,
-      detail: registered ? "bot_status에 등록됨" : "bot_status에 미등록",
+      detail: registered ? 'bot_status에 등록됨' : 'bot_status에 미등록',
     });
 
     if (registered) {
       const syncedAt = result.rows[0].synced_at;
-      const hoursAgo = syncedAt
-        ? (Date.now() - new Date(syncedAt).getTime()) / 3600000
-        : Infinity;
+      const hoursAgo = syncedAt ? (Date.now() - new Date(syncedAt).getTime()) / 3600000 : Infinity;
       const recent = hoursAgo < SYNC_STALE_HOURS;
       checks.push({
-        name: "db/synced_recent",
+        name: 'db/synced_recent',
         passed: recent,
         detail: recent
           ? `${Math.round(hoursAgo)}시간 전 동기화`
           : syncedAt
             ? `${Math.round(hoursAgo)}시간 전 (>${SYNC_STALE_HOURS}h stale)`
-            : "synced_at 없음",
+            : 'synced_at 없음',
       });
     } else {
       checks.push({
-        name: "db/synced_recent",
+        name: 'db/synced_recent',
         passed: false,
-        detail: "DB 미등록 — 동기화 불가",
+        detail: 'DB 미등록 — 동기화 불가',
       });
     }
   } catch (err) {
     checks.push({
-      name: "db/registered",
+      name: 'db/registered',
       passed: false,
       detail: `DB 조회 실패: ${err}`,
     });
     checks.push({
-      name: "db/synced_recent",
+      name: 'db/synced_recent',
       passed: false,
-      detail: "DB 조회 실패",
+      detail: 'DB 조회 실패',
     });
   }
 
   return checks;
 }
 
-export function mergeDbChecks(
-  result: BotAuditResult,
-  dbChecks: AuditCheck[]
-): BotAuditResult {
+export function mergeDbChecks(result: BotAuditResult, dbChecks: AuditCheck[]): BotAuditResult {
   const allChecks = [...result.checks, ...dbChecks];
   const passed = allChecks.filter((c) => c.passed).length;
   const total = allChecks.length;
   const score = Math.round((passed / total) * 100);
 
-  const memorySlim = allChecks.find((c) => c.name === "memory/slim");
+  const memorySlim = allChecks.find((c) => c.name === 'memory/slim');
   const isMemorySlim = memorySlim ? memorySlim.passed : true;
 
-  let rating: BotAuditResult["rating"];
+  let rating: BotAuditResult['rating'];
   if (score >= 80 && isMemorySlim) {
-    rating = "GOOD";
+    rating = 'GOOD';
   } else if (score >= 50) {
-    rating = "NEEDS-WORK";
+    rating = 'NEEDS-WORK';
   } else {
-    rating = "POOR";
+    rating = 'POOR';
   }
 
   return { botId: result.botId, rating, score, checks: allChecks };
@@ -881,41 +862,33 @@ export function mergeDbChecks(
 // ============================================================
 
 const RATING_EMOJI: Record<string, string> = {
-  GOOD: "🟢",
-  "NEEDS-WORK": "🟡",
-  POOR: "🔴",
+  GOOD: '🟢',
+  'NEEDS-WORK': '🟡',
+  POOR: '🔴',
 };
 
 export function formatAuditSlack(results: BotAuditResult[]): string {
   const date = new Date().toISOString().slice(0, 10);
-  const good = results.filter((r) => r.rating === "GOOD").length;
-  const needsWork = results.filter((r) => r.rating === "NEEDS-WORK").length;
-  const poor = results.filter((r) => r.rating === "POOR").length;
-  const avgScore = Math.round(
-    results.reduce((s, r) => s + r.score, 0) / results.length
-  );
+  const good = results.filter((r) => r.rating === 'GOOD').length;
+  const needsWork = results.filter((r) => r.rating === 'NEEDS-WORK').length;
+  const poor = results.filter((r) => r.rating === 'POOR').length;
+  const avgScore = Math.round(results.reduce((s, r) => s + r.score, 0) / results.length);
 
-  const lines: string[] = [
-    `📋 *봇 워크스페이스 Audit* — ${date}`,
-    "",
-  ];
+  const lines: string[] = [`📋 *봇 워크스페이스 Audit* — ${date}`, ''];
 
   for (const r of results) {
-    const emoji = RATING_EMOJI[r.rating] ?? "⚪";
+    const emoji = RATING_EMOJI[r.rating] ?? '⚪';
     const failed = r.checks.filter((c) => !c.passed);
-    const failInfo =
-      failed.length > 0
-        ? ` — missing: ${failed.map((c) => c.name).join(", ")}`
-        : "";
+    const failInfo = failed.length > 0 ? ` — missing: ${failed.map((c) => c.name).join(', ')}` : '';
     lines.push(`${emoji} *${r.botId}* ${r.score}% ${r.rating}${failInfo}`);
   }
 
-  lines.push("");
+  lines.push('');
   lines.push(
-    `${results.length}개 봇 | 평균 ${avgScore}% | GOOD: ${good} / NEEDS-WORK: ${needsWork} / POOR: ${poor}`
+    `${results.length}개 봇 | 평균 ${avgScore}% | GOOD: ${good} / NEEDS-WORK: ${needsWork} / POOR: ${poor}`,
   );
 
-  return lines.join("\n");
+  return lines.join('\n');
 }
 
 // ============================================================
@@ -924,7 +897,7 @@ export function formatAuditSlack(results: BotAuditResult[]): string {
 
 export async function storeAuditResults(
   results: BotAuditResult[],
-  client: PoolClient
+  client: PoolClient,
 ): Promise<void> {
   const runId = randomUUID();
 
@@ -932,7 +905,7 @@ export async function storeAuditResults(
     await client.query(
       `INSERT INTO semo.bot_workspace_audits (bot_id, run_id, rating, score, checks)
        VALUES ($1, $2, $3, $4, $5)`,
-      [r.botId, runId, r.rating, r.score, JSON.stringify(r.checks)]
+      [r.botId, runId, r.rating, r.score, JSON.stringify(r.checks)],
     );
   }
 }

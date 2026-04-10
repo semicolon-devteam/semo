@@ -31,7 +31,7 @@ const SHARED_AGENTS = path.join(
   'agents',
 );
 const SHARED_SKILLS = path.join(os.homedir(), '.claude', 'skills');
-const SHARED_HOOKS = path.join(os.homedir(), '.openclaw-shared', 'hooks');
+const SHARED_HOOKS = path.join(os.homedir(), '.semo', 'shared', 'hooks');
 const SEMO_ENV = path.join(os.homedir(), '.claude', 'semo', '.env');
 const LAUNCHD_DIR = path.join(os.homedir(), 'Library', 'LaunchAgents');
 

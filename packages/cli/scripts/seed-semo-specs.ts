@@ -7,11 +7,11 @@
  * Usage: npx tsx packages/cli/scripts/seed-semo-specs.ts
  */
 
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import { getPool, closeConnection } from "../src/database";
-import { kbUpsert } from "../src/kb";
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import { getPool, closeConnection } from '../src/database';
+import { kbUpsert } from '../src/kb';
 
 const pool = getPool();
 
@@ -19,8 +19,8 @@ const pool = getPool();
 
 const entries: { key: string; subKey: string; content: string }[] = [
   {
-    key: "spec",
-    subKey: "data-flow",
+    key: 'spec',
+    subKey: 'data-flow',
     content: `# SEMO 데이터 흐름
 
 \`\`\`
@@ -46,8 +46,8 @@ Core DB: semo.knowledge_base (KB: bot-config/spec/skill 도메인 포함)
 스킬은 \`skill_definitions\` 테이블에서 관리되며, \`semo context sync\`로 봇 워크스페이스에 자동 배포됩니다.`,
   },
   {
-    key: "spec",
-    subKey: "openclaw-config",
+    key: 'spec',
+    subKey: 'openclaw-config',
     content: `# OpenClaw 봇 설정
 
 ## openclaw.json
@@ -68,8 +68,8 @@ http://127.0.0.1:{포트}/chat?session=agent%3Amain%3Amain&token={토큰}
 \`semo-system/bot-workspaces/\`는 폐기됨 — 사용하지 말 것.`,
   },
   {
-    key: "spec",
-    subKey: "mcp-server-config",
+    key: 'spec',
+    subKey: 'mcp-server-config',
     content: `# MCP 서버 설정 규칙
 
 - **프로젝트레벨** \`.claude/settings.json\` — semo-kb만 등록 (프로젝트 전용 서버)
@@ -78,8 +78,8 @@ http://127.0.0.1:{포트}/chat?session=agent%3Amain%3Amain&token={토큰}
 - 공통 서버와 프로젝트 전용 서버를 같은 레벨에 넣으면 충돌 발생 가능`,
   },
   {
-    key: "spec",
-    subKey: "workspace-v2",
+    key: 'spec',
+    subKey: 'workspace-v2',
     content: `# 봇 워크스페이스 구조 (v2.0)
 
 봇 워크스페이스의 SoT는 \`~/.openclaw-{bot}/workspace/\` 디렉토리.
@@ -87,14 +87,14 @@ http://127.0.0.1:{포트}/chat?session=agent%3Amain%3Amain&token={토큰}
 \`\`\`
 ~/.openclaw-{bot}/workspace/
 ├── SOUL.md              # 봇 고유: 페르소나 + R&R + 행동강령 (< 120줄)
-├── AGENTS.md            # 공통: → ~/.openclaw-shared/AGENTS.md (심링크)
+├── AGENTS.md            # 공통: → ~/.semo/shared/AGENTS.md (심링크)
 ├── USER.md              # 봇 고유: 사용자 컨텍스트 (< 15줄)
 ├── MEMORY.md            # 봇 고유: KB 도메인 인덱스 (< 30줄, main 세션만)
 ├── HEARTBEAT.md         # 선택: 크론 작업 (해당 봇만, 현재 semiclaw)
 ├── .claude/settings.json # MCP 서버 설정
 ├── hooks/               # OpenClaw 훅 (직접 실행)
 ├── memory/              # 일일로그 (YYYY-MM-DD.md)
-├── shared/              # → ~/.openclaw-shared/ (심링크)
+├── shared/              # → ~/.semo/shared/ (심링크)
 ├── skills/              # 봇 전용 스킬
 └── scripts/             # 유틸리티 스크립트
 \`\`\`
@@ -110,8 +110,8 @@ http://127.0.0.1:{포트}/chat?session=agent%3Amain%3Amain&token={토큰}
 \`semo test run workspace-audit\`로 검증.`,
   },
   {
-    key: "infra",
-    subKey: "env-config",
+    key: 'infra',
+    subKey: 'env-config',
     content: `# 환경변수 (~/.semo.env)
 
 SEMO는 \`~/.semo.env\` 파일에서 팀 공통 환경변수를 로드합니다.
@@ -126,8 +126,8 @@ SessionStart 훅과 OpenClaw 게이트웨이 래퍼에서 자동 source됩니다
 키 갱신이 필요하면 \`~/.semo.env\`를 직접 편집하거나 \`semo onboarding -f\`를 실행하세요.`,
   },
   {
-    key: "process",
-    subKey: "recovery",
+    key: 'process',
+    subKey: 'recovery',
     content: `# SEMO 복구 명령어
 
 \`\`\`bash
@@ -144,8 +144,8 @@ semo test run --all      # 전체 테스트 실행
 \`\`\``,
   },
   {
-    key: "process",
-    subKey: "coding-convention",
+    key: 'process',
+    subKey: 'coding-convention',
     content: `# SEMO 코딩 컨벤션
 
 ## 기술 스택
@@ -171,15 +171,15 @@ semo test run --all      # 전체 테스트 실행
 ];
 
 async function main() {
-  console.log("=== SEMO Specs → KB Seed ===\n");
+  console.log('=== SEMO Specs → KB Seed ===\n');
 
   for (const entry of entries) {
     const result = await kbUpsert(pool, {
-      domain: "semo",
+      domain: 'semo',
       key: entry.key,
       sub_key: entry.subKey,
       content: entry.content,
-      created_by: "seed-semo-specs",
+      created_by: 'seed-semo-specs',
     });
     if (result.success) {
       console.log(`  ✅ semo/${entry.key}/${entry.subKey}`);
@@ -193,7 +193,7 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("Fatal:", err);
+  console.error('Fatal:', err);
   closeConnection();
   process.exit(1);
 });
