@@ -941,23 +941,32 @@ export async function kbUpsert(
       if (typeResult.rows.length > 0) {
         const entityType = typeResult.rows[0].entity_type;
         const schemaResult = await schemaClient.query(
-          "SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source FROM semo.kb_type_schema WHERE type_key = $1",
+          "SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source, scheme_description, value_hint FROM semo.kb_type_schema WHERE type_key = $1 ORDER BY sort_order",
           [entityType],
         );
         const schemas = schemaResult.rows as Array<{
           scheme_key: string;
           key_type: string;
           source: string;
+          scheme_description: string | null;
+          value_hint: string | null;
         }>;
         if (schemas.length > 0) {
           const match = schemas.find((s) => s.scheme_key === key);
           if (!match) {
-            const allowedKeys = schemas.map((s) =>
-              s.key_type === 'singleton' ? s.scheme_key : `${s.scheme_key}/{sub_key}`,
-            );
+            const schemaGuide = schemas
+              .filter((s) => s.source !== 'projection')
+              .map((s) => {
+                const keyDisplay =
+                  s.key_type === 'singleton' ? s.scheme_key : `${s.scheme_key}/{sub_key}`;
+                const desc = s.scheme_description ? ` — ${s.scheme_description}` : '';
+                const hint = s.value_hint ? `\n                     hint: ${s.value_hint}` : '';
+                return `  ${keyDisplay.padEnd(25)} (${s.key_type})${desc}${hint}`;
+              })
+              .join('\n');
             return {
               success: false,
-              error: `키 '${key}'은(는) '${entityType}' 타입의 스키마에 허용되지 않습니다. 허용 키: [${allowedKeys.join(', ')}]`,
+              error: `키 '${key}'은(는) '${entityType}' 타입의 스키마에 허용되지 않습니다.\n\n사용 가능한 키:\n${schemaGuide}`,
             };
           }
           // Projection key 차단: pm-pipeline만 쓰기 허용

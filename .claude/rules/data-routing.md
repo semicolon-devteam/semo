@@ -66,3 +66,30 @@ SEMO 플랫폼 하위 모듈(`module` 타입)은 자체 KB 도메인을 가진�
 | `service_incidents` | 운영 인시던트 (FK: service_id) |
 
 레거시 하위 호환 VIEW(`gfp_*`, `service_projects`)가 존재하므로 기존 쿼리도 동작. 신규 코드는 `services` 사용. (VIEW는 추후 제거 예정)
+
+## 서비스 역할 매핑 (v072+)
+
+서비스별 역할은 `role` collection 키로 관리:
+```
+semo kb upsert {service} role/po --content "{team-domain}"
+semo kb upsert {service} role/lead-dev --content "{team-domain}"
+```
+
+| 표준 역할명 | 설명 |
+|------------|------|
+| `po` | 프로젝트 오너 (→ services.owner_name 자동 동기화) |
+| `lead-dev` | 리드 개발자 |
+| `backend` | 백엔드 개발 |
+| `frontend` | 프론트엔드 개발 |
+| `designer` | 디자이너 |
+| `ops` | 운영/인프라 |
+| `planner` | 기획자 |
+
+content 값은 ontology team 도메인 (소문자). 복수 담당: 쉼표 구분 (`"reus, garden"`).
+
+## KB 쓰기 전 스키마 확인 (NON-NEGOTIABLE)
+
+KB에 새 엔트리를 쓸 때 키를 추측하지 않는다.
+1. `semo kb ontology --action schema --type {entity_type}` 으로 허용 키 목록 확인
+2. collection 키는 value_hint의 sub_key 형태를 따른다
+3. 스키마에 없는 키는 upsert가 차단된다
