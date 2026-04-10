@@ -1,50 +1,51 @@
 /**
- * semo context — 스킬/캐시/크론잡 동기화
+ * semo context — 스킬/캐시 동기화
  *
- * sync: DB → 글로벌 캐시 (skills/commands/agents) + 스킬 DB 동기화 + 크론잡
+ * sync: DB → 글로벌 캐시 (skills/commands/agents) + 스킬 DB 동기화
  * push: .claude/memory/<domain>.md → DB (deprecated — semo kb upsert로 대체)
  *
  * [v4.2.0] KB→md 파일 생성 제거 — semo CLI kb 명령어로 통일
+ * [v4.17.0] 크론잡 파일 sync 제거 — DB가 SoT, semo cron CLI로 관리
  */
 
-import { Command } from "commander";
-import chalk from "chalk";
-import ora from "ora";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import { Pool } from "pg";
-import { getPool, closeConnection, isDbConnected } from "../database";
-import { KBEntry, generateEmbeddings } from "../kb";
+import { Command } from 'commander';
+import chalk from 'chalk';
+import ora from 'ora';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import { Pool } from 'pg';
+import { getPool, closeConnection, isDbConnected } from '../database';
+import { KBEntry, generateEmbeddings } from '../kb';
 // [v4.7.0] syncSkillsToDB 복원 — 워크스페이스 → DB 동기화 경로 재활성화
-import { syncSkillsToDB, getBotIds } from "./skill-sync";
-import { syncGlobalCache } from "../global-cache";
-import { populateBotMirrors } from "../semo-workspace";
+import { syncSkillsToDB, getBotIds } from './skill-sync';
+import { syncGlobalCache } from '../global-cache';
+import { populateBotMirrors } from '../semo-workspace';
 
 // ============================================================
 // Memory file mapping
 // ============================================================
 
-const MEMORY_DIR = ".claude/memory";
+const MEMORY_DIR = '.claude/memory';
 
 // --out-dir 로 override 가능 (OpenClaw 봇 workspace 경로 지원)
 // 기본값: ~/.claude/memory/ (글로벌 — 모든 프로젝트에서 공유)
 function resolveMemoryDir(outDir?: string): string {
   if (outDir) {
     // 절대경로 또는 ~ 경로 처리
-    return outDir.replace(/^~/, require("os").homedir());
+    return outDir.replace(/^~/, require('os').homedir());
   }
-  return path.join(require("os").homedir(), MEMORY_DIR);
+  return path.join(require('os').homedir(), MEMORY_DIR);
 }
 
 /** @deprecated context push uses legacy flat domains — prefer semo kb upsert */
 const KB_DOMAIN_MAP: Record<string, string> = {
-  semicolon: "semicolon.md",
-  team: "team.md",
-  project: "projects.md",
-  decision: "decisions.md",
-  infra: "infra.md",
-  process: "process.md",
+  semicolon: 'semicolon.md',
+  team: 'team.md',
+  project: 'projects.md',
+  decision: 'decisions.md',
+  infra: 'infra.md',
+  process: 'process.md',
 };
 
 // ============================================================
@@ -60,97 +61,19 @@ function ensureMemoryDir(resolvedDir: string): string {
 // kbEntriesToMarkdown, botStatusToMarkdown, ontologyToMarkdown, fetchBotStatus 삭제됨
 
 // ============================================================
-// Cron job sync (local ~/.openclaw-*/cron/jobs.json → DB)
+// Cron job count (DB-first — file sync 제거됨, Phase 4-A)
 // ============================================================
 
-interface CronJob {
-  jobId: string;
-  name: string;
-  schedule: Record<string, unknown>;
-  enabled: boolean;
-  lastRun: string | null;
-  nextRun: string | null;
-  sessionTarget: string;
-  payload: Record<string, unknown> | null;
-}
-
-function parseCronJobsFile(filePath: string): CronJob[] {
-  try {
-    const content = fs.readFileSync(filePath, "utf-8");
-    const data = JSON.parse(content);
-    const jobs: unknown[] = data.jobs || [];
-    return jobs.map((job: any) => ({
-      jobId: job.jobId || job.id,
-      name: job.name || "",
-      schedule: job.schedule || {},
-      enabled: job.enabled !== false,
-      lastRun: job.lastRun || null,
-      nextRun: job.nextRun || null,
-      sessionTarget: job.sessionTarget || "main",
-      payload: job.payload || null,
-    }));
-  } catch {
-    return [];
-  }
-}
-
-function getOpenClawBotIds(): string[] {
-  const homeDir = os.homedir();
-  try {
-    return fs.readdirSync(homeDir)
-      .filter(f => f.startsWith(".openclaw-"))
-      .map(f => f.replace(".openclaw-", ""));
-  } catch {
-    return [];
-  }
-}
-
 /**
- * Collect cron jobs from all ~/.openclaw-* directories and upsert to semo.bot_cron_jobs.
- * Uses DELETE + INSERT per bot (same pattern as sync-agent).
+ * DB에서 크론잡 카운트만 조회 (표시용).
+ * 파일 기반 sync는 제거됨. 잡 관리는 `semo cron create/import`로.
  */
-export async function syncCronJobs(pool: Pool): Promise<{ bots: number; jobs: number }> {
-  const homeDir = os.homedir();
-  const botIds = getOpenClawBotIds();
-  let totalJobs = 0;
-  let syncedBots = 0;
-
-  const client = await pool.connect();
-  try {
-    for (const botId of botIds) {
-      const cronPath = path.join(homeDir, `.openclaw-${botId}`, "cron", "jobs.json");
-      const jobs = parseCronJobsFile(cronPath);
-
-      // Always delete old entries (handles removed jobs)
-      await client.query("DELETE FROM semo.bot_cron_jobs WHERE bot_id = $1", [botId]);
-
-      for (const job of jobs) {
-        await client.query(
-          `INSERT INTO semo.bot_cron_jobs
-             (bot_id, job_id, name, schedule, enabled, last_run, next_run, session_target, payload, synced_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
-          [
-            botId,
-            job.jobId,
-            job.name,
-            JSON.stringify(job.schedule),
-            job.enabled,
-            job.lastRun,
-            job.nextRun,
-            job.sessionTarget,
-            job.payload ? JSON.stringify(job.payload) : null,
-          ]
-        );
-      }
-
-      totalJobs += jobs.length;
-      if (jobs.length > 0) syncedBots++;
-    }
-  } finally {
-    client.release();
-  }
-
-  return { bots: syncedBots, jobs: totalJobs };
+export async function getCronJobStats(pool: Pool): Promise<{ bots: number; jobs: number }> {
+  const result = await pool.query(
+    `SELECT COUNT(DISTINCT bot_id)::int AS bots, COUNT(*)::int AS jobs FROM semo.bot_cron_jobs`,
+  );
+  const row = result.rows[0] as { bots: number; jobs: number };
+  return { bots: row.bots, jobs: row.jobs };
 }
 
 // ============================================================
@@ -165,7 +88,7 @@ function parseMarkdownSections(content: string, domain: string): KBEntry[] {
 
   for (let i = 1; i < sections.length; i++) {
     const section = sections[i];
-    const firstNewline = section.indexOf("\n");
+    const firstNewline = section.indexOf('\n');
     if (firstNewline === -1) continue;
 
     const key = section.substring(0, firstNewline).trim();
@@ -176,7 +99,7 @@ function parseMarkdownSections(content: string, domain: string): KBEntry[] {
         domain,
         key,
         content: body,
-        created_by: "claude-context-push",
+        created_by: 'claude-context-push',
       });
     }
   }
@@ -191,23 +114,21 @@ function parseMarkdownSections(content: string, domain: string): KBEntry[] {
 // ============================================================
 
 export function registerContextCommands(program: Command): void {
-  const ctxCmd = program
-    .command("context")
-    .description("스킬/캐시/크론잡 동기화 (KB는 semo CLI)");
+  const ctxCmd = program.command('context').description('스킬/캐시/크론잡 동기화 (KB는 semo CLI)');
 
   // ── semo context sync ──────────────────────────────────────
   ctxCmd
-    .command("sync")
-    .description("스킬/에이전트/캐시 동기화 + 크론잡 (KB는 semo CLI 사용)")
-    .option("--no-skills", "스킬 파일 → DB 동기화 건너뜀")
-    .option("--out-dir <path>", "캐시 파일 출력 경로 (기본: .claude/memory/)")
-    .option("--no-global-cache", "글로벌 캐시(skills/commands/agents) 동기화 건너뜀")
+    .command('sync')
+    .description('스킬/에이전트/캐시 동기화 + 크론잡 (KB는 semo CLI 사용)')
+    .option('--no-skills', '스킬 파일 → DB 동기화 건너뜀')
+    .option('--out-dir <path>', '캐시 파일 출력 경로 (기본: .claude/memory/)')
+    .option('--no-global-cache', '글로벌 캐시(skills/commands/agents) 동기화 건너뜀')
     .action(async (options) => {
-      const spinner = ora("context sync 시작...").start();
+      const spinner = ora('context sync 시작...').start();
 
       const connected = await isDbConnected();
       if (!connected) {
-        spinner.warn("DB 연결 실패 — context sync 건너뜀");
+        spinner.warn('DB 연결 실패 — context sync 건너뜀');
         await closeConnection();
         return;
       }
@@ -224,7 +145,7 @@ export function registerContextCommands(program: Command): void {
         // v4.4.0에서 제거했으나, 워크스페이스 스킬이 DB에 미반영되는 문제 발생.
         // --no-skills 플래그로 스킵 가능.
         if (options.skills !== false) {
-          spinner.text = "스킬 동기화 (워크스페이스 → DB)...";
+          spinner.text = '스킬 동기화 (워크스페이스 → DB)...';
           try {
             const client = await pool.connect();
             try {
@@ -242,10 +163,14 @@ export function registerContextCommands(program: Command): void {
 
         // DB → 글로벌 캐시 (skills/commands/agents → ~/.claude/)
         if (options.globalCache !== false) {
-          spinner.text = "글로벌 캐시 동기화 (skills/commands/agents)...";
+          spinner.text = '글로벌 캐시 동기화 (skills/commands/agents)...';
           try {
             const cacheResult = await syncGlobalCache();
-            console.log(chalk.green(`  ✓ 글로벌 캐시: skills(${cacheResult.skills}) commands(${cacheResult.commands}) agents(${cacheResult.agents})`));
+            console.log(
+              chalk.green(
+                `  ✓ 글로벌 캐시: skills(${cacheResult.skills}) commands(${cacheResult.commands}) agents(${cacheResult.agents})`,
+              ),
+            );
           } catch (cacheErr) {
             // DB 실패 시 기존 파일 유지 (비치명적)
             console.log(chalk.yellow(`  ⚠ 글로벌 캐시 동기화 실패 (기존 파일 유지): ${cacheErr}`));
@@ -253,31 +178,35 @@ export function registerContextCommands(program: Command): void {
         }
 
         // 3. 봇 미러 리프레시 (DB → ~/.claude/semo/bots/)
-        const semoDir = path.join(os.homedir(), ".claude", "semo");
+        const semoDir = path.join(os.homedir(), '.claude', 'semo');
         if (fs.existsSync(semoDir)) {
           try {
-            spinner.text = "봇 미러 동기화 (~/.claude/semo/bots/)...";
+            spinner.text = '봇 미러 동기화 (~/.claude/semo/bots/)...';
             const mirrorResult = await populateBotMirrors();
             if (mirrorResult.files > 0) {
-              console.log(chalk.green(`  ✓ 봇 미러: ${mirrorResult.bots}개 봇, ${mirrorResult.files}개 파일`));
+              console.log(
+                chalk.green(`  ✓ 봇 미러: ${mirrorResult.bots}개 봇, ${mirrorResult.files}개 파일`),
+              );
             }
           } catch {
             // 봇 미러 동기화 실패는 비치명적
           }
         }
 
-        // 4. 크론잡 동기화 (local → DB)
+        // 4. 크론잡 카운트 표시 (DB-first — 파일 sync 제거됨)
         try {
-          spinner.text = "크론잡 동기화...";
-          const cronResult = await syncCronJobs(pool);
-          if (cronResult.jobs > 0) {
-            console.log(chalk.green(`  ✓ 크론잡: ${cronResult.bots}개 봇, ${cronResult.jobs}개 잡 동기화`));
+          spinner.text = '크론잡 확인...';
+          const cronStats = await getCronJobStats(pool);
+          if (cronStats.jobs > 0) {
+            console.log(
+              chalk.green(`  ✓ 크론잡: ${cronStats.bots}개 봇, ${cronStats.jobs}개 잡 (DB SoT)`),
+            );
           }
         } catch {
-          // 크론잡 동기화 실패는 비치명적
+          // 크론잡 조회 실패는 비치명적
         }
 
-        spinner.succeed("context sync 완료 — 스킬/캐시/봇미러/크론잡 동기화");
+        spinner.succeed('context sync 완료 — 스킬/캐시/봇미러/크론잡 동기화');
         console.log(chalk.gray(`  저장 위치: ${memDir}`));
       } catch (err) {
         spinner.fail(`context sync 실패: ${err}`);
@@ -288,16 +217,24 @@ export function registerContextCommands(program: Command): void {
 
   // ── semo context push ──────────────────────────────────────
   ctxCmd
-    .command("push")
-    .description(".claude/memory/<domain>.md → Core DB (semo.knowledge_base)")
-    .option("--domain <name>", "push할 도메인 (쉼표 구분 가능, 기본: decision)", "decision")
-    .option("--dry-run", "실제 push 없이 변경사항만 미리보기")
-    .option("--out-dir <path>", "메모리 파일 경로 (기본: .claude/memory/). OpenClaw 봇 workspace 지원용")
+    .command('push')
+    .description('.claude/memory/<domain>.md → Core DB (semo.knowledge_base)')
+    .option('--domain <name>', 'push할 도메인 (쉼표 구분 가능, 기본: decision)', 'decision')
+    .option('--dry-run', '실제 push 없이 변경사항만 미리보기')
+    .option(
+      '--out-dir <path>',
+      '메모리 파일 경로 (기본: .claude/memory/). OpenClaw 봇 workspace 지원용',
+    )
     .action(async (options) => {
-      console.log(chalk.yellow("⚠️  [deprecated] context push는 semo kb upsert로 대체 예정입니다."));
-      console.log(chalk.yellow("   봇/세션에서는 semo kb upsert 명령어를 직접 사용하세요.\n"));
+      console.log(
+        chalk.yellow('⚠️  [deprecated] context push는 semo kb upsert로 대체 예정입니다.'),
+      );
+      console.log(chalk.yellow('   봇/세션에서는 semo kb upsert 명령어를 직접 사용하세요.\n'));
 
-      const domains: string[] = (options.domain as string).split(",").map((d: string) => d.trim()).filter(Boolean);
+      const domains: string[] = (options.domain as string)
+        .split(',')
+        .map((d: string) => d.trim())
+        .filter(Boolean);
       const memDir = resolveMemoryDir(options.outDir);
 
       // 각 도메인별 엔트리 수집
@@ -311,17 +248,19 @@ export function registerContextCommands(program: Command): void {
           continue;
         }
 
-        const content = fs.readFileSync(filePath, "utf-8");
+        const content = fs.readFileSync(filePath, 'utf-8');
         const entries = parseMarkdownSections(content, domain);
         allEntries.push(...entries);
       }
 
       if (allEntries.length === 0) {
-        console.log(chalk.yellow("⚠️  push할 항목이 없습니다."));
+        console.log(chalk.yellow('⚠️  push할 항목이 없습니다.'));
         return;
       }
 
-      console.log(chalk.cyan(`\n📤 context push: ${domains.join(", ")} (${allEntries.length}건)\n`));
+      console.log(
+        chalk.cyan(`\n📤 context push: ${domains.join(', ')} (${allEntries.length}건)\n`),
+      );
 
       if (options.dryRun) {
         for (const e of allEntries) {
@@ -330,11 +269,11 @@ export function registerContextCommands(program: Command): void {
         return;
       }
 
-      const spinner = ora("DB에 업로드 중...").start();
+      const spinner = ora('DB에 업로드 중...').start();
 
       const connected = await isDbConnected();
       if (!connected) {
-        spinner.fail("DB 연결 실패");
+        spinner.fail('DB 연결 실패');
         process.exit(1);
       }
 
@@ -345,7 +284,7 @@ export function registerContextCommands(program: Command): void {
 
       try {
         // Domain validation: check all domains against ontology
-        const ontologyResult = await client.query("SELECT domain FROM semo.ontology");
+        const ontologyResult = await client.query('SELECT domain FROM semo.ontology');
         const knownDomains = new Set(ontologyResult.rows.map((r: { domain: string }) => r.domain));
 
         const validEntries: KBEntry[] = [];
@@ -353,29 +292,31 @@ export function registerContextCommands(program: Command): void {
           if (knownDomains.has(entry.domain)) {
             validEntries.push(entry);
           } else {
-            errors.push(`${entry.domain}/${entry.key}: 미등록 도메인 '${entry.domain}' (등록된 도메인: ${Array.from(knownDomains).join(', ')})`);
+            errors.push(
+              `${entry.domain}/${entry.key}: 미등록 도메인 '${entry.domain}' (등록된 도메인: ${Array.from(knownDomains).join(', ')})`,
+            );
           }
         }
 
         if (validEntries.length === 0 && errors.length > 0) {
-          spinner.fail("모든 엔트리가 도메인 검증에 실패했습니다.");
-          errors.forEach(e => console.log(chalk.red(`  ❌ ${e}`)));
+          spinner.fail('모든 엔트리가 도메인 검증에 실패했습니다.');
+          errors.forEach((e) => console.log(chalk.red(`  ❌ ${e}`)));
           client.release();
           await closeConnection();
           return;
         }
 
         // Generate embeddings for all valid entries
-        spinner.text = "임베딩 생성 중...";
-        const texts = validEntries.map(e => `${e.key}: ${e.content}`);
+        spinner.text = '임베딩 생성 중...';
+        const texts = validEntries.map((e) => `${e.key}: ${e.content}`);
         const embeddings = await generateEmbeddings(texts);
 
-        await client.query("BEGIN");
+        await client.query('BEGIN');
         for (let i = 0; i < validEntries.length; i++) {
           const entry = validEntries[i];
           try {
             const embedding = embeddings[i];
-            const embeddingStr = embedding ? `[${embedding.join(",")}]` : null;
+            const embeddingStr = embedding ? `[${embedding.join(',')}]` : null;
 
             await client.query(
               `INSERT INTO semo.knowledge_base (domain, key, content, metadata, created_by, embedding)
@@ -384,21 +325,30 @@ export function registerContextCommands(program: Command): void {
                  content = EXCLUDED.content,
                  metadata = EXCLUDED.metadata,
                  embedding = COALESCE(EXCLUDED.embedding, semo.knowledge_base.embedding)`,
-              [entry.domain, entry.key, entry.content, JSON.stringify(entry.metadata || {}), entry.created_by, embeddingStr]
+              [
+                entry.domain,
+                entry.key,
+                entry.content,
+                JSON.stringify(entry.metadata || {}),
+                entry.created_by,
+                embeddingStr,
+              ],
             );
             upserted++;
           } catch (err) {
             errors.push(`${entry.domain}/${entry.key}: ${err}`);
           }
         }
-        await client.query("COMMIT");
+        await client.query('COMMIT');
 
-        spinner.succeed(`push 완료: ${upserted}건 업서트 (임베딩 ${process.env.OPENAI_API_KEY ? '생성됨' : '건너뜀'})`);
+        spinner.succeed(
+          `push 완료: ${upserted}건 업서트 (임베딩 ${process.env.OPENAI_API_KEY ? '생성됨' : '건너뜀'})`,
+        );
         if (errors.length > 0) {
-          errors.forEach(e => console.log(chalk.red(`  ❌ ${e}`)));
+          errors.forEach((e) => console.log(chalk.red(`  ❌ ${e}`)));
         }
       } catch (err) {
-        await client.query("ROLLBACK");
+        await client.query('ROLLBACK');
         spinner.fail(`push 실패: ${err}`);
       } finally {
         client.release();

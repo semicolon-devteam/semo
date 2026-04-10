@@ -38,7 +38,7 @@ import {
   BotAuditResult,
   WorkspaceStandardRow,
 } from './audit';
-import { syncCronJobs } from './context';
+import { getCronJobStats } from './context';
 
 // ============================================================
 // Types (matches actual DB schema)
@@ -637,17 +637,16 @@ export function registerBotsCommands(program: Command): void {
           console.log(chalk.yellow('  ⚠ sessions sync 실패 (무시)'));
         }
 
-        // Cron jobs piggyback — sync 후 크론잡 동기화
+        // Cron jobs — DB 카운트 표시 (파일 sync 제거됨, Phase 4-A)
         try {
-          console.log(chalk.gray('  → cron sync 실행 중...'));
-          const cronResult = await syncCronJobs(pool);
-          if (cronResult.jobs > 0) {
+          const cronStats = await getCronJobStats(pool);
+          if (cronStats.jobs > 0) {
             console.log(
-              chalk.green(`  → cron sync 완료: ${cronResult.bots}개 봇, ${cronResult.jobs}개 잡`),
+              chalk.green(`  → 크론잡: ${cronStats.bots}개 봇, ${cronStats.jobs}개 잡 (DB SoT)`),
             );
           }
         } catch {
-          console.log(chalk.yellow('  ⚠ cron sync 실패 (무시)'));
+          // 비치명적
         }
 
         // Audit piggyback — sync 후 자동 audit 실행
@@ -1038,27 +1037,18 @@ export function registerBotsCommands(program: Command): void {
 
   cronCmd
     .command('sync')
-    .description('로컬 크론잡 → DB 수동 동기화')
+    .description('[deprecated] → semo cron import 사용')
     .action(async () => {
-      const spinner = ora('크론잡 동기화 중...').start();
-
-      const connected = await isDbConnected();
-      if (!connected) {
-        spinner.fail('DB 연결 실패');
-        await closeConnection();
-        process.exit(1);
-      }
-
-      try {
-        const pool = getPool();
-        const result = await syncCronJobs(pool);
-        spinner.succeed(`크론잡 동기화 완료: ${result.bots}개 봇, ${result.jobs}개 잡`);
-      } catch (err) {
-        spinner.fail(`동기화 실패: ${err}`);
-        process.exit(1);
-      } finally {
-        await closeConnection();
-      }
+      console.log(chalk.yellow('⚠️  [deprecated] 파일 기반 크론 sync는 제거되었습니다.'));
+      console.log(
+        chalk.yellow('   기존 파일에서 임포트: semo cron import ~/.openclaw-{bot}/cron/jobs.json'),
+      );
+      console.log(
+        chalk.yellow(
+          '   새 잡 생성: semo cron create --bot {id} --name {name} --schedule "cron:..."',
+        ),
+      );
+      console.log(chalk.yellow('   DB 조회: semo cron list'));
     });
 
   // ── semo bots delegation ─────────────────────────────────────
