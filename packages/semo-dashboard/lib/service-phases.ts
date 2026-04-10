@@ -1,5 +1,5 @@
 /**
- * GFP Phase → Bot 매핑
+ * Phase → Bot 매핑
  *
  * 각 Phase의 담당 봇과 Slack ID를 정의.
  * Phase 완료 시 다음 Phase 담당 봇에게 알림,

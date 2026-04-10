@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     const projects = await listProjects(status);
     return NextResponse.json(projects);
   } catch (error) {
-    console.error('GFP list error:', error);
+    console.error('Project list error:', error);
     return NextResponse.json({ error: 'Failed to list projects' }, { status: 500 });
   }
 }
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(project, { status: 201 });
   } catch (error) {
-    console.error('GFP create error:', error);
+    console.error('Project create error:', error);
     return NextResponse.json({ error: 'Failed to create project' }, { status: 500 });
   }
 }

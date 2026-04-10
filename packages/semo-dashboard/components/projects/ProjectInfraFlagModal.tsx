@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { ServiceInfraCategory } from '@/types';
 
-interface GfpInfraFlagModalProps {
+interface ServiceInfraFlagModalProps {
   serviceId: string;
   sourcePhase: number;
   sourceSectionId?: string;
@@ -21,13 +21,13 @@ const CATEGORIES: { value: ServiceInfraCategory; label: string }[] = [
   { value: 'other', label: '기타' },
 ];
 
-export default function GfpInfraFlagModal({
+export default function ServiceInfraFlagModal({
   serviceId,
   sourcePhase,
   sourceSectionId,
   onClose,
   onCreated,
-}: GfpInfraFlagModalProps) {
+}: ServiceInfraFlagModalProps) {
   const [form, setForm] = useState({
     category: 'other' as ServiceInfraCategory,
     title: '',
@@ -41,7 +41,7 @@ export default function GfpInfraFlagModal({
     if (!form.title.trim()) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/gfp/${serviceId}/infra-requests`, {
+      const res = await fetch(`/api/projects/${serviceId}/infra-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

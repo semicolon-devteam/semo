@@ -5,7 +5,7 @@ import type { ServiceSection, DesignStep } from '@/types';
 import { DESIGN_STEPS, matchesStep } from '@/types';
 import DesignSystemPreview from './DesignSystemPreview';
 
-interface GfpDesignToolsPanelProps {
+interface ServiceDesignToolsPanelProps {
   serviceId: string;
   sections: ServiceSection[];
   designStep: DesignStep;
@@ -17,7 +17,7 @@ export default function ServiceStitchPanel({
   sections,
   designStep,
   onUploaded,
-}: GfpDesignToolsPanelProps) {
+}: ServiceDesignToolsPanelProps) {
   const [showUpload, setShowUpload] = useState(false);
   const [exportContent, setExportContent] = useState('');
   const [targetPrompt, setTargetPrompt] = useState('');
@@ -43,7 +43,7 @@ export default function ServiceStitchPanel({
     if (!exportContent.trim() || !targetPrompt) return;
     setUploading(true);
     try {
-      const res = await fetch('/api/gfp/callback', {
+      const res = await fetch('/api/projects/callback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

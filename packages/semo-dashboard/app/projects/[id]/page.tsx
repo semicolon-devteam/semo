@@ -16,8 +16,8 @@ import ServiceInfraFlagModal from '@/components/service/ServiceInfraFlagModal';
 import type {
   ServiceProject,
   ServiceSection,
-  GfpResearchTask,
-  GfpInfraRequest,
+  ServiceResearchTask,
+  ServiceInfraRequest,
   DesignStep,
   ServicePresetId,
   ServiceTrack,
@@ -25,7 +25,7 @@ import type {
 import { DESIGN_STEPS, matchesStep } from '@/types';
 import type { PhaseProgress } from '@/lib/service';
 import { PHASE_LABELS, INFRA_PHASE_LABELS } from '@/lib/service-phases';
-import { GFP_PRESETS } from '@/lib/service-presets';
+import { SERVICE_PRESETS } from '@/lib/service-presets';
 import { PoProfileProvider } from '@/components/service/PoProfileContext';
 import { getPoProfile } from '@/lib/po-profile';
 
@@ -57,7 +57,7 @@ async function fetchSectionsData(
   }
 }
 
-async function fetchResearchData(id: string): Promise<GfpResearchTask[]> {
+async function fetchResearchData(id: string): Promise<ServiceResearchTask[]> {
   try {
     const res = await fetch(`/api/projects/${id}/research`);
     if (!res.ok) return [];
@@ -67,7 +67,7 @@ async function fetchResearchData(id: string): Promise<GfpResearchTask[]> {
   }
 }
 
-async function fetchInfraRequests(id: string): Promise<GfpInfraRequest[]> {
+async function fetchInfraRequests(id: string): Promise<ServiceInfraRequest[]> {
   try {
     const res = await fetch(`/api/projects/${id}/infra-requests`);
     if (!res.ok) return [];
@@ -108,7 +108,7 @@ async function fetchInfraProgress(id: string): Promise<PhaseProgress[]> {
   }
 }
 
-export default function GfpDetailPage() {
+export default function ServiceDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const id = params.id as string;
@@ -122,8 +122,8 @@ export default function GfpDetailPage() {
   const [project, setProject] = useState<ProjectWithProgress | null>(null);
   const [slackActionProcessed, setSlackActionProcessed] = useState(false);
   const [sections, setSections] = useState<ServiceSection[]>([]);
-  const [researchTasks, setResearchTasks] = useState<GfpResearchTask[]>([]);
-  const [infraRequests, setInfraRequests] = useState<GfpInfraRequest[]>([]);
+  const [researchTasks, setResearchTasks] = useState<ServiceResearchTask[]>([]);
+  const [infraRequests, setInfraRequests] = useState<ServiceInfraRequest[]>([]);
   const [infraProgress, setInfraProgress] = useState<PhaseProgress[]>([]);
   const [activePhase, setActivePhase] = useState(0);
   const [activeTrack, setActiveTrack] = useState<ServiceTrack>(trackParam ?? 'plan');
@@ -371,7 +371,7 @@ export default function GfpDetailPage() {
     return (
       <div className="container mx-auto px-4 py-16 text-center">
         <p className="text-lg text-gray-500 dark:text-gray-400">프로젝트를 찾을 수 없습니다</p>
-        <Link href="/gfp" className="text-blue-600 hover:underline text-sm mt-2 inline-block">
+        <Link href="/projects" className="text-blue-600 hover:underline text-sm mt-2 inline-block">
           프로젝트 목록으로
         </Link>
       </div>
@@ -479,10 +479,10 @@ export default function GfpDetailPage() {
           <div>
             <div className="flex items-center gap-3 mb-1">
               <Link
-                href="/gfp"
+                href="/projects"
                 className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-sm"
               >
-                GFP
+                서비스
               </Link>
               <span className="text-gray-300 dark:text-gray-600">/</span>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -496,7 +496,7 @@ export default function GfpDetailPage() {
                 const pid = (project.metadata as Record<string, unknown>)?.preset as
                   | ServicePresetId
                   | undefined;
-                const pdef = pid && pid !== 'standard' ? GFP_PRESETS[pid] : null;
+                const pdef = pid && pid !== 'standard' ? SERVICE_PRESETS[pid] : null;
                 return pdef ? (
                   <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
                     {pdef.label}

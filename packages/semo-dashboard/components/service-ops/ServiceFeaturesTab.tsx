@@ -27,7 +27,12 @@ const STATUS_BADGES: Record<string, { label: string; color: string }> = {
   deprecated: { label: '폐기', color: 'bg-red-900/50 text-red-300' },
 };
 
-export default function ServiceFeaturesTab({ projectId, features, onRefresh, serviceDomain }: Props) {
+export default function ServiceFeaturesTab({
+  projectId,
+  features,
+  onRefresh,
+  serviceDomain,
+}: Props) {
   const [showModal, setShowModal] = useState(false);
   const [editingFeature, setEditingFeature] = useState<ServiceFeature | null>(null);
   const [showImproveModal, setShowImproveModal] = useState<ServiceFeature | null>(null);
@@ -37,15 +42,28 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
   const [specFeature, setSpecFeature] = useState<ServiceFeature | null>(null);
 
   // Form state
-  const [form, setForm] = useState({ name: '', description: '', category: 'core', status: 'active', parent_id: '' });
-  const [improveForm, setImproveForm] = useState({ title: '', description: '', priority: 'normal' });
+  const [form, setForm] = useState({
+    name: '',
+    description: '',
+    category: 'core',
+    status: 'active',
+    parent_id: '',
+  });
+  const [improveForm, setImproveForm] = useState({
+    title: '',
+    description: '',
+    priority: 'normal',
+  });
 
   // Group features by category
   const activeFeatures = features.filter((f) => f.status !== 'deprecated');
-  const grouped = activeFeatures.reduce((acc, f) => {
-    (acc[f.category] ??= []).push(f);
-    return acc;
-  }, {} as Record<string, ServiceFeature[]>);
+  const grouped = activeFeatures.reduce(
+    (acc, f) => {
+      (acc[f.category] ??= []).push(f);
+      return acc;
+    },
+    {} as Record<string, ServiceFeature[]>,
+  );
 
   // Build parent-child map
   const childMap = new Map<string | null, ServiceFeature[]>();
@@ -80,13 +98,17 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
     setSaving(true);
     try {
       if (editingFeature) {
-        await fetch(`/api/gfp/${projectId}/features`, {
+        await fetch(`/api/projects/${projectId}/features`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ feature_id: editingFeature.feature_id, ...form, parent_id: form.parent_id || null }),
+          body: JSON.stringify({
+            feature_id: editingFeature.feature_id,
+            ...form,
+            parent_id: form.parent_id || null,
+          }),
         });
       } else {
-        await fetch(`/api/gfp/${projectId}/features`, {
+        await fetch(`/api/projects/${projectId}/features`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ...form, parent_id: form.parent_id || null }),
@@ -103,7 +125,7 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
     if (!showImproveModal) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/gfp/${projectId}/features/improve`, {
+      const res = await fetch(`/api/projects/${projectId}/features/improve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -129,14 +151,16 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
 
   const deprecateFeature = async (featureId: string) => {
     if (!confirm('이 기능을 폐기 처리하시겠습니까?')) return;
-    await fetch(`/api/gfp/${projectId}/features?feature_id=${featureId}`, { method: 'DELETE' });
+    await fetch(`/api/projects/${projectId}/features?feature_id=${featureId}`, {
+      method: 'DELETE',
+    });
     await onRefresh();
   };
 
   const startDiscovery = async () => {
     setScanning(true);
     try {
-      const res = await fetch(`/api/gfp/${projectId}/features/discover`, {
+      const res = await fetch(`/api/projects/${projectId}/features/discover`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -150,9 +174,11 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
       const { session_id } = await res.json();
       // 폴링으로 완료 대기
       const poll = setInterval(async () => {
-        const statusRes = await fetch(`/api/gfp/${projectId}/features/discover?session_id=${session_id}`);
+        const statusRes = await fetch(
+          `/api/projects/${projectId}/features/discover?session_id=${session_id}`,
+        );
         if (statusRes.ok) {
-          const session = await statusRes.json() as FeatureDiscoverySession;
+          const session = (await statusRes.json()) as FeatureDiscoverySession;
           if (session.status === 'candidates_ready') {
             clearInterval(poll);
             setScanning(false);
@@ -165,14 +191,17 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
         }
       }, 5000);
       // 5분 타임아웃
-      setTimeout(() => { clearInterval(poll); setScanning(false); }, 300000);
+      setTimeout(() => {
+        clearInterval(poll);
+        setScanning(false);
+      }, 300000);
     } catch {
       setScanning(false);
     }
   };
 
   const startConversation = async () => {
-    const res = await fetch(`/api/gfp/${projectId}/features/conversation`, {
+    const res = await fetch(`/api/projects/${projectId}/features/conversation`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mode: 'create' }),
@@ -197,15 +226,32 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
           style={{ paddingLeft: `${depth * 24 + 12}px` }}
         >
           {children.length > 0 && <span className="text-zinc-500 text-xs">&#9656;</span>}
-          <span className={`px-1.5 py-0.5 rounded text-[10px] ${badge.color} text-white`}>{badge.label}</span>
-          <button onClick={() => setSpecFeature(f)} className="text-sm text-zinc-200 flex-1 text-left hover:text-blue-300">{f.name}</button>
+          <span className={`px-1.5 py-0.5 rounded text-[10px] ${badge.color} text-white`}>
+            {badge.label}
+          </span>
+          <button
+            onClick={() => setSpecFeature(f)}
+            className="text-sm text-zinc-200 flex-1 text-left hover:text-blue-300"
+          >
+            {f.name}
+          </button>
           {issueUrl && (
-            <a href={issueUrl} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline">
+            <a
+              href={issueUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-blue-400 hover:underline"
+            >
               Issue
             </a>
           )}
           <div className="hidden group-hover:flex gap-1">
-            <button onClick={() => openEdit(f)} className="text-[10px] text-zinc-400 hover:text-white px-1">수정</button>
+            <button
+              onClick={() => openEdit(f)}
+              className="text-[10px] text-zinc-400 hover:text-white px-1"
+            >
+              수정
+            </button>
             <button
               onClick={() => {
                 setShowImproveModal(f);
@@ -215,7 +261,10 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
             >
               개선
             </button>
-            <button onClick={() => deprecateFeature(f.feature_id)} className="text-[10px] text-red-400 hover:text-red-300 px-1">
+            <button
+              onClick={() => deprecateFeature(f.feature_id)}
+              className="text-[10px] text-red-400 hover:text-red-300 px-1"
+            >
               폐기
             </button>
           </div>
@@ -230,7 +279,10 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-white">기능 관리</h2>
         <div className="flex gap-2">
-          <button onClick={openCreate} className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-500">
+          <button
+            onClick={openCreate}
+            className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-500"
+          >
             + 기능 추가
           </button>
           <button
@@ -256,10 +308,17 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
         </div>
       ) : (
         Object.entries(grouped).map(([cat, feats]) => (
-          <div key={cat} className="bg-zinc-800/50 border border-zinc-700 rounded-lg overflow-hidden">
+          <div
+            key={cat}
+            className="bg-zinc-800/50 border border-zinc-700 rounded-lg overflow-hidden"
+          >
             <div className="px-4 py-2 bg-zinc-700/30 border-b border-zinc-700">
-              <span className="text-xs font-semibold text-zinc-300 uppercase">{CATEGORY_LABELS[cat] || cat}</span>
-              <span className="text-xs text-zinc-500 ml-2">{feats.filter(f => !f.parent_id).length}개</span>
+              <span className="text-xs font-semibold text-zinc-300 uppercase">
+                {CATEGORY_LABELS[cat] || cat}
+              </span>
+              <span className="text-xs text-zinc-500 ml-2">
+                {feats.filter((f) => !f.parent_id).length}개
+              </span>
             </div>
             <div className="py-1">
               {feats.filter((f) => !f.parent_id).map((f) => renderFeatureItem(f))}
@@ -275,17 +334,27 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
             폐기된 기능 ({features.filter((f) => f.status === 'deprecated').length}개)
           </summary>
           <div className="mt-2 space-y-1 opacity-50">
-            {features.filter((f) => f.status === 'deprecated').map((f) => (
-              <div key={f.feature_id} className="text-sm text-zinc-500 pl-4 line-through">{f.name}</div>
-            ))}
+            {features
+              .filter((f) => f.status === 'deprecated')
+              .map((f) => (
+                <div key={f.feature_id} className="text-sm text-zinc-500 pl-4 line-through">
+                  {f.name}
+                </div>
+              ))}
           </div>
         </details>
       )}
 
       {/* Create/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowModal(false)}>
-          <div className="bg-zinc-800 border border-zinc-600 rounded-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="bg-zinc-800 border border-zinc-600 rounded-xl p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-lg font-semibold text-white mb-4">
               {editingFeature ? '기능 수정' : '기능 추가'}
             </h3>
@@ -318,7 +387,9 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
                     className="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-white"
                   >
                     {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
-                      <option key={k} value={k}>{v}</option>
+                      <option key={k} value={k}>
+                        {v}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -330,7 +401,9 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
                     className="w-full mt-1 px-3 py-2 bg-zinc-900 border border-zinc-700 rounded text-sm text-white"
                   >
                     {Object.entries(STATUS_BADGES).map(([k, v]) => (
-                      <option key={k} value={k}>{v.label}</option>
+                      <option key={k} value={k}>
+                        {v.label}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -346,13 +419,20 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
                   {activeFeatures
                     .filter((f) => f.feature_id !== editingFeature?.feature_id)
                     .map((f) => (
-                      <option key={f.feature_id} value={f.feature_id}>{f.name}</option>
+                      <option key={f.feature_id} value={f.feature_id}>
+                        {f.name}
+                      </option>
                     ))}
                 </select>
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => setShowModal(false)} className="px-3 py-1.5 text-sm text-zinc-400 hover:text-white">취소</button>
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-3 py-1.5 text-sm text-zinc-400 hover:text-white"
+              >
+                취소
+              </button>
               <button
                 onClick={saveFeature}
                 disabled={!form.name || saving}
@@ -367,8 +447,14 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
 
       {/* Improve Modal */}
       {showImproveModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50" onClick={() => setShowImproveModal(null)}>
-          <div className="bg-zinc-800 border border-zinc-600 rounded-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+          onClick={() => setShowImproveModal(null)}
+        >
+          <div
+            className="bg-zinc-800 border border-zinc-600 rounded-xl p-6 w-full max-w-md"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-lg font-semibold text-white mb-1">기능 개선 요청</h3>
             <p className="text-sm text-zinc-400 mb-4">
               <strong>{showImproveModal.name}</strong>에 대한 개선 GitHub Issue를 생성합니다.
@@ -407,7 +493,12 @@ export default function ServiceFeaturesTab({ projectId, features, onRefresh, ser
               </div>
             </div>
             <div className="flex justify-end gap-2 mt-5">
-              <button onClick={() => setShowImproveModal(null)} className="px-3 py-1.5 text-sm text-zinc-400 hover:text-white">취소</button>
+              <button
+                onClick={() => setShowImproveModal(null)}
+                className="px-3 py-1.5 text-sm text-zinc-400 hover:text-white"
+              >
+                취소
+              </button>
               <button
                 onClick={submitImprovement}
                 disabled={!improveForm.title || saving}

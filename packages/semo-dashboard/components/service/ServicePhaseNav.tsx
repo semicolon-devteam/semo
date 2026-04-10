@@ -4,7 +4,7 @@ import type { PhaseProgress } from '@/lib/service';
 import { PHASE_LABELS, INFRA_PHASE_LABELS } from '@/lib/service-phases';
 import type { ServiceTrack } from '@/types';
 
-interface GfpPhaseNavProps {
+interface ServicePhaseNavProps {
   currentPhase: number;
   progress: PhaseProgress[];
   onPhaseClick: (phase: number) => void;
@@ -24,7 +24,7 @@ export default function ServicePhaseNav({
   infraPhase,
   infraProgress = [],
   onTrackChange,
-}: GfpPhaseNavProps) {
+}: ServicePhaseNavProps) {
   const progressMap = new Map(progress.map((p) => [p.phase, p]));
   const infraProgressMap = new Map(infraProgress.map((p) => [p.phase, p]));
   const hasInfraTrack = infraPhase !== null && infraPhase !== undefined;

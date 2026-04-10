@@ -128,7 +128,7 @@ ${serviceDomain}
 5. **테스트 시나리오**: 검증 항목
 6. **예상 규모**: small / medium / large
 
-완료 시 POST /api/gfp/callback 으로 콜백:
+완료 시 POST /api/projects/callback 으로 콜백:
 \`\`\`json
 {
   "type": "feature-spec-ready",
@@ -168,7 +168,7 @@ ${spec ? `## 스펙\n${typeof spec === 'string' ? spec : JSON.stringify(spec, nu
 2. 스펙의 수용 기준에 맞춰 구현
 3. 완료 시 콜백
 
-완료 시 POST /api/gfp/callback 으로 콜백:
+완료 시 POST /api/projects/callback 으로 콜백:
 \`\`\`json
 {
   "type": "feature-work-complete",
@@ -205,7 +205,7 @@ ${testSpec ? `## 스펙 (수용 기준/테스트 시나리오 확인)\n${typeof 
 3. 코드 품질 확인 (린트, 타입체크)
 4. 결과 리포트 작성
 
-완료 시 POST /api/gfp/callback 으로 콜백:
+완료 시 POST /api/projects/callback 으로 콜백:
 \`\`\`json
 {
   "type": "feature-test-complete",

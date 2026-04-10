@@ -2,12 +2,15 @@
 
 import { useState, useRef } from 'react';
 
-interface GfpMaterialUploadProps {
+interface ServiceMaterialUploadProps {
   serviceId: string;
   onUploaded: () => void;
 }
 
-export default function GfpMaterialUpload({ serviceId, onUploaded }: GfpMaterialUploadProps) {
+export default function ServiceMaterialUpload({
+  serviceId,
+  onUploaded,
+}: ServiceMaterialUploadProps) {
   const [content, setContent] = useState('');
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -20,7 +23,7 @@ export default function GfpMaterialUpload({ serviceId, onUploaded }: GfpMaterial
     setError('');
 
     try {
-      const res = await fetch(`/api/gfp/${serviceId}/materials`, {
+      const res = await fetch(`/api/projects/${serviceId}/materials`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: content.trim() }),
@@ -62,7 +65,7 @@ export default function GfpMaterialUpload({ serviceId, onUploaded }: GfpMaterial
         기존 기획서 업로드
       </h3>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-        기존 기획 문서를 붙여넣거나 업로드하세요. AI가 분석하여 GFP Phase에 매핑합니다.
+        기존 기획 문서를 붙여넣거나 업로드하세요. AI가 분석하여 Phase에 매핑합니다.
       </p>
 
       <div

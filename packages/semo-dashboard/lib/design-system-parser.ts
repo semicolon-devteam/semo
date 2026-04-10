@@ -1,6 +1,6 @@
 /**
  * Design System Parser — Tailwind config 마크다운에서 구조화 데이터 추출.
- * GfpSectionCard (R1), DesignSystemPreview (R2), Slack palette image (R3) 공유.
+ * ServiceSectionCard (R1), DesignSystemPreview (R2), Slack palette image (R3) 공유.
  */
 
 // ── Types ──

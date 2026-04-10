@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import { query } from './db';
 import { getPhaseAssignee, getPhaseCc, PHASE_LABELS, INFRA_PHASE_LABELS } from './service-phases';
 import { getBotSlackProfiles } from './bot-profiles';
-import type { ServiceQAItem, GfpInfraRequest } from '@/types';
+import type { ServiceQAItem, ServiceInfraRequest } from '@/types';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const DASHBOARD_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space';
@@ -67,17 +67,17 @@ export async function postSlackMessage(
   }
 }
 
-// Re-export for backward compat (removed local PHASE_LABELS, now from gfp-phases)
+// Re-export for backward compat (removed local PHASE_LABELS, now from service-phases)
 export { PHASE_LABELS } from './service-phases';
 
 // ── Channel Resolution ──
 
-export interface GfpSlackContext {
+export interface ServiceSlackContext {
   channelId: string;
   ownerSlackId: string | null;
 }
 
-export async function resolveServiceSlackContext(serviceId: string): Promise<GfpSlackContext> {
+export async function resolveServiceSlackContext(serviceId: string): Promise<ServiceSlackContext> {
   let channelId: string | null = null;
   let ownerSlackId: string | null = null;
 
@@ -130,7 +130,7 @@ export async function resolveServiceSlackContext(serviceId: string): Promise<Gfp
 
       // 채널 없으면 Reus에게 DM으로 설정 요청
       if (!channelId && SLACK_BOT_TOKEN) {
-        const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${serviceId}`;
+        const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${serviceId}`;
         await postSlackMessage(
           REUS_DM_CHANNEL,
           `[Service] ${projectName} (domain: ${domain || 'N/A'}) 프로젝트에 Slack 채널이 설정되지 않았습니다.\n\nDB에 채널을 등록해주세요:\n\`semo service update --domain ${domain || 'DOMAIN'} --slack-channel "C채널ID"\`\n\n프로젝트: <${dashboardUrl}|${projectName}>`,
@@ -153,9 +153,9 @@ export async function resolveServiceSlackChannel(serviceId: string): Promise<str
   return ctx.channelId;
 }
 
-// ── GFP Rejection Notification ──
+// ── Rejection Notification ──
 
-export interface GfpRejectionNotifyOpts {
+export interface ServiceRejectionNotifyOpts {
   projectName: string;
   serviceId: string;
   sectionId: string;
@@ -166,9 +166,11 @@ export interface GfpRejectionNotifyOpts {
   channelId?: string;
 }
 
-export async function sendServiceRejectionSlack(opts: GfpRejectionNotifyOpts): Promise<boolean> {
+export async function sendServiceRejectionSlack(
+  opts: ServiceRejectionNotifyOpts,
+): Promise<boolean> {
   if (!SLACK_BOT_TOKEN) {
-    console.warn('SLACK_BOT_TOKEN not set — skipping GFP rejection notification');
+    console.warn('SLACK_BOT_TOKEN not set — skipping rejection notification');
     return false;
   }
 
@@ -179,7 +181,7 @@ export async function sendServiceRejectionSlack(opts: GfpRejectionNotifyOpts): P
   }
   const assignee = getPhaseAssignee(opts.phase);
   const phaseLabel = PHASE_LABELS[opts.phase] ?? `Phase ${opts.phase}`;
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=${opts.phase}&section=${opts.sectionKey}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?phase=${opts.phase}&section=${opts.sectionKey}`;
 
   const blocks = [
     {
@@ -215,7 +217,7 @@ export async function sendServiceRejectionSlack(opts: GfpRejectionNotifyOpts): P
 
   const data = await postSlackMessage(
     channel,
-    `<@${assignee.slackId}> [GFP Rejection] ${opts.projectName} — ${opts.sectionKey} 섹션 거절됨\nReason: ${opts.reviewerNote}`,
+    `<@${assignee.slackId}> [Rejection] ${opts.projectName} — ${opts.sectionKey} 섹션 거절됨\nReason: ${opts.reviewerNote}`,
     { blocks, botId: assignee.botId },
   );
   if (!data.ok) {
@@ -227,7 +229,7 @@ export async function sendServiceRejectionSlack(opts: GfpRejectionNotifyOpts): P
 
 // ── Service Phase Completed Notification ──
 
-export interface GfpPhaseCompletedOpts {
+export interface ServicePhaseCompletedOpts {
   projectName: string;
   serviceId: string;
   completedPhase: number;
@@ -239,10 +241,10 @@ export interface GfpPhaseCompletedOpts {
 }
 
 export async function sendServicePhaseCompletedSlack(
-  opts: GfpPhaseCompletedOpts,
+  opts: ServicePhaseCompletedOpts,
 ): Promise<boolean> {
   if (!SLACK_BOT_TOKEN) {
-    console.warn('SLACK_BOT_TOKEN not set — skipping GFP phase complete notification');
+    console.warn('SLACK_BOT_TOKEN not set — skipping phase complete notification');
     return false;
   }
 
@@ -254,7 +256,7 @@ export async function sendServicePhaseCompletedSlack(
   const completedLabel = PHASE_LABELS[opts.completedPhase] ?? `Phase ${opts.completedPhase}`;
   const phaseForUrl =
     opts.nextPhase !== null && opts.nextPhase <= 9 ? opts.nextPhase : opts.completedPhase;
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=${phaseForUrl}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?phase=${phaseForUrl}`;
 
   const isLastPhase = opts.nextPhase === null || opts.nextPhase > 9;
   const nextLabel = isLastPhase
@@ -277,7 +279,7 @@ export async function sendServicePhaseCompletedSlack(
   const allMentions = [assigneeMention, ccMentions, ownerMention].filter(Boolean).join(' ');
 
   const textFallback = isLastPhase
-    ? `${ownerMention.trim()} [GFP Complete] ${opts.projectName} — 모든 Phase 완료!`
+    ? `${ownerMention.trim()} [Complete] ${opts.projectName} — 모든 Phase 완료!`
     : `${allMentions} [Service Phase Complete] ${opts.projectName} — Phase ${opts.completedPhase} (${completedLabel}) 전체 승인. Phase ${opts.nextPhase} (${nextLabel}) 섹션 작성을 시작해주세요.`;
 
   const ownerField = opts.ownerSlackId
@@ -299,7 +301,7 @@ export async function sendServicePhaseCompletedSlack(
       type: 'header',
       text: {
         type: 'plain_text',
-        text: isLastPhase ? '🎉 GFP 전체 Phase 완료' : '🟢 Service Phase 완료',
+        text: isLastPhase ? '🎉 전체 Phase 완료' : '🟢 Service Phase 완료',
         emoji: true,
       },
     },
@@ -334,7 +336,7 @@ export async function sendServicePhaseCompletedSlack(
       elements: [
         {
           type: 'mrkdwn',
-          text: `GFP ID: \`${opts.serviceId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>`,
+          text: `Service ID: \`${opts.serviceId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>`,
         },
       ],
     },
@@ -351,9 +353,9 @@ export async function sendServicePhaseCompletedSlack(
   return true;
 }
 
-// ── GFP Q&A Slack Delivery ──
+// ── Q&A Slack Delivery ──
 
-export interface GfpQASlackOpts {
+export interface ServiceQASlackOpts {
   projectName: string;
   serviceId: string;
   sections: Array<{
@@ -369,12 +371,12 @@ export interface GfpQASlackOpts {
  * Send Phase 3 Q&A questions to Slack — one parent message + one threaded reply per category.
  * Returns a map of section_id → Slack thread_ts for answer collection.
  */
-export async function sendServiceQASlack(opts: GfpQASlackOpts): Promise<Map<string, string>> {
+export async function sendServiceQASlack(opts: ServiceQASlackOpts): Promise<Map<string, string>> {
   const threadMap = new Map<string, string>();
 
   if (!SLACK_BOT_TOKEN || !opts.channelId) return threadMap;
 
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=3`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?phase=3`;
   const totalQuestions = opts.sections.reduce((sum, s) => sum + s.qa_items.length, 0);
 
   const categoryList = opts.sections
@@ -406,7 +408,7 @@ export async function sendServiceQASlack(opts: GfpQASlackOpts): Promise<Map<stri
       elements: [
         {
           type: 'mrkdwn',
-          text: `GFP ID: \`${opts.serviceId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>`,
+          text: `Service ID: \`${opts.serviceId.slice(0, 8)}...\` | <${dashboardUrl}|대시보드 열기>`,
         },
       ],
     },
@@ -436,7 +438,7 @@ export async function sendServiceQASlack(opts: GfpQASlackOpts): Promise<Map<stri
         })
         .join('\n\n');
 
-      const sectionUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=3&section=${section.section_key}`;
+      const sectionUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?phase=3&section=${section.section_key}`;
 
       const threadData = await postSlackMessage(
         opts.channelId,
@@ -472,7 +474,7 @@ export async function sendServiceQASlack(opts: GfpQASlackOpts): Promise<Map<stri
     }
 
     console.log(
-      `[GFP Slack] Q&A delivered: ${opts.sections.length} categories to channel ${opts.channelId}`,
+      `[Slack] Q&A delivered: ${opts.sections.length} categories to channel ${opts.channelId}`,
     );
   } catch (err) {
     console.error('Slack Q&A delivery failed:', err);
@@ -481,7 +483,7 @@ export async function sendServiceQASlack(opts: GfpQASlackOpts): Promise<Map<stri
   return threadMap;
 }
 
-// ── GFP Project Created — Phase 0 Bot Mention ──
+// ── Project Created — Phase 0 Bot Mention ──
 
 export interface ServiceProjectCreatedOpts {
   projectName: string;
@@ -502,7 +504,7 @@ export async function sendServiceProjectCreatedSlack(
   if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
 
   const assignee = getPhaseAssignee(0, 'plan');
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=0`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?phase=0`;
   const isParallel = opts.preset === 'parallel';
 
   const blocks = [
@@ -543,11 +545,11 @@ export async function sendServiceProjectCreatedSlack(
     console.error('Slack project created error:', data.error);
     return false;
   }
-  console.log(`[GFP Slack] Project created notification sent for ${opts.projectName}`);
+  console.log(`[Slack] Project created notification sent for ${opts.projectName}`);
   return true;
 }
 
-// ── GFP Track Fork Notification ──
+// ── Track Fork Notification ──
 
 export interface ServiceTrackForkOpts {
   projectName: string;
@@ -562,7 +564,7 @@ export interface ServiceTrackForkOpts {
 export async function sendServiceTrackForkSlack(opts: ServiceTrackForkOpts): Promise<boolean> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
 
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=1`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?phase=1`;
   const planAssignee = getPhaseAssignee(1, 'plan');
   const infraAssignee = getPhaseAssignee(0, 'infra');
   const ownerMention = opts.ownerSlackId ? ` <@${opts.ownerSlackId}>` : '';
@@ -571,7 +573,7 @@ export async function sendServiceTrackForkSlack(opts: ServiceTrackForkOpts): Pro
     // Message 1: Track A — PlanClaw
     await postSlackMessage(
       opts.channelId,
-      `<@${planAssignee.slackId}>${ownerMention} [GFP Track A] ${opts.projectName} — Phase 1 (디스커버리) 시작해주세요.`,
+      `<@${planAssignee.slackId}>${ownerMention} [Track A] ${opts.projectName} — Phase 1 (디스커버리) 시작해주세요.`,
       {
         blocks: [
           {
@@ -603,7 +605,7 @@ export async function sendServiceTrackForkSlack(opts: ServiceTrackForkOpts): Pro
     // Message 2: Track B — InfraClaw
     await postSlackMessage(
       opts.channelId,
-      `<@${infraAssignee.slackId}>${ownerMention} [GFP Track B] ${opts.projectName} — 기본 인프라 세팅을 시작해주세요.`,
+      `<@${infraAssignee.slackId}>${ownerMention} [Track B] ${opts.projectName} — 기본 인프라 세팅을 시작해주세요.`,
       {
         blocks: [
           {
@@ -632,7 +634,7 @@ export async function sendServiceTrackForkSlack(opts: ServiceTrackForkOpts): Pro
       },
     );
 
-    console.log(`[GFP Slack] Track fork notifications sent for ${opts.projectName}`);
+    console.log(`[Slack] Track fork notifications sent for ${opts.projectName}`);
     return true;
   } catch (err) {
     console.error('Slack track fork failed:', err);
@@ -640,26 +642,26 @@ export async function sendServiceTrackForkSlack(opts: ServiceTrackForkOpts): Pro
   }
 }
 
-// ── GFP Infra Request Notification ──
+// ── Infra Request Notification ──
 
-export interface GfpInfraRequestSlackOpts {
+export interface ServiceInfraRequestSlackOpts {
   projectName: string;
   serviceId: string;
   channelId: string;
-  request: GfpInfraRequest;
+  request: ServiceInfraRequest;
 }
 
 export async function sendServiceInfraRequestSlack(
-  opts: GfpInfraRequestSlackOpts,
+  opts: ServiceInfraRequestSlackOpts,
 ): Promise<boolean> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
 
   const infraAssignee = getPhaseAssignee(0, 'infra');
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?track=infra`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?track=infra`;
 
   const data = await postSlackMessage(
     opts.channelId,
-    `<@${infraAssignee.slackId}> [GFP Infra Request] ${opts.projectName} — ${opts.request.title}`,
+    `<@${infraAssignee.slackId}> [Infra Request] ${opts.projectName} — ${opts.request.title}`,
     {
       blocks: [
         {
@@ -703,9 +705,9 @@ export async function sendServiceInfraRequestSlack(
   return true;
 }
 
-// ── GFP Infra Phase Completed Notification ──
+// ── Infra Phase Completed Notification ──
 
-export interface GfpInfraPhaseCompletedOpts {
+export interface ServiceInfraPhaseCompletedOpts {
   projectName: string;
   serviceId: string;
   completedPhase: number;
@@ -715,7 +717,7 @@ export interface GfpInfraPhaseCompletedOpts {
 }
 
 export async function sendServiceInfraPhaseCompletedSlack(
-  opts: GfpInfraPhaseCompletedOpts,
+  opts: ServiceInfraPhaseCompletedOpts,
 ): Promise<boolean> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
 
@@ -726,7 +728,7 @@ export async function sendServiceInfraPhaseCompletedSlack(
     ? null
     : (INFRA_PHASE_LABELS[opts.nextPhase!] ?? `Infra Phase ${opts.nextPhase}`);
   const nextAssignee = isLast ? null : getPhaseAssignee(opts.nextPhase!, 'infra');
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?track=infra`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?track=infra`;
   const ownerMention = opts.ownerSlackId ? ` <@${opts.ownerSlackId}>` : '';
 
   const blocks = [
@@ -789,7 +791,7 @@ export async function sendDeployVerificationRequiredSlack(
 
   const infraLabel = INFRA_PHASE_LABELS[opts.infraPhase] ?? `Infra Phase ${opts.infraPhase}`;
   const assignee = getPhaseAssignee(opts.infraPhase, 'infra');
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?track=infra`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?track=infra`;
 
   const blocks = [
     {
@@ -841,9 +843,9 @@ export async function sendDeployVerificationRequiredSlack(
   return true;
 }
 
-// ── GFP Design System Notification (Color Palette) ──
+// ── Design System Notification (Color Palette) ──
 
-export interface GfpDesignSystemSlackOpts {
+export interface ServiceDesignSystemSlackOpts {
   projectName: string;
   serviceId: string;
   channelId: string;
@@ -856,11 +858,11 @@ export interface GfpDesignSystemSlackOpts {
  * - Block Kit image 블록: 팔레트 이미지 API URL
  * - Attachments: 주요 색상별 색상 바
  */
-export async function sendDesignSystemSlack(opts: GfpDesignSystemSlackOpts): Promise<boolean> {
+export async function sendDesignSystemSlack(opts: ServiceDesignSystemSlackOpts): Promise<boolean> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return false;
 
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=4`;
-  const paletteImageUrl = `${DASHBOARD_BASE_URL}/api/gfp/${opts.serviceId}/design-palette-image`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?phase=4`;
+  const paletteImageUrl = `${DASHBOARD_BASE_URL}/api/projects/${opts.serviceId}/design-palette-image`;
 
   const blocks = [
     {
@@ -904,7 +906,7 @@ export async function sendDesignSystemSlack(opts: GfpDesignSystemSlackOpts): Pro
     console.error('Slack design system notify error:', data.error);
     return false;
   }
-  console.log(`[GFP Slack] Design system notification sent for ${opts.projectName}`);
+  console.log(`[Slack] Design system notification sent for ${opts.projectName}`);
   return true;
 }
 
@@ -1002,7 +1004,7 @@ export async function updateSlackMessage(
 
 // ── Service Section Pending Review Notification ──
 
-export interface GfpSectionPendingReviewOpts {
+export interface ServiceSectionPendingReviewOpts {
   projectName: string;
   serviceId: string;
   sectionId: string;
@@ -1018,7 +1020,7 @@ export interface GfpSectionPendingReviewOpts {
  * 반환: 전송된 메시지의 ts (양방향 싱크용) 또는 null.
  */
 export async function sendServiceSectionPendingReviewSlack(
-  opts: GfpSectionPendingReviewOpts,
+  opts: ServiceSectionPendingReviewOpts,
 ): Promise<string | null> {
   if (!SLACK_BOT_TOKEN) return null;
   const phaseLabel = PHASE_LABELS[opts.phase] ?? `Phase ${opts.phase}`;
@@ -1029,7 +1031,7 @@ export async function sendServiceSectionPendingReviewSlack(
 
   const isVisualSection =
     opts.sectionKey.startsWith('ds-') || opts.sectionKey.startsWith('impl-screen-');
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=${opts.phase}&section=${opts.sectionKey}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?phase=${opts.phase}&section=${opts.sectionKey}`;
 
   const actionValue = JSON.stringify({
     serviceId: opts.serviceId,
@@ -1063,8 +1065,8 @@ export async function sendServiceSectionPendingReviewSlack(
     });
   }
 
-  const approveUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?action=approve&sectionId=${opts.sectionId}&phase=${opts.phase}&section=${opts.sectionKey}`;
-  const rejectUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?action=reject&sectionId=${opts.sectionId}&phase=${opts.phase}&section=${opts.sectionKey}`;
+  const approveUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?action=approve&sectionId=${opts.sectionId}&phase=${opts.phase}&section=${opts.sectionKey}`;
+  const rejectUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?action=reject&sectionId=${opts.sectionId}&phase=${opts.phase}&section=${opts.sectionKey}`;
 
   blocks.push(
     {
@@ -1179,7 +1181,7 @@ export async function sendServiceDesignStepAdvanceSlack(opts: {
   const guide = DESIGN_STEP_GUIDES[opts.toStep] || `Step ${opts.toStep} 작업을 시작해주세요.`;
   const fromLabel = DESIGN_STEP_LABELS[opts.fromStep] || `Step ${opts.fromStep}`;
   const toLabel = DESIGN_STEP_LABELS[opts.toStep] || `Step ${opts.toStep}`;
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=4&step=${opts.toStep}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?phase=4&step=${opts.toStep}`;
   const designAssignee = getPhaseAssignee(4);
 
   await postSlackMessage(
@@ -1224,7 +1226,7 @@ export async function sendServiceStitchResultSlack(opts: {
 }): Promise<void> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return;
 
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=4&step=3&section=${opts.sectionKey}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?phase=4&step=3&section=${opts.sectionKey}`;
 
   const blocks: Record<string, unknown>[] = [
     {
@@ -1286,7 +1288,7 @@ export async function sendServiceStitchFallbackSlack(opts: {
 }): Promise<void> {
   if (!SLACK_BOT_TOKEN || !opts.channelId) return;
 
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.serviceId}?phase=4&step=3`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.serviceId}?phase=4&step=3`;
 
   const blocks: Record<string, unknown>[] = [
     {
@@ -1355,7 +1357,7 @@ export async function sendFeatureSpecReviewSlack(
 ): Promise<string | null> {
   if (!SLACK_BOT_TOKEN) return null;
 
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.projectId}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.projectId}`;
   const effortLabel = opts.estimatedEffort ? ` | 규모: ${opts.estimatedEffort}` : '';
 
   const blocks = [
@@ -1482,7 +1484,7 @@ export async function sendFeatureDiscoveryCompleteSlack(opts: {
 }): Promise<boolean> {
   if (!SLACK_BOT_TOKEN) return false;
 
-  const dashboardUrl = `${DASHBOARD_BASE_URL}/gfp/${opts.projectId}`;
+  const dashboardUrl = `${DASHBOARD_BASE_URL}/projects/${opts.projectId}`;
   const blocks = [
     {
       type: 'header',

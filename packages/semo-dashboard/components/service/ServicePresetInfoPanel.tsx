@@ -2,11 +2,11 @@
 
 import type { ServiceInfraConfig, ServicePresetConfig } from '@/types';
 
-interface GfpPresetInfoPanelProps {
+interface ServicePresetInfoPanelProps {
   metadata: Record<string, unknown>;
 }
 
-export default function ServicePresetInfoPanel({ metadata }: GfpPresetInfoPanelProps) {
+export default function ServicePresetInfoPanel({ metadata }: ServicePresetInfoPanelProps) {
   const preset = metadata?.preset as string | undefined;
   if (!preset || preset === 'standard') return null;
 

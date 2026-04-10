@@ -1,5 +1,5 @@
 /**
- * GFP Design Context API
+ * Design Context API
  *
  * Phase 0-2 승인된 산출물에서 UI 컨텍스트를 구조화하여 추출.
  * DesignClaw stitch-bridge 스킬이 Stitch 프롬프트 생성 시 사용.
@@ -30,7 +30,7 @@ interface UIContext {
 }
 
 /**
- * POST /api/gfp/[id]/design/extract-context
+ * POST /api/projects/[id]/design/extract-context
  * Phase 0-2 승인 섹션에서 UI 관련 정보를 JSON으로 추출
  */
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -86,13 +86,13 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
     return NextResponse.json(context);
   } catch (error) {
-    console.error('GFP design context extraction error:', error);
+    console.error('Design context extraction error:', error);
     return NextResponse.json({ error: 'Failed to extract design context' }, { status: 500 });
   }
 }
 
 /**
- * GET /api/gfp/[id]/design
+ * GET /api/projects/[id]/design
  * Phase 4 디자인 섹션 요약 (Stitch 프롬프트 + 결과)
  */
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -134,7 +134,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       completed_results: results.filter((r) => r.status === 'approved').length,
     });
   } catch (error) {
-    console.error('GFP design fetch error:', error);
+    console.error('Design fetch error:', error);
     return NextResponse.json({ error: 'Failed to fetch design data' }, { status: 500 });
   }
 }

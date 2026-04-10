@@ -6,7 +6,7 @@ import { renderPaletteImage } from '@/lib/palette-image-renderer';
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/gfp/[id]/design-palette-image
+ * GET /api/projects/[id]/design-palette-image
  * ds-colors 섹션 content를 파싱하여 팔레트 이미지(PNG) 생성.
  * Slack Block Kit image 블록에서 사용.
  */

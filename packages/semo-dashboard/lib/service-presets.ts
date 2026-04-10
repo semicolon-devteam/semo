@@ -1,7 +1,7 @@
 /**
- * GFP Preset Registry
+ * Service Preset Registry
  *
- * 프리셋은 GFP 파이프라인의 사전 구성 모드를 정의.
+ * 프리셋은 서비스 파이프라인의 사전 구성 모드를 정의.
  * parallel: SemiClaw 온보딩 → 기획/인프라 병렬 진행 (기본값)
  * infra-ready: 인프라가 이미 구축된 프로젝트 (Track B 생략)
  * standard: 레거시 호환
@@ -9,7 +9,7 @@
 
 import type { ServicePresetId, ServicePresetConfig } from '@/types';
 
-export interface GfpPresetDef {
+export interface ServicePresetDef {
   id: ServicePresetId;
   label: string;
   description: string;
@@ -18,7 +18,7 @@ export interface GfpPresetDef {
   botHintTemplate: Partial<Record<number, string>>;
 }
 
-export const GFP_PRESETS: Record<ServicePresetId, GfpPresetDef> = {
+export const SERVICE_PRESETS: Record<ServicePresetId, ServicePresetDef> = {
   parallel: {
     id: 'parallel',
     label: '병렬 트랙',
@@ -55,9 +55,9 @@ export const GFP_PRESETS: Record<ServicePresetId, GfpPresetDef> = {
 /**
  * metadata에서 프리셋 정의를 가져옴.
  */
-export function getProjectPreset(metadata: Record<string, unknown>): GfpPresetDef {
+export function getProjectPreset(metadata: Record<string, unknown>): ServicePresetDef {
   const presetId = (metadata?.preset as ServicePresetId) || 'standard';
-  return GFP_PRESETS[presetId] ?? GFP_PRESETS.standard;
+  return SERVICE_PRESETS[presetId] ?? SERVICE_PRESETS.standard;
 }
 
 /**

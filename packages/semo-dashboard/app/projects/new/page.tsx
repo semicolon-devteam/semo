@@ -3,10 +3,10 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import type { KBDomain, ServicePresetId, PoProfile } from '@/types';
-import { GFP_PRESETS } from '@/lib/service-presets';
+import { SERVICE_PRESETS } from '@/lib/service-presets';
 import PoProfileWizard from '@/components/service/PoProfileWizard';
 
-const PRESET_LIST = Object.values(GFP_PRESETS);
+const PRESET_LIST = Object.values(SERVICE_PRESETS);
 
 type WizardStep = 'basics' | 'profile';
 
@@ -51,7 +51,7 @@ export default function ServiceNewProjectPage() {
     try {
       const metadata: Record<string, unknown> = { preset, po_profile: profile };
       if (preset === 'infra-ready') {
-        const presetDef = GFP_PRESETS['infra-ready'];
+        const presetDef = SERVICE_PRESETS['infra-ready'];
         metadata.preset_config = {
           infra: {
             repo_url: infraForm.repo_url.trim(),
@@ -77,7 +77,7 @@ export default function ServiceNewProjectPage() {
       });
       if (!res.ok) throw new Error('Failed to create project');
       const project = await res.json();
-      router.push(`/gfp/${project.service_id}`);
+      router.push(`/projects/${project.service_id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to create');
       setWizardStep('basics');
@@ -118,7 +118,7 @@ export default function ServiceNewProjectPage() {
   // ── Step 1: Basic Info ──
   return (
     <div className="container mx-auto px-4 py-8 max-w-xl">
-      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">새 GFP 프로젝트</h1>
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">새 프로젝트</h1>
       <p className="text-gray-600 dark:text-gray-400 mb-8">
         신규 프로젝트 파이프라인을 생성합니다.
       </p>
@@ -278,7 +278,7 @@ export default function ServiceNewProjectPage() {
         <div className="flex items-center justify-end gap-3 pt-2">
           <button
             type="button"
-            onClick={() => router.push('/gfp')}
+            onClick={() => router.push('/projects')}
             className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             취소

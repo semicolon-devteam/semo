@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { GfpResearchTask } from '@/types';
+import type { ServiceResearchTask } from '@/types';
 
 const TASK_TYPES = [
   { value: 'competitor-analysis', label: '경쟁사 분석' },
@@ -24,17 +24,17 @@ const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   },
 };
 
-interface GfpResearchPanelProps {
+interface ServiceResearchPanelProps {
   serviceId: string;
-  tasks: GfpResearchTask[];
+  tasks: ServiceResearchTask[];
   onTaskCreated: () => void;
 }
 
-export default function GfpResearchPanel({
+export default function ServiceResearchPanel({
   serviceId,
   tasks,
   onTaskCreated,
-}: GfpResearchPanelProps) {
+}: ServiceResearchPanelProps) {
   const [showForm, setShowForm] = useState(false);
   const [taskType, setTaskType] = useState('competitor-analysis');
   const [urls, setUrls] = useState('');
@@ -46,7 +46,7 @@ export default function GfpResearchPanel({
     if (!prompt.trim()) return;
     setCreating(true);
     try {
-      const res = await fetch(`/api/gfp/${serviceId}/research`, {
+      const res = await fetch(`/api/projects/${serviceId}/research`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

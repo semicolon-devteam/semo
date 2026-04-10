@@ -23,7 +23,9 @@ test.describe.serial('Service Ops API — axoracle', () => {
     const res = await request.get('/api/gfp');
     expect(res.ok()).toBeTruthy();
     const projects = await res.json();
-    const axoracle = projects.find((p: { service_domain: string }) => p.service_domain === 'axoracle');
+    const axoracle = projects.find(
+      (p: { service_domain: string }) => p.service_domain === 'axoracle',
+    );
     expect(axoracle).toBeTruthy();
     expect(axoracle.lifecycle).toBe('ops');
     expect(axoracle.status).toBe('active');
@@ -31,8 +33,8 @@ test.describe.serial('Service Ops API — axoracle', () => {
     axoracleId = axoracle.service_id;
   });
 
-  test('GET /api/gfp/[id]/overview — KB 데이터 집계 정상', async ({ request }) => {
-    const res = await request.get(`/api/gfp/${axoracleId}/overview`);
+  test('GET /api/projects/[id]/overview — KB 데이터 집계 정상', async ({ request }) => {
+    const res = await request.get(`/api/projects/${axoracleId}/overview`);
     expect(res.ok()).toBeTruthy();
 
     const body = await res.json();
@@ -66,8 +68,8 @@ test.describe.serial('Service Ops API — axoracle', () => {
     }
   });
 
-  test('GET /api/gfp/[id]/kpi — KPI 스냅샷 + 액션아이템 반환', async ({ request }) => {
-    const res = await request.get(`/api/gfp/${axoracleId}/kpi?limit=5`);
+  test('GET /api/projects/[id]/kpi — KPI 스냅샷 + 액션아이템 반환', async ({ request }) => {
+    const res = await request.get(`/api/projects/${axoracleId}/kpi?limit=5`);
     expect(res.ok()).toBeTruthy();
 
     const body = await res.json();
@@ -94,8 +96,8 @@ test.describe.serial('Service Ops API — axoracle', () => {
     expect(Array.isArray(body.incidents)).toBeTruthy();
   });
 
-  test('GET /api/gfp/[id]/features — 빈 배열 (아직 기능 미등록)', async ({ request }) => {
-    const res = await request.get(`/api/gfp/${axoracleId}/features`);
+  test('GET /api/projects/[id]/features — 빈 배열 (아직 기능 미등록)', async ({ request }) => {
+    const res = await request.get(`/api/projects/${axoracleId}/features`);
     expect(res.ok()).toBeTruthy();
     const features = await res.json();
     expect(Array.isArray(features)).toBeTruthy();
@@ -104,8 +106,8 @@ test.describe.serial('Service Ops API — axoracle', () => {
   // ── 기능 CRUD 테스트 ──
   let featureId: string;
 
-  test('POST /api/gfp/[id]/features — 기능 추가', async ({ request }) => {
-    const res = await request.post(`/api/gfp/${axoracleId}/features`, {
+  test('POST /api/projects/[id]/features — 기능 추가', async ({ request }) => {
+    const res = await request.post(`/api/projects/${axoracleId}/features`, {
       data: {
         name: 'AI 직업 분석',
         description: 'Claude API를 활용한 직업 AI 대체 위험도 분석 기능',
@@ -121,8 +123,8 @@ test.describe.serial('Service Ops API — axoracle', () => {
     featureId = feature.feature_id;
   });
 
-  test('POST /api/gfp/[id]/features — 하위 기능 추가 (parent_id)', async ({ request }) => {
-    const res = await request.post(`/api/gfp/${axoracleId}/features`, {
+  test('POST /api/projects/[id]/features — 하위 기능 추가 (parent_id)', async ({ request }) => {
+    const res = await request.post(`/api/projects/${axoracleId}/features`, {
       data: {
         name: 'BLS 급여 데이터 연동',
         description: 'US Bureau of Labor Statistics API 연동',
@@ -136,8 +138,8 @@ test.describe.serial('Service Ops API — axoracle', () => {
     expect(child.parent_id).toBe(featureId);
   });
 
-  test('GET /api/gfp/[id]/features — 계층 구조 포함', async ({ request }) => {
-    const res = await request.get(`/api/gfp/${axoracleId}/features`);
+  test('GET /api/projects/[id]/features — 계층 구조 포함', async ({ request }) => {
+    const res = await request.get(`/api/projects/${axoracleId}/features`);
     expect(res.ok()).toBeTruthy();
     const features = await res.json();
     expect(features.length).toBe(2);
@@ -149,8 +151,8 @@ test.describe.serial('Service Ops API — axoracle', () => {
     expect(child).toBeTruthy();
   });
 
-  test('PATCH /api/gfp/[id]/features — 기능 수정', async ({ request }) => {
-    const res = await request.patch(`/api/gfp/${axoracleId}/features`, {
+  test('PATCH /api/projects/[id]/features — 기능 수정', async ({ request }) => {
+    const res = await request.patch(`/api/projects/${axoracleId}/features`, {
       data: {
         feature_id: featureId,
         status: 'in-dev',
@@ -163,12 +165,14 @@ test.describe.serial('Service Ops API — axoracle', () => {
     expect(updated.description).toContain('개선 중');
   });
 
-  test('DELETE /api/gfp/[id]/features — 기능 폐기 (soft delete)', async ({ request }) => {
-    const res = await request.delete(`/api/gfp/${axoracleId}/features?feature_id=${featureId}`);
+  test('DELETE /api/projects/[id]/features — 기능 폐기 (soft delete)', async ({ request }) => {
+    const res = await request.delete(
+      `/api/projects/${axoracleId}/features?feature_id=${featureId}`,
+    );
     expect(res.ok()).toBeTruthy();
 
     // 폐기 후 status=deprecated 확인
-    const listRes = await request.get(`/api/gfp/${axoracleId}/features`);
+    const listRes = await request.get(`/api/projects/${axoracleId}/features`);
     const features = await listRes.json();
     const deprecated = features.find((f: { feature_id: string }) => f.feature_id === featureId);
     expect(deprecated.status).toBe('deprecated');
@@ -189,8 +193,10 @@ test.describe.serial('Service Ops API — jungchipan (KB-rich)', () => {
     jungchipanId = jp.service_id;
   });
 
-  test('overview — KB 데이터 정상 (po=harry-lee, bm 존재, service-url 존재)', async ({ request }) => {
-    const res = await request.get(`/api/gfp/${jungchipanId}/overview`);
+  test('overview — KB 데이터 정상 (po=harry-lee, bm 존재, service-url 존재)', async ({
+    request,
+  }) => {
+    const res = await request.get(`/api/projects/${jungchipanId}/overview`);
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
 
@@ -202,7 +208,7 @@ test.describe.serial('Service Ops API — jungchipan (KB-rich)', () => {
   });
 
   test('kpi — 16개 이상 KPI 스냅샷 + 4개 이상 마일스톤', async ({ request }) => {
-    const res = await request.get(`/api/gfp/${jungchipanId}/kpi?limit=20`);
+    const res = await request.get(`/api/projects/${jungchipanId}/kpi?limit=20`);
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
 
@@ -247,7 +253,9 @@ test.describe('Service Ops Detail Page', () => {
   test.beforeAll(async ({ request }) => {
     const res = await request.get('/api/gfp');
     const projects = await res.json();
-    const axoracle = projects.find((p: { service_domain: string }) => p.service_domain === 'axoracle');
+    const axoracle = projects.find(
+      (p: { service_domain: string }) => p.service_domain === 'axoracle',
+    );
     axoracleId = axoracle?.service_id;
   });
 

@@ -31,7 +31,7 @@ export async function updateSession(request: NextRequest) {
   const publicPaths = ['/login', '/auth/callback', '/api/health'];
   const isPublicPath =
     publicPaths.some((p) => pathname.startsWith(p)) ||
-    pathname.startsWith('/api/gfp/callback') ||
+    pathname.startsWith('/api/projects/callback') ||
     pathname.startsWith('/api/projects/callback') ||
     pathname.startsWith('/api/kb-sync') ||
     pathname.startsWith('/api/slack/') ||

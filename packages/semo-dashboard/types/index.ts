@@ -380,7 +380,7 @@ export type ServiceResearchTaskType =
   | 'design-reference';
 export type ServiceResearchStatus = 'queued' | 'dispatched' | 'completed';
 
-// GFP Phase 4 Design Sub-Steps
+// Phase 4 Design Sub-Steps
 export type DesignStep = 1 | 2 | 3 | 4 | 5;
 
 export const DESIGN_STEPS = [
@@ -484,7 +484,7 @@ export interface ServiceResearchTask {
   updated_at: string;
 }
 
-// GFP PO Profile — Phase 0 RPG-style profiling
+// PO Profile — Phase 0 RPG-style profiling
 export type PoTechLevel = 'non-technical' | 'basic' | 'intermediate' | 'advanced';
 export type PoDesignSensitivity = 'low' | 'medium' | 'high';
 export type PoDomainArea = 'business' | 'engineering' | 'design' | 'product';
@@ -571,47 +571,6 @@ export interface SandboxScenario {
   /** infra-ready 프리셋용 인프라 설정 */
   infra_config?: ServiceInfraConfig;
 }
-
-// ── Gfp* backward-compat aliases (deprecated — use Service* instead) ──
-
-/** @deprecated Use ServiceProject */
-export type GfpProject = ServiceProject;
-/** @deprecated Use ServiceSection */
-export type GfpPhaseSection = ServiceSection;
-/** @deprecated Use ServiceMaterial */
-export type GfpMaterial = ServiceMaterial;
-/** @deprecated Use ServiceResearchTask */
-export type GfpResearchTask = ServiceResearchTask;
-/** @deprecated Use ServiceInfraRequest */
-export type GfpInfraRequest = ServiceInfraRequest;
-/** @deprecated Use ServicePresetId */
-export type GfpPresetId = ServicePresetId;
-/** @deprecated Use ServiceTrack */
-export type GfpTrack = ServiceTrack;
-/** @deprecated Use ServiceProjectStatus */
-export type GfpProjectStatus = ServiceProjectStatus;
-/** @deprecated Use ServiceSectionStatus */
-export type GfpSectionStatus = ServiceSectionStatus;
-/** @deprecated Use ServiceSectionSource */
-export type GfpSectionSource = ServiceSectionSource;
-/** @deprecated Use ServiceInfraCategory */
-export type GfpInfraCategory = ServiceInfraCategory;
-/** @deprecated Use ServiceInfraRequestStatus */
-export type GfpInfraRequestStatus = ServiceInfraRequestStatus;
-/** @deprecated Use ServicePresetConfig */
-export type GfpPresetConfig = ServicePresetConfig;
-/** @deprecated Use ServiceInfraConfig */
-export type GfpInfraConfig = ServiceInfraConfig;
-/** @deprecated Use ServiceQAItem */
-export type GfpQAItem = ServiceQAItem;
-/** @deprecated Use ServicePhaseMapping */
-export type GfpPhaseMapping = ServicePhaseMapping;
-/** @deprecated Use ServiceMaterialType */
-export type GfpMaterialType = ServiceMaterialType;
-/** @deprecated Use ServiceResearchTaskType */
-export type GfpResearchTaskType = ServiceResearchTaskType;
-/** @deprecated Use ServiceResearchStatus */
-export type GfpResearchStatus = ServiceResearchStatus;
 
 // ── Service Iterations (ops mode) ──
 

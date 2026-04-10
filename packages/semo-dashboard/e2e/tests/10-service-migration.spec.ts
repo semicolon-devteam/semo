@@ -15,7 +15,9 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
 
   // ── A. 프로젝트 CRUD (services 테이블) ──
 
-  test('POST /api/gfp — 프로젝트 생성 시 lifecycle=build, launched_at=null', async ({ request }) => {
+  test('POST /api/gfp — 프로젝트 생성 시 lifecycle=build, launched_at=null', async ({
+    request,
+  }) => {
     const response = await request.post('/api/gfp', {
       data: {
         project_name: testName,
@@ -39,8 +41,8 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
     projectId = body.service_id;
   });
 
-  test('GET /api/gfp/[id] — 상세 조회에 lifecycle 필드 포함', async ({ request }) => {
-    const response = await request.get(`/api/gfp/${projectId}`);
+  test('GET /api/projects/[id] — 상세 조회에 lifecycle 필드 포함', async ({ request }) => {
+    const response = await request.get(`/api/projects/${projectId}`);
     expect(response.ok()).toBeTruthy();
 
     const body = await response.json();
@@ -54,7 +56,7 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
   let sectionId: string;
 
   test('POST sections — service_sections에 섹션 생성', async ({ request }) => {
-    const response = await request.post(`/api/gfp/${projectId}/sections`, {
+    const response = await request.post(`/api/projects/${projectId}/sections`, {
       data: {
         phase: 0,
         section_key: 'overview',
@@ -75,7 +77,7 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
   });
 
   test('GET sections — phase 필터링 동작', async ({ request }) => {
-    const response = await request.get(`/api/gfp/${projectId}/sections?phase=0`);
+    const response = await request.get(`/api/projects/${projectId}/sections?phase=0`);
     expect(response.ok()).toBeTruthy();
 
     const body = await response.json();
@@ -86,7 +88,7 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
   // ── C. Infra Track (service_infra_requests 테이블) ──
 
   test('POST infra-requests — service_infra_requests에 ��성', async ({ request }) => {
-    const response = await request.post(`/api/gfp/${projectId}/infra-requests`, {
+    const response = await request.post(`/api/projects/${projectId}/infra-requests`, {
       data: {
         source_phase: 0,
         category: 'dns',
@@ -105,7 +107,7 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
   // ── D. Materials (service_materials 테이블) ──
 
   test('POST materials — service_materials에 업로드', async ({ request }) => {
-    const response = await request.post(`/api/gfp/${projectId}/materials`, {
+    const response = await request.post(`/api/projects/${projectId}/materials`, {
       data: {
         content: '# 기획서\n\n서비스 마이그레이션 테스트용 기획서입니다.',
       },
@@ -120,7 +122,7 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
   // ── E. Research Tasks (service_research_tasks 테이블) ──
 
   test('POST research — service_research_tasks에 생성', async ({ request }) => {
-    const response = await request.post(`/api/gfp/${projectId}/research`, {
+    const response = await request.post(`/api/projects/${projectId}/research`, {
       data: {
         task_type: 'market-research',
         reference_urls: ['https://example.com'],
@@ -216,7 +218,7 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
 
   test('섹션 승인 → KB spec/* writeback 자동 실행', async ({ request }) => {
     // Phase 0 섹션을 승인
-    const approveRes = await request.patch(`/api/gfp/${projectId}/sections`, {
+    const approveRes = await request.patch(`/api/projects/${projectId}/sections`, {
       data: {
         section_id: sectionId,
         status: 'approved',
@@ -240,7 +242,7 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
 
   test('phase 전진 → KB pm-status writeback 확인', async ({ request }) => {
     // Phase가 0→1로 전진했는지 확인
-    const projRes = await request.get(`/api/gfp/${projectId}`);
+    const projRes = await request.get(`/api/projects/${projectId}`);
     expect(projRes.ok()).toBeTruthy();
     const project = await projRes.json();
 
@@ -278,7 +280,7 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
   // ── I. 정리: 테스트 프로젝트 상태 확인 ──
 
   test('테스트 프로젝트 최종 상태 검증', async ({ request }) => {
-    const response = await request.get(`/api/gfp/${projectId}`);
+    const response = await request.get(`/api/projects/${projectId}`);
     expect(response.ok()).toBeTruthy();
 
     const body = await response.json();

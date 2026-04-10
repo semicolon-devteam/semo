@@ -10,10 +10,14 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     if (!project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
-    if (!project.service_domain) {
-      return NextResponse.json({ project, kb: {} });
+    let kb = {};
+    if (project.service_domain) {
+      try {
+        kb = await getServiceOverviewKB(project.service_domain);
+      } catch (err) {
+        console.warn('KB overview fetch failed, using empty KB:', err);
+      }
     }
-    const kb = await getServiceOverviewKB(project.service_domain);
     return NextResponse.json({ project, kb });
   } catch (error) {
     console.error('Service overview error:', error);

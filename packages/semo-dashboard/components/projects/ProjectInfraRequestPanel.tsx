@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import type { GfpInfraRequest, ServiceInfraRequestStatus } from '@/types';
+import type { ServiceInfraRequest, ServiceInfraRequestStatus } from '@/types';
 
-interface GfpInfraRequestPanelProps {
+interface ServiceInfraRequestPanelProps {
   serviceId: string;
-  requests: GfpInfraRequest[];
+  requests: ServiceInfraRequest[];
   onRefresh: () => void;
 }
 
@@ -38,17 +38,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   other: '기타',
 };
 
-export default function GfpInfraRequestPanel({
+export default function ServiceInfraRequestPanel({
   serviceId,
   requests,
   onRefresh,
-}: GfpInfraRequestPanelProps) {
+}: ServiceInfraRequestPanelProps) {
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   async function handleStatusUpdate(requestId: string, status: ServiceInfraRequestStatus) {
     setUpdatingId(requestId);
     try {
-      await fetch(`/api/gfp/${serviceId}/infra-requests`, {
+      await fetch(`/api/projects/${serviceId}/infra-requests`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ request_id: requestId, status }),

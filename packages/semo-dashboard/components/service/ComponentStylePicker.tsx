@@ -76,7 +76,7 @@ export default function ComponentStylePicker({
       // 선택 결과를 section에 저장
       setSaving(true);
       try {
-        await fetch(`/api/gfp/${serviceId}/sections`, {
+        await fetch(`/api/projects/${serviceId}/sections`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

@@ -40,16 +40,17 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
   const [dbActionItems, setDbActionItems] = useState<ActionItem[]>([]);
   const [features, setFeatures] = useState<ServiceFeature[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [ovRes, kpiRes, metricsRes, actionsRes, featRes] = await Promise.all([
-        fetch(`/api/gfp/${projectId}/overview`),
-        fetch(`/api/gfp/${projectId}/kpi?limit=10`),
-        fetch(`/api/gfp/${projectId}/kpi-metrics`),
+        fetch(`/api/projects/${projectId}/overview`),
+        fetch(`/api/projects/${projectId}/kpi?limit=10`),
+        fetch(`/api/projects/${projectId}/kpi-metrics`),
         fetch(`/api/action-items?target_domain=${projectId}`),
-        fetch(`/api/gfp/${projectId}/features`),
+        fetch(`/api/projects/${projectId}/features`),
       ]);
       if (ovRes.ok) setOverview(await ovRes.json());
       if (kpiRes.ok) setKbKpiData(await kpiRes.json());
@@ -61,6 +62,7 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
       if (featRes.ok) setFeatures(await featRes.json());
     } catch (err) {
       console.error('Failed to load ops data:', err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -71,7 +73,7 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
   }, [projectId]);
 
   const refreshFeatures = async () => {
-    const res = await fetch(`/api/gfp/${projectId}/features`);
+    const res = await fetch(`/api/projects/${projectId}/features`);
     if (res.ok) setFeatures(await res.json());
   };
 
@@ -85,7 +87,23 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
   }
 
   if (!overview) {
-    return <div className="p-8 text-center text-red-400">서비스 데이터를 불러올 수 없습니다.</div>;
+    if (loadError) {
+      return (
+        <div className="p-8 text-center">
+          <p className="text-red-400 mb-2">서비스 데이터를 불러올 수 없습니다.</p>
+          <button
+            onClick={() => {
+              setLoadError(false);
+              loadData();
+            }}
+            className="text-sm text-blue-400 hover:underline"
+          >
+            다시 시도
+          </button>
+        </div>
+      );
+    }
+    return <div className="p-8 text-center text-zinc-400">데이터 로딩 중...</div>;
   }
 
   const project = overview.project;
@@ -108,7 +126,7 @@ export default function ServiceOpsView({ projectId }: ServiceOpsViewProps) {
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-2 text-sm text-zinc-400 mb-1">
-          <a href="/gfp" className="hover:text-zinc-200">
+          <a href="/projects" className="hover:text-zinc-200">
             서비스
           </a>
           <span>/</span>

@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/design/palette-image?palette=<JSON-encoded ColorGroup[]>
- * GFP 프로젝트 없이 임의 색상 조합의 PNG 팔레트 이미지 생성.
+ * 프로젝트 없이 임의 색상 조합의 PNG 팔레트 이미지 생성.
  * DesignClaw가 Slack image block에 직접 첨부 가능.
  *
  * palette 파라미터 형식:

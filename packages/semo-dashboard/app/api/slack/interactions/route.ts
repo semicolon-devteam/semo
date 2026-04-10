@@ -1,5 +1,5 @@
 /**
- * Slack Interactivity Endpoint — GFP 섹션 승인/거절 버튼 + 모달 핸들러.
+ * Slack Interactivity Endpoint — 섹션 승인/거절 버튼 + 모달 핸들러.
  *
  * Slack App 설정에서 Interactivity Request URL을:
  *   https://semo.semi-colon.space/api/slack/interactions
@@ -90,7 +90,7 @@ async function handleBlockAction(payload: Record<string, unknown>): Promise<void
           type: 'section',
           text: {
             type: 'mrkdwn',
-            text: `*${project?.project_name ?? 'GFP'}* — ${result.section?.title ?? 'Section'}\n${statusText}`,
+            text: `*${project?.project_name ?? 'Service'}* — ${result.section?.title ?? 'Section'}\n${statusText}`,
           },
         },
       ]);
@@ -117,7 +117,7 @@ async function handleBlockAction(payload: Record<string, unknown>): Promise<void
   if (actionId.startsWith('feature_approve_spec_')) {
     const { projectId, featureId } = value;
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space'}/api/gfp/${projectId}/features/improve`,
+      `${process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space'}/api/projects/${projectId}/features/improve`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -198,7 +198,7 @@ async function handleViewSubmission(payload: Record<string, unknown>): Promise<v
     if (!reviewerNote) return;
 
     const res = await fetch(
-      `${process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space'}/api/gfp/${projectId}/features/improve`,
+      `${process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space'}/api/projects/${projectId}/features/improve`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

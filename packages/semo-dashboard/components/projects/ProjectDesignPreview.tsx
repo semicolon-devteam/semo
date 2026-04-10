@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 
-interface GfpDesignPreviewProps {
+interface ServiceDesignPreviewProps {
   htmlContent: string;
   title?: string;
 }
@@ -51,7 +51,7 @@ ${html}
 </html>`;
 }
 
-export default function GfpDesignPreview({ htmlContent, title }: GfpDesignPreviewProps) {
+export default function ServiceDesignPreview({ htmlContent, title }: ServiceDesignPreviewProps) {
   const [viewport, setViewport] = useState<ViewportSize>('desktop');
   const [showSource, setShowSource] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);

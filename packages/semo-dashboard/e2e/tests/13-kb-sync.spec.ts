@@ -98,7 +98,7 @@ test.describe.serial('KB-Sync: KPI 마크다운 → DB', () => {
       return;
     }
 
-    const metricsRes = await request.get(`/api/gfp/${axoracle.service_id}/kpi-metrics`);
+    const metricsRes = await request.get(`/api/projects/${axoracle.service_id}/kpi-metrics`);
     expect(metricsRes.ok()).toBeTruthy();
 
     const metricsData = await metricsRes.json();
@@ -248,7 +248,7 @@ test.describe.serial('Feature Spec API', () => {
     }
     serviceId = intro.service_id;
 
-    const featRes = await request.get(`/api/gfp/${serviceId}/features`);
+    const featRes = await request.get(`/api/projects/${serviceId}/features`);
     const features = await featRes.json();
     if (features.length === 0) {
       test.skip();
@@ -262,7 +262,7 @@ test.describe.serial('Feature Spec API', () => {
       test.skip();
       return;
     }
-    const res = await request.get(`/api/gfp/${serviceId}/features/${featureId}/spec`);
+    const res = await request.get(`/api/projects/${serviceId}/features/${featureId}/spec`);
     expect(res.ok()).toBeTruthy();
 
     const body = await res.json();
@@ -279,7 +279,7 @@ test.describe.serial('Feature Spec API', () => {
       test.skip();
       return;
     }
-    const res = await request.patch(`/api/gfp/${serviceId}/features/${featureId}/spec`, {
+    const res = await request.patch(`/api/projects/${serviceId}/features/${featureId}/spec`, {
       data: {
         acceptance_criteria: [{ id: 'ac-test-1', criterion: 'E2E 테스트용 AC', verified: false }],
       },
@@ -299,11 +299,11 @@ test.describe.serial('Feature Spec API', () => {
     }
 
     // 먼저 테스트 시나리오가 있는지 확인
-    const getRes = await request.get(`/api/gfp/${serviceId}/features/${featureId}/spec`);
+    const getRes = await request.get(`/api/projects/${serviceId}/features/${featureId}/spec`);
     const spec = (await getRes.json()).spec;
     if (!spec.test_scenarios || spec.test_scenarios.length === 0) {
       // 시나리오 추가
-      await request.patch(`/api/gfp/${serviceId}/features/${featureId}/spec`, {
+      await request.patch(`/api/projects/${serviceId}/features/${featureId}/spec`, {
         data: {
           test_scenarios: [
             {
@@ -319,7 +319,7 @@ test.describe.serial('Feature Spec API', () => {
     }
 
     const scenarioId = spec.test_scenarios?.[0]?.id || 'ts-test-1';
-    const res = await request.post(`/api/gfp/${serviceId}/features/${featureId}/spec`, {
+    const res = await request.post(`/api/projects/${serviceId}/features/${featureId}/spec`, {
       data: { action: 'test-result', scenario_id: scenarioId, result: 'pass', bot_id: 'e2e-test' },
     });
     expect(res.ok()).toBeTruthy();
@@ -350,7 +350,7 @@ test.describe.serial('Feature Discovery API', () => {
       test.skip();
       return;
     }
-    const res = await request.post(`/api/gfp/${serviceId}/features/discover`, {
+    const res = await request.post(`/api/projects/${serviceId}/features/discover`, {
       data: {},
     });
 
@@ -370,7 +370,7 @@ test.describe.serial('Feature Discovery API', () => {
       test.skip();
       return;
     }
-    const res = await request.get(`/api/gfp/${serviceId}/features/discover`);
+    const res = await request.get(`/api/projects/${serviceId}/features/discover`);
     expect(res.ok()).toBeTruthy();
     const sessions = await res.json();
     expect(Array.isArray(sessions)).toBeTruthy();
@@ -400,7 +400,7 @@ test.describe.serial('Feature Conversation API', () => {
       test.skip();
       return;
     }
-    const res = await request.post(`/api/gfp/${serviceId}/features/conversation`, {
+    const res = await request.post(`/api/projects/${serviceId}/features/conversation`, {
       data: { mode: 'create' },
     });
 

@@ -38,8 +38,8 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     expect(response.status()).toBe(400);
   });
 
-  test('GET /api/gfp/[id] — 프로젝트 상세 + progress', async ({ request }) => {
-    const response = await request.get(`/api/gfp/${projectId}`);
+  test('GET /api/projects/[id] — 프로젝트 상세 + progress', async ({ request }) => {
+    const response = await request.get(`/api/projects/${projectId}`);
     expect(response.ok()).toBeTruthy();
 
     const body = await response.json();
@@ -48,8 +48,8 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     expect(Array.isArray(body.progress)).toBeTruthy();
   });
 
-  test('PATCH /api/gfp/[id] — 프로젝트 수정', async ({ request }) => {
-    const response = await request.patch(`/api/gfp/${projectId}`, {
+  test('PATCH /api/projects/[id] — 프로젝트 수정', async ({ request }) => {
+    const response = await request.patch(`/api/projects/${projectId}`, {
       data: { current_phase: 1 },
     });
     expect(response.ok()).toBeTruthy();
@@ -58,15 +58,15 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     expect(body.current_phase).toBe(1);
   });
 
-  test('GET /api/gfp/nonexistent — 없는 프로젝트 404', async ({ request }) => {
-    const response = await request.get('/api/gfp/00000000-0000-0000-0000-000000000000');
+  test('GET /api/projects/nonexistent — 없는 프로젝트 404', async ({ request }) => {
+    const response = await request.get('/api/projects/00000000-0000-0000-0000-000000000000');
     expect(response.status()).toBe(404);
   });
 
   // ── Sections ──
 
-  test('POST /api/gfp/[id]/sections — 섹션 생성', async ({ request }) => {
-    const response = await request.post(`/api/gfp/${projectId}/sections`, {
+  test('POST /api/projects/[id]/sections — 섹션 생성', async ({ request }) => {
+    const response = await request.post(`/api/projects/${projectId}/sections`, {
       data: {
         phase: 0,
         section_key: 'overview',
@@ -85,8 +85,8 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     sectionId = body.section_id;
   });
 
-  test('POST /api/gfp/[id]/sections — 두 번째 섹션 생성', async ({ request }) => {
-    const response = await request.post(`/api/gfp/${projectId}/sections`, {
+  test('POST /api/projects/[id]/sections — 두 번째 섹션 생성', async ({ request }) => {
+    const response = await request.post(`/api/projects/${projectId}/sections`, {
       data: {
         phase: 0,
         section_key: 'core-value',
@@ -100,8 +100,8 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     expect(response.ok()).toBeTruthy();
   });
 
-  test('GET /api/gfp/[id]/sections?phase=0 — 섹션 목록', async ({ request }) => {
-    const response = await request.get(`/api/gfp/${projectId}/sections?phase=0`);
+  test('GET /api/projects/[id]/sections?phase=0 — 섹션 목록', async ({ request }) => {
+    const response = await request.get(`/api/projects/${projectId}/sections?phase=0`);
     expect(response.ok()).toBeTruthy();
 
     const body = await response.json();
@@ -109,15 +109,15 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     expect(body[0].phase).toBe(0);
   });
 
-  test('POST /api/gfp/[id]/sections — 필수 필드 누락 시 400', async ({ request }) => {
-    const response = await request.post(`/api/gfp/${projectId}/sections`, {
+  test('POST /api/projects/[id]/sections — 필수 필드 누락 시 400', async ({ request }) => {
+    const response = await request.post(`/api/projects/${projectId}/sections`, {
       data: { phase: 0 },
     });
     expect(response.status()).toBe(400);
   });
 
-  test('PATCH /api/gfp/[id]/sections — 섹션 거절 (reviewer_note)', async ({ request }) => {
-    const response = await request.patch(`/api/gfp/${projectId}/sections`, {
+  test('PATCH /api/projects/[id]/sections — 섹션 거절 (reviewer_note)', async ({ request }) => {
+    const response = await request.patch(`/api/projects/${projectId}/sections`, {
       data: {
         section_id: sectionId,
         status: 'rejected',
@@ -131,8 +131,8 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     expect(body.reviewer_note).toContain('KPI');
   });
 
-  test('PATCH /api/gfp/[id]/sections — 섹션 승인', async ({ request }) => {
-    const response = await request.patch(`/api/gfp/${projectId}/sections`, {
+  test('PATCH /api/projects/[id]/sections — 섹션 승인', async ({ request }) => {
+    const response = await request.patch(`/api/projects/${projectId}/sections`, {
       data: {
         section_id: sectionId,
         status: 'approved',
@@ -144,8 +144,8 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     expect(body.status).toBe('approved');
   });
 
-  test('PATCH /api/gfp/[id]/sections — section_id 누락 시 400', async ({ request }) => {
-    const response = await request.patch(`/api/gfp/${projectId}/sections`, {
+  test('PATCH /api/projects/[id]/sections — section_id 누락 시 400', async ({ request }) => {
+    const response = await request.patch(`/api/projects/${projectId}/sections`, {
       data: { status: 'approved' },
     });
     expect(response.status()).toBe(400);
@@ -153,10 +153,10 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
 
   // ── 콘텐츠 업데이트 ──
 
-  test('PATCH /api/gfp/[id]/sections — 콘텐츠 업데이트 (action: update-content)', async ({
+  test('PATCH /api/projects/[id]/sections — 콘텐츠 업데이트 (action: update-content)', async ({
     request,
   }) => {
-    const response = await request.patch(`/api/gfp/${projectId}/sections`, {
+    const response = await request.patch(`/api/projects/${projectId}/sections`, {
       data: {
         section_id: sectionId,
         action: 'update-content',
@@ -173,8 +173,8 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
 
   // ── Callback API ──
 
-  test('POST /api/gfp/callback — section-regeneration 콜백', async ({ request }) => {
-    const response = await request.post('/api/gfp/callback', {
+  test('POST /api/projects/callback — section-regeneration 콜백', async ({ request }) => {
+    const response = await request.post('/api/projects/callback', {
       data: {
         type: 'section-regeneration',
         section_id: sectionId,
@@ -190,15 +190,15 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     expect(body.section.content).toContain('Regenerated');
   });
 
-  test('POST /api/gfp/callback — 필수 필드 누락 시 400', async ({ request }) => {
-    const response = await request.post('/api/gfp/callback', {
+  test('POST /api/projects/callback — 필수 필드 누락 시 400', async ({ request }) => {
+    const response = await request.post('/api/projects/callback', {
       data: { type: 'section-regeneration', bot_id: 'planclaw' },
     });
     expect(response.status()).toBe(400);
   });
 
-  test('POST /api/gfp/callback — 존재하지 않는 섹션 404', async ({ request }) => {
-    const response = await request.post('/api/gfp/callback', {
+  test('POST /api/projects/callback — 존재하지 않는 섹션 404', async ({ request }) => {
+    const response = await request.post('/api/projects/callback', {
       data: {
         type: 'section-regeneration',
         section_id: '00000000-0000-0000-0000-000000000000',
@@ -209,8 +209,8 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     expect(response.status()).toBe(404);
   });
 
-  test('POST /api/gfp/callback — 알 수 없는 타입 400', async ({ request }) => {
-    const response = await request.post('/api/gfp/callback', {
+  test('POST /api/projects/callback — 알 수 없는 타입 400', async ({ request }) => {
+    const response = await request.post('/api/projects/callback', {
       data: { type: 'unknown-type', bot_id: 'test' },
     });
     expect(response.status()).toBe(400);
@@ -218,8 +218,8 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
 
   // ── Research ──
 
-  test('POST /api/gfp/[id]/research — 리서치 작업 생성', async ({ request }) => {
-    const response = await request.post(`/api/gfp/${projectId}/research`, {
+  test('POST /api/projects/[id]/research — 리서치 작업 생성', async ({ request }) => {
+    const response = await request.post(`/api/projects/${projectId}/research`, {
       data: {
         task_type: 'competitor-analysis',
         reference_urls: ['https://example.com'],
@@ -234,16 +234,16 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     taskId = body.task_id;
   });
 
-  test('GET /api/gfp/[id]/research — 리서치 목록', async ({ request }) => {
-    const response = await request.get(`/api/gfp/${projectId}/research`);
+  test('GET /api/projects/[id]/research — 리서치 목록', async ({ request }) => {
+    const response = await request.get(`/api/projects/${projectId}/research`);
     expect(response.ok()).toBeTruthy();
 
     const body = await response.json();
     expect(body.length).toBeGreaterThanOrEqual(1);
   });
 
-  test('POST /api/gfp/callback — research-result 콜백', async ({ request }) => {
-    const response = await request.post('/api/gfp/callback', {
+  test('POST /api/projects/callback — research-result 콜백', async ({ request }) => {
+    const response = await request.post('/api/projects/callback', {
       data: {
         type: 'research-result',
         task_id: taskId,
@@ -259,8 +259,10 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     expect(body.task.result).toContain('Competitor Analysis');
   });
 
-  test('POST /api/gfp/callback — research-result 존재하지 않는 task 404', async ({ request }) => {
-    const response = await request.post('/api/gfp/callback', {
+  test('POST /api/projects/callback — research-result 존재하지 않는 task 404', async ({
+    request,
+  }) => {
+    const response = await request.post('/api/projects/callback', {
       data: {
         type: 'research-result',
         task_id: '00000000-0000-0000-0000-000000000000',
@@ -273,8 +275,8 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
 
   // ── Materials ──
 
-  test('POST /api/gfp/[id]/materials — 기획안 업로드', async ({ request }) => {
-    const response = await request.post(`/api/gfp/${projectId}/materials`, {
+  test('POST /api/projects/[id]/materials — 기획안 업로드', async ({ request }) => {
+    const response = await request.post(`/api/projects/${projectId}/materials`, {
       data: {
         content:
           '# 기존 기획안\n\n## 사용자 정의\n교회/교역자/성도\n\n## 문제 정의\n매칭 플랫폼 부재',
@@ -288,8 +290,8 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
     expect(body).toHaveProperty('sections_created');
   });
 
-  test('GET /api/gfp/[id]/materials — 기획안 목록', async ({ request }) => {
-    const response = await request.get(`/api/gfp/${projectId}/materials`);
+  test('GET /api/projects/[id]/materials — 기획안 목록', async ({ request }) => {
+    const response = await request.get(`/api/projects/${projectId}/materials`);
     expect(response.ok()).toBeTruthy();
 
     const body = await response.json();
@@ -298,8 +300,8 @@ test.describe.serial('GFP API — 프로젝트 CRUD + 섹션 승인/거절 + 콜
 
   // ── Progress ──
 
-  test('GET /api/gfp/[id] — progress에 Phase 0 반영 확인', async ({ request }) => {
-    const response = await request.get(`/api/gfp/${projectId}`);
+  test('GET /api/projects/[id] — progress에 Phase 0 반영 확인', async ({ request }) => {
+    const response = await request.get(`/api/projects/${projectId}`);
     const body = await response.json();
 
     const phase0 = body.progress.find((p: { phase: number }) => p.phase === 0);

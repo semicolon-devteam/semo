@@ -10,7 +10,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const tasks = await listResearchTasks(id);
     return NextResponse.json(tasks);
   } catch (error) {
-    console.error('GFP research list error:', error);
+    console.error('Research list error:', error);
     return NextResponse.json({ error: 'Failed to list research tasks' }, { status: 500 });
   }
 }
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json(task, { status: 201 });
   } catch (error) {
-    console.error('GFP research create error:', error);
+    console.error('Research create error:', error);
     return NextResponse.json({ error: 'Failed to create research task' }, { status: 500 });
   }
 }
@@ -64,7 +64,7 @@ export async function PATCH(request: NextRequest) {
     }
     return NextResponse.json(task);
   } catch (error) {
-    console.error('GFP research update error:', error);
+    console.error('Service update error:', error);
     return NextResponse.json({ error: 'Failed to update research task' }, { status: 500 });
   }
 }

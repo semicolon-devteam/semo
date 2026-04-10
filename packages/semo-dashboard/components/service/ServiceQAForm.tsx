@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import type { ServiceQAItem } from '@/types';
 
-interface GfpQAFormProps {
+interface ServiceQAFormProps {
   sectionId: string;
   serviceId: string;
   qaItems: ServiceQAItem[];
@@ -15,7 +15,7 @@ export default function ServiceQAForm({
   serviceId,
   qaItems: rawItems,
   onSaved,
-}: GfpQAFormProps) {
+}: ServiceQAFormProps) {
   // id가 누락된 QA 항목 방어: q1, q2, ... 자동 부여
   const qaItems = rawItems.map((item, i) => (item.id ? item : { ...item, id: `q${i + 1}` }));
 
@@ -39,7 +39,7 @@ export default function ServiceQAForm({
 
     setSaving(true);
     try {
-      await fetch(`/api/gfp/${serviceId}/sections`, {
+      await fetch(`/api/projects/${serviceId}/sections`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ section_id: sectionId, action: 'answer-qa', qa_answers }),

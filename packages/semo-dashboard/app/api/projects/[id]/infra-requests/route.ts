@@ -16,7 +16,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const requests = await listInfraRequests(id);
     return NextResponse.json(requests);
   } catch (error) {
-    console.error('GFP infra requests list error:', error);
+    console.error('Service requests list error:', error);
     return NextResponse.json({ error: 'Failed to list infra requests' }, { status: 500 });
   }
 }
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json(infraRequest, { status: 201 });
   } catch (error) {
-    console.error('GFP infra request create error:', error);
+    console.error('Service request create error:', error);
     return NextResponse.json({ error: 'Failed to create infra request' }, { status: 500 });
   }
 }
@@ -103,7 +103,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     return NextResponse.json(updated);
   } catch (error) {
-    console.error('GFP infra request update error:', error);
+    console.error('Service request update error:', error);
     return NextResponse.json({ error: 'Failed to update infra request' }, { status: 500 });
   }
 }

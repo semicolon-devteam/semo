@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       elements: [
         {
           type: 'mrkdwn',
-          text: `Phase ${phase} | ${pending.length}개 섹션 대기 | <https://semo.semi-colon.space/gfp/${service_id}|대시보드에서 보기>`,
+          text: `Phase ${phase} | ${pending.length}개 섹션 대기 | <https://semo.semi-colon.space/projects/${service_id}|대시보드에서 보기>`,
         },
       ],
     },

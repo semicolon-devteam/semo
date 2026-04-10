@@ -2,7 +2,7 @@
 
 import { DESIGN_STEPS, type DesignStep } from '@/types';
 
-interface GfpDesignStepNavProps {
+interface ServiceDesignStepNavProps {
   currentStep: DesignStep;
   stepStatuses: Record<number, 'pending' | 'in-progress' | 'completed'>;
   onStepClick: (step: DesignStep) => void;
@@ -16,11 +16,11 @@ const STEP_ICONS: Record<string, string> = {
   'arrow-right': '\u2192',
 };
 
-export default function GfpDesignStepNav({
+export default function ServiceDesignStepNav({
   currentStep,
   stepStatuses,
   onStepClick,
-}: GfpDesignStepNavProps) {
+}: ServiceDesignStepNavProps) {
   return (
     <div className="flex items-center gap-1 overflow-x-auto pb-1">
       {DESIGN_STEPS.map((def, idx) => {

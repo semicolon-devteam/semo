@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const sections = await listSections(id, phase, trackParam ?? undefined);
     return NextResponse.json(sections);
   } catch (error) {
-    console.error('GFP sections list error:', error);
+    console.error('Service list error:', error);
     return NextResponse.json({ error: 'Failed to list sections' }, { status: 500 });
   }
 }
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     });
     return NextResponse.json({ ...section, warning }, { status: 201 });
   } catch (error) {
-    console.error('GFP section upsert error:', error);
+    console.error('Service upsert error:', error);
     return NextResponse.json({ error: 'Failed to upsert section' }, { status: 500 });
   }
 }
@@ -164,7 +164,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     return NextResponse.json(section);
   } catch (error) {
-    console.error('GFP section status error:', error);
+    console.error('Service status error:', error);
     return NextResponse.json({ error: 'Failed to update section' }, { status: 500 });
   }
 }
@@ -192,7 +192,7 @@ export async function DELETE(
 
     return NextResponse.json(deleted);
   } catch (error) {
-    console.error('GFP section delete error:', error);
+    console.error('Service delete error:', error);
     return NextResponse.json({ error: 'Failed to delete section' }, { status: 500 });
   }
 }

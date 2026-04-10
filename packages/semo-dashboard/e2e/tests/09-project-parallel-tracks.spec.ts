@@ -57,7 +57,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
   // ── 2. Track 필터 기본 동작 ──
 
   test('track=plan 섹션 조회 — 빈 배열', async ({ request }) => {
-    const res = await request.get(`/api/gfp/${projectId}/sections?track=plan`);
+    const res = await request.get(`/api/projects/${projectId}/sections?track=plan`);
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
     expect(Array.isArray(body)).toBeTruthy();
@@ -65,7 +65,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
   });
 
   test('track=infra 섹션 조회 — 빈 배열', async ({ request }) => {
-    const res = await request.get(`/api/gfp/${projectId}/sections?track=infra`);
+    const res = await request.get(`/api/projects/${projectId}/sections?track=infra`);
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
     expect(body.length).toBe(0);
@@ -80,7 +80,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
     ];
 
     for (const sec of sections) {
-      const res = await request.post(`/api/gfp/${projectId}/sections`, {
+      const res = await request.post(`/api/projects/${projectId}/sections`, {
         data: {
           phase: 0,
           section_key: sec.key,
@@ -102,7 +102,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
   });
 
   test('Phase 0 plan 섹션만 조회됨', async ({ request }) => {
-    const res = await request.get(`/api/gfp/${projectId}/sections?phase=0&track=plan`);
+    const res = await request.get(`/api/projects/${projectId}/sections?phase=0&track=plan`);
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
     expect(body.length).toBe(2);
@@ -117,14 +117,14 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
   test('Phase 0 전체 승인 → current_phase=1 (포크 트리거)', async ({ request }) => {
     // 모든 Phase 0 섹션 승인
     for (const secId of phase0SectionIds) {
-      const res = await request.patch(`/api/gfp/${projectId}/sections`, {
+      const res = await request.patch(`/api/projects/${projectId}/sections`, {
         data: { section_id: secId, status: 'approved' },
       });
       expect(res.ok()).toBeTruthy();
     }
 
     // 프로젝트 상태 확인
-    const proj = await request.get(`/api/gfp/${projectId}`);
+    const proj = await request.get(`/api/projects/${projectId}`);
     const body = await proj.json();
     expect(body.current_phase).toBe(1); // Track A → Phase 1
     expect(body.infra_phase).toBe(0); // Track B 유지
@@ -133,7 +133,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
   // ── 5. 인프라 요구사항 CRUD ──
 
   test('POST infra-requests — 인프라 요구사항 생성', async ({ request }) => {
-    const res = await request.post(`/api/gfp/${projectId}/infra-requests`, {
+    const res = await request.post(`/api/projects/${projectId}/infra-requests`, {
       data: {
         source_phase: 1,
         category: 'oauth',
@@ -152,7 +152,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
   });
 
   test('POST infra-requests — 잘못된 카테고리 400', async ({ request }) => {
-    const res = await request.post(`/api/gfp/${projectId}/infra-requests`, {
+    const res = await request.post(`/api/projects/${projectId}/infra-requests`, {
       data: {
         source_phase: 1,
         category: 'invalid-category',
@@ -163,14 +163,14 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
   });
 
   test('POST infra-requests — 필수 필드 누락 400', async ({ request }) => {
-    const res = await request.post(`/api/gfp/${projectId}/infra-requests`, {
+    const res = await request.post(`/api/projects/${projectId}/infra-requests`, {
       data: { source_phase: 1 },
     });
     expect(res.status()).toBe(400);
   });
 
   test('GET infra-requests — 목록 조회', async ({ request }) => {
-    const res = await request.get(`/api/gfp/${projectId}/infra-requests`);
+    const res = await request.get(`/api/projects/${projectId}/infra-requests`);
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
     expect(body.length).toBe(1);
@@ -178,7 +178,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
   });
 
   test('PATCH infra-requests — 상태 업데이트 (acknowledged)', async ({ request }) => {
-    const res = await request.patch(`/api/gfp/${projectId}/infra-requests`, {
+    const res = await request.patch(`/api/projects/${projectId}/infra-requests`, {
       data: { request_id: infraRequestId, status: 'acknowledged' },
     });
     expect(res.ok()).toBeTruthy();
@@ -187,7 +187,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
   });
 
   test('PATCH infra-requests — 상태 업데이트 (completed)', async ({ request }) => {
-    const res = await request.patch(`/api/gfp/${projectId}/infra-requests`, {
+    const res = await request.patch(`/api/projects/${projectId}/infra-requests`, {
       data: { request_id: infraRequestId, status: 'completed' },
     });
     expect(res.ok()).toBeTruthy();
@@ -196,7 +196,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
   });
 
   test('PATCH infra-requests — 잘못된 상태 400', async ({ request }) => {
-    const res = await request.patch(`/api/gfp/${projectId}/infra-requests`, {
+    const res = await request.patch(`/api/projects/${projectId}/infra-requests`, {
       data: { request_id: infraRequestId, status: 'invalid' },
     });
     expect(res.status()).toBe(400);
@@ -205,7 +205,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
   // ── 6. Track B (infra) 섹션 생성/승인 → infra_phase 전진 ──
 
   test('Infra Phase 0 섹션 생성 — source: infraclaw', async ({ request }) => {
-    const res = await request.post(`/api/gfp/${projectId}/sections`, {
+    const res = await request.post(`/api/projects/${projectId}/sections`, {
       data: {
         phase: 0,
         section_key: 'repo-setup',
@@ -225,7 +225,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
 
   test('동일 section_key가 plan/infra 각각 존재 가능', async ({ request }) => {
     // plan에도 'repo-setup' 키로 생성 가능 (track이 다르므로 UNIQUE 충돌 없음)
-    const res = await request.post(`/api/gfp/${projectId}/sections`, {
+    const res = await request.post(`/api/projects/${projectId}/sections`, {
       data: {
         phase: 0,
         section_key: 'repo-setup',
@@ -242,7 +242,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
   });
 
   test('track=infra 필터로 infra 섹션만 조회', async ({ request }) => {
-    const res = await request.get(`/api/gfp/${projectId}/sections?phase=0&track=infra`);
+    const res = await request.get(`/api/projects/${projectId}/sections?phase=0&track=infra`);
     expect(res.ok()).toBeTruthy();
     const body = await res.json();
     expect(body.length).toBe(1);
@@ -251,12 +251,12 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
   });
 
   test('Infra Phase 0 승인 → infra_phase=1', async ({ request }) => {
-    const res = await request.patch(`/api/gfp/${projectId}/sections`, {
+    const res = await request.patch(`/api/projects/${projectId}/sections`, {
       data: { section_id: infraSectionId, status: 'approved' },
     });
     expect(res.ok()).toBeTruthy();
 
-    const proj = await request.get(`/api/gfp/${projectId}`);
+    const proj = await request.get(`/api/projects/${projectId}`);
     const body = await proj.json();
     expect(body.infra_phase).toBe(1);
   });
@@ -265,7 +265,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
 
   test('Infra Phase 1 → 2 전진', async ({ request }) => {
     // Infra Phase 1 섹션
-    const res1 = await request.post(`/api/gfp/${projectId}/sections`, {
+    const res1 = await request.post(`/api/projects/${projectId}/sections`, {
       data: {
         phase: 1,
         section_key: 'oauth-setup',
@@ -280,18 +280,18 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
     const sec1 = await res1.json();
 
     // 승인
-    await request.patch(`/api/gfp/${projectId}/sections`, {
+    await request.patch(`/api/projects/${projectId}/sections`, {
       data: { section_id: sec1.section_id, status: 'approved' },
     });
 
-    const proj1 = await request.get(`/api/gfp/${projectId}`);
+    const proj1 = await request.get(`/api/projects/${projectId}`);
     const body1 = await proj1.json();
     expect(body1.infra_phase).toBe(2);
   });
 
   test('Infra Phase 2 완료 → infra_phase=3 (완료 상태)', async ({ request }) => {
     // Infra Phase 2 섹션
-    const res2 = await request.post(`/api/gfp/${projectId}/sections`, {
+    const res2 = await request.post(`/api/projects/${projectId}/sections`, {
       data: {
         phase: 2,
         section_key: 'verification',
@@ -305,11 +305,11 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
     expect(res2.status()).toBe(201);
     const sec2 = await res2.json();
 
-    await request.patch(`/api/gfp/${projectId}/sections`, {
+    await request.patch(`/api/projects/${projectId}/sections`, {
       data: { section_id: sec2.section_id, status: 'approved' },
     });
 
-    const proj2 = await request.get(`/api/gfp/${projectId}`);
+    const proj2 = await request.get(`/api/projects/${projectId}`);
     const body2 = await proj2.json();
     expect(body2.infra_phase).toBe(3); // > 2 means completed
   });
@@ -319,7 +319,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
   test('Track A Phase 1~8 빠르게 진행', async ({ request }) => {
     for (let phase = 1; phase <= 8; phase++) {
       // 섹션 생성
-      const res = await request.post(`/api/gfp/${projectId}/sections`, {
+      const res = await request.post(`/api/projects/${projectId}/sections`, {
         data: {
           phase,
           section_key: `e2e-section-p${phase}`,
@@ -334,14 +334,14 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
       const sec = await res.json();
 
       // 승인
-      const approveRes = await request.patch(`/api/gfp/${projectId}/sections`, {
+      const approveRes = await request.patch(`/api/projects/${projectId}/sections`, {
         data: { section_id: sec.section_id, status: 'approved' },
       });
       expect(approveRes.ok()).toBeTruthy();
     }
 
     // current_phase가 9에 도달
-    const proj = await request.get(`/api/gfp/${projectId}`);
+    const proj = await request.get(`/api/projects/${projectId}`);
     const body = await proj.json();
     expect(body.current_phase).toBe(9);
   });
@@ -350,7 +350,7 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
 
   test('Phase 9 승인 — Track B 완료 → 프로젝트 completed', async ({ request }) => {
     // Phase 9 섹션
-    const res = await request.post(`/api/gfp/${projectId}/sections`, {
+    const res = await request.post(`/api/projects/${projectId}/sections`, {
       data: {
         phase: 9,
         section_key: 'final-checklist',
@@ -365,12 +365,12 @@ test.describe.serial('GFP Parallel Tracks — 병렬 트랙 전체 플로우', (
     const sec = await res.json();
 
     // 승인 → Track B도 완료이므로 프로젝트 completed
-    const approveRes = await request.patch(`/api/gfp/${projectId}/sections`, {
+    const approveRes = await request.patch(`/api/projects/${projectId}/sections`, {
       data: { section_id: sec.section_id, status: 'approved' },
     });
     expect(approveRes.ok()).toBeTruthy();
 
-    const proj = await request.get(`/api/gfp/${projectId}`);
+    const proj = await request.get(`/api/projects/${projectId}`);
     const body = await proj.json();
     expect(body.status).toBe('completed');
   });
@@ -395,7 +395,7 @@ test.describe.serial('GFP Handoff Gate — Track B 미완 블로킹', () => {
 
   test('Phase 0~8 빠르게 통과 (infra 미완)', async ({ request }) => {
     for (let phase = 0; phase <= 8; phase++) {
-      const sec = await request.post(`/api/gfp/${projectId}/sections`, {
+      const sec = await request.post(`/api/projects/${projectId}/sections`, {
         data: {
           phase,
           section_key: `gate-test-p${phase}`,
@@ -407,14 +407,14 @@ test.describe.serial('GFP Handoff Gate — Track B 미완 블로킹', () => {
         },
       });
       const secBody = await sec.json();
-      await request.patch(`/api/gfp/${projectId}/sections`, {
+      await request.patch(`/api/projects/${projectId}/sections`, {
         data: { section_id: secBody.section_id, status: 'approved' },
       });
     }
   });
 
   test('Phase 9 승인 — Track B 미완 → warning 반환, status 유지', async ({ request }) => {
-    const sec = await request.post(`/api/gfp/${projectId}/sections`, {
+    const sec = await request.post(`/api/projects/${projectId}/sections`, {
       data: {
         phase: 9,
         section_key: 'final',
@@ -427,7 +427,7 @@ test.describe.serial('GFP Handoff Gate — Track B 미완 블로킹', () => {
     });
     const secBody = await sec.json();
 
-    const approveRes = await request.patch(`/api/gfp/${projectId}/sections`, {
+    const approveRes = await request.patch(`/api/projects/${projectId}/sections`, {
       data: { section_id: secBody.section_id, status: 'approved' },
     });
     expect(approveRes.ok()).toBeTruthy();
@@ -436,7 +436,7 @@ test.describe.serial('GFP Handoff Gate — Track B 미완 블로킹', () => {
     expect(body.warning).toContain('Track B');
 
     // 프로젝트 여전히 active
-    const proj = await request.get(`/api/gfp/${projectId}`);
+    const proj = await request.get(`/api/projects/${projectId}`);
     const projBody = await proj.json();
     expect(projBody.status).toBe('active');
   });
@@ -455,7 +455,7 @@ test.describe('GFP Backward Compatibility — 기존 프로젝트 호환', () =>
     const proj = await projRes.json();
 
     // track 미지정으로 섹션 생성
-    const secRes = await request.post(`/api/gfp/${proj.service_id}/sections`, {
+    const secRes = await request.post(`/api/projects/${proj.service_id}/sections`, {
       data: {
         phase: 0,
         section_key: 'compat-test',

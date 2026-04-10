@@ -11,13 +11,13 @@ import { query, transaction } from './db';
 import type {
   ServiceProject,
   ServiceSection,
-  GfpMaterial,
-  GfpResearchTask,
+  ServiceMaterial,
+  ServiceResearchTask,
   ServiceSectionStatus,
   ServicePhaseMapping,
   ServiceQAItem,
   ServiceTrack,
-  GfpInfraRequest,
+  ServiceInfraRequest,
   ServiceInfraRequestStatus,
   ServiceInfraCategory,
   ServiceKPIMetric,
@@ -95,8 +95,8 @@ export async function createProject(data: {
 
   // KB에 gfp_id 저장 (service_domain이 있을 때)
   if (data.service_domain) {
-    writeGfpIdToKB(data.service_domain, project).catch((err) =>
-      console.error('[PM] KB gfp-id write failed:', err),
+    writeServiceIdToKB(data.service_domain, project).catch((err) =>
+      console.error('[PM] KB service-id write failed:', err),
     );
 
     // infra-ready 프리셋: 인프라 정보를 KB에 별도 기록
@@ -130,7 +130,7 @@ async function ensureOntologyDomain(domain: string, projectName: string): Promis
  * 서비스 프로젝트 생성 시 gfp_id를 KB에 기록.
  * 봇이 KB 검색으로 서비스의 서비스 프로젝트를 찾을 수 있도록 함.
  */
-async function writeGfpIdToKB(serviceDomain: string, project: ServiceProject): Promise<void> {
+async function writeServiceIdToKB(serviceDomain: string, project: ServiceProject): Promise<void> {
   const { upsertItem } = await import('./kb');
   const presetId = (project.metadata?.preset as string) ?? 'standard';
   const presetConfig = project.metadata?.preset_config as Record<string, unknown> | undefined;
@@ -154,7 +154,7 @@ async function writeGfpIdToKB(serviceDomain: string, project: ServiceProject): P
 
   await upsertItem(serviceDomain, 'gfp-id', lines.join('\n'), 'pm-pipeline');
   console.log(
-    `[PM] KB gfp-id written for domain '${serviceDomain}': ${project.service_id} (preset: ${presetId})`,
+    `[PM] KB service-id written for domain '${serviceDomain}': ${project.service_id} (preset: ${presetId})`,
   );
 }
 
@@ -499,8 +499,8 @@ export async function createMaterial(data: {
   service_id: string;
   content: string;
   phase_mapping?: ServicePhaseMapping[];
-}): Promise<GfpMaterial> {
-  const res = await query<GfpMaterial>(
+}): Promise<ServiceMaterial> {
+  const res = await query<ServiceMaterial>(
     `INSERT INTO semo.service_materials (service_id, content, phase_mapping)
      VALUES ($1, $2, $3)
      RETURNING *`,
@@ -509,8 +509,8 @@ export async function createMaterial(data: {
   return res.rows[0];
 }
 
-export async function listMaterials(serviceId: string): Promise<GfpMaterial[]> {
-  const res = await query<GfpMaterial>(
+export async function listMaterials(serviceId: string): Promise<ServiceMaterial[]> {
+  const res = await query<ServiceMaterial>(
     'SELECT * FROM semo.service_materials WHERE service_id =$1 ORDER BY created_at DESC',
     [serviceId],
   );
@@ -523,9 +523,9 @@ export async function createStitchMaterial(data: {
   service_id: string;
   content: string;
   material_type?: string;
-}): Promise<GfpMaterial> {
+}): Promise<ServiceMaterial> {
   const materialType = data.material_type ?? 'stitch-export';
-  const res = await query<GfpMaterial>(
+  const res = await query<ServiceMaterial>(
     `INSERT INTO semo.service_materials (service_id, content, material_type)
      VALUES ($1, $2, $3)
      RETURNING *`,
@@ -594,8 +594,8 @@ export async function createResearchTask(data: {
   task_type: string;
   reference_urls: string[];
   input_prompt: string;
-}): Promise<GfpResearchTask> {
-  const res = await query<GfpResearchTask>(
+}): Promise<ServiceResearchTask> {
+  const res = await query<ServiceResearchTask>(
     `INSERT INTO semo.service_research_tasks (service_id, task_type, reference_urls, input_prompt)
      VALUES ($1, $2, $3, $4)
      RETURNING *`,
@@ -604,8 +604,8 @@ export async function createResearchTask(data: {
   return res.rows[0];
 }
 
-export async function listResearchTasks(serviceId: string): Promise<GfpResearchTask[]> {
-  const res = await query<GfpResearchTask>(
+export async function listResearchTasks(serviceId: string): Promise<ServiceResearchTask[]> {
+  const res = await query<ServiceResearchTask>(
     'SELECT * FROM semo.service_research_tasks WHERE service_id =$1 ORDER BY created_at DESC',
     [serviceId],
   );
@@ -614,8 +614,8 @@ export async function listResearchTasks(serviceId: string): Promise<GfpResearchT
 
 export async function updateResearchTask(
   taskId: string,
-  data: Partial<Pick<GfpResearchTask, 'status' | 'result'>>,
-): Promise<GfpResearchTask | null> {
+  data: Partial<Pick<ServiceResearchTask, 'status' | 'result'>>,
+): Promise<ServiceResearchTask | null> {
   const sets: string[] = [];
   const params: unknown[] = [];
   let idx = 1;
@@ -631,7 +631,7 @@ export async function updateResearchTask(
   if (sets.length === 0) return null;
 
   params.push(taskId);
-  const res = await query<GfpResearchTask>(
+  const res = await query<ServiceResearchTask>(
     `UPDATE semo.service_research_tasks SET ${sets.join(', ')} WHERE task_id = $${idx} RETURNING *`,
     params,
   );
@@ -767,8 +767,8 @@ export async function createSectionsFromMapping(
 
 // ── Infra Requests ──
 
-export async function listInfraRequests(serviceId: string): Promise<GfpInfraRequest[]> {
-  const res = await query<GfpInfraRequest>(
+export async function listInfraRequests(serviceId: string): Promise<ServiceInfraRequest[]> {
+  const res = await query<ServiceInfraRequest>(
     'SELECT * FROM semo.service_infra_requests WHERE service_id =$1 ORDER BY created_at DESC',
     [serviceId],
   );
@@ -783,8 +783,8 @@ export async function createInfraRequest(data: {
   title: string;
   description?: string;
   priority?: 'low' | 'normal' | 'high';
-}): Promise<GfpInfraRequest> {
-  const res = await query<GfpInfraRequest>(
+}): Promise<ServiceInfraRequest> {
+  const res = await query<ServiceInfraRequest>(
     `INSERT INTO semo.service_infra_requests (service_id, source_phase, source_section_id, category, title, description, priority)
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
@@ -805,8 +805,8 @@ export async function updateInfraRequest(
   requestId: string,
   status: ServiceInfraRequestStatus,
   slackThreadTs?: string,
-): Promise<GfpInfraRequest | null> {
-  const res = await query<GfpInfraRequest>(
+): Promise<ServiceInfraRequest | null> {
+  const res = await query<ServiceInfraRequest>(
     `UPDATE semo.service_infra_requests
      SET status = $1, slack_thread_ts = COALESCE($2, slack_thread_ts), updated_at = NOW()
      WHERE request_id = $3

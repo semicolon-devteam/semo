@@ -14,7 +14,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const children = project.service_type === 'platform' ? await getChildServices(id) : undefined;
     return NextResponse.json({ ...project, progress, children });
   } catch (error) {
-    console.error('GFP get error:', error);
+    console.error('Project get error:', error);
     return NextResponse.json({ error: 'Failed to get project' }, { status: 500 });
   }
 }
@@ -29,7 +29,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
     return NextResponse.json(project);
   } catch (error) {
-    console.error('GFP update error:', error);
+    console.error('Project update error:', error);
     return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
   }
 }

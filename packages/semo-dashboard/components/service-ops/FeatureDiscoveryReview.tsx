@@ -13,16 +13,29 @@ interface Props {
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  core: '코어', growth: '그로스', infra: '인프라', ux: 'UX', integration: '연동',
+  core: '코어',
+  growth: '그로스',
+  infra: '인프라',
+  ux: 'UX',
+  integration: '연동',
 };
 
 const CONFIDENCE_COLORS: Record<string, string> = {
-  high: 'text-green-400', medium: 'text-yellow-400', low: 'text-zinc-500',
+  high: 'text-green-400',
+  medium: 'text-yellow-400',
+  low: 'text-zinc-500',
 };
 
-export default function FeatureDiscoveryReview({ projectId, sessionId, candidates, screenshots, onClose, onConfirm }: Props) {
+export default function FeatureDiscoveryReview({
+  projectId,
+  sessionId,
+  candidates,
+  screenshots,
+  onClose,
+  onConfirm,
+}: Props) {
   const [selected, setSelected] = useState<Set<number>>(
-    new Set(candidates.map((_, i) => i).filter(i => candidates[i].confidence !== 'low'))
+    new Set(candidates.map((_, i) => i).filter((i) => candidates[i].confidence !== 'low')),
   );
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editForm, setEditForm] = useState({ name: '', description: '', category: 'core' });
@@ -36,7 +49,8 @@ export default function FeatureDiscoveryReview({ projectId, sessionId, candidate
 
   const toggleSelect = (idx: number) => {
     const next = new Set(selected);
-    if (next.has(idx)) next.delete(idx); else next.add(idx);
+    if (next.has(idx)) next.delete(idx);
+    else next.add(idx);
     setSelected(next);
   };
 
@@ -76,12 +90,17 @@ export default function FeatureDiscoveryReview({ projectId, sessionId, candidate
   const handleConfirm = async () => {
     setSaving(true);
     try {
-      const features = Array.from(selected).map(i => {
+      const features = Array.from(selected).map((i) => {
         const f = allFeatures[i];
-        return { name: f.name, description: f.description, category: f.category, metadata: { source_url: f.source_url, screenshot_key: f.screenshot_key } };
+        return {
+          name: f.name,
+          description: f.description,
+          category: f.category,
+          metadata: { source_url: f.source_url, screenshot_key: f.screenshot_key },
+        };
       });
 
-      const res = await fetch(`/api/gfp/${projectId}/features/discover`, {
+      const res = await fetch(`/api/projects/${projectId}/features/discover`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'confirm', session_id: sessionId, features }),
@@ -106,9 +125,13 @@ export default function FeatureDiscoveryReview({ projectId, sessionId, candidate
         <div className="px-6 py-4 border-b border-zinc-700 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-white">기능 스캔 결과</h2>
-            <p className="text-sm text-zinc-400">{candidates.length}개 발견 / {selected.size}개 선택됨</p>
+            <p className="text-sm text-zinc-400">
+              {candidates.length}개 발견 / {selected.size}개 선택됨
+            </p>
           </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-white text-xl">&times;</button>
+          <button onClick={onClose} className="text-zinc-400 hover:text-white text-xl">
+            &times;
+          </button>
         </div>
 
         {/* Body */}
@@ -120,7 +143,11 @@ export default function FeatureDiscoveryReview({ projectId, sessionId, candidate
               <div>
                 <p className="text-xs text-zinc-500 mb-1">{previewKey}</p>
                 <img
-                  src={screenshots[previewKey].startsWith('data:') ? screenshots[previewKey] : `data:image/png;base64,${screenshots[previewKey]}`}
+                  src={
+                    screenshots[previewKey].startsWith('data:')
+                      ? screenshots[previewKey]
+                      : `data:image/png;base64,${screenshots[previewKey]}`
+                  }
                   alt={previewKey}
                   className="w-full rounded border border-zinc-700"
                 />
@@ -130,7 +157,7 @@ export default function FeatureDiscoveryReview({ projectId, sessionId, candidate
             )}
             {Object.keys(screenshots).length > 1 && (
               <div className="mt-3 flex flex-wrap gap-1">
-                {Object.keys(screenshots).map(key => (
+                {Object.keys(screenshots).map((key) => (
                   <button
                     key={key}
                     onClick={() => setPreviewKey(key)}
@@ -160,35 +187,55 @@ export default function FeatureDiscoveryReview({ projectId, sessionId, candidate
                     checked={selected.has(i)}
                     onChange={() => toggleSelect(i)}
                     className="accent-blue-500"
-                    onClick={e => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
                   />
-                  <span className={`text-[10px] ${CONFIDENCE_COLORS[f.confidence] ?? 'text-zinc-400'}`}>
+                  <span
+                    className={`text-[10px] ${CONFIDENCE_COLORS[f.confidence] ?? 'text-zinc-400'}`}
+                  >
                     [{f.confidence}]
                   </span>
                   {editingIdx === i ? (
-                    <div className="flex-1 flex gap-2" onClick={e => e.stopPropagation()}>
+                    <div className="flex-1 flex gap-2" onClick={(e) => e.stopPropagation()}>
                       <input
                         value={editForm.name}
-                        onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                        onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
                         className="flex-1 px-2 py-1 bg-zinc-900 border border-zinc-600 rounded text-sm text-white"
                       />
                       <select
                         value={editForm.category}
-                        onChange={e => setEditForm({ ...editForm, category: e.target.value })}
+                        onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
                         className="px-2 py-1 bg-zinc-900 border border-zinc-600 rounded text-xs text-white"
                       >
-                        {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                        {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
+                          <option key={k} value={k}>
+                            {v}
+                          </option>
+                        ))}
                       </select>
-                      <button onClick={saveEdit} className="text-xs text-green-400 hover:text-green-300">저장</button>
-                      <button onClick={() => setEditingIdx(null)} className="text-xs text-zinc-400">취소</button>
+                      <button
+                        onClick={saveEdit}
+                        className="text-xs text-green-400 hover:text-green-300"
+                      >
+                        저장
+                      </button>
+                      <button onClick={() => setEditingIdx(null)} className="text-xs text-zinc-400">
+                        취소
+                      </button>
                     </div>
                   ) : (
                     <>
                       <span className="text-sm text-zinc-200 flex-1">{f.name}</span>
-                      <span className="text-[10px] text-zinc-500">{CATEGORY_LABELS[f.category] || f.category}</span>
-                      {i >= candidates.length && <span className="text-[10px] text-blue-400">수동</span>}
+                      <span className="text-[10px] text-zinc-500">
+                        {CATEGORY_LABELS[f.category] || f.category}
+                      </span>
+                      {i >= candidates.length && (
+                        <span className="text-[10px] text-blue-400">수동</span>
+                      )}
                       <button
-                        onClick={e => { e.stopPropagation(); startEdit(i); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          startEdit(i);
+                        }}
                         className="text-[10px] text-zinc-400 hover:text-white opacity-0 group-hover:opacity-100"
                       >
                         수정
@@ -204,31 +251,49 @@ export default function FeatureDiscoveryReview({ projectId, sessionId, candidate
               <div className="mt-3 p-3 bg-zinc-900/50 border border-zinc-700 rounded space-y-2">
                 <input
                   value={manualForm.name}
-                  onChange={e => setManualForm({ ...manualForm, name: e.target.value })}
+                  onChange={(e) => setManualForm({ ...manualForm, name: e.target.value })}
                   className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-700 rounded text-sm text-white"
                   placeholder="기능 이름"
                   autoFocus
                 />
                 <input
                   value={manualForm.description}
-                  onChange={e => setManualForm({ ...manualForm, description: e.target.value })}
+                  onChange={(e) => setManualForm({ ...manualForm, description: e.target.value })}
                   className="w-full px-2 py-1.5 bg-zinc-900 border border-zinc-700 rounded text-sm text-white"
                   placeholder="설명"
                 />
                 <div className="flex gap-2">
                   <select
                     value={manualForm.category}
-                    onChange={e => setManualForm({ ...manualForm, category: e.target.value })}
+                    onChange={(e) => setManualForm({ ...manualForm, category: e.target.value })}
                     className="px-2 py-1 bg-zinc-900 border border-zinc-700 rounded text-xs text-white"
                   >
-                    {Object.entries(CATEGORY_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
+                      <option key={k} value={k}>
+                        {v}
+                      </option>
+                    ))}
                   </select>
-                  <button onClick={addManual} disabled={!manualForm.name} className="px-3 py-1 text-xs bg-blue-600 text-white rounded disabled:opacity-50">추가</button>
-                  <button onClick={() => setShowManual(false)} className="px-2 py-1 text-xs text-zinc-400">취소</button>
+                  <button
+                    onClick={addManual}
+                    disabled={!manualForm.name}
+                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded disabled:opacity-50"
+                  >
+                    추가
+                  </button>
+                  <button
+                    onClick={() => setShowManual(false)}
+                    className="px-2 py-1 text-xs text-zinc-400"
+                  >
+                    취소
+                  </button>
                 </div>
               </div>
             ) : (
-              <button onClick={() => setShowManual(true)} className="mt-3 text-sm text-blue-400 hover:text-blue-300">
+              <button
+                onClick={() => setShowManual(true)}
+                className="mt-3 text-sm text-blue-400 hover:text-blue-300"
+              >
                 + 수동 추가
               </button>
             )}
@@ -237,9 +302,16 @@ export default function FeatureDiscoveryReview({ projectId, sessionId, candidate
 
         {/* Footer */}
         <div className="px-6 py-3 border-t border-zinc-700 flex items-center justify-between">
-          <span className="text-xs text-zinc-500">{selected.size}개 기능을 service_features에 등록합니다</span>
+          <span className="text-xs text-zinc-500">
+            {selected.size}개 기능을 service_features에 등록합니다
+          </span>
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-3 py-1.5 text-sm text-zinc-400 hover:text-white">취소</button>
+            <button
+              onClick={onClose}
+              className="px-3 py-1.5 text-sm text-zinc-400 hover:text-white"
+            >
+              취소
+            </button>
             <button
               onClick={handleConfirm}
               disabled={selected.size === 0 || saving}

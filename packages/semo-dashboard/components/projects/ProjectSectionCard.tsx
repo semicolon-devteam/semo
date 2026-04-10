@@ -52,7 +52,7 @@ const SOURCE_LABELS: Record<string, string> = {
   workclaw: 'WorkClaw',
 };
 
-interface GfpSectionCardProps {
+interface ServiceSectionCardProps {
   section: ServiceSection;
   serviceId: string;
   focused?: boolean;
@@ -62,7 +62,7 @@ interface GfpSectionCardProps {
   onQASaved?: () => void;
 }
 
-export default function GfpSectionCard({
+export default function ServiceSectionCard({
   section,
   serviceId,
   focused,
@@ -70,7 +70,7 @@ export default function GfpSectionCard({
   onReject,
   onUndoReject,
   onQASaved,
-}: GfpSectionCardProps) {
+}: ServiceSectionCardProps) {
   const ref = useRef<HTMLDivElement>(null);
   const poProfile = usePoProfile();
   const [showRejectModal, setShowRejectModal] = useState(false);

@@ -10,7 +10,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const materials = await listMaterials(id);
     return NextResponse.json(materials);
   } catch (error) {
-    console.error('GFP materials list error:', error);
+    console.error('Service list error:', error);
     return NextResponse.json({ error: 'Failed to list materials' }, { status: 500 });
   }
 }
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return NextResponse.json({ material, sections_created: 0 }, { status: 201 });
   } catch (error) {
-    console.error('GFP material create error:', error);
+    console.error('Service create error:', error);
     return NextResponse.json({ error: 'Failed to create material' }, { status: 500 });
   }
 }

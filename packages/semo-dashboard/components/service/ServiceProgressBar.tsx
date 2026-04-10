@@ -3,11 +3,11 @@
 import type { PhaseProgress } from '@/lib/service';
 import { PHASE_LABELS } from '@/lib/service-phases';
 
-interface GfpProgressBarProps {
+interface ServiceProgressBarProps {
   progress: PhaseProgress[];
 }
 
-export default function ServiceProgressBar({ progress }: GfpProgressBarProps) {
+export default function ServiceProgressBar({ progress }: ServiceProgressBarProps) {
   if (progress.length === 0) return null;
 
   return (

@@ -1,5 +1,5 @@
 /**
- * GFP Design Step API
+ * Design Step API
  *
  * Phase 4 내부 디자인 서브스텝 진행 체크 및 전진.
  * POST: 현재 스텝 체크 후 가능하면 자동 전진
@@ -37,7 +37,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       blocking_sections: blockingSections,
     });
   } catch (error) {
-    console.error('GFP design step check error:', error);
+    console.error('Design step check error:', error);
     return NextResponse.json({ error: 'Failed to check design step' }, { status: 500 });
   }
 }
@@ -68,7 +68,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       { status: 400 },
     );
   } catch (error) {
-    console.error('GFP design step advance error:', error);
+    console.error('Design step advance error:', error);
     return NextResponse.json({ error: 'Failed to advance design step' }, { status: 500 });
   }
 }

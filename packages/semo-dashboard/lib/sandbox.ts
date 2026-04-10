@@ -494,7 +494,7 @@ export async function reinitializeSandbox(
     metadata: { sandbox: updatedConfig },
   });
 
-  // 5. KB gfp-id 재작성 (fire-and-forget)
+  // 5. KB service-id 재작성 (fire-and-forget)
   if (project.service_domain) {
     try {
       const { upsertItem } = await import('./kb');
@@ -508,7 +508,7 @@ export async function reinitializeSandbox(
         );
       }
     } catch (err) {
-      console.error('[SANDBOX] KB gfp-id rewrite on reinit failed:', err);
+      console.error('[SANDBOX] KB service-id rewrite on reinit failed:', err);
     }
   }
 
@@ -562,7 +562,7 @@ async function incrementRunStat(
 export { incrementRunStat };
 
 /**
- * Sandbox auto-advance 트리거 (gfp-actions.ts에서 호출).
+ * Sandbox auto-advance 트리거 (service-actions.ts에서 호출).
  * phase complete 시 다음 phase로 자동 진행.
  */
 export function triggerSandboxAdvance(

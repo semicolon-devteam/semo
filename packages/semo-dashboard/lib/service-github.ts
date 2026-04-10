@@ -1,5 +1,5 @@
 /**
- * GFP GitHub Auto-Publish
+ * GitHub Auto-Publish
  *
  * When an entire phase is approved, publish the combined content
  * to the semicolon-devteam/docs repo as a Markdown file.
@@ -49,9 +49,9 @@ export async function publishPhaseToGitHub(
         ${shaArg}`,
     );
 
-    console.log(`[GFP GitHub] Published: ${path}`);
+    console.log(`[GitHub] Published: ${path}`);
   } catch (error) {
-    console.error(`[GFP GitHub] Failed to publish ${path}:`, error);
+    console.error(`[GitHub] Failed to publish ${path}:`, error);
     throw error;
   }
 }

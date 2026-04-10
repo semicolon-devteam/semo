@@ -42,7 +42,7 @@ interface ProjectCost {
   total_output_tokens: number;
 }
 
-export default function GfpListPage() {
+export default function ServiceListPage() {
   const [projects, setProjects] = useState<ServiceProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterTab>('all');
