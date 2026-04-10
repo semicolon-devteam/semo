@@ -87,9 +87,10 @@ export default function GfpListPage() {
       .catch(() => {});
   }, [isAdmin, projectAccess]);
 
-  // 1차 뷰 기반 필터링
-  const generalProjects = projects.filter((p) => p.lifecycle === 'ops' || p.lifecycle === 'sunset');
-  const incubatorProjects = projects.filter((p) => p.lifecycle === 'build');
+  // 1차 뷰 기반 필터링: 인큐베이터 = PM 파이프라인 진행 중 (metadata.preset 존재 + build)
+  const isIncubator = (p: ServiceProject) => p.lifecycle === 'build' && p.metadata?.preset != null;
+  const incubatorProjects = projects.filter(isIncubator);
+  const generalProjects = projects.filter((p) => !isIncubator(p));
 
   // 2차 필터 (일반 탭 내부)
   const filteredGeneral =
@@ -100,6 +101,10 @@ export default function GfpListPage() {
     {
       key: 'ops',
       label: `운영 중 (${generalProjects.filter((p) => p.lifecycle === 'ops').length})`,
+    },
+    {
+      key: 'build',
+      label: `빌드 (${generalProjects.filter((p) => p.lifecycle === 'build').length})`,
     },
     {
       key: 'sunset',

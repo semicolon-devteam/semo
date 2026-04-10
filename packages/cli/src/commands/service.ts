@@ -304,6 +304,11 @@ export function registerServiceCommands(program: Command): void {
     .option('--phase <number>', '현재 phase (0-9)', parseInt)
     .option('--name <projectName>', '프로젝트명')
     .option('--owner <ownerName>', '오너명')
+    .option('--tech-stack <stack>', '기술 스택')
+    .option('--service-url <url>', '서비스 URL')
+    .option('--bm <model>', '비즈니스 모델')
+    .option('--repo <repo>', '레포지토리')
+    .option('--slack-channel <channel>', 'Slack 채널 ID')
     .action(
       async (options: {
         domain: string;
@@ -312,6 +317,11 @@ export function registerServiceCommands(program: Command): void {
         phase?: number;
         name?: string;
         owner?: string;
+        techStack?: string;
+        serviceUrl?: string;
+        bm?: string;
+        repo?: string;
+        slackChannel?: string;
       }) => {
         const pool = getPool();
         const spinner = ora('서비스 업데이트 중...').start();
@@ -346,10 +356,15 @@ export function registerServiceCommands(program: Command): void {
           if (options.phase !== undefined) updates.current_phase = options.phase;
           if (options.name) updates.project_name = options.name;
           if (options.owner) updates.owner_name = options.owner;
+          if (options.techStack !== undefined) updates.tech_stack = options.techStack;
+          if (options.serviceUrl !== undefined) updates.service_url = options.serviceUrl;
+          if (options.bm !== undefined) updates.bm = options.bm;
+          if (options.repo !== undefined) updates.repo = options.repo;
+          if (options.slackChannel !== undefined) updates.slack_channel = options.slackChannel;
 
           if (Object.keys(updates).length === 0) {
             spinner.info(
-              '업데이트할 항목이 없습니다. --status, --lifecycle, --phase 등을 지정하세요.',
+              '업데이트할 항목이 없습니다. --status, --lifecycle, --phase, --tech-stack 등을 지정하세요.',
             );
             await closeConnection();
             return;

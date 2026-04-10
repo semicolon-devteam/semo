@@ -5,9 +5,9 @@
  * 자동으로 이식. KB 엔트리 전수 조사(audit) 후 매핑/비매핑 분류.
  */
 
-import { Pool } from "pg";
-import chalk from "chalk";
-import { kbGet, kbList, kbUpsert } from "./kb";
+import { Pool } from 'pg';
+import chalk from 'chalk';
+import { kbGet, kbList, kbUpsert } from './kb';
 
 // ── Types ──
 
@@ -42,7 +42,7 @@ export interface MigrationRow {
 
 export interface MigrationResult {
   domain: string;
-  action: "created" | "skipped" | "error";
+  action: 'created' | 'skipped' | 'error';
   projectId?: string;
   audit: AuditResult;
   error?: string;
@@ -51,53 +51,47 @@ export interface MigrationResult {
 // ── KB Status Mapping ──
 
 export const STATUS_MAP: Record<string, { lifecycle: string; status: string }> = {
-  active: { lifecycle: "ops", status: "active" },
-  hold: { lifecycle: "ops", status: "paused" },
-  maintenance: { lifecycle: "ops", status: "active" },
-  completed: { lifecycle: "sunset", status: "completed" },
-  deprecated: { lifecycle: "sunset", status: "completed" },
+  active: { lifecycle: 'ops', status: 'active' },
+  hold: { lifecycle: 'ops', status: 'paused' },
+  maintenance: { lifecycle: 'ops', status: 'active' },
+  completed: { lifecycle: 'sunset', status: 'completed' },
+  deprecated: { lifecycle: 'sunset', status: 'completed' },
 };
 
 // Keys that map directly to services columns
 const COLUMN_KEYS: Record<string, string> = {
-  "base-information": "project_name",
-  po: "owner_name",
-  status: "status+lifecycle",
+  'base-information': 'project_name',
+  po: 'owner_name',
+  status: 'status+lifecycle',
 };
 
 // Keys that go into metadata JSONB
-const METADATA_KEYS = new Set([
-  "repo",
-  "slack-channel",
-  "tech-stack",
-  "service-url",
-  "bm",
-]);
+const METADATA_KEYS = new Set(['repo', 'slack-channel', 'tech-stack', 'service-url', 'bm']);
 
 // Keys that stay in KB only (normal)
 const KB_ONLY_KEYS = new Set([
-  "current-situation",
-  "kpi",
-  "milestone",
-  "decision",
-  "process",
-  "infra",
+  'current-situation',
+  'kpi',
+  'milestone',
+  'decision',
+  'process',
+  'infra',
 ]);
 
 // Projection keys (auto-managed by pm-pipeline)
 const PROJECTION_KEYS = new Set([
-  "spec",
-  "pm-status",
-  "gfp-status",
-  "gfp-id",
-  "infra-status",
-  "pm-summary",
+  'spec',
+  'pm-status',
+  'gfp-status',
+  'gfp-id',
+  'infra-status',
+  'pm-summary',
 ]);
 
 // ── Core Functions ──
 
 export async function getUnregisteredServices(
-  pool: Pool
+  pool: Pool,
 ): Promise<Array<{ domain: string; description: string | null; created_at: string | null }>> {
   const result = await pool.query(
     `SELECT o.domain, o.description, o.created_at::text
@@ -107,16 +101,14 @@ export async function getUnregisteredServices(
        AND NOT EXISTS (
          SELECT 1 FROM semo.services sp WHERE sp.service_domain = o.domain
        )
-     ORDER BY o.domain`
+     ORDER BY o.domain`,
   );
   return result.rows;
 }
 
-export async function getRegisteredServices(
-  pool: Pool
-): Promise<string[]> {
+export async function getRegisteredServices(pool: Pool): Promise<string[]> {
   const result = await pool.query(
-    `SELECT service_domain FROM semo.services WHERE service_domain IS NOT NULL`
+    `SELECT service_domain FROM semo.services WHERE service_domain IS NOT NULL`,
   );
   return result.rows.map((r: { service_domain: string }) => r.service_domain);
 }
@@ -125,7 +117,7 @@ export async function auditServiceKBEntries(
   pool: Pool,
   domain: string,
   ontologyDescription: string | null,
-  ontologyCreatedAt: string | null
+  ontologyCreatedAt: string | null,
 ): Promise<AuditResult> {
   // Fetch ALL KB entries for this domain
   const entriesResult = await pool.query(
@@ -133,22 +125,22 @@ export async function auditServiceKBEntries(
      FROM semo.knowledge_base
      WHERE domain = $1
      ORDER BY key, sub_key`,
-    [domain]
+    [domain],
   );
-  const entries = (entriesResult.rows as Array<{
-    key: string;
-    sub_key: string;
-    content: string;
-  }>).map((e) => ({ ...e, content: (e.content ?? "").substring(0, 500) }));
+  const entries = (
+    entriesResult.rows as Array<{
+      key: string;
+      sub_key: string;
+      content: string;
+    }>
+  ).map((e) => ({ ...e, content: (e.content ?? '').substring(0, 500) }));
 
   // Fetch allowed keys from type schema
   const schemaResult = await pool.query(
     `SELECT scheme_key, COALESCE(source, 'manual') as source
-     FROM semo.kb_type_schema WHERE type_key = 'service'`
+     FROM semo.kb_type_schema WHERE type_key = 'service'`,
   );
-  const allowedKeys = new Set(
-    schemaResult.rows.map((r: { scheme_key: string }) => r.scheme_key)
-  );
+  const allowedKeys = new Set(schemaResult.rows.map((r: { scheme_key: string }) => r.scheme_key));
 
   const audit: AuditResult = {
     domain,
@@ -173,14 +165,14 @@ export async function auditServiceKBEntries(
   for (const [key, items] of byKey) {
     if (COLUMN_KEYS[key]) {
       // Maps to services column
-      const firstContent = items[0]?.content ?? "";
+      const firstContent = items[0]?.content ?? '';
       audit.mapped.push({
         key,
         target: COLUMN_KEYS[key],
         value: firstContent.substring(0, 200),
       });
     } else if (METADATA_KEYS.has(key)) {
-      const firstContent = items[0]?.content ?? "";
+      const firstContent = items[0]?.content ?? '';
       audit.metadata.push({ key, value: firstContent.substring(0, 200) });
     } else if (KB_ONLY_KEYS.has(key)) {
       audit.kbOnly.push({ key, count: items.length });
@@ -200,7 +192,7 @@ export async function auditServiceKBEntries(
   }
 
   // Check required keys
-  for (const reqKey of ["base-information", "po", "status"]) {
+  for (const reqKey of ['base-information', 'po', 'status']) {
     if (!byKey.has(reqKey)) {
       audit.missingRequired.push(reqKey);
     }
@@ -209,15 +201,13 @@ export async function auditServiceKBEntries(
   return audit;
 }
 
-export function buildServiceProjectRow(
-  audit: AuditResult
-): MigrationRow {
+export function buildServiceProjectRow(audit: AuditResult): MigrationRow {
   // Extract project_name from base-information
-  const baseInfo = audit.mapped.find((m) => m.key === "base-information");
+  const baseInfo = audit.mapped.find((m) => m.key === 'base-information');
   let projectName = audit.domain; // fallback
   if (baseInfo) {
     // Take first line or first sentence as project name
-    const firstLine = baseInfo.value.split("\n")[0].trim();
+    const firstLine = baseInfo.value.split('\n')[0].trim();
     // Try to extract name pattern like "AXOracle — 오라클 정보 플랫폼"
     const match = firstLine.match(/^([^—–\-]+)/);
     projectName = match ? match[1].trim() : firstLine.substring(0, 100);
@@ -227,18 +217,16 @@ export function buildServiceProjectRow(
   }
 
   // Extract owner from po
-  const poEntry = audit.mapped.find((m) => m.key === "po");
-  const ownerName = poEntry ? poEntry.value.split("\n")[0].trim().substring(0, 100) : "TBD";
+  const poEntry = audit.mapped.find((m) => m.key === 'po');
+  const ownerName = poEntry ? poEntry.value.split('\n')[0].trim().substring(0, 100) : 'TBD';
 
   // Map status
-  const statusEntry = audit.mapped.find((m) => m.key === "status");
-  const rawStatus = statusEntry
-    ? statusEntry.value.split("\n")[0].trim().toLowerCase()
-    : "active";
-  const mapping = STATUS_MAP[rawStatus] ?? STATUS_MAP["active"];
+  const statusEntry = audit.mapped.find((m) => m.key === 'status');
+  const rawStatus = statusEntry ? statusEntry.value.split('\n')[0].trim().toLowerCase() : 'active';
+  const mapping = STATUS_MAP[rawStatus] ?? STATUS_MAP['active'];
 
   // Build metadata from repo, slack-channel, tech-stack, etc.
-  const meta: Record<string, unknown> = { source: "kb-migration" };
+  const meta: Record<string, unknown> = { source: 'kb-migration' };
   for (const m of audit.metadata) {
     meta[m.key] = m.value;
   }
@@ -254,10 +242,7 @@ export function buildServiceProjectRow(
   };
 }
 
-export async function insertServiceProject(
-  pool: Pool,
-  row: MigrationRow
-): Promise<string> {
+export async function insertServiceProject(pool: Pool, row: MigrationRow): Promise<string> {
   const result = await pool.query(
     `INSERT INTO semo.services
        (project_name, owner_name, service_domain, status, lifecycle, launched_at, metadata)
@@ -271,7 +256,7 @@ export async function insertServiceProject(
       row.lifecycle,
       row.launched_at,
       JSON.stringify(row.metadata),
-    ]
+    ],
   );
   return result.rows[0].service_id;
 }
@@ -281,7 +266,7 @@ export async function writePmSummaryToKB(
   domain: string,
   projectId: string,
   row: MigrationRow,
-  kbEntryCount: number
+  kbEntryCount: number,
 ): Promise<void> {
   const content = [
     `service_id: ${projectId}`,
@@ -292,54 +277,56 @@ export async function writePmSummaryToKB(
     `registered_at: ${new Date().toISOString()}`,
     `kb_entries: ${kbEntryCount}`,
     `owner: ${row.owner_name}`,
-  ].join("\n");
+  ].join('\n');
 
   await kbUpsert(pool, {
     domain,
-    key: "pm-summary",
+    key: 'pm-summary',
     content,
-    created_by: "pm-pipeline",
+    created_by: 'pm-pipeline',
   });
 }
 
 // ── Reporting ──
 
 export function printAuditReport(results: MigrationResult[]): void {
-  const created = results.filter((r) => r.action === "created");
-  const skipped = results.filter((r) => r.action === "skipped");
-  const errors = results.filter((r) => r.action === "error");
+  const created = results.filter((r) => r.action === 'created');
+  const skipped = results.filter((r) => r.action === 'skipped');
+  const errors = results.filter((r) => r.action === 'error');
 
   console.log(chalk.cyan.bold(`\n📊 서비스 이식 결과\n`));
   console.log(
-    `  ${chalk.green(`✓ 등록: ${created.length}`)}  ${chalk.yellow(`⊘ 건너뜀: ${skipped.length}`)}  ${chalk.red(`✗ 오류: ${errors.length}`)}`
+    `  ${chalk.green(`✓ 등록: ${created.length}`)}  ${chalk.yellow(`⊘ 건너뜀: ${skipped.length}`)}  ${chalk.red(`✗ 오류: ${errors.length}`)}`,
   );
 
   for (const r of results) {
     const icon =
-      r.action === "created" ? chalk.green("✓") :
-      r.action === "skipped" ? chalk.yellow("⊘") :
-      chalk.red("✗");
+      r.action === 'created'
+        ? chalk.green('✓')
+        : r.action === 'skipped'
+          ? chalk.yellow('⊘')
+          : chalk.red('✗');
 
     console.log(`\n  ${icon} ${chalk.bold(r.domain)}`);
 
-    if (r.action === "created") {
+    if (r.action === 'created') {
       console.log(
         chalk.gray(
           `    service_id: ${r.projectId}\n` +
-          `    mapped: ${r.audit.mapped.map((m) => m.key).join(", ") || "(없음)"}\n` +
-          `    metadata: ${r.audit.metadata.map((m) => m.key).join(", ") || "(없음)"}\n` +
-          `    kb-only: ${r.audit.kbOnly.map((k) => `${k.key}(${k.count})`).join(", ") || "(없음)"}`
-        )
+            `    mapped: ${r.audit.mapped.map((m) => m.key).join(', ') || '(없음)'}\n` +
+            `    metadata: ${r.audit.metadata.map((m) => m.key).join(', ') || '(없음)'}\n` +
+            `    kb-only: ${r.audit.kbOnly.map((k) => `${k.key}(${k.count})`).join(', ') || '(없음)'}`,
+        ),
       );
     }
 
-    if (r.action === "error") {
+    if (r.action === 'error') {
       console.log(chalk.red(`    ${r.error}`));
     }
 
     // Warnings
     if (r.audit.warnings.length > 0) {
-      console.log(chalk.yellow("    ⚠ 비표준 키:"));
+      console.log(chalk.yellow('    ⚠ 비표준 키:'));
       for (const w of r.audit.warnings) {
         console.log(chalk.yellow(`      ${w.key}: ${w.reason}`));
         console.log(chalk.gray(`        → ${w.suggestion}`));
@@ -348,11 +335,7 @@ export function printAuditReport(results: MigrationResult[]): void {
 
     // Missing required
     if (r.audit.missingRequired.length > 0) {
-      console.log(
-        chalk.yellow(
-          `    ⚠ 필수 키 누락: ${r.audit.missingRequired.join(", ")}`
-        )
-      );
+      console.log(chalk.yellow(`    ⚠ 필수 키 누락: ${r.audit.missingRequired.join(', ')}`));
     }
   }
 
@@ -366,18 +349,22 @@ export function printDryRunReport(results: MigrationResult[]): void {
   for (const r of results) {
     const row = buildServiceProjectRow(r.audit);
     console.log(chalk.bold(`  ${r.domain}`));
-    console.log(chalk.gray(
-      `    → project_name: ${row.project_name}\n` +
-      `    → owner_name: ${row.owner_name}\n` +
-      `    → lifecycle: ${row.lifecycle}, status: ${row.status}\n` +
-      `    → launched_at: ${row.launched_at ?? 'NOW()'}\n` +
-      `    → metadata keys: ${Object.keys(row.metadata).join(", ")}`
-    ));
+    console.log(
+      chalk.gray(
+        `    → project_name: ${row.project_name}\n` +
+          `    → owner_name: ${row.owner_name}\n` +
+          `    → lifecycle: ${row.lifecycle}, status: ${row.status}\n` +
+          `    → launched_at: ${row.launched_at ?? 'NOW()'}\n` +
+          `    → metadata keys: ${Object.keys(row.metadata).join(', ')}`,
+      ),
+    );
 
     if (r.audit.kbOnly.length > 0) {
-      console.log(chalk.gray(
-        `    → kb-only: ${r.audit.kbOnly.map((k) => `${k.key}(${k.count})`).join(", ")}`
-      ));
+      console.log(
+        chalk.gray(
+          `    → kb-only: ${r.audit.kbOnly.map((k) => `${k.key}(${k.count})`).join(', ')}`,
+        ),
+      );
     }
 
     if (r.audit.warnings.length > 0) {
@@ -388,11 +375,7 @@ export function printDryRunReport(results: MigrationResult[]): void {
     }
 
     if (r.audit.missingRequired.length > 0) {
-      console.log(
-        chalk.yellow(
-          `    ⚠ 필수 키 누락: ${r.audit.missingRequired.join(", ")}`
-        )
-      );
+      console.log(chalk.yellow(`    ⚠ 필수 키 누락: ${r.audit.missingRequired.join(', ')}`));
     }
 
     console.log();
@@ -421,7 +404,7 @@ export interface ServiceProjectRow {
 
 export async function getServiceProjectByDomain(
   pool: Pool,
-  domain: string
+  domain: string,
 ): Promise<ServiceProjectRow | null> {
   const result = await pool.query(
     `SELECT service_id, project_name, service_domain, owner_name, owner_contact,
@@ -430,7 +413,7 @@ export async function getServiceProjectByDomain(
             created_at::text, updated_at::text
      FROM semo.services
      WHERE service_domain = $1`,
-    [domain]
+    [domain],
   );
   return result.rows[0] ?? null;
 }
@@ -442,12 +425,17 @@ export interface ServiceProjectUpdate {
   project_name?: string;
   owner_name?: string;
   metadata?: Record<string, unknown>;
+  tech_stack?: string;
+  service_url?: string;
+  bm?: string;
+  repo?: string;
+  slack_channel?: string;
 }
 
 export async function updateServiceProject(
   pool: Pool,
   domain: string,
-  updates: ServiceProjectUpdate
+  updates: ServiceProjectUpdate,
 ): Promise<ServiceProjectRow | null> {
   const sets: string[] = [];
   const params: unknown[] = [];
@@ -473,7 +461,7 @@ export async function updateServiceProject(
     sets.push(`lifecycle = $${idx++}`);
     params.push(updates.lifecycle);
     // ops 전환 시 launched_at 자동 설정
-    if (updates.lifecycle === "ops") {
+    if (updates.lifecycle === 'ops') {
       sets.push(`launched_at = COALESCE(launched_at, NOW())`);
     }
   }
@@ -481,17 +469,38 @@ export async function updateServiceProject(
     sets.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${idx++}::jsonb`);
     params.push(JSON.stringify(updates.metadata));
   }
+  if (updates.tech_stack !== undefined) {
+    sets.push(`tech_stack = $${idx++}`);
+    params.push(updates.tech_stack);
+  }
+  if (updates.service_url !== undefined) {
+    sets.push(`service_url = $${idx++}`);
+    params.push(updates.service_url);
+  }
+  if (updates.bm !== undefined) {
+    sets.push(`bm = $${idx++}`);
+    params.push(updates.bm);
+  }
+  if (updates.repo !== undefined) {
+    sets.push(`repo = $${idx++}`);
+    params.push(updates.repo);
+  }
+  if (updates.slack_channel !== undefined) {
+    sets.push(`slack_channel = $${idx++}`);
+    params.push(updates.slack_channel);
+  }
 
   if (sets.length === 0) return getServiceProjectByDomain(pool, domain);
 
   params.push(domain);
   const result = await pool.query(
-    `UPDATE semo.services SET ${sets.join(", ")}
+    `UPDATE semo.services SET ${sets.join(', ')}
      WHERE service_domain = $${idx}
      RETURNING service_id, project_name, service_domain, owner_name, owner_contact,
                current_phase, infra_phase, status, lifecycle,
+               tech_stack, service_url, bm, repo, slack_channel,
                launched_at::text, metadata, created_at::text, updated_at::text`,
-    params
+    params,
   );
   return result.rows[0] ?? null;
 }
@@ -507,7 +516,7 @@ export interface DiagnoseMismatch {
 
 export interface DiagnoseResult {
   domain: string;
-  verdict: "healthy" | "mismatch" | "kb-only" | "sp-only" | "missing";
+  verdict: 'healthy' | 'mismatch' | 'kb-only' | 'sp-only' | 'missing';
   kbEntryCount: number;
   kbKeys: string[];
   serviceProject: ServiceProjectRow | null;
@@ -515,15 +524,12 @@ export interface DiagnoseResult {
   missingRequired: string[];
 }
 
-export async function diagnoseServiceStatus(
-  pool: Pool,
-  domain: string
-): Promise<DiagnoseResult> {
+export async function diagnoseServiceStatus(pool: Pool, domain: string): Promise<DiagnoseResult> {
   // 1. KB 도메인 존재 확인
   const ontoResult = await pool.query(
     `SELECT domain, description, created_at::text
      FROM semo.ontology WHERE domain = $1 AND entity_type = 'service'`,
-    [domain]
+    [domain],
   );
   const kbExists = ontoResult.rows.length > 0;
 
@@ -534,7 +540,7 @@ export async function diagnoseServiceStatus(
   if (!kbExists && !sp) {
     return {
       domain,
-      verdict: "missing",
+      verdict: 'missing',
       kbEntryCount: 0,
       kbKeys: [],
       serviceProject: null,
@@ -546,7 +552,7 @@ export async function diagnoseServiceStatus(
   if (!kbExists && sp) {
     return {
       domain,
-      verdict: "sp-only",
+      verdict: 'sp-only',
       kbEntryCount: 0,
       kbKeys: [],
       serviceProject: sp,
@@ -558,25 +564,25 @@ export async function diagnoseServiceStatus(
   // KB 엔트리 목록
   const entriesResult = await pool.query(
     `SELECT DISTINCT key FROM semo.knowledge_base WHERE domain = $1 ORDER BY key`,
-    [domain]
+    [domain],
   );
   const kbKeys = entriesResult.rows.map((r: { key: string }) => r.key);
 
   const countResult = await pool.query(
     `SELECT COUNT(*)::int as cnt FROM semo.knowledge_base WHERE domain = $1`,
-    [domain]
+    [domain],
   );
   const kbEntryCount = countResult.rows[0]?.cnt ?? 0;
 
   if (kbExists && !sp) {
     // 필수 키 체크
     const missingRequired: string[] = [];
-    for (const req of ["base-information", "po", "status"]) {
+    for (const req of ['base-information', 'po', 'status']) {
       if (!kbKeys.includes(req)) missingRequired.push(req);
     }
     return {
       domain,
-      verdict: "kb-only",
+      verdict: 'kb-only',
       kbEntryCount,
       kbKeys,
       serviceProject: null,
@@ -593,15 +599,15 @@ export async function diagnoseServiceStatus(
     `SELECT content FROM semo.knowledge_base
      WHERE domain = $1 AND key = 'status' AND (sub_key IS NULL OR sub_key = '')
      LIMIT 1`,
-    [domain]
+    [domain],
   );
   if (statusEntry.rows.length > 0 && sp) {
-    const kbStatus = statusEntry.rows[0].content.split("\n")[0].trim().toLowerCase();
+    const kbStatus = statusEntry.rows[0].content.split('\n')[0].trim().toLowerCase();
     const expected = STATUS_MAP[kbStatus];
     if (expected) {
       if (expected.lifecycle !== sp.lifecycle) {
         mismatches.push({
-          field: "lifecycle",
+          field: 'lifecycle',
           kbValue: `status=${kbStatus} → lifecycle=${expected.lifecycle}`,
           spValue: sp.lifecycle,
           expected: expected.lifecycle,
@@ -609,7 +615,7 @@ export async function diagnoseServiceStatus(
       }
       if (expected.status !== sp.status) {
         mismatches.push({
-          field: "status",
+          field: 'status',
           kbValue: `status=${kbStatus} → status=${expected.status}`,
           spValue: sp.status,
           expected: expected.status,
@@ -623,13 +629,13 @@ export async function diagnoseServiceStatus(
     `SELECT content FROM semo.knowledge_base
      WHERE domain = $1 AND key = 'po' AND (sub_key IS NULL OR sub_key = '')
      LIMIT 1`,
-    [domain]
+    [domain],
   );
   if (poEntry.rows.length > 0 && sp) {
-    const kbPo = poEntry.rows[0].content.split("\n")[0].trim().toLowerCase();
+    const kbPo = poEntry.rows[0].content.split('\n')[0].trim().toLowerCase();
     if (kbPo !== sp.owner_name.toLowerCase()) {
       mismatches.push({
-        field: "owner",
+        field: 'owner',
         kbValue: kbPo,
         spValue: sp.owner_name,
         expected: kbPo,
@@ -638,27 +644,27 @@ export async function diagnoseServiceStatus(
   }
 
   // section 존재 여부 vs current_phase
-  if (sp && sp.lifecycle === "build" && sp.current_phase > 0) {
+  if (sp && sp.lifecycle === 'build' && sp.current_phase > 0) {
     const sectionResult = await pool.query(
       `SELECT COUNT(*)::int as cnt
        FROM semo.service_sections
        WHERE service_id = $1 AND status = 'approved'`,
-      [sp.service_id]
+      [sp.service_id],
     );
     const approvedSections = sectionResult.rows[0]?.cnt ?? 0;
     if (approvedSections === 0 && sp.current_phase > 0) {
       mismatches.push({
-        field: "phase",
-        kbValue: "승인된 섹션 0개",
+        field: 'phase',
+        kbValue: '승인된 섹션 0개',
         spValue: `current_phase=${sp.current_phase}`,
-        expected: "phase=0 (승인된 섹션 없음)",
+        expected: 'phase=0 (승인된 섹션 없음)',
       });
     }
   }
 
   return {
     domain,
-    verdict: mismatches.length > 0 ? "mismatch" : "healthy",
+    verdict: mismatches.length > 0 ? 'mismatch' : 'healthy',
     kbEntryCount,
     kbKeys,
     serviceProject: sp,
