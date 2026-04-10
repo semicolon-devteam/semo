@@ -87,8 +87,9 @@ export default function GfpListPage() {
       .catch(() => {});
   }, [isAdmin, projectAccess]);
 
-  // 1차 뷰 기반 필터링: 인큐베이터 = PM 파이프라인 진행 중 (metadata.preset 존재 + build)
-  const isIncubator = (p: ServiceProject) => p.lifecycle === 'build' && p.metadata?.preset != null;
+  // 1차 뷰 기반 필터링: 인큐베이터 = PM 파이프라인 또는 인큐베이터 CP 진행 중
+  const isIncubator = (p: ServiceProject) =>
+    p.lifecycle === 'build' && (p.metadata?.preset != null || p.metadata?.incubator != null);
   const incubatorProjects = projects.filter(isIncubator);
   const generalProjects = projects.filter((p) => !isIncubator(p));
 
