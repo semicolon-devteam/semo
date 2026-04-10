@@ -12,14 +12,18 @@ export const dynamic = 'force-dynamic';
 
 const HEARTBEAT_SECRET = process.env.SEMO_HEARTBEAT_SECRET || '';
 
+if (!HEARTBEAT_SECRET) {
+  console.warn(
+    '[heartbeat] SEMO_HEARTBEAT_SECRET is not set — heartbeat endpoint is unauthenticated. Set the env var to enable auth.',
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
-    // shared secret 검증 (스푸핑 방지)
-    if (HEARTBEAT_SECRET) {
-      const token = request.headers.get('x-heartbeat-token');
-      if (token !== HEARTBEAT_SECRET) {
-        return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
-      }
+    // shared secret 검증 (스푸핑 방지) — 미설정 시 경고 로그 후 허용 (개발 호환)
+    const token = request.headers.get('x-heartbeat-token');
+    if (HEARTBEAT_SECRET && token !== HEARTBEAT_SECRET) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
     }
 
     const body = await request.json();
