@@ -77,10 +77,8 @@ export async function POST(request: NextRequest) {
         const { dispatchLiveSandboxPhase } = await import('@/lib/sandbox');
         const { getScenario } = await import('@/lib/sandbox-scenarios');
         const { getPhaseAssignee } = await import('@/lib/service-phases');
-        const scenario = getScenario(sandbox.scenario_id);
-        if (scenario) {
-          await dispatchLiveSandboxPhase(service_id, nextPhase, scenario, sandbox);
-        }
+        const scenario = sandbox.scenario_id ? getScenario(sandbox.scenario_id) : null;
+        await dispatchLiveSandboxPhase(service_id, nextPhase, scenario, sandbox);
         const assignee = getPhaseAssignee(nextPhase);
         return NextResponse.json({
           message: `Phase ${nextPhase} 봇 디스패치 완료 — ${assignee.botId}가 작업 중`,
@@ -104,7 +102,7 @@ export async function POST(request: NextRequest) {
       }
 
       // 기존 일괄 주입
-      const sections = await injectMockSections(service_id, nextPhase, sandbox.scenario_id);
+      const sections = await injectMockSections(service_id, nextPhase, sandbox.scenario_id!);
       return NextResponse.json({
         message: `Phase ${nextPhase} Mock 주입 완료 (${sections.length}개 섹션)`,
         phase: nextPhase,
@@ -164,7 +162,7 @@ export async function POST(request: NextRequest) {
         ?.sandbox as SandboxConfig;
 
       if (updatedSandbox.mode === 'mock') {
-        const sections = await injectMockSections(service_id, 0, updatedSandbox.scenario_id);
+        const sections = await injectMockSections(service_id, 0, updatedSandbox.scenario_id!);
 
         if (updatedSandbox.virtual_po.mode !== 'interactive') {
           const { processVirtualPOReviewBatch } = await import('@/lib/sandbox-virtual-po');

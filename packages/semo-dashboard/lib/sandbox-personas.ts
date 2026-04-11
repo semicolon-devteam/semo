@@ -71,6 +71,18 @@ export const SANDBOX_PERSONAS: Record<string, SandboxPersona> = {
     domain_context:
       '소형 동물병원 원장. 예약/진료기록/보호자 알림 시스템이 필요. 기존 종이 차트에서 디지털 전환 원함. 개인정보 보호 중요.',
   },
+  generic: {
+    id: 'generic',
+    name: 'Sandbox PO',
+    po_profile: {
+      tech_level: 'basic',
+      design_sensitivity: 'medium',
+      domain_area: 'product',
+      interaction_style: 'detailed',
+      decision_style: 'options',
+    },
+    domain_context: '범용 샌드박스. 사용자가 제공한 프로젝트 설명을 기반으로 진행합니다.',
+  },
 };
 
 export function getPersona(personaId: string): SandboxPersona | null {

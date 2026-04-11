@@ -26,10 +26,18 @@ import type {
 
 const MAX_CONCURRENT_SANDBOXES = 3;
 
+// ── Helpers ──
+
+export function isEmptyMode(config: SandboxConfig): boolean {
+  return !config.scenario_id;
+}
+
 // ── Create ──
 
 export interface CreateSandboxParams {
-  scenario_id: string;
+  scenario_id?: string;
+  project_name?: string;
+  initial_description?: string;
   depth: SandboxDepth;
   mode?: SandboxMode;
   virtual_po_mode: SandboxVirtualPOMode;
@@ -56,24 +64,36 @@ export async function createSandboxProject(
     };
   }
 
-  const scenario = getScenario(params.scenario_id);
-  if (!scenario) {
-    return {
-      project: null as unknown as ServiceProject,
-      error: `시나리오 '${params.scenario_id}'를 찾을 수 없습니다.`,
-    };
-  }
+  // Empty 모드: scenario_id 없이 생성
+  const isEmpty = !params.scenario_id;
 
-  const persona = getPersona(scenario.persona_id);
-  if (!persona) {
-    return {
-      project: null as unknown as ServiceProject,
-      error: `페르소나 '${scenario.persona_id}'를 찾을 수 없습니다.`,
-    };
+  let scenario: ReturnType<typeof getScenario> = null;
+  let persona = getPersona('generic')!;
+
+  if (!isEmpty) {
+    scenario = getScenario(params.scenario_id!);
+    if (!scenario) {
+      return {
+        project: null as unknown as ServiceProject,
+        error: `시나리오 '${params.scenario_id}'를 찾을 수 없습니다.`,
+      };
+    }
+    const scenarioPersona = getPersona(scenario.persona_id);
+    if (!scenarioPersona) {
+      return {
+        project: null as unknown as ServiceProject,
+        error: `페르소나 '${scenario.persona_id}'를 찾을 수 없습니다.`,
+      };
+    }
+    persona = scenarioPersona;
   }
 
   const shortId = Math.random().toString(36).slice(2, 6);
-  const serviceDomain = `sandbox-${params.scenario_id}-${shortId}`;
+  const serviceDomain = isEmpty
+    ? `sandbox-empty-${shortId}`
+    : `sandbox-${params.scenario_id}-${shortId}`;
+  // Empty 모드는 mock 데이터가 없으므로 항상 live
+  const resolvedMode: SandboxMode = isEmpty ? 'live' : (params.mode ?? 'mock');
 
   // Phase별 거절 가중치 (디자인/기술설계 집중)
   const defaultPhaseWeights: Record<number, number> = {
@@ -92,19 +112,20 @@ export async function createSandboxProject(
   const sandboxConfig: SandboxConfig = {
     enabled: true,
     depth: params.depth,
-    mode: params.mode ?? 'mock',
+    mode: resolvedMode,
     virtual_po: {
       mode: params.virtual_po_mode,
-      persona_id: scenario.persona_id,
+      persona_id: isEmpty ? 'generic' : scenario!.persona_id,
       rejection_rate: params.rejection_rate ?? 0.15,
       phase_rejection_weights:
         params.virtual_po_mode === 'semi-auto' ? defaultPhaseWeights : undefined,
     },
     scenario_id: params.scenario_id,
+    initial_description: isEmpty ? params.initial_description : undefined,
     auto_advance: params.auto_advance ?? params.virtual_po_mode !== 'interactive',
     slack_suppress: false,
-    progressive_reveal: (params.mode ?? 'mock') !== 'live',
-    phase_timeout_ms: (params.mode ?? 'mock') === 'live' ? 300000 : undefined,
+    progressive_reveal: resolvedMode !== 'live',
+    phase_timeout_ms: resolvedMode === 'live' ? 300000 : undefined,
     timing: {
       phase_delay_ms: params.phase_delay_ms ?? 500,
       section_delay_ms: params.section_delay_ms ?? 300,
@@ -120,21 +141,26 @@ export async function createSandboxProject(
     reinit_count: 0,
   };
 
+  const projectName = isEmpty
+    ? `[SANDBOX] ${params.project_name ?? 'Empty Sandbox'}`
+    : `[SANDBOX] ${scenario!.project_name}`;
+
   const project = await createProject({
-    project_name: `[SANDBOX] ${scenario.project_name}`,
+    project_name: projectName,
     owner_name: `${persona.name} (Virtual PO)`,
     owner_contact: 'sandbox@semo.internal',
     service_domain: serviceDomain,
     metadata: {
-      preset: scenario.preset,
+      preset: isEmpty ? 'parallel' : scenario!.preset,
       po_profile: persona.po_profile,
       sandbox: sandboxConfig,
-      preset_config: scenario.infra_config ? { infra: scenario.infra_config } : undefined,
+      preset_config:
+        !isEmpty && scenario!.infra_config ? { infra: scenario!.infra_config } : undefined,
     },
   });
 
   console.log(
-    `[SANDBOX] Created project "${project.project_name}" (${project.service_id}) — scenario: ${params.scenario_id}, depth: ${params.depth}, po: ${params.virtual_po_mode}`,
+    `[SANDBOX] Created project "${project.project_name}" (${project.service_id}) — ${isEmpty ? 'empty mode' : `scenario: ${params.scenario_id}`}, depth: ${params.depth}, po: ${params.virtual_po_mode}`,
   );
 
   return { project };
@@ -205,14 +231,14 @@ export async function injectAndReviewProgressive(
   phase: number,
   sandbox: SandboxConfig,
 ): Promise<void> {
-  const scenario = getScenario(sandbox.scenario_id);
+  const scenario = getScenario(sandbox.scenario_id!);
   if (!scenario) return;
 
   const mockSections = scenario.mock_sections[phase];
   const items =
     mockSections && mockSections.length > 0
       ? mockSections
-      : [generatePlaceholderSection(phase, sandbox.scenario_id)];
+      : [generatePlaceholderSection(phase, sandbox.scenario_id!)];
 
   // 1. 모든 섹션을 draft로 한꺼번에 등록
   const sections: ServiceSection[] = [];
@@ -338,9 +364,14 @@ export interface SandboxReport {
   sections_by_phase: Record<number, { total: number; approved: number; rejected: number }>;
   run_stats: SandboxConfig['run_stats'];
   verification: { passed: boolean; issues: string[] };
+  /** include_sections=true 시 전체 섹션 콘텐츠 */
+  sections_detail?: ServiceSection[];
 }
 
-export async function getSandboxReport(serviceId: string): Promise<SandboxReport | null> {
+export async function getSandboxReport(
+  serviceId: string,
+  options?: { include_sections?: boolean },
+): Promise<SandboxReport | null> {
   const project = await getProject(serviceId);
   if (!project) return null;
 
@@ -362,9 +393,9 @@ export async function getSandboxReport(serviceId: string): Promise<SandboxReport
     if (s.status === 'rejected') sectionsByPhase[s.phase].rejected++;
   }
 
-  // 간단한 검증
+  // 검증: empty 모드(시나리오 없음)에서는 expected_section_counts 스킵
   const issues: string[] = [];
-  const scenario = getScenario(sandbox.scenario_id);
+  const scenario = sandbox.scenario_id ? getScenario(sandbox.scenario_id) : null;
   if (scenario) {
     for (const [phase, expected] of Object.entries(scenario.expected_section_counts)) {
       const phaseNum = Number(phase);
@@ -381,6 +412,7 @@ export async function getSandboxReport(serviceId: string): Promise<SandboxReport
     sections_by_phase: sectionsByPhase,
     run_stats: sandbox.run_stats,
     verification: { passed: issues.length === 0, issues },
+    ...(options?.include_sections ? { sections_detail: allSections } : {}),
   };
 }
 
@@ -575,6 +607,11 @@ export function triggerSandboxAdvance(
   // interactive 모드에서도 mock 주입은 진행 (auto_advance=false라도)
   if (!sandbox.auto_advance && sandbox.virtual_po.mode !== 'interactive') return;
 
+  // 완료된 phase 타이밍 기록 (nextPhase - 1이 방금 완료된 phase)
+  if (nextPhase > 0) {
+    logPhaseComplete(serviceId, nextPhase - 1).catch(() => {});
+  }
+
   scheduleSandboxNextPhase(serviceId, nextPhase, metadata).catch((err) =>
     console.error('[SANDBOX] Auto-advance trigger failed:', err),
   );
@@ -608,12 +645,10 @@ export async function scheduleSandboxNextPhase(
   if (!sandbox?.enabled) return;
   if (!sandbox.auto_advance && sandbox.virtual_po.mode !== 'interactive') return;
 
-  // Live 모드: 실제 봇에게 디스패치
+  // Live 모드: 실제 봇에게 디스패치 (empty 모드 포함)
   if (sandbox.mode === 'live') {
-    const scenario = getScenario(sandbox.scenario_id);
-    if (scenario) {
-      await dispatchLiveSandboxPhase(serviceId, nextPhase, scenario, sandbox);
-    }
+    const scenario = sandbox.scenario_id ? getScenario(sandbox.scenario_id) : null;
+    await dispatchLiveSandboxPhase(serviceId, nextPhase, scenario, sandbox);
     return;
   }
 
@@ -673,7 +708,7 @@ export async function scheduleSandboxNextPhase(
       }
 
       // 기존 일괄 주입 (progressive_reveal=false, backward compat)
-      const sections = await injectMockSections(serviceId, nextPhase, sandbox.scenario_id);
+      const sections = await injectMockSections(serviceId, nextPhase, sandbox.scenario_id!);
       console.log(
         `[SANDBOX] Injected ${sections.length} mock sections for Phase ${nextPhase} of ${serviceId}`,
       );
@@ -722,7 +757,7 @@ export async function scheduleSandboxNextPhase(
 export async function dispatchLiveSandboxPhase(
   serviceId: string,
   phase: number,
-  scenario: ReturnType<typeof getScenario> & {},
+  scenario: ReturnType<typeof getScenario> | null,
   sandbox: SandboxConfig,
 ): Promise<void> {
   const { getPhaseAssignee, PHASE_LABELS } = await import('./service-phases');
@@ -749,10 +784,12 @@ export async function dispatchLiveSandboxPhase(
     ? `\n## PO Profile\nTech: ${persona.po_profile.tech_level}, Design: ${persona.po_profile.design_sensitivity}, Domain: ${persona.po_profile.domain_area}\n`
     : '';
 
+  const description = scenario?.initial_description ?? sandbox.initial_description ?? '';
+
   const message = `[Sandbox Live Phase: ${serviceId}]
 
 ## Phase ${phase} — ${phaseLabel}
-${scenario.initial_description}
+${description}
 ${profileCtx}${prevContext}
 ## Instructions
 Generate sections for Phase ${phase} (${phaseLabel}).
@@ -770,6 +807,9 @@ Submit each section via POST /api/projects/callback with:
 \`\`\``;
 
   await dispatchBotMessage(assignee.botId, message, sandboxChannel);
+
+  // Phase 타이밍 + 봇 할당 기록
+  await logPhaseStart(serviceId, phase, assignee.botId);
 
   // Slack: Phase 시작 알림
   await postSlackMessage(
@@ -800,6 +840,64 @@ Submit each section via POST /api/projects/callback with:
   }, timeoutMs);
 
   console.log(`[SANDBOX] Live dispatch: Phase ${phase} → ${assignee.botId} for ${serviceId}`);
+}
+
+// ── Phase Timing ──
+
+async function logPhaseStart(serviceId: string, phase: number, botId: string): Promise<void> {
+  // phase_timings 초기화 + 해당 phase 기록
+  await query(
+    `UPDATE semo.services
+     SET metadata = jsonb_set(
+       jsonb_set(
+         metadata,
+         '{sandbox,run_stats,phase_timings}',
+         COALESCE(metadata->'sandbox'->'run_stats'->'phase_timings', '{}'::jsonb)
+       ),
+       $1::text[],
+       $2::jsonb
+     )
+     WHERE service_id = $3`,
+    [
+      ['sandbox', 'run_stats', 'phase_timings', String(phase)],
+      JSON.stringify({ started_at: new Date().toISOString() }),
+      serviceId,
+    ],
+  );
+  // bot_assignments 기록
+  await query(
+    `UPDATE semo.services
+     SET metadata = jsonb_set(
+       jsonb_set(
+         metadata,
+         '{sandbox,run_stats,bot_assignments}',
+         COALESCE(metadata->'sandbox'->'run_stats'->'bot_assignments', '{}'::jsonb)
+       ),
+       $1::text[],
+       $2::jsonb
+     )
+     WHERE service_id = $3`,
+    [['sandbox', 'run_stats', 'bot_assignments', String(phase)], JSON.stringify(botId), serviceId],
+  );
+}
+
+async function logPhaseComplete(serviceId: string, phase: number): Promise<void> {
+  await query(
+    `UPDATE semo.services
+     SET metadata = jsonb_set(
+       metadata,
+       $1::text[],
+       $2::jsonb
+     )
+     WHERE service_id = $3
+       AND metadata->'sandbox'->'run_stats'->'phase_timings'->$4 IS NOT NULL`,
+    [
+      ['sandbox', 'run_stats', 'phase_timings', String(phase), 'completed_at'],
+      JSON.stringify(new Date().toISOString()),
+      serviceId,
+      String(phase),
+    ],
+  );
 }
 
 // ── Cost Tracking ──

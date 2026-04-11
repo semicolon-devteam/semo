@@ -167,6 +167,7 @@ interface SandboxSectionSubmitPayload {
   title: string;
   content: string;
   bot_id: string;
+  cost_usd?: number;
 }
 
 type CallbackPayload =
@@ -868,7 +869,7 @@ export async function POST(request: NextRequest) {
 
         const { incrementRunStat, incrementSandboxCost } = await import('@/lib/sandbox');
         await incrementRunStat(body.service_id, 'sections_generated');
-        await incrementSandboxCost(body.service_id, 0.05);
+        await incrementSandboxCost(body.service_id, body.cost_usd ?? 0.05);
 
         // Slack pending-review 알림
         const sbSlackCtx = await resolveServiceSlackContext(body.service_id);

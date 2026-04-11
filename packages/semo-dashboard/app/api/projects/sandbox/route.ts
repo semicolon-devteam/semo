@@ -35,6 +35,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       scenario_id,
+      project_name,
+      initial_description,
       depth,
       mode,
       virtual_po_mode,
@@ -43,7 +45,9 @@ export async function POST(request: NextRequest) {
       phase_delay_ms,
       section_delay_ms,
     } = body as {
-      scenario_id: string;
+      scenario_id?: string;
+      project_name?: string;
+      initial_description?: string;
       depth: SandboxDepth;
       mode?: SandboxMode;
       virtual_po_mode: SandboxVirtualPOMode;
@@ -53,15 +57,21 @@ export async function POST(request: NextRequest) {
       section_delay_ms?: number;
     };
 
-    if (!scenario_id || !depth || !virtual_po_mode) {
+    if (!depth || !virtual_po_mode) {
+      return NextResponse.json({ error: 'depth, virtual_po_mode are required' }, { status: 400 });
+    }
+    // scenario_id 없으면 empty 모드 → project_name 필수
+    if (!scenario_id && !project_name) {
       return NextResponse.json(
-        { error: 'scenario_id, depth, virtual_po_mode are required' },
+        { error: 'scenario_id 또는 project_name이 필요합니다.' },
         { status: 400 },
       );
     }
 
     const result = await createSandboxProject({
       scenario_id,
+      project_name,
+      initial_description,
       depth,
       mode,
       virtual_po_mode,
@@ -81,15 +91,13 @@ export async function POST(request: NextRequest) {
       | undefined;
 
     if (sandbox?.mode === 'live') {
-      // Live: 봇에게 Phase 0 디스패치
+      // Live: 봇에게 Phase 0 디스패치 (empty 모드 포함)
       const { dispatchLiveSandboxPhase } = await import('@/lib/sandbox');
       const { getScenario } = await import('@/lib/sandbox-scenarios');
-      const scenario = getScenario(sandbox.scenario_id);
-      if (scenario) {
-        dispatchLiveSandboxPhase(result.project.service_id, 0, scenario, sandbox).catch((err) =>
-          console.error('[SANDBOX API] Live Phase 0 dispatch failed:', err),
-        );
-      }
+      const scenario = sandbox.scenario_id ? getScenario(sandbox.scenario_id) : null;
+      dispatchLiveSandboxPhase(result.project.service_id, 0, scenario, sandbox).catch((err) =>
+        console.error('[SANDBOX API] Live Phase 0 dispatch failed:', err),
+      );
     } else if (sandbox?.mode === 'mock') {
       if (sandbox.progressive_reveal !== false) {
         // Progressive: draft 등록 후 순차 리뷰 (fire-and-forget)
@@ -102,7 +110,7 @@ export async function POST(request: NextRequest) {
         const sections = await injectMockSections(
           result.project.service_id,
           0,
-          sandbox.scenario_id,
+          sandbox.scenario_id!,
         );
         if (sandbox.virtual_po.mode !== 'interactive') {
           const { processVirtualPOReviewBatch } = await import('@/lib/sandbox-virtual-po');

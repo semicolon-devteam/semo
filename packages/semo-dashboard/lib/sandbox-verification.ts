@@ -34,7 +34,7 @@ export async function verifySandboxRun(serviceId: string): Promise<VerificationR
     | undefined;
   if (!sandbox?.enabled) return null;
 
-  const scenario = getScenario(sandbox.scenario_id);
+  const scenario = sandbox.scenario_id ? getScenario(sandbox.scenario_id) : null;
   const allSections = await listSections(serviceId);
   const planSections = allSections.filter((s) => s.track === 'plan');
 

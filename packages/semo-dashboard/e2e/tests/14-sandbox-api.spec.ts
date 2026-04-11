@@ -159,6 +159,91 @@ test.describe.serial('Sandbox API — 생성, 목록, 리포트, Phase 진행, T
   });
 });
 
+test.describe.serial('Sandbox Empty Mode — 시나리오 없이 생성, 내보내기, Teardown', () => {
+  let emptyServiceId: string;
+
+  test('POST /api/projects/sandbox — empty 모드 생성 (project_name + initial_description)', async ({
+    request,
+  }) => {
+    const response = await request.post('/api/projects/sandbox', {
+      data: {
+        project_name: 'E2E Empty Test',
+        initial_description: '테스트용 빈 샌드박스 프로젝트',
+        depth: 'plan-only',
+        virtual_po_mode: 'interactive',
+      },
+    });
+    expect(response.ok()).toBeTruthy();
+    expect(response.status()).toBe(201);
+
+    const body = await response.json();
+    expect(body).toHaveProperty('service_id');
+    expect(body.project_name).toContain('[SANDBOX]');
+    expect(body.project_name).toContain('E2E Empty Test');
+    expect(body.metadata?.sandbox?.enabled).toBe(true);
+    expect(body.metadata?.sandbox?.scenario_id).toBeUndefined();
+    expect(body.metadata?.sandbox?.initial_description).toBe('테스트용 빈 샌드박스 프로젝트');
+    expect(body.metadata?.sandbox?.mode).toBe('live');
+    emptyServiceId = body.service_id;
+  });
+
+  test('GET /api/projects/sandbox — empty 모드 프로젝트가 목록에 포함', async ({ request }) => {
+    const response = await request.get('/api/projects/sandbox');
+    expect(response.ok()).toBeTruthy();
+
+    const body = await response.json();
+    const found = body.find((p: { service_id: string }) => p.service_id === emptyServiceId);
+    expect(found).toBeTruthy();
+    expect(found.metadata?.sandbox?.mode).toBe('live');
+  });
+
+  test('POST /api/projects/sandbox — scenario_id도 project_name도 없으면 400', async ({
+    request,
+  }) => {
+    const response = await request.post('/api/projects/sandbox', {
+      data: { depth: 'plan-only', virtual_po_mode: 'auto-pilot' },
+    });
+    expect(response.status()).toBe(400);
+    const body = await response.json();
+    expect(body.error).toContain('project_name');
+  });
+
+  test('GET /api/projects/sandbox/report — empty 모드 리포트 (검증 통과)', async ({ request }) => {
+    const response = await request.get(`/api/projects/sandbox/report?service_id=${emptyServiceId}`);
+    expect(response.ok()).toBeTruthy();
+
+    const body = await response.json();
+    expect(body).toHaveProperty('project');
+    expect(body).toHaveProperty('config');
+    expect(body.config.scenario_id).toBeUndefined();
+    // empty 모드에서는 expected_section_counts 검증이 없으므로 항상 passed
+    expect(body.verification.passed).toBe(true);
+  });
+
+  test('GET /api/projects/sandbox/export — 내보내기 JSON', async ({ request }) => {
+    const response = await request.get(`/api/projects/sandbox/export?service_id=${emptyServiceId}`);
+    expect(response.ok()).toBeTruthy();
+
+    const body = await response.json();
+    expect(body).toHaveProperty('exported_at');
+    expect(body).toHaveProperty('project');
+    expect(body).toHaveProperty('sandbox_config');
+    expect(body).toHaveProperty('run_stats');
+    expect(body).toHaveProperty('sections_detail');
+    expect(body.sandbox_config.scenario_id).toBeNull();
+    expect(body.sandbox_config.initial_description).toBe('테스트용 빈 샌드박스 프로젝트');
+  });
+
+  test('DELETE /api/projects/sandbox — empty 모드 Teardown', async ({ request }) => {
+    const response = await request.delete(`/api/projects/sandbox?service_id=${emptyServiceId}`);
+    expect(response.ok()).toBeTruthy();
+
+    const list = await (await request.get('/api/projects/sandbox')).json();
+    const found = list.find((p: { service_id: string }) => p.service_id === emptyServiceId);
+    expect(found).toBeFalsy();
+  });
+});
+
 test.describe.serial('GFP→Service 리네이밍 검증', () => {
   test('/api/projects/ → /api/projects/ 리다이렉트 (307)', async ({ request }) => {
     const response = await request.get('/api/gfp', { maxRedirects: 0 });

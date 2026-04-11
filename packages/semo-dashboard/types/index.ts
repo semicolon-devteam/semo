@@ -521,6 +521,10 @@ export interface SandboxRunStats {
   sections_reviewed: number;
   rejections: number;
   cost_usd?: number;
+  /** Phase별 시작/완료 타이밍 */
+  phase_timings?: Record<number, { started_at: string; completed_at?: string }>;
+  /** Phase별 봇 할당 기록 */
+  bot_assignments?: Record<number, string>;
 }
 
 export interface SandboxConfig {
@@ -528,7 +532,9 @@ export interface SandboxConfig {
   depth: SandboxDepth;
   mode: SandboxMode;
   virtual_po: SandboxVirtualPO;
-  scenario_id: string;
+  scenario_id?: string;
+  /** Empty 모드: 사용자 입력 프로젝트 설명 */
+  initial_description?: string;
   auto_advance: boolean;
   slack_suppress: boolean;
   timing: {

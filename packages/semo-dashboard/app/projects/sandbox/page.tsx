@@ -25,13 +25,18 @@ const PO_MODES: { id: SandboxVirtualPOMode; emoji: string; label: string; desc: 
   { id: 'interactive', emoji: '👤', label: '직접 리뷰', desc: '시연/데모용' },
 ];
 
+type CreateMode = 'scenario' | 'empty';
+
 export default function SandboxPage() {
   const [projects, setProjects] = useState<ServiceProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
 
   // Create form state
+  const [createMode, setCreateMode] = useState<CreateMode>('scenario');
   const [scenario, setScenario] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState('');
+  const [initialDescription, setInitialDescription] = useState('');
   const [depth, setDepth] = useState<SandboxDepth | null>(null);
   const [poMode, setPoMode] = useState<SandboxVirtualPOMode | null>(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -51,18 +56,34 @@ export default function SandboxPage() {
     fetchProjects();
   }, [fetchProjects]);
 
+  const canCreate =
+    createMode === 'scenario'
+      ? !!(scenario && depth && poMode)
+      : !!(projectName.trim() && depth && poMode);
+
   async function handleCreate() {
-    if (!scenario || !depth || !poMode) return;
+    if (!canCreate) return;
     setCreating(true);
     try {
+      const payload =
+        createMode === 'scenario'
+          ? { scenario_id: scenario, depth, virtual_po_mode: poMode }
+          : {
+              project_name: projectName.trim(),
+              initial_description: initialDescription.trim(),
+              depth,
+              virtual_po_mode: poMode,
+            };
       const res = await fetch('/api/projects/sandbox', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scenario_id: scenario, depth, virtual_po_mode: poMode }),
+        body: JSON.stringify(payload),
       });
       if (res.ok) {
         setShowCreate(false);
         setScenario(null);
+        setProjectName('');
+        setInitialDescription('');
         setDepth(null);
         setPoMode(null);
         await fetchProjects();
@@ -115,26 +136,91 @@ export default function SandboxPage() {
       {/* Create Form */}
       {showCreate && (
         <div className="bg-amber-50 dark:bg-amber-900/20 border border-dashed border-amber-300 dark:border-amber-700 rounded-lg p-6 mb-6 space-y-4">
-          <h3 className="font-semibold text-gray-900 dark:text-white">시나리오 선택</h3>
-          <div className="grid grid-cols-5 gap-2">
-            {SCENARIOS.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => setScenario(s.id)}
-                className={`p-3 rounded-lg text-center text-sm transition-all ${
-                  scenario === s.id
-                    ? 'bg-amber-200 dark:bg-amber-800 border-2 border-amber-500'
-                    : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-amber-300'
-                }`}
-              >
-                <div className="text-2xl mb-1">{s.emoji}</div>
-                <div className="font-medium">{s.label}</div>
-                <div className="text-xs text-gray-500">{s.desc}</div>
-              </button>
-            ))}
+          {/* 모드 토글 */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setCreateMode('scenario');
+                setProjectName('');
+                setInitialDescription('');
+                setDepth(null);
+                setPoMode(null);
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                createMode === 'scenario'
+                  ? 'bg-amber-600 text-white'
+                  : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
+              }`}
+            >
+              시나리오
+            </button>
+            <button
+              onClick={() => {
+                setCreateMode('empty');
+                setScenario(null);
+                setDepth(null);
+                setPoMode(null);
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                createMode === 'empty'
+                  ? 'bg-amber-600 text-white'
+                  : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700'
+              }`}
+            >
+              빈 샌드박스
+            </button>
           </div>
 
-          {scenario && (
+          {/* 시나리오 모드 */}
+          {createMode === 'scenario' && (
+            <>
+              <h3 className="font-semibold text-gray-900 dark:text-white">시나리오 선택</h3>
+              <div className="grid grid-cols-5 gap-2">
+                {SCENARIOS.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setScenario(s.id)}
+                    className={`p-3 rounded-lg text-center text-sm transition-all ${
+                      scenario === s.id
+                        ? 'bg-amber-200 dark:bg-amber-800 border-2 border-amber-500'
+                        : 'bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-amber-300'
+                    }`}
+                  >
+                    <div className="text-2xl mb-1">{s.emoji}</div>
+                    <div className="font-medium">{s.label}</div>
+                    <div className="text-xs text-gray-500">{s.desc}</div>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+
+          {/* Empty 모드 */}
+          {createMode === 'empty' && (
+            <>
+              <h3 className="font-semibold text-gray-900 dark:text-white">프로젝트 정보</h3>
+              <input
+                type="text"
+                placeholder="프로젝트 이름 (필수)"
+                value={projectName}
+                onChange={(e) => setProjectName(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+              />
+              <textarea
+                placeholder="프로젝트 설명 — 어떤 서비스를 만들고 싶은지 자유롭게 작성하세요"
+                value={initialDescription}
+                onChange={(e) => setInitialDescription(e.target.value)}
+                rows={3}
+                className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                시나리오 없이 실제 봇이 콘텐츠를 생성합니다 (Live 모드). 완료 후 폐기 가능.
+              </p>
+            </>
+          )}
+
+          {/* 공통: 검증 범위 */}
+          {(createMode === 'scenario' ? !!scenario : !!projectName.trim()) && (
             <>
               <h3 className="font-semibold text-gray-900 dark:text-white">검증 범위</h3>
               <div className="flex gap-2">
@@ -155,6 +241,7 @@ export default function SandboxPage() {
             </>
           )}
 
+          {/* 공통: PO 모드 */}
           {depth && (
             <>
               <h3 className="font-semibold text-gray-900 dark:text-white">가상 PO 모드</h3>
@@ -177,18 +264,21 @@ export default function SandboxPage() {
             </>
           )}
 
-          {scenario && depth && poMode && (
+          {/* 공통: 시작 버튼 */}
+          {canCreate && (
             <div className="flex gap-2 pt-2">
               <button
                 onClick={handleCreate}
                 disabled={creating}
                 className="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-lg text-sm font-medium disabled:opacity-50"
               >
-                {creating ? '생성 중...' : '▶️ 시작'}
+                {creating ? '생성 중...' : '시작'}
               </button>
               <button
                 onClick={() => {
                   setScenario(null);
+                  setProjectName('');
+                  setInitialDescription('');
                   setDepth(null);
                   setPoMode(null);
                 }}
@@ -236,7 +326,7 @@ export default function SandboxPage() {
                   <SandboxBadge />
                 </div>
                 <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400 mb-3">
-                  <p>시나리오: {sandbox?.scenario_id}</p>
+                  <p>시나리오: {sandbox?.scenario_id ?? 'Empty (Custom)'}</p>
                   <p>
                     PO: {sandbox?.virtual_po.mode} | {sandbox?.mode}
                   </p>

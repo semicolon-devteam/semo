@@ -292,7 +292,7 @@ async function handleSandboxAction(
           | import('@/types').SandboxConfig
           | undefined;
         if (sandbox?.mode === 'mock') {
-          const sections = await injectMockSections(project.service_id, 0, sandbox.scenario_id);
+          const sections = await injectMockSections(project.service_id, 0, sandbox.scenario_id!);
           if (sandbox.virtual_po.mode !== 'interactive') {
             const { processVirtualPOReviewBatch } = await import('@/lib/sandbox-virtual-po');
             processVirtualPOReviewBatch(project.service_id, sections, sandbox).catch((err) =>

@@ -72,7 +72,7 @@ export function SandboxControls({
       <div className="flex items-center gap-2">
         <span className="text-amber-600 dark:text-amber-400 font-semibold text-sm">SANDBOX</span>
         <span className="text-xs text-gray-500 dark:text-gray-400">
-          {sandbox.scenario_id} | {depthLabels[sandbox.depth] ?? sandbox.depth} |{' '}
+          {sandbox.scenario_id ?? 'Empty'} | {depthLabels[sandbox.depth] ?? sandbox.depth} |{' '}
           {modeLabels[sandbox.virtual_po.mode] ?? sandbox.virtual_po.mode} |{' '}
           {sandbox.mode === 'live'
             ? 'Live 봇'
@@ -193,10 +193,18 @@ export function SandboxControls({
           {loading === 'reinitialize' ? '...' : '초기화'}
         </button>
 
+        <a
+          href={`/api/projects/sandbox/export?service_id=${serviceId}`}
+          download
+          className="px-3 py-1.5 text-xs font-medium bg-gray-600 hover:bg-gray-700 text-white rounded ml-auto"
+        >
+          내보내기
+        </a>
+
         <button
           onClick={handleTeardown}
           disabled={loading !== null}
-          className="px-3 py-1.5 text-xs font-medium bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50 ml-auto"
+          className="px-3 py-1.5 text-xs font-medium bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50"
         >
           {loading === 'teardown' ? '...' : '삭제'}
         </button>
