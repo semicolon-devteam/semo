@@ -2076,6 +2076,7 @@ kbCmd
   .option('--key-type <type>', 'action=add-key 시 키 유형 (singleton|collection)', 'singleton')
   .option('--required', 'action=add-key 시 필수 여부')
   .option('--hint <text>', 'action=add-key 시 값 힌트')
+  .option('--ref-type <type>', 'action=add-key 시 참조 대상 온톨로지 타입 (예: organization)')
   .option('--description <text>', 'action=register|add-key 시 설명')
   .option('--service <name>', 'action=register 시 서비스 그룹')
   .option('--parent <name>', 'action=register 시 상위 도메인 (모듈인 경우)')
@@ -2192,7 +2193,8 @@ kbCmd
             for (const s of schema) {
               const reqStr = s.required ? chalk.red(' *') : '';
               const typeStr = chalk.gray(` [${s.key_type}]`);
-              console.log(chalk.cyan(`  ${s.scheme_key}`) + typeStr + reqStr);
+              const refStr = s.ref_type ? chalk.yellow(` → ${s.ref_type}`) : '';
+              console.log(chalk.cyan(`  ${s.scheme_key}`) + typeStr + reqStr + refStr);
               if (s.scheme_description) console.log(chalk.gray(`    ${s.scheme_description}`));
               if (s.value_hint) console.log(chalk.gray(`    hint: ${s.value_hint}`));
             }
@@ -2310,6 +2312,7 @@ kbCmd
           key_type: options.keyType as 'singleton' | 'collection',
           required: options.required || false,
           value_hint: options.hint,
+          ref_type: options.refType,
         });
         if (result.success) {
           console.log(

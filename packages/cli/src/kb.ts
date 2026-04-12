@@ -941,7 +941,7 @@ export async function kbUpsert(
       if (typeResult.rows.length > 0) {
         const entityType = typeResult.rows[0].entity_type;
         const schemaResult = await schemaClient.query(
-          "SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source, scheme_description, value_hint FROM semo.kb_type_schema WHERE type_key = $1 ORDER BY sort_order",
+          "SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source, scheme_description, value_hint, ref_type FROM semo.kb_type_schema WHERE type_key = $1 ORDER BY sort_order",
           [entityType],
         );
         const schemas = schemaResult.rows as Array<{
@@ -950,6 +950,7 @@ export async function kbUpsert(
           source: string;
           scheme_description: string | null;
           value_hint: string | null;
+          ref_type: string | null;
         }>;
         if (schemas.length > 0) {
           const match = schemas.find((s) => s.scheme_key === key);
@@ -990,6 +991,24 @@ export async function kbUpsert(
               success: false,
               error: `키 '${key}'은(는) collection이므로 sub_key가 필요합니다.`,
             };
+          }
+          // ref_type 검증: content가 참조 타입의 등록된 도메인인지 확인
+          if (match.ref_type) {
+            const refCheck = await schemaClient.query(
+              'SELECT domain FROM semo.ontology WHERE domain = $1 AND entity_type = $2',
+              [entry.content.trim(), match.ref_type],
+            );
+            if (refCheck.rows.length === 0) {
+              const existing = await schemaClient.query(
+                'SELECT domain FROM semo.ontology WHERE entity_type = $1 ORDER BY domain',
+                [match.ref_type],
+              );
+              const domains = existing.rows.map((r: { domain: string }) => r.domain);
+              return {
+                success: false,
+                error: `키 '${key}'의 값 '${entry.content.trim()}'은(는) '${match.ref_type}' 타입의 등록된 도메인이 아닙니다. 등록된 도메인: [${domains.join(', ')}]`,
+              };
+            }
           }
         }
       }
@@ -1162,6 +1181,7 @@ export interface TypeSchemaEntry {
   value_hint: string | null;
   sort_order: number;
   key_type: 'singleton' | 'collection';
+  ref_type: string | null;
 }
 
 export interface RoutingEntry {
@@ -1198,7 +1218,7 @@ export async function ontoListSchema(pool: Pool, typeKey: string): Promise<TypeS
   try {
     const result = await client.query(
       `SELECT type_key, scheme_key, scheme_description, required, value_hint, sort_order,
-              COALESCE(key_type, 'singleton') as key_type
+              COALESCE(key_type, 'singleton') as key_type, ref_type
        FROM semo.kb_type_schema
        WHERE type_key = $1
        ORDER BY sort_order, scheme_key`,
@@ -1499,6 +1519,7 @@ export async function ontoAddKey(
     key_type?: 'singleton' | 'collection';
     required?: boolean;
     value_hint?: string;
+    ref_type?: string;
   },
 ): Promise<{ success: boolean; error?: string }> {
   const client = await pool.connect();
@@ -1548,8 +1569,8 @@ export async function ontoAddKey(
     const sortOrder = maxOrder.rows[0].next_order;
 
     await client.query(
-      `INSERT INTO semo.kb_type_schema (type_key, scheme_key, scheme_description, key_type, required, value_hint, sort_order)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO semo.kb_type_schema (type_key, scheme_key, scheme_description, key_type, required, value_hint, sort_order, ref_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         opts.type_key,
         opts.scheme_key,
@@ -1558,6 +1579,7 @@ export async function ontoAddKey(
         opts.required || false,
         opts.value_hint || null,
         sortOrder,
+        opts.ref_type || null,
       ],
     );
 
