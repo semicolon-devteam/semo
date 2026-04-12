@@ -20,7 +20,15 @@ export interface RouteResult {
   serviceDomain: string;
   phase: number;
   track: 'plan' | 'infra';
-  routeReason: 'route-tag' | 'thread-sticky' | 'keyword' | 'phase-based' | 'fallback';
+  routeReason:
+    | 'route-tag'
+    | 'thread-sticky'
+    | 'keyword'
+    | 'skill-dispatch'
+    | 'phase-based'
+    | 'fallback';
+  /** 스킬 힌트 — 라우터가 감지한 스킬을 봇에게 전달 */
+  skillHint?: string;
 }
 
 export interface ThreadMessage {

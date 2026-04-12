@@ -515,11 +515,17 @@ export class SessionPool {
         ? `프로젝트: ${context.route.serviceDomain} (Phase ${context.route.phase})\n[채널 스코프] 이 채널은 ${context.route.serviceDomain} 프로젝트 전용입니다. "전체" 또는 다른 프로젝트를 명시하지 않는 한, ${context.route.serviceDomain} 관련 정보만 응답하세요.`
         : '';
 
+      // 스킬 디스패치 힌트
+      const skillBlock = context.route.skillHint
+        ? `[SKILL DISPATCH] 이 메시지는 /${context.route.skillHint} 스킬로 처리하세요. 반드시 해당 스킬을 호출하여 응답하세요.`
+        : '';
+
       const contextPrompt = [
         `[Slack 메시지]`,
         `채널: ${context.channel}`,
         `발신자: ${context.sender} (${context.senderId})`,
         channelScope,
+        skillBlock,
         `스레드: ${context.threadTs}`,
         gfpContext,
         imageBlock,

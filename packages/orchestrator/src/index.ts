@@ -187,7 +187,7 @@ async function main() {
       const route = await router.route(msg.channel, msg.text, msg.thread_ts);
       router.setThreadBot(threadTs, route.botId as import('./bot-config').BotId);
       console.log(
-        `[orchestrator] ${senderName} → ${route.botId} (${route.routeReason}, phase=${route.phase})`,
+        `[orchestrator] ${senderName} → ${route.botId} (${route.routeReason}${route.skillHint ? `, skill=${route.skillHint}` : ''}, phase=${route.phase})`,
       );
 
       // 스레드 히스토리 조회 (스레드 답글인 경우만)

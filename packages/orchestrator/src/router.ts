@@ -23,6 +23,20 @@ const INFRA_PHASE_ASSIGNEES: Record<number, BotId> = {
   2: 'infraclaw',
 };
 
+// 스킬 디스패치 — 키워드 감지 시 봇 + 스킬 힌트를 함께 전달
+const SKILL_ROUTES: Array<{ keywords: RegExp; botId: BotId; skill: string }> = [
+  {
+    keywords: /액션.?아이템|action.?item|할일|todo.*확인|할.?일.*추적/i,
+    botId: 'semiclaw',
+    skill: 'action-item-tracker',
+  },
+  {
+    keywords: /서비스.*(현황|상태|조회|목록|브리핑|정보)|서비스.*get|service.*(status|list|brief)/i,
+    botId: 'semiclaw',
+    skill: 'service-briefing',
+  },
+];
+
 // 키워드 → 봇 매핑 (구체적 패턴이 일반 패턴보다 우선)
 const KEYWORD_ROUTES: Array<{ keywords: RegExp; botId: BotId }> = [
   {
@@ -117,7 +131,22 @@ export class Router {
     // 3. 채널 → 서비스 조회
     const service = await this.getServiceInfo(channelId);
 
-    // 4. 키워드 분기
+    // 4. 스킬 디스패치 (키워드 분기보다 우선)
+    for (const { keywords, botId, skill } of SKILL_ROUTES) {
+      if (keywords.test(text)) {
+        return {
+          botId,
+          serviceId: service?.serviceId || '',
+          serviceDomain: service?.serviceDomain || '',
+          phase: service?.currentPhase ?? -1,
+          track: 'plan',
+          routeReason: 'skill-dispatch',
+          skillHint: skill,
+        };
+      }
+    }
+
+    // 5. 키워드 분기
     for (const { keywords, botId } of KEYWORD_ROUTES) {
       if (keywords.test(text)) {
         return {
@@ -131,7 +160,7 @@ export class Router {
       }
     }
 
-    // 4. Phase 기반 라우팅
+    // 6. Phase 기반 라우팅
     if (service) {
       // 인프라 관련 키워드 없으면 Track A(plan) 기반
       const botId = PHASE_ASSIGNEES[service.currentPhase] || 'semiclaw';
@@ -145,7 +174,7 @@ export class Router {
       };
     }
 
-    // 5. 폴백: semiclaw
+    // 7. 폴백: semiclaw
     return {
       botId: 'semiclaw',
       serviceId: '',
