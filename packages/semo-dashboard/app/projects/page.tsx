@@ -54,9 +54,14 @@ export default function ServiceListPage() {
   const isIncubatorPO = profile?.onboarding_role === 'incubator-participant';
   const showBothTabs = isAdmin || isTeamMember;
 
-  const [activeView, setActiveView] = useState<PrimaryView>(
-    isIncubatorPO && !showBothTabs ? 'incubator' : 'general',
-  );
+  const [activeView, setActiveView] = useState<PrimaryView>('general');
+
+  // profile 비동기 로드 후 인큐베이터 유저는 incubator 뷰로 전환
+  useEffect(() => {
+    if (isIncubatorPO && !showBothTabs) {
+      setActiveView('incubator');
+    }
+  }, [isIncubatorPO, showBothTabs]);
 
   useEffect(() => {
     fetch('/api/projects')
@@ -68,6 +73,14 @@ export default function ServiceListPage() {
         const all = Array.isArray(data) ? data : [];
         if (isAdmin) {
           setProjects(all);
+        } else if (isIncubatorPO) {
+          // 인큐베이터 유저: 리더보드용 전체 인큐베이터 프로젝트 + 본인 접근 프로젝트
+          setProjects(
+            all.filter(
+              (p: ServiceProject) =>
+                p.service_type === 'incubator' || projectAccess.includes(p.service_id),
+            ),
+          );
         } else {
           setProjects(all.filter((p: ServiceProject) => projectAccess.includes(p.service_id)));
         }
@@ -96,7 +109,7 @@ export default function ServiceListPage() {
       .then((r) => (r.ok ? r.json() : {}))
       .then((data: Record<string, SubPhaseProgress[]>) => setPhaseProgress(data))
       .catch(() => {});
-  }, [isAdmin, projectAccess]);
+  }, [isAdmin, isIncubatorPO, projectAccess]);
 
   // 1차 뷰 기반 필터링: service_type 컬럼 기반
   const incubatorProjects = projects.filter((p) => p.service_type === 'incubator');
