@@ -3,7 +3,7 @@ name: Build & Push SEMO Dashboard Docker Image
 on:
   push:
     branches:
-      - feat/135-semo-dashboard-phase1
+      - dev
       - main
     paths:
       - 'packages/semo-dashboard/**'
@@ -26,7 +26,7 @@ env:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -50,9 +50,9 @@ jobs:
           else
             ENV="dev"
           fi
-          
+
           SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
-          
+
           echo "env=${ENV}" >> $GITHUB_OUTPUT
           echo "tag=${ENV}-${SHORT_SHA}" >> $GITHUB_OUTPUT
           echo "latest=${ENV}-latest" >> $GITHUB_OUTPUT
@@ -82,11 +82,11 @@ jobs:
         if: steps.tag.outputs.env == 'dev'
         run: |
           cd ops
-          
+
           # Update dev overlay
           sed -i "s|newTag:.*|newTag: ${{ steps.tag.outputs.tag }}|" \
             semo/overlays/dev/kustomization.yaml
-          
+
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add semo/overlays/dev/kustomization.yaml
