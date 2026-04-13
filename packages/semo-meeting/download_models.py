@@ -15,5 +15,5 @@ WhisperModel('large-v3', device='cpu', compute_type='int8')
 from pyannote.audio import Pipeline
 Pipeline.from_pretrained(
     'pyannote/speaker-diarization-3.1',
-    token=os.environ.get('HF_TOKEN', ''),
+    use_auth_token=os.environ.get('HF_TOKEN', ''),
 )
