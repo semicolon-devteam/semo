@@ -8,6 +8,16 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 
+const SLACK_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
+  semiclaw: { username: 'SemiClaw', icon_emoji: ':clipboard:' },
+  planclaw: { username: 'PlanClaw', icon_emoji: ':bar_chart:' },
+  designclaw: { username: 'DesignClaw', icon_emoji: ':art:' },
+  workclaw: { username: 'WorkClaw', icon_emoji: ':hammer_and_wrench:' },
+  reviewclaw: { username: 'ReviewClaw', icon_emoji: ':mag:' },
+  infraclaw: { username: 'InfraClaw', icon_emoji: ':gear:' },
+  growthclaw: { username: 'GrowthClaw', icon_emoji: ':chart_with_upwards_trend:' },
+};
+
 function getToken(): string {
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
@@ -30,7 +40,7 @@ function parsePermalink(link: string): { channel: string; ts: string } | null {
 }
 
 export function registerSlackCommands(program: Command): void {
-  const cmd = program.command('slack').description('Slack 메시지 조회');
+  const cmd = program.command('slack').description('Slack 메시지 조회/발송');
 
   cmd
     .command('read <permalink>')
@@ -119,4 +129,81 @@ export function registerSlackCommands(program: Command): void {
         process.exit(1);
       }
     });
+
+  cmd
+    .command('send')
+    .description('Slack 채널에 메시지 발송')
+    .requiredOption('-c, --channel <channel>', '채널 ID 또는 #channel-name')
+    .requiredOption('-t, --text <text>', '메시지 본문 (mrkdwn 지원)')
+    .option('--thread <ts>', '스레드 답글 (thread_ts)')
+    .option('--as <botId>', '봇 페르소나 (semiclaw, planclaw 등)')
+    .option('--json', 'JSON 형식으로 결과 출력', false)
+    .action(
+      async (opts: {
+        channel: string;
+        text: string;
+        thread?: string;
+        as?: string;
+        json: boolean;
+      }) => {
+        const token = getToken();
+
+        const body: Record<string, unknown> = {
+          channel: opts.channel,
+          text: opts.text,
+          unfurl_links: false,
+        };
+        if (opts.thread) body.thread_ts = opts.thread;
+        if (opts.as) {
+          const profile = SLACK_PROFILES[opts.as] || {
+            username: opts.as,
+            icon_emoji: ':robot_face:',
+          };
+          body.username = profile.username;
+          body.icon_emoji = profile.icon_emoji;
+        }
+
+        try {
+          const res = await fetch('https://slack.com/api/chat.postMessage', {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(body),
+            signal: AbortSignal.timeout(15000),
+          });
+          const data = (await res.json()) as {
+            ok: boolean;
+            ts?: string;
+            channel?: string;
+            error?: string;
+          };
+
+          if (!data.ok) {
+            const hint = data.error === 'not_in_channel' ? ' (SemoBot을 채널에 초대하세요)' : '';
+            console.error(chalk.red(`Slack API 오류: ${data.error}${hint}`));
+            process.exit(1);
+          }
+
+          const pTs = data.ts!.replace('.', '');
+          const permalink = `https://semicolon-devteam.slack.com/archives/${data.channel}/p${pTs}`;
+
+          if (opts.json) {
+            console.log(
+              JSON.stringify({ ok: true, ts: data.ts, channel: data.channel, permalink }),
+            );
+          } else {
+            console.log(chalk.green('sent'), data.ts);
+            console.log(permalink);
+          }
+        } catch (err) {
+          console.error(
+            chalk.red('Slack API 호출 실패:'),
+            err instanceof Error ? err.message : err,
+          );
+          process.exit(1);
+        }
+      },
+    );
 }
