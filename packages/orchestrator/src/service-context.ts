@@ -25,6 +25,13 @@ function commonBlock(route: RouteResult): string {
 - 읽기: 프로젝트 실행 상태(phase, sections) → Dashboard API
 - 쓰기: 섹션 제출/재생성 → POST /api/projects/callback (KB spec/* 직접 쓰기 금지)
 
+## Dashboard API 인증
+모든 Dashboard API 호출 시 아래 헤더를 포함하라:
+\`\`\`
+-H "x-semo-agent-token: \${SEMO_AGENT_SECRET}" -H "x-semo-agent-id: \${BOT_ID}"
+\`\`\`
+SEMO_AGENT_SECRET 미설정 시 개발 환경에서는 헤더 없이도 동작한다.
+
 ## Slack-First 원칙
 - 섹션 제출 완료 시: "Slack에서 바로 승인/거절 가능합니다. 시각 산출물은 대시보드에서 확인하세요."`;
 }

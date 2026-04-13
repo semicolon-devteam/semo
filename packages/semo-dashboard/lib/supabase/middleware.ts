@@ -5,6 +5,24 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config';
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
+  // ── Agent Service Token Auth ──
+  // Bot/agent requests carry x-semo-agent-token header.
+  // If valid, skip Supabase session auth entirely (agents have no browser session).
+  const agentToken = request.headers.get('x-semo-agent-token');
+  if (agentToken !== null) {
+    const AGENT_SECRET = process.env.SEMO_AGENT_SECRET;
+    const agentId = request.headers.get('x-semo-agent-id') ?? 'unknown';
+    if (!AGENT_SECRET) {
+      console.warn(
+        '[agent-auth] SEMO_AGENT_SECRET is not set — agent auth is open. Set the env var to enable auth.',
+      );
+    } else if (agentToken !== AGENT_SECRET) {
+      return NextResponse.json({ error: 'Invalid agent token' }, { status: 401 });
+    }
+    console.log(`[agent-auth] ${agentId} → ${request.method} ${request.nextUrl.pathname}`);
+    return supabaseResponse;
+  }
+
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { flowType: 'pkce' },
     cookies: {
@@ -31,7 +49,6 @@ export async function updateSession(request: NextRequest) {
   const publicPaths = ['/login', '/auth/callback', '/api/health'];
   const isPublicPath =
     publicPaths.some((p) => pathname.startsWith(p)) ||
-    pathname.startsWith('/api/projects/callback') ||
     pathname.startsWith('/api/projects/callback') ||
     pathname.startsWith('/api/kb-sync') ||
     pathname.startsWith('/api/slack/') ||
