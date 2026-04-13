@@ -19,19 +19,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Pre-download models at build time (ARG only — not persisted in runtime image)
 ARG HF_TOKEN
+ENV HF_TOKEN=${HF_TOKEN}
 
-RUN python3 -c "\
-from faster_whisper import WhisperModel; \
-WhisperModel('large-v3', device='cpu', compute_type='int8')"
-
-RUN python3 -c "\
-import os, torch; \
-os.environ['PYANNOTE_CACHE'] = '/root/.cache/huggingface'; \
-_orig = torch.load; \
-def _patched(*a, **kw): kw['weights_only'] = False; return _orig(*a, **kw); \
-torch.load = _patched; \
-from pyannote.audio import Pipeline; \
-Pipeline.from_pretrained('pyannote/speaker-diarization-3.1', token='${HF_TOKEN}')"
+COPY download_models.py /tmp/
+RUN python3 /tmp/download_models.py && rm /tmp/download_models.py
 
 # Stage 2: Runtime (clean — no HF_TOKEN, no build tools)
 FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04 AS runtime
