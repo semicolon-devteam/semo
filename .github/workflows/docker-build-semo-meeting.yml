@@ -73,8 +73,6 @@ jobs:
             ${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.latest }}
           build-args: |
             HF_TOKEN=${{ secrets.HF_TOKEN }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
           platforms: linux/amd64
 
       - name: Checkout ops repo
