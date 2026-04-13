@@ -91,7 +91,12 @@ const SEMO_DASHBOARD_URL = process.env.SEMO_DASHBOARD_URL || 'https://semo.semi-
 
 export async function loadSlackProfilesFromAPI(): Promise<void> {
   try {
-    const res = await fetch(`${SEMO_DASHBOARD_URL}/api/bots/profiles`);
+    const headers: Record<string, string> = {};
+    if (process.env.SEMO_AGENT_SECRET) {
+      headers['x-semo-agent-token'] = process.env.SEMO_AGENT_SECRET;
+      headers['x-semo-agent-id'] = 'orchestrator';
+    }
+    const res = await fetch(`${SEMO_DASHBOARD_URL}/api/bots/profiles`, { headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = (await res.json()) as Record<string, { username: string; icon_emoji: string }>;
     if (Object.keys(data).length > 0) {
@@ -124,6 +129,7 @@ const BUDGET_PER_MESSAGE: Record<string, number> = {
   growthclaw: 0.5,
 };
 
+/** Fallback 봇 목록 (DB 장애 시 + 타입 참고용) */
 export const BOT_IDS = [
   'semiclaw',
   'planclaw',
@@ -134,6 +140,25 @@ export const BOT_IDS = [
   'growthclaw',
 ] as const;
 export type BotId = (typeof BOT_IDS)[number];
+
+/** DB에서 활성 봇 목록 동적 로드 (bot_status 기반) */
+let _activeBotIds: string[] = [...BOT_IDS];
+export async function loadActiveBotIds(pool: Pool): Promise<string[]> {
+  try {
+    const result = await pool.query(
+      `SELECT bot_id FROM semo.bot_status WHERE status != 'retired' ORDER BY bot_id`,
+    );
+    if (result.rows.length > 0) {
+      _activeBotIds = result.rows.map((r) => r.bot_id);
+    }
+  } catch {
+    // fallback to hardcoded list
+  }
+  return _activeBotIds;
+}
+export function getActiveBotIds(): readonly string[] {
+  return _activeBotIds;
+}
 
 export function loadBotConfig(botId: BotId, serviceDomain?: string): BotConfig {
   const def = parseAgentDefinition(botId);

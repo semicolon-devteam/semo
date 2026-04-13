@@ -160,6 +160,7 @@ async function main() {
   const costTracker = new CostTracker(pool);
   const commitmentTracker = new CommitmentTracker(pool);
   const router = new Router(pool);
+  await router.loadRouting();
   const sessionPool = new SessionPool(botConfigs, costTracker);
   const slack = new SlackGateway(SLACK_BOT_TOKEN, SLACK_APP_TOKEN);
 
