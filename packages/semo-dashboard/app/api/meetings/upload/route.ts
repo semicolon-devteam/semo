@@ -7,9 +7,7 @@ export const dynamic = 'force-dynamic';
 // Allow up to 5 minutes for large audio uploads
 export const maxDuration = 300;
 
-const ALLOWED_EXTENSIONS = new Set([
-  'mp3', 'm4a', 'mp4', 'wav', 'flac', 'ogg', 'webm', 'amr',
-]);
+const ALLOWED_EXTENSIONS = new Set(['mp3', 'm4a', 'mp4', 'wav', 'flac', 'ogg', 'webm', 'amr']);
 
 /** POST /api/meetings/upload — upload audio and start STT transcription */
 export async function POST(request: NextRequest) {
@@ -19,10 +17,7 @@ export async function POST(request: NextRequest) {
     const meetingId = formData.get('meetingId') as string | null;
 
     if (!file || !meetingId) {
-      return NextResponse.json(
-        { error: 'file and meetingId are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'file and meetingId are required' }, { status: 400 });
     }
 
     // Validate meeting exists
@@ -31,12 +26,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Meeting not found' }, { status: 404 });
     }
 
-    // Validate file type
-    const ext = file.name.split('.').pop()?.toLowerCase() || '';
+    // Validate file type (MediaRecorder may produce files with generated names)
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'webm';
     if (!ALLOWED_EXTENSIONS.has(ext)) {
       return NextResponse.json(
-        { error: `Unsupported file type: ${ext}. Supported: ${[...ALLOWED_EXTENSIONS].join(', ')}` },
-        { status: 400 }
+        {
+          error: `Unsupported file type: ${ext}. Supported: ${[...ALLOWED_EXTENSIONS].join(', ')}`,
+        },
+        { status: 400 },
       );
     }
 
@@ -61,7 +58,7 @@ export async function POST(request: NextRequest) {
     console.error('Failed to upload audio:', error);
     return NextResponse.json(
       { error: error instanceof Error ? error.message : 'Upload failed' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

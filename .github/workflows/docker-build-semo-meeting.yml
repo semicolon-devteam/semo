@@ -1,0 +1,109 @@
+name: Build & Push SEMO Meeting Docker Image
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'packages/semo-meeting/**'
+      - '.github/workflows/docker-build-semo-meeting.yml'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: false
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prd
+
+env:
+  DOCKER_IMAGE: semicolonmanager/semo-meeting
+  WORKING_DIR: packages/semo-meeting
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Determine tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV="${{ github.event.inputs.environment }}"
+          elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            ENV="prd"
+          else
+            ENV="dev"
+          fi
+
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+
+          echo "env=${ENV}" >> $GITHUB_OUTPUT
+          echo "tag=${ENV}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "latest=${ENV}-latest" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.WORKING_DIR }}
+          file: ${{ env.WORKING_DIR }}/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.tag }}
+            ${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.latest }}
+          build-args: |
+            HF_TOKEN=${{ secrets.HF_TOKEN }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Checkout ops repo
+        if: steps.tag.outputs.env == 'dev'
+        uses: actions/checkout@v4
+        with:
+          repository: semicolon-devteam/semi-colon-ops
+          token: ${{ secrets.SOURCE_REPO_TOKEN }}
+          path: ops
+
+      - name: Update Kustomize image tag
+        if: steps.tag.outputs.env == 'dev'
+        run: |
+          cd ops
+
+          # Update dev overlay (create if not exists)
+          KUSTOMIZE_PATH="semo-meeting/overlays/dev/kustomization.yaml"
+          if [ -f "$KUSTOMIZE_PATH" ]; then
+            sed -i "s|newTag:.*|newTag: ${{ steps.tag.outputs.tag }}|" "$KUSTOMIZE_PATH"
+          else
+            echo "Warning: $KUSTOMIZE_PATH not found, skipping Kustomize update"
+            exit 0
+          fi
+
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add "$KUSTOMIZE_PATH"
+          git diff --cached --quiet || git commit -m "chore: Update semo-meeting dev image to ${{ steps.tag.outputs.tag }}"
+          git push
+
+      - name: Summary
+        run: |
+          echo "## Docker Image Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: ${{ steps.tag.outputs.env }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Image Tag**: \`${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.tag }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Latest Tag**: \`${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.latest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY

@@ -8,7 +8,11 @@ interface TranscriptionProgressProps {
   onError: (error: string) => void;
 }
 
-export default function TranscriptionProgress({ meetingId, onComplete, onError }: TranscriptionProgressProps) {
+export default function TranscriptionProgress({
+  meetingId,
+  onComplete,
+  onError,
+}: TranscriptionProgressProps) {
   const [elapsed, setElapsed] = useState(0);
   const [status, setStatus] = useState<'transcribing' | 'completed' | 'failed'>('transcribing');
   const startTime = useRef(0);
@@ -68,13 +72,13 @@ export default function TranscriptionProgress({ meetingId, onComplete, onError }
           </div>
           <div className="text-center space-y-2">
             <p className="text-lg font-medium text-gray-800 dark:text-gray-200">
-              VITO가 오디오를 녹취하고 있습니다...
+              오디오를 녹취하고 있습니다...
             </p>
             <p className="text-3xl font-mono text-blue-600 dark:text-blue-400">
               {minutes}:{seconds.toString().padStart(2, '0')}
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-400">
-              1시간 오디오 기준 약 5~15분 소요
+              1시간 오디오 기준 약 2~5분 소요
             </p>
           </div>
         </>
@@ -83,9 +87,7 @@ export default function TranscriptionProgress({ meetingId, onComplete, onError }
       {status === 'failed' && (
         <div className="text-center space-y-2">
           <div className="text-4xl">❌</div>
-          <p className="text-lg font-medium text-red-600 dark:text-red-400">
-            녹취 실패
-          </p>
+          <p className="text-lg font-medium text-red-600 dark:text-red-400">녹취 실패</p>
         </div>
       )}
     </div>

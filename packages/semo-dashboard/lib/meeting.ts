@@ -14,6 +14,7 @@ export interface Meeting {
   adhoc_subtype: 'client' | 'internal' | 'external' | 'workshop' | null;
   meeting_date: string;
   attendees: string[];
+  service_id: string | null;
   audio_filename: string | null;
   audio_duration_ms: number | null;
   vito_transcribe_id: string | null;
@@ -37,12 +38,13 @@ export interface CreateMeetingInput {
   adhoc_subtype?: 'client' | 'internal' | 'external' | 'workshop';
   meeting_date?: string;
   attendees: string[];
+  service_id?: string;
 }
 
 export async function createMeeting(input: CreateMeetingInput): Promise<Meeting> {
   const result = await query<Meeting>(
-    `INSERT INTO semo.meetings (title, meeting_type, adhoc_subtype, meeting_date, attendees)
-     VALUES ($1, $2, $3, $4, $5::jsonb)
+    `INSERT INTO semo.meetings (title, meeting_type, adhoc_subtype, meeting_date, attendees, service_id)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6)
      RETURNING *`,
     [
       input.title,
@@ -50,13 +52,14 @@ export async function createMeeting(input: CreateMeetingInput): Promise<Meeting>
       input.adhoc_subtype ?? null,
       input.meeting_date ?? new Date().toISOString().slice(0, 10),
       JSON.stringify(input.attendees),
-    ]
+      input.service_id ?? null,
+    ],
   );
   return result.rows[0];
 }
 
 // All columns except audio_data (binary, up to ~8MB per row)
-const MEETING_COLS = `meeting_id, title, meeting_type, adhoc_subtype, meeting_date, attendees,
+const MEETING_COLS = `meeting_id, title, meeting_type, adhoc_subtype, meeting_date, attendees, service_id,
   audio_filename, audio_duration_ms, vito_transcribe_id, transcription_status, transcription_error,
   raw_transcript, speaker_map, mapped_transcript, discussion_url, discussion_number,
   generation_status, generation_error, generation_result, created_at, updated_at`;
@@ -64,7 +67,7 @@ const MEETING_COLS = `meeting_id, title, meeting_type, adhoc_subtype, meeting_da
 export async function getMeeting(meetingId: string): Promise<Meeting | null> {
   const result = await query<Meeting>(
     `SELECT ${MEETING_COLS} FROM semo.meetings WHERE meeting_id = $1`,
-    [meetingId]
+    [meetingId],
   );
   return result.rows[0] ?? null;
 }
@@ -72,7 +75,7 @@ export async function getMeeting(meetingId: string): Promise<Meeting | null> {
 export async function listMeetings(limit = 50, offset = 0): Promise<Meeting[]> {
   const result = await query<Meeting>(
     `SELECT ${MEETING_COLS} FROM semo.meetings ORDER BY meeting_date DESC, created_at DESC LIMIT $1 OFFSET $2`,
-    [limit, offset]
+    [limit, offset],
   );
   return result.rows;
 }
@@ -82,7 +85,7 @@ export async function updateTranscriptionStarted(
   vitoTranscribeId: string,
   audioOriginalName: string,
   audioFileName?: string,
-  audioData?: Buffer
+  audioData?: Buffer,
 ): Promise<void> {
   if (audioData) {
     await query(
@@ -91,7 +94,7 @@ export async function updateTranscriptionStarted(
            audio_data = $4,
            transcription_status = 'transcribing', updated_at = NOW()
        WHERE meeting_id = $1`,
-      [meetingId, vitoTranscribeId, audioFileName ?? audioOriginalName, audioData]
+      [meetingId, vitoTranscribeId, audioFileName ?? audioOriginalName, audioData],
     );
   } else {
     await query(
@@ -99,15 +102,17 @@ export async function updateTranscriptionStarted(
        SET vito_transcribe_id = $2, audio_filename = $3,
            transcription_status = 'transcribing', updated_at = NOW()
        WHERE meeting_id = $1`,
-      [meetingId, vitoTranscribeId, audioFileName ?? audioOriginalName]
+      [meetingId, vitoTranscribeId, audioFileName ?? audioOriginalName],
     );
   }
 }
 
-export async function getAudioData(meetingId: string): Promise<{ data: Buffer; filename: string } | null> {
+export async function getAudioData(
+  meetingId: string,
+): Promise<{ data: Buffer; filename: string } | null> {
   const result = await query<{ audio_data: Buffer; audio_filename: string }>(
     'SELECT audio_data, audio_filename FROM semo.meetings WHERE meeting_id = $1 AND audio_data IS NOT NULL',
-    [meetingId]
+    [meetingId],
   );
   const row = result.rows[0];
   if (!row?.audio_data) return null;
@@ -116,31 +121,28 @@ export async function getAudioData(meetingId: string): Promise<{ data: Buffer; f
 
 export async function updateTranscriptionCompleted(
   meetingId: string,
-  utterances: VitoUtterance[]
+  utterances: VitoUtterance[],
 ): Promise<void> {
   await query(
     `UPDATE semo.meetings
      SET raw_transcript = $2::jsonb, transcription_status = 'completed', updated_at = NOW()
      WHERE meeting_id = $1`,
-    [meetingId, JSON.stringify(utterances)]
+    [meetingId, JSON.stringify(utterances)],
   );
 }
 
-export async function updateTranscriptionFailed(
-  meetingId: string,
-  error: string
-): Promise<void> {
+export async function updateTranscriptionFailed(meetingId: string, error: string): Promise<void> {
   await query(
     `UPDATE semo.meetings
      SET transcription_status = 'failed', transcription_error = $2, updated_at = NOW()
      WHERE meeting_id = $1`,
-    [meetingId, error]
+    [meetingId, error],
   );
 }
 
 export async function updateSpeakerMap(
   meetingId: string,
-  speakerMap: Record<string, string>
+  speakerMap: Record<string, string>,
 ): Promise<void> {
   // Build mapped transcript from raw_transcript + speakerMap
   const meeting = await getMeeting(meetingId);
@@ -157,7 +159,7 @@ export async function updateSpeakerMap(
     `UPDATE semo.meetings
      SET speaker_map = $2::jsonb, mapped_transcript = $3, updated_at = NOW()
      WHERE meeting_id = $1`,
-    [meetingId, JSON.stringify(speakerMap), mappedLines.join('\n')]
+    [meetingId, JSON.stringify(speakerMap), mappedLines.join('\n')],
   );
 }
 
@@ -166,7 +168,7 @@ export async function updateGenerationStarted(meetingId: string): Promise<void> 
     `UPDATE semo.meetings
      SET generation_status = 'generating', updated_at = NOW()
      WHERE meeting_id = $1`,
-    [meetingId]
+    [meetingId],
   );
 }
 
@@ -174,25 +176,22 @@ export async function updateGenerationCompleted(
   meetingId: string,
   discussionUrl: string,
   discussionNumber: number,
-  result: { decisions: number; actions: number; kpi: number }
+  result: { decisions: number; actions: number; kpi: number },
 ): Promise<void> {
   await query(
     `UPDATE semo.meetings
      SET discussion_url = $2, discussion_number = $3,
          generation_status = 'completed', generation_result = $4::jsonb, updated_at = NOW()
      WHERE meeting_id = $1`,
-    [meetingId, discussionUrl, discussionNumber, JSON.stringify(result)]
+    [meetingId, discussionUrl, discussionNumber, JSON.stringify(result)],
   );
 }
 
-export async function updateGenerationFailed(
-  meetingId: string,
-  error: string
-): Promise<void> {
+export async function updateGenerationFailed(meetingId: string, error: string): Promise<void> {
   await query(
     `UPDATE semo.meetings
      SET generation_status = 'failed', generation_error = $2, updated_at = NOW()
      WHERE meeting_id = $1`,
-    [meetingId, error]
+    [meetingId, error],
   );
 }
