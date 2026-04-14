@@ -27,6 +27,7 @@ import type { InboxMessage, OutboxMessage } from '../../platform-common/src/type
 import { InboxWriter } from '../../platform-common/src/inbox-writer.js';
 import { OutboxReader } from '../../platform-common/src/outbox-reader.js';
 import { HealthMonitor } from '../../platform-common/src/health-monitor.js';
+import { resolveSpeaker } from '../../platform-common/src/speaker-resolver.js';
 
 // ── Configuration ──
 
@@ -216,7 +217,10 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
     }));
   }
 
-  // 3. Write to bot inbox (default: semiclaw as orchestrator)
+  // 3. Resolve speaker profile from KB
+  const speaker = await resolveSpeaker(pool, 'slack', msg.user);
+
+  // 4. Write to bot inbox (default: semiclaw as orchestrator)
   const msgId = await inboxWriter.write(botId, {
     type: 'message',
     priority: 'normal',
@@ -232,6 +236,14 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
       media_type: img.media_type,
       local_path: img.localPath,
     })),
+    speaker_domain: speaker?.domain,
+    speaker_profile: speaker
+      ? {
+          nickname: speaker.nickname,
+          organization: speaker.organization,
+          ...speaker.communicationProfile,
+        }
+      : undefined,
     route_reason: routeReason,
     thread_history: threadHistory,
   });

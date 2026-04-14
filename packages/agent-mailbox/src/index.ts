@@ -280,6 +280,28 @@ mcp.setRequestHandler(CallToolRequestSchema, async (request) => {
         parts.push('[/Thread History]');
       }
 
+      if (msg.speaker_domain || msg.speaker_profile) {
+        parts.push('');
+        parts.push('[발화자 프로필]');
+        if (msg.speaker_domain) parts.push(`도메인: ${msg.speaker_domain}`);
+        if (msg.speaker_profile) {
+          const sp = msg.speaker_profile;
+          if (sp.nickname) parts.push(`닉네임: ${sp.nickname}`);
+          if (sp.tech_level) parts.push(`기술수준: ${sp.tech_level}`);
+          if (sp.organization) parts.push(`소속: ${sp.organization}`);
+          if (sp.dri_scope) parts.push(`DRI: ${sp.dri_scope}`);
+          if (sp.comm_style) parts.push(`톤 지시: ${sp.comm_style}`);
+          if (sp.language) parts.push(`언어: ${sp.language}`);
+          // ACCESS CONTROL for external/incubator-po
+          if (sp.access_level && sp.access_level !== 'internal') {
+            parts.push('');
+            parts.push(`[ACCESS CONTROL] access_level=${sp.access_level}`);
+            parts.push('내부 정보(지분구조, 재무, 팀 내부 의사결정 과정) 미공개.');
+          }
+        }
+        parts.push('[/발화자 프로필]');
+      }
+
       if (msg.images && msg.images.length > 0) {
         parts.push('');
         parts.push(`[${msg.images.length} images attached]`);

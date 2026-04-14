@@ -19,6 +19,18 @@ export interface InboxMessage {
     local_path: string;
   }>;
 
+  // 발화자 프로필 (Router가 주입)
+  speaker_domain?: string;
+  speaker_profile?: {
+    nickname?: string;
+    organization?: string;
+    tech_level?: string;
+    access_level?: string;
+    dri_scope?: string;
+    comm_style?: string;
+    language?: string;
+  };
+
   // Routing metadata
   route_reason: string;
   service_id?: string;
