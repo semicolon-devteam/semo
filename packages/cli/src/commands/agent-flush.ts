@@ -228,7 +228,8 @@ export function registerAgentFlushCommands(program: Command): void {
 
   // ── semo session-register ──────────────────────────────────────────────────
   // SessionStart 훅이 호출. parent session의 bot_sessions 행을 생성한다.
-  // 단일 사용자는 semiclaw-local 고정. 멀티 사용자 환경은 추후 확장.
+  // bot_id는 FK 제약(bot_status) 때문에 'semiclaw' 고정. 로컬 세션 구분은
+  // environment='claude-code-local'과 session_key 접두어 'local-'로 수행.
   program
     .command('session-register')
     .description('[훅 전용] SessionStart — 로컬 Claude Code 세션 등록')
@@ -247,7 +248,7 @@ export function registerAgentFlushCommands(program: Command): void {
         await pool.query(
           `INSERT INTO semo.bot_sessions
              (bot_id, session_key, kind, chat_type, owner, environment, status, started_at)
-           VALUES ('semiclaw-local', $1, 'main', 'claude-code', $2, 'claude-code-local', 'active', NOW())
+           VALUES ('semiclaw', $1, 'main', 'claude-code', $2, 'claude-code-local', 'active', NOW())
            ON CONFLICT (bot_id, session_key) DO UPDATE
              SET status = 'active', started_at = NOW(), owner = EXCLUDED.owner, environment = 'claude-code-local'`,
           [sessionKey, owner],
@@ -296,7 +297,7 @@ export function registerAgentFlushCommands(program: Command): void {
         await pool.query(
           `UPDATE semo.bot_sessions
            SET status = 'terminated', ended_at = NOW()
-           WHERE bot_id = 'semiclaw-local' AND session_key = $1`,
+           WHERE bot_id = 'semiclaw' AND session_key = $1`,
           [sessionKey],
         );
       } catch (err) {
