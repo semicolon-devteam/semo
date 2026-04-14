@@ -4,7 +4,6 @@
  * CRUD operations for semo.meetings table.
  */
 
-import { put } from '@vercel/blob';
 import { query } from './db';
 import type { VitoUtterance } from './stt';
 
@@ -17,7 +16,6 @@ export interface Meeting {
   attendees: string[];
   service_id: string | null;
   audio_filename: string | null;
-  audio_blob_url: string | null;
   audio_duration_ms: number | null;
   vito_transcribe_id: string | null;
   transcription_status: 'pending' | 'uploading' | 'transcribing' | 'completed' | 'failed';
@@ -62,7 +60,7 @@ export async function createMeeting(input: CreateMeetingInput): Promise<Meeting>
 
 // All columns except audio_data (binary, up to ~8MB per row)
 const MEETING_COLS = `meeting_id, title, meeting_type, adhoc_subtype, meeting_date, attendees, service_id,
-  audio_filename, audio_blob_url, audio_duration_ms, vito_transcribe_id, transcription_status, transcription_error,
+  audio_filename, audio_duration_ms, vito_transcribe_id, transcription_status, transcription_error,
   raw_transcript, speaker_map, mapped_transcript, discussion_url, discussion_number,
   generation_status, generation_error, generation_result, created_at, updated_at`;
 
@@ -89,39 +87,14 @@ export async function updateTranscriptionStarted(
   audioFileName?: string,
   audioData?: Buffer,
 ): Promise<void> {
-  const fname = audioFileName ?? audioOriginalName;
-  let blobUrl: string | null = null;
-
   if (audioData) {
-    try {
-      const blob = await put(`meetings/${meetingId}/${fname}`, audioData, {
-        access: 'public',
-        addRandomSuffix: false,
-        allowOverwrite: true,
-        multipart: true,
-      });
-      blobUrl = blob.url;
-    } catch (e) {
-      // Blob 업로드 실패 시 DB bytea fallback
-      console.warn('Blob upload failed, falling back to DB storage:', e);
-    }
-  }
-
-  if (blobUrl) {
     await query(
       `UPDATE semo.meetings
-       SET vito_transcribe_id = $2, audio_filename = $3, audio_blob_url = $4,
+       SET vito_transcribe_id = $2, audio_filename = $3,
+           audio_data = $4,
            transcription_status = 'transcribing', updated_at = NOW()
        WHERE meeting_id = $1`,
-      [meetingId, vitoTranscribeId, fname, blobUrl],
-    );
-  } else if (audioData) {
-    await query(
-      `UPDATE semo.meetings
-       SET vito_transcribe_id = $2, audio_filename = $3, audio_data = $4,
-           transcription_status = 'transcribing', updated_at = NOW()
-       WHERE meeting_id = $1`,
-      [meetingId, vitoTranscribeId, fname, audioData],
+      [meetingId, vitoTranscribeId, audioFileName ?? audioOriginalName, audioData],
     );
   } else {
     await query(
@@ -129,30 +102,21 @@ export async function updateTranscriptionStarted(
        SET vito_transcribe_id = $2, audio_filename = $3,
            transcription_status = 'transcribing', updated_at = NOW()
        WHERE meeting_id = $1`,
-      [meetingId, vitoTranscribeId, fname],
+      [meetingId, vitoTranscribeId, audioFileName ?? audioOriginalName],
     );
   }
 }
 
 export async function getAudioData(
   meetingId: string,
-): Promise<{ data: Buffer; filename: string } | { blobUrl: string; filename: string } | null> {
-  const result = await query<{
-    audio_data: Buffer | null;
-    audio_blob_url: string | null;
-    audio_filename: string;
-  }>('SELECT audio_data, audio_blob_url, audio_filename FROM semo.meetings WHERE meeting_id = $1', [
-    meetingId,
-  ]);
+): Promise<{ data: Buffer; filename: string } | null> {
+  const result = await query<{ audio_data: Buffer; audio_filename: string }>(
+    'SELECT audio_data, audio_filename FROM semo.meetings WHERE meeting_id = $1 AND audio_data IS NOT NULL',
+    [meetingId],
+  );
   const row = result.rows[0];
-  if (!row) return null;
-  if (row.audio_blob_url) {
-    return { blobUrl: row.audio_blob_url, filename: row.audio_filename };
-  }
-  if (row.audio_data) {
-    return { data: row.audio_data, filename: row.audio_filename };
-  }
-  return null;
+  if (!row?.audio_data) return null;
+  return { data: row.audio_data, filename: row.audio_filename };
 }
 
 export async function updateTranscriptionCompleted(
