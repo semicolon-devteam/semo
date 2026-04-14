@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { Suspense, useState, useCallback, useRef, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import AudioUploader from '@/components/meetings/AudioUploader';
 import TranscriptionProgress from '@/components/meetings/TranscriptionProgress';
@@ -37,6 +37,20 @@ function determineStep(m: Meeting): number {
 }
 
 export default function NewMeetingPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center py-16">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <NewMeetingContent />
+    </Suspense>
+  );
+}
+
+function NewMeetingContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const resumeId = searchParams.get('id');
