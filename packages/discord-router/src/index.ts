@@ -18,6 +18,7 @@ import * as os from 'os';
 import { Pool } from 'pg';
 
 // Import from orchestrator (shared monorepo)
+import { Router } from '../../orchestrator/src/router.js';
 import { FALLBACK_BOT_IDS } from '../../orchestrator/src/bot-config.js';
 import type { InboxMessage, OutboxMessage } from '../../platform-common/src/types.js';
 
@@ -40,6 +41,7 @@ const MAX_ESCALATION_DEPTH = 3;
 // ── Components ──
 
 const pool = new Pool({ connectionString: DATABASE_URL });
+const router = new Router(pool);
 const discord = new DiscordGateway(DISCORD_BOT_TOKEN);
 const inboxWriter = new InboxWriter(MAILBOX_DIR);
 
@@ -165,18 +167,9 @@ const healthMonitor = new HealthMonitor({
 // ── Message Handler ──
 
 async function handleDiscordMessage(msg: DiscordMessage, senderName: string): Promise<void> {
-  // 1. [Route: botId] tag → direct routing
-  const routeTag = msg.text.match(/\[Route:\s*(\w+)\]/);
-  let botId = 'semiclaw';
-  let routeReason = 'orchestrator';
-
-  if (routeTag) {
-    const candidate = routeTag[1].toLowerCase();
-    if (FALLBACK_BOT_IDS.includes(candidate as (typeof FALLBACK_BOT_IDS)[number])) {
-      botId = candidate;
-      routeReason = 'route-tag';
-    }
-  }
+  // 1. Router를 사용한 채널→서비스→Phase→봇 자동 라우팅 (Slack Router와 동일 패턴)
+  const route = await router.route(msg.channel, msg.text, msg.thread_ts);
+  router.setThreadBot(msg.thread_ts || msg.ts, route.botId);
 
   // 2. Fetch thread history
   let threadHistory: InboxMessage['thread_history'];
@@ -192,8 +185,8 @@ async function handleDiscordMessage(msg: DiscordMessage, senderName: string): Pr
   // 3. Resolve speaker profile from KB
   const speaker = await resolveSpeaker(pool, 'discord', msg.user);
 
-  // 4. Write to bot inbox (default: semiclaw as orchestrator)
-  const msgId = await inboxWriter.write(botId, {
+  // 4. Write to bot inbox (Router가 결정한 botId로 분배)
+  const msgId = await inboxWriter.write(route.botId, {
     type: 'message',
     priority: 'normal',
     platform: 'discord' as const,
@@ -216,11 +209,19 @@ async function handleDiscordMessage(msg: DiscordMessage, senderName: string): Pr
           ...speaker.communicationProfile,
         }
       : undefined,
-    route_reason: routeReason,
+    route_reason: route.routeReason,
+    service_id: route.serviceId || undefined,
+    service_domain: route.serviceDomain || undefined,
+    phase: route.phase >= 0 ? route.phase : undefined,
+    skill_hint: route.skillHint,
     thread_history: threadHistory,
   });
 
-  console.log(`[router] ${senderName} → ${botId} (${routeReason}) [${msgId.slice(0, 8)}]`);
+  console.log(
+    `[router] ${senderName} → ${route.botId} (${route.routeReason}` +
+      `${route.serviceDomain ? `, svc=${route.serviceDomain}` : ''}` +
+      `${route.phase >= 0 ? `, ph=${route.phase}` : ''}) [${msgId.slice(0, 8)}]`,
+  );
 }
 
 // ── Startup ──
@@ -236,18 +237,22 @@ async function start(): Promise<void> {
     process.exit(1);
   }
 
-  // 1. Set message handler
+  // 1. Load routing config from DB
+  await router.loadRouting();
+  console.log('[discord-router] Routing config loaded');
+
+  // 2. Set message handler
   discord.setMessageHandler(handleDiscordMessage);
 
-  // 2. Start Discord WebSocket
+  // 3. Start Discord WebSocket
   await discord.start();
   console.log('[discord-router] Discord connected');
 
-  // 3. Start outbox reader
+  // 4. Start outbox reader
   outboxReader.start();
   console.log('[discord-router] Outbox reader started');
 
-  // 4. Start health monitor
+  // 5. Start health monitor
   healthMonitor.start();
   console.log('[discord-router] Health monitor started');
 

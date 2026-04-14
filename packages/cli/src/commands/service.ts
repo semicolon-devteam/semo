@@ -187,7 +187,7 @@ export function registerServiceCommands(program: Command): void {
         const result = await pool.query(
           `SELECT service_id, project_name, service_domain, owner_name, owner_contact,
                   status, lifecycle, current_phase, infra_phase,
-                  tech_stack, service_url, bm, repo, slack_channel,
+                  tech_stack, service_url, bm, repo, slack_channel, discord_channel,
                   service_type, parent_service_id,
                   metadata, created_at::text, updated_at::text
            FROM semo.services WHERE service_domain = $1`,
@@ -216,6 +216,7 @@ export function registerServiceCommands(program: Command): void {
           if (row.service_url) console.log(chalk.gray(`  URL: ${row.service_url}`));
           if (row.repo) console.log(chalk.gray(`  레포: ${row.repo}`));
           if (row.slack_channel) console.log(chalk.gray(`  Slack: ${row.slack_channel}`));
+          if (row.discord_channel) console.log(chalk.gray(`  Discord: ${row.discord_channel}`));
           if (row.bm) console.log(chalk.gray(`  BM: ${row.bm}`));
           console.log();
         }
@@ -312,6 +313,7 @@ export function registerServiceCommands(program: Command): void {
     .option('--bm <model>', '비즈니스 모델')
     .option('--repo <repo>', '레포지토리')
     .option('--slack-channel <channel>', 'Slack 채널 ID')
+    .option('--discord-channel <channel>', 'Discord 채널 ID')
     .option('--service-type <type>', '서비스 타입 (incubator|general|external|platform)')
     .option('--parent <domain>', '상위 플랫폼 도메인')
     .action(
@@ -327,6 +329,7 @@ export function registerServiceCommands(program: Command): void {
         bm?: string;
         repo?: string;
         slackChannel?: string;
+        discordChannel?: string;
         serviceType?: string;
         parent?: string;
       }) => {
@@ -377,6 +380,8 @@ export function registerServiceCommands(program: Command): void {
           if (options.bm !== undefined) updates.bm = options.bm;
           if (options.repo !== undefined) updates.repo = options.repo;
           if (options.slackChannel !== undefined) updates.slack_channel = options.slackChannel;
+          if (options.discordChannel !== undefined)
+            updates.discord_channel = options.discordChannel;
           if (options.serviceType) updates.service_type = options.serviceType;
 
           // --parent: 도메인 → service_id 변환

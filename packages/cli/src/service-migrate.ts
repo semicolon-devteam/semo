@@ -432,6 +432,7 @@ export interface ServiceProjectUpdate {
   bm?: string;
   repo?: string;
   slack_channel?: string;
+  discord_channel?: string;
   service_type?: string;
   parent_service_id?: string;
 }
@@ -493,6 +494,10 @@ export async function updateServiceProject(
     sets.push(`slack_channel = $${idx++}`);
     params.push(updates.slack_channel);
   }
+  if (updates.discord_channel !== undefined) {
+    sets.push(`discord_channel = $${idx++}`);
+    params.push(updates.discord_channel);
+  }
   if (updates.service_type !== undefined) {
     sets.push(`service_type = $${idx++}`);
     params.push(updates.service_type);
@@ -510,7 +515,7 @@ export async function updateServiceProject(
      WHERE service_domain = $${idx}
      RETURNING service_id, project_name, service_domain, owner_name, owner_contact,
                current_phase, infra_phase, status, lifecycle,
-               tech_stack, service_url, bm, repo, slack_channel,
+               tech_stack, service_url, bm, repo, slack_channel, discord_channel,
                service_type, parent_service_id,
                launched_at::text, metadata, created_at::text, updated_at::text`,
     params,
