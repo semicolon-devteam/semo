@@ -18,10 +18,9 @@ import * as path from 'path';
 import * as os from 'os';
 import { Pool } from 'pg';
 
-// Import from orchestrator (shared monorepo)
-import { SlackGateway } from '../../orchestrator/src/slack-gateway.js';
-import { FALLBACK_BOT_IDS } from '../../orchestrator/src/bot-config.js';
-import type { SlackMessage } from '../../orchestrator/src/types.js';
+import { SlackGateway } from '../../platform-common/src/slack-gateway.js';
+import { FALLBACK_BOT_IDS } from '../../platform-common/src/bot-config.js';
+import type { SlackMessage } from '../../platform-common/src/channel-types.js';
 import type { InboxMessage, OutboxMessage } from '../../platform-common/src/types.js';
 
 import { InboxWriter } from '../../platform-common/src/inbox-writer.js';

@@ -17,9 +17,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { Pool } from 'pg';
 
-// Import from orchestrator (shared monorepo)
-import { Router } from '../../orchestrator/src/router.js';
-import { FALLBACK_BOT_IDS } from '../../orchestrator/src/bot-config.js';
+import { Router } from '../../platform-common/src/channel-router.js';
+import { FALLBACK_BOT_IDS } from '../../platform-common/src/bot-config.js';
 import type { InboxMessage, OutboxMessage } from '../../platform-common/src/types.js';
 
 import { InboxWriter } from '../../platform-common/src/inbox-writer.js';

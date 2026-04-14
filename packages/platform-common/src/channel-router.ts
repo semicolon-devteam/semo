@@ -1,5 +1,5 @@
 import { Pool } from 'pg';
-import type { RouteResult, ProjectContext } from './types';
+import type { RouteResult, ProjectContext } from './channel-types';
 import { loadRoutingConfig, type RoutingConfig } from './kb-routing';
 
 // 채널 → 도메인 매핑 캐시 (ontology 기반, services LEFT JOIN)

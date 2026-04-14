@@ -10,11 +10,10 @@
     "rootDir": "../..",
     "baseUrl": ".",
     "paths": {
-      "../../orchestrator/src/*": ["../orchestrator/src/*"],
       "../../agent-mailbox/src/*": ["../agent-mailbox/src/*"],
       "../../platform-common/src/*": ["../platform-common/src/*"]
     }
   },
-  "include": ["src", "../orchestrator/src", "../agent-mailbox/src", "../platform-common/src"],
+  "include": ["src", "../agent-mailbox/src", "../platform-common/src"],
   "exclude": ["../**/__tests__/**", "../**/dist/**"]
 }

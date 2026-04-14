@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { convertMarkdownToBlocks } from './markdown-to-slack.js';
-import type { SlackMessage, SlackImage, AskOption } from './types';
+import type { SlackMessage, SlackImage, AskOption } from './channel-types';
 import { SLACK_PROFILES } from './bot-config';
 import type { BotId } from './bot-config';
 
@@ -285,7 +285,7 @@ export class SlackGateway {
     channel: string,
     threadTs: string,
     limit = 15,
-  ): Promise<import('./types').ThreadMessage[]> {
+  ): Promise<import('./channel-types').ThreadMessage[]> {
     try {
       const result = await this.web.conversations.replies({
         channel,

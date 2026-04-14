@@ -10,10 +10,9 @@
     "rootDir": "../..",
     "baseUrl": ".",
     "paths": {
-      "../../orchestrator/src/*": ["../orchestrator/src/*"],
       "../../platform-common/src/*": ["../platform-common/src/*"]
     }
   },
-  "include": ["src", "../orchestrator/src", "../platform-common/src"],
+  "include": ["src", "../platform-common/src"],
   "exclude": ["../**/__tests__/**", "../**/dist/**"]
 }

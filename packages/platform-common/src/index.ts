@@ -1,7 +1,11 @@
 export * from './types.js';
+export * from './channel-types.js';
 export { InboxWriter } from './inbox-writer.js';
 export { OutboxReader } from './outbox-reader.js';
 export type { GatewayAdapter } from './outbox-reader.js';
 export { HealthMonitor } from './health-monitor.js';
 export { BusyDetector } from './busy-detector.js';
 export { resolveSpeaker, type SpeakerProfile } from './speaker-resolver.js';
+export { SlackGateway } from './slack-gateway.js';
+export { Router as ChannelRouter } from './channel-router.js';
+export { FALLBACK_BOT_IDS, SLACK_PROFILES, type BotId } from './bot-config.js';

@@ -23,7 +23,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import type { GatewayAdapter } from '../../platform-common/src/outbox-reader.js';
-import type { AskOption } from '../../orchestrator/src/types.js';
+import type { AskOption } from '../../platform-common/src/channel-types.js';
 import { splitDiscordMessage } from './markdown-to-discord.js';
 
 // ── Types ──

@@ -1,10 +1,16 @@
 {
   "name": "@team-semicolon/semo-platform-common",
   "version": "0.1.0",
-  "description": "SEMO multi-platform common layer — types, inbox/outbox, health monitor",
+  "description": "SEMO multi-platform common layer — types, inbox/outbox, slack gateway, router, bot config",
   "main": "src/index.ts",
-  "dependencies": {},
+  "dependencies": {
+    "@slack/socket-mode": "^2.0.0",
+    "@slack/web-api": "^7.0.0",
+    "pg": "^8.17.2"
+  },
   "devDependencies": {
+    "@anthropic-ai/claude-agent-sdk": "~0.2.96",
+    "@types/pg": "^8.11.0",
     "typescript": "^5.7.0"
   }
 }
