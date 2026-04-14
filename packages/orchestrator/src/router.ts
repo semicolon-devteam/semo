@@ -184,28 +184,35 @@ export class Router {
     if (cached && Date.now() < expiry) return cached;
 
     try {
-      // incubator_sessions에서 채널 → 서비스 매핑
-      const sessionResult = await this.pool.query(
-        `SELECT service_id, service_name FROM semo.incubator_sessions WHERE channel = $1 AND status = 'active' LIMIT 1`,
+      // 통합 조회: services.slack_channel / discord_channel (1순위) + incubator_sessions (2순위)
+      const result = await this.pool.query(
+        `SELECT service_id::text as full_service_id, project_name, service_domain,
+                current_phase, COALESCE(infra_phase, 0) as infra_phase
+         FROM semo.services
+         WHERE slack_channel LIKE '%' || $1 || '%'
+            OR discord_channel = $1
+
+         UNION ALL
+
+         SELECT s.service_id::text, s.project_name, s.service_domain,
+                s.current_phase, COALESCE(s.infra_phase, 0)
+         FROM semo.incubator_sessions i
+         JOIN semo.services s ON s.service_id::text LIKE i.service_id || '%'
+         WHERE i.channel = $1 AND i.status = 'active'
+
+         LIMIT 1`,
         [channelId],
       );
-      if (sessionResult.rows.length === 0) return null;
 
-      const { service_id, service_name } = sessionResult.rows[0];
+      if (result.rows.length === 0) return null;
 
-      // services에서 현재 Phase 조회 (incubator_sessions의 service_id가 short hash일 수 있으므로 LIKE 매칭)
-      const serviceResult = await this.pool.query(
-        `SELECT service_id::text as full_service_id, current_phase, COALESCE(infra_phase, 0) as infra_phase, COALESCE(service_domain, $2) as service_domain FROM semo.services WHERE service_id::text LIKE $1 || '%'`,
-        [service_id, service_name.toLowerCase().replace(/\s+/g, '-')],
-      );
-
-      const row = serviceResult.rows[0];
+      const row = result.rows[0];
       const info: ServiceInfo = {
-        serviceId: row?.full_service_id || service_id,
-        serviceName: service_name,
-        serviceDomain: row?.service_domain || service_name.toLowerCase(),
-        currentPhase: row?.current_phase ?? 0,
-        infraPhase: row?.infra_phase ?? 0,
+        serviceId: row.full_service_id,
+        serviceName: row.project_name || row.service_domain,
+        serviceDomain: row.service_domain || '',
+        currentPhase: row.current_phase ?? 0,
+        infraPhase: row.infra_phase ?? 0,
       };
 
       this.channelCache.set(channelId, info);
