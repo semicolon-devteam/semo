@@ -53,6 +53,9 @@ function loadAgentIds() {
 
 const BOT_IDS = loadAgentIds();
 
+/** Overflow sessions: derived from a primary bot, separate mailbox, same persona */
+const OVERFLOW_BOTS = [{ id: 'semiclaw-overflow', primaryId: 'semiclaw' }];
+
 const AGENTS_DIR = path.join(os.homedir(), '.claude', 'agents');
 const SEMO_ROOT = path.resolve(import.meta.dirname, '..');
 const DEFAULT_SESSION_DIR = path.join(os.homedir(), '.semo-bot-sessions');
@@ -341,6 +344,60 @@ for (const botId of bots) {
   }
 
   console.log(`  [${botId}] Done`);
+}
+
+// ── Overflow bots (derived from primary) ──
+
+if (allBots) {
+  for (const overflow of OVERFLOW_BOTS) {
+    const primaryDef = parseAgentDef(overflow.primaryId);
+    if (!primaryDef) {
+      console.error(`  [SKIP] ${overflow.id}: primary ${overflow.primaryId} not found`);
+      continue;
+    }
+
+    console.log(
+      `\n[${overflow.id}] Generating overflow environment (primary: ${overflow.primaryId})...`,
+    );
+
+    const botSessionDir = path.join(sessionDir, overflow.id);
+
+    // 1. CLAUDE.md — same as primary with overflow note
+    const claudeMd = generateClaudeMd(overflow.primaryId, primaryDef.meta, primaryDef.body).replace(
+      `# SEMO Bot Session — ${overflow.primaryId}`,
+      `# SEMO Bot Session — ${overflow.id}\n\n> Overflow session for ${overflow.primaryId}. Same persona, separate mailbox.`,
+    );
+    writeFile(path.join(botSessionDir, '.claude', 'CLAUDE.md'), claudeMd);
+
+    // 2. settings.json — same as primary
+    const settings = generateSettings(overflow.primaryId, primaryDef.meta);
+    writeFile(path.join(botSessionDir, '.claude', 'settings.json'), settings);
+
+    // 3. .mcp.json — own BOT_ID + REPLY_AS for persona
+    const mcpJson = {
+      mcpServers: {
+        'semo-agent-mailbox': {
+          command: 'npx',
+          args: ['tsx', path.join(SEMO_ROOT, 'packages', 'agent-mailbox', 'src', 'index.ts')],
+          env: {
+            SEMO_BOT_ID: overflow.id,
+            SEMO_REPLY_AS: overflow.primaryId,
+            SEMO_MAILBOX_DIR: mailboxDir,
+          },
+        },
+      },
+    };
+    writeFile(path.join(botSessionDir, '.mcp.json'), mcpJson);
+
+    // 4. Ensure directories
+    if (!dryRun) {
+      fs.mkdirSync(path.join(botSessionDir, 'memory'), { recursive: true });
+      fs.mkdirSync(path.join(botSessionDir, 'workspace'), { recursive: true });
+      fs.mkdirSync(path.join(mailboxDir, overflow.id, 'archive'), { recursive: true });
+    }
+
+    console.log(`  [${overflow.id}] Done`);
+  }
 }
 
 if (dryRun) {
