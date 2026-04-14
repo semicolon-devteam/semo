@@ -134,7 +134,32 @@ export class Router {
       }
     }
 
-    // 4. Phase 기반 라우팅 (키워드 라우팅 제거 — 봇이 자체 역할 판단 후 에스컬레이션)
+    // 4. Sprint 워크플로우 감지
+    const sprintFull = /스프린트\s*시작|sprint\s*start/i;
+    const sprintQuick = /빠른\s*구현|quick\s*build/i;
+    const sprintReview = /리뷰해줘\s*PR|review\s*PR/i;
+    const sprintPreset = sprintFull.test(text)
+      ? 'full'
+      : sprintQuick.test(text)
+        ? 'quick'
+        : sprintReview.test(text)
+          ? 'review-only'
+          : null;
+    if (sprintPreset) {
+      return {
+        botId: 'semiclaw',
+        serviceId: service?.serviceId || '',
+        serviceDomain: service?.serviceDomain || '',
+        phase: service?.currentPhase ?? -1,
+        track: 'plan',
+        projectType: service?.projectType || 'service',
+        routeReason: 'phase-based',
+        workflow: 'sprint',
+        workflowPreset: sprintPreset,
+      };
+    }
+
+    // 5. Phase 기반 라우팅 (키워드 라우팅 제거 — 봇이 자체 역할 판단 후 에스컬레이션)
     if (service) {
       const botId = config.phaseAssignees[service.currentPhase] || 'semiclaw';
       return {

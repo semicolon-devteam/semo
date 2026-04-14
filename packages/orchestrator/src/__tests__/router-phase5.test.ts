@@ -143,9 +143,8 @@ describe('Router — Phase 5: projectType propagation', () => {
       expect(result.projectType).toBe('service');
     });
 
-    it('should propagate projectType in keyword routing', async () => {
+    it('should propagate projectType in sprint workflow routing', async () => {
       const pool = createMockPool({
-        delegation: [{ to_bot_id: 'infraclaw', domains: ['인프라'], metadata: { order: 1 } }],
         services: [
           {
             full_service_id: 'svc-1',
@@ -158,8 +157,8 @@ describe('Router — Phase 5: projectType propagation', () => {
         ],
       });
       const router = new Router(pool);
-      const result = await router.route('C_PROJ', '인프라 확인');
-      expect(result.routeReason).toBe('keyword');
+      const result = await router.route('C_PROJ', '스프린트 시작');
+      expect(result.workflow).toBe('sprint');
       expect(result.projectType).toBe('platform');
     });
   });

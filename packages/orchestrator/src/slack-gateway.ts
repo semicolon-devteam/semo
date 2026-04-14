@@ -70,6 +70,10 @@ export class SlackGateway {
   private readonly BOT_THREAD_TTL = 2 * 60 * 60_000; // 2시간
   private readonly BOT_THREAD_MAX = 500;
 
+  // Event dedup — same message ts processed only once (app_mention + message race)
+  private processedEvents = new Set<string>();
+  private readonly PROCESSED_EVENTS_MAX = 200;
+
   constructor(botToken: string, appToken: string) {
     this.web = new WebClient(botToken);
     this.socket = new SocketModeClient({ appToken });
@@ -149,6 +153,14 @@ export class SlackGateway {
   private async handleEvent(event: any) {
     if (event.user === this.botUserId) return;
     if (event.bot_id && !isSystemMessage(event.text)) return;
+
+    // Dedup: skip if same event.ts already processed (app_mention + message race)
+    if (this.processedEvents.has(event.ts)) return;
+    this.processedEvents.add(event.ts);
+    if (this.processedEvents.size > this.PROCESSED_EVENTS_MAX) {
+      const first = this.processedEvents.values().next().value;
+      if (first) this.processedEvents.delete(first);
+    }
 
     const cleanText = (event.text || '')
       .replace(new RegExp(`<@${this.botUserId}>\\s*`, 'g'), '')
@@ -437,6 +449,15 @@ export class SlackGateway {
       /* API 실패 시 보수적으로 미응답 */
     }
     return false;
+  }
+
+  /** 기존 메시지 내용을 갱신한다 (chat.update). */
+  async updateMessage(channel: string, ts: string, text: string): Promise<void> {
+    try {
+      await this.web.chat.update({ channel, ts, text });
+    } catch (err) {
+      console.warn('[slack] updateMessage failed:', err);
+    }
   }
 
   async stop() {

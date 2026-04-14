@@ -96,21 +96,28 @@ describe('Router', () => {
     });
   });
 
-  describe('keyword routing', () => {
-    const pool = createMockPool();
-
+  describe('sprint workflow routing', () => {
     it.each([
-      ['인프라 배포해줘', 'infraclaw'],
-      ['디자인 시스템 검토해줘', 'designclaw'],
-      ['코드 리뷰 부탁', 'reviewclaw'],
-      ['SEO 키워드 분석', 'growthclaw'],
-      ['새 기능 feature 구현해줘', 'workclaw'],
-      ['PRD 작성해줘', 'planclaw'],
-    ])('"%s" → %s', async (text, expectedBot) => {
+      ['스프린트 시작해줘', 'full'],
+      ['sprint start 진행', 'full'],
+      ['빠른 구현 부탁', 'quick'],
+      ['quick build this', 'quick'],
+      ['리뷰해줘 PR #42', 'review-only'],
+      ['review PR please', 'review-only'],
+    ])('"%s" → sprint preset %s', async (text, expectedPreset) => {
+      const pool = createMockPool();
       const router = new Router(pool);
       const result = await router.route('C_UNKNOWN', text);
-      expect(result.botId).toBe(expectedBot);
-      expect(result.routeReason).toBe('keyword');
+      expect(result.workflow).toBe('sprint');
+      expect(result.workflowPreset).toBe(expectedPreset);
+      expect(result.botId).toBe('semiclaw');
+    });
+
+    it('should not trigger sprint for unrelated messages', async () => {
+      const pool = createMockPool();
+      const router = new Router(pool);
+      const result = await router.route('C_UNKNOWN', '안녕하세요');
+      expect(result.workflow).toBeUndefined();
     });
   });
 
@@ -245,13 +252,27 @@ describe('Router', () => {
     });
   });
 
-  describe('keyword priority', () => {
-    it('should match first keyword in delegation order', async () => {
-      const pool = createMockPool();
+  describe('sprint priority', () => {
+    it('sprint trigger takes precedence over phase routing', async () => {
+      const pool = createMockPool({
+        services: [
+          {
+            full_service_id: 'svc-1',
+            project_name: 'Test',
+            service_domain: 'test',
+            current_phase: 4,
+            infra_phase: 0,
+            project_type: 'service',
+          },
+        ],
+        kbRoles: [
+          { bot_id: 'designclaw', content: '### GFP Phase 담당\n| Phase | Name |\n| 4 | Design |' },
+        ],
+      });
       const router = new Router(pool);
-      // "인프라"(infraclaw, order:1) + "리뷰"(reviewclaw, order:3) → infraclaw wins
-      const result = await router.route('C_UNKNOWN', '인프라 코드 리뷰해줘');
-      expect(result.botId).toBe('infraclaw');
+      const result = await router.route('C_PROJ', '스프린트 시작해줘');
+      expect(result.workflow).toBe('sprint');
+      expect(result.botId).toBe('semiclaw');
     });
   });
 
@@ -270,6 +291,102 @@ describe('Router', () => {
       const result = await router.route('C_PROJ', '안녕하세요 잘 지내시나요');
       expect(result.botId).toBe('semiclaw');
       expect(result.routeReason).toBe('fallback');
+    });
+  });
+
+  describe('thread stickiness', () => {
+    it('should route follow-up messages in same thread to the same bot', async () => {
+      const pool = createMockPool();
+      const router = new Router(pool);
+
+      // Simulate first dispatch → infraclaw via route-tag
+      const first = await router.route(
+        'C_UNKNOWN',
+        '[Route: infraclaw] 인프라 점검해줘',
+        '1234.5678',
+      );
+      expect(first.botId).toBe('infraclaw');
+
+      // Record the thread→bot mapping (normally done by dispatch layer)
+      router.setThreadBot('1234.5678', 'infraclaw');
+
+      // Follow-up in same thread — should stick to infraclaw
+      const second = await router.route('C_UNKNOWN', '그거 언제 끝나?', '1234.5678');
+      expect(second.botId).toBe('infraclaw');
+      expect(second.routeReason).toBe('thread-sticky');
+    });
+
+    it('should not apply thread stickiness to a different thread', async () => {
+      const pool = createMockPool();
+      const router = new Router(pool);
+
+      router.setThreadBot('1111.0000', 'designclaw');
+
+      // Different thread — should NOT be sticky
+      const result = await router.route('C_UNKNOWN', '안녕하세요', '9999.0000');
+      expect(result.botId).toBe('semiclaw');
+      expect(result.routeReason).toBe('fallback');
+    });
+
+    it('[Route:] tag should override thread stickiness', async () => {
+      const pool = createMockPool();
+      const router = new Router(pool);
+
+      router.setThreadBot('1234.5678', 'infraclaw');
+
+      // Explicit route tag overrides sticky
+      const result = await router.route(
+        'C_UNKNOWN',
+        '[Route: workclaw] 이거 구현해줘',
+        '1234.5678',
+      );
+      expect(result.botId).toBe('workclaw');
+      expect(result.routeReason).toBe('route-tag');
+    });
+  });
+
+  describe('incubator session routing', () => {
+    it('should route to incubator when active session exists for channel', async () => {
+      const pool = createMockPool({
+        services: [
+          {
+            full_service_id: 'svc-inc',
+            project_name: 'NewStartup',
+            service_domain: 'new-startup',
+            current_phase: 1,
+            infra_phase: 0,
+            project_type: 'service',
+          },
+        ],
+        incubator: [{ '?column?': 1 }], // SELECT 1 returns a row
+      });
+      const router = new Router(pool);
+      const result = await router.route('C_INCUBATOR', '프로젝트 진행상황 알려줘');
+      expect(result.botId).toBe('incubator');
+      expect(result.serviceDomain).toBe('new-startup');
+    });
+
+    it('should NOT route to incubator when no active session', async () => {
+      const pool = createMockPool({
+        services: [
+          {
+            full_service_id: 'svc-1',
+            project_name: 'RegularSvc',
+            service_domain: 'regular',
+            current_phase: 2,
+            infra_phase: 0,
+            project_type: 'service',
+          },
+        ],
+        incubator: [], // no active session
+        kbRoles: [
+          { bot_id: 'planclaw', content: '### GFP Phase 담당\n| Phase | Name |\n| 2 | PRD |' },
+        ],
+      });
+      const router = new Router(pool);
+      const result = await router.route('C_REGULAR', '일반 메시지');
+      expect(result.botId).toBe('planclaw');
+      expect(result.routeReason).toBe('phase-based');
     });
   });
 

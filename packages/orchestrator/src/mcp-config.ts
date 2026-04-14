@@ -57,9 +57,54 @@ const STITCH_TOOLS = {
   update_design_system: 'mcp__stitch__update_design_system',
 } as const;
 
+// ── Slack MCP 도구 목록 ──
+
+const SLACK_TOOLS = {
+  list_channels: 'mcp__slack__slack_list_channels',
+  get_channel_history: 'mcp__slack__slack_get_channel_history',
+  get_thread_replies: 'mcp__slack__slack_get_thread_replies',
+  get_users: 'mcp__slack__slack_get_users',
+  get_user_profile: 'mcp__slack__slack_get_user_profile',
+  search_messages: 'mcp__slack__slack_search_messages',
+  post_message: 'mcp__slack__slack_post_message',
+  reply_to_thread: 'mcp__slack__slack_reply_to_thread',
+  add_reaction: 'mcp__slack__slack_add_reaction',
+} as const;
+
+const SLACK_READ_TOOLS = [
+  SLACK_TOOLS.list_channels,
+  SLACK_TOOLS.get_channel_history,
+  SLACK_TOOLS.get_thread_replies,
+  SLACK_TOOLS.get_users,
+  SLACK_TOOLS.get_user_profile,
+  SLACK_TOOLS.search_messages,
+];
+
 // ── 서버 정의 ──
 
 const MCP_SERVERS: Record<string, McpServerDefinition> = {
+  slack: {
+    create: (): McpStdioServerConfig | null => {
+      const token = process.env.SLACK_BOT_TOKEN;
+      const teamId = process.env.SLACK_TEAM_ID;
+      if (!token) return null;
+      return {
+        command: 'npx',
+        args: ['-y', '@anthropic-ai/mcp-server-slack'],
+        env: {
+          SLACK_BOT_TOKEN: token,
+          ...(teamId ? { SLACK_TEAM_ID: teamId } : {}),
+        },
+      };
+    },
+    toolsByAccess: {
+      full: Object.values(SLACK_TOOLS),
+      read_write: [...SLACK_READ_TOOLS, SLACK_TOOLS.add_reaction],
+      read_only: SLACK_READ_TOOLS,
+      none: [],
+    },
+  },
+
   supabase: {
     create: (): McpStdioServerConfig | null => {
       const token = process.env.SUPABASE_ACCESS_TOKEN;
@@ -121,10 +166,26 @@ const MCP_SERVERS: Record<string, McpServerDefinition> = {
 // ── 봇별 접근 매트릭스 (DB-driven, fallback 포함) ──
 
 const FALLBACK_MCP_ACCESS: Record<string, BotMcpAccess[]> = {
-  infraclaw: [{ serverName: 'supabase', accessLevel: 'full' }],
-  workclaw: [{ serverName: 'supabase', accessLevel: 'read_write' }],
-  semiclaw: [{ serverName: 'supabase', accessLevel: 'read_only' }],
-  designclaw: [{ serverName: 'stitch', accessLevel: 'full' }],
+  semiclaw: [
+    { serverName: 'slack', accessLevel: 'read_write' },
+    { serverName: 'supabase', accessLevel: 'read_only' },
+  ],
+  planclaw: [{ serverName: 'slack', accessLevel: 'read_only' }],
+  designclaw: [
+    { serverName: 'slack', accessLevel: 'read_only' },
+    { serverName: 'stitch', accessLevel: 'full' },
+  ],
+  workclaw: [
+    { serverName: 'slack', accessLevel: 'read_only' },
+    { serverName: 'supabase', accessLevel: 'read_write' },
+  ],
+  reviewclaw: [{ serverName: 'slack', accessLevel: 'read_only' }],
+  infraclaw: [
+    { serverName: 'slack', accessLevel: 'read_only' },
+    { serverName: 'supabase', accessLevel: 'full' },
+  ],
+  growthclaw: [{ serverName: 'slack', accessLevel: 'read_only' }],
+  incubator: [{ serverName: 'slack', accessLevel: 'read_only' }],
 };
 
 let _botMcpAccess: Record<string, BotMcpAccess[]> = { ...FALLBACK_MCP_ACCESS };
