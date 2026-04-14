@@ -65,6 +65,8 @@ export interface BotConfig {
   slackProfile: { username: string; icon_emoji: string };
   mcpServers?: Record<string, import('@anthropic-ai/claude-agent-sdk').McpServerConfig>;
   mcpAllowedTools?: string[];
+  agents?: Record<string, import('@anthropic-ai/claude-agent-sdk').AgentDefinition>;
+  worktreeSettings?: { symlinkDirectories?: string[]; sparsePaths?: string[] };
 }
 
 export interface ProjectContext {

@@ -212,10 +212,12 @@ class BotSession {
               },
             ],
           },
+          ...(config.worktreeSettings ? { worktree: config.worktreeSettings } : {}),
         },
         ...(config.mcpServers && Object.keys(config.mcpServers).length > 0
           ? { mcpServers: config.mcpServers }
           : {}),
+        ...(config.agents ? { agents: config.agents } : {}),
         env: {
           ...process.env,
           // 봇 프로세스가 직접 Slack API 호출하는 것을 방지 (이중 응답 원인)

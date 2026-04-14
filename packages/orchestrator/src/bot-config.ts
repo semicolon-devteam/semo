@@ -271,7 +271,7 @@ export async function loadAllBotConfigsAsync(pool: Pool): Promise<Map<string, Bo
 
       const mcp = resolveMcpForBot(botId);
 
-      configs.set(botId, {
+      const botConfig: BotConfig = {
         botId,
         model: resolveModel(def.model),
         tools: def.tools,
@@ -283,7 +283,37 @@ export async function loadAllBotConfigsAsync(pool: Pool): Promise<Map<string, Bo
         ...(Object.keys(mcp.servers).length > 0
           ? { mcpServers: mcp.servers, mcpAllowedTools: mcp.allowedTools }
           : {}),
-      });
+      };
+
+      if (botId === 'workclaw') {
+        botConfig.agents = {
+          'worktree-coder': {
+            description:
+              'Runs coding tasks in an isolated git worktree to prevent conflicts with main branch. Use for any task that modifies source code files.',
+            prompt: [
+              'You are a coding agent running in an isolated git worktree.',
+              'Your CWD is a temporary worktree branched from the target repository.',
+              'Follow this workflow:',
+              '1. Create a feature branch (feat/<slug>)',
+              '2. Implement the requested changes',
+              '3. Run build verification (tsc --noEmit, lint)',
+              '4. Commit changes with a descriptive message',
+              '5. Push the branch and create a PR to dev',
+              'Report results when done. Do not merge.',
+            ].join('\n'),
+            tools: ['Read', 'Glob', 'Grep', 'Bash', 'Edit', 'Write'],
+            model: 'sonnet',
+            maxTurns: 50,
+            effort: 'medium',
+            permissionMode: 'acceptEdits',
+          },
+        };
+        botConfig.worktreeSettings = {
+          symlinkDirectories: ['node_modules', '.next', '.cache'],
+        };
+      }
+
+      configs.set(botId, botConfig);
     } catch (err) {
       console.error(`[bot-config] Failed to load ${botId}:`, err);
     }
