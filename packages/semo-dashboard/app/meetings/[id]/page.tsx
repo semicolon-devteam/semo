@@ -2,13 +2,24 @@
 
 import { useState, useEffect, useRef, use } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import TranscriptPreview from '@/components/meetings/TranscriptPreview';
 import AudioPlayer from '@/components/meetings/AudioPlayer';
 import type { AudioPlayerHandle } from '@/components/meetings/AudioPlayer';
 import type { Meeting } from '@/lib/meeting';
 
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const yy = String(d.getFullYear()).slice(2);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
 export default function MeetingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const playerRef = useRef<AudioPlayerHandle>(null);
   const [meeting, setMeeting] = useState<Meeting | null>(null);
   const [loading, setLoading] = useState(true);
@@ -18,7 +29,7 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
 
   useEffect(() => {
     fetch(`/api/meetings/${id}`)
-      .then((r) => r.ok ? r.json() : null)
+      .then((r) => (r.ok ? r.json() : null))
       .then((data) => setMeeting(data?.meeting ?? null))
       .catch(() => setMeeting(null))
       .finally(() => setLoading(false));
@@ -45,17 +56,31 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
         throw new Error(data.error || 'Regeneration failed');
       }
       const data = await res.json();
-      setMeeting((prev) => prev ? {
-        ...prev,
-        discussion_url: data.discussionUrl,
-        discussion_number: data.discussionNumber,
-        generation_status: 'completed' as const,
-        generation_result: data.result,
-      } : null);
+      setMeeting((prev) =>
+        prev
+          ? {
+              ...prev,
+              discussion_url: data.discussionUrl,
+              discussion_number: data.discussionNumber,
+              generation_status: 'completed' as const,
+              generation_result: data.result,
+            }
+          : null,
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Regeneration failed');
     } finally {
       setRegenerating(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm(`"${meeting?.title}" 회의를 삭제하시겠습니까?`)) return;
+    try {
+      const res = await fetch(`/api/meetings/${id}`, { method: 'DELETE' });
+      if (res.ok) router.push('/meetings');
+    } catch {
+      /* ignore */
     }
   }
 
@@ -71,33 +96,70 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
     return (
       <div className="container mx-auto px-4 py-8">
         <p className="text-gray-500">회의를 찾을 수 없습니다.</p>
-        <Link href="/meetings" className="text-blue-600 hover:underline text-sm mt-2 inline-block">회의 목록으로 돌아가기</Link>
+        <Link href="/meetings" className="text-blue-600 hover:underline text-sm mt-2 inline-block">
+          회의 목록으로 돌아가기
+        </Link>
       </div>
     );
   }
 
   const hasAudio = !!meeting.audio_filename;
   const audioUrl = `/api/meetings/${id}/audio`;
+  const isPending =
+    meeting.transcription_status === 'pending' && meeting.generation_status === 'pending';
 
   return (
     <div className={`container mx-auto px-4 py-8 max-w-4xl ${hasAudio ? 'pb-20' : ''}`}>
       {/* Header */}
       <div className="flex items-start justify-between mb-6">
         <div>
-          <Link href="/meetings" className="text-sm text-blue-600 hover:underline mb-2 inline-block">&larr; 회의</Link>
+          <Link
+            href="/meetings"
+            className="text-sm text-blue-600 hover:underline mb-2 inline-block"
+          >
+            &larr; 회의
+          </Link>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{meeting.title}</h1>
           <div className="flex items-center gap-3 mt-2 text-sm text-gray-500 dark:text-gray-400">
-            <span>{meeting.meeting_date}</span>
+            <span>{formatDate(meeting.meeting_date)}</span>
             <span>{meeting.meeting_type === 'regular' ? '정기' : '비정기'}</span>
             {meeting.adhoc_subtype && <span className="capitalize">{meeting.adhoc_subtype}</span>}
           </div>
         </div>
-        {meeting.discussion_url && (
-          <a href={meeting.discussion_url} target="_blank" rel="noopener noreferrer"
-            className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
-            Discussion #{meeting.discussion_number}
-          </a>
-        )}
+        <div className="flex items-center gap-2">
+          {isPending && (
+            <Link
+              href={`/meetings/new?id=${id}`}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              이어서 진행
+            </Link>
+          )}
+          {meeting.discussion_url && (
+            <a
+              href={meeting.discussion_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-gray-900 dark:bg-white text-white dark:text-gray-900 px-4 py-2 rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+            >
+              Discussion #{meeting.discussion_number}
+            </a>
+          )}
+          <button
+            onClick={handleDelete}
+            className="text-gray-400 hover:text-red-500 transition-colors p-2"
+            title="삭제"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -111,7 +173,9 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">녹취</p>
           <p className="text-sm font-medium capitalize">{meeting.transcription_status}</p>
-          {meeting.audio_filename && <p className="text-xs text-gray-400 mt-1 truncate">{meeting.audio_filename}</p>}
+          {meeting.audio_filename && (
+            <p className="text-xs text-gray-400 mt-1 truncate">{meeting.audio_filename}</p>
+          )}
         </div>
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">화자</p>
@@ -126,7 +190,8 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
           <p className="text-sm font-medium capitalize">{meeting.generation_status}</p>
           {meeting.generation_result && (
             <p className="text-xs text-gray-400 mt-1">
-              {meeting.generation_result.decisions}d {meeting.generation_result.actions}a {meeting.generation_result.kpi}k
+              {meeting.generation_result.decisions}d {meeting.generation_result.actions}a{' '}
+              {meeting.generation_result.kpi}k
             </p>
           )}
         </div>
@@ -137,7 +202,12 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
         <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">참석자</h3>
         <div className="flex flex-wrap gap-2">
           {meeting.attendees.map((a: string) => (
-            <span key={a} className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded-full">{a}</span>
+            <span
+              key={a}
+              className="text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 px-2 py-1 rounded-full"
+            >
+              {a}
+            </span>
           ))}
         </div>
       </div>
@@ -147,7 +217,9 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
         <div className="mb-6">
           <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
             녹취록
-            <span className="text-xs font-normal text-gray-400 ml-2">텍스트를 클릭하면 재생, 화자 이름을 클릭하면 수정</span>
+            <span className="text-xs font-normal text-gray-400 ml-2">
+              텍스트를 클릭하면 재생, 화자 이름을 클릭하면 수정
+            </span>
           </h3>
           <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
             <TranscriptPreview
@@ -164,18 +236,25 @@ export default function MeetingDetailPage({ params }: { params: Promise<{ id: st
 
       {/* Regenerate button */}
       {meeting.mapped_transcript && (
-        <button onClick={handleRegenerate} disabled={regenerating}
+        <button
+          onClick={handleRegenerate}
+          disabled={regenerating}
           className={`w-full py-3 rounded-lg text-sm font-medium transition-colors ${
-            regenerating ? 'bg-purple-400 text-white cursor-wait' : 'bg-blue-600 hover:bg-blue-700 text-white'
-          }`}>
-          {regenerating ? '재생성 중...' : (meeting.generation_status === 'completed' ? '회의록 재생성' : '회의록 생성')}
+            regenerating
+              ? 'bg-purple-400 text-white cursor-wait'
+              : 'bg-blue-600 hover:bg-blue-700 text-white'
+          }`}
+        >
+          {regenerating
+            ? '재생성 중...'
+            : meeting.generation_status === 'completed'
+              ? '회의록 재생성'
+              : '회의록 생성'}
         </button>
       )}
 
       {/* Audio Player */}
-      {hasAudio && (
-        <AudioPlayer ref={playerRef} src={audioUrl} onTimeUpdate={setActiveTimeMs} />
-      )}
+      {hasAudio && <AudioPlayer ref={playerRef} src={audioUrl} onTimeUpdate={setActiveTimeMs} />}
     </div>
   );
 }

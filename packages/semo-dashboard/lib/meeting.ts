@@ -41,6 +41,15 @@ export interface CreateMeetingInput {
   service_id?: string;
 }
 
+export interface UpdateMeetingInput {
+  title?: string;
+  meeting_type?: 'regular' | 'adhoc';
+  adhoc_subtype?: 'client' | 'internal' | 'external' | 'workshop' | null;
+  meeting_date?: string;
+  attendees?: string[];
+  service_id?: string | null;
+}
+
 export async function createMeeting(input: CreateMeetingInput): Promise<Meeting> {
   const result = await query<Meeting>(
     `INSERT INTO semo.meetings (title, meeting_type, adhoc_subtype, meeting_date, attendees, service_id)
@@ -194,4 +203,52 @@ export async function updateGenerationFailed(meetingId: string, error: string): 
      WHERE meeting_id = $1`,
     [meetingId, error],
   );
+}
+
+export async function updateMeeting(
+  meetingId: string,
+  input: UpdateMeetingInput,
+): Promise<Meeting | null> {
+  const sets: string[] = [];
+  const vals: unknown[] = [meetingId];
+  let idx = 2;
+
+  if (input.title !== undefined) {
+    sets.push(`title = $${idx++}`);
+    vals.push(input.title);
+  }
+  if (input.meeting_type !== undefined) {
+    sets.push(`meeting_type = $${idx++}`);
+    vals.push(input.meeting_type);
+  }
+  if (input.adhoc_subtype !== undefined) {
+    sets.push(`adhoc_subtype = $${idx++}`);
+    vals.push(input.adhoc_subtype);
+  }
+  if (input.meeting_date !== undefined) {
+    sets.push(`meeting_date = $${idx++}`);
+    vals.push(input.meeting_date);
+  }
+  if (input.attendees !== undefined) {
+    sets.push(`attendees = $${idx++}::jsonb`);
+    vals.push(JSON.stringify(input.attendees));
+  }
+  if (input.service_id !== undefined) {
+    sets.push(`service_id = $${idx++}`);
+    vals.push(input.service_id);
+  }
+
+  if (sets.length === 0) return getMeeting(meetingId);
+
+  sets.push('updated_at = NOW()');
+  const result = await query<Meeting>(
+    `UPDATE semo.meetings SET ${sets.join(', ')} WHERE meeting_id = $1 RETURNING ${MEETING_COLS}`,
+    vals,
+  );
+  return result.rows[0] ?? null;
+}
+
+export async function deleteMeeting(meetingId: string): Promise<boolean> {
+  const result = await query('DELETE FROM semo.meetings WHERE meeting_id = $1', [meetingId]);
+  return (result.rowCount ?? 0) > 0;
 }

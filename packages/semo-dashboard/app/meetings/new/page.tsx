@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import AudioUploader from '@/components/meetings/AudioUploader';
 import TranscriptionProgress from '@/components/meetings/TranscriptionProgress';
 import SpeakerMapper from '@/components/meetings/SpeakerMapper';
@@ -11,6 +11,7 @@ import GenerationPreview from '@/components/meetings/GenerationPreview';
 import type { AudioPlayerHandle } from '@/components/meetings/AudioPlayer';
 import type { VitoUtterance } from '@/lib/stt';
 import type { KBEntry } from '@/lib/meeting-generate';
+import type { Meeting } from '@/lib/meeting';
 
 const REGULAR_ATTENDEES = ['@reus-jeon', '@garden92', '@Roki-Noh', '@kyago', '@Yeomsoyam'];
 
@@ -25,11 +26,25 @@ interface ServiceOption {
   domain: string;
 }
 
+function determineStep(m: Meeting): number {
+  if (m.generation_status === 'completed') return 4;
+  if (m.mapped_transcript) return 4;
+  if (Object.keys(m.speaker_map).length > 0 && m.raw_transcript?.length) return 4;
+  if (m.raw_transcript?.length) return 3;
+  if (m.transcription_status === 'transcribing') return 2;
+  if (m.audio_filename) return 2;
+  return 1;
+}
+
 export default function NewMeetingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const resumeId = searchParams.get('id');
+
   const playerRef = useRef<AudioPlayerHandle>(null);
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(resumeId ? -1 : 0);
   const [error, setError] = useState<string | null>(null);
+  const [resumeLoading, setResumeLoading] = useState(!!resumeId);
 
   // Step 1: Meeting info
   const [meetingType, setMeetingType] = useState<MeetingType>('regular');
@@ -48,7 +63,7 @@ export default function NewMeetingPage() {
   }, []);
 
   // Step 2-3: Upload & transcription
-  const [meetingId, setMeetingId] = useState<string | null>(null);
+  const [meetingId, setMeetingId] = useState<string | null>(resumeId);
 
   // Step 4: Speaker mapping
   const [utterances, setUtterances] = useState<VitoUtterance[]>([]);
@@ -67,6 +82,43 @@ export default function NewMeetingPage() {
 
   const audioUrl = meetingId ? `/api/meetings/${meetingId}/audio` : undefined;
 
+  // Resume: load existing meeting data
+  useEffect(() => {
+    if (!resumeId) return;
+    fetch(`/api/meetings/${resumeId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        const m: Meeting | null = data?.meeting;
+        if (!m) {
+          setError('회의를 찾을 수 없습니다');
+          setStep(0);
+          setMeetingId(null);
+          return;
+        }
+        setMeetingId(m.meeting_id);
+        setMeetingType(m.meeting_type);
+        setTitle(m.title);
+        if (m.adhoc_subtype) setAdhocSubtype(m.adhoc_subtype);
+        setMeetingDate(m.meeting_date ? new Date(m.meeting_date).toISOString().slice(0, 10) : '');
+        setAttendees(m.attendees || []);
+        setServiceId(m.service_id || '');
+        if (m.raw_transcript?.length) {
+          setUtterances(m.raw_transcript);
+          const spks = [...new Set(m.raw_transcript.map((u) => u.spk))].sort();
+          setSpeakers(spks);
+        }
+        if (m.speaker_map && Object.keys(m.speaker_map).length > 0) {
+          setSpeakerMap(m.speaker_map);
+        }
+        setStep(determineStep(m));
+      })
+      .catch(() => {
+        setError('회의 로딩 실패');
+        setStep(0);
+      })
+      .finally(() => setResumeLoading(false));
+  }, [resumeId]);
+
   // Auto-generate regular meeting title
   function getRegularTitle(): string {
     const d = new Date(meetingDate);
@@ -78,7 +130,7 @@ export default function NewMeetingPage() {
     return `[${month}월 ${weekNum}/${totalWeeks}] 정기 회고 & 회의`;
   }
 
-  // Step 1: Create meeting
+  // Step 1: Create or update meeting
   async function handleCreateMeeting() {
     setError(null);
     const finalTitle = meetingType === 'regular' ? getRegularTitle() : title;
@@ -88,24 +140,52 @@ export default function NewMeetingPage() {
     }
 
     try {
-      const res = await fetch('/api/meetings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: finalTitle,
-          meeting_type: meetingType,
-          adhoc_subtype: meetingType === 'adhoc' ? adhocSubtype : undefined,
-          meeting_date: meetingDate,
-          attendees,
-          service_id: serviceId || undefined,
-        }),
-      });
-      if (!res.ok) throw new Error('Failed to create meeting');
-      const data = await res.json();
-      setMeetingId(data.meeting.meeting_id);
-      setStep(1);
+      if (meetingId) {
+        const res = await fetch(`/api/meetings/${meetingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: finalTitle,
+            meeting_type: meetingType,
+            adhoc_subtype: meetingType === 'adhoc' ? adhocSubtype : null,
+            meeting_date: meetingDate,
+            attendees,
+            service_id: serviceId || null,
+          }),
+        });
+        if (!res.ok) throw new Error('Failed to update meeting');
+        setStep(1);
+      } else {
+        const res = await fetch('/api/meetings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: finalTitle,
+            meeting_type: meetingType,
+            adhoc_subtype: meetingType === 'adhoc' ? adhocSubtype : undefined,
+            meeting_date: meetingDate,
+            attendees,
+            service_id: serviceId || undefined,
+          }),
+        });
+        if (!res.ok) throw new Error('Failed to create meeting');
+        const data = await res.json();
+        setMeetingId(data.meeting.meeting_id);
+        setStep(1);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create meeting');
+    }
+  }
+
+  async function handleDelete() {
+    if (!meetingId) return;
+    if (!confirm('이 회의를 삭제하시겠습니까?')) return;
+    try {
+      const res = await fetch(`/api/meetings/${meetingId}`, { method: 'DELETE' });
+      if (res.ok) router.push('/meetings');
+    } catch {
+      /* ignore */
     }
   }
 
@@ -154,7 +234,6 @@ export default function NewMeetingPage() {
     if (!meetingId) return;
     const newMap = { ...speakerMap, [String(spkId)]: newName };
     setSpeakerMap(newMap);
-    // Save to DB in background
     fetch(`/api/meetings/${meetingId}/speakers`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -209,22 +288,46 @@ export default function NewMeetingPage() {
     }
   }
 
+  if (resumeLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div
       className={`container mx-auto px-4 py-8 max-w-4xl ${step >= 4 && audioUrl ? 'pb-20' : ''}`}
     >
-      <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">새 회의</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+          {resumeId ? '회의 이어서 진행' : '새 회의'}
+        </h1>
+        {meetingId && (
+          <button
+            onClick={handleDelete}
+            className="text-sm text-gray-400 hover:text-red-500 transition-colors"
+          >
+            삭제
+          </button>
+        )}
+      </div>
 
       {/* Step indicator */}
       <div className="flex items-center gap-1 mb-8">
         {STEPS.map((label, i) => (
           <div key={label} className="flex items-center gap-1 flex-1">
-            <div
+            <button
+              onClick={() => {
+                if (i < step) setStep(i);
+              }}
+              disabled={i >= step}
               className={`
-              flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shrink-0
+              flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold shrink-0 transition-colors
               ${
                 i < step
-                  ? 'bg-green-600 text-white'
+                  ? 'bg-green-600 text-white cursor-pointer hover:bg-green-700'
                   : i === step
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-200 dark:bg-gray-700 text-gray-500'
@@ -232,7 +335,7 @@ export default function NewMeetingPage() {
             `}
             >
               {i < step ? '✓' : i + 1}
-            </div>
+            </button>
             <span
               className={`text-xs truncate ${i === step ? 'text-blue-600 font-medium' : 'text-gray-400'}`}
             >
@@ -367,7 +470,7 @@ export default function NewMeetingPage() {
             onClick={handleCreateMeeting}
             className="w-full py-3 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors"
           >
-            다음: 오디오 업로드
+            {meetingId ? '수정 후 다음' : '다음: 오디오 업로드'}
           </button>
         </div>
       )}
