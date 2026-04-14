@@ -68,8 +68,8 @@ async function handleBlockAction(payload: Record<string, unknown>): Promise<void
   const value = action.value ? JSON.parse(action.value as string) : {};
   const triggerId = payload.trigger_id as string;
 
-  // service_approve_{sectionId} (legacy: gfp_approve_)
-  if (actionId.startsWith('service_approve_') || actionId.startsWith('gfp_approve_')) {
+  // service_approve_{sectionId}
+  if (actionId.startsWith('service_approve_')) {
     const { serviceId, sectionId } = value;
     const result = await executeSectionAction({
       serviceId,
@@ -98,8 +98,8 @@ async function handleBlockAction(payload: Record<string, unknown>): Promise<void
     return;
   }
 
-  // service_reject_{sectionId} (legacy: gfp_reject_) → 모달 열기
-  if (actionId.startsWith('service_reject_') || actionId.startsWith('gfp_reject_')) {
+  // service_reject_{sectionId} → 모달 열기
+  if (actionId.startsWith('service_reject_')) {
     const { serviceId, sectionId, phase } = value;
     // 섹션 제목을 가져오기 위해 프로젝트 조회
     const project = await getProject(serviceId);
@@ -157,7 +157,7 @@ async function handleBlockAction(payload: Record<string, unknown>): Promise<void
     return;
   }
 
-  // gfp_view_dashboard_* — URL 버튼이므로 Slack이 직접 처리, no-op
+  // service_view_dashboard_* — URL 버튼이므로 Slack이 직접 처리, no-op
 }
 
 // ── View Submission (모달 제출) ──
@@ -173,7 +173,7 @@ async function handleViewSubmission(payload: Record<string, unknown>): Promise<v
   >;
   const reviewerNote = stateValues?.rejection_reason?.reason_input?.value as string;
 
-  if (callbackId === 'gfp_rejection_modal') {
+  if (callbackId === 'service_rejection_modal') {
     const metadata = JSON.parse(view.private_metadata as string);
     const { serviceId, sectionId } = metadata;
     if (!reviewerNote) return;

@@ -11,12 +11,25 @@
  */
 
 import { query } from '@anthropic-ai/claude-agent-sdk';
-import type { SDKUserMessage, SDKResultMessage, Query } from '@anthropic-ai/claude-agent-sdk';
+import type {
+  SDKUserMessage,
+  SDKResultMessage,
+  Query,
+  SDKTaskNotificationMessage,
+  SDKTaskStartedMessage,
+  SDKTaskProgressMessage,
+} from '@anthropic-ai/claude-agent-sdk';
 import type { MessageParam } from '@anthropic-ai/sdk/resources';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
-import type { BotConfig, DispatchContext, DispatchResult, ContextProvider } from './types';
+import type {
+  BotConfig,
+  DispatchContext,
+  DispatchResult,
+  ContextProvider,
+  BackgroundTaskEvent,
+} from './types';
 import { syncBotSkillSymlinks } from './bot-config';
 // resolveModelForMessage 보류 — 쿼터 절감 기간 중 전체 Sonnet 고정
 import { CostTracker } from './cost-tracker';
@@ -81,6 +94,17 @@ class BotSession {
     reject: (err: Error) => void;
     timer?: ReturnType<typeof setTimeout>;
   } | null = null;
+
+  // 백그라운드 태스크 추적
+  private activeTasks = new Map<
+    string,
+    { startedAt: number; timer: ReturnType<typeof setTimeout> }
+  >();
+  private onTaskComplete?: (event: BackgroundTaskEvent) => void;
+
+  setOnTaskComplete(cb: (event: BackgroundTaskEvent) => void): void {
+    this.onTaskComplete = cb;
+  }
 
   constructor(botId: string, config: BotConfig) {
     this.botId = botId;
@@ -321,6 +345,50 @@ class BotSession {
           turnText = '';
           turnCostUsd = 0;
         }
+
+        // Background task started
+        if (msg.type === 'system' && (msg as SDKTaskStartedMessage).subtype === 'task_started') {
+          const taskMsg = msg as SDKTaskStartedMessage;
+          const taskId = taskMsg.task_id;
+          const description = taskMsg.description;
+          console.log(
+            `[bot-session] ${this.botId} background task started: ${taskId} — ${description}`,
+          );
+          const TIMEOUT = 10 * 60_000; // 10분
+          const timer = setTimeout(() => {
+            console.warn(`[bot-session] ${this.botId} task ${taskId} timed out`);
+            this.queryHandle.stopTask(taskId).catch(console.error);
+          }, TIMEOUT);
+          this.activeTasks.set(taskId, { startedAt: Date.now(), timer });
+        }
+
+        // Background task progress (logging only)
+        if (msg.type === 'system' && (msg as SDKTaskProgressMessage).subtype === 'task_progress') {
+          const progressMsg = msg as SDKTaskProgressMessage;
+          console.log(`[bot-session] ${this.botId} task progress: ${progressMsg.task_id}`);
+        }
+
+        // Background task completed/failed
+        if (
+          msg.type === 'system' &&
+          (msg as SDKTaskNotificationMessage).subtype === 'task_notification'
+        ) {
+          const notifMsg = msg as SDKTaskNotificationMessage;
+          const taskId = notifMsg.task_id;
+          const taskInfo = this.activeTasks.get(taskId);
+          if (taskInfo?.timer) clearTimeout(taskInfo.timer);
+          this.activeTasks.delete(taskId);
+          if (this.onTaskComplete) {
+            this.onTaskComplete({
+              botId: this.botId,
+              taskId,
+              status: notifMsg.status,
+              summary: notifMsg.summary,
+              outputFile: notifMsg.output_file || undefined,
+              usage: notifMsg.usage,
+            });
+          }
+        }
       }
     } catch (err) {
       this.rejectPending(err instanceof Error ? err : new Error(String(err)));
@@ -419,6 +487,10 @@ class BotSession {
   }
 
   close(): void {
+    for (const task of this.activeTasks.values()) {
+      clearTimeout(task.timer);
+    }
+    this.activeTasks.clear();
     this.inputQueue.close();
     this._alive = false;
     this.rejectPending(new Error('Session closed'));
@@ -433,6 +505,7 @@ export class SessionPool {
   private costTracker: CostTracker;
   private activeDispatches = 0;
   private contextProviders: Map<string, ContextProvider>;
+  private _taskCompleteCallback?: (event: BackgroundTaskEvent) => void;
 
   constructor(
     configs: Map<string, BotConfig>,
@@ -469,8 +542,18 @@ export class SessionPool {
     console.log(`[session-pool] Recreating session for ${botId}`);
     session?.close();
     const newSession = new BotSession(botId, config);
+    if (this._taskCompleteCallback) {
+      newSession.setOnTaskComplete(this._taskCompleteCallback);
+    }
     this.sessions.set(botId, newSession);
     return newSession;
+  }
+
+  onBackgroundTaskComplete(cb: (event: BackgroundTaskEvent) => void): void {
+    this._taskCompleteCallback = cb;
+    for (const session of this.sessions.values()) {
+      session.setOnTaskComplete(cb);
+    }
   }
 
   async dispatch(

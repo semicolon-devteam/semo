@@ -30,6 +30,9 @@ export interface RouteResult {
     | 'fallback';
   /** 스킬 힌트 — 라우터가 감지한 스킬을 봇에게 전달 */
   skillHint?: string;
+  /** 스프린트 워크플로우 */
+  workflow?: 'sprint' | null;
+  workflowPreset?: 'full' | 'quick' | 'review-only';
 }
 
 export interface ThreadMessage {
@@ -52,6 +55,12 @@ export interface DispatchResult {
   botId: string;
   costUsd: number;
   escalation?: { targetBotId: string; reason: string };
+  artifacts?: {
+    filePaths?: string[];
+    prUrl?: string;
+    issueNumber?: number;
+    branch?: string;
+  };
 }
 
 export interface BotConfig {
@@ -82,4 +91,18 @@ export interface ContextProvider {
 export interface AskOption {
   label: string;
   value: string;
+}
+
+export interface BackgroundTaskEvent {
+  botId: string;
+  taskId: string;
+  status: 'completed' | 'failed' | 'stopped';
+  summary: string;
+  outputFile?: string;
+  /** Agent SDK task_notification usage stats */
+  usage?: {
+    total_tokens: number;
+    tool_uses: number;
+    duration_ms: number;
+  };
 }

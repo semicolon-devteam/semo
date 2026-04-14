@@ -46,6 +46,20 @@ describe('createMeeting — target_domain support', () => {
     expect(params).toContain('axoracle');
   });
 
+  it('should not include service_id in INSERT', async () => {
+    mockQuery.mockResolvedValueOnce(mockRows([{ meeting_id: 'm-1a' }]));
+
+    await createMeeting({
+      title: '테스트',
+      meeting_type: 'adhoc',
+      attendees: ['reus'],
+      target_domain: 'axoracle',
+    });
+
+    const sql = mockQuery.mock.calls[0][0] as string;
+    expect(sql).not.toContain('service_id');
+  });
+
   it('should pass null target_domain when not provided', async () => {
     mockQuery.mockResolvedValueOnce(mockRows([{ meeting_id: 'm-2' }]));
 
@@ -122,7 +136,6 @@ describe('getMeeting — target_domain in result', () => {
           meeting_id: 'm-1',
           title: '테스트',
           target_domain: 'axoracle',
-          service_id: null,
         },
       ]),
     );

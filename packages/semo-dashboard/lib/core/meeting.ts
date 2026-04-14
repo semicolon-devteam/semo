@@ -14,7 +14,6 @@ export interface Meeting {
   adhoc_subtype: 'client' | 'internal' | 'external' | 'workshop' | null;
   meeting_date: string;
   attendees: string[];
-  service_id: string | null;
   target_domain: string | null;
   audio_filename: string | null;
   audio_duration_ms: number | null;
@@ -29,6 +28,10 @@ export interface Meeting {
   generation_status: 'pending' | 'generating' | 'completed' | 'failed';
   generation_error: string | null;
   generation_result: { decisions: number; actions: number; kpi: number } | null;
+  notion_page_id: string | null;
+  notion_url: string | null;
+  notion_sync_status: 'pending' | 'synced' | 'failed' | 'skipped' | null;
+  notion_sync_error: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -39,7 +42,6 @@ export interface CreateMeetingInput {
   adhoc_subtype?: 'client' | 'internal' | 'external' | 'workshop';
   meeting_date?: string;
   attendees: string[];
-  service_id?: string;
   target_domain?: string;
 }
 
@@ -49,17 +51,15 @@ export interface UpdateMeetingInput {
   adhoc_subtype?: 'client' | 'internal' | 'external' | 'workshop' | null;
   meeting_date?: string;
   attendees?: string[];
-  service_id?: string | null;
   target_domain?: string | null;
 }
 
 export async function createMeeting(input: CreateMeetingInput): Promise<Meeting> {
   const targetDomain = input.target_domain ?? null;
-  const serviceId = input.service_id ?? null;
 
   const result = await query<Meeting>(
-    `INSERT INTO semo.meetings (title, meeting_type, adhoc_subtype, meeting_date, attendees, service_id, target_domain)
-     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7)
+    `INSERT INTO semo.meetings (title, meeting_type, adhoc_subtype, meeting_date, attendees, target_domain)
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6)
      RETURNING *`,
     [
       input.title,
@@ -67,7 +67,6 @@ export async function createMeeting(input: CreateMeetingInput): Promise<Meeting>
       input.adhoc_subtype ?? null,
       input.meeting_date ?? new Date().toISOString().slice(0, 10),
       JSON.stringify(input.attendees),
-      serviceId,
       targetDomain,
     ],
   );
@@ -75,10 +74,12 @@ export async function createMeeting(input: CreateMeetingInput): Promise<Meeting>
 }
 
 // All columns except audio_data (binary, up to ~8MB per row)
-const MEETING_COLS = `meeting_id, title, meeting_type, adhoc_subtype, meeting_date, attendees, service_id, target_domain,
+const MEETING_COLS = `meeting_id, title, meeting_type, adhoc_subtype, meeting_date, attendees, target_domain,
   audio_filename, audio_duration_ms, vito_transcribe_id, transcription_status, transcription_error,
   raw_transcript, speaker_map, mapped_transcript, discussion_url, discussion_number,
-  generation_status, generation_error, generation_result, created_at, updated_at`;
+  generation_status, generation_error, generation_result,
+  notion_page_id, notion_url, notion_sync_status, notion_sync_error,
+  created_at, updated_at`;
 
 export async function getMeeting(meetingId: string): Promise<Meeting | null> {
   const result = await query<Meeting>(
@@ -251,10 +252,6 @@ export async function updateMeeting(
   if (input.attendees !== undefined) {
     sets.push(`attendees = $${idx++}::jsonb`);
     vals.push(JSON.stringify(input.attendees));
-  }
-  if (input.service_id !== undefined) {
-    sets.push(`service_id = $${idx++}`);
-    vals.push(input.service_id);
   }
   if (input.target_domain !== undefined) {
     sets.push(`target_domain = $${idx++}`);

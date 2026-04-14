@@ -19,6 +19,8 @@ import { CostTracker } from './cost-tracker';
 import { CommitmentTracker } from './commitment-tracker';
 import { loadAllBotConfigsAsync, loadSlackProfilesFromAPI } from './bot-config';
 import type { SlackMessage, DispatchContext } from './types';
+import { SprintOrchestrator } from './sprint-orchestrator';
+import type { SprintPreset } from './sprint-orchestrator';
 
 // ── Incubator Channel Check 제거 ──
 // incubator 에이전트가 orchestrator SessionPool에서 직접 처리.
@@ -115,6 +117,25 @@ async function main() {
   sessionPool.warmUp().catch((err) => console.warn('[orchestrator] Warm-up partial failure:', err));
   await commitmentTracker.registerSessions(Array.from(botConfigs.keys()));
 
+  // 5b. 백그라운드 태스크 완료 콜백 등록
+  // 봇별 마지막 디스패치 컨텍스트 추적 (task 완료 시 올바른 채널/스레드에 보고)
+  const lastDispatchContext = new Map<string, { channel: string; threadTs: string }>();
+
+  sessionPool.onBackgroundTaskComplete(async (event) => {
+    const ctx = lastDispatchContext.get(event.botId);
+    if (!ctx) {
+      console.warn(`[orchestrator] No dispatch context for ${event.botId} task ${event.taskId}`);
+      return;
+    }
+    const statusIcon = event.status === 'completed' ? '[PASS]' : '[FAIL]';
+    const text = `${statusIcon} Background task ${event.status}\n${event.summary || '(no summary)'}`;
+    try {
+      await slack.postAsBot(event.botId, ctx.channel, text, ctx.threadTs);
+    } catch (err) {
+      console.error('[orchestrator] Failed to post background task result:', err);
+    }
+  });
+
   // 6. Message handler
   slack.setMessageHandler(async (msg: SlackMessage, senderName: string) => {
     const threadTs = msg.thread_ts || msg.ts;
@@ -142,6 +163,43 @@ async function main() {
         `${botConfigs.get(route.botId)?.slackProfile.username || route.botId}가 처리 중...`,
       );
 
+      // Sprint workflow 분기
+      if (route.workflow === 'sprint') {
+        const dispatchFn = async (botId: string, message: string, ctx: DispatchContext) => {
+          return sessionPool.dispatch(botId, message, ctx, undefined, undefined);
+        };
+        const slackPostFn = async (
+          botId: string,
+          channel: string,
+          text: string,
+          threadTs: string,
+        ) => {
+          await slack.postAsBot(botId, channel, text, threadTs || undefined);
+        };
+        const slackUpdateFn = async (channel: string, ts: string, text: string) => {
+          await slack.updateMessage(channel, ts, text);
+        };
+        const sprintOrchestrator = new SprintOrchestrator(
+          pool,
+          dispatchFn,
+          slackPostFn,
+          slackUpdateFn,
+        );
+        await sprintOrchestrator.startSprint(
+          (route.workflowPreset ?? 'full') as SprintPreset,
+          msg.text,
+          {
+            route,
+            sender: senderName,
+            senderId: msg.user,
+            channel: msg.channel,
+            threadTs,
+            threadHistory,
+          },
+        );
+        return;
+      }
+
       // Dispatch with escalation chain + commitment tracking
       let currentBotId = route.botId;
       let currentMessage = msg.text;
@@ -151,7 +209,11 @@ async function main() {
         title: msg.text.slice(0, 100),
         serviceId: route.serviceId,
         sessionOwner: 'agent-sdk',
-        pipelineContext: { channel: msg.channel, phase: route.phase },
+        pipelineContext: {
+          channel: msg.channel,
+          phase: route.phase,
+          slack_event_id: msg.ts,
+        },
       });
 
       while (depth < MAX_ESCALATION_DEPTH) {
@@ -163,6 +225,9 @@ async function main() {
           threadTs,
           threadHistory,
         };
+
+        // 백그라운드 태스크 완료 시 사용할 컨텍스트 저장
+        lastDispatchContext.set(currentBotId, { channel: msg.channel, threadTs });
 
         const result = await sessionPool.dispatch(
           currentBotId,

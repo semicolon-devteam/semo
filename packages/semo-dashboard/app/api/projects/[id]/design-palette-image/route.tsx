@@ -15,7 +15,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
   // ds-color* 섹션 조회
   const res = await query(
-    `SELECT content FROM semo.gfp_phase_sections
+    `SELECT content FROM semo.service_sections
      WHERE service_id = $1 AND section_key LIKE 'ds-color%' AND status != 'rejected'
      ORDER BY ordinal LIMIT 1`,
     [id],

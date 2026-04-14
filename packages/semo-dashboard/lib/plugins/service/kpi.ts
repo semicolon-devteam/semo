@@ -210,56 +210,7 @@ export function extractMetricsFromKBEntry(
   return [];
 }
 
-// ── DB fallback helpers ──
-
-async function resolveServiceId(domain: string): Promise<string | null> {
-  const res = await query<{ service_id: string }>(
-    'SELECT service_id FROM semo.services WHERE service_domain = $1 LIMIT 1',
-    [domain],
-  );
-  return res.rows[0]?.service_id ?? null;
-}
-
-async function listKPIMetricsFromDB(
-  domain: string,
-  period?: string,
-  limit = 50,
-): Promise<ServiceKPIMetric[]> {
-  const serviceId = await resolveServiceId(domain);
-  if (!serviceId) return [];
-
-  if (period) {
-    const res = await query<ServiceKPIMetric>(
-      `SELECT * FROM semo.service_kpi_metrics
-       WHERE service_id = $1 AND period = $2::date
-       ORDER BY category, metric_name`,
-      [serviceId, period],
-    );
-    return res.rows;
-  }
-  const res = await query<ServiceKPIMetric>(
-    `SELECT * FROM semo.service_kpi_metrics
-     WHERE service_id = $1
-     ORDER BY period DESC, category, metric_name
-     LIMIT $2`,
-    [serviceId, limit],
-  );
-  return res.rows;
-}
-
-async function listKPIPeriodsFromDB(domain: string): Promise<string[]> {
-  const serviceId = await resolveServiceId(domain);
-  if (!serviceId) return [];
-
-  const res = await query<{ period: string }>(
-    `SELECT DISTINCT period::text FROM semo.service_kpi_metrics
-     WHERE service_id = $1 ORDER BY period DESC`,
-    [serviceId],
-  );
-  return res.rows.map((r) => r.period);
-}
-
-// ── Public API: KB-first, DB fallback ──
+// ── Public API: KB-based ──
 
 export async function getServiceKPIData(serviceDomain: string, limit = 5) {
   const kpiRes = await query<{ key: string; sub_key: string; content: string; updated_at: string }>(
@@ -353,7 +304,7 @@ export async function listKPIMetrics(
     if (allMetrics.length > 0) return allMetrics.slice(0, limit);
   }
 
-  return listKPIMetricsFromDB(domain, period, limit);
+  return [];
 }
 
 export async function listKPIPeriods(domain: string): Promise<string[]> {
@@ -361,9 +312,7 @@ export async function listKPIPeriods(domain: string): Promise<string[]> {
   const kbPeriods = kbEntries
     .map((e) => (e.key.startsWith('kpi/') ? e.key.slice(4) : ''))
     .filter(Boolean);
-  if (kbPeriods.length > 0) return kbPeriods;
-
-  return listKPIPeriodsFromDB(domain);
+  return kbPeriods;
 }
 
 export async function batchCreateKPIMetrics(
@@ -508,52 +457,12 @@ export async function updateKPIMetric(
   >,
 ): Promise<ServiceKPIMetric | null> {
   const kbParsed = parseKBMetricId(metricId);
-  if (kbParsed) {
-    return updateKBMetric(kbParsed.domain, kbParsed.period, kbParsed.metricName, data);
-  }
-
-  const sets: string[] = [];
-  const params: unknown[] = [];
-  let idx = 1;
-
-  const COL_MAP: Record<string, string> = {
-    current_value: 'current_value',
-    baseline_value: 'baseline_value',
-    target_value: 'target_value',
-    wow_change: 'wow_change',
-    signal: 'signal',
-    achieved: 'achieved',
-    metric_label: 'metric_label',
-    category: 'category',
-    unit: 'unit',
-    metadata: 'metadata',
-  };
-  for (const [key, val] of Object.entries(data)) {
-    const colName = COL_MAP[key];
-    if (val === undefined || !colName) continue;
-    if (colName === 'metadata') {
-      sets.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${idx++}::jsonb`);
-      params.push(JSON.stringify(val));
-    } else {
-      sets.push(`${colName} = $${idx++}`);
-      params.push(val);
-    }
-  }
-  if (sets.length === 0) return null;
-  params.push(metricId);
-  const res = await query<ServiceKPIMetric>(
-    `UPDATE semo.service_kpi_metrics SET ${sets.join(', ')} WHERE metric_id = $${idx} RETURNING *`,
-    params,
-  );
-  return res.rows[0] ?? null;
+  if (!kbParsed) return null;
+  return updateKBMetric(kbParsed.domain, kbParsed.period, kbParsed.metricName, data);
 }
 
 export async function deleteKPIMetric(metricId: string): Promise<boolean> {
   const kbParsed = parseKBMetricId(metricId);
-  if (kbParsed) {
-    return deleteKBMetric(kbParsed.domain, kbParsed.period, kbParsed.metricName);
-  }
-
-  const res = await query('DELETE FROM semo.service_kpi_metrics WHERE metric_id = $1', [metricId]);
-  return (res.rowCount ?? 0) > 0;
+  if (!kbParsed) return false;
+  return deleteKBMetric(kbParsed.domain, kbParsed.period, kbParsed.metricName);
 }

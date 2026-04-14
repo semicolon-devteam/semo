@@ -21,7 +21,6 @@ type MeetingType = 'regular' | 'adhoc';
 type AdhocSubtype = 'client' | 'internal' | 'external' | 'workshop';
 
 interface ServiceOption {
-  service_id: string;
   project_name: string;
   service_domain: string | null;
 }

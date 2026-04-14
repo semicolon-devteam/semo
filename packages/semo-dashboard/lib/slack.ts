@@ -1090,7 +1090,7 @@ export async function sendServiceSectionPendingReviewSlack(
           type: 'button',
           text: { type: 'plain_text', text: '대시보드에서 보기', emoji: true },
           url: dashboardUrl,
-          action_id: `gfp_view_dashboard_${opts.sectionId}`,
+          action_id: `service_view_dashboard_${opts.sectionId}`,
         },
       ],
     },
@@ -1123,7 +1123,7 @@ export function buildRejectionModalView(params: {
 }): Record<string, unknown> {
   return {
     type: 'modal',
-    callback_id: 'gfp_rejection_modal',
+    callback_id: 'service_rejection_modal',
     private_metadata: JSON.stringify({
       serviceId: params.serviceId,
       sectionId: params.sectionId,

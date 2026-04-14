@@ -307,6 +307,23 @@ export async function loadAllBotConfigsAsync(pool: Pool): Promise<Map<string, Bo
             effort: 'medium',
             permissionMode: 'acceptEdits',
           },
+          'build-verify-background': {
+            description:
+              'Runs full build verification (tsc --noEmit, lint, build) in the background. Use when asked to verify the build or run a full check.',
+            prompt: [
+              'Run the following commands in sequence and report results:',
+              '1. npx tsc --noEmit',
+              '2. npm run lint',
+              '3. npm run build',
+              'Report pass/fail for each step with any error output.',
+            ].join('\n'),
+            tools: ['Bash', 'Read'],
+            model: 'claude-haiku-4-5-20251001',
+            maxTurns: 20,
+            effort: 'low',
+            permissionMode: 'acceptEdits',
+            background: true,
+          },
         };
         botConfig.worktreeSettings = {
           symlinkDirectories: ['node_modules', '.next', '.cache'],
