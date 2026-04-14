@@ -31,10 +31,11 @@ export class HealthMonitor {
     this.sessionDir = opts.sessionDir;
     this.onRestart = opts.onRestart;
 
-    // Pane index: bot index + 1 (pane 0 = router)
+    // Pane index: bot index + offset (pane 0=slack router, pane 1=discord router if enabled)
+    const paneOffset = parseInt(process.env.SEMO_BOT_PANE_OFFSET || '1', 10);
     this.botPaneIndex = {};
     opts.botIds.forEach((id, i) => {
-      this.botPaneIndex[id] = i + 1;
+      this.botPaneIndex[id] = i + paneOffset;
     });
   }
 

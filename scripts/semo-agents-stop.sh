@@ -14,11 +14,19 @@ echo "[stop] Stopping SEMO Agents..."
 touch "$MAILBOX_DIR/_shutdown"
 echo "  Shutdown flag set"
 
-# 2. Send /quit to each bot (reverse order)
+# 2. Send /quit to each bot (reverse order, detect pane offset)
+# Discord Router present → bots at pane 2+, otherwise pane 1+
+TOTAL_PANES=$(cmux tree --workspace "$WORKSPACE" 2>/dev/null | grep -c "pane:" || echo 0)
+BOT_PANE_OFFSET=1
+if [ "$TOTAL_PANES" -gt $((${#BOTS[@]} + 1)) ]; then
+  BOT_PANE_OFFSET=2  # Discord Router occupies pane 1
+fi
+
 for i in $(seq ${#BOTS[@]} -1 1); do
   bot="${BOTS[$((i - 1))]}"
-  echo "  Stopping $bot (pane $i)..."
-  cmux send --workspace "$WORKSPACE" --surface "pane:$i" "/quit\n" 2>/dev/null || true
+  pane=$((i - 1 + BOT_PANE_OFFSET))
+  echo "  Stopping $bot (pane $pane)..."
+  cmux send --workspace "$WORKSPACE" --surface "pane:$pane" "/quit\n" 2>/dev/null || true
   sleep 1
 done
 
@@ -26,23 +34,28 @@ done
 echo "  Waiting 5s for agent-flush hooks..."
 sleep 5
 
-# 4. Stop Router (pane 0)
-echo "  Stopping Router (pane 0)..."
-# Send Ctrl+C
-cmux send --workspace "$WORKSPACE" --surface "pane:0" '\x03' 2>/dev/null || true
+# 4. Stop Discord Router (pane 1, if present)
+if [ "$BOT_PANE_OFFSET" -eq 2 ]; then
+  echo "  Stopping Discord Router (pane 1)..."
+  cmux send --workspace "$WORKSPACE" --surface "pane:1" $'\x03' 2>/dev/null || true
+  sleep 1
+fi
+
+# 5. Stop Slack Router (pane 0)
+echo "  Stopping Slack Router (pane 0)..."
+cmux send --workspace "$WORKSPACE" --surface "pane:0" $'\x03' 2>/dev/null || true
 sleep 2
 
-# 5. Close workspace
+# 6. Close workspace
 echo "  Closing workspace..."
 cmux close-workspace "$WORKSPACE" 2>/dev/null || true
 
-# 6. Verify heartbeats are stale
+# 7. Verify heartbeats are stale
 echo "  Verifying shutdown..."
 ALL_STOPPED=true
 for bot in "${BOTS[@]}"; do
   HB_FILE="$MAILBOX_DIR/$bot/heartbeat"
   if [ -f "$HB_FILE" ]; then
-    # Check if heartbeat is older than 30 seconds
     HB_AGE=$(( $(date +%s) - $(date -r "$HB_FILE" +%s 2>/dev/null || echo 0) ))
     if [ "$HB_AGE" -lt 30 ]; then
       echo "  [WARN] $bot heartbeat still fresh ($HB_AGE s ago)"
@@ -57,7 +70,7 @@ else
   echo "  [WARN] Some bots may still be running. Check 'cmux list-workspaces'."
 fi
 
-# 7. Cleanup
+# 8. Cleanup
 rm -f "$PID_FILE"
 rm -f "$MAILBOX_DIR/_shutdown"
 

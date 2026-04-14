@@ -30,6 +30,15 @@ for var in SLACK_BOT_TOKEN SLACK_APP_TOKEN DATABASE_URL; do
   fi
 done
 
+# Discord is optional
+DISCORD_ENABLED=false
+if [ -n "${DISCORD_BOT_TOKEN:-}" ]; then
+  DISCORD_ENABLED=true
+  echo "[start] Discord Router enabled (DISCORD_BOT_TOKEN found)"
+else
+  echo "[start] Discord Router disabled (no DISCORD_BOT_TOKEN)"
+fi
+
 # Check if already running
 if cmux list-workspaces 2>/dev/null | grep -q "$WORKSPACE"; then
   echo "[ERROR] Workspace '$WORKSPACE' already exists. Run semo-agents-stop.sh first, or use --force"
@@ -58,11 +67,16 @@ for bot in "${BOTS[@]}"; do
   touch "$MAILBOX_DIR/$bot/inbox.consumed"
 done
 
-# ── Install agent-mailbox deps if needed ──
+# ── Install deps if needed ──
 
 if [ ! -d "$SEMO_ROOT/packages/agent-mailbox/node_modules" ]; then
   echo "[start] Installing agent-mailbox dependencies..."
   (cd "$SEMO_ROOT/packages/agent-mailbox" && npm install --quiet)
+fi
+
+if $DISCORD_ENABLED && [ ! -d "$SEMO_ROOT/packages/discord-router/node_modules" ]; then
+  echo "[start] Installing discord-router dependencies..."
+  (cd "$SEMO_ROOT/packages/discord-router" && npm install --quiet)
 fi
 
 # ── Create cmux workspace ──
@@ -72,16 +86,34 @@ cmux create-workspace --title "$WORKSPACE" 2>/dev/null || true
 
 # ── Pane 0: Slack Router ──
 
+# Calculate pane offset before starting routers
+BOT_PANE_OFFSET=1
+if $DISCORD_ENABLED; then
+  BOT_PANE_OFFSET=2
+fi
+
 echo "[start] Starting Slack Router (pane 0)..."
-cmux send --workspace "$WORKSPACE" "cd $SEMO_ROOT/packages/slack-router && source $HOME/.claude/semo/.env 2>/dev/null && SEMO_MAILBOX_DIR=$MAILBOX_DIR SEMO_SESSION_DIR=$SESSION_DIR npx tsx src/index.ts\n"
+cmux send --workspace "$WORKSPACE" \
+  "cd $SEMO_ROOT && set -a && source $HOME/.claude/semo/.env && set +a && SEMO_MAILBOX_DIR=$MAILBOX_DIR SEMO_SESSION_DIR=$SESSION_DIR SEMO_SURFACE_MAP=/tmp/semo-surface-map.json SEMO_BOT_PANE_OFFSET=$BOT_PANE_OFFSET npx tsx packages/slack-router/src/index.ts\n"
 
 sleep 3  # Let router connect to Slack
 
-# ── Pane 1-7: Bot sessions ──
+# ── Pane 1: Discord Router (optional) ──
+
+if $DISCORD_ENABLED; then
+  echo "[start] Starting Discord Router (pane 1)..."
+  cmux split --workspace "$WORKSPACE" --direction down 2>/dev/null || \
+    cmux new-surface --workspace "$WORKSPACE" 2>/dev/null || true
+  cmux send --workspace "$WORKSPACE" --surface "pane:1" \
+    "cd $SEMO_ROOT && set -a && source $HOME/.claude/semo/.env && set +a && SEMO_MAILBOX_DIR=$MAILBOX_DIR SEMO_SESSION_DIR=$SESSION_DIR SEMO_SURFACE_MAP=/tmp/semo-surface-map.json SEMO_BOT_PANE_OFFSET=$BOT_PANE_OFFSET npx tsx packages/discord-router/src/index.ts\n"
+  sleep 3
+fi
+
+# ── Pane N+: Bot sessions ──
 
 for i in "${!BOTS[@]}"; do
   bot="${BOTS[$i]}"
-  pane_idx=$((i + 1))
+  pane_idx=$((i + BOT_PANE_OFFSET))
 
   echo "[start] Starting $bot (pane $pane_idx)..."
 
@@ -95,6 +127,20 @@ for i in "${!BOTS[@]}"; do
 
   sleep 2  # Stagger startup to avoid rate limit burst
 done
+
+# ── Generate surface map (for nudge) ──
+
+echo "[start] Generating surface map..."
+python3 -c "
+import json, sys
+bots = '${BOTS[*]}'.split()
+offset = $BOT_PANE_OFFSET
+surfaces = {bot: f'pane:{i+offset}' for i, bot in enumerate(bots)}
+data = {'workspace': '$WORKSPACE', 'surfaces': surfaces}
+with open('/tmp/semo-surface-map.json', 'w') as f:
+    json.dump(data, f, indent=2)
+print(f'  Surface map: {len(surfaces)} bots, offset={offset}')
+"
 
 # ── Health gate: wait for heartbeats ──
 
@@ -131,8 +177,11 @@ echo $$ > "$PID_FILE"
 echo ""
 echo "==================================="
 echo " SEMO Agents (Architecture B)"
-echo " Router: pane 0"
-echo " Bots: pane 1-${#BOTS[@]}"
+echo " Slack Router: pane 0"
+if $DISCORD_ENABLED; then
+echo " Discord Router: pane 1"
+fi
+echo " Bots: pane ${BOT_PANE_OFFSET}-$((${#BOTS[@]} + BOT_PANE_OFFSET - 1))"
 echo " Mailbox: $MAILBOX_DIR"
 echo " Sessions: $SESSION_DIR"
 echo "==================================="
