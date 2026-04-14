@@ -53,6 +53,16 @@ export class OutboxReader {
     for (const botId of this.botIds) {
       const outboxPath = path.join(this.mailboxDir, botId, 'outbox.jsonl');
       this.ensureFile(outboxPath);
+      // Skip existing content on startup — only process new messages
+      try {
+        const skipBytes = fs.statSync(outboxPath).size;
+        if (skipBytes > 0) {
+          console.log(`[outbox] ${botId}: skipping ${skipBytes} existing bytes on startup`);
+        }
+        this.fileOffsets.set(botId, skipBytes);
+      } catch {
+        /* ignore */
+      }
       try {
         const watcher = fs.watch(outboxPath, { persistent: false }, () => {
           this.processOutbox(botId).catch((err) =>
@@ -168,6 +178,9 @@ export class OutboxReader {
       case 'reply':
         if (msg.text) {
           try {
+            console.log(
+              `[outbox] Posting reply from ${msg.bot_id}: "${msg.text.slice(0, 30)}" (id: ${msg.id?.slice(0, 8)})`,
+            );
             await this.gateway.postAsBot(msg.bot_id, msg.channel_id, msg.text, msg.thread_id);
             console.log(`[outbox] Posted reply from ${msg.bot_id} to ${this.platform}`);
           } catch (err) {
