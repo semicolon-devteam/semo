@@ -9,6 +9,7 @@ interface Props {
   groups: GroupedItems[];
   activeTab: Tab;
   toggling: Set<string>;
+  teamDomainSet?: Set<string>;
   onToggle: (item: ActionItem) => void;
   onEdit?: (item: ActionItem) => void;
   onDelete?: (item: ActionItem) => void;
@@ -18,6 +19,7 @@ export default function ActionItemList({
   groups,
   activeTab,
   toggling,
+  teamDomainSet = new Set(),
   onToggle,
   onEdit,
   onDelete,
@@ -46,14 +48,17 @@ export default function ActionItemList({
         const isExp = expanded.has(group.key);
         const openCount = group.items.filter((i) => i.status === 'open').length;
         const isExternalGroup =
-          activeTab === 'person' && group.items.every((i) => i.owner_entity_type !== 'team');
+          activeTab === 'person' &&
+          teamDomainSet != null &&
+          group.items.every((i) => !teamDomainSet.has(i.owner_domain));
 
         return (
           <div key={group.key}>
             {/* 외부/기타 섹션 구분 */}
             {isExternalGroup &&
+              teamDomainSet != null &&
               group ===
-                groups.find((g) => g.items.every((i) => i.owner_entity_type !== 'team')) && (
+                groups.find((g) => g.items.every((i) => !teamDomainSet.has(i.owner_domain))) && (
                 <div className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wider mt-6 mb-2 px-1 col-span-full">
                   외부 / 기타
                 </div>

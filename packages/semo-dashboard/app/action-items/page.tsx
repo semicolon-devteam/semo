@@ -15,6 +15,7 @@ export default function ActionItemsPage() {
     stats,
     loading,
     teamMembers,
+    teamDomainSet,
     serviceDomains,
     activeTab,
     setActiveTab,
@@ -167,6 +168,7 @@ export default function ActionItemsPage() {
           groups={groups}
           activeTab={activeTab}
           toggling={toggling}
+          teamDomainSet={teamDomainSet}
           onToggle={handleToggle}
           onEdit={openEdit}
           onDelete={confirmDelete}

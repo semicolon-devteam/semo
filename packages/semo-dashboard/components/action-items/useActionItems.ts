@@ -62,8 +62,8 @@ export function useActionItems() {
   const filtered = useMemo(() => {
     let list: ActionItem[];
     if (activeTab === 'person') {
-      // 사람별: owner가 team 타입인 모든 아이템
-      list = items.filter((i) => i.owner_entity_type === 'team');
+      // 사람별: owner가 내부 팀원(teamMembers에 포함)인 아이템
+      list = items.filter((i) => teamDomainSet.has(i.owner_domain));
     } else {
       // 서비스별: target_domain이 있는 아이템
       list = items.filter((i) => i.target_domain);
@@ -236,6 +236,7 @@ export function useActionItems() {
     stats,
     loading,
     teamMembers,
+    teamDomainSet,
     serviceDomains,
     activeTab,
     setActiveTab,
