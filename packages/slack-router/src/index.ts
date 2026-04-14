@@ -22,11 +22,11 @@ import { Pool } from 'pg';
 import { SlackGateway } from '../../orchestrator/src/slack-gateway.js';
 import { BOT_IDS } from '../../orchestrator/src/bot-config.js';
 import type { SlackMessage } from '../../orchestrator/src/types.js';
-import type { InboxMessage, OutboxMessage } from '../../agent-mailbox/src/types.js';
+import type { InboxMessage, OutboxMessage } from '../../platform-common/src/types.js';
 
-import { InboxWriter } from './inbox-writer.js';
-import { OutboxReader } from './outbox-reader.js';
-import { HealthMonitor } from './health-monitor.js';
+import { InboxWriter } from '../../platform-common/src/inbox-writer.js';
+import { OutboxReader } from '../../platform-common/src/outbox-reader.js';
+import { HealthMonitor } from '../../platform-common/src/health-monitor.js';
 
 // ── Configuration ──
 
@@ -136,7 +136,8 @@ async function handleAskUser(msg: OutboxMessage): Promise<void> {
 const outboxReader = new OutboxReader({
   mailboxDir: MAILBOX_DIR,
   botIds: [...BOT_IDS],
-  slack,
+  platform: 'slack',
+  gateway: slack,
   inboxWriter,
   onEscalation: handleEscalation,
   onAskUser: handleAskUser,

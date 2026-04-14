@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import { exec } from 'child_process';
-import type { InboxMessage } from '../../agent-mailbox/src/types.js';
+import type { InboxMessage } from './types.js';
 
 const LOCK_TIMEOUT_MS = 5_000;
 

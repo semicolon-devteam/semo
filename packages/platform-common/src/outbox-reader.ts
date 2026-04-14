@@ -1,18 +1,26 @@
 /**
- * Polls bot outbox files and processes messages (post to Slack, handle escalations).
+ * Polls bot outbox files and processes messages (post via gateway, handle escalations).
+ * Platform-agnostic: uses GatewayAdapter interface instead of direct Slack dependency.
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import type { OutboxMessage } from '../../agent-mailbox/src/types.js';
-import type { SlackGateway } from '../../orchestrator/src/slack-gateway.js';
+import type { OutboxMessage } from './types.js';
 import type { InboxWriter } from './inbox-writer.js';
 
 const POLL_INTERVAL_MS = 500;
 
+/** Platform-agnostic gateway interface for posting messages */
+export interface GatewayAdapter {
+  postAsBot(botId: string, channel: string, text: string, threadTs?: string): Promise<void>;
+  setTypingStatus(channel: string, threadTs: string, status: string): Promise<void>;
+  addReaction(channel: string, timestamp: string, emoji: string): Promise<void>;
+}
+
 export class OutboxReader {
   private readonly mailboxDir: string;
   private readonly botIds: string[];
-  private readonly slack: SlackGateway;
+  private readonly platform: 'slack' | 'discord';
+  private readonly gateway: GatewayAdapter;
   private readonly inboxWriter: InboxWriter;
   private readonly onEscalation: (msg: OutboxMessage) => Promise<void>;
   private readonly onAskUser: (msg: OutboxMessage) => Promise<void>;
@@ -25,14 +33,16 @@ export class OutboxReader {
   constructor(opts: {
     mailboxDir: string;
     botIds: string[];
-    slack: SlackGateway;
+    platform: 'slack' | 'discord';
+    gateway: GatewayAdapter;
     inboxWriter: InboxWriter;
     onEscalation: (msg: OutboxMessage) => Promise<void>;
     onAskUser: (msg: OutboxMessage) => Promise<void>;
   }) {
     this.mailboxDir = opts.mailboxDir;
     this.botIds = opts.botIds;
-    this.slack = opts.slack;
+    this.platform = opts.platform;
+    this.gateway = opts.gateway;
     this.inboxWriter = opts.inboxWriter;
     this.onEscalation = opts.onEscalation;
     this.onAskUser = opts.onAskUser;
@@ -140,7 +150,7 @@ export class OutboxReader {
 
   private async handleOutboxMessage(msg: OutboxMessage, botId: string): Promise<void> {
     // Skip messages from other platforms
-    if (msg.platform && msg.platform !== 'slack') return;
+    if (msg.platform && msg.platform !== this.platform) return;
 
     // Fallback: if channel_id is missing, look up from the inbox message it replies to
     if (!msg.channel_id && msg.in_reply_to) {
@@ -158,23 +168,23 @@ export class OutboxReader {
       case 'reply':
         if (msg.text) {
           try {
-            await this.slack.postAsBot(msg.bot_id, msg.channel_id, msg.text, msg.thread_id);
-            console.log(`[outbox] Posted reply from ${msg.bot_id} to Slack`);
+            await this.gateway.postAsBot(msg.bot_id, msg.channel_id, msg.text, msg.thread_id);
+            console.log(`[outbox] Posted reply from ${msg.bot_id} to ${this.platform}`);
           } catch (err) {
-            console.error(`[outbox] Slack post failed for ${msg.bot_id}:`, err);
+            console.error(`[outbox] ${this.platform} post failed for ${msg.bot_id}:`, err);
           }
         }
         break;
 
       case 'status_update':
         if (msg.status_text) {
-          await this.slack.setTypingStatus(msg.channel_id, msg.thread_id, msg.status_text);
+          await this.gateway.setTypingStatus(msg.channel_id, msg.thread_id, msg.status_text);
         }
         break;
 
       case 'react':
         if (msg.emoji && msg.message_id) {
-          await this.slack.addReaction(msg.channel_id, msg.message_id, msg.emoji);
+          await this.gateway.addReaction(msg.channel_id, msg.message_id, msg.emoji);
         }
         break;
 
