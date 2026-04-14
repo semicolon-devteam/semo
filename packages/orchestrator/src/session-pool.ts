@@ -94,6 +94,12 @@ class BotSession {
     const cwd = path.join(SESSIONS_DIR, botId);
     fs.mkdirSync(path.join(cwd, '.claude'), { recursive: true });
 
+    if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
+      console.log(
+        `[bot-session] ${botId} MCP servers: ${Object.keys(config.mcpServers).join(', ')}`,
+      );
+    }
+
     const startTime = Date.now();
     // 전체 Sonnet + effort low (쿼터 절감은 thinking 토큰 최소화로)
     const sessionModel = 'claude-sonnet-4-6';
@@ -106,26 +112,7 @@ class BotSession {
       options: {
         cwd,
         model: sessionModel,
-        allowedTools: [
-          ...config.tools,
-          // DesignClaw: Stitch MCP 도구 자동 승인
-          ...(botId === 'designclaw'
-            ? [
-                'mcp__stitch__list_projects',
-                'mcp__stitch__create_project',
-                'mcp__stitch__get_project',
-                'mcp__stitch__list_screens',
-                'mcp__stitch__get_screen',
-                'mcp__stitch__generate_screen_from_text',
-                'mcp__stitch__edit_screens',
-                'mcp__stitch__generate_variants',
-                'mcp__stitch__list_design_systems',
-                'mcp__stitch__create_design_system',
-                'mcp__stitch__apply_design_system',
-                'mcp__stitch__update_design_system',
-              ]
-            : []),
-        ],
+        allowedTools: [...config.tools, ...(config.mcpAllowedTools || [])],
         permissionMode: 'acceptEdits',
         effort: 'low',
         systemPrompt: {
@@ -136,6 +123,18 @@ class BotSession {
         persistSession: false,
         settings: {
           hooks: {
+            PreToolUse: [
+              {
+                matcher: 'Bash',
+                hooks: [
+                  {
+                    type: 'command' as const,
+                    command: `bash ${hooksDir}/destructive-guard.sh`,
+                    timeout: 5,
+                  },
+                ],
+              },
+            ],
             // 로컬 세션과 동일한 훅 구성 — 4단계 양방향 동기화
             SessionStart: [
               {
@@ -207,22 +206,8 @@ class BotSession {
             ],
           },
         },
-        // DesignClaw만 Stitch MCP 서버 연동 (Phase 4 UI 생성 자동화)
-        // 인증: STITCH_API_KEY는 활성화 게이트, 실제 인증은 gcloud OAuth (~/.stitch-mcp/config/)
-        ...(botId === 'designclaw' && process.env.STITCH_API_KEY
-          ? {
-              mcpServers: {
-                stitch: {
-                  command: 'npx',
-                  args: ['@_davideast/stitch-mcp', 'proxy'],
-                  env: {
-                    STITCH_API_KEY: process.env.STITCH_API_KEY,
-                    CLOUDSDK_CONFIG: path.join(os.homedir(), '.stitch-mcp', 'config'),
-                    GOOGLE_CLOUD_PROJECT: 'gen-lang-client-0353417824',
-                  },
-                },
-              },
-            }
+        ...(config.mcpServers && Object.keys(config.mcpServers).length > 0
+          ? { mcpServers: config.mcpServers }
           : {}),
         env: {
           ...process.env,
@@ -551,9 +536,9 @@ export class SessionPool {
       const actualModel = 'claude-sonnet-4-6';
       console.log(`[session-pool] Dispatching to ${botId} (streaming, model: ${actualModel})`);
 
-      // 디스패치 — 세션 장애 시 1회 재시도
-      // DesignClaw: Stitch MCP 호출이 느려서 타임아웃 확장
-      const dispatchTimeout = botId === 'designclaw' ? 300_000 : 180_000;
+      // MCP 서버가 있는 봇은 도구 호출이 느릴 수 있으므로 타임아웃 확장
+      const hasMcp = config.mcpServers && Object.keys(config.mcpServers).length > 0;
+      const dispatchTimeout = hasMcp ? 300_000 : 180_000;
       let turnResult: TurnResult;
       try {
         turnResult = await session.dispatch(contextPrompt, actualModel, dispatchTimeout);

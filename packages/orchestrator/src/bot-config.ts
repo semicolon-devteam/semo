@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as os from 'os';
 import type { Pool } from 'pg';
 import type { BotConfig } from './types';
+import { resolveMcpForBot, loadMcpAccessFromDb } from './mcp-config';
 
 const AGENTS_DIR = path.join(os.homedir(), '.claude', 'agents');
 
@@ -173,6 +174,8 @@ export function loadBotConfig(botId: string, serviceDomain?: string): BotConfig 
     kbDomains.push(serviceDomain);
   }
 
+  const mcp = resolveMcpForBot(botId);
+
   return {
     botId,
     model: resolveModel(def.model),
@@ -182,6 +185,9 @@ export function loadBotConfig(botId: string, serviceDomain?: string): BotConfig 
     soulPrompt: def.body,
     kbDomains,
     slackProfile: SLACK_PROFILES[botId] || { username: botId, icon_emoji: ':robot_face:' },
+    ...(Object.keys(mcp.servers).length > 0
+      ? { mcpServers: mcp.servers, mcpAllowedTools: mcp.allowedTools }
+      : {}),
   };
 }
 
@@ -245,7 +251,8 @@ export async function expandKBDomainsWithChildren(
 export async function loadAllBotConfigsAsync(pool: Pool): Promise<Map<string, BotConfig>> {
   const configs = new Map<string, BotConfig>();
 
-  // DB에서 활성 봇 목록 동적 로드
+  // DB에서 MCP 접근 매트릭스 + 활성 봇 목록 동적 로드
+  await loadMcpAccessFromDb(pool);
   const activeBotIds = await loadActiveBotIds(pool);
 
   // Pre-expand all unique base domains across bots
@@ -262,6 +269,8 @@ export async function loadAllBotConfigsAsync(pool: Pool): Promise<Map<string, Bo
       const kbDomains =
         baseDomains.length > 0 ? await expandKBDomainsWithChildren(pool, baseDomains) : [];
 
+      const mcp = resolveMcpForBot(botId);
+
       configs.set(botId, {
         botId,
         model: resolveModel(def.model),
@@ -271,6 +280,9 @@ export async function loadAllBotConfigsAsync(pool: Pool): Promise<Map<string, Bo
         soulPrompt: def.body,
         kbDomains,
         slackProfile: SLACK_PROFILES[botId] || { username: botId, icon_emoji: ':robot_face:' },
+        ...(Object.keys(mcp.servers).length > 0
+          ? { mcpServers: mcp.servers, mcpAllowedTools: mcp.allowedTools }
+          : {}),
       });
     } catch (err) {
       console.error(`[bot-config] Failed to load ${botId}:`, err);

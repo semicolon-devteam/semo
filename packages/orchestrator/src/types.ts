@@ -63,6 +63,8 @@ export interface BotConfig {
   soulPrompt: string;
   kbDomains: string[];
   slackProfile: { username: string; icon_emoji: string };
+  mcpServers?: Record<string, import('@anthropic-ai/claude-agent-sdk').McpServerConfig>;
+  mcpAllowedTools?: string[];
 }
 
 export interface ProjectContext {
