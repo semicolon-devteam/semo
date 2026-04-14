@@ -1,17 +1,76 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Router } from '../router';
 
-// Mock pg Pool
 function createMockPool(queryResponses: Record<string, any[]> = {}) {
   return {
     query: vi.fn(async (sql: string, params: any[]) => {
-      // incubator_sessions 쿼리
-      if (sql.includes('incubator_sessions')) {
-        return { rows: queryResponses['sessions'] || [] };
+      // KB routing config: bot_status
+      if (sql.includes('bot_status')) {
+        return {
+          rows: queryResponses['bots'] || [
+            { bot_id: 'semiclaw' },
+            { bot_id: 'planclaw' },
+            { bot_id: 'designclaw' },
+            { bot_id: 'workclaw' },
+            { bot_id: 'reviewclaw' },
+            { bot_id: 'infraclaw' },
+            { bot_id: 'growthclaw' },
+            { bot_id: 'incubator' },
+          ],
+        };
       }
-      // services 쿼리
+      // KB routing config: phase assignments from knowledge_base role entries
+      if (sql.includes('knowledge_base') && sql.includes('role')) {
+        return { rows: queryResponses['kbRoles'] || [] };
+      }
+      // KB routing config: keyword/skill delegation
+      if (sql.includes('bot_delegation') && sql.includes('skill-routing')) {
+        return { rows: queryResponses['skillDelegation'] || [] };
+      }
+      if (sql.includes('bot_delegation')) {
+        return {
+          rows: queryResponses['delegation'] || [
+            {
+              to_bot_id: 'infraclaw',
+              domains: ['인프라', '배포', '서버', 'CI', 'CD', 'DevOps', 'k8s', '쿠버네티스'],
+              metadata: { order: 1 },
+            },
+            {
+              to_bot_id: 'designclaw',
+              domains: ['디자인', 'UI', 'UX', '피그마', 'Figma', '시각'],
+              metadata: { order: 2 },
+            },
+            {
+              to_bot_id: 'reviewclaw',
+              domains: ['리뷰', 'review', 'PR 리뷰', '코드리뷰'],
+              metadata: { order: 3 },
+            },
+            {
+              to_bot_id: 'growthclaw',
+              domains: ['SEO', '마케팅', 'GA4', '그로스', '키워드'],
+              metadata: { order: 4 },
+            },
+            {
+              to_bot_id: 'workclaw',
+              domains: ['구현', 'feature', '기능', '코딩', '버그'],
+              metadata: { order: 5 },
+            },
+            {
+              to_bot_id: 'planclaw',
+              domains: ['PRD', '기획', '스펙', '요구사항'],
+              metadata: { order: 6 },
+            },
+          ],
+        };
+      }
+      // Step 3.5: incubator session check (SELECT 1)
+      if (sql.includes('incubator_sessions') && sql.includes('SELECT 1')) {
+        return { rows: queryResponses['incubator'] || [] };
+      }
+      // Service info (UNION query includes semo.services)
       if (sql.includes('semo.services')) {
-        return { rows: queryResponses['services'] || [] };
+        const services = queryResponses['services'] || [];
+        return { rows: services };
       }
       return { rows: [] };
     }),
@@ -58,8 +117,32 @@ describe('Router', () => {
   describe('phase-based routing', () => {
     it('should route Phase 0 to semiclaw', async () => {
       const pool = createMockPool({
-        sessions: [{ service_id: 'svc-1', service_name: 'TestSvc' }],
-        services: [{ current_phase: 0, infra_phase: 0, service_domain: 'test-svc' }],
+        services: [
+          {
+            full_service_id: 'svc-1',
+            project_name: 'TestSvc',
+            service_domain: 'test-svc',
+            current_phase: 0,
+            infra_phase: 0,
+            project_type: 'service',
+          },
+        ],
+        kbRoles: [
+          {
+            bot_id: 'semiclaw',
+            content: '### GFP Phase 담당\n| Phase | Name |\n| 0 | Onboarding |',
+          },
+          {
+            bot_id: 'planclaw',
+            content:
+              '### GFP Phase 담당\n| Phase | Name |\n| 1 | Discovery |\n| 2 | PRD |\n| 3 | Review |\n| 5 | Planning |\n| 6 | Sprint |\n| 9 | Closing |',
+          },
+          { bot_id: 'designclaw', content: '### GFP Phase 담당\n| Phase | Name |\n| 4 | Design |' },
+          {
+            bot_id: 'workclaw',
+            content: '### GFP Phase 담당\n| Phase | Name |\n| 7 | Dev |\n| 8 | Test |',
+          },
+        ],
       });
       const router = new Router(pool);
       const result = await router.route('C_PROJ', '프로젝트 시작하자');
@@ -70,8 +153,19 @@ describe('Router', () => {
 
     it('should route Phase 4 to designclaw', async () => {
       const pool = createMockPool({
-        sessions: [{ service_id: 'svc-1', service_name: 'SEUM' }],
-        services: [{ current_phase: 4, infra_phase: 0, service_domain: 'seum' }],
+        services: [
+          {
+            full_service_id: 'svc-1',
+            project_name: 'SEUM',
+            service_domain: 'seum',
+            current_phase: 4,
+            infra_phase: 0,
+            project_type: 'service',
+          },
+        ],
+        kbRoles: [
+          { bot_id: 'designclaw', content: '### GFP Phase 담당\n| Phase | Name |\n| 4 | Design |' },
+        ],
       });
       const router = new Router(pool);
       const result = await router.route('C_PROJ', '어떤 작업이든');
@@ -81,8 +175,22 @@ describe('Router', () => {
 
     it('should route Phase 7 to workclaw', async () => {
       const pool = createMockPool({
-        sessions: [{ service_id: 'svc-1', service_name: 'PAT' }],
-        services: [{ current_phase: 7, infra_phase: 0, service_domain: 'pat' }],
+        services: [
+          {
+            full_service_id: 'svc-1',
+            project_name: 'PAT',
+            service_domain: 'pat',
+            current_phase: 7,
+            infra_phase: 0,
+            project_type: 'service',
+          },
+        ],
+        kbRoles: [
+          {
+            bot_id: 'workclaw',
+            content: '### GFP Phase 담당\n| Phase | Name |\n| 7 | Dev |\n| 8 | Test |',
+          },
+        ],
       });
       const router = new Router(pool);
       const result = await router.route('C_PROJ', '기술 설계 검토');
@@ -91,6 +199,19 @@ describe('Router', () => {
   });
 
   describe('all phase mappings', () => {
+    const kbRoles = [
+      { bot_id: 'semiclaw', content: '### GFP Phase 담당\n| Phase | Name |\n| 0 | Onboarding |' },
+      {
+        bot_id: 'planclaw',
+        content:
+          '### GFP Phase 담당\n| Phase | Name |\n| 1 | Discovery |\n| 2 | PRD |\n| 3 | Review |\n| 5 | Planning |\n| 6 | Sprint |\n| 9 | Closing |',
+      },
+      { bot_id: 'designclaw', content: '### GFP Phase 담당\n| Phase | Name |\n| 4 | Design |' },
+      {
+        bot_id: 'workclaw',
+        content: '### GFP Phase 담당\n| Phase | Name |\n| 7 | Dev |\n| 8 | Test |',
+      },
+    ];
     const phaseBotMap: [number, string][] = [
       [0, 'semiclaw'],
       [1, 'planclaw'],
@@ -106,8 +227,17 @@ describe('Router', () => {
 
     it.each(phaseBotMap)('Phase %i → %s', async (phase, expectedBot) => {
       const pool = createMockPool({
-        sessions: [{ service_id: 'svc', service_name: 'Test' }],
-        services: [{ current_phase: phase, infra_phase: 0, service_domain: 'test' }],
+        services: [
+          {
+            full_service_id: 'svc',
+            project_name: 'Test',
+            service_domain: 'test',
+            current_phase: phase,
+            infra_phase: 0,
+            project_type: 'service',
+          },
+        ],
+        kbRoles,
       });
       const router = new Router(pool);
       const result = await router.route('C_PROJ', '일반 메시지');
@@ -116,10 +246,10 @@ describe('Router', () => {
   });
 
   describe('keyword priority', () => {
-    it('should match first keyword in KEYWORD_ROUTES order', async () => {
+    it('should match first keyword in delegation order', async () => {
       const pool = createMockPool();
       const router = new Router(pool);
-      // "인프라"(infraclaw) + "리뷰"(reviewclaw) → infraclaw wins (배열 순서)
+      // "인프라"(infraclaw, order:1) + "리뷰"(reviewclaw, order:3) → infraclaw wins
       const result = await router.route('C_UNKNOWN', '인프라 코드 리뷰해줘');
       expect(result.botId).toBe('infraclaw');
     });
@@ -127,7 +257,7 @@ describe('Router', () => {
 
   describe('fallback', () => {
     it('should fallback to semiclaw when no service found', async () => {
-      const pool = createMockPool({ sessions: [] });
+      const pool = createMockPool({ services: [] });
       const router = new Router(pool);
       const result = await router.route('C_UNKNOWN', '안녕하세요');
       expect(result.botId).toBe('semiclaw');
@@ -146,19 +276,33 @@ describe('Router', () => {
   describe('caching', () => {
     it('should cache service info and not re-query within TTL', async () => {
       const pool = createMockPool({
-        sessions: [{ service_id: 'svc-1', service_name: 'TestSvc' }],
-        services: [{ current_phase: 1, infra_phase: 0, service_domain: 'test-svc' }],
+        services: [
+          {
+            full_service_id: 'svc-1',
+            project_name: 'TestSvc',
+            service_domain: 'test-svc',
+            current_phase: 1,
+            infra_phase: 0,
+            project_type: 'service',
+          },
+        ],
+        kbRoles: [
+          {
+            bot_id: 'planclaw',
+            content: '### GFP Phase 담당\n| Phase | Name |\n| 1 | Discovery |',
+          },
+        ],
       });
       const router = new Router(pool);
 
       await router.route('C_PROJ', 'first');
       await router.route('C_PROJ', 'second');
 
-      // sessions 쿼리는 1번만 호출되어야 함 (캐시 적중)
-      const sessionCalls = pool.query.mock.calls.filter((c: any[]) =>
-        c[0].includes('incubator_sessions'),
+      // services 쿼리(UNION)는 1번만 호출되어야 함 (캐시 적중)
+      const serviceCalls = pool.query.mock.calls.filter(
+        (c: any[]) => c[0].includes('semo.services') && !c[0].includes('bot_status'),
       );
-      expect(sessionCalls).toHaveLength(1);
+      expect(serviceCalls).toHaveLength(1);
     });
   });
 });

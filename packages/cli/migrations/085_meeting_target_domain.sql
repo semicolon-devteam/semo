@@ -17,6 +17,18 @@ UPDATE semo.meetings m
     AND s.service_domain IS NOT NULL
     AND m.target_domain IS NULL;
 
+-- Step 2.5: 마이그레이션 후 누락 행 검증
+DO $$
+DECLARE unmigrated INT;
+BEGIN
+  SELECT COUNT(*) INTO unmigrated
+  FROM semo.meetings
+  WHERE service_id IS NOT NULL AND target_domain IS NULL;
+  IF unmigrated > 0 THEN
+    RAISE WARNING '% meetings have service_id but no target_domain (service_domain missing from ontology)', unmigrated;
+  END IF;
+END $$;
+
 -- Step 3: service_id는 당분간 유지 (하위호환)
 COMMENT ON COLUMN semo.meetings.service_id IS 'DEPRECATED: Use target_domain instead. Will be removed after migration period.';
 

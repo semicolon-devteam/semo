@@ -219,6 +219,7 @@ export class Router {
                 s.current_phase, COALESCE(s.infra_phase, 0),
                 COALESCE(o.entity_type, 'service')
          FROM semo.incubator_sessions i
+         -- incubator_sessions.service_id는 UUID 축약형 (prefix match 의도)
          JOIN semo.services s ON starts_with(s.service_id::text, i.service_id)
          LEFT JOIN semo.ontology o ON o.domain = s.service_domain
          WHERE i.channel = $1 AND i.status = 'active'

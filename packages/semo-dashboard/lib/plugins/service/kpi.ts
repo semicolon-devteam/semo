@@ -16,7 +16,7 @@ interface ParsedKPIMetric {
   category: 'common' | 'service-specific';
 }
 
-function parseValue(s: string): { value: number | null; unit: string } {
+export function parseValue(s: string): { value: number | null; unit: string } {
   const c = s.replace(/[,\s⚠️🟢🟡🔴✅❌]/g, '').trim();
   const tm = c.match(/^(\d+)m\s*(\d+)s$/);
   if (tm) return { value: parseInt(tm[1]) * 60 + parseInt(tm[2]), unit: 'seconds' };
@@ -32,7 +32,7 @@ function parseValue(s: string): { value: number | null; unit: string } {
   return { value: null, unit: '' };
 }
 
-function parseKPIMarkdown(content: string): ParsedKPIMetric[] {
+export function parseKPIMarkdown(content: string): ParsedKPIMetric[] {
   const metrics: ParsedKPIMetric[] = [];
   const lines = content.split('\n');
   let category: 'common' | 'service-specific' = 'common';
@@ -133,7 +133,7 @@ interface KBMetricEntry {
   achieved?: boolean;
 }
 
-function kbMetricsToServiceKPI(
+export function kbMetricsToServiceKPI(
   domain: string,
   period: string,
   metrics: KBMetricEntry[],
@@ -190,7 +190,7 @@ function parsedToServiceKPI(
   }));
 }
 
-function extractMetricsFromKBEntry(
+export function extractMetricsFromKBEntry(
   domain: string,
   period: string,
   metadata: Record<string, unknown> | undefined,
@@ -414,7 +414,7 @@ export async function batchCreateKPIMetrics(
 
 // KB metric_id format: "kb-{domain}-{YYYY-MM-DD}-{metric_name}"
 // Domain may contain hyphens, so we locate the date pattern as anchor.
-function parseKBMetricId(
+export function parseKBMetricId(
   metricId: string,
 ): { domain: string; period: string; metricName: string } | null {
   if (!metricId.startsWith('kb-')) return null;
@@ -516,25 +516,26 @@ export async function updateKPIMetric(
   const params: unknown[] = [];
   let idx = 1;
 
-  const ALLOWED_COLS = new Set([
-    'current_value',
-    'baseline_value',
-    'target_value',
-    'wow_change',
-    'signal',
-    'achieved',
-    'metric_label',
-    'category',
-    'unit',
-    'metadata',
-  ]);
+  const COL_MAP: Record<string, string> = {
+    current_value: 'current_value',
+    baseline_value: 'baseline_value',
+    target_value: 'target_value',
+    wow_change: 'wow_change',
+    signal: 'signal',
+    achieved: 'achieved',
+    metric_label: 'metric_label',
+    category: 'category',
+    unit: 'unit',
+    metadata: 'metadata',
+  };
   for (const [key, val] of Object.entries(data)) {
-    if (val === undefined || !ALLOWED_COLS.has(key)) continue;
-    if (key === 'metadata') {
+    const colName = COL_MAP[key];
+    if (val === undefined || !colName) continue;
+    if (colName === 'metadata') {
       sets.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${idx++}::jsonb`);
       params.push(JSON.stringify(val));
     } else {
-      sets.push(`${key} = $${idx++}`);
+      sets.push(`${colName} = $${idx++}`);
       params.push(val);
     }
   }
