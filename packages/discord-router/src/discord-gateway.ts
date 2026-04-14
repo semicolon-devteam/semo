@@ -163,11 +163,16 @@ export class DiscordGateway implements GatewayAdapter {
       .trim();
     if (!cleanText && (!message.attachments || message.attachments.size === 0)) return;
 
-    // Add :eyes: reaction
+    // Add :eyes: reaction + typing indicator
     try {
       await message.react('\uD83D\uDC40'); // eyes emoji
     } catch {
       /* already reacted or missing permissions */
+    }
+    try {
+      await message.channel.sendTyping();
+    } catch {
+      /* typing indicator failure is non-fatal */
     }
 
     // Download image attachments
