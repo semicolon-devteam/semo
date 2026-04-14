@@ -65,7 +65,12 @@ export class Router {
     }
   }
 
-  async route(channelId: string, text: string, threadTs?: string): Promise<RouteResult> {
+  async route(
+    channelId: string,
+    text: string,
+    threadTs?: string,
+    guildId?: string,
+  ): Promise<RouteResult> {
     const config = await this.getConfig();
 
     // 1. [Route: botId] 태그 직접 라우팅 (최우선)
@@ -105,26 +110,27 @@ export class Router {
     // 3. 채널 → 서비스 조회
     const service = await this.getServiceInfo(channelId);
 
-    // 3.5. 인큐베이터 세션 라우팅: active incubator_sessions 채널 → incubator 에이전트
-    if (service && config.validBotIds.includes('incubator')) {
+    // 3.5. 인큐베이터 세션 라우팅: Slack channel 또는 Discord guild → incubator 에이전트
+    if (config.validBotIds.includes('incubator')) {
       try {
         const incResult = await this.pool.query(
-          `SELECT 1 FROM semo.incubator_sessions WHERE channel = $1 AND status = 'active' LIMIT 1`,
-          [channelId],
+          `SELECT 1 FROM semo.incubator_sessions
+           WHERE (channel = $1 OR discord_guild = $2) AND status = 'active' LIMIT 1`,
+          [channelId, guildId || ''],
         );
         if (incResult.rows.length > 0) {
           return {
             botId: 'incubator',
-            serviceId: service.serviceId,
-            serviceDomain: service.serviceDomain,
-            phase: service.currentPhase,
+            serviceId: service?.serviceId || '',
+            serviceDomain: service?.serviceDomain || '',
+            phase: service?.currentPhase ?? -1,
             track: 'plan',
-            projectType: service.projectType,
-            routeReason: 'keyword',
+            projectType: service?.projectType || 'service',
+            routeReason: 'incubator-session',
           };
         }
       } catch {
-        // DB 에러 시 fall-through to keyword/phase routing
+        // DB 에러 시 fall-through to phase routing
       }
     }
 

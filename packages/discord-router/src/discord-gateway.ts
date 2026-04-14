@@ -39,6 +39,7 @@ export interface DiscordMessage {
   user: string;
   channel: string;
   parentChannel?: string; // 부모 채널 ID (스레드인 경우, Router 서비스 매핑용)
+  guildId?: string; // Discord 서버 ID (guild 단위 incubator 라우팅용)
   ts: string; // message ID
   thread_ts?: string; // thread (channel) ID if in thread
   images?: DiscordImage[];
@@ -218,6 +219,7 @@ export class DiscordGateway implements GatewayAdapter {
       user: message.author.id,
       channel: responseChannel,
       parentChannel: parentChannelId,
+      guildId: message.guildId || undefined,
       ts: message.id,
       thread_ts: threadId,
       ...(images.length > 0 && { images }),

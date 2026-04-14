@@ -169,8 +169,9 @@ const healthMonitor = new HealthMonitor({
 async function handleDiscordMessage(msg: DiscordMessage, senderName: string): Promise<void> {
   // 1. Router를 사용한 채널→서비스→Phase→봇 자동 라우팅
   // Discord 스레드인 경우 parentChannel로 서비스 매핑 (스레드 ID는 서비스와 매핑 안됨)
+  // guildId 전달 → incubator guild 라우팅
   const routeChannelId = msg.parentChannel || msg.channel;
-  const route = await router.route(routeChannelId, msg.text, msg.thread_ts);
+  const route = await router.route(routeChannelId, msg.text, msg.thread_ts, msg.guildId);
   router.setThreadBot(msg.thread_ts || msg.ts, route.botId);
 
   // 2. Fetch thread history
