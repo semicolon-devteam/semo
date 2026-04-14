@@ -14,17 +14,19 @@ const MIME_TYPES: Record<string, string> = {
   amr: 'audio/amr',
 };
 
-/** GET /api/meetings/[id]/audio — serve audio from DB with range support */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+/** GET /api/meetings/[id]/audio — serve audio from Blob or DB with range support */
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
     const audio = await getAudioData(id);
 
     if (!audio) {
       return NextResponse.json({ error: 'No audio file' }, { status: 404 });
+    }
+
+    // Blob URL available — redirect to CDN (handles Range natively)
+    if ('blobUrl' in audio) {
+      return NextResponse.redirect(audio.blobUrl, 302);
     }
 
     const ext = audio.filename.split('.').pop()?.toLowerCase() || 'mp3';

@@ -19,10 +19,10 @@ function authHeaders(): Record<string, string> {
 // ── Types (backward-compatible with former Vito* types) ──────────────────
 
 export interface VitoUtterance {
-  start_at: number;   // ms
-  duration: number;    // ms
+  start_at: number; // ms
+  duration: number; // ms
   msg: string;
-  spk: number;         // speaker index
+  spk: number; // speaker index
   lang?: string;
 }
 
@@ -42,9 +42,13 @@ export interface VitoTranscribeResult {
 export async function transcribe(
   fileBuffer: Buffer,
   fileName: string,
+  callbackUrl?: string,
 ): Promise<string> {
   const formData = new FormData();
   formData.append('file', new Blob([new Uint8Array(fileBuffer)]), fileName);
+  if (callbackUrl) {
+    formData.append('callback_url', callbackUrl);
+  }
 
   const response = await fetch(`${STT_API_BASE}/transcribe`, {
     method: 'POST',
@@ -57,7 +61,7 @@ export async function transcribe(
     throw new Error(`STT transcribe failed (${response.status}): ${text}`);
   }
 
-  const data = await response.json() as { id: string };
+  const data = (await response.json()) as { id: string };
   return data.id;
 }
 
@@ -75,7 +79,7 @@ export async function getTranscribeStatus(jobId: string): Promise<VitoTranscribe
     throw new Error(`STT status check failed (${response.status}): ${text}`);
   }
 
-  const data = await response.json() as {
+  const data = (await response.json()) as {
     id: string;
     status: VitoStatus;
     utterances?: VitoUtterance[];

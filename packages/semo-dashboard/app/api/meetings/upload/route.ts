@@ -43,8 +43,14 @@ export async function POST(request: NextRequest) {
 
     const audioFileName = `${meetingId}.${ext}`;
 
+    // Build callback URL for STT service to notify on completion
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+    const callbackUrl = `${baseUrl}/api/meetings/${meetingId}/transcription-callback`;
+
     // Send to STT service
-    const transcribeId = await transcribe(buffer, file.name);
+    const transcribeId = await transcribe(buffer, file.name, callbackUrl);
 
     // Update meeting with transcription info + audio stored in DB
     await updateTranscriptionStarted(meetingId, transcribeId, file.name, audioFileName, buffer);

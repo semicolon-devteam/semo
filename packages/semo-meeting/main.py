@@ -8,16 +8,18 @@ GET  /health      — service health check
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import urllib.request
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from threading import Thread
 from typing import Any, Dict
 
-from fastapi import FastAPI, File, HTTPException, Security, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Security, UploadFile
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 logging.basicConfig(
@@ -55,11 +57,42 @@ jobs: dict[str, dict[str, Any]] = {}
 # Stats
 stats = {"total_jobs": 0, "total_duration_ms": 0, "started_at": None}
 
+MAX_JOB_AGE = timedelta(minutes=30)
+
+
+def _cleanup_jobs() -> None:
+    now = datetime.now(timezone.utc)
+    expired = [
+        k for k, v in jobs.items()
+        if now - datetime.fromisoformat(v["created_at"]) > MAX_JOB_AGE
+    ]
+    for k in expired:
+        del jobs[k]
+    if expired:
+        logger.info("Cleaned up %d expired jobs", len(expired))
+
+
+def _send_callback(callback_url: str, payload: dict) -> None:
+    try:
+        body = json.dumps(payload).encode()
+        req = urllib.request.Request(
+            callback_url,
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {STT_API_KEY}",
+            },
+        )
+        urllib.request.urlopen(req, timeout=10)
+        logger.info("Callback sent to %s", callback_url)
+    except Exception as e:
+        logger.warning("Callback failed (%s): %s", callback_url, e)
+
 
 # ---------------------------------------------------------------------------
 # Background worker
 # ---------------------------------------------------------------------------
-def _run_job(job_id: str, audio_bytes: bytes, filename: str) -> None:
+def _run_job(job_id: str, audio_bytes: bytes, filename: str, callback_url: str | None = None) -> None:
     """Run STT pipeline in background thread."""
     from worker import process_audio
 
@@ -77,10 +110,24 @@ def _run_job(job_id: str, audio_bytes: bytes, filename: str) -> None:
         jobs[job_id]["utterances"] = utterances
         jobs[job_id]["completed_at"] = datetime.now(timezone.utc).isoformat()
         logger.info("Job %s: completed with %d utterances", job_id, len(utterances))
+
+        if callback_url:
+            _send_callback(callback_url, {
+                "job_id": job_id,
+                "status": "completed",
+                "utterances": utterances,
+            })
     except Exception as e:
         logger.error("Job %s: failed — %s", job_id, e, exc_info=True)
         jobs[job_id]["status"] = JobStatus.failed
         jobs[job_id]["error"] = str(e)
+
+        if callback_url:
+            _send_callback(callback_url, {
+                "job_id": job_id,
+                "status": "failed",
+                "error": str(e),
+            })
 
 
 # ---------------------------------------------------------------------------
@@ -110,9 +157,12 @@ async def health():
 @app.post("/transcribe")
 async def transcribe(
     file: UploadFile = File(...),
+    callback_url: str | None = Form(default=None),
     _token: str = Security(verify_token),
 ):
     """Accept audio file, start background transcription, return job ID."""
+    _cleanup_jobs()
+
     audio_bytes = await file.read()
     if not audio_bytes:
         raise HTTPException(status_code=400, detail="Empty file")
@@ -127,8 +177,11 @@ async def transcribe(
     }
     stats["total_jobs"] += 1
 
-    # Run in background thread (not blocking the event loop)
-    thread = Thread(target=_run_job, args=(job_id, audio_bytes, file.filename or "audio"), daemon=True)
+    thread = Thread(
+        target=_run_job,
+        args=(job_id, audio_bytes, file.filename or "audio", callback_url),
+        daemon=True,
+    )
     thread.start()
 
     return {"id": job_id}
