@@ -204,12 +204,15 @@ export function registerAgentFlushCommands(program: Command): void {
           truncateSidecar(parentSessionId);
         } else if (options.bot) {
           // Fallback: --bot 옵션만 주어진 레거시 경로
+          // slack-inbox source_type은 slack-router가 outbox 매칭으로 done 처리하므로
+          // 여기서 건드리지 않는다 — 봇 Stop 훅이 살아있는 Slack 작업을 조기 마감하는 것을 방지
           const sessionKey = parentSessionId ? localSessionKey(parentSessionId) : '';
           const result = await pool.query(
             `UPDATE semo.bot_commitments
              SET status = 'done'
              WHERE bot_id = $1
                AND status IN ('pending', 'active')
+               AND source_type != 'slack-inbox'
                AND ($2 = '' OR assigned_session = $2)
              RETURNING id, title`,
             [options.bot, sessionKey],
