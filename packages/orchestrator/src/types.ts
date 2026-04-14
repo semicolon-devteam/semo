@@ -28,6 +28,7 @@ export interface RouteResult {
     | 'keyword'
     | 'skill-dispatch'
     | 'phase-based'
+    | 'domain-matched'
     | 'fallback';
   /** 스킬 힌트 — 라우터가 감지한 스킬을 봇에게 전달 */
   skillHint?: string;

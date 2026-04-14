@@ -50,8 +50,13 @@ function createMockPool(queryResponses: Record<string, any[]> = {}) {
       if (sql.includes('incubator_sessions') && sql.includes('SELECT 1')) {
         return { rows: queryResponses['incubator'] || [] };
       }
-      if (sql.includes('semo.services')) {
-        return { rows: queryResponses['services'] || [] };
+      // resolveDomainContext: 1차 ontology 기반 쿼리
+      if (sql.includes('semo.ontology') && sql.includes('o.slack_channel')) {
+        return { rows: queryResponses['ontology'] || queryResponses['services'] || [] };
+      }
+      // resolveDomainContext: 2차 incubator_sessions fallback
+      if (sql.includes('incubator_sessions') && sql.includes('i.service_id')) {
+        return { rows: queryResponses['incubatorFallback'] || [] };
       }
       return { rows: [] };
     }),
@@ -62,14 +67,15 @@ describe('Router — Phase 5: projectType propagation', () => {
   describe('projectType in RouteResult', () => {
     it('should include projectType from ontology entity_type', async () => {
       const pool = createMockPool({
-        services: [
+        ontology: [
           {
-            full_service_id: 'svc-1',
+            domain: 'test-svc',
+            description: 'TestSvc',
+            entity_type: 'module',
+            service_id: 'svc-1',
             project_name: 'TestSvc',
-            service_domain: 'test-svc',
             current_phase: 3,
             infra_phase: 0,
-            project_type: 'module',
           },
         ],
       });
@@ -78,34 +84,36 @@ describe('Router — Phase 5: projectType propagation', () => {
       expect(result.projectType).toBe('module');
     });
 
-    it('should default projectType to "service" when ontology has no entity_type', async () => {
+    it('should default projectType to "unknown" when ontology has no entity_type', async () => {
       const pool = createMockPool({
-        services: [
+        ontology: [
           {
-            full_service_id: 'svc-1',
+            domain: 'test-svc',
+            description: 'TestSvc',
+            entity_type: null,
+            service_id: 'svc-1',
             project_name: 'TestSvc',
-            service_domain: 'test-svc',
             current_phase: 3,
             infra_phase: 0,
-            project_type: null,
           },
         ],
       });
       const router = new Router(pool);
       const result = await router.route('C_PROJ', '안녕하세요');
-      expect(result.projectType).toBe('service');
+      expect(result.projectType).toBe('unknown');
     });
 
     it('should propagate projectType in route-tag result', async () => {
       const pool = createMockPool({
-        services: [
+        ontology: [
           {
-            full_service_id: 'svc-1',
+            domain: 'test-svc',
+            description: 'TestSvc',
+            entity_type: 'platform',
+            service_id: 'svc-1',
             project_name: 'TestSvc',
-            service_domain: 'test-svc',
             current_phase: 0,
             infra_phase: 0,
-            project_type: 'platform',
           },
         ],
       });
@@ -117,14 +125,15 @@ describe('Router — Phase 5: projectType propagation', () => {
 
     it('should propagate projectType in thread-sticky result', async () => {
       const pool = createMockPool({
-        services: [
+        ontology: [
           {
-            full_service_id: 'svc-1',
+            domain: 'test-svc',
+            description: 'TestSvc',
+            entity_type: 'module',
+            service_id: 'svc-1',
             project_name: 'TestSvc',
-            service_domain: 'test-svc',
             current_phase: 3,
             infra_phase: 0,
-            project_type: 'module',
           },
         ],
       });
@@ -136,23 +145,24 @@ describe('Router — Phase 5: projectType propagation', () => {
     });
 
     it('should default projectType in fallback result', async () => {
-      const pool = createMockPool({ services: [] });
+      const pool = createMockPool({ ontology: [] });
       const router = new Router(pool);
       const result = await router.route('C_UNKNOWN', '안녕하세요');
       expect(result.routeReason).toBe('fallback');
-      expect(result.projectType).toBe('service');
+      expect(result.projectType).toBe('unknown');
     });
 
     it('should propagate projectType in sprint workflow routing', async () => {
       const pool = createMockPool({
-        services: [
+        ontology: [
           {
-            full_service_id: 'svc-1',
+            domain: 'test-svc',
+            description: 'TestSvc',
+            entity_type: 'platform',
+            service_id: 'svc-1',
             project_name: 'TestSvc',
-            service_domain: 'test-svc',
             current_phase: 3,
             infra_phase: 0,
-            project_type: 'platform',
           },
         ],
       });
@@ -160,6 +170,77 @@ describe('Router — Phase 5: projectType propagation', () => {
       const result = await router.route('C_PROJ', '스프린트 시작');
       expect(result.workflow).toBe('sprint');
       expect(result.projectType).toBe('platform');
+    });
+  });
+
+  describe('domain-matched routing (non-service domains)', () => {
+    it('should route to semiclaw with domain-matched when ontology has no phase', async () => {
+      const pool = createMockPool({
+        ontology: [
+          {
+            domain: 'trade-corp',
+            description: '무역회사',
+            entity_type: 'organization',
+            service_id: null,
+            project_name: null,
+            current_phase: null,
+            infra_phase: 0,
+          },
+        ],
+      });
+      const router = new Router(pool);
+      const result = await router.route('C_TRADE', '재고 현황 알려줘');
+      expect(result.routeReason).toBe('domain-matched');
+      expect(result.botId).toBe('semiclaw');
+      expect(result.serviceDomain).toBe('trade-corp');
+      expect(result.projectType).toBe('organization');
+      expect(result.phase).toBe(-1);
+      expect(result.serviceId).toBe('');
+    });
+
+    it('should use phase-based routing when ontology domain has services phase', async () => {
+      const pool = createMockPool({
+        ontology: [
+          {
+            domain: 'axoracle',
+            description: 'AXOracle',
+            entity_type: 'service',
+            service_id: 'svc-ax',
+            project_name: 'AXOracle',
+            current_phase: 7,
+            infra_phase: 1,
+          },
+        ],
+      });
+      const router = new Router(pool);
+      const result = await router.route('C_AX', '빌드 상태 확인');
+      expect(result.routeReason).toBe('phase-based');
+      expect(result.botId).toBe('workclaw');
+      expect(result.serviceDomain).toBe('axoracle');
+      expect(result.phase).toBe(7);
+      expect(result.serviceId).toBe('svc-ax');
+    });
+
+    it('should fallback to incubator_sessions when ontology has no match', async () => {
+      const pool = createMockPool({
+        ontology: [],
+        incubatorFallback: [
+          {
+            inc_service_id: 'inc-1',
+            service_name: 'NewProject',
+            service_id: 'svc-new',
+            service_domain: 'new-project',
+            project_name: 'NewProject',
+            current_phase: 0,
+            infra_phase: 0,
+            entity_type: 'service',
+          },
+        ],
+      });
+      const router = new Router(pool);
+      const result = await router.route('C_INC', '진행 상황');
+      expect(result.serviceDomain).toBe('new-project');
+      expect(result.serviceId).toBe('svc-new');
     });
   });
 

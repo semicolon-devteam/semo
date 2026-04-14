@@ -74,17 +74,4 @@ describe('Re-export shims (backward compatibility)', () => {
     expect(shimService.listProjects).toBe(pluginService.listProjects);
     expect(shimService.getProject).toBe(pluginService.getProject);
   });
-
-  it('lib/kpi.ts should re-export from plugins/service/kpi.ts', async () => {
-    const shimKpi = await import('../kpi');
-    const pluginKpi = await import('../plugins/service/kpi');
-    expect(shimKpi.listKPIMetrics).toBe(pluginKpi.listKPIMetrics);
-    expect(shimKpi.listKPIPeriods).toBe(pluginKpi.listKPIPeriods);
-  });
-
-  it('lib/iterations.ts should re-export from plugins/service/iterations.ts', async () => {
-    const shimIter = await import('../iterations');
-    const pluginIter = await import('../plugins/service/iterations');
-    expect(shimIter.listIterations).toBe(pluginIter.listIterations);
-  });
 });

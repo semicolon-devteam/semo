@@ -34,6 +34,7 @@ import { syncBotSkillSymlinks } from './bot-config';
 // resolveModelForMessage 보류 — 쿼터 절감 기간 중 전체 Sonnet 고정
 import { CostTracker } from './cost-tracker';
 import { ITServiceContextProvider } from './service-context';
+import { CoreContextProvider } from './core-context';
 import { AsyncQueue } from './async-queue';
 
 const SESSIONS_DIR = path.join(os.homedir(), '.semo-bot-sessions');
@@ -505,6 +506,7 @@ export class SessionPool {
   private costTracker: CostTracker;
   private activeDispatches = 0;
   private contextProviders: Map<string, ContextProvider>;
+  private coreContextProvider = new CoreContextProvider();
   private _taskCompleteCallback?: (event: BackgroundTaskEvent) => void;
 
   constructor(
@@ -586,14 +588,10 @@ export class SessionPool {
           ].join('\n')
         : '';
 
-      // 프로젝트 컨텍스트 (entity_type 기반 provider 선택)
-      const provider = this.contextProviders.get(context.route.projectType);
-      if (!provider && context.route.projectType !== 'service') {
-        console.warn(
-          `[session-pool] No context provider for projectType: ${context.route.projectType}`,
-        );
-      }
-      const gfpContext = provider?.buildContext(context.route, botId) ?? '';
+      // 프로젝트 컨텍스트 (entity_type 기반 provider 선택, fallback: CoreContextProvider)
+      const provider =
+        this.contextProviders.get(context.route.projectType) ?? this.coreContextProvider;
+      const gfpContext = provider.buildContext(context.route, botId);
 
       // 이미지 첨부 안내
       const imageBlock =
@@ -606,7 +604,9 @@ export class SessionPool {
 
       // 컨텍스트 프롬프트 조립
       const channelScope = context.route.serviceDomain
-        ? `프로젝트: ${context.route.serviceDomain} (Phase ${context.route.phase})\n[채널 스코프] 이 채널은 ${context.route.serviceDomain} 프로젝트 전용입니다. "전체" 또는 다른 프로젝트를 명시하지 않는 한, ${context.route.serviceDomain} 관련 정보만 응답하세요.`
+        ? context.route.phase >= 0
+          ? `프로젝트: ${context.route.serviceDomain} (Phase ${context.route.phase})\n[채널 스코프] 이 채널은 ${context.route.serviceDomain} 프로젝트 전용입니다. "전체" 또는 다른 프로젝트를 명시하지 않는 한, ${context.route.serviceDomain} 관련 정보만 응답하세요.`
+          : `도메인: ${context.route.serviceDomain}\n[채널 스코프] 이 채널은 ${context.route.serviceDomain} 관련 채널입니다. "전체" 또는 다른 도메인을 명시하지 않는 한, ${context.route.serviceDomain} 관련 정보만 응답하세요.`
         : '';
 
       // 스킬 디스패치 힌트

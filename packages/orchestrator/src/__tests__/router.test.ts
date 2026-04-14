@@ -67,10 +67,13 @@ function createMockPool(queryResponses: Record<string, any[]> = {}) {
       if (sql.includes('incubator_sessions') && sql.includes('SELECT 1')) {
         return { rows: queryResponses['incubator'] || [] };
       }
-      // Service info (UNION query includes semo.services)
-      if (sql.includes('semo.services')) {
-        const services = queryResponses['services'] || [];
-        return { rows: services };
+      // resolveDomainContext: 1차 ontology 기반 쿼리
+      if (sql.includes('semo.ontology') && sql.includes('o.slack_channel')) {
+        return { rows: queryResponses['ontology'] || queryResponses['services'] || [] };
+      }
+      // resolveDomainContext: 2차 incubator_sessions fallback
+      if (sql.includes('incubator_sessions') && sql.includes('i.service_id')) {
+        return { rows: queryResponses['incubatorFallback'] || [] };
       }
       return { rows: [] };
     }),
@@ -126,12 +129,13 @@ describe('Router', () => {
       const pool = createMockPool({
         services: [
           {
-            full_service_id: 'svc-1',
+            domain: 'test-svc',
+            description: 'TestSvc',
+            entity_type: 'service',
+            service_id: 'svc-1',
             project_name: 'TestSvc',
-            service_domain: 'test-svc',
             current_phase: 0,
             infra_phase: 0,
-            project_type: 'service',
           },
         ],
         kbRoles: [
@@ -162,12 +166,13 @@ describe('Router', () => {
       const pool = createMockPool({
         services: [
           {
-            full_service_id: 'svc-1',
+            domain: 'seum',
+            description: 'SEUM',
+            entity_type: 'service',
+            service_id: 'svc-1',
             project_name: 'SEUM',
-            service_domain: 'seum',
             current_phase: 4,
             infra_phase: 0,
-            project_type: 'service',
           },
         ],
         kbRoles: [
@@ -184,12 +189,13 @@ describe('Router', () => {
       const pool = createMockPool({
         services: [
           {
-            full_service_id: 'svc-1',
+            domain: 'pat',
+            description: 'PAT',
+            entity_type: 'service',
+            service_id: 'svc-1',
             project_name: 'PAT',
-            service_domain: 'pat',
             current_phase: 7,
             infra_phase: 0,
-            project_type: 'service',
           },
         ],
         kbRoles: [
@@ -236,12 +242,13 @@ describe('Router', () => {
       const pool = createMockPool({
         services: [
           {
-            full_service_id: 'svc',
+            domain: 'test',
+            description: 'Test',
+            entity_type: 'service',
+            service_id: 'svc',
             project_name: 'Test',
-            service_domain: 'test',
             current_phase: phase,
             infra_phase: 0,
-            project_type: 'service',
           },
         ],
         kbRoles,
@@ -257,12 +264,13 @@ describe('Router', () => {
       const pool = createMockPool({
         services: [
           {
-            full_service_id: 'svc-1',
+            domain: 'test',
+            description: 'Test',
+            entity_type: 'service',
+            service_id: 'svc-1',
             project_name: 'Test',
-            service_domain: 'test',
             current_phase: 4,
             infra_phase: 0,
-            project_type: 'service',
           },
         ],
         kbRoles: [
@@ -350,12 +358,13 @@ describe('Router', () => {
       const pool = createMockPool({
         services: [
           {
-            full_service_id: 'svc-inc',
+            domain: 'new-startup',
+            description: 'NewStartup',
+            entity_type: 'service',
+            service_id: 'svc-inc',
             project_name: 'NewStartup',
-            service_domain: 'new-startup',
             current_phase: 1,
             infra_phase: 0,
-            project_type: 'service',
           },
         ],
         incubator: [{ '?column?': 1 }], // SELECT 1 returns a row
@@ -370,12 +379,13 @@ describe('Router', () => {
       const pool = createMockPool({
         services: [
           {
-            full_service_id: 'svc-1',
+            domain: 'regular',
+            description: 'RegularSvc',
+            entity_type: 'service',
+            service_id: 'svc-1',
             project_name: 'RegularSvc',
-            service_domain: 'regular',
             current_phase: 2,
             infra_phase: 0,
-            project_type: 'service',
           },
         ],
         incubator: [], // no active session
@@ -393,14 +403,15 @@ describe('Router', () => {
   describe('caching', () => {
     it('should cache service info and not re-query within TTL', async () => {
       const pool = createMockPool({
-        services: [
+        ontology: [
           {
-            full_service_id: 'svc-1',
+            domain: 'test-svc',
+            description: 'TestSvc',
+            entity_type: 'service',
+            service_id: 'svc-1',
             project_name: 'TestSvc',
-            service_domain: 'test-svc',
             current_phase: 1,
             infra_phase: 0,
-            project_type: 'service',
           },
         ],
         kbRoles: [
@@ -415,11 +426,11 @@ describe('Router', () => {
       await router.route('C_PROJ', 'first');
       await router.route('C_PROJ', 'second');
 
-      // services 쿼리(UNION)는 1번만 호출되어야 함 (캐시 적중)
-      const serviceCalls = pool.query.mock.calls.filter(
-        (c: any[]) => c[0].includes('semo.services') && !c[0].includes('bot_status'),
+      // ontology 쿼리는 1번만 호출되어야 함 (캐시 적중)
+      const ontologyCalls = pool.query.mock.calls.filter(
+        (c: any[]) => c[0].includes('semo.ontology') && c[0].includes('o.slack_channel'),
       );
-      expect(serviceCalls).toHaveLength(1);
+      expect(ontologyCalls).toHaveLength(1);
     });
   });
 });

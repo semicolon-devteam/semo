@@ -2,19 +2,19 @@ import { Pool } from 'pg';
 import type { RouteResult, ProjectContext } from './types';
 import { loadRoutingConfig, type RoutingConfig } from './kb-routing';
 
-// 채널 → 프로젝트 매핑 캐시
-interface ServiceInfo {
-  serviceId: string;
-  serviceName: string;
-  serviceDomain: string;
-  currentPhase: number;
-  infraPhase: number;
-  projectType: string;
+// 채널 → 도메인 매핑 캐시 (ontology 기반, services LEFT JOIN)
+interface DomainContext {
+  domain: string; // ontology.domain (보편적 식별자)
+  displayName: string; // ontology.description || services.project_name
+  entityType: string; // ontology.entity_type
+  serviceId?: string; // services 있을 때만 (IT서비스 Plugin 전용)
+  currentPhase?: number; // services 있을 때만
+  infraPhase?: number; // services 있을 때만
 }
 
 export class Router {
   private pool: Pool;
-  private channelCache = new Map<string, ServiceInfo>();
+  private channelCache = new Map<string, DomainContext>();
   private cacheExpiry = new Map<string, number>();
   private readonly CACHE_TTL = 60_000; // 1분
 
@@ -78,14 +78,14 @@ export class Router {
     if (routeTag) {
       const candidate = routeTag[1].toLowerCase();
       const botId = config.validBotIds.includes(candidate) ? candidate : 'semiclaw';
-      const service = await this.getServiceInfo(channelId);
+      const ctx = await this.resolveDomainContext(channelId);
       return {
         botId,
-        serviceId: service?.serviceId || '',
-        serviceDomain: service?.serviceDomain || '',
-        phase: service?.currentPhase ?? -1,
+        serviceId: ctx?.serviceId || '',
+        serviceDomain: ctx?.domain || '',
+        phase: ctx?.currentPhase ?? -1,
         track: 'plan',
-        projectType: service?.projectType || 'service',
+        projectType: ctx?.entityType || 'service',
         routeReason: 'route-tag',
       };
     }
@@ -94,21 +94,21 @@ export class Router {
     if (threadTs) {
       const cached = this.threadBotCache.get(threadTs);
       if (cached && Date.now() < cached.expiresAt) {
-        const service = await this.getServiceInfo(channelId);
+        const ctx = await this.resolveDomainContext(channelId);
         return {
           botId: cached.botId,
-          serviceId: service?.serviceId || '',
-          serviceDomain: service?.serviceDomain || '',
-          phase: service?.currentPhase ?? -1,
+          serviceId: ctx?.serviceId || '',
+          serviceDomain: ctx?.domain || '',
+          phase: ctx?.currentPhase ?? -1,
           track: 'plan',
-          projectType: service?.projectType || 'service',
+          projectType: ctx?.entityType || 'service',
           routeReason: 'thread-sticky',
         };
       }
     }
 
-    // 3. 채널 → 서비스 조회
-    const service = await this.getServiceInfo(channelId);
+    // 3. 채널 → 도메인 리졸브 (Core: ontology 기반)
+    const ctx = await this.resolveDomainContext(channelId);
 
     // 3.5. 인큐베이터 세션 라우팅: Slack channel 또는 Discord guild → incubator 에이전트
     if (config.validBotIds.includes('incubator')) {
@@ -121,11 +121,11 @@ export class Router {
         if (incResult.rows.length > 0) {
           return {
             botId: 'incubator',
-            serviceId: service?.serviceId || '',
-            serviceDomain: service?.serviceDomain || '',
-            phase: service?.currentPhase ?? -1,
+            serviceId: ctx?.serviceId || '',
+            serviceDomain: ctx?.domain || '',
+            phase: ctx?.currentPhase ?? -1,
             track: 'plan',
-            projectType: service?.projectType || 'service',
+            projectType: ctx?.entityType || 'service',
             routeReason: 'incubator-session',
           };
         }
@@ -148,39 +148,52 @@ export class Router {
     if (sprintPreset) {
       return {
         botId: 'semiclaw',
-        serviceId: service?.serviceId || '',
-        serviceDomain: service?.serviceDomain || '',
-        phase: service?.currentPhase ?? -1,
+        serviceId: ctx?.serviceId || '',
+        serviceDomain: ctx?.domain || '',
+        phase: ctx?.currentPhase ?? -1,
         track: 'plan',
-        projectType: service?.projectType || 'service',
+        projectType: ctx?.entityType || 'service',
         routeReason: 'phase-based',
         workflow: 'sprint',
         workflowPreset: sprintPreset,
       };
     }
 
-    // 5. Phase 기반 라우팅 (키워드 라우팅 제거 — 봇이 자체 역할 판단 후 에스컬레이션)
-    if (service) {
-      const botId = config.phaseAssignees[service.currentPhase] || 'semiclaw';
+    // 5. Phase 기반 라우팅 — IT서비스(services 테이블에 phase가 있는 도메인)
+    if (ctx?.currentPhase !== undefined && ctx.currentPhase >= 0) {
+      const botId = config.phaseAssignees[ctx.currentPhase] || 'semiclaw';
       return {
         botId,
-        serviceId: service.serviceId,
-        serviceDomain: service.serviceDomain,
-        phase: service.currentPhase,
+        serviceId: ctx.serviceId || '',
+        serviceDomain: ctx.domain,
+        phase: ctx.currentPhase,
         track: 'plan',
-        projectType: service.projectType,
+        projectType: ctx.entityType,
         routeReason: 'phase-based',
       };
     }
 
-    // 8. 폴백: semiclaw
+    // 5.5. 비-서비스 도메인 — domain은 있지만 phase가 없는 경우
+    if (ctx) {
+      return {
+        botId: 'semiclaw',
+        serviceId: ctx.serviceId || '',
+        serviceDomain: ctx.domain,
+        phase: -1,
+        track: 'plan',
+        projectType: ctx.entityType,
+        routeReason: 'domain-matched',
+      };
+    }
+
+    // 6. 폴백: 채널에 매핑된 도메인 없음
     return {
       botId: 'semiclaw',
       serviceId: '',
       serviceDomain: '',
       phase: -1,
       track: 'plan',
-      projectType: 'service',
+      projectType: 'unknown',
       routeReason: 'fallback',
     };
   }
@@ -198,53 +211,75 @@ export class Router {
     };
   }
 
-  private async getServiceInfo(channelId: string): Promise<ServiceInfo | null> {
+  private async resolveDomainContext(channelId: string): Promise<DomainContext | null> {
     const cached = this.channelCache.get(channelId);
     const expiry = this.cacheExpiry.get(channelId) || 0;
     if (cached && Date.now() < expiry) return cached;
 
     try {
+      // 1차: ontology 기반 채널 매핑 (Core — 모든 도메인 타입)
       const result = await this.pool.query(
-        `SELECT s.service_id::text as full_service_id, s.project_name, s.service_domain,
-                s.current_phase, COALESCE(s.infra_phase, 0) as infra_phase,
-                COALESCE(o.entity_type, 'service') as project_type
-         FROM semo.services s
-         LEFT JOIN semo.ontology o ON o.domain = s.service_domain
-         WHERE position($1 in s.slack_channel) > 0
-            OR s.discord_channel = $1
-
-         UNION ALL
-
-         SELECT s.service_id::text, s.project_name, s.service_domain,
-                s.current_phase, COALESCE(s.infra_phase, 0),
-                COALESCE(o.entity_type, 'service')
-         FROM semo.incubator_sessions i
-         -- incubator_sessions.service_id는 UUID 축약형 (prefix match 의도)
-         JOIN semo.services s ON starts_with(s.service_id::text, i.service_id)
-         LEFT JOIN semo.ontology o ON o.domain = s.service_domain
-         WHERE i.channel = $1 AND i.status = 'active'
-
+        `SELECT o.domain, o.description, o.entity_type,
+                s.service_id::text AS service_id,
+                s.project_name,
+                s.current_phase, COALESCE(s.infra_phase, 0) AS infra_phase
+         FROM semo.ontology o
+         LEFT JOIN semo.services s ON s.service_domain = o.domain
+         WHERE position($1 in o.slack_channel) > 0
+            OR o.discord_channel = $1
          LIMIT 1`,
         [channelId],
       );
 
-      if (result.rows.length === 0) return null;
+      if (result.rows.length > 0) {
+        const row = result.rows[0];
+        const ctx: DomainContext = {
+          domain: row.domain,
+          displayName: row.project_name || row.description || row.domain,
+          entityType: row.entity_type || 'unknown',
+          serviceId: row.service_id || undefined,
+          currentPhase: row.current_phase ?? undefined,
+          infraPhase: row.infra_phase ?? undefined,
+        };
+        this.channelCache.set(channelId, ctx);
+        this.cacheExpiry.set(channelId, Date.now() + this.CACHE_TTL);
+        return ctx;
+      }
 
-      const row = result.rows[0];
-      const info: ServiceInfo = {
-        serviceId: row.full_service_id,
-        serviceName: row.project_name || row.service_domain,
-        serviceDomain: row.service_domain || '',
-        currentPhase: row.current_phase ?? 0,
-        infraPhase: row.infra_phase ?? 0,
-        projectType: row.project_type || 'service',
-      };
+      // 2차: incubator_sessions fallback (아직 ontology 미등록 세션)
+      const incResult = await this.pool.query(
+        `SELECT i.service_id AS inc_service_id, i.service_name,
+                s.service_id::text AS service_id, s.service_domain,
+                s.project_name, s.current_phase,
+                COALESCE(s.infra_phase, 0) AS infra_phase,
+                COALESCE(o.entity_type, 'service') AS entity_type
+         FROM semo.incubator_sessions i
+         LEFT JOIN semo.services s ON starts_with(s.service_id::text, i.service_id)
+         LEFT JOIN semo.ontology o ON o.domain = s.service_domain
+         WHERE i.channel = $1 AND i.status = 'active'
+         LIMIT 1`,
+        [channelId],
+      );
 
-      this.channelCache.set(channelId, info);
-      this.cacheExpiry.set(channelId, Date.now() + this.CACHE_TTL);
-      return info;
+      if (incResult.rows.length > 0) {
+        const row = incResult.rows[0];
+        const ctx: DomainContext = {
+          domain: row.service_domain || row.inc_service_id,
+          displayName:
+            row.project_name || row.service_name || row.service_domain || row.inc_service_id,
+          entityType: row.entity_type || 'service',
+          serviceId: row.service_id || undefined,
+          currentPhase: row.current_phase ?? undefined,
+          infraPhase: row.infra_phase ?? undefined,
+        };
+        this.channelCache.set(channelId, ctx);
+        this.cacheExpiry.set(channelId, Date.now() + this.CACHE_TTL);
+        return ctx;
+      }
+
+      return null;
     } catch (err) {
-      console.error(`[router] DB query failed for channel ${channelId}:`, err);
+      console.error(`[router] resolveDomainContext failed for channel ${channelId}:`, err);
       return null;
     }
   }
