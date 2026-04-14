@@ -128,38 +128,7 @@ export class Router {
       }
     }
 
-    // 4. 스킬 디스패치 (키워드 분기보다 우선)
-    for (const { pattern, botId, skill } of config.skillRoutes) {
-      if (pattern.test(text)) {
-        return {
-          botId,
-          serviceId: service?.serviceId || '',
-          serviceDomain: service?.serviceDomain || '',
-          phase: service?.currentPhase ?? -1,
-          track: 'plan',
-          projectType: service?.projectType || 'service',
-          routeReason: 'skill-dispatch',
-          skillHint: skill,
-        };
-      }
-    }
-
-    // 5. 키워드 분기
-    for (const { pattern, botId } of config.keywordRoutes) {
-      if (pattern.test(text)) {
-        return {
-          botId,
-          serviceId: service?.serviceId || '',
-          serviceDomain: service?.serviceDomain || '',
-          phase: service?.currentPhase ?? -1,
-          track: 'plan',
-          projectType: service?.projectType || 'service',
-          routeReason: 'keyword',
-        };
-      }
-    }
-
-    // 6. Phase 기반 라우팅
+    // 4. Phase 기반 라우팅 (키워드 라우팅 제거 — 봇이 자체 역할 판단 후 에스컬레이션)
     if (service) {
       const botId = config.phaseAssignees[service.currentPhase] || 'semiclaw';
       return {
@@ -173,7 +142,7 @@ export class Router {
       };
     }
 
-    // 7. 폴백: semiclaw
+    // 8. 폴백: semiclaw
     return {
       botId: 'semiclaw',
       serviceId: '',
