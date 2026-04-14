@@ -53,20 +53,36 @@ SEMO 플랫폼 하위 모듈(`module` 타입)은 자체 KB 도메인을 가진�
 |------------|-----------|------|------|
 | 액션 아이템 | `action_items` | `semo action-items list [--owner {domain}] [--status open]` | `semo action-items create --owner {domain} --description "..."` |
 | 커밋먼트 | `bot_commitments` | `semo commitments list [--bot-id {botId}]` | `semo commitments create --bot-id {botId} --title "..."` |
-| KPI 메트릭 | `service_kpi_metrics` | `GET /api/projects/{id}/kpi-metrics` | KB upsert → 자동 DB sync |
+| KPI 메트릭 | **KB metadata** (v084+) | `GET /api/projects/{id}/kpi-metrics` (domain 기반 KB 읽기, DB fallback) | `semo kb upsert {domain} kpi/{YYYY-MM-DD} --metadata '{"metrics":[...]}'` |
 
 **`semo kb`로 접근하면 안 되는 키**: `action-item` (kb_type_schema에서 제거됨)
+
+> **v084+**: `service_kpi_metrics` 테이블은 deprecated. KPI 데이터는 KB metadata가 SoT. 기존 DB 데이터는 fallback으로 읽기만 가능.
+> **v085+**: `meetings.service_id`는 deprecated. `target_domain` (ontology FK) 사용. 회의를 서비스뿐 아니라 ontology 어떤 도메인에든 연결 가능.
+
+## Core/Plugin 아키텍처 (v084+)
+
+Dashboard lib 계층은 Core(범용)와 Plugin(서비스 전용)으로 분리:
+
+| 계층 | 경로 | 의존 | 포함 모듈 |
+|------|------|------|----------|
+| Core | `lib/core/` | ontology domain 기반 | kb, action-items, meeting, meeting-generate, meeting-github |
+| Plugin (IT Service) | `lib/plugins/service/` | service_id FK | service, kpi, iterations, sandbox, feature-* 등 18개 |
+
+기존 import 경로(`lib/kb.ts`, `lib/service.ts` 등)는 re-export shim으로 하위호환 유지.
 
 ## 테이블 매핑 (v052+)
 | 테이블 | 설명 |
 |--------|------|
-| `services` | 서비스 정의 (PK: service_id) |
+| `services` | 서비스 정의 (PK: service_id) — **Plugin 전용** |
 | `service_sections` | 섹션 (FK: service_id) |
 | `service_materials` | 자료 (FK: service_id) |
 | `service_research_tasks` | 리서치 (FK: service_id) |
 | `service_infra_requests` | 인프라 요청 (FK: service_id) |
 | `service_iterations` | 운영 이터레이션 (FK: service_id) |
 | `service_incidents` | 운영 인시던트 (FK: service_id) |
+| `service_kpi_metrics` | **DEPRECATED** — KB metadata로 전환 |
+| `meetings` | 회의 (target_domain FK → ontology) — **Core** |
 
 레거시 하위 호환 VIEW(`gfp_*`, `service_projects`)가 존재하므로 기존 쿼리도 동작. 신규 코드는 `services` 사용. (VIEW는 추후 제거 예정)
 

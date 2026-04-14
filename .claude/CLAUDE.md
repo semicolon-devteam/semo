@@ -43,7 +43,6 @@ npm run lint && npx tsc --noEmit && npm run build
 
 ## 상세 규칙 (필요 시 참조)
 
-GFP 파이프라인 작업 시 → `.claude/rules/pipeline-slack-first.md` (Slack-First 원칙)
 PM 데이터 읽기/쓰기 시 → `.claude/rules/data-routing.md` (Data Routing)
 빌드/배포 상세 → `.claude/rules/quality-gate.md` (CLI 배포 포함)
 세션 동기화 → `.claude/rules/session-sync.md` (로컬↔Agent SDK 동기화)
