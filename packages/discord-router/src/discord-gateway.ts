@@ -38,6 +38,7 @@ export interface DiscordMessage {
   text: string;
   user: string;
   channel: string;
+  parentChannel?: string; // 부모 채널 ID (스레드인 경우, Router 서비스 매핑용)
   ts: string; // message ID
   thread_ts?: string; // thread (channel) ID if in thread
   images?: DiscordImage[];
@@ -207,10 +208,16 @@ export class DiscordGateway implements GatewayAdapter {
     const senderName =
       message.member?.displayName || message.author.displayName || message.author.username;
 
+    // parentChannelId: Router의 서비스 매핑에 사용 (스레드가 아닌 실제 채널 ID)
+    const parentChannelId = isThread
+      ? (message.channel as ThreadChannel).parentId || message.channelId
+      : message.channelId;
+
     const discordMsg: DiscordMessage = {
       text: cleanText || '(image)',
       user: message.author.id,
       channel: responseChannel,
+      parentChannel: parentChannelId,
       ts: message.id,
       thread_ts: threadId,
       ...(images.length > 0 && { images }),
