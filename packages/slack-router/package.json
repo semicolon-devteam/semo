@@ -1,0 +1,21 @@
+{
+  "name": "@team-semicolon/semo-slack-router",
+  "version": "0.1.0",
+  "description": "Lightweight Slack Router for SEMO multi-session agents — no LLM dependency",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "npx tsx src/index.ts",
+    "start:bun": "bun src/index.ts",
+    "dev": "npx tsx --watch src/index.ts"
+  },
+  "dependencies": {
+    "@slack/socket-mode": "^2.0.0",
+    "@slack/web-api": "^7.0.0",
+    "pg": "^8.17.2"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0"
+  }
+}

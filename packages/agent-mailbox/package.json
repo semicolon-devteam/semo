@@ -1,0 +1,17 @@
+{
+  "name": "@team-semicolon/semo-agent-mailbox",
+  "version": "0.1.0",
+  "description": "JSONL file-based mailbox MCP server for SEMO multi-agent sessions",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "npx tsx src/index.ts",
+    "start:bun": "bun src/index.ts",
+    "dev": "npx tsx --watch src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.4.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
+  }
+}
