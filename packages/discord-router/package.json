@@ -1,0 +1,19 @@
+{
+  "name": "@team-semicolon/semo-discord-router",
+  "version": "0.1.0",
+  "description": "SEMO Discord Router — Discord Gateway + JSONL Mailbox routing",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "npx tsx src/index.ts",
+    "dev": "npx tsx --watch src/index.ts"
+  },
+  "dependencies": {
+    "discord.js": "^14.18.0",
+    "pg": "^8.17.2"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0"
+  }
+}
