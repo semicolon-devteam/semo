@@ -13,7 +13,7 @@ import {
   resetToPhase,
 } from '../lib/sandbox';
 import { processVirtualPOReviewBatch, switchVirtualPOMode } from '../lib/sandbox-virtual-po';
-import { verifySandboxRun } from '../lib/sandbox-verification';
+import { verifySandboxRun } from '../lib/plugins/service/sandbox-verification';
 import { getProject, listSections } from '../lib/service';
 import type { SandboxConfig } from '../types';
 

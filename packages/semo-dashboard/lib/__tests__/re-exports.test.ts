@@ -68,13 +68,6 @@ describe('Re-export shims (backward compatibility)', () => {
     expect(shimMeeting.listMeetings).toBe(coreMeeting.listMeetings);
   });
 
-  it('lib/action-items.ts should re-export from core/action-items.ts', async () => {
-    const shimAI = await import('../action-items');
-    const coreAI = await import('../core/action-items');
-    expect(shimAI.listActionItems).toBe(coreAI.listActionItems);
-    expect(shimAI.createActionItem).toBe(coreAI.createActionItem);
-  });
-
   it('lib/service.ts should re-export from plugins/service/service.ts', async () => {
     const shimService = await import('../service');
     const pluginService = await import('../plugins/service/service');

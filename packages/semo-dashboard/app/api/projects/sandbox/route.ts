@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
     if (sandbox?.mode === 'live') {
       // Live: 봇에게 Phase 0 디스패치 (empty 모드 포함)
       const { dispatchLiveSandboxPhase } = await import('@/lib/sandbox');
-      const { getScenario } = await import('@/lib/sandbox-scenarios');
+      const { getScenario } = await import('@/lib/plugins/service/sandbox-scenarios');
       const scenario = sandbox.scenario_id ? getScenario(sandbox.scenario_id) : null;
       dispatchLiveSandboxPhase(result.project.service_id, 0, scenario, sandbox).catch((err) =>
         console.error('[SANDBOX API] Live Phase 0 dispatch failed:', err),

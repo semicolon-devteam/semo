@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
       if (sandbox.mode === 'live') {
         const { dispatchLiveSandboxPhase } = await import('@/lib/sandbox');
-        const { getScenario } = await import('@/lib/sandbox-scenarios');
+        const { getScenario } = await import('@/lib/plugins/service/sandbox-scenarios');
         const { getPhaseAssignee } = await import('@/lib/service-phases');
         const scenario = sandbox.scenario_id ? getScenario(sandbox.scenario_id) : null;
         await dispatchLiveSandboxPhase(service_id, nextPhase, scenario, sandbox);
