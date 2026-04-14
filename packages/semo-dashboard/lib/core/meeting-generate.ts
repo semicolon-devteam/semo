@@ -9,6 +9,7 @@
 
 import { createMeetingDiscussion } from './meeting-github';
 import { upsertItem } from './kb';
+import { syncMeetingToNotion, updateNotionSync } from './meeting-notion';
 import type { Meeting } from './meeting';
 
 // ── Anthropic API ──
@@ -348,7 +349,11 @@ export interface GenerationResult {
   result: { decisions: number; actions: number; kpi: number };
 }
 
-async function sendSlackNotification(title: string, discussionUrl: string): Promise<void> {
+async function sendSlackNotification(
+  title: string,
+  discussionUrl: string,
+  notionUrl?: string | null,
+): Promise<void> {
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
     console.warn('SLACK_BOT_TOKEN not set, skipping notification');
@@ -383,7 +388,7 @@ async function sendSlackNotification(title: string, discussionUrl: string): Prom
     },
     body: JSON.stringify({
       channel: channelId,
-      text: `📝 회의록 생성 완료\n*제목*: ${title}\n*URL*: ${discussionUrl}`,
+      text: `📝 회의록 생성 완료\n*제목*: ${title}\n*GitHub*: ${discussionUrl}${notionUrl ? `\n*Notion*: ${notionUrl}` : ''}`,
     }),
   });
 }
@@ -396,6 +401,7 @@ export async function generateMeetingNotes(
   let body: string;
   let kbEntries: KBEntry[];
   let actionItemInputs: ActionItemInput[] = [];
+  let analysis: MeetingAnalysis | null = null;
 
   if (editedData) {
     // Use user-edited data
@@ -403,6 +409,29 @@ export async function generateMeetingNotes(
     body = editedData.discussion.body;
     kbEntries = editedData.kbEntries;
     actionItemInputs = editedData.actionItems ?? [];
+    // Reconstruct a minimal analysis from edited data for Notion sync
+    analysis = {
+      meeting_time: meeting.meeting_date,
+      meeting_type_label: meeting.meeting_type === 'regular' ? '정기 회고&회의' : '임시회의',
+      agenda_items: '',
+      decisions: kbEntries
+        .filter((e) => e.type === 'decision')
+        .map((e) => ({
+          title: e.sub_key,
+          content: e.content,
+          background: '',
+          assignee: '',
+          related_project: '',
+        })),
+      kpi_changes: [],
+      action_items: actionItemInputs.map((a) => ({
+        assignee: a.assignee,
+        item: a.item,
+        deadline: a.deadline,
+      })),
+      next_meeting: '',
+      additional_notes: '',
+    };
   } else {
     // Auto-generate (legacy path)
     if (!meeting.mapped_transcript) {
@@ -413,6 +442,7 @@ export async function generateMeetingNotes(
     body = preview.discussion.body;
     kbEntries = preview.kbEntries;
     actionItemInputs = preview.analysis.action_items;
+    analysis = preview.analysis;
   }
 
   // 1. Create GitHub Discussion
@@ -457,8 +487,27 @@ export async function generateMeetingNotes(
     }
   }
 
-  // 3. Slack notification
-  await sendSlackNotification(title, discussion.url).catch((err) => {
+  // 3. Notion sync (non-blocking)
+  let notionUrl: string | null = null;
+  try {
+    const notionResult = analysis
+      ? await syncMeetingToNotion(meeting, analysis, discussion.url)
+      : null;
+    if (notionResult) {
+      await updateNotionSync(meeting.meeting_id, notionResult);
+      notionUrl = notionResult.url;
+    }
+  } catch (err) {
+    console.warn('[meeting-generate] Notion sync failed (non-blocking):', err);
+    await updateNotionSync(
+      meeting.meeting_id,
+      null,
+      err instanceof Error ? err.message : String(err),
+    ).catch(() => {});
+  }
+
+  // 4. Slack notification
+  await sendSlackNotification(title, discussion.url, notionUrl).catch((err) => {
     console.warn('Slack notification failed:', err);
   });
 
