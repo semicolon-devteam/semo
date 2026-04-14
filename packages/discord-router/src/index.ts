@@ -96,6 +96,8 @@ async function handleEscalation(msg: OutboxMessage): Promise<void> {
     escalation_reason: msg.escalation_reason || '',
     prior_response: context.prior_response as string,
     escalation_depth: depth,
+    speaker_domain: (context.speaker_domain as string) || undefined,
+    speaker_profile: context.speaker_profile as InboxMessage['speaker_profile'],
   });
 
   console.log(

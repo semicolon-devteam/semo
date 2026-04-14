@@ -27,6 +27,7 @@ import type { InboxMessage, OutboxMessage } from '../../platform-common/src/type
 import { InboxWriter } from '../../platform-common/src/inbox-writer.js';
 import { OutboxReader } from '../../platform-common/src/outbox-reader.js';
 import { HealthMonitor } from '../../platform-common/src/health-monitor.js';
+import { BusyDetector } from '../../platform-common/src/busy-detector.js';
 import { resolveSpeaker } from '../../platform-common/src/speaker-resolver.js';
 
 // ── Configuration ──
@@ -43,6 +44,16 @@ const MAX_ESCALATION_DEPTH = 3;
 const pool = new Pool({ connectionString: DATABASE_URL });
 const slack = new SlackGateway(SLACK_BOT_TOKEN, SLACK_APP_TOKEN);
 const inboxWriter = new InboxWriter(MAILBOX_DIR);
+const busyDetector = new BusyDetector(MAILBOX_DIR);
+
+// ── Overflow Configuration ──
+
+const OVERFLOW_MAP: Record<string, string> = { semiclaw: 'semiclaw-overflow' };
+const OVERFLOW_BOT_IDS = Object.values(OVERFLOW_MAP);
+
+/** Thread pin: once a thread is assigned to a session, follow-ups go there too (30 min TTL) */
+const threadPins = new Map<string, { target: string; expiresAt: number }>();
+const THREAD_PIN_TTL = 30 * 60_000;
 
 // ── Escalation Handler ──
 
@@ -100,6 +111,8 @@ async function handleEscalation(msg: OutboxMessage): Promise<void> {
     escalation_reason: msg.escalation_reason || '',
     prior_response: context.prior_response as string,
     escalation_depth: depth,
+    speaker_domain: (context.speaker_domain as string) || undefined,
+    speaker_profile: context.speaker_profile as InboxMessage['speaker_profile'],
   });
 
   console.log(
@@ -136,7 +149,7 @@ async function handleAskUser(msg: OutboxMessage): Promise<void> {
 
 const outboxReader = new OutboxReader({
   mailboxDir: MAILBOX_DIR,
-  botIds: [...FALLBACK_BOT_IDS],
+  botIds: [...FALLBACK_BOT_IDS, ...OVERFLOW_BOT_IDS],
   platform: 'slack',
   gateway: slack,
   inboxWriter,
@@ -148,7 +161,7 @@ const outboxReader = new OutboxReader({
 
 const healthMonitor = new HealthMonitor({
   mailboxDir: MAILBOX_DIR,
-  botIds: [...FALLBACK_BOT_IDS],
+  botIds: [...FALLBACK_BOT_IDS, ...OVERFLOW_BOT_IDS],
   sessionDir: SESSION_DIR,
   onRestart: async (botId) => {
     console.log(`[health] ${botId} restarted — posting notification`);
@@ -206,7 +219,24 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
     }
   }
 
-  // 2. Fetch thread history
+  // 2. Overflow routing: if semiclaw is busy, route to overflow session
+  const overflowId = OVERFLOW_MAP[botId];
+  if (overflowId) {
+    const threadKey = msg.thread_ts || msg.ts;
+    const pin = threadPins.get(threadKey);
+
+    if (pin && Date.now() < pin.expiresAt) {
+      botId = pin.target;
+    } else if (busyDetector.isBusy(botId)) {
+      botId = overflowId;
+      threadPins.set(threadKey, { target: overflowId, expiresAt: Date.now() + THREAD_PIN_TTL });
+      routeReason = 'overflow';
+    } else {
+      threadPins.set(threadKey, { target: botId, expiresAt: Date.now() + THREAD_PIN_TTL });
+    }
+  }
+
+  // 3. Fetch thread history
   let threadHistory: InboxMessage['thread_history'];
   if (msg.thread_ts) {
     const history = await slack.getThreadHistory(msg.channel, msg.thread_ts);
@@ -217,10 +247,10 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
     }));
   }
 
-  // 3. Resolve speaker profile from KB
+  // 4. Resolve speaker profile from KB
   const speaker = await resolveSpeaker(pool, 'slack', msg.user);
 
-  // 4. Write to bot inbox (default: semiclaw as orchestrator)
+  // 5. Write to bot inbox
   const msgId = await inboxWriter.write(botId, {
     type: 'message',
     priority: 'normal',
@@ -257,7 +287,7 @@ async function start(): Promise<void> {
   console.log('[slack-router] Starting...');
   console.log(`[slack-router] Mailbox: ${MAILBOX_DIR}`);
   console.log(`[slack-router] Sessions: ${SESSION_DIR}`);
-  console.log(`[slack-router] Bots: ${FALLBACK_BOT_IDS.join(', ')}`);
+  console.log(`[slack-router] Bots: ${[...FALLBACK_BOT_IDS, ...OVERFLOW_BOT_IDS].join(', ')}`);
 
   // 1. Load incubator channel filter
   await loadIncubatorChannels();

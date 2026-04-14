@@ -23,6 +23,8 @@ import type { InboxMessage, OutboxMessage } from './types.js';
 // ── Configuration ──
 
 const BOT_ID = process.env.SEMO_BOT_ID || 'semiclaw';
+/** Persona override — overflow sessions post as the primary bot's identity */
+const REPLY_AS = process.env.SEMO_REPLY_AS || BOT_ID;
 const MAILBOX_DIR = process.env.SEMO_MAILBOX_DIR || path.join(os.homedir(), '.semo-mailbox');
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const POLL_INTERVAL_MS = 3_000;
@@ -345,7 +347,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (request) => {
         in_reply_to: inReplyTo,
         timestamp: new Date().toISOString(),
         type: 'reply',
-        bot_id: (args?.bot_id as string) || BOT_ID,
+        bot_id: (args?.bot_id as string) || REPLY_AS,
         text: (args?.text as string) || '',
         platform: currentInboxMessage?.platform || 'slack',
         channel_id: (args?.channel_id as string) || currentInboxMessage?.channel_id || '',
@@ -372,7 +374,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (request) => {
         in_reply_to: currentInboxMessage?.id || 'unknown',
         timestamp: new Date().toISOString(),
         type: 'status_update',
-        bot_id: BOT_ID,
+        bot_id: REPLY_AS,
         status_text: (args?.status_text as string) || '',
         platform: currentInboxMessage?.platform || 'slack',
         channel_id: (args?.channel_id as string) || currentInboxMessage?.channel_id || '',
@@ -392,7 +394,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (request) => {
         in_reply_to: currentInboxMessage?.id || 'unknown',
         timestamp: new Date().toISOString(),
         type: 'ask_user',
-        bot_id: (args?.bot_id as string) || BOT_ID,
+        bot_id: (args?.bot_id as string) || REPLY_AS,
         question: (args?.question as string) || '',
         options: (args?.options as Array<{ label: string; value: string }>) || [],
         platform: currentInboxMessage?.platform || 'slack',
@@ -450,6 +452,8 @@ mcp.setRequestHandler(CallToolRequestSchema, async (request) => {
           thread_id: currentInboxMessage?.thread_id,
           service_domain: currentInboxMessage?.service_domain,
           phase: currentInboxMessage?.phase,
+          speaker_domain: currentInboxMessage?.speaker_domain,
+          speaker_profile: currentInboxMessage?.speaker_profile,
         });
 
       const outMsg: OutboxMessage = {
@@ -457,7 +461,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (request) => {
         in_reply_to: currentInboxMessage?.id || 'unknown',
         timestamp: new Date().toISOString(),
         type: 'escalation',
-        bot_id: BOT_ID,
+        bot_id: REPLY_AS,
         target_bot_id: targetBotId,
         escalation_reason: reason,
         original_context: context,
