@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     } else {
       // 유효성: ontology에 존재하는지
       const check = await query(
-        `SELECT 1 FROM semo.ontology WHERE domain = $1 AND entity_type = 'team'`,
+        `SELECT 1 FROM semo.ontology WHERE domain = $1 AND entity_type = 'person'`,
         [body.domain],
       );
       if (check.rowCount === 0) {

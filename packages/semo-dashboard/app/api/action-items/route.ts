@@ -28,7 +28,8 @@ export async function GET(request: NextRequest) {
        FROM semo.ontology o
        LEFT JOIN semo.knowledge_base nk ON nk.domain = o.domain AND nk.key = 'nickname'
        LEFT JOIN semo.knowledge_base rl ON rl.domain = o.domain AND rl.key = 'role'
-       WHERE o.entity_type = 'team'
+       WHERE o.entity_type = 'person'
+         AND EXISTS (SELECT 1 FROM semo.knowledge_base org WHERE org.domain = o.domain AND org.key = 'organization' AND org.content = 'semicolon')
        ORDER BY o.domain`,
     );
 

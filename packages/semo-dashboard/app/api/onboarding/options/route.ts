@@ -23,7 +23,8 @@ export async function GET() {
          ON kb_nick.domain = o.domain AND kb_nick.key = 'nickname'
        LEFT JOIN semo.knowledge_base kb_name
          ON kb_name.domain = o.domain AND kb_name.key = 'real-name'
-       WHERE o.entity_type = 'team'
+       WHERE o.entity_type = 'person'
+         AND EXISTS (SELECT 1 FROM semo.knowledge_base org WHERE org.domain = o.domain AND org.key = 'organization' AND org.content = 'semicolon')
        ORDER BY o.domain`,
     ),
     // 3) 인큐베이터 프로젝트 — build 라이프사이클(인큐베이터)만 노출 (core DB)
