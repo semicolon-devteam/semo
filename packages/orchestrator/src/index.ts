@@ -116,6 +116,7 @@ async function main() {
   // 5. 봇 세션 프리웜 (Slack 수신 전 프로세스 기동)
   sessionPool.warmUp().catch((err) => console.warn('[orchestrator] Warm-up partial failure:', err));
   await commitmentTracker.registerSessions(Array.from(botConfigs.keys()));
+  commitmentTracker.startStaleReaper();
 
   // 5b. 백그라운드 태스크 완료 콜백 등록
   // 봇별 마지막 디스패치 컨텍스트 추적 (task 완료 시 올바른 채널/스레드에 보고)
@@ -301,6 +302,7 @@ async function main() {
     shuttingDown = true;
     console.log(`[orchestrator] ${signal} received, shutting down...`);
     try {
+      commitmentTracker.stopStaleReaper();
       await sessionPool.drainAndShutdown(10_000);
       await commitmentTracker.terminateSessions(Array.from(botConfigs.keys()));
     } catch (err) {

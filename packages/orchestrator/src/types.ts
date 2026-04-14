@@ -24,6 +24,7 @@ export interface RouteResult {
   routeReason:
     | 'route-tag'
     | 'thread-sticky'
+    | 'incubator-session'
     | 'keyword'
     | 'skill-dispatch'
     | 'phase-based'

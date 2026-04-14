@@ -570,4 +570,78 @@ export function registerCommitmentsCommands(program: Command): void {
         await closeConnection();
       }
     });
+
+  // ── semo commitments summary ──────────────────────────────────────────────
+  // session_owner 기준으로 local vs agent-sdk 분포를 보여준다.
+  // 로컬 훅이 제대로 돌고 있는지 한눈에 확인하는 용도.
+  cmd
+    .command('summary')
+    .description('환경별(local/agent-sdk) commitment 분포 요약')
+    .option('--format <type>', '출력 형식 (table|json)', 'table')
+    .action(async (options) => {
+      const connected = await isDbConnected();
+      if (!connected) {
+        console.error(chalk.red('❌ DB 연결 실패'));
+        await closeConnection();
+        process.exit(1);
+      }
+
+      try {
+        const pool = getPool();
+        const result = await pool.query<{
+          session_owner: string | null;
+          status: string;
+          count: string;
+          oldest_active_hours: string | null;
+        }>(
+          `SELECT
+             COALESCE(session_owner, '(none)') AS session_owner,
+             status,
+             COUNT(*)::text AS count,
+             ROUND(
+               EXTRACT(EPOCH FROM NOW() - MIN(created_at) FILTER (WHERE status IN ('pending','active')))/3600,
+               1
+             )::text AS oldest_active_hours
+           FROM semo.bot_commitments
+           WHERE created_at > NOW() - INTERVAL '7 days'
+           GROUP BY session_owner, status
+           ORDER BY session_owner, status`,
+        );
+
+        if (options.format === 'json') {
+          console.log(JSON.stringify(result.rows, null, 2));
+        } else {
+          if (result.rows.length === 0) {
+            console.log(chalk.gray('(지난 7일 간 commitment 없음)'));
+          } else {
+            console.log(chalk.bold('\n📊 Commitment Summary (최근 7일)\n'));
+            let currentOwner = '';
+            for (const row of result.rows) {
+              if (row.session_owner !== currentOwner) {
+                currentOwner = row.session_owner || '(none)';
+                console.log(chalk.cyan.bold(`  ${currentOwner}`));
+              }
+              const statusColor =
+                row.status === 'done'
+                  ? chalk.green
+                  : row.status === 'failed'
+                    ? chalk.red
+                    : chalk.yellow;
+              const suffix = row.oldest_active_hours
+                ? chalk.gray(`  (oldest active: ${row.oldest_active_hours}h)`)
+                : '';
+              console.log(
+                `    ${statusColor(row.status.padEnd(8))} ${row.count.padStart(4)}${suffix}`,
+              );
+            }
+            console.log();
+          }
+        }
+      } catch (err) {
+        console.error(chalk.red(`❌ summary 실패: ${err}`));
+        process.exit(1);
+      } finally {
+        await closeConnection();
+      }
+    });
 }
