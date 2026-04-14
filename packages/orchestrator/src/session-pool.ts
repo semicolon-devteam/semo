@@ -17,6 +17,7 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import type { BotConfig, DispatchContext, DispatchResult, ContextProvider } from './types';
+import { syncBotSkillSymlinks } from './bot-config';
 // resolveModelForMessage 보류 — 쿼터 절감 기간 중 전체 Sonnet 고정
 import { CostTracker } from './cost-tracker';
 import { ITServiceContextProvider } from './service-context';
@@ -94,6 +95,11 @@ class BotSession {
     const cwd = path.join(SESSIONS_DIR, botId);
     fs.mkdirSync(path.join(cwd, '.claude'), { recursive: true });
 
+    const skillCount = syncBotSkillSymlinks(botId, cwd);
+    if (skillCount > 0) {
+      console.log(`[bot-session] ${botId} skills symlinked: ${skillCount}`);
+    }
+
     if (config.mcpServers && Object.keys(config.mcpServers).length > 0) {
       console.log(
         `[bot-session] ${botId} MCP servers: ${Object.keys(config.mcpServers).join(', ')}`,
@@ -115,6 +121,7 @@ class BotSession {
         allowedTools: [...config.tools, ...(config.mcpAllowedTools || [])],
         permissionMode: 'acceptEdits',
         effort: 'low',
+        settingSources: ['project'],
         systemPrompt: {
           type: 'preset',
           preset: 'claude_code',
@@ -496,6 +503,11 @@ export class SessionPool {
 
       // 프로젝트 컨텍스트 (entity_type 기반 provider 선택)
       const provider = this.contextProviders.get(context.route.projectType);
+      if (!provider && context.route.projectType !== 'service') {
+        console.warn(
+          `[session-pool] No context provider for projectType: ${context.route.projectType}`,
+        );
+      }
       const gfpContext = provider?.buildContext(context.route, botId) ?? '';
 
       // 이미지 첨부 안내

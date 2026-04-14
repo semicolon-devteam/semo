@@ -290,3 +290,33 @@ export async function loadAllBotConfigsAsync(pool: Pool): Promise<Map<string, Bo
   }
   return configs;
 }
+
+// ── Per-bot skill symlinks ──
+
+export function syncBotSkillSymlinks(botId: string, sessionCwd: string): number {
+  const skillsDir = path.join(sessionCwd, '.claude', 'skills');
+  fs.mkdirSync(skillsDir, { recursive: true });
+  const srcDir = path.join(os.homedir(), `.openclaw-${botId}`, 'workspace', 'skills');
+  if (!fs.existsSync(srcDir)) return 0;
+
+  let count = 0;
+  for (const name of fs.readdirSync(srcDir)) {
+    const src = path.join(srcDir, name);
+    if (!fs.statSync(src).isDirectory()) continue;
+    if (!fs.existsSync(path.join(src, 'SKILL.md'))) continue;
+
+    const dest = path.join(skillsDir, name);
+    try {
+      if (fs.lstatSync(dest).isSymbolicLink() && fs.readlinkSync(dest) === src) {
+        count++;
+        continue;
+      }
+      fs.rmSync(dest, { recursive: true });
+    } catch {
+      // dest doesn't exist
+    }
+    fs.symlinkSync(src, dest);
+    count++;
+  }
+  return count;
+}
