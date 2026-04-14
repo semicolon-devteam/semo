@@ -131,6 +131,7 @@ const KNOWN_BOTS = [
   'designclaw',
   'infraclaw',
   'growthclaw',
+  'incubator',
 ];
 
 function scanBotWorkspaces(_semoSystemDir?: string): ScannedBot[] {

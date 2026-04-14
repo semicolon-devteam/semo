@@ -33,7 +33,8 @@ function getRandomRejectionNote(phase: number): string {
 
 function shouldReject(sandbox: SandboxConfig, phase: number): boolean {
   if (sandbox.virtual_po.mode === 'auto-pilot') return false;
-  if (sandbox.virtual_po.mode === 'interactive') return false;
+  if (sandbox.virtual_po.mode === 'interactive' || sandbox.virtual_po.mode === 'full-interaction')
+    return false;
 
   const baseRate = sandbox.virtual_po.rejection_rate ?? 0.15;
   const phaseWeight = sandbox.virtual_po.phase_rejection_weights?.[phase] ?? 1.0;
@@ -50,7 +51,8 @@ export async function processVirtualPOReview(
   section: ServiceSection,
   sandbox: SandboxConfig,
 ): Promise<void> {
-  if (sandbox.virtual_po.mode === 'interactive') return;
+  if (sandbox.virtual_po.mode === 'interactive' || sandbox.virtual_po.mode === 'full-interaction')
+    return;
   if (section.status !== 'pending-review') return;
 
   const reject = shouldReject(sandbox, section.phase);
@@ -116,7 +118,7 @@ export async function switchVirtualPOMode(
   const updatedSandbox: SandboxConfig = {
     ...sandbox,
     virtual_po: { ...sandbox.virtual_po, mode: newMode },
-    auto_advance: newMode !== 'interactive',
+    auto_advance: newMode !== 'interactive' && newMode !== 'full-interaction',
   };
 
   await updateProject(serviceId, {

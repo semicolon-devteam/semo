@@ -12,70 +12,17 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { Pool } from 'pg';
-import { SlackGateway, isSystemMessage } from './slack-gateway';
+import { SlackGateway } from './slack-gateway';
 import { Router } from './router';
 import { SessionPool } from './session-pool';
 import { CostTracker } from './cost-tracker';
 import { CommitmentTracker } from './commitment-tracker';
 import { loadAllBotConfigsAsync, loadSlackProfilesFromAPI } from './bot-config';
-import type { BotId } from './bot-config';
 import type { SlackMessage, DispatchContext } from './types';
 
-// ── Incubator Channel Check (중복 응답 방지) ──
-
-const incubatorChannelCache = new Map<string, { active: boolean; expiry: number }>();
-
-// 만료된 캐시 엔트리 주기적 정리 (5분마다)
-setInterval(
-  () => {
-    const now = Date.now();
-    for (const [key, val] of incubatorChannelCache) {
-      if (now >= val.expiry) incubatorChannelCache.delete(key);
-    }
-  },
-  5 * 60 * 1000,
-).unref();
-
-async function isIncubatorChannel(pool: Pool, channelId: string): Promise<boolean> {
-  const cached = incubatorChannelCache.get(channelId);
-  if (cached && Date.now() < cached.expiry) return cached.active;
-
-  try {
-    const result = await pool.query(
-      `SELECT 1 FROM semo.incubator_sessions
-       WHERE channel = $1 AND status = 'active'
-       AND (
-         -- heartbeat가 있고 신선한 경우
-         (last_heartbeat IS NOT NULL AND (NOW() - last_heartbeat) <= make_interval(secs => COALESCE(heartbeat_stale_threshold_sec, 180)))
-         OR
-         -- grace period: 생성 후 5분 이내면 heartbeat 없어도 허용
-         (last_heartbeat IS NULL AND (NOW() - created_at) <= INTERVAL '5 minutes')
-       )
-       LIMIT 1`,
-      [channelId],
-    );
-    const active = result.rows.length > 0;
-    incubatorChannelCache.set(channelId, { active, expiry: Date.now() + 60_000 });
-
-    if (!active) {
-      // stale 세션 자동 정리 (non-blocking)
-      pool
-        .query(
-          `UPDATE semo.incubator_sessions
-           SET status = 'stopped', stopped_reason = 'heartbeat_timeout', updated_at = NOW()
-           WHERE channel = $1 AND status = 'active'
-           AND last_heartbeat IS NOT NULL
-           AND (NOW() - last_heartbeat) > make_interval(secs => COALESCE(heartbeat_stale_threshold_sec, 180))`,
-          [channelId],
-        )
-        .catch(() => {});
-    }
-
-    return active;
-  } catch {
-    return false; // DB 에러 시 안전하게 오케스트레이터가 처리
-  }
-}
+// ── Incubator Channel Check 제거 ──
+// incubator 에이전트가 orchestrator SessionPool에서 직접 처리.
+// 기존 channel-slack 기반 incubator 세션은 deprecated.
 
 // ── Env Loading ──
 
@@ -174,19 +121,10 @@ async function main() {
     let commitmentId = '';
 
     try {
-      // 인큐베이터 채널 중복 응답 방지 — channel-slack이 처리하는 채널은 스킵
-      // 시스템 디스패치([Route:], [GFP:] 등)는 항상 오케스트레이터가 처리
-      if (!isSystemMessage(msg.text) && (await isIncubatorChannel(pool, msg.channel))) {
-        console.log(
-          `[orchestrator] Skipping ${msg.channel} — active incubator session (channel-slack handles)`,
-        );
-        return;
-      }
-
       // Route: msg.thread_ts만 전달 — 부모 메시지는 thread-sticky 스킵, 답글만 캐시 히트.
       // setThreadBot은 threadTs(=thread_ts||ts)로 저장 — 답글의 thread_ts와 매칭됨.
       const route = await router.route(msg.channel, msg.text, msg.thread_ts);
-      router.setThreadBot(threadTs, route.botId as import('./bot-config').BotId);
+      router.setThreadBot(threadTs, route.botId);
       console.log(
         `[orchestrator] ${senderName} → ${route.botId} (${route.routeReason}${route.skillHint ? `, skill=${route.skillHint}` : ''}, phase=${route.phase})`,
       );
@@ -201,11 +139,11 @@ async function main() {
       await slack.setTypingStatus(
         msg.channel,
         threadTs,
-        `${botConfigs.get(route.botId as BotId)?.slackProfile.username || route.botId}가 처리 중...`,
+        `${botConfigs.get(route.botId)?.slackProfile.username || route.botId}가 처리 중...`,
       );
 
       // Dispatch with escalation chain + commitment tracking
-      let currentBotId = route.botId as BotId;
+      let currentBotId = route.botId;
       let currentMessage = msg.text;
       let depth = 0;
       commitmentId = await commitmentTracker.claimForDispatch({
@@ -250,7 +188,7 @@ async function main() {
             threadTs,
             `${result.escalation.targetBotId}에 인계 중...`,
           );
-          currentBotId = result.escalation.targetBotId as BotId;
+          currentBotId = result.escalation.targetBotId;
           currentMessage = `[에스컬레이션 from ${result.botId}]\n원본 질문: ${msg.text}\n${result.botId} 응답: ${result.response}`;
           depth++;
           continue;

@@ -53,6 +53,7 @@ const FALLBACK_BOT_IDS = [
   'reviewclaw',
   'infraclaw',
   'growthclaw',
+  'incubator',
 ];
 
 // ── Helpers ──

@@ -503,7 +503,7 @@ export interface PoProfile {
 
 export type SandboxDepth = 'plan-only' | 'full' | 'e2e';
 export type SandboxMode = 'mock' | 'live';
-export type SandboxVirtualPOMode = 'auto-pilot' | 'semi-auto' | 'interactive';
+export type SandboxVirtualPOMode = 'auto-pilot' | 'semi-auto' | 'interactive' | 'full-interaction';
 
 export interface SandboxVirtualPO {
   mode: SandboxVirtualPOMode;

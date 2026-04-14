@@ -624,7 +624,11 @@ export function registerIncubatorCommands(program: Command): void {
       '시나리오 ID (minicafe, creator-pulse, quickdrop, office-hub, petcare)',
     )
     .requiredOption('--depth <depth>', '검증 범위 (plan-only, full, e2e)')
-    .option('--po-mode <mode>', '가상 PO 모드 (auto-pilot, semi-auto, interactive)', 'auto-pilot')
+    .option(
+      '--po-mode <mode>',
+      '가상 PO 모드 (auto-pilot, semi-auto, interactive, full-interaction)',
+      'auto-pilot',
+    )
     .option('--live', '실제 봇 실행 모드 (기본: mock)')
     .action(async (options) => {
       const spinner = ora('샌드박스 생성 중...').start();
@@ -787,7 +791,10 @@ export function registerIncubatorCommands(program: Command): void {
     .description('샌드박스 초기화 (같은 프로젝트 ID 유지, Phase 0부터 재시작)')
     .requiredOption('--service-id <uuid>', '서비스 UUID')
     .option('--scenario <id>', '시나리오 변경')
-    .option('--po-mode <mode>', 'PO 모드 변경 (auto-pilot, semi-auto, interactive)')
+    .option(
+      '--po-mode <mode>',
+      'PO 모드 변경 (auto-pilot, semi-auto, interactive, full-interaction)',
+    )
     .option('--rejection-rate <rate>', '거절률 변경 (0.0-1.0)', parseFloat)
     .action(async (options) => {
       const spinner = ora('샌드박스 초기화 중...').start();

@@ -17,7 +17,6 @@ import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
 import type { BotConfig, DispatchContext, DispatchResult } from './types';
-import type { BotId } from './bot-config';
 // resolveModelForMessage 보류 — 쿼터 절감 기간 중 전체 Sonnet 고정
 import { CostTracker } from './cost-tracker';
 import { buildGfpContext } from './service-context';
@@ -28,18 +27,23 @@ const SESSIONS_DIR = path.join(os.homedir(), '.semo-bot-sessions');
 // ── 에스컬레이션 패턴 감지 ──
 
 export const ESCALATION_PATTERNS = [
-  /에스컬레이션[:\s]*(\w+claw)/i,
-  /인계[:\s]*(\w+claw)/i,
-  /→\s*(Semi|Plan|Design|Work|Review|Infra|Growth)Claw/i,
-  /역할\s*밖.*?(\w+claw)/i,
+  /에스컬레이션[:\s]*(\w+(?:claw)?)/i,
+  /인계[:\s]*(\w+(?:claw)?)/i,
+  /→\s*(Semi|Plan|Design|Work|Review|Infra|Growth|Incubator)(?:Claw)?\b/i,
+  /역할\s*밖.*?(\w+(?:claw)?)/i,
 ];
+
+/** claw 안 붙는 봇 ID (에스컬레이션 정규화 시 claw 자동 붙이지 않음) */
+const NON_CLAW_BOTS = new Set(['incubator']);
 
 export function detectEscalation(text: string): { targetBotId: string; reason: string } | null {
   for (const pattern of ESCALATION_PATTERNS) {
     const match = text.match(pattern);
     if (match) {
       let target = match[1].toLowerCase();
-      if (!target.endsWith('claw')) target = target.toLowerCase() + 'claw';
+      if (!target.endsWith('claw') && !NON_CLAW_BOTS.has(target)) {
+        target = target + 'claw';
+      }
       return { targetBotId: target, reason: match[0] };
     }
   }
@@ -61,7 +65,7 @@ interface TurnResult {
 }
 
 class BotSession {
-  readonly botId: BotId;
+  readonly botId: string;
   private config: BotConfig;
   private inputQueue: AsyncQueue<SDKUserMessage>;
   private queryHandle: Query;
@@ -77,7 +81,7 @@ class BotSession {
     timer?: ReturnType<typeof setTimeout>;
   } | null = null;
 
-  constructor(botId: BotId, config: BotConfig) {
+  constructor(botId: string, config: BotConfig) {
     this.botId = botId;
     this.config = config;
     this.currentModel = config.model;
@@ -430,12 +434,12 @@ class BotSession {
 // ── SessionPool — 봇 세션 풀 ──
 
 export class SessionPool {
-  private configs: Map<BotId, BotConfig>;
-  private sessions: Map<BotId, BotSession> = new Map();
+  private configs: Map<string, BotConfig>;
+  private sessions: Map<string, BotSession> = new Map();
   private costTracker: CostTracker;
   private activeDispatches = 0;
 
-  constructor(configs: Map<BotId, BotConfig>, costTracker: CostTracker) {
+  constructor(configs: Map<string, BotConfig>, costTracker: CostTracker) {
     this.configs = configs;
     this.costTracker = costTracker;
 
@@ -453,7 +457,7 @@ export class SessionPool {
     console.log(`[session-pool] All sessions warm (${Date.now() - start}ms)`);
   }
 
-  private getOrRecreateSession(botId: BotId): BotSession | null {
+  private getOrRecreateSession(botId: string): BotSession | null {
     let session = this.sessions.get(botId);
     if (session?.alive) return session;
 
@@ -469,7 +473,7 @@ export class SessionPool {
   }
 
   async dispatch(
-    botId: BotId,
+    botId: string,
     message: string,
     context: DispatchContext,
     images?: import('./types').SlackImage[],

@@ -82,6 +82,7 @@ const FALLBACK_SLACK_PROFILES: Record<string, { username: string; icon_emoji: st
   reviewclaw: { username: 'ReviewClaw', icon_emoji: ':mag:' },
   infraclaw: { username: 'InfraClaw', icon_emoji: ':gear:' },
   growthclaw: { username: 'GrowthClaw', icon_emoji: ':chart_with_upwards_trend:' },
+  incubator: { username: 'Incubator', icon_emoji: ':hatching_chick:' },
 };
 export let SLACK_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
   ...FALLBACK_SLACK_PROFILES,
@@ -129,8 +130,8 @@ const BUDGET_PER_MESSAGE: Record<string, number> = {
   growthclaw: 0.5,
 };
 
-/** Fallback 봇 목록 (DB 장애 시 + 타입 참고용) */
-export const BOT_IDS = [
+/** Fallback 봇 목록 (DB 장애 시) */
+export const FALLBACK_BOT_IDS = [
   'semiclaw',
   'planclaw',
   'designclaw',
@@ -138,11 +139,14 @@ export const BOT_IDS = [
   'reviewclaw',
   'infraclaw',
   'growthclaw',
+  'incubator',
 ] as const;
-export type BotId = (typeof BOT_IDS)[number];
+
+/** @deprecated Use string directly. Kept for backward compat. */
+export type BotId = string;
 
 /** DB에서 활성 봇 목록 동적 로드 (bot_status 기반) */
-let _activeBotIds: string[] = [...BOT_IDS];
+let _activeBotIds: string[] = [...FALLBACK_BOT_IDS];
 export async function loadActiveBotIds(pool: Pool): Promise<string[]> {
   try {
     const result = await pool.query(
@@ -160,7 +164,7 @@ export function getActiveBotIds(): readonly string[] {
   return _activeBotIds;
 }
 
-export function loadBotConfig(botId: BotId, serviceDomain?: string): BotConfig {
+export function loadBotConfig(botId: string, serviceDomain?: string): BotConfig {
   const def = parseAgentDefinition(botId);
 
   // 서비스 도메인을 KB 접근 목록에 동적 추가
@@ -181,9 +185,9 @@ export function loadBotConfig(botId: BotId, serviceDomain?: string): BotConfig {
   };
 }
 
-export function loadAllBotConfigs(): Map<BotId, BotConfig> {
-  const configs = new Map<BotId, BotConfig>();
-  for (const botId of BOT_IDS) {
+export function loadAllBotConfigs(): Map<string, BotConfig> {
+  const configs = new Map<string, BotConfig>();
+  for (const botId of FALLBACK_BOT_IDS) {
     try {
       configs.set(botId, loadBotConfig(botId));
     } catch (err) {
@@ -238,8 +242,11 @@ export async function expandKBDomainsWithChildren(
  * Load all bot configs with parent-based KB domain expansion.
  * Async version — call after DB pool is ready.
  */
-export async function loadAllBotConfigsAsync(pool: Pool): Promise<Map<BotId, BotConfig>> {
-  const configs = new Map<BotId, BotConfig>();
+export async function loadAllBotConfigsAsync(pool: Pool): Promise<Map<string, BotConfig>> {
+  const configs = new Map<string, BotConfig>();
+
+  // DB에서 활성 봇 목록 동적 로드
+  const activeBotIds = await loadActiveBotIds(pool);
 
   // Pre-expand all unique base domains across bots
   const allBaseDomains = new Set<string>();
@@ -248,10 +255,10 @@ export async function loadAllBotConfigsAsync(pool: Pool): Promise<Map<BotId, Bot
   }
   await expandKBDomainsWithChildren(pool, [...allBaseDomains]);
 
-  for (const botId of BOT_IDS) {
+  for (const botId of activeBotIds) {
     try {
       const def = parseAgentDefinition(botId);
-      const baseDomains = KB_DOMAINS[botId] || [];
+      const baseDomains = KB_DOMAINS[botId] || ['semicolon'];
       const kbDomains =
         baseDomains.length > 0 ? await expandKBDomainsWithChildren(pool, baseDomains) : [];
 

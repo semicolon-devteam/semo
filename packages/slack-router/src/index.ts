@@ -20,7 +20,7 @@ import { Pool } from 'pg';
 
 // Import from orchestrator (shared monorepo)
 import { SlackGateway } from '../../orchestrator/src/slack-gateway.js';
-import { BOT_IDS } from '../../orchestrator/src/bot-config.js';
+import { FALLBACK_FALLBACK_BOT_IDS } from '../../orchestrator/src/bot-config.js';
 import type { SlackMessage } from '../../orchestrator/src/types.js';
 import type { InboxMessage, OutboxMessage } from '../../platform-common/src/types.js';
 
@@ -135,7 +135,7 @@ async function handleAskUser(msg: OutboxMessage): Promise<void> {
 
 const outboxReader = new OutboxReader({
   mailboxDir: MAILBOX_DIR,
-  botIds: [...BOT_IDS],
+  botIds: [...FALLBACK_BOT_IDS],
   platform: 'slack',
   gateway: slack,
   inboxWriter,
@@ -147,7 +147,7 @@ const outboxReader = new OutboxReader({
 
 const healthMonitor = new HealthMonitor({
   mailboxDir: MAILBOX_DIR,
-  botIds: [...BOT_IDS],
+  botIds: [...FALLBACK_BOT_IDS],
   sessionDir: SESSION_DIR,
   onRestart: async (botId) => {
     console.log(`[health] ${botId} restarted — posting notification`);
@@ -199,7 +199,7 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
 
   if (routeTag) {
     const candidate = routeTag[1].toLowerCase();
-    if (BOT_IDS.includes(candidate as (typeof BOT_IDS)[number])) {
+    if (FALLBACK_BOT_IDS.includes(candidate as (typeof FALLBACK_BOT_IDS)[number])) {
       botId = candidate;
       routeReason = 'route-tag';
     }
@@ -245,7 +245,7 @@ async function start(): Promise<void> {
   console.log('[slack-router] Starting...');
   console.log(`[slack-router] Mailbox: ${MAILBOX_DIR}`);
   console.log(`[slack-router] Sessions: ${SESSION_DIR}`);
-  console.log(`[slack-router] Bots: ${BOT_IDS.join(', ')}`);
+  console.log(`[slack-router] Bots: ${FALLBACK_BOT_IDS.join(', ')}`);
 
   // 1. Load incubator channel filter
   await loadIncubatorChannels();

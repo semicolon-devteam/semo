@@ -5,15 +5,15 @@
  * V1: LLM 요약 없이 raw 저장 (Garden 정책 확정 후 추가 예정)
  */
 
-import { Command } from "commander";
-import chalk from "chalk";
-import ora from "ora";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
-import * as crypto from "crypto";
-import { getPool, closeConnection } from "../database";
-import { generateEmbedding } from "../kb";
+import { Command } from 'commander';
+import chalk from 'chalk';
+import ora from 'ora';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import * as crypto from 'crypto';
+import { getPool, closeConnection } from '../database';
+import { generateEmbedding } from '../kb';
 
 // ============================================================
 // Types
@@ -24,7 +24,7 @@ interface MemorySyncState {
 }
 
 interface SyncCandidate {
-  sourceType: "bot" | "local-session";
+  sourceType: 'bot' | 'local-session';
   sourceId: string;
   date: string;
   filePath: string;
@@ -37,18 +37,19 @@ interface SyncCandidate {
 // ============================================================
 
 const BOT_IDS = [
-  "semiclaw",
-  "workclaw",
-  "reviewclaw",
-  "planclaw",
-  "designclaw",
-  "infraclaw",
-  "growthclaw",
+  'semiclaw',
+  'workclaw',
+  'reviewclaw',
+  'planclaw',
+  'designclaw',
+  'infraclaw',
+  'growthclaw',
+  'incubator',
 ];
 
 const MEMORY_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}\.md$/;
-const STATE_DIR = path.join(os.homedir(), ".semo");
-const STATE_FILE = path.join(STATE_DIR, "memory-sync-state.json");
+const STATE_DIR = path.join(os.homedir(), '.semo');
+const STATE_FILE = path.join(STATE_DIR, 'memory-sync-state.json');
 
 // ============================================================
 // State Management
@@ -57,7 +58,7 @@ const STATE_FILE = path.join(STATE_DIR, "memory-sync-state.json");
 function readSyncState(): MemorySyncState {
   try {
     if (fs.existsSync(STATE_FILE)) {
-      return JSON.parse(fs.readFileSync(STATE_FILE, "utf-8"));
+      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8'));
     }
   } catch {
     // corrupted state file
@@ -71,23 +72,15 @@ function writeSyncState(state: MemorySyncState): void {
 }
 
 function contentHash(content: string): string {
-  return crypto.createHash("sha256").update(content).digest("hex").slice(0, 16);
+  return crypto.createHash('sha256').update(content).digest('hex').slice(0, 16);
 }
 
 // ============================================================
 // File Discovery
 // ============================================================
 
-function discoverBotMemoryFiles(
-  botId: string,
-  minAgeDays: number
-): SyncCandidate[] {
-  const memoryDir = path.join(
-    os.homedir(),
-    `.openclaw-${botId}`,
-    "workspace",
-    "memory"
-  );
+function discoverBotMemoryFiles(botId: string, minAgeDays: number): SyncCandidate[] {
+  const memoryDir = path.join(os.homedir(), `.openclaw-${botId}`, 'workspace', 'memory');
 
   if (!fs.existsSync(memoryDir)) return [];
 
@@ -99,18 +92,18 @@ function discoverBotMemoryFiles(
   for (const file of files) {
     if (!MEMORY_DATE_PATTERN.test(file)) continue;
 
-    const dateStr = file.replace(".md", "");
-    const fileDate = new Date(dateStr + "T23:59:59Z");
+    const dateStr = file.replace('.md', '');
+    const fileDate = new Date(dateStr + 'T23:59:59Z');
 
     if (fileDate > cutoffDate) continue; // Too recent
 
     const filePath = path.join(memoryDir, file);
-    const content = fs.readFileSync(filePath, "utf-8").trim();
+    const content = fs.readFileSync(filePath, 'utf-8').trim();
 
     if (!content) continue; // Skip empty files
 
     candidates.push({
-      sourceType: "bot",
+      sourceType: 'bot',
       sourceId: botId,
       date: dateStr,
       filePath,
@@ -130,7 +123,7 @@ async function syncMemories(
   candidates: SyncCandidate[],
   state: MemorySyncState,
   force: boolean,
-  dryRun: boolean
+  dryRun: boolean,
 ): Promise<{ synced: number; skipped: number; errors: string[] }> {
   let synced = 0;
   let skipped = 0;
@@ -157,16 +150,16 @@ async function syncMemories(
     if (dryRun) {
       console.log(
         chalk.gray(
-          `  [dry-run] ${stateKey} (${candidate.content.length} chars, hash: ${candidate.hash})`
-        )
+          `  [dry-run] ${stateKey} (${candidate.content.length} chars, hash: ${candidate.hash})`,
+        ),
       );
       synced++;
       continue;
     }
 
     try {
-      const domain = "memory";
-      const flatKey = "memory";
+      const domain = 'memory';
+      const flatKey = 'memory';
       const subKey = stateKey; // sourceId/date
       const metadata = {
         source_type: candidate.sourceType,
@@ -180,7 +173,7 @@ async function syncMemories(
       // Generate embedding
       const text = `memory/${stateKey}: ${candidate.content}`;
       const embedding = await generateEmbedding(text);
-      const embeddingStr = embedding ? `[${embedding.join(",")}]` : null;
+      const embeddingStr = embedding ? `[${embedding.join(',')}]` : null;
 
       const client = await pool.connect();
       try {
@@ -197,9 +190,9 @@ async function syncMemories(
             subKey,
             candidate.content,
             JSON.stringify(metadata),
-            "semo-memory-sync",
+            'semo-memory-sync',
             embeddingStr,
-          ]
+          ],
         );
       } finally {
         client.release();
@@ -225,42 +218,32 @@ async function syncMemories(
 
 export function registerMemoryCommands(program: Command): void {
   const memoryCmd = program
-    .command("memory")
-    .description("메모리 관리 — L1(bot workspace) → L2(KB) 동기화");
+    .command('memory')
+    .description('메모리 관리 — L1(bot workspace) → L2(KB) 동기화');
 
   memoryCmd
-    .command("sync")
-    .description(
-      "봇 워크스페이스 메모리를 KB memory 도메인으로 동기화"
-    )
-    .option(
-      "--source <type>",
-      "소스 타입 (bot | local | all)",
-      "all"
-    )
-    .option("--bot <id>", "특정 봇만 동기화")
-    .option(
-      "--days <n>",
-      "N일 이상 경과한 메모리만 동기화",
-      "2"
-    )
-    .option("--dry-run", "프리뷰만 (실제 동기화 안 함)")
-    .option("--force", "워터마크 무시, 전체 재동기화")
+    .command('sync')
+    .description('봇 워크스페이스 메모리를 KB memory 도메인으로 동기화')
+    .option('--source <type>', '소스 타입 (bot | local | all)', 'all')
+    .option('--bot <id>', '특정 봇만 동기화')
+    .option('--days <n>', 'N일 이상 경과한 메모리만 동기화', '2')
+    .option('--dry-run', '프리뷰만 (실제 동기화 안 함)')
+    .option('--force', '워터마크 무시, 전체 재동기화')
     .action(async (options) => {
       console.log(
         chalk.yellow.bold(
-          "\n⚠️  [DEPRECATED] semo memory sync는 semiclaw memory-escalation 크론잡으로 대체되었습니다."
-        )
+          '\n⚠️  [DEPRECATED] semo memory sync는 semiclaw memory-escalation 크론잡으로 대체되었습니다.',
+        ),
       );
       console.log(
         chalk.yellow(
-          "   매일 06:00 자동 실행되며, LLM 기반 분류로 적절한 KB 도메인/키에 에스컬레이션합니다."
-        )
+          '   매일 06:00 자동 실행되며, LLM 기반 분류로 적절한 KB 도메인/키에 에스컬레이션합니다.',
+        ),
       );
       console.log(
         chalk.yellow(
-          "   수동 실행이 필요하면 semiclaw에게 'memory-escalation 스킬 실행' 을 지시하세요.\n"
-        )
+          "   수동 실행이 필요하면 semiclaw에게 'memory-escalation 스킬 실행' 을 지시하세요.\n",
+        ),
       );
 
       const dryRun = !!options.dryRun;
@@ -269,16 +252,14 @@ export function registerMemoryCommands(program: Command): void {
       const sourceType = options.source as string;
       const specificBot = options.bot as string | undefined;
 
-      const spinner = ora(
-        dryRun ? "동기화 대상 탐색 중..." : "메모리 동기화 중..."
-      ).start();
+      const spinner = ora(dryRun ? '동기화 대상 탐색 중...' : '메모리 동기화 중...').start();
 
       try {
         const state = readSyncState();
         let allCandidates: SyncCandidate[] = [];
 
         // Discover bot memory files
-        if (sourceType === "bot" || sourceType === "all") {
+        if (sourceType === 'bot' || sourceType === 'all') {
           const bots = specificBot ? [specificBot] : BOT_IDS;
 
           for (const botId of bots) {
@@ -290,38 +271,25 @@ export function registerMemoryCommands(program: Command): void {
         spinner.text = `${allCandidates.length}개 메모리 파일 발견`;
 
         if (allCandidates.length === 0) {
-          spinner.succeed("동기화 대상 메모리 파일 없음");
+          spinner.succeed('동기화 대상 메모리 파일 없음');
           await closeConnection();
           return;
         }
 
-        const result = await syncMemories(
-          allCandidates,
-          state,
-          force,
-          dryRun
-        );
+        const result = await syncMemories(allCandidates, state, force, dryRun);
 
         if (!dryRun) {
           writeSyncState(state);
         }
 
         if (dryRun) {
-          spinner.succeed(
-            `[dry-run] ${result.synced}건 동기화 예정, ${result.skipped}건 스킵`
-          );
+          spinner.succeed(`[dry-run] ${result.synced}건 동기화 예정, ${result.skipped}건 스킵`);
         } else {
-          spinner.succeed(
-            `${result.synced}건 동기화 완료, ${result.skipped}건 스킵 (변경 없음)`
-          );
+          spinner.succeed(`${result.synced}건 동기화 완료, ${result.skipped}건 스킵 (변경 없음)`);
         }
 
         if (result.errors.length > 0) {
-          console.log(
-            chalk.yellow(
-              `  ⚠️ ${result.errors.length}건 오류:`
-            )
-          );
+          console.log(chalk.yellow(`  ⚠️ ${result.errors.length}건 오류:`));
           for (const err of result.errors) {
             console.log(chalk.red(`     ${err}`));
           }
@@ -337,18 +305,18 @@ export function registerMemoryCommands(program: Command): void {
     });
 
   memoryCmd
-    .command("status")
-    .description("메모리 동기화 상태 확인")
-    .option("--bot <id>", "특정 봇만")
+    .command('status')
+    .description('메모리 동기화 상태 확인')
+    .option('--bot <id>', '특정 봇만')
     .action(async (options) => {
       const state = readSyncState();
       const specificBot = options.bot as string | undefined;
 
-      console.log(chalk.cyan.bold("\n📝 메모리 동기화 상태\n"));
+      console.log(chalk.cyan.bold('\n📝 메모리 동기화 상태\n'));
 
       const entries = Object.entries(state.synced);
       if (entries.length === 0) {
-        console.log(chalk.yellow("  동기화된 메모리 없음"));
+        console.log(chalk.yellow('  동기화된 메모리 없음'));
         console.log();
         return;
       }
@@ -356,7 +324,7 @@ export function registerMemoryCommands(program: Command): void {
       // Group by source
       const grouped: Record<string, { date: string; hash: string; syncedAt: string }[]> = {};
       for (const [stKey, val] of entries) {
-        const [sourceId, date] = stKey.split("/");
+        const [sourceId, date] = stKey.split('/');
         if (specificBot && sourceId !== specificBot) continue;
         if (!grouped[sourceId]) grouped[sourceId] = [];
         grouped[sourceId].push({ date, ...val });
@@ -367,16 +335,10 @@ export function registerMemoryCommands(program: Command): void {
         const sorted = items.sort((a, b) => b.date.localeCompare(a.date));
         const shown = sorted.slice(0, 10);
         for (const item of shown) {
-          console.log(
-            chalk.gray(
-              `    ${item.date}  (synced: ${item.syncedAt.split("T")[0]})`
-            )
-          );
+          console.log(chalk.gray(`    ${item.date}  (synced: ${item.syncedAt.split('T')[0]})`));
         }
         if (sorted.length > 10) {
-          console.log(
-            chalk.gray(`    ... +${sorted.length - 10} more`)
-          );
+          console.log(chalk.gray(`    ... +${sorted.length - 10} more`));
         }
       }
 

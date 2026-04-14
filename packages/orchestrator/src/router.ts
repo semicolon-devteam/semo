@@ -102,6 +102,28 @@ export class Router {
     // 3. 채널 → 서비스 조회
     const service = await this.getServiceInfo(channelId);
 
+    // 3.5. 인큐베이터 세션 라우팅: active incubator_sessions 채널 → incubator 에이전트
+    if (service && config.validBotIds.includes('incubator')) {
+      try {
+        const incResult = await this.pool.query(
+          `SELECT 1 FROM semo.incubator_sessions WHERE channel = $1 AND status = 'active' LIMIT 1`,
+          [channelId],
+        );
+        if (incResult.rows.length > 0) {
+          return {
+            botId: 'incubator',
+            serviceId: service.serviceId,
+            serviceDomain: service.serviceDomain,
+            phase: service.currentPhase,
+            track: 'plan',
+            routeReason: 'keyword',
+          };
+        }
+      } catch {
+        // DB 에러 시 fall-through to keyword/phase routing
+      }
+    }
+
     // 4. 스킬 디스패치 (키워드 분기보다 우선)
     for (const { pattern, botId, skill } of config.skillRoutes) {
       if (pattern.test(text)) {

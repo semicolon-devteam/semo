@@ -92,8 +92,9 @@ export async function createSandboxProject(
   const serviceDomain = isEmpty
     ? `sandbox-empty-${shortId}`
     : `sandbox-${params.scenario_id}-${shortId}`;
-  // Empty 모드는 mock 데이터가 없으므로 항상 live
-  const resolvedMode: SandboxMode = isEmpty ? 'live' : (params.mode ?? 'mock');
+  // Empty 모드 또는 full-interaction은 mock 데이터가 없으��로 항상 live
+  const isFullInteraction = params.virtual_po_mode === 'full-interaction';
+  const resolvedMode: SandboxMode = isEmpty || isFullInteraction ? 'live' : (params.mode ?? 'mock');
 
   // Phase별 거절 가중치 (디자인/기술설계 집중)
   const defaultPhaseWeights: Record<number, number> = {
@@ -122,9 +123,10 @@ export async function createSandboxProject(
     },
     scenario_id: params.scenario_id,
     initial_description: isEmpty ? params.initial_description : undefined,
-    auto_advance: params.auto_advance ?? params.virtual_po_mode !== 'interactive',
+    auto_advance:
+      params.auto_advance ?? (params.virtual_po_mode !== 'interactive' && !isFullInteraction),
     slack_suppress: false,
-    progressive_reveal: resolvedMode !== 'live',
+    progressive_reveal: isFullInteraction ? false : resolvedMode !== 'live',
     phase_timeout_ms: resolvedMode === 'live' ? 300000 : undefined,
     timing: {
       phase_delay_ms: params.phase_delay_ms ?? 500,
@@ -604,6 +606,8 @@ export function triggerSandboxAdvance(
 ): void {
   const sandbox = metadata?.sandbox as SandboxConfig | undefined;
   if (!sandbox?.enabled) return;
+  // full-interaction 모드: 자동 진행 완전 비활성화 (사용자가 직접 대화로 진행)
+  if (sandbox.virtual_po.mode === 'full-interaction') return;
   // interactive 모드에서도 mock 주입은 진행 (auto_advance=false라도)
   if (!sandbox.auto_advance && sandbox.virtual_po.mode !== 'interactive') return;
 
