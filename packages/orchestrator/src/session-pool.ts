@@ -16,10 +16,10 @@ import type { MessageParam } from '@anthropic-ai/sdk/resources';
 import * as os from 'os';
 import * as path from 'path';
 import * as fs from 'fs';
-import type { BotConfig, DispatchContext, DispatchResult } from './types';
+import type { BotConfig, DispatchContext, DispatchResult, ContextProvider } from './types';
 // resolveModelForMessage 보류 — 쿼터 절감 기간 중 전체 Sonnet 고정
 import { CostTracker } from './cost-tracker';
-import { buildGfpContext } from './service-context';
+import { ITServiceContextProvider } from './service-context';
 import { AsyncQueue } from './async-queue';
 
 const SESSIONS_DIR = path.join(os.homedir(), '.semo-bot-sessions');
@@ -438,10 +438,17 @@ export class SessionPool {
   private sessions: Map<string, BotSession> = new Map();
   private costTracker: CostTracker;
   private activeDispatches = 0;
+  private contextProviders: Map<string, ContextProvider>;
 
-  constructor(configs: Map<string, BotConfig>, costTracker: CostTracker) {
+  constructor(
+    configs: Map<string, BotConfig>,
+    costTracker: CostTracker,
+    contextProviders?: Map<string, ContextProvider>,
+  ) {
     this.configs = configs;
     this.costTracker = costTracker;
+    this.contextProviders =
+      contextProviders ?? new Map([['service', new ITServiceContextProvider()]]);
 
     // 모든 봇 세션 즉시 생성 — 프로세스 프리웜
     for (const [botId, config] of configs) {
@@ -502,8 +509,9 @@ export class SessionPool {
           ].join('\n')
         : '';
 
-      // GFP 프로젝트 컨텍스트
-      const gfpContext = buildGfpContext(context.route, botId);
+      // 프로젝트 컨텍스트 (entity_type 기반 provider 선택)
+      const provider = this.contextProviders.get(context.route.projectType);
+      const gfpContext = provider?.buildContext(context.route, botId) ?? '';
 
       // 이미지 첨부 안내
       const imageBlock =

@@ -1,14 +1,15 @@
 import { Pool } from 'pg';
-import type { RouteResult } from './types';
+import type { RouteResult, ProjectContext } from './types';
 import { loadRoutingConfig, type RoutingConfig } from './kb-routing';
 
-// 채널 → 서비스 매핑 캐시
+// 채널 → 프로젝트 매핑 캐시
 interface ServiceInfo {
   serviceId: string;
   serviceName: string;
   serviceDomain: string;
   currentPhase: number;
   infraPhase: number;
+  projectType: string;
 }
 
 export class Router {
@@ -79,6 +80,7 @@ export class Router {
         serviceDomain: service?.serviceDomain || '',
         phase: service?.currentPhase ?? -1,
         track: 'plan',
+        projectType: service?.projectType || 'service',
         routeReason: 'route-tag',
       };
     }
@@ -94,6 +96,7 @@ export class Router {
           serviceDomain: service?.serviceDomain || '',
           phase: service?.currentPhase ?? -1,
           track: 'plan',
+          projectType: service?.projectType || 'service',
           routeReason: 'thread-sticky',
         };
       }
@@ -116,6 +119,7 @@ export class Router {
             serviceDomain: service.serviceDomain,
             phase: service.currentPhase,
             track: 'plan',
+            projectType: service.projectType,
             routeReason: 'keyword',
           };
         }
@@ -133,6 +137,7 @@ export class Router {
           serviceDomain: service?.serviceDomain || '',
           phase: service?.currentPhase ?? -1,
           track: 'plan',
+          projectType: service?.projectType || 'service',
           routeReason: 'skill-dispatch',
           skillHint: skill,
         };
@@ -148,6 +153,7 @@ export class Router {
           serviceDomain: service?.serviceDomain || '',
           phase: service?.currentPhase ?? -1,
           track: 'plan',
+          projectType: service?.projectType || 'service',
           routeReason: 'keyword',
         };
       }
@@ -162,6 +168,7 @@ export class Router {
         serviceDomain: service.serviceDomain,
         phase: service.currentPhase,
         track: 'plan',
+        projectType: service.projectType,
         routeReason: 'phase-based',
       };
     }
@@ -173,31 +180,47 @@ export class Router {
       serviceDomain: '',
       phase: -1,
       track: 'plan',
+      projectType: 'service',
       routeReason: 'fallback',
     };
   }
 
+  getProjectContext(route: RouteResult): ProjectContext | null {
+    if (!route.serviceDomain) return null;
+    return {
+      domain: route.serviceDomain,
+      projectType: route.projectType,
+      metadata: {
+        serviceId: route.serviceId,
+        phase: route.phase,
+        track: route.track,
+      },
+    };
+  }
+
   private async getServiceInfo(channelId: string): Promise<ServiceInfo | null> {
-    // 캐시 확인
     const cached = this.channelCache.get(channelId);
     const expiry = this.cacheExpiry.get(channelId) || 0;
     if (cached && Date.now() < expiry) return cached;
 
     try {
-      // 통합 조회: services.slack_channel / discord_channel (1순위) + incubator_sessions (2순위)
       const result = await this.pool.query(
-        `SELECT service_id::text as full_service_id, project_name, service_domain,
-                current_phase, COALESCE(infra_phase, 0) as infra_phase
-         FROM semo.services
-         WHERE slack_channel LIKE '%' || $1 || '%'
-            OR discord_channel = $1
+        `SELECT s.service_id::text as full_service_id, s.project_name, s.service_domain,
+                s.current_phase, COALESCE(s.infra_phase, 0) as infra_phase,
+                COALESCE(o.entity_type, 'service') as project_type
+         FROM semo.services s
+         LEFT JOIN semo.ontology o ON o.domain = s.service_domain
+         WHERE position($1 in s.slack_channel) > 0
+            OR s.discord_channel = $1
 
          UNION ALL
 
          SELECT s.service_id::text, s.project_name, s.service_domain,
-                s.current_phase, COALESCE(s.infra_phase, 0)
+                s.current_phase, COALESCE(s.infra_phase, 0),
+                COALESCE(o.entity_type, 'service')
          FROM semo.incubator_sessions i
-         JOIN semo.services s ON s.service_id::text LIKE i.service_id || '%'
+         JOIN semo.services s ON starts_with(s.service_id::text, i.service_id)
+         LEFT JOIN semo.ontology o ON o.domain = s.service_domain
          WHERE i.channel = $1 AND i.status = 'active'
 
          LIMIT 1`,
@@ -213,6 +236,7 @@ export class Router {
         serviceDomain: row.service_domain || '',
         currentPhase: row.current_phase ?? 0,
         infraPhase: row.infra_phase ?? 0,
+        projectType: row.project_type || 'service',
       };
 
       this.channelCache.set(channelId, info);

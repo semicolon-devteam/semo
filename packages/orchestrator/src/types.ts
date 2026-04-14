@@ -20,6 +20,7 @@ export interface RouteResult {
   serviceDomain: string;
   phase: number;
   track: 'plan' | 'infra';
+  projectType: string;
   routeReason:
     | 'route-tag'
     | 'thread-sticky'
@@ -62,6 +63,16 @@ export interface BotConfig {
   soulPrompt: string;
   kbDomains: string[];
   slackProfile: { username: string; icon_emoji: string };
+}
+
+export interface ProjectContext {
+  domain: string;
+  projectType: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface ContextProvider {
+  buildContext(route: RouteResult, botId: string): string;
 }
 
 export interface AskOption {

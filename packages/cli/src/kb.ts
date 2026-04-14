@@ -374,7 +374,15 @@ export async function kbStatus(pool: Pool): Promise<KBStatusInfo> {
  */
 export async function kbList(
   pool: Pool,
-  options: { domain?: string; service?: string; limit?: number; offset?: number },
+  options: {
+    domain?: string;
+    service?: string;
+    key?: string;
+    where?: Record<string, unknown>;
+    orderBy?: string;
+    limit?: number;
+    offset?: number;
+  },
 ): Promise<KBEntry[]> {
   const client = await pool.connect();
   const limit = options.limit || 50;
@@ -384,24 +392,119 @@ export async function kbList(
     let query =
       'SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text FROM semo.knowledge_base';
     const params: (string | number)[] = [];
+    const conditions: string[] = [];
     let paramIdx = 1;
 
     if (options.domain) {
-      query += ` WHERE domain = $${paramIdx++}`;
+      conditions.push(`domain = $${paramIdx++}`);
       params.push(options.domain);
     } else if (options.service) {
-      // Resolve service to domain list: service name itself + dot-notation domains
       const serviceDomains = await resolveServiceDomainsLocal(client, options.service);
       if (serviceDomains.length > 0) {
-        query += ` WHERE domain = ANY($${paramIdx++})`;
+        conditions.push(`domain = ANY($${paramIdx++})`);
         params.push(serviceDomains as any);
       }
     }
-    query += ` ORDER BY domain, key, sub_key LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
+
+    if (options.key) {
+      conditions.push(`key = $${paramIdx++}`);
+      params.push(options.key);
+    }
+
+    if (options.where) {
+      for (const [k, v] of Object.entries(options.where)) {
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(k)) continue;
+        if (v === null) {
+          conditions.push(`metadata->>$${paramIdx++} IS NULL`);
+          params.push(k);
+        } else if (typeof v === 'object') {
+          conditions.push(`metadata @> $${paramIdx++}::jsonb`);
+          params.push(JSON.stringify({ [k]: v }));
+        } else {
+          conditions.push(`metadata->>$${paramIdx++} = $${paramIdx++}`);
+          params.push(k);
+          params.push(String(v));
+        }
+      }
+    }
+
+    if (conditions.length > 0) {
+      query += ` WHERE ${conditions.join(' AND ')}`;
+    }
+
+    const ORDER_ALLOWLIST = ['updated_at', 'created_at', 'key', 'sub_key', 'domain'];
+    const METADATA_ORDER_ALLOWLIST = [
+      'status',
+      'priority',
+      'phase',
+      'category',
+      'signal',
+      'deadline',
+    ];
+    if (options.orderBy) {
+      let col: string;
+      if (options.orderBy.startsWith('metadata.')) {
+        const metaKey = options.orderBy.slice(9);
+        col = METADATA_ORDER_ALLOWLIST.includes(metaKey) ? `metadata->>'${metaKey}'` : 'domain';
+      } else {
+        col = ORDER_ALLOWLIST.includes(options.orderBy) ? options.orderBy : 'domain';
+      }
+      query += ` ORDER BY ${col} DESC NULLS LAST`;
+    } else {
+      query += ` ORDER BY domain, key, sub_key`;
+    }
+
+    query += ` LIMIT $${paramIdx++} OFFSET $${paramIdx++}`;
     params.push(limit, offset);
 
     const result = await client.query(query, params);
     return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Count KB entries matching filters (for pagination / dashboards)
+ */
+export async function kbCount(
+  pool: Pool,
+  domain: string,
+  key?: string,
+  where?: Record<string, unknown>,
+): Promise<number> {
+  const client = await pool.connect();
+  try {
+    const conditions: string[] = [`domain = $1`];
+    const params: (string | number)[] = [domain];
+    let paramIdx = 2;
+
+    if (key) {
+      conditions.push(`key = $${paramIdx++}`);
+      params.push(key);
+    }
+    if (where) {
+      for (const [k, v] of Object.entries(where)) {
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(k)) continue;
+        if (v === null) {
+          conditions.push(`metadata->>$${paramIdx++} IS NULL`);
+          params.push(k);
+        } else if (typeof v === 'object') {
+          conditions.push(`metadata @> $${paramIdx++}::jsonb`);
+          params.push(JSON.stringify({ [k]: v }));
+        } else {
+          conditions.push(`metadata->>$${paramIdx++} = $${paramIdx++}`);
+          params.push(k);
+          params.push(String(v));
+        }
+      }
+    }
+
+    const result = await client.query(
+      `SELECT COUNT(*)::int AS count FROM semo.knowledge_base WHERE ${conditions.join(' AND ')}`,
+      params,
+    );
+    return result.rows[0].count;
   } finally {
     client.release();
   }
@@ -1128,37 +1231,6 @@ export async function kbUpsert(
           embeddingStr,
         ],
       );
-    }
-
-    // KB→DB 동기화: Dashboard API에 위임 (파서 단일화)
-    if (key === 'kpi' && subKey) {
-      try {
-        const baseUrl =
-          process.env.DASHBOARD_URL ||
-          process.env.NEXT_PUBLIC_BASE_URL ||
-          'https://semo.semi-colon.space';
-        const syncRes = await fetch(`${baseUrl}/api/kb-sync`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            domain: entry.domain,
-            key,
-            sub_key: subKey,
-            content: entry.content,
-          }),
-        });
-        if (syncRes.ok) {
-          const syncData = await syncRes.json();
-          if (syncData.synced > 0) {
-            console.error(`  ↳ DB sync: ${syncData.synced} records`);
-          }
-        } else {
-          console.error(`[kb] ⚠️  DB sync failed: ${syncRes.status}`);
-        }
-      } catch (wtErr) {
-        // sync 실패는 KB 성공에 영향 없음 — 로깅만
-        console.error(`[kb] ⚠️  DB sync 실패 (KB 저장은 정상): ${wtErr}`);
-      }
     }
 
     return { success: true, warnings: warnings.length > 0 ? warnings : undefined };

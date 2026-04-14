@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getProject } from '@/lib/service';
 import {
   listKPIMetrics,
   listKPIPeriods,
@@ -9,16 +10,26 @@ import {
 
 export const dynamic = 'force-dynamic';
 
+async function resolveDomain(id: string): Promise<string | null> {
+  const project = await getProject(id);
+  return project?.service_domain ?? null;
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const domain = await resolveDomain(id);
+    if (!domain) {
+      return NextResponse.json({ metrics: [], periods: [], latestPeriod: null });
+    }
+
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') ?? undefined;
     const limit = parseInt(searchParams.get('limit') ?? '50', 10);
 
     const [metrics, periods] = await Promise.all([
-      listKPIMetrics(id, period, limit),
-      listKPIPeriods(id),
+      listKPIMetrics(domain, period, limit),
+      listKPIPeriods(domain),
     ]);
 
     return NextResponse.json({
@@ -35,6 +46,11 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const domain = await resolveDomain(id);
+    if (!domain) {
+      return NextResponse.json({ error: 'Project not found or has no domain' }, { status: 404 });
+    }
+
     const body = await request.json();
     const { period, source, metrics } = body;
 
@@ -45,7 +61,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
-    const created = await batchCreateKPIMetrics(id, period, source ?? 'manual', metrics);
+    const created = await batchCreateKPIMetrics(domain, period, source ?? 'manual', metrics);
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
     console.error('KPI metrics create error:', error);

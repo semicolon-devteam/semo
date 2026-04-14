@@ -50,7 +50,6 @@ export async function updateSession(request: NextRequest) {
   const isPublicPath =
     publicPaths.some((p) => pathname.startsWith(p)) ||
     pathname.startsWith('/api/projects/callback') ||
-    pathname.startsWith('/api/kb-sync') ||
     pathname.startsWith('/api/slack/') ||
     pathname.startsWith('/api/bots/profiles') ||
     pathname.startsWith('/api/projects/sandbox') ||

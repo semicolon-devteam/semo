@@ -21,7 +21,12 @@ interface OverviewData {
 
 interface KBKPIData {
   kpiSnapshots: Array<{ subKey: string; content: string; updatedAt: string }>;
-  actionItems: Array<{ subKey: string; content: string; updatedAt: string }>;
+  actionItems: Array<{
+    description: string;
+    status: string;
+    assignee: string | null;
+    createdAt: string;
+  }>;
   milestones: Array<{ subKey: string; content: string; metadata: Record<string, unknown> }>;
   incidents: Array<Record<string, unknown>>;
 }

@@ -6,19 +6,25 @@ import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth/provider';
 
-const NAV_ITEMS = [
+const CORE_NAV = [
   { href: '/bots', label: '봇 팀', key: 'bots' },
   { href: '/org', label: '조직도', key: 'org' },
-  { href: '/cost', label: '비용', key: 'cost' },
   { href: '/goals', label: '목표', key: 'goals' },
   { href: '/action-items', label: '액션', key: 'action-items' },
   { href: '/kb', label: '지식', key: 'kb' },
-  { href: '/system', label: '시스템', key: 'system' },
-  { href: '/tests', label: '테스트', key: 'tests' },
-  { href: '/projects', label: '서비스', key: 'incubator' },
   { href: '/meetings', label: '회의', key: 'meetings' },
   { href: '/voice', label: '음성', key: 'voice' },
 ];
+
+const PLUGIN_NAV = [{ href: '/projects', label: '서비스', key: 'incubator' }];
+
+const ADMIN_NAV = [
+  { href: '/system', label: '시스템', key: 'system' },
+  { href: '/cost', label: '비용', key: 'cost' },
+  { href: '/tests', label: '테스트', key: 'tests' },
+];
+
+const NAV_ITEMS = [...CORE_NAV, ...PLUGIN_NAV, ...ADMIN_NAV];
 
 export default function GlobalNav() {
   const [menuOpen, setMenuOpen] = useState(false);

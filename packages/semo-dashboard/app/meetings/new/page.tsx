@@ -23,7 +23,7 @@ type AdhocSubtype = 'client' | 'internal' | 'external' | 'workshop';
 interface ServiceOption {
   service_id: string;
   project_name: string;
-  domain: string;
+  service_domain: string | null;
 }
 
 function determineStep(m: Meeting): number {
@@ -66,7 +66,7 @@ function NewMeetingContent() {
   const [adhocSubtype, setAdhocSubtype] = useState<AdhocSubtype>('internal');
   const [meetingDate, setMeetingDate] = useState(new Date().toISOString().slice(0, 10));
   const [attendees, setAttendees] = useState<string[]>(REGULAR_ATTENDEES);
-  const [serviceId, setServiceId] = useState<string>('');
+  const [selectedDomain, setSelectedDomain] = useState<string>('');
   const [services, setServices] = useState<ServiceOption[]>([]);
 
   useEffect(() => {
@@ -115,7 +115,7 @@ function NewMeetingContent() {
         if (m.adhoc_subtype) setAdhocSubtype(m.adhoc_subtype);
         setMeetingDate(m.meeting_date ? new Date(m.meeting_date).toISOString().slice(0, 10) : '');
         setAttendees(m.attendees || []);
-        setServiceId(m.service_id || '');
+        setSelectedDomain(m.target_domain || '');
         if (m.raw_transcript?.length) {
           setUtterances(m.raw_transcript);
           const spks = [...new Set(m.raw_transcript.map((u) => u.spk))].sort();
@@ -164,7 +164,7 @@ function NewMeetingContent() {
             adhoc_subtype: meetingType === 'adhoc' ? adhocSubtype : null,
             meeting_date: meetingDate,
             attendees,
-            service_id: serviceId || null,
+            target_domain: selectedDomain || null,
           }),
         });
         if (!res.ok) throw new Error('Failed to update meeting');
@@ -179,7 +179,7 @@ function NewMeetingContent() {
             adhoc_subtype: meetingType === 'adhoc' ? adhocSubtype : undefined,
             meeting_date: meetingDate,
             attendees,
-            service_id: serviceId || undefined,
+            target_domain: selectedDomain || undefined,
           }),
         });
         if (!res.ok) throw new Error('Failed to create meeting');
@@ -458,16 +458,18 @@ function NewMeetingContent() {
               연관 서비스 <span className="text-gray-400 font-normal">(선택사항)</span>
             </label>
             <select
-              value={serviceId}
-              onChange={(e) => setServiceId(e.target.value)}
+              value={selectedDomain}
+              onChange={(e) => setSelectedDomain(e.target.value)}
               className="w-full border border-gray-300 dark:border-gray-600 rounded-lg px-3 py-2 text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100"
             >
               <option value="">없음</option>
-              {services.map((s) => (
-                <option key={s.service_id} value={s.service_id}>
-                  {s.project_name} ({s.domain})
-                </option>
-              ))}
+              {services
+                .filter((s) => s.service_domain)
+                .map((s) => (
+                  <option key={s.service_domain} value={s.service_domain!}>
+                    {s.project_name} ({s.service_domain})
+                  </option>
+                ))}
             </select>
           </div>
 
