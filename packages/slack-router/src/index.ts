@@ -229,6 +229,46 @@ async function loadIncubatorChannels(): Promise<void> {
 // Reload every 5 minutes
 setInterval(() => loadIncubatorChannels().catch(() => {}), 5 * 60_000);
 
+// ── Stale Commitment / Session Reaper ──
+
+/**
+ * 24시간 이상 상태 변경 없는 active commitment/session을 자동 정리한다.
+ * Architecture B 전환으로 기존 orchestrator reaper가 소멸했으므로
+ * 살아있는 프로세스인 slack-router가 동일 책임을 이어받는다.
+ * 로컬 reus 세션의 claude-code-local commitment도 같이 reap 대상이다.
+ */
+async function reapStale(): Promise<void> {
+  try {
+    const commitRes = await pool.query(
+      `UPDATE semo.bot_commitments
+       SET status = 'failed',
+           metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('fail_reason', 'stale_auto', 'reaped_at', NOW())
+       WHERE status IN ('pending', 'active')
+         AND created_at < NOW() - INTERVAL '24 hours'
+       RETURNING id, bot_id`,
+    );
+    if (commitRes.rowCount && commitRes.rowCount > 0) {
+      console.log(`[reaper] Marked ${commitRes.rowCount} stale commitments as failed`);
+    }
+
+    const sessRes = await pool.query(
+      `UPDATE semo.bot_sessions
+       SET status = 'terminated', ended_at = NOW()
+       WHERE status = 'active'
+         AND COALESCE(ended_at, started_at) < NOW() - INTERVAL '24 hours'
+       RETURNING bot_id, session_key`,
+    );
+    if (sessRes.rowCount && sessRes.rowCount > 0) {
+      console.log(`[reaper] Terminated ${sessRes.rowCount} stale sessions`);
+    }
+  } catch (err) {
+    console.error('[reaper] Failed:', err);
+  }
+}
+
+// Reap every hour
+setInterval(() => reapStale().catch(() => {}), 60 * 60_000);
+
 // ── Message Handler ──
 
 async function handleSlackMessage(msg: SlackMessage, senderName: string): Promise<void> {
@@ -352,8 +392,9 @@ async function start(): Promise<void> {
   console.log(`[slack-router] Sessions: ${SESSION_DIR}`);
   console.log(`[slack-router] Bots: ${[...FALLBACK_BOT_IDS, ...OVERFLOW_BOT_IDS].join(', ')}`);
 
-  // 1. Load incubator channel filter
+  // 1. Load incubator channel filter + initial stale reap
   await loadIncubatorChannels();
+  reapStale().catch(() => {});
   console.log('[slack-router] Config loaded');
 
   // 2. Set message handler
