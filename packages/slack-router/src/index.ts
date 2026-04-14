@@ -144,6 +144,38 @@ async function handleAskUser(msg: OutboxMessage): Promise<void> {
     .catch((err) => console.error(`[ask_user] Failed for ${msg.bot_id}:`, err));
 }
 
+// ── Commitment Mark-Done Handler ──
+
+async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
+  // Primary bot이 응답한 경우에도 overflow bot_id로 마감될 수 있음.
+  // source_ref = channel:thread_id 매칭, 같은 thread 여러 open commitment가 있으면
+  // 가장 오래된 active 하나를 마감한다 (FIFO).
+  const sourceRef = `slack-${msg.channel_id}-${msg.thread_id}`;
+  try {
+    const result = await pool.query(
+      `UPDATE semo.bot_commitments
+       SET status = 'done',
+           metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('completed_at', NOW())
+       WHERE id = (
+         SELECT id FROM semo.bot_commitments
+         WHERE bot_id = $1
+           AND source_type = 'slack-inbox'
+           AND source_ref = $2
+           AND status = 'active'
+         ORDER BY created_at ASC
+         LIMIT 1
+       )
+       RETURNING id`,
+      [msg.bot_id, sourceRef],
+    );
+    if (result.rowCount && result.rowCount > 0) {
+      console.log(`[commitment] done: ${result.rows[0].id} (${msg.bot_id}) ← ${sourceRef}`);
+    }
+  } catch (err) {
+    console.error(`[commitment] UPDATE done failed for ${msg.bot_id}:`, err);
+  }
+}
+
 // ── Outbox Reader ──
 
 const outboxReader = new OutboxReader({
@@ -154,6 +186,7 @@ const outboxReader = new OutboxReader({
   inboxWriter,
   onEscalation: handleEscalation,
   onAskUser: handleAskUser,
+  onReplyPosted: handleReplyPosted,
 });
 
 // ── Health Monitor ──
@@ -249,7 +282,38 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
   // 4. Resolve speaker profile from KB
   const speaker = await resolveSpeaker(pool, 'slack', msg.user);
 
-  // 5. Write to bot inbox
+  // 5. Create commitment row (Architecture B tracking)
+  //    DB 실패는 dispatch를 막지 않는다 — non-fatal
+  //    ON CONFLICT DO NOTHING + migration 089 unique index (slack_event_id)로 중복 router 방어
+  const commitmentId = `cmt-${botId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  try {
+    await pool.query(
+      `INSERT INTO semo.bot_commitments
+         (id, bot_id, status, title, source_type, source_ref,
+          session_owner, assigned_session, pipeline_context)
+       VALUES ($1, $2, 'active', $3, 'slack-inbox', $4, $5, $6, $7)
+       ON CONFLICT DO NOTHING`,
+      [
+        commitmentId,
+        botId,
+        msg.text.slice(0, 200) || '(empty)',
+        `${msg.channel}:${msg.thread_ts || msg.ts}`,
+        `${botId}-slack`,
+        `slack-${msg.channel}-${msg.thread_ts || msg.ts}`,
+        JSON.stringify({
+          slack_event_id: msg.ts,
+          channel: msg.channel,
+          thread_ts: msg.thread_ts || msg.ts,
+          sender_id: msg.user,
+          route_reason: routeReason,
+        }),
+      ],
+    );
+  } catch (err) {
+    console.error(`[commitment] INSERT failed for ${msg.ts}:`, err);
+  }
+
+  // 6. Write to bot inbox
   const msgId = await inboxWriter.write(botId, {
     type: 'message',
     priority: 'normal',

@@ -24,6 +24,7 @@ export class OutboxReader {
   private readonly inboxWriter: InboxWriter;
   private readonly onEscalation: (msg: OutboxMessage) => Promise<void>;
   private readonly onAskUser: (msg: OutboxMessage) => Promise<void>;
+  private readonly onReplyPosted?: (msg: OutboxMessage) => Promise<void>;
   /** Track byte offset per bot to only read new content */
   private fileOffsets = new Map<string, number>();
   /** Prevent concurrent processOutbox for same bot */
@@ -38,6 +39,8 @@ export class OutboxReader {
     inboxWriter: InboxWriter;
     onEscalation: (msg: OutboxMessage) => Promise<void>;
     onAskUser: (msg: OutboxMessage) => Promise<void>;
+    /** Fired after a successful `reply` post — used by router to mark commitments done */
+    onReplyPosted?: (msg: OutboxMessage) => Promise<void>;
   }) {
     this.mailboxDir = opts.mailboxDir;
     this.botIds = opts.botIds;
@@ -46,6 +49,7 @@ export class OutboxReader {
     this.inboxWriter = opts.inboxWriter;
     this.onEscalation = opts.onEscalation;
     this.onAskUser = opts.onAskUser;
+    this.onReplyPosted = opts.onReplyPosted;
   }
 
   start(): void {
@@ -183,6 +187,13 @@ export class OutboxReader {
             );
             await this.gateway.postAsBot(msg.bot_id, msg.channel_id, msg.text, msg.thread_id);
             console.log(`[outbox] Posted reply from ${msg.bot_id} to ${this.platform}`);
+            if (this.onReplyPosted) {
+              try {
+                await this.onReplyPosted(msg);
+              } catch (err) {
+                console.error(`[outbox] onReplyPosted hook failed for ${msg.bot_id}:`, err);
+              }
+            }
           } catch (err) {
             console.error(`[outbox] ${this.platform} post failed for ${msg.bot_id}:`, err);
           }
