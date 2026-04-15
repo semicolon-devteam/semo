@@ -16,6 +16,34 @@ function combineKey(key: string, subKey: string): string {
   return subKey ? `${key}/${subKey}` : key;
 }
 
+const ORDER_ALLOWLIST = ['updated_at', 'created_at', 'key', 'sub_key', 'domain'];
+const METADATA_ORDER_ALLOWLIST = [
+  'status',
+  'priority',
+  'phase',
+  'category',
+  'signal',
+  'deadline',
+  'ordinal',
+  'track',
+];
+const NUMERIC_META_KEYS = ['ordinal', 'phase'];
+
+function buildMetadataOrderClause(orderBy: string, fallback: string): string {
+  if (orderBy.startsWith('metadata.')) {
+    const metaKey = orderBy.slice(9);
+    if (!METADATA_ORDER_ALLOWLIST.includes(metaKey)) return `ORDER BY ${fallback}`;
+    if (NUMERIC_META_KEYS.includes(metaKey)) {
+      return `ORDER BY (metadata->>'${metaKey}')::int ASC NULLS LAST`;
+    }
+    return `ORDER BY metadata->>'${metaKey}' ASC NULLS LAST`;
+  }
+  if (ORDER_ALLOWLIST.includes(orderBy)) {
+    return `ORDER BY ${orderBy} DESC NULLS LAST`;
+  }
+  return `ORDER BY ${fallback}`;
+}
+
 // lib/db.ts와 동일한 DATABASE_URL을 사용하는 Pool
 // KB_DB_* 환경변수는 하위 호환성을 위해 유지하되, DATABASE_URL을 우선한다.
 const pool = new Pool(
@@ -177,24 +205,8 @@ export async function list(
     sql += ` WHERE ${conditions.join(' AND ')}`;
   }
 
-  const ORDER_ALLOWLIST = ['updated_at', 'created_at', 'key', 'sub_key', 'domain'];
-  const METADATA_ORDER_ALLOWLIST = [
-    'status',
-    'priority',
-    'phase',
-    'category',
-    'signal',
-    'deadline',
-  ];
   if (options?.orderBy) {
-    let col: string;
-    if (options.orderBy.startsWith('metadata.')) {
-      const metaKey = options.orderBy.slice(9);
-      col = METADATA_ORDER_ALLOWLIST.includes(metaKey) ? `metadata->>'${metaKey}'` : 'domain';
-    } else {
-      col = ORDER_ALLOWLIST.includes(options.orderBy) ? options.orderBy : 'domain';
-    }
-    sql += ` ORDER BY ${col} DESC NULLS LAST`;
+    sql += ` ${buildMetadataOrderClause(options.orderBy, 'domain')}`;
   } else {
     sql += ` ORDER BY domain, key`;
   }
@@ -386,6 +398,172 @@ export async function upsertItem(
   const item = res.rows[0];
 
   return { ...item, key: combineKey(item.key, item.sub_key) };
+}
+
+/**
+ * KB metadata만 업데이트 (임베딩 재생성 없음)
+ * 워크플로우 상태 변경(status, qa_items 등)에 사용 — 임베딩 비용 절감
+ */
+export async function updateMetadata(
+  domain: string,
+  rawKey: string,
+  metadataPatch: Record<string, unknown>,
+): Promise<KBItem | null> {
+  const { key, subKey } = splitKey(rawKey);
+
+  // Domain validation only (no type schema / projection check — metadata-only)
+  const domainCheck = await pool.query('SELECT 1 FROM semo.ontology WHERE domain = $1', [domain]);
+  if (domainCheck.rows.length === 0) {
+    throw new Error(`도메인 '${domain}'은(는) 온톨로지에 등록되지 않았습니다.`);
+  }
+
+  const res = await pool.query(
+    `UPDATE semo.knowledge_base
+     SET metadata = COALESCE(metadata, '{}'::jsonb) || $4::jsonb,
+         updated_at = NOW()
+     WHERE domain = $1 AND key = $2 AND sub_key = $3
+     RETURNING kb_id, domain, key, sub_key, content, metadata, created_by, updated_at`,
+    [domain, key, subKey, JSON.stringify(metadataPatch)],
+  );
+
+  const row = res.rows[0];
+  if (!row) return null;
+  return { ...row, key: combineKey(row.key, row.sub_key) };
+}
+
+/**
+ * sub_key 접두사로 KB 항목 목록 조회
+ * 예: listByKeyPrefix('axoracle', 'section', 'plan/3/') → phase 3 plan track 섹션들
+ */
+export async function listByKeyPrefix(
+  domain: string,
+  key: string,
+  subKeyPrefix: string,
+  options?: { where?: Record<string, unknown>; orderBy?: string },
+): Promise<KBItem[]> {
+  const conditions: string[] = [`domain = $1`, `key = $2`, `sub_key LIKE $3`];
+  const params: (string | number)[] = [domain, key, subKeyPrefix + '%'];
+  let idx = 4;
+
+  if (options?.where) {
+    for (const [k, v] of Object.entries(options.where)) {
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(k)) continue;
+      if (v === null) {
+        conditions.push(`metadata->>$${idx++} IS NULL`);
+        params.push(k);
+      } else if (typeof v === 'object') {
+        conditions.push(`metadata @> $${idx++}::jsonb`);
+        params.push(JSON.stringify({ [k]: v }));
+      } else {
+        conditions.push(`metadata->>$${idx} = $${idx + 1}`);
+        params.push(k);
+        params.push(String(v));
+        idx += 2;
+      }
+    }
+  }
+
+  const orderClause = options?.orderBy
+    ? buildMetadataOrderClause(options.orderBy, 'sub_key')
+    : 'ORDER BY sub_key';
+
+  const sql = `
+    SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at
+    FROM semo.knowledge_base
+    WHERE ${conditions.join(' AND ')}
+    ${orderClause}
+  `;
+
+  const res = await pool.query(sql, params);
+  return res.rows.map((r: KBItem & { sub_key?: string }) => ({
+    ...r,
+    key: combineKey(r.key, r.sub_key ?? ''),
+  }));
+}
+
+/**
+ * sub_key 접두사로 KB 항목 수 조회 (metadata 필터 지원)
+ * 예: countByKeyPrefix('axoracle', 'section', 'plan/3/', { status: 'approved' })
+ */
+export async function countByKeyPrefix(
+  domain: string,
+  key: string,
+  subKeyPrefix: string,
+  where?: Record<string, unknown>,
+): Promise<number> {
+  const conditions: string[] = [`domain = $1`, `key = $2`, `sub_key LIKE $3`];
+  const params: (string | number)[] = [domain, key, subKeyPrefix + '%'];
+  let idx = 4;
+
+  if (where) {
+    for (const [k, v] of Object.entries(where)) {
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(k)) continue;
+      if (v === null) {
+        conditions.push(`metadata->>$${idx++} IS NULL`);
+        params.push(k);
+      } else if (typeof v === 'object') {
+        conditions.push(`metadata @> $${idx++}::jsonb`);
+        params.push(JSON.stringify({ [k]: v }));
+      } else {
+        conditions.push(`metadata->>$${idx} = $${idx + 1}`);
+        params.push(k);
+        params.push(String(v));
+        idx += 2;
+      }
+    }
+  }
+
+  const res = await pool.query(
+    `SELECT COUNT(*)::int AS count FROM semo.knowledge_base WHERE ${conditions.join(' AND ')}`,
+    params,
+  );
+  return res.rows[0].count;
+}
+
+/**
+ * 전 도메인에서 특정 entity_type + key 조합 조회 (크로스 도메인 프로젝트 목록 등)
+ */
+export async function listByKeyAcrossDomains(
+  entityType: string,
+  key: string,
+  where?: Record<string, unknown>,
+): Promise<KBItem[]> {
+  const { key: flatKey, subKey } = splitKey(key);
+  const conditions: string[] = [`o.entity_type = $1`, `kb.key = $2`, `kb.sub_key = $3`];
+  const params: (string | number)[] = [entityType, flatKey, subKey];
+  let idx = 4;
+
+  if (where) {
+    for (const [k, v] of Object.entries(where)) {
+      if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(k)) continue;
+      if (v === null) {
+        conditions.push(`kb.metadata->>$${idx++} IS NULL`);
+        params.push(k);
+      } else if (typeof v === 'object') {
+        conditions.push(`kb.metadata @> $${idx++}::jsonb`);
+        params.push(JSON.stringify({ [k]: v }));
+      } else {
+        conditions.push(`kb.metadata->>$${idx} = $${idx + 1}`);
+        params.push(k);
+        params.push(String(v));
+        idx += 2;
+      }
+    }
+  }
+
+  const sql = `
+    SELECT kb.kb_id, kb.domain, kb.key, kb.sub_key, kb.content, kb.metadata, kb.created_by, kb.updated_at
+    FROM semo.knowledge_base kb
+    JOIN semo.ontology o ON o.domain = kb.domain
+    WHERE ${conditions.join(' AND ')}
+    ORDER BY kb.domain
+  `;
+
+  const res = await pool.query(sql, params);
+  return res.rows.map((r: KBItem & { sub_key?: string }) => ({
+    ...r,
+    key: combineKey(r.key, r.sub_key ?? ''),
+  }));
 }
 
 /**

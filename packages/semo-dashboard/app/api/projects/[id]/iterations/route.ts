@@ -50,7 +50,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await params;
+    const { id } = await params;
     const body = await request.json();
     const { iteration_id, action, ...data } = body;
 
@@ -60,11 +60,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     let iteration;
     if (action === 'activate') {
-      iteration = await activateIteration(iteration_id);
+      iteration = await activateIteration(id, iteration_id);
     } else if (action === 'complete') {
-      iteration = await completeIteration(iteration_id, data.retrospective);
+      iteration = await completeIteration(id, iteration_id, data.retrospective);
     } else {
-      iteration = await updateIteration(iteration_id, data);
+      iteration = await updateIteration(id, iteration_id, data);
     }
 
     if (!iteration) {
@@ -82,7 +82,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    await params;
+    const { id } = await params;
     const { searchParams } = new URL(request.url);
     const iterationId = searchParams.get('iteration_id');
 
@@ -90,7 +90,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'iteration_id is required' }, { status: 400 });
     }
 
-    const deleted = await deleteIteration(iterationId);
+    const deleted = await deleteIteration(id, iterationId);
     if (!deleted) {
       return NextResponse.json({ error: 'Iteration not found' }, { status: 404 });
     }

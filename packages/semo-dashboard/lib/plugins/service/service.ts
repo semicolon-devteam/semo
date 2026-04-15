@@ -584,7 +584,24 @@ export async function checkDesignStepAdvance(serviceId: string): Promise<number>
   return currentStep;
 }
 
-// ── Research Tasks ──
+// ── Research Tasks (KB-backed) ──
+
+import { randomUUID } from 'crypto';
+import {
+  upsertItem as kbUpsert,
+  updateMetadata as kbUpdateMetadata,
+  listByKeyPrefix as kbListByKeyPrefix,
+  deleteItemByKey as kbDelete,
+  getItem as kbGetItem,
+} from '../../core/kb';
+
+async function resolveDomain(serviceId: string): Promise<string> {
+  const project = await getProject(serviceId);
+  if (!project?.service_domain) {
+    throw new Error(`서비스 ${serviceId}의 도메인을 찾을 수 없습니다.`);
+  }
+  return project.service_domain;
+}
 
 export async function createResearchTask(data: {
   service_id: string;
@@ -592,47 +609,78 @@ export async function createResearchTask(data: {
   reference_urls: string[];
   input_prompt: string;
 }): Promise<ServiceResearchTask> {
-  const res = await query<ServiceResearchTask>(
-    `INSERT INTO semo.service_research_tasks (service_id, task_type, reference_urls, input_prompt)
-     VALUES ($1, $2, $3, $4)
-     RETURNING *`,
-    [data.service_id, data.task_type, data.reference_urls, data.input_prompt],
-  );
-  return res.rows[0];
+  const domain = await resolveDomain(data.service_id);
+  const taskId = randomUUID();
+  const now = new Date().toISOString();
+  const item = await kbUpsert(domain, `research/${taskId}`, data.input_prompt, 'pm-pipeline', {
+    task_id: taskId,
+    service_id: data.service_id,
+    task_type: data.task_type,
+    reference_urls: data.reference_urls,
+    status: 'queued',
+    result: null,
+    created_at: now,
+  });
+  const m = item.metadata ?? {};
+  return {
+    task_id: taskId,
+    service_id: data.service_id,
+    task_type: m.task_type as ServiceResearchTask['task_type'],
+    reference_urls: m.reference_urls as string[],
+    input_prompt: item.content,
+    status: 'queued',
+    result: null,
+    created_at: now,
+    updated_at: item.updated_at ?? now,
+  };
 }
 
 export async function listResearchTasks(serviceId: string): Promise<ServiceResearchTask[]> {
-  const res = await query<ServiceResearchTask>(
-    'SELECT * FROM semo.service_research_tasks WHERE service_id =$1 ORDER BY created_at DESC',
-    [serviceId],
-  );
-  return res.rows;
+  const domain = await resolveDomain(serviceId);
+  const items = await kbListByKeyPrefix(domain, 'research', '', { orderBy: 'updated_at' });
+  return items.map((item) => {
+    const m = item.metadata ?? {};
+    return {
+      task_id: (m.task_id as string) ?? '',
+      service_id: (m.service_id as string) ?? serviceId,
+      task_type: (m.task_type ?? '') as ServiceResearchTask['task_type'],
+      reference_urls: (m.reference_urls as string[]) ?? [],
+      input_prompt: item.content,
+      status: ((m.status as string) ?? 'queued') as ServiceResearchTask['status'],
+      result: (m.result as string) ?? null,
+      created_at: (m.created_at as string) ?? '',
+      updated_at: item.updated_at ?? '',
+    } as ServiceResearchTask;
+  });
 }
 
 export async function updateResearchTask(
   taskId: string,
   data: Partial<Pick<ServiceResearchTask, 'status' | 'result'>>,
+  serviceId?: string,
 ): Promise<ServiceResearchTask | null> {
-  const sets: string[] = [];
-  const params: unknown[] = [];
-  let idx = 1;
+  if (!serviceId) return null;
+  const domain = await resolveDomain(serviceId);
+  const key = `research/${taskId}`;
+  const patch: Record<string, unknown> = {};
+  if (data.status !== undefined) patch.status = data.status;
+  if (data.result !== undefined) patch.result = data.result;
+  if (Object.keys(patch).length === 0) return null;
 
-  if (data.status !== undefined) {
-    sets.push(`status = $${idx++}`);
-    params.push(data.status);
-  }
-  if (data.result !== undefined) {
-    sets.push(`result = $${idx++}`);
-    params.push(data.result);
-  }
-  if (sets.length === 0) return null;
-
-  params.push(taskId);
-  const res = await query<ServiceResearchTask>(
-    `UPDATE semo.service_research_tasks SET ${sets.join(', ')} WHERE task_id = $${idx} RETURNING *`,
-    params,
-  );
-  return res.rows[0] ?? null;
+  const item = await kbUpdateMetadata(domain, key, patch);
+  if (!item) return null;
+  const m = item.metadata ?? {};
+  return {
+    task_id: (m.task_id as string) ?? taskId,
+    service_id: (m.service_id as string) ?? '',
+    task_type: (m.task_type ?? '') as ServiceResearchTask['task_type'],
+    reference_urls: (m.reference_urls as string[]) ?? [],
+    input_prompt: item.content,
+    status: ((m.status as string) ?? 'queued') as ServiceResearchTask['status'],
+    result: (m.result as string) ?? null,
+    created_at: (m.created_at as string) ?? '',
+    updated_at: item.updated_at ?? '',
+  } as ServiceResearchTask;
 }
 
 // ── KB Write-back (phase completion) ──
@@ -762,14 +810,28 @@ export async function createSectionsFromMapping(
   return count;
 }
 
-// ── Infra Requests ──
+// ── Infra Requests (KB-backed) ──
 
 export async function listInfraRequests(serviceId: string): Promise<ServiceInfraRequest[]> {
-  const res = await query<ServiceInfraRequest>(
-    'SELECT * FROM semo.service_infra_requests WHERE service_id =$1 ORDER BY created_at DESC',
-    [serviceId],
-  );
-  return res.rows;
+  const domain = await resolveDomain(serviceId);
+  const items = await kbListByKeyPrefix(domain, 'infra-request', '', { orderBy: 'updated_at' });
+  return items.map((item) => {
+    const m = item.metadata ?? {};
+    return {
+      request_id: (m.request_id as string) ?? '',
+      service_id: (m.service_id as string) ?? serviceId,
+      source_phase: (m.source_phase as number) ?? 0,
+      source_section_id: (m.source_section_id as string) ?? null,
+      category: (m.category as string) ?? 'other',
+      title: (m.title as string) ?? '',
+      description: item.content || null,
+      priority: (m.priority as string) ?? 'normal',
+      status: (m.status as string) ?? 'pending',
+      slack_thread_ts: (m.slack_thread_ts as string) ?? null,
+      created_at: (m.created_at as string) ?? '',
+      updated_at: item.updated_at ?? '',
+    } as ServiceInfraRequest;
+  });
 }
 
 export async function createInfraRequest(data: {
@@ -781,36 +843,64 @@ export async function createInfraRequest(data: {
   description?: string;
   priority?: 'low' | 'normal' | 'high';
 }): Promise<ServiceInfraRequest> {
-  const res = await query<ServiceInfraRequest>(
-    `INSERT INTO semo.service_infra_requests (service_id, source_phase, source_section_id, category, title, description, priority)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING *`,
-    [
-      data.service_id,
-      data.source_phase,
-      data.source_section_id ?? null,
-      data.category,
-      data.title,
-      data.description ?? null,
-      data.priority ?? 'normal',
-    ],
-  );
-  return res.rows[0];
+  const domain = await resolveDomain(data.service_id);
+  const requestId = randomUUID();
+  const now = new Date().toISOString();
+  await kbUpsert(domain, `infra-request/${requestId}`, data.description ?? '', 'pm-pipeline', {
+    request_id: requestId,
+    service_id: data.service_id,
+    source_phase: data.source_phase,
+    source_section_id: data.source_section_id ?? null,
+    category: data.category,
+    title: data.title,
+    priority: data.priority ?? 'normal',
+    status: 'pending',
+    slack_thread_ts: null,
+    created_at: now,
+  });
+  return {
+    request_id: requestId,
+    service_id: data.service_id,
+    source_phase: data.source_phase,
+    source_section_id: data.source_section_id ?? null,
+    category: data.category,
+    title: data.title,
+    description: data.description ?? null,
+    priority: data.priority ?? 'normal',
+    status: 'pending',
+    slack_thread_ts: null,
+    created_at: now,
+    updated_at: now,
+  };
 }
 
 export async function updateInfraRequest(
   requestId: string,
   status: ServiceInfraRequestStatus,
   slackThreadTs?: string,
+  serviceId?: string,
 ): Promise<ServiceInfraRequest | null> {
-  const res = await query<ServiceInfraRequest>(
-    `UPDATE semo.service_infra_requests
-     SET status = $1, slack_thread_ts = COALESCE($2, slack_thread_ts), updated_at = NOW()
-     WHERE request_id = $3
-     RETURNING *`,
-    [status, slackThreadTs ?? null, requestId],
-  );
-  return res.rows[0] ?? null;
+  if (!serviceId) return null;
+  const domain = await resolveDomain(serviceId);
+  const patch: Record<string, unknown> = { status };
+  if (slackThreadTs) patch.slack_thread_ts = slackThreadTs;
+  const item = await kbUpdateMetadata(domain, `infra-request/${requestId}`, patch);
+  if (!item) return null;
+  const m = item.metadata ?? {};
+  return {
+    request_id: (m.request_id as string) ?? requestId,
+    service_id: (m.service_id as string) ?? '',
+    source_phase: (m.source_phase as number) ?? 0,
+    source_section_id: (m.source_section_id as string) ?? null,
+    category: (m.category as string) ?? 'other',
+    title: (m.title as string) ?? '',
+    description: item.content || null,
+    priority: (m.priority as string) ?? 'normal',
+    status: (m.status as string) ?? 'pending',
+    slack_thread_ts: (m.slack_thread_ts as string) ?? null,
+    created_at: (m.created_at as string) ?? '',
+    updated_at: item.updated_at ?? '',
+  } as ServiceInfraRequest;
 }
 
 export async function checkInfraTrackComplete(serviceId: string): Promise<boolean> {
@@ -1075,27 +1165,83 @@ export {
   deleteIteration,
 } from './iterations';
 
-// ── Feature Discovery Sessions ──
+// ── Feature Discovery Sessions (KB-backed) ──
 
 export async function createDiscoverySession(data: {
   service_id: string;
   source_url: string;
 }): Promise<FeatureDiscoverySession> {
-  const res = await query<FeatureDiscoverySession>(
-    `INSERT INTO semo.feature_discovery_sessions (service_id, source_url) VALUES ($1, $2) RETURNING *`,
-    [data.service_id, data.source_url],
-  );
-  return res.rows[0];
+  const domain = await resolveDomain(data.service_id);
+  const sessionId = randomUUID();
+  const now = new Date().toISOString();
+  await kbUpsert(domain, `session/discovery/${sessionId}`, data.source_url, 'pm-pipeline', {
+    session_id: sessionId,
+    service_id: data.service_id,
+    source_url: data.source_url,
+    status: 'crawling',
+    candidates: null,
+    confirmed: null,
+    screenshots: null,
+    error: null,
+    created_at: now,
+  });
+  return {
+    session_id: sessionId,
+    service_id: data.service_id,
+    source_url: data.source_url,
+    status: 'crawling',
+    candidates: null,
+    confirmed: null,
+    screenshots: null,
+    error: null,
+    created_at: now,
+    updated_at: now,
+  } as unknown as FeatureDiscoverySession;
 }
 
 export async function getDiscoverySession(
   sessionId: string,
+  serviceId?: string,
 ): Promise<FeatureDiscoverySession | null> {
-  const res = await query<FeatureDiscoverySession>(
-    'SELECT * FROM semo.feature_discovery_sessions WHERE session_id = $1',
-    [sessionId],
-  );
-  return res.rows[0] ?? null;
+  if (serviceId) {
+    const domain = await resolveDomain(serviceId);
+    const item = await kbGetItem(domain, `session/discovery/${sessionId}`);
+    if (!item) return null;
+    const m = item.metadata ?? {};
+    return {
+      session_id: sessionId,
+      service_id: (m.service_id as string) ?? '',
+      source_url: (m.source_url as string) ?? item.content,
+      status: (m.status as string) ?? 'pending',
+      candidates: (m.candidates as unknown) ?? null,
+      confirmed: (m.confirmed as unknown) ?? null,
+      screenshots: (m.screenshots as unknown) ?? null,
+      error: (m.error as string) ?? null,
+      created_at: (m.created_at as string) ?? '',
+      updated_at: item.updated_at ?? '',
+    } as unknown as FeatureDiscoverySession;
+  }
+  // Fallback: search across domains (for callback route)
+  const { list: kbList } = await import('../../core/kb');
+  const items = await kbList(undefined, undefined, {
+    key: 'session',
+    where: { session_id: sessionId },
+  });
+  if (items.length === 0) return null;
+  const item = items[0];
+  const m = item.metadata ?? {};
+  return {
+    session_id: sessionId,
+    service_id: (m.service_id as string) ?? '',
+    source_url: (m.source_url as string) ?? item.content,
+    status: (m.status as string) ?? 'pending',
+    candidates: (m.candidates as unknown) ?? null,
+    confirmed: (m.confirmed as unknown) ?? null,
+    screenshots: (m.screenshots as unknown) ?? null,
+    error: (m.error as string) ?? null,
+    created_at: (m.created_at as string) ?? '',
+    updated_at: item.updated_at ?? '',
+  } as unknown as FeatureDiscoverySession;
 }
 
 export async function updateDiscoverySession(
@@ -1103,50 +1249,51 @@ export async function updateDiscoverySession(
   data: Partial<
     Pick<FeatureDiscoverySession, 'status' | 'candidates' | 'confirmed' | 'screenshots' | 'error'>
   >,
+  serviceId?: string,
 ): Promise<FeatureDiscoverySession | null> {
-  const sets: string[] = [];
-  const params: unknown[] = [];
-  let idx = 1;
-
-  if (data.status !== undefined) {
-    sets.push(`status = $${idx++}`);
-    params.push(data.status);
-  }
-  if (data.candidates !== undefined) {
-    sets.push(`candidates = $${idx++}::jsonb`);
-    params.push(JSON.stringify(data.candidates));
-  }
-  if (data.confirmed !== undefined) {
-    sets.push(`confirmed = $${idx++}::jsonb`);
-    params.push(JSON.stringify(data.confirmed));
-  }
-  if (data.screenshots !== undefined) {
-    sets.push(`screenshots = $${idx++}::jsonb`);
-    params.push(JSON.stringify(data.screenshots));
-  }
-  if (data.error !== undefined) {
-    sets.push(`error = $${idx++}`);
-    params.push(data.error);
+  // Resolve domain: use serviceId if available, else find via getDiscoverySession
+  let domain: string;
+  if (serviceId) {
+    domain = await resolveDomain(serviceId);
+  } else {
+    const existing = await getDiscoverySession(sessionId);
+    if (!existing) return null;
+    domain = await resolveDomain(existing.service_id);
   }
 
-  if (sets.length === 0) return null;
-  params.push(sessionId);
-  const res = await query<FeatureDiscoverySession>(
-    `UPDATE semo.feature_discovery_sessions SET ${sets.join(', ')} WHERE session_id = $${idx} RETURNING *`,
-    params,
-  );
-  return res.rows[0] ?? null;
+  const patch: Record<string, unknown> = {};
+  if (data.status !== undefined) patch.status = data.status;
+  if (data.candidates !== undefined) patch.candidates = data.candidates;
+  if (data.confirmed !== undefined) patch.confirmed = data.confirmed;
+  if (data.screenshots !== undefined) patch.screenshots = data.screenshots;
+  if (data.error !== undefined) patch.error = data.error;
+
+  if (Object.keys(patch).length === 0) return null;
+  await kbUpdateMetadata(domain, `session/discovery/${sessionId}`, patch);
+  return getDiscoverySession(sessionId, serviceId);
 }
 
 export async function listDiscoverySessions(serviceId: string): Promise<FeatureDiscoverySession[]> {
-  const res = await query<FeatureDiscoverySession>(
-    'SELECT * FROM semo.feature_discovery_sessions WHERE service_id = $1 ORDER BY created_at DESC LIMIT 10',
-    [serviceId],
-  );
-  return res.rows;
+  const domain = await resolveDomain(serviceId);
+  const items = await kbListByKeyPrefix(domain, 'session', 'discovery/', { orderBy: 'updated_at' });
+  return items.map((item) => {
+    const m = item.metadata ?? {};
+    return {
+      session_id: (m.session_id as string) ?? '',
+      service_id: (m.service_id as string) ?? serviceId,
+      source_url: (m.source_url as string) ?? item.content,
+      status: (m.status as string) ?? 'pending',
+      candidates: (m.candidates as unknown) ?? null,
+      confirmed: (m.confirmed as unknown) ?? null,
+      screenshots: (m.screenshots as unknown) ?? null,
+      error: (m.error as string) ?? null,
+      created_at: (m.created_at as string) ?? '',
+      updated_at: item.updated_at ?? '',
+    } as unknown as FeatureDiscoverySession;
+  });
 }
 
-// ── Feature Conversation Sessions ──
+// ── Feature Conversation Sessions (KB-backed) ──
 
 export async function createConversationSession(data: {
   service_id: string;
@@ -1154,53 +1301,96 @@ export async function createConversationSession(data: {
   slack_channel?: string;
   slack_thread_ts?: string;
 }): Promise<FeatureConversationSession> {
-  const res = await query<FeatureConversationSession>(
-    `INSERT INTO semo.feature_conversation_sessions (service_id, mode, slack_channel, slack_thread_ts)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
-    [
-      data.service_id,
-      data.mode ?? 'create',
-      data.slack_channel ?? null,
-      data.slack_thread_ts ?? null,
-    ],
-  );
-  return res.rows[0];
+  const domain = await resolveDomain(data.service_id);
+  const sessionId = randomUUID();
+  const now = new Date().toISOString();
+  await kbUpsert(domain, `session/conversation/${sessionId}`, '', 'pm-pipeline', {
+    session_id: sessionId,
+    service_id: data.service_id,
+    mode: data.mode ?? 'create',
+    status: 'collecting',
+    features: null,
+    slack_channel: data.slack_channel ?? null,
+    slack_thread_ts: data.slack_thread_ts ?? null,
+    created_at: now,
+  });
+  return {
+    session_id: sessionId,
+    service_id: data.service_id,
+    mode: data.mode ?? 'create',
+    status: 'collecting',
+    features: null,
+    slack_channel: data.slack_channel ?? null,
+    slack_thread_ts: data.slack_thread_ts ?? null,
+    created_at: now,
+    updated_at: now,
+  } as unknown as FeatureConversationSession;
 }
 
 export async function getConversationSession(
   sessionId: string,
+  serviceId?: string,
 ): Promise<FeatureConversationSession | null> {
-  const res = await query<FeatureConversationSession>(
-    'SELECT * FROM semo.feature_conversation_sessions WHERE session_id = $1',
-    [sessionId],
-  );
-  return res.rows[0] ?? null;
+  if (serviceId) {
+    const domain = await resolveDomain(serviceId);
+    const item = await kbGetItem(domain, `session/conversation/${sessionId}`);
+    if (!item) return null;
+    const m = item.metadata ?? {};
+    return {
+      session_id: sessionId,
+      service_id: (m.service_id as string) ?? '',
+      mode: (m.mode as string) ?? 'create',
+      status: (m.status as string) ?? 'active',
+      features: (m.features as unknown) ?? null,
+      slack_channel: (m.slack_channel as string) ?? null,
+      slack_thread_ts: (m.slack_thread_ts as string) ?? null,
+      created_at: (m.created_at as string) ?? '',
+      updated_at: item.updated_at ?? '',
+    } as unknown as FeatureConversationSession;
+  }
+  // Fallback: cross-domain search
+  const { list: kbList } = await import('../../core/kb');
+  const items = await kbList(undefined, undefined, {
+    key: 'session',
+    where: { session_id: sessionId },
+  });
+  if (items.length === 0) return null;
+  const item = items[0];
+  const m = item.metadata ?? {};
+  return {
+    session_id: sessionId,
+    service_id: (m.service_id as string) ?? '',
+    mode: (m.mode as string) ?? 'create',
+    status: (m.status as string) ?? 'active',
+    features: (m.features as unknown) ?? null,
+    slack_channel: (m.slack_channel as string) ?? null,
+    slack_thread_ts: (m.slack_thread_ts as string) ?? null,
+    created_at: (m.created_at as string) ?? '',
+    updated_at: item.updated_at ?? '',
+  } as unknown as FeatureConversationSession;
 }
 
 export async function updateConversationSession(
   sessionId: string,
   data: Partial<Pick<FeatureConversationSession, 'status' | 'features'>>,
+  serviceId?: string,
 ): Promise<FeatureConversationSession | null> {
-  const sets: string[] = [];
-  const params: unknown[] = [];
-  let idx = 1;
-
-  if (data.status !== undefined) {
-    sets.push(`status = $${idx++}`);
-    params.push(data.status);
-  }
-  if (data.features !== undefined) {
-    sets.push(`features = $${idx++}::jsonb`);
-    params.push(JSON.stringify(data.features));
+  let domain: string;
+  if (serviceId) {
+    domain = await resolveDomain(serviceId);
+  } else {
+    const existing = await getConversationSession(sessionId);
+    if (!existing) return null;
+    domain = await resolveDomain(existing.service_id);
   }
 
-  if (sets.length === 0) return null;
-  params.push(sessionId);
-  const res = await query<FeatureConversationSession>(
-    `UPDATE semo.feature_conversation_sessions SET ${sets.join(', ')} WHERE session_id = $${idx} RETURNING *`,
-    params,
-  );
-  return res.rows[0] ?? null;
+  const patch: Record<string, unknown> = {};
+  if (data.status !== undefined) patch.status = data.status;
+  if (data.features !== undefined) patch.features = data.features;
+
+  if (Object.keys(patch).length === 0) return null;
+  await kbUpdateMetadata(domain, `session/conversation/${sessionId}`, patch);
+  return getConversationSession(sessionId, serviceId);
 }
 
 // ── Bulk Feature Creation ──
