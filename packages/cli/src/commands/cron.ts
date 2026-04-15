@@ -75,7 +75,7 @@ function translateSchedule(schedule: Record<string, unknown>): string | null {
 // Prompt builder
 // ============================================================
 
-const WORK_DIR = '/Users/reus/Desktop/Sources/semicolon/projects/semo';
+const WORK_DIR = process.env.SEMO_WORK_DIR ?? '/Users/reus/Desktop/Sources/semicolon/projects/semo';
 const DEFAULT_REPORT_CHANNEL = '#bot-ops';
 
 function buildTriggerPrompt(botId: string, job: CronJobRow, opts?: { scheduledAt?: Date }): string {

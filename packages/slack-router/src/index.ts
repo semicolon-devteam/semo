@@ -269,6 +269,52 @@ async function reapStale(): Promise<void> {
 // Reap every hour
 setInterval(() => reapStale().catch(() => {}), 60 * 60_000);
 
+// ── Cron Poller Watchdog ──
+
+/**
+ * CronCreate 폴러가 매 분 `semiclaw/cron-poller-tick` 의 last_run 을 갱신해야 한다.
+ * 5분 이상 정지하면 CronCreate 세션 만료/폴러 크래시/cmux 패인 종료 중 하나이므로
+ * 즉시 #bot-ops 에 알린다. 회복되면 한 번만 recovery 통지.
+ */
+const POLLER_STALE_THRESHOLD_MS = 5 * 60_000;
+let pollerAlertActive = false;
+
+async function checkPollerHeartbeat(): Promise<void> {
+  try {
+    const res = await pool.query(
+      `SELECT last_run FROM semo.bot_cron_jobs
+        WHERE bot_id = 'semiclaw' AND job_id = 'cron-poller-tick'`,
+    );
+    if (!res.rows.length) return;
+    const lastRun = res.rows[0].last_run as Date | null;
+    const ageMs = lastRun ? Date.now() - new Date(lastRun).getTime() : Number.POSITIVE_INFINITY;
+    const channel = process.env.BOT_OPS_CHANNEL || '#bot-ops';
+
+    if (ageMs > POLLER_STALE_THRESHOLD_MS && !pollerAlertActive) {
+      pollerAlertActive = true;
+      const mins = Math.round(ageMs / 60_000);
+      console.error(`[poller-watchdog] stale — last_run ${mins}m ago`);
+      await slack
+        .postAsBot(
+          'semiclaw',
+          channel,
+          `:rotating_light: cron-poller heartbeat stale (${mins}m). CronCreate 세션/폴러 패인 확인 필요.`,
+        )
+        .catch(() => {});
+    } else if (ageMs <= POLLER_STALE_THRESHOLD_MS && pollerAlertActive) {
+      pollerAlertActive = false;
+      await slack
+        .postAsBot('semiclaw', channel, ':white_check_mark: cron-poller heartbeat recovered.')
+        .catch(() => {});
+    }
+  } catch (err) {
+    console.error('[poller-watchdog] failed:', err);
+  }
+}
+
+// Check every 3 minutes
+setInterval(() => checkPollerHeartbeat().catch(() => {}), 3 * 60_000);
+
 // ── Message Handler ──
 
 async function handleSlackMessage(msg: SlackMessage, senderName: string): Promise<void> {

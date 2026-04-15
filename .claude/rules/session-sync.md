@@ -38,6 +38,7 @@
 - **봇 세션 내부 subagent spawn은 현재 추적 대상 아님**. planclaw가 workclaw를 내부 위임해도 DB에는 별도 commitment가 생기지 않는다. Slack 메시지 1건 = commitment 1행.
 - 봇 재기동 시 legacy Stop 훅(`semo agent-flush --bot ${botId}`)의 fallback 쿼리는 `source_type NOT IN ('slack-inbox', 'cron')` 가드로 slack-inbox/cron commitment를 건드리지 않는다.
 - Migration 089 (`bot_commitments_slack_event_uniq`)가 `(bot_id, pipeline_context->>'slack_event_id')` 부분 유니크 인덱스로 중복 router 인스턴스를 DB 레벨에서 차단한다.
+- CronCreate 트리거는 ~7일 후 자동 만료. slack-router 의 `poller-watchdog`(3분 주기)이 `semiclaw/cron-poller-tick` 의 `last_run` 이 5분 이상 정지하면 `#bot-ops` 에 경보를 올린다. 복구 절차는 `~/.semo/sessions/cron-poller/CLAUDE.md` 의 "CronCreate 7일 만료 복구" 섹션 참조.
 
 ## 코드 변경 시 체크리스트
 

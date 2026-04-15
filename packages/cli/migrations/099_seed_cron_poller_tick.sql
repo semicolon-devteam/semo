@@ -7,7 +7,7 @@ VALUES (
   'semiclaw',
   'cron-poller-tick',
   'SEMO cron poller heartbeat',
-  '{"kind":"cron","expr":"* * * * *"}'::jsonb,
+  '{"kind":"cron","expr":"* * * * *","tz":"Asia/Seoul"}'::jsonb,
   TRUE,
   '{"report_channel":"#bot-ops","skip_dispatch":true,"meta":"cron-poller"}'::jsonb
 )
