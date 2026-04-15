@@ -8,6 +8,7 @@ node_modules/
 dist/
 build/
 *.tsbuildinfo
+packages/cli/*.tgz
 
 # === 환경 설정 ===
 .env
