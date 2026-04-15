@@ -1,7 +1,7 @@
 {
-  "name": "@team-semicolon/semo-platform-common",
+  "name": "@team-semicolon/semo-common",
   "version": "0.1.0",
-  "description": "SEMO multi-platform common layer — types, inbox/outbox, slack gateway, router, bot config",
+  "description": "SEMO common layer — types, inbox/outbox, slack gateway, router, bot config",
   "main": "src/index.ts",
   "scripts": {
     "test": "vitest --run",

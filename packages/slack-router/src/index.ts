@@ -18,16 +18,16 @@ import * as path from 'path';
 import * as os from 'os';
 import { Pool } from 'pg';
 
-import { SlackGateway } from '../../platform-common/src/slack-gateway.js';
-import { FALLBACK_BOT_IDS } from '../../platform-common/src/bot-config.js';
-import type { SlackMessage } from '../../platform-common/src/channel-types.js';
-import type { InboxMessage, OutboxMessage } from '../../platform-common/src/types.js';
+import { SlackGateway } from '../../common/src/slack-gateway.js';
+import { FALLBACK_BOT_IDS } from '../../common/src/bot-config.js';
+import type { SlackMessage } from '../../common/src/channel-types.js';
+import type { InboxMessage, OutboxMessage } from '../../common/src/types.js';
 
-import { InboxWriter } from '../../platform-common/src/inbox-writer.js';
-import { OutboxReader } from '../../platform-common/src/outbox-reader.js';
-import { HealthMonitor } from '../../platform-common/src/health-monitor.js';
-import { BusyDetector } from '../../platform-common/src/busy-detector.js';
-import { resolveSpeaker } from '../../platform-common/src/speaker-resolver.js';
+import { InboxWriter } from '../../common/src/inbox-writer.js';
+import { OutboxReader } from '../../common/src/outbox-reader.js';
+import { HealthMonitor } from '../../common/src/health-monitor.js';
+import { BusyDetector } from '../../common/src/busy-detector.js';
+import { resolveSpeaker } from '../../common/src/speaker-resolver.js';
 
 // ── Configuration ──
 
@@ -318,13 +318,7 @@ setInterval(() => checkPollerHeartbeat().catch(() => {}), 3 * 60_000);
 // ── Message Handler ──
 
 async function handleSlackMessage(msg: SlackMessage, senderName: string): Promise<void> {
-  // 0. Skip incubator channels — handled by channel-slack MCP
-  if (incubatorChannels.has(msg.channel)) {
-    console.log(`[router] Skipping incubator channel ${msg.channel}`);
-    return;
-  }
-
-  // 1. [Route: botId] 태그 → 해당 봇 직접 라우팅 (유지)
+  // 0. [Route: botId] 태그 → 해당 봇 직접 라우팅 (최우선)
   const routeTag = msg.text.match(/\[Route:\s*(\w+)\]/);
   let botId = 'semiclaw';
   let routeReason = 'orchestrator';
@@ -335,6 +329,12 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
       botId = candidate;
       routeReason = 'route-tag';
     }
+  }
+
+  // 1. Incubator channel → route to incubator bot mailbox
+  if (!routeTag && incubatorChannels.has(msg.channel)) {
+    botId = 'incubator';
+    routeReason = 'incubator-session';
   }
 
   // 2. Overflow routing: if semiclaw is busy, route to overflow session

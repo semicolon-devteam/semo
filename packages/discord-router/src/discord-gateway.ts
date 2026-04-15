@@ -22,8 +22,8 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import type { GatewayAdapter } from '../../platform-common/src/outbox-reader.js';
-import type { AskOption } from '../../platform-common/src/channel-types.js';
+import type { GatewayAdapter } from '../../common/src/outbox-reader.js';
+import type { AskOption } from '../../common/src/channel-types.js';
 import { splitDiscordMessage } from './markdown-to-discord.js';
 
 // ── Types ──
@@ -90,6 +90,9 @@ export class DiscordGateway implements GatewayAdapter {
   private pendingAskResponses = new Map<string, (value: string) => void>();
   private askCounter = 0;
 
+  // Guild-level allow list — all messages from these guilds are processed (e.g., incubator servers)
+  private allowedGuilds = new Set<string>();
+
   // Busy state + queue (serial processing per thread)
   private busyThreads = new Set<string>();
   private busyTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -110,6 +113,10 @@ export class DiscordGateway implements GatewayAdapter {
 
   setMessageHandler(handler: MessageHandler): void {
     this.onMessage = handler;
+  }
+
+  setAllowedGuilds(guildIds: string[]): void {
+    this.allowedGuilds = new Set(guildIds);
   }
 
   async start(): Promise<void> {
@@ -150,8 +157,10 @@ export class DiscordGateway implements GatewayAdapter {
       message.channel.type === ChannelType.PrivateThread;
     const isBotThreadReply = isThread && this.isBotThreadCached(message.channel.id);
 
-    // Filter: only process bot mentions, DMs, or replies in bot-tracked threads
-    if (!isMentioned && !isDM && !isBotThreadReply) return;
+    const isAllowedGuild = !!message.guildId && this.allowedGuilds.has(message.guildId);
+
+    // Filter: only process bot mentions, DMs, replies in bot-tracked threads, or allowed guild messages
+    if (!isMentioned && !isDM && !isBotThreadReply && !isAllowedGuild) return;
 
     // Track thread if bot was mentioned
     if (isMentioned) {
@@ -172,7 +181,9 @@ export class DiscordGateway implements GatewayAdapter {
       /* already reacted or missing permissions */
     }
     try {
-      await message.channel.sendTyping();
+      if ('sendTyping' in message.channel) {
+        await message.channel.sendTyping();
+      }
     } catch {
       /* typing indicator failure is non-fatal */
     }

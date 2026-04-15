@@ -17,14 +17,14 @@ import * as path from 'path';
 import * as os from 'os';
 import { Pool } from 'pg';
 
-import { Router } from '../../platform-common/src/channel-router.js';
-import { FALLBACK_BOT_IDS } from '../../platform-common/src/bot-config.js';
-import type { InboxMessage, OutboxMessage } from '../../platform-common/src/types.js';
+import { Router } from '../../common/src/channel-router.js';
+import { FALLBACK_BOT_IDS } from '../../common/src/bot-config.js';
+import type { InboxMessage, OutboxMessage } from '../../common/src/types.js';
 
-import { InboxWriter } from '../../platform-common/src/inbox-writer.js';
-import { OutboxReader } from '../../platform-common/src/outbox-reader.js';
-import { HealthMonitor } from '../../platform-common/src/health-monitor.js';
-import { resolveSpeaker } from '../../platform-common/src/speaker-resolver.js';
+import { InboxWriter } from '../../common/src/inbox-writer.js';
+import { OutboxReader } from '../../common/src/outbox-reader.js';
+import { HealthMonitor } from '../../common/src/health-monitor.js';
+import { resolveSpeaker } from '../../common/src/speaker-resolver.js';
 
 import { DiscordGateway } from './discord-gateway.js';
 import type { DiscordMessage } from './discord-gateway.js';
@@ -243,18 +243,33 @@ async function start(): Promise<void> {
   await router.loadRouting();
   console.log('[discord-router] Routing config loaded');
 
-  // 2. Set message handler
+  // 2. Load incubator guilds — all messages from these guilds are processed
+  try {
+    const guildRes = await pool.query(
+      `SELECT DISTINCT discord_guild FROM semo.incubator_sessions
+       WHERE status = 'active' AND discord_guild IS NOT NULL AND discord_guild != ''`,
+    );
+    const guilds = guildRes.rows.map((r: { discord_guild: string }) => r.discord_guild);
+    if (guilds.length > 0) {
+      discord.setAllowedGuilds(guilds);
+      console.log(`[discord-router] Allowed guilds (incubator): ${guilds.join(', ')}`);
+    }
+  } catch (err) {
+    console.error('[discord-router] Failed to load incubator guilds:', err);
+  }
+
+  // 3. Set message handler
   discord.setMessageHandler(handleDiscordMessage);
 
-  // 3. Start Discord WebSocket
+  // 4. Start Discord WebSocket
   await discord.start();
   console.log('[discord-router] Discord connected');
 
-  // 4. Start outbox reader
+  // 5. Start outbox reader
   outboxReader.start();
   console.log('[discord-router] Outbox reader started');
 
-  // 5. Start health monitor
+  // 6. Start health monitor
   healthMonitor.start();
   console.log('[discord-router] Health monitor started');
 

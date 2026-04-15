@@ -57,7 +57,7 @@ Slack Socket Mode → SlackGateway → Router → SessionPool → Claude Agent S
 
 ## 봇 워크스페이스 접근
 봇 파일을 읽거나 수정할 때는 \`~/.semo/workspaces/{bot}/\`를 직접 참조.
-\`resolveBotWorkspace(botId)\` 헬퍼 사용 (packages/cli/src/paths.ts, packages/platform-common/src/paths.ts).
+\`resolveBotWorkspace(botId)\` 헬퍼 사용 (packages/cli/src/paths.ts, packages/common/src/paths.ts).
 
 ## 자격증명
 \`~/.semo/credentials/{bot}/\` — Google 서비스 계정 등 봇 전용 자격증명.`,

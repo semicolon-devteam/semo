@@ -10,9 +10,9 @@
     "rootDir": "../..",
     "baseUrl": ".",
     "paths": {
-      "../../platform-common/src/*": ["../platform-common/src/*"]
+      "../../common/src/*": ["../common/src/*"]
     }
   },
-  "include": ["src", "../platform-common/src"],
+  "include": ["src", "../common/src"],
   "exclude": ["../**/__tests__/**", "../**/dist/**"]
 }

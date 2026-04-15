@@ -1,1 +1,1 @@
-export * from '../../platform-common/src/markdown-to-slack.js';
+export * from '../../common/src/markdown-to-slack.js';
