@@ -311,10 +311,7 @@ export async function teardownSandboxProject(serviceId: string): Promise<{ error
     | undefined;
   if (!sandbox?.enabled) return { error: '이 프로젝트는 샌드박스가 아닙니다.' };
 
-  // 1. DB cascade delete (sections, materials, research_tasks, infra_requests, etc.)
-  await query('DELETE FROM semo.services WHERE service_id = $1', [serviceId]);
-
-  // 2. KB namespace 정리
+  // 1. KB domain 전체 삭제 (pipeline/config 포함 — sections, materials 등 모두 KB에 저장됨)
   if (project.service_domain) {
     try {
       const { deleteItemsByDomain } = await import('../../core/kb');
@@ -352,12 +349,11 @@ export async function teardownAllSandboxProjects(): Promise<{
 // ── List & Query ──
 
 export async function listSandboxProjects(): Promise<ServiceProject[]> {
-  const res = await query<ServiceProject>(
-    `SELECT * FROM semo.services
-     WHERE metadata->'sandbox'->>'enabled' = 'true'
-     ORDER BY created_at DESC`,
-  );
-  return res.rows;
+  const all = await listProjects();
+  return all.filter((p) => {
+    const sandbox = (p.metadata as Record<string, unknown>)?.sandbox as SandboxConfig | undefined;
+    return sandbox?.enabled === true;
+  });
 }
 
 export interface SandboxReport {
@@ -556,41 +552,27 @@ export async function reinitializeSandbox(
 
 type RunStatKey = 'sections_generated' | 'sections_reviewed' | 'rejections' | 'phases_completed';
 
-const RUN_STAT_PATHS: Record<RunStatKey, { jsonPath: string; jsonQuery: string }> = {
-  sections_generated: {
-    jsonPath: '{sandbox,run_stats,sections_generated}',
-    jsonQuery: "metadata->'sandbox'->'run_stats'->>'sections_generated'",
-  },
-  sections_reviewed: {
-    jsonPath: '{sandbox,run_stats,sections_reviewed}',
-    jsonQuery: "metadata->'sandbox'->'run_stats'->>'sections_reviewed'",
-  },
-  rejections: {
-    jsonPath: '{sandbox,run_stats,rejections}',
-    jsonQuery: "metadata->'sandbox'->'run_stats'->>'rejections'",
-  },
-  phases_completed: {
-    jsonPath: '{sandbox,run_stats,phases_completed}',
-    jsonQuery: "metadata->'sandbox'->'run_stats'->>'phases_completed'",
-  },
-};
-
 async function incrementRunStat(
   serviceId: string,
   stat: RunStatKey,
   amount: number = 1,
 ): Promise<void> {
-  const paths = RUN_STAT_PATHS[stat];
-  await query(
-    `UPDATE semo.services
-     SET metadata = jsonb_set(
-       metadata,
-       '${paths.jsonPath}',
-       (COALESCE((${paths.jsonQuery})::int, 0) + $1)::text::jsonb
-     )
-     WHERE service_id = $2`,
-    [amount, serviceId],
-  );
+  const project = await getProject(serviceId);
+  if (!project) return;
+  const sandbox = (project.metadata as Record<string, unknown>)?.sandbox as
+    | SandboxConfig
+    | undefined;
+  if (!sandbox) return;
+
+  const current = sandbox.run_stats?.[stat] ?? 0;
+  await updateProject(serviceId, {
+    metadata: {
+      sandbox: {
+        ...sandbox,
+        run_stats: { ...sandbox.run_stats, [stat]: current + amount },
+      },
+    },
+  });
 }
 
 export { incrementRunStat };
@@ -659,12 +641,22 @@ export async function scheduleSandboxNextPhase(
   const maxPhase = getMaxPhaseForDepth(sandbox.depth);
   if (nextPhase > maxPhase) {
     // 완료
-    await query(
-      `UPDATE semo.services
-       SET metadata = jsonb_set(metadata, '{sandbox,run_stats,completed_at}', $1::jsonb)
-       WHERE service_id = $2`,
-      [JSON.stringify(new Date().toISOString()), serviceId],
-    );
+    const doneProject = await getProject(serviceId);
+    if (doneProject) {
+      const doneSandbox = (doneProject.metadata as Record<string, unknown>)?.sandbox as
+        | SandboxConfig
+        | undefined;
+      if (doneSandbox) {
+        await updateProject(serviceId, {
+          metadata: {
+            sandbox: {
+              ...doneSandbox,
+              run_stats: { ...doneSandbox.run_stats, completed_at: new Date().toISOString() },
+            },
+          },
+        });
+      }
+    }
     console.log(`[SANDBOX] Run completed for ${serviceId}`);
     return;
   }
@@ -849,72 +841,83 @@ Submit each section via POST /api/projects/callback with:
 // ── Phase Timing ──
 
 async function logPhaseStart(serviceId: string, phase: number, botId: string): Promise<void> {
-  // phase_timings 초기화 + 해당 phase 기록
-  await query(
-    `UPDATE semo.services
-     SET metadata = jsonb_set(
-       jsonb_set(
-         metadata,
-         '{sandbox,run_stats,phase_timings}',
-         COALESCE(metadata->'sandbox'->'run_stats'->'phase_timings', '{}'::jsonb)
-       ),
-       $1::text[],
-       $2::jsonb
-     )
-     WHERE service_id = $3`,
-    [
-      ['sandbox', 'run_stats', 'phase_timings', String(phase)],
-      JSON.stringify({ started_at: new Date().toISOString() }),
-      serviceId,
-    ],
-  );
-  // bot_assignments 기록
-  await query(
-    `UPDATE semo.services
-     SET metadata = jsonb_set(
-       jsonb_set(
-         metadata,
-         '{sandbox,run_stats,bot_assignments}',
-         COALESCE(metadata->'sandbox'->'run_stats'->'bot_assignments', '{}'::jsonb)
-       ),
-       $1::text[],
-       $2::jsonb
-     )
-     WHERE service_id = $3`,
-    [['sandbox', 'run_stats', 'bot_assignments', String(phase)], JSON.stringify(botId), serviceId],
-  );
+  const project = await getProject(serviceId);
+  if (!project) return;
+  const sandbox = (project.metadata as Record<string, unknown>)?.sandbox as
+    | SandboxConfig
+    | undefined;
+  if (!sandbox) return;
+
+  const runStats = sandbox.run_stats;
+  const phaseTimings = runStats?.phase_timings;
+  const botAssignments = runStats?.bot_assignments;
+
+  await updateProject(serviceId, {
+    metadata: {
+      sandbox: {
+        ...sandbox,
+        run_stats: {
+          ...runStats,
+          phase_timings: {
+            ...(phaseTimings ?? {}),
+            [phase]: { started_at: new Date().toISOString() },
+          },
+          bot_assignments: {
+            ...(botAssignments ?? {}),
+            [phase]: botId,
+          },
+        },
+      },
+    },
+  });
 }
 
 async function logPhaseComplete(serviceId: string, phase: number): Promise<void> {
-  await query(
-    `UPDATE semo.services
-     SET metadata = jsonb_set(
-       metadata,
-       $1::text[],
-       $2::jsonb
-     )
-     WHERE service_id = $3
-       AND metadata->'sandbox'->'run_stats'->'phase_timings'->$4 IS NOT NULL`,
-    [
-      ['sandbox', 'run_stats', 'phase_timings', String(phase), 'completed_at'],
-      JSON.stringify(new Date().toISOString()),
-      serviceId,
-      String(phase),
-    ],
-  );
+  const project = await getProject(serviceId);
+  if (!project) return;
+  const sandbox = (project.metadata as Record<string, unknown>)?.sandbox as
+    | SandboxConfig
+    | undefined;
+  if (!sandbox) return;
+
+  const runStats = sandbox.run_stats;
+  const phaseTimings = runStats?.phase_timings;
+  const existing = phaseTimings?.[phase];
+  if (!existing) return; // phase_timings에 해당 phase가 없으면 스킵
+
+  await updateProject(serviceId, {
+    metadata: {
+      sandbox: {
+        ...sandbox,
+        run_stats: {
+          ...runStats,
+          phase_timings: {
+            ...(phaseTimings ?? {}),
+            [phase]: { ...existing, completed_at: new Date().toISOString() },
+          },
+        },
+      },
+    },
+  });
 }
 
 // ── Cost Tracking ──
 
 export async function incrementSandboxCost(serviceId: string, costDelta: number): Promise<void> {
-  await query(
-    `UPDATE semo.services
-     SET metadata = jsonb_set(
-       metadata,
-       '{sandbox,run_stats,cost_usd}',
-       (COALESCE((metadata->'sandbox'->'run_stats'->>'cost_usd')::numeric, 0) + $1)::text::jsonb
-     )
-     WHERE service_id = $2`,
-    [costDelta, serviceId],
-  );
+  const project = await getProject(serviceId);
+  if (!project) return;
+  const sandbox = (project.metadata as Record<string, unknown>)?.sandbox as
+    | SandboxConfig
+    | undefined;
+  if (!sandbox) return;
+
+  const currentCost = sandbox.run_stats?.cost_usd ?? 0;
+  await updateProject(serviceId, {
+    metadata: {
+      sandbox: {
+        ...sandbox,
+        run_stats: { ...sandbox.run_stats, cost_usd: currentCost + costDelta },
+      },
+    },
+  });
 }
