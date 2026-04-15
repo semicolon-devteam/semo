@@ -1,6 +1,6 @@
 # semo — Claude Configuration
 
-> SEMO v4.7.0 (2026-04-06)
+> SEMO v4.8.0 (2026-04-15) — services/service_* 13개 테이블 KB 이식 완료
 > 공통 규칙(KB-First, 3자 동기화, KB CLI)은 `~/.claude/CLAUDE.md` 참조.
 
 ---
