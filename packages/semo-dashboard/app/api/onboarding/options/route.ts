@@ -27,12 +27,16 @@ export async function GET() {
          AND EXISTS (SELECT 1 FROM semo.knowledge_base org WHERE org.domain = o.domain AND org.key = 'organization' AND org.content = 'semicolon')
        ORDER BY o.domain`,
     ),
-    // 3) 인큐베이터 프로젝트 — build 라이프사이클(인큐베이터)만 노출 (core DB)
+    // 3) 인큐베이터 프로젝트 — build 라이프사이클, KB pipeline/config에서 조회
     query<{ service_id: string; project_name: string; service_domain: string }>(
-      `SELECT service_id, project_name, service_domain
-       FROM semo.services
-       WHERE status = 'active' AND lifecycle = 'build'
-       ORDER BY project_name`,
+      `SELECT kb.metadata->>'service_id' AS service_id,
+              kb.metadata->>'project_name' AS project_name,
+              kb.domain AS service_domain
+       FROM semo.knowledge_base kb
+       JOIN semo.ontology o ON o.domain = kb.domain AND o.entity_type = 'service'
+       WHERE kb.key = 'pipeline' AND kb.sub_key = 'config'
+         AND kb.metadata->>'status' = 'active' AND kb.metadata->>'lifecycle' = 'build'
+       ORDER BY kb.metadata->>'project_name'`,
     ),
   ]);
 

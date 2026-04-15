@@ -52,13 +52,10 @@ export async function GET() {
   // 프로젝트 이름
   const serviceMap = new Map<string, string>();
   if (serviceIds.length > 0) {
-    const placeholders = serviceIds.map((_, i) => `$${i + 1}`).join(',');
-    const res = await query<{ service_id: string; project_name: string }>(
-      `SELECT service_id, project_name FROM semo.services WHERE service_id IN (${placeholders})`,
-      serviceIds,
-    );
-    for (const row of res.rows) {
-      serviceMap.set(row.service_id, row.project_name);
+    const { getProject } = await import('@/lib/service');
+    for (const sid of serviceIds) {
+      const proj = await getProject(sid);
+      if (proj) serviceMap.set(sid, proj.project_name);
     }
   }
 

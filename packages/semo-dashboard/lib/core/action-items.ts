@@ -36,12 +36,12 @@ export async function listActionItems(filters: ActionItemFilters = {}): Promise<
     `SELECT ai.*,
             COALESCE(nk.content, INITCAP(o_owner.domain)) AS owner_label,
             o_owner.entity_type AS owner_entity_type,
-            COALESCE(s.project_name, o_target.description, ai.target_domain) AS target_label
+            COALESCE(kb_pn.metadata->>'project_name', o_target.description, ai.target_domain) AS target_label
      FROM semo.action_items ai
      JOIN semo.ontology o_owner ON ai.owner_domain = o_owner.domain
      LEFT JOIN semo.knowledge_base nk ON nk.domain = ai.owner_domain AND nk.key = 'nickname'
      LEFT JOIN semo.ontology o_target ON ai.target_domain = o_target.domain
-     LEFT JOIN semo.services s ON s.service_domain = ai.target_domain
+     LEFT JOIN semo.knowledge_base kb_pn ON kb_pn.domain = ai.target_domain AND kb_pn.key = 'pipeline' AND kb_pn.sub_key = 'config'
      ${where}
      ORDER BY CASE ai.status WHEN 'open' THEN 0 WHEN 'completed' THEN 1 ELSE 2 END,
               ai.sort_order, ai.created_at DESC`,

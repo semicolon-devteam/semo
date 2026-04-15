@@ -336,17 +336,14 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // services.metadata에 Stitch 프로젝트/디자인시스템 ID 저장
-        await query(
-          `UPDATE semo.services
-           SET metadata = COALESCE(metadata, '{}'::jsonb)
-             || jsonb_build_object(
-                  'stitch_project_id', $2::text,
-                  'stitch_design_system_id', $3::text
-                )
-           WHERE service_id::text LIKE $1 || '%'`,
-          [body.service_id, body.stitch_project_id, body.stitch_design_system_id],
-        );
+        // services metadata에 Stitch 프로젝트/디자인시스템 ID 저장 (KB)
+        const { updateProject } = await import('@/lib/service');
+        await updateProject(body.service_id, {
+          metadata: {
+            stitch_project_id: body.stitch_project_id,
+            stitch_design_system_id: body.stitch_design_system_id,
+          },
+        });
 
         // Slack 알림
         const dsProject = await getProject(body.service_id);
@@ -841,10 +838,8 @@ export async function POST(request: NextRequest) {
         };
         inc.last_activity = `CP-${body.checkpoint}: ${body.summary || body.status}`;
 
-        await query(
-          'UPDATE semo.services SET metadata = $1, updated_at = NOW() WHERE service_id = $2',
-          [JSON.stringify(incMetadata), body.service_id],
-        );
+        const { updateProject: updateInc } = await import('@/lib/service');
+        await updateInc(body.service_id, { metadata: incMetadata });
 
         console.log(
           `[Callback] Incubator CP-${body.checkpoint} ${body.status} for ${body.service_id} by ${body.bot_id}`,

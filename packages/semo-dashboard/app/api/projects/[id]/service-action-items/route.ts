@@ -11,11 +11,9 @@ export const dynamic = 'force-dynamic';
 
 /** service_id(UUID) → service_domain(문자열) 변환 */
 async function resolveServiceDomain(serviceId: string): Promise<string | null> {
-  const res = await query<{ service_domain: string }>(
-    `SELECT service_domain FROM semo.services WHERE service_id = $1 LIMIT 1`,
-    [serviceId],
-  );
-  return res.rows[0]?.service_domain ?? null;
+  const { getProject } = await import('@/lib/service');
+  const project = await getProject(serviceId);
+  return project?.service_domain ?? null;
 }
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

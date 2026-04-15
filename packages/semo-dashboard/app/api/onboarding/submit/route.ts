@@ -69,10 +69,9 @@ export async function POST(request: Request) {
     if (!body.serviceId) {
       return NextResponse.json({ error: '프로젝트를 선택해주세요.' }, { status: 400 });
     }
-    const check = await query(`SELECT 1 FROM semo.services WHERE service_id = $1`, [
-      body.serviceId,
-    ]);
-    if (check.rowCount === 0) {
+    const { getProject } = await import('@/lib/service');
+    const checkProject = await getProject(body.serviceId);
+    if (!checkProject) {
       return NextResponse.json({ error: '존재하지 않는 프로젝트입니다.' }, { status: 400 });
     }
     linkedServiceId = body.serviceId;

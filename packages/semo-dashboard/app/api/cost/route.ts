@@ -23,10 +23,11 @@ export async function GET(request: NextRequest) {
                MIN(c.created_at)::date AS first_activity,
                MAX(c.created_at)::date AS last_activity
         FROM semo.bot_cost_log c
-        JOIN semo.services s ON s.service_id::text = c.service_id
-                              OR LEFT(s.service_id::text, 8) = c.service_id
+        JOIN semo.knowledge_base kb ON kb.key = 'pipeline' AND kb.sub_key = 'config'
+          AND (kb.metadata->>'service_id' = c.service_id
+               OR LEFT(kb.metadata->>'service_id', 8) = c.service_id)
         WHERE c.service_id IS NOT NULL
-        GROUP BY s.service_id, s.project_name, s.service_domain
+        GROUP BY kb.metadata->>'service_id', kb.metadata->>'project_name', kb.domain
         ORDER BY total_cost_usd DESC
       `);
       return NextResponse.json({ projects: result.rows });

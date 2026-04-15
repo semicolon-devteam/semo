@@ -82,15 +82,13 @@ export async function resolveServiceSlackContext(serviceId: string): Promise<Ser
   let ownerSlackId: string | null = null;
 
   try {
-    const project = await query(
-      `SELECT metadata, service_domain, project_name, slack_channel FROM semo.services WHERE service_id = $1`,
-      [serviceId],
-    );
-    if (project.rows.length > 0) {
-      const meta = project.rows[0].metadata as Record<string, unknown>;
-      const domain = project.rows[0].service_domain as string;
-      const projectName = project.rows[0].project_name as string;
-      const dbSlackChannel = project.rows[0].slack_channel as string | null;
+    const { getProject } = await import('./plugins/service/service');
+    const proj = await getProject(serviceId);
+    if (proj) {
+      const meta = proj.metadata as Record<string, unknown>;
+      const domain = proj.service_domain as string;
+      const projectName = proj.project_name as string;
+      const dbSlackChannel = proj.slack_channel as string | null;
 
       // Sandbox: 전용 채널로 리다이렉트 (#proj-si-sandbox)
       const sandbox = meta?.sandbox as Record<string, unknown> | undefined;

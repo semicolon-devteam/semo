@@ -26,33 +26,66 @@ import type {
   DeployVerificationChecks,
 } from '@/types';
 
-// ── Projects ──
+// ── Projects (KB-backed) ──
+// KB key: pipeline/config — 모든 ServiceProject 필드를 metadata에 저장
 
-export async function listProjects(status?: string): Promise<ServiceProject[]> {
-  let sql = 'SELECT * FROM semo.services';
-  const params: string[] = [];
-  if (status) {
-    sql += ' WHERE status = $1';
-    params.push(status);
-  }
-  sql += ' ORDER BY created_at DESC';
-  const res = await query<ServiceProject>(sql, params);
-  return res.rows;
+function kbToProject(item: {
+  domain: string;
+  key: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+  updated_at?: string;
+}): ServiceProject {
+  const m = (item.metadata ?? {}) as Record<string, unknown>;
+  return {
+    service_id: (m.service_id as string) ?? item.domain,
+    project_name: (m.project_name as string) ?? '',
+    service_domain: item.domain,
+    owner_name: (m.owner_name as string) ?? '',
+    owner_contact: (m.owner_contact as string) ?? null,
+    current_phase: (m.current_phase as number) ?? 0,
+    infra_phase: (m.infra_phase as number) ?? null,
+    status: ((m.status as string) ?? 'active') as ServiceProject['status'],
+    lifecycle: ((m.lifecycle as string) ?? 'build') as ServiceProject['lifecycle'],
+    launched_at: (m.launched_at as string) ?? null,
+    metadata: (m.project_metadata as Record<string, unknown>) ?? {},
+    created_at: (m.created_at as string) ?? '',
+    updated_at: (item.updated_at as string) ?? '',
+    tech_stack: (m.tech_stack as string) ?? null,
+    service_url: (m.service_url as string) ?? null,
+    bm: (m.bm as string) ?? null,
+    repo: (m.repo as string) ?? null,
+    slack_channel: (m.slack_channel as string) ?? null,
+    service_type: ((m.service_type as string) ?? 'incubator') as ServiceProject['service_type'],
+    parent_service_id: (m.parent_service_id as string) ?? null,
+  };
 }
 
-export async function getProject(serviceId: string): Promise<ServiceProject | null> {
-  const res = await query<ServiceProject>('SELECT * FROM semo.services WHERE service_id =$1', [
-    serviceId,
-  ]);
-  return res.rows[0] ?? null;
+export async function listProjects(status?: string): Promise<ServiceProject[]> {
+  const { listByKeyAcrossDomains: listAcross } = await import('../../core/kb');
+  const where = status ? { status } : undefined;
+  const items = await listAcross('service', 'pipeline/config', where);
+  const projects = items.map(kbToProject);
+  return projects.sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
+}
+
+export async function getProject(serviceIdOrDomain: string): Promise<ServiceProject | null> {
+  // domain으로 직접 조회 시도
+  const item = await kbGetItem(serviceIdOrDomain, 'pipeline/config');
+  if (item) return kbToProject(item);
+
+  // UUID service_id로 검색 (레거시 호환)
+  const { listByKeyAcrossDomains: listAcross } = await import('../../core/kb');
+  const found = await listAcross('service', 'pipeline/config', { service_id: serviceIdOrDomain });
+  if (found.length > 0) return kbToProject(found[0]);
+
+  return null;
 }
 
 export async function getChildServices(parentId: string): Promise<ServiceProject[]> {
-  const res = await query<ServiceProject>(
-    'SELECT * FROM semo.services WHERE parent_service_id = $1 ORDER BY project_name',
-    [parentId],
-  );
-  return res.rows;
+  const { listByKeyAcrossDomains: listAcross } = await import('../../core/kb');
+  const items = await listAcross('service', 'pipeline/config', { parent_service_id: parentId });
+  return items.map(kbToProject).sort((a, b) => a.project_name.localeCompare(b.project_name));
 }
 
 export async function createProject(data: {
@@ -62,46 +95,49 @@ export async function createProject(data: {
   service_domain?: string;
   metadata?: Record<string, unknown>;
 }): Promise<ServiceProject> {
-  // 온톨로지 자동 등록: service_domain이 지정되었으나 아직 등록 안 된 경우
-  if (data.service_domain) {
-    await ensureOntologyDomain(data.service_domain, data.project_name);
-  }
+  const domain = data.service_domain;
+  if (!domain) throw new Error('service_domain은 필수입니다.');
 
-  const res = await query<ServiceProject>(
-    `INSERT INTO semo.services (project_name, owner_name, owner_contact, service_domain, metadata, service_type)
-     VALUES ($1, $2, $3, $4, $5, $6)
-     RETURNING *`,
-    [
-      data.project_name,
-      data.owner_name,
-      data.owner_contact ?? null,
-      data.service_domain ?? null,
-      JSON.stringify({ preset: 'parallel', ...data.metadata }),
-      'incubator',
-    ],
+  // 온톨로지 자동 등록
+  await ensureOntologyDomain(domain, data.project_name);
+
+  const serviceId = randomUUID();
+  const now = new Date().toISOString();
+  const projectMetadata = { preset: 'parallel', ...data.metadata };
+  const infraPhase = projectMetadata.preset === 'parallel' ? 0 : null;
+
+  const item = await kbUpsert(domain, 'pipeline/config', data.project_name, 'pm-pipeline', {
+    service_id: serviceId,
+    project_name: data.project_name,
+    owner_name: data.owner_name,
+    owner_contact: data.owner_contact ?? null,
+    current_phase: 0,
+    infra_phase: infraPhase,
+    status: 'active',
+    lifecycle: 'build',
+    service_type: 'incubator',
+    parent_service_id: null,
+    tech_stack: null,
+    service_url: null,
+    bm: null,
+    repo: null,
+    slack_channel: null,
+    launched_at: null,
+    project_metadata: projectMetadata,
+    created_at: now,
+  });
+  const project = kbToProject(item);
+
+  // gfp-id KB 기록
+  writeServiceIdToKB(domain, project).catch((err) =>
+    console.error('[PM] KB service-id write failed:', err),
   );
-  const project = res.rows[0];
 
-  // parallel 프리셋: infra_phase = 0 초기화 (Track B 활성화)
-  if (data.metadata?.preset === 'parallel') {
-    await query('UPDATE semo.services SET infra_phase = 0 WHERE service_id =$1', [
-      project.service_id,
-    ]);
-    project.infra_phase = 0;
-  }
-
-  // KB에 gfp_id 저장 (service_domain이 있을 때)
-  if (data.service_domain) {
-    writeServiceIdToKB(data.service_domain, project).catch((err) =>
-      console.error('[PM] KB service-id write failed:', err),
+  // infra-ready 프리셋
+  if (data.metadata?.preset === 'infra-ready') {
+    writeInfraToKB(domain, data.metadata).catch((err) =>
+      console.error('[PM] KB infra write failed:', err),
     );
-
-    // infra-ready 프리셋: 인프라 정보를 KB에 별도 기록
-    if (data.metadata?.preset === 'infra-ready') {
-      writeInfraToKB(data.service_domain, data.metadata).catch((err) =>
-        console.error('[PM] KB infra write failed:', err),
-      );
-    }
   }
 
   return project;
@@ -197,50 +233,31 @@ export async function updateProject(
     >
   >,
 ): Promise<ServiceProject | null> {
-  const sets: string[] = [];
-  const params: unknown[] = [];
-  let idx = 1;
+  const project = await getProject(serviceId);
+  if (!project?.service_domain) return null;
+  const domain = project.service_domain;
 
-  if (data.project_name !== undefined) {
-    sets.push(`project_name = $${idx++}`);
-    params.push(data.project_name);
-  }
-  if (data.current_phase !== undefined) {
-    sets.push(`current_phase = $${idx++}`);
-    params.push(data.current_phase);
-  }
-  if (data.infra_phase !== undefined) {
-    sets.push(`infra_phase = $${idx++}`);
-    params.push(data.infra_phase);
-  }
-  if (data.status !== undefined) {
-    sets.push(`status = $${idx++}`);
-    params.push(data.status);
-  }
+  const patch: Record<string, unknown> = {};
+  if (data.project_name !== undefined) patch.project_name = data.project_name;
+  if (data.current_phase !== undefined) patch.current_phase = data.current_phase;
+  if (data.infra_phase !== undefined) patch.infra_phase = data.infra_phase;
+  if (data.status !== undefined) patch.status = data.status;
   if (data.lifecycle !== undefined) {
-    sets.push(`lifecycle = $${idx++}`);
-    params.push(data.lifecycle);
-    if (data.lifecycle === 'ops') {
-      sets.push(`launched_at = COALESCE(launched_at, NOW())`);
+    patch.lifecycle = data.lifecycle;
+    if (data.lifecycle === 'ops' && !project.launched_at) {
+      patch.launched_at = new Date().toISOString();
     }
   }
-  if (data.launched_at !== undefined) {
-    sets.push(`launched_at = $${idx++}`);
-    params.push(data.launched_at);
-  }
+  if (data.launched_at !== undefined) patch.launched_at = data.launched_at;
   if (data.metadata !== undefined) {
-    sets.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${idx++}::jsonb`);
-    params.push(JSON.stringify(data.metadata));
+    // 기존 metadata와 병합
+    patch.project_metadata = { ...(project.metadata ?? {}), ...data.metadata };
   }
 
-  if (sets.length === 0) return getProject(serviceId);
+  if (Object.keys(patch).length === 0) return project;
 
-  params.push(serviceId);
-  const res = await query<ServiceProject>(
-    `UPDATE semo.services SET ${sets.join(', ')} WHERE service_id =$${idx} RETURNING *`,
-    params,
-  );
-  return res.rows[0] ?? null;
+  const item = await kbUpdateMetadata(domain, 'pipeline/config', patch);
+  return item ? kbToProject(item) : null;
 }
 
 // ── Sections (KB-backed) ──
@@ -643,12 +660,7 @@ export async function getDesignStep(serviceId: string): Promise<number> {
 }
 
 export async function setDesignStep(serviceId: string, step: number): Promise<void> {
-  await query(
-    `UPDATE semo.services
-     SET metadata = COALESCE(metadata, '{}'::jsonb) || $1::jsonb
-     WHERE service_id =$2`,
-    [JSON.stringify({ design_step: step }), serviceId],
-  );
+  await updateProject(serviceId, { metadata: { design_step: step } });
 }
 
 /**
@@ -1280,40 +1292,22 @@ export interface ServiceOverviewKB {
 }
 
 export async function getServiceOverviewKB(serviceDomain: string): Promise<ServiceOverviewKB> {
-  // 1) services 테이블에서 SoT 컬럼 조회
-  const svcRes = await query<{
-    owner_name: string | null;
-    tech_stack: string | null;
-    service_url: string | null;
-    repo: string | null;
-    slack_channel: string | null;
-    bm: string | null;
-    status: string | null;
-  }>(
-    `SELECT owner_name, tech_stack, service_url, repo, slack_channel, bm, status
-     FROM semo.services WHERE service_domain = $1 LIMIT 1`,
-    [serviceDomain],
-  );
-  const svc = svcRes.rows[0];
+  // pipeline/config에서 프로젝트 메타 조회 (KB 기반)
+  const project = await getProject(serviceDomain);
 
-  // 2) KB에서 자유형 텍스트 키만 조회
-  const kbKeys = ['base-information', 'current-situation', 'infra'];
-  const kbRes = await query<{ key: string; content: string }>(
-    `SELECT key, content FROM semo.knowledge_base
-     WHERE domain = $1 AND key = ANY($2) AND (sub_key = '' OR sub_key IS NULL)
-     ORDER BY key`,
-    [serviceDomain, kbKeys],
-  );
-  const map = new Map(kbRes.rows.map((r) => [r.key, r.content]));
+  // KB에서 자유형 텍스트 키 조회
+  const { list: kbListAll } = await import('../../core/kb');
+  const kbItems = await kbListAll(serviceDomain);
+  const map = new Map(kbItems.map((r) => [r.key, r.content]));
 
   return {
     baseInformation: map.get('base-information') ?? null,
-    po: svc?.owner_name ?? null,
-    techStack: svc?.tech_stack ?? null,
-    serviceUrl: svc?.service_url ?? null,
-    repo: svc?.repo ?? null,
-    slackChannel: svc?.slack_channel ?? null,
-    bm: svc?.bm ?? null,
+    po: project?.owner_name ?? null,
+    techStack: project?.tech_stack ?? null,
+    serviceUrl: project?.service_url ?? null,
+    repo: project?.repo ?? null,
+    slackChannel: project?.slack_channel ?? null,
+    bm: project?.bm ?? null,
     currentSituation: map.get('current-situation') ?? null,
     infra: map.get('infra') ?? null,
   };
