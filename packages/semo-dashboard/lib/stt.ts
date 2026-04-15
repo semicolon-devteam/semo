@@ -1,7 +1,7 @@
 /**
  * Self-Hosted STT Client
  *
- * Calls semo-stt (faster-whisper + pyannote) FastAPI service.
+ * Calls semo-meeting (faster-whisper + pyannote) FastAPI service.
  * Drop-in replacement for the former VITO API client — same exported types & functions.
  */
 

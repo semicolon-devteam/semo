@@ -4,7 +4,7 @@
  * 구현체:
  * - ConsoleSTTAdapter: TCP 소켓 기반 텍스트 시뮬레이션 (Phase 1)
  * - DeepgramSTTAdapter: 클라우드 스트리밍 (Phase 2)
- * - LocalWhisperSTTAdapter: semo-stt 로컬 (Phase 2)
+ * - LocalWhisperSTTAdapter: semo-meeting 로컬 (Phase 2)
  *
  * 주의: MCP StdioServerTransport가 process.stdin을 점유하므로
  *       Console 모드에서도 stdin 직접 사용 금지.
