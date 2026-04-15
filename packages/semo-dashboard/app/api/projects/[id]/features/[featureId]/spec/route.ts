@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { updateFeature } from '@/lib/service';
-import { query } from '@/lib/db';
+import { updateFeature, getFeatureById } from '@/lib/service';
 import { normalizeSpec, mergeSpecs, validateSpec } from '@/lib/feature-spec';
 import type { FeatureSpec, ServiceFeature } from '@/types';
 
@@ -12,13 +11,9 @@ export async function GET(
   { params }: { params: Promise<{ id: string; featureId: string }> },
 ) {
   try {
-    const { featureId } = await params;
+    const { id, featureId } = await params;
 
-    const res = await query<ServiceFeature>(
-      'SELECT * FROM semo.service_features WHERE feature_id = $1',
-      [featureId],
-    );
-    const feature = res.rows[0];
+    const feature = await getFeatureById(id, featureId);
     if (!feature) return NextResponse.json({ error: 'Feature not found' }, { status: 404 });
 
     const spec = normalizeSpec(feature.metadata?.spec);
@@ -39,15 +34,11 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string; featureId: string }> },
 ) {
   try {
-    const { featureId } = await params;
+    const { id, featureId } = await params;
     const body = await request.json();
 
-    // 기존 feature 조회
-    const res = await query<ServiceFeature>(
-      'SELECT * FROM semo.service_features WHERE feature_id = $1',
-      [featureId],
-    );
-    const feature = res.rows[0];
+    // 기존 feature 조회 (KB)
+    const feature = await getFeatureById(id, featureId);
     if (!feature) return NextResponse.json({ error: 'Feature not found' }, { status: 404 });
 
     // 기존 spec 정규화 + 병합
@@ -88,7 +79,7 @@ export async function POST(
     }
 
     if (action === 'test-result') {
-      return handleTestResult(featureId, body);
+      return handleTestResult(id, featureId, body);
     }
 
     return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 });
@@ -99,7 +90,7 @@ export async function POST(
 }
 
 async function handleGenerate(serviceId: string, featureId: string) {
-  const { getProject } = await import('@/lib/service');
+  const { getProject, getFeatureById: getFeature } = await import('@/lib/service');
   const { dispatchSpecEnrichment } = await import('@/lib/service-bot');
 
   const project = await getProject(serviceId);
@@ -107,11 +98,7 @@ async function handleGenerate(serviceId: string, featureId: string) {
     return NextResponse.json({ error: 'Project not found' }, { status: 404 });
   }
 
-  const res = await query<ServiceFeature>(
-    'SELECT * FROM semo.service_features WHERE feature_id = $1',
-    [featureId],
-  );
-  const feature = res.rows[0];
+  const feature = await getFeature(serviceId, featureId);
   if (!feature) return NextResponse.json({ error: 'Feature not found' }, { status: 404 });
 
   // 기존 spec 가져오기
@@ -134,7 +121,11 @@ async function handleGenerate(serviceId: string, featureId: string) {
   return NextResponse.json({ ok: true, message: 'Spec generation dispatched to PlanClaw' });
 }
 
-async function handleTestResult(featureId: string, body: Record<string, unknown>) {
+async function handleTestResult(
+  serviceId: string,
+  featureId: string,
+  body: Record<string, unknown>,
+) {
   const { scenario_id, result, notes } = body as {
     scenario_id: string;
     result: 'pass' | 'fail' | 'skip';
@@ -145,11 +136,7 @@ async function handleTestResult(featureId: string, body: Record<string, unknown>
     return NextResponse.json({ error: 'scenario_id and result are required' }, { status: 400 });
   }
 
-  const res = await query<ServiceFeature>(
-    'SELECT * FROM semo.service_features WHERE feature_id = $1',
-    [featureId],
-  );
-  const feature = res.rows[0];
+  const feature = await getFeatureById(serviceId, featureId);
   if (!feature) return NextResponse.json({ error: 'Feature not found' }, { status: 404 });
 
   const spec = normalizeSpec(feature.metadata?.spec);

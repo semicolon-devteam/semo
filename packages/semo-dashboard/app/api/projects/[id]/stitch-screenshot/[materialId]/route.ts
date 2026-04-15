@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { getMaterial } from '@/lib/service';
 
 export async function GET(
   _request: Request,
@@ -7,18 +7,16 @@ export async function GET(
 ) {
   const { id, materialId } = await params;
 
-  const res = await query(
-    `SELECT screenshot_data FROM semo.service_materials
-     WHERE material_id = $1 AND service_id = $2 AND screenshot_data IS NOT NULL`,
-    [materialId, id],
-  );
+  const material = await getMaterial(id, materialId);
+  const screenshotData = (material as unknown as Record<string, unknown>)?.screenshot_data as
+    | string
+    | undefined;
 
-  if (res.rows.length === 0) {
+  if (!material || !screenshotData) {
     return NextResponse.json({ error: 'Screenshot not found' }, { status: 404 });
   }
 
-  const base64 = res.rows[0].screenshot_data as string;
-  const buffer = Buffer.from(base64, 'base64');
+  const buffer = Buffer.from(screenshotData, 'base64');
 
   return new NextResponse(buffer, {
     headers: {

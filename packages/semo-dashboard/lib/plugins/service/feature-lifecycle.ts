@@ -8,8 +8,8 @@
  * 각 전환 시 감사 로그 기록 + 다음 단계 봇 자동 디스패치.
  */
 
-import { query } from '../../db';
-import { updateFeature, getProject } from './service';
+import { updateFeature, getProject, getFeatureById } from './service';
+import { updateMetadata } from '../../core/kb';
 import { dispatchBotMessage } from './service-bot';
 import { getItem } from '../../core/kb';
 import type { ServiceFeatureStatus } from '@/types';
@@ -48,16 +48,27 @@ export async function transitionFeatureStatus(
     reason?: string;
     metadata?: Record<string, unknown>;
     skipDispatch?: boolean; // 테스트용: 봇 디스패치 건너뛰기
+    serviceId?: string; // KB 조회용 service_id
   } = {},
 ): Promise<TransitionResult> {
-  const { triggeredBy = 'system', reason, metadata: extraMeta, skipDispatch } = opts;
+  const { triggeredBy = 'system', reason, metadata: extraMeta, skipDispatch, serviceId } = opts;
 
-  // 1. 현재 상태 조회
-  const res = await query<ServiceFeature>(
-    'SELECT * FROM semo.service_features WHERE feature_id = $1',
-    [featureId],
-  );
-  const feature = res.rows[0];
+  // 1. 현재 상태 조회 (KB 기반)
+  let feature: ServiceFeature | null = null;
+  if (serviceId) {
+    feature = await getFeatureById(serviceId, featureId);
+  } else {
+    // serviceId 없으면 cross-domain fallback
+    const { list: kbList } = await import('../../core/kb');
+    const found = await kbList(undefined, undefined, {
+      key: 'feature',
+      where: { feature_id: featureId },
+    });
+    if (found.length > 0) {
+      const project = await getProject(found[0].domain);
+      if (project) feature = await getFeatureById(project.service_id, featureId);
+    }
+  }
   if (!feature) return { ok: false, error: 'Feature not found' };
 
   const fromStatus = feature.status as ServiceFeatureStatus;
@@ -68,22 +79,32 @@ export async function transitionFeatureStatus(
   }
 
   // 3. 상태 업데이트
-  const updated = await updateFeature(featureId, {
-    status: toStatus,
-    metadata: {
-      lifecycle_pipeline: true,
-      last_transition_at: new Date().toISOString(),
-      ...extraMeta,
+  const updated = await updateFeature(
+    featureId,
+    {
+      status: toStatus,
+      metadata: {
+        lifecycle_pipeline: true,
+        last_transition_at: new Date().toISOString(),
+        ...extraMeta,
+      },
     },
-  });
+    serviceId,
+  );
   if (!updated) return { ok: false, error: 'Failed to update feature' };
 
-  // 4. 감사 로그
-  await query(
-    `INSERT INTO semo.feature_status_transitions (feature_id, from_status, to_status, triggered_by, reason, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6)`,
-    [featureId, fromStatus, toStatus, triggeredBy, reason ?? null, JSON.stringify(extraMeta ?? {})],
-  );
+  // 4. 감사 로그 → KB metadata transitions[] 배열에 추가
+  const transitions =
+    ((updated.metadata as Record<string, unknown>)?.transitions as unknown[]) ?? [];
+  transitions.push({
+    from: fromStatus,
+    to: toStatus,
+    triggered_by: triggeredBy,
+    reason: reason ?? null,
+    metadata: extraMeta ?? {},
+    at: new Date().toISOString(),
+  });
+  await updateFeature(featureId, { metadata: { transitions } }, serviceId);
 
   // 5. 다음 단계 자동 디스패치
   let dispatched: string | undefined;

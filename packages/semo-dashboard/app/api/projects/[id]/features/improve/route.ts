@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getProject, updateFeature } from '@/lib/service';
+import { getProject, updateFeature, getFeatureById } from '@/lib/service';
 import { getItem } from '@/lib/kb';
-import { query } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,16 +23,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
-    const featureRes = await query<{
-      name: string;
-      description: string;
-      category: string;
-      metadata: Record<string, unknown>;
-    }>(
-      'SELECT name, description, category, metadata FROM semo.service_features WHERE feature_id = $1',
-      [feature_id],
-    );
-    const feature = featureRes.rows[0];
+    const feature = await getFeatureById(id, feature_id);
     if (!feature) {
       return NextResponse.json({ error: 'Feature not found' }, { status: 404 });
     }
