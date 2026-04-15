@@ -41,6 +41,12 @@ npm run lint && npx tsc --noEmit && npm run build
 
 ---
 
+## Cron 실행 마감 (NON-NEGOTIABLE)
+
+Cron 트리거로 실행한 작업은 종료 시점에 반드시 `semo cron mark-run --bot-id ... --job-id ... --status ... --started-at ... --duration-ms ...` 를 호출한다. 이 호출이 `bot_commitments(source_type='cron')` 한 행을 마감 상태로 INSERT하고 `bot_cron_jobs` rollup(`last_status`, `consecutive_failures`)을 갱신한다. 누락 시 24h 후 stale_auto로 reap 되지만 그동안 다음 실행이 막힌다.
+
+---
+
 ## 상세 규칙 (필요 시 참조)
 
 PM 데이터 읽기/쓰기 시 → `.claude/rules/data-routing.md` (Data Routing)

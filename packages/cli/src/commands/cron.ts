@@ -72,20 +72,86 @@ function translateSchedule(schedule: Record<string, unknown>): string | null {
 // ============================================================
 
 const WORK_DIR = '/Users/reus/Desktop/Sources/semicolon/projects/semo';
+const DEFAULT_REPORT_CHANNEL = '#bot-ops';
 
 function buildTriggerPrompt(botId: string, job: CronJobRow): string {
-  const message = (job.payload as Record<string, unknown> | null)?.message ?? job.name;
+  const payload = (job.payload as Record<string, unknown> | null) ?? {};
+  const message =
+    (typeof payload.prompt === 'string' && payload.prompt) ||
+    (typeof payload.message === 'string' && payload.message) ||
+    job.name;
+  const reportChannel =
+    (typeof payload.report_channel === 'string' && payload.report_channel) ||
+    DEFAULT_REPORT_CHANNEL;
+  const targetDomain = typeof payload.target_domain === 'string' ? payload.target_domain : null;
+  const maxDuration = typeof payload.max_duration === 'number' ? payload.max_duration : null;
+  const scheduleExpr = translateSchedule(job.schedule) ?? JSON.stringify(job.schedule);
+  const today = new Date().toISOString().slice(0, 10);
 
-  const lines: string[] = [
-    `You are operating as ${botId} agent.`,
-    `Working directory: ${WORK_DIR}`,
-    ``,
-    `Task: ${message}`,
-    ``,
-    `After completion, record results via semo kb upsert if applicable.`,
+  const sections: string[] = [];
+
+  // 1. Identity (inline)
+  sections.push(
+    `## Identity
+You are operating as **${botId}**, a SEMO/Semicolon team agent. Use your bot persona and skills (~/.claude/agents/${botId}/${botId}.md). Do not delegate to or impersonate other bots unless your skill explicitly requires it.`,
+  );
+
+  // 2. Environment
+  sections.push(
+    `## Environment
+- working directory: ${WORK_DIR}
+- date: ${today}
+- branch: dev
+- session: ${botId}-cron-local`,
+  );
+
+  // 3. KB-First guard
+  sections.push(
+    `## KB-First (NON-NEGOTIABLE)
+Before answering anything about a service, the org, a teammate, or another bot, query KB first via \`semo kb get\` / \`semo kb search\`. If the answer is not in KB, say so explicitly — do NOT invent URLs, owners, or schedules. Use \`semo service get {domain}\` for structured service metadata (status, po, tech-stack, repo, slack-channel).`,
+  );
+
+  // 4. Cron trigger context
+  const ctxLines = [
+    `## Cron Trigger Context`,
+    `- job_id: ${job.job_id}`,
+    `- job_name: ${job.name}`,
+    `- schedule: ${scheduleExpr}`,
+    `- scheduled_at: ${new Date().toISOString()}`,
   ];
+  if (targetDomain) ctxLines.push(`- target_domain: ${targetDomain}`);
+  if (maxDuration) ctxLines.push(`- max_duration_sec: ${maxDuration}`);
+  sections.push(ctxLines.join('\n'));
 
-  return lines.join('\n');
+  // 5. Task body
+  sections.push(`## Task
+${message}`);
+
+  // 6. Report channel fallback
+  sections.push(
+    `## Report Destination
+On completion (success or failure), post a short result summary to Slack channel \`${reportChannel}\`. Format: \`[${job.name}] 결과: ...\` (3 lines max).`,
+  );
+
+  // 7. Completion obligation
+  sections.push(
+    `## Completion Obligation
+After your work is done — even on failure or early exit — you MUST run:
+
+\`\`\`
+semo cron mark-run \\
+  --bot-id ${botId} \\
+  --job-id ${job.job_id} \\
+  --status <success|failure|timeout|skipped> \\
+  --started-at <ISO> \\
+  --duration-ms <int> \\
+  [--error "..."] [--output-digest "..."]
+\`\`\`
+
+This call records a \`bot_commitments\` row with \`source_type='cron'\` and updates the rollup on \`bot_cron_jobs\`. Skipping it leaves the job stuck.`,
+  );
+
+  return sections.join('\n\n');
 }
 
 // ============================================================
@@ -233,6 +299,142 @@ async function cronExport(opts: { bot?: string }) {
   }
 }
 
+// ============================================================
+// Mark Run — cron 실행 기록을 bot_commitments(source_type='cron')에 흡수
+// ============================================================
+
+type CronRunStatus = 'success' | 'failure' | 'timeout' | 'skipped';
+
+async function cronMarkRun(opts: {
+  botId: string;
+  jobId: string;
+  status: CronRunStatus;
+  startedAt: string;
+  durationMs: number;
+  error?: string;
+  outputDigest?: string;
+  metadata?: string;
+}) {
+  const pool = getPool();
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const jobRes = await client.query<{ name: string; schedule: Record<string, unknown> }>(
+      `SELECT name, schedule FROM semo.bot_cron_jobs
+       WHERE bot_id = $1 AND job_id = $2
+       FOR UPDATE`,
+      [opts.botId, opts.jobId],
+    );
+    if (jobRes.rowCount === 0) {
+      throw new Error(`cron job not found: ${opts.botId}/${opts.jobId}`);
+    }
+    const job = jobRes.rows[0];
+    const scheduleExpr = translateSchedule(job.schedule) ?? JSON.stringify(job.schedule);
+
+    const commitmentId = `cmt-${opts.botId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const sessionTag = `${opts.botId}-cron-local`;
+    const commitmentStatus =
+      opts.status === 'success' || opts.status === 'skipped' ? 'done' : 'failed';
+
+    let userMetadata: Record<string, unknown> = {};
+    if (opts.metadata) {
+      try {
+        userMetadata = JSON.parse(opts.metadata);
+      } catch {
+        throw new Error('--metadata JSON 파싱 실패');
+      }
+    }
+    const fullMetadata: Record<string, unknown> = {
+      ...userMetadata,
+      run_status: opts.status,
+      duration_ms: opts.durationMs,
+    };
+    if (opts.error) fullMetadata.error = opts.error;
+    if (opts.outputDigest) fullMetadata.output_digest = opts.outputDigest;
+
+    const pipelineContext = {
+      job_id: opts.jobId,
+      job_name: job.name,
+      schedule_expr: scheduleExpr,
+      scheduled_at: opts.startedAt,
+    };
+
+    const finishedAt = new Date(new Date(opts.startedAt).getTime() + opts.durationMs).toISOString();
+
+    await client.query(
+      `INSERT INTO semo.bot_commitments
+         (id, bot_id, status, title, description,
+          source_type, source_ref,
+          assigned_session, session_owner,
+          pipeline_context, metadata,
+          last_heartbeat_at, completed_at, created_at)
+       VALUES ($1, $2, $3, $4, $5,
+               'cron', $6,
+               $7, $7,
+               $8::jsonb, $9::jsonb,
+               NOW(), $10::timestamptz, $11::timestamptz)`,
+      [
+        commitmentId,
+        opts.botId,
+        commitmentStatus,
+        `cron: ${job.name}`,
+        `schedule=${scheduleExpr} run_status=${opts.status} duration=${opts.durationMs}ms`,
+        `cron:${opts.jobId}`,
+        sessionTag,
+        JSON.stringify(pipelineContext),
+        JSON.stringify(fullMetadata),
+        finishedAt,
+        opts.startedAt,
+      ],
+    );
+
+    let consecutiveFailures = 0;
+    if (opts.status === 'skipped') {
+      const cur = await client.query<{ consecutive_failures: number }>(
+        `SELECT consecutive_failures FROM semo.bot_cron_jobs
+         WHERE bot_id = $1 AND job_id = $2`,
+        [opts.botId, opts.jobId],
+      );
+      consecutiveFailures = cur.rows[0]?.consecutive_failures ?? 0;
+    } else {
+      const rollup = await client.query<{ consecutive_failures: number }>(
+        `UPDATE semo.bot_cron_jobs
+            SET last_run = $1::timestamptz,
+                last_status = $2,
+                last_error = LEFT($3, 500),
+                consecutive_failures = CASE WHEN $2 = 'success' THEN 0 ELSE consecutive_failures + 1 END
+          WHERE bot_id = $4 AND job_id = $5
+          RETURNING consecutive_failures`,
+        [finishedAt, opts.status, opts.error ?? null, opts.botId, opts.jobId],
+      );
+      consecutiveFailures = rollup.rows[0]?.consecutive_failures ?? 0;
+    }
+
+    await client.query('COMMIT');
+
+    console.log(
+      JSON.stringify({
+        commitment_id: commitmentId,
+        commitment_status: commitmentStatus,
+        run_status: opts.status,
+        consecutive_failures: consecutiveFailures,
+      }),
+    );
+
+    if (consecutiveFailures >= 3) {
+      console.error(chalk.red(`warn: consecutive_failures=${consecutiveFailures}`));
+    }
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error(chalk.red(`❌ mark-run 실패: ${(err as Error).message}`));
+    process.exitCode = 1;
+  } finally {
+    client.release();
+    await closeConnection();
+  }
+}
+
 async function cronMarkDeployed(opts: { jobId: string; triggerId: string }) {
   const spinner = ora('deploy_status 업데이트 중...').start();
   const pool = getPool();
@@ -271,6 +473,9 @@ async function cronCreate(opts: {
   payload?: string;
   sessionTarget?: string;
   disabled?: boolean;
+  reportChannel?: string;
+  targetDomain?: string;
+  maxDuration?: number;
 }) {
   const spinner = ora('크론잡 생성 중...').start();
   const pool = getPool();
@@ -283,7 +488,16 @@ async function cronCreate(opts: {
       return;
     }
 
-    const payload = opts.payload ? { kind: 'agentTurn', message: opts.payload } : null;
+    const payload: Record<string, unknown> | null =
+      opts.payload || opts.reportChannel || opts.targetDomain || opts.maxDuration != null
+        ? { kind: 'agentTurn' }
+        : null;
+    if (payload) {
+      if (opts.payload) payload.message = opts.payload;
+      if (opts.reportChannel) payload.report_channel = opts.reportChannel;
+      if (opts.targetDomain) payload.target_domain = opts.targetDomain;
+      if (opts.maxDuration != null) payload.max_duration = opts.maxDuration;
+    }
 
     const result = await pool.query(
       `INSERT INTO semo.bot_cron_jobs
@@ -612,6 +826,11 @@ export function registerCronCommands(program: Command): void {
     .option('--payload <message>', '실행 시 전달할 메시지/프롬프트')
     .option('--session-target <target>', '세션 타겟 (main|isolated)', 'isolated')
     .option('--disabled', '비활성 상태로 생성')
+    .option('--report-channel <channel>', '결과 보고 Slack 채널 (기본: #bot-ops)')
+    .option('--target-domain <domain>', 'ontology 대상 도메인 (예: axoracle, semo)')
+    .option('--max-duration <sec>', '최대 실행 시간 (초) — Phase 0에서는 메타데이터만', (v) =>
+      parseInt(v, 10),
+    )
     .action(async (opts) => {
       await cronCreate({
         bot: opts.bot,
@@ -620,6 +839,9 @@ export function registerCronCommands(program: Command): void {
         payload: opts.payload,
         sessionTarget: opts.sessionTarget,
         disabled: opts.disabled,
+        reportChannel: opts.reportChannel,
+        targetDomain: opts.targetDomain,
+        maxDuration: opts.maxDuration,
       });
     });
 
@@ -686,6 +908,38 @@ export function registerCronCommands(program: Command): void {
     .option('--bot <name>', '봇 ID 필터')
     .action(async (opts) => {
       await cronExport({ bot: opts.bot });
+    });
+
+  cron
+    .command('mark-run')
+    .description(
+      'cron 실행 결과를 bot_commitments(source_type=cron)에 기록 + bot_cron_jobs rollup 갱신',
+    )
+    .requiredOption('--bot-id <id>', '봇 ID')
+    .requiredOption('--job-id <uuid>', '크론잡 ID')
+    .requiredOption('--status <status>', 'success | failure | timeout | skipped')
+    .requiredOption('--started-at <iso>', '시작 시각 (ISO 8601)')
+    .requiredOption('--duration-ms <ms>', '실행 소요 (ms)', (v) => parseInt(v, 10))
+    .option('--error <text>', '실패 사유 (last_error에 500자까지 저장)')
+    .option('--output-digest <text>', '출력 요약/해시')
+    .option('--metadata <json>', '추가 metadata JSON')
+    .action(async (opts) => {
+      const status = opts.status as CronRunStatus;
+      if (!['success', 'failure', 'timeout', 'skipped'].includes(status)) {
+        console.error(chalk.red(`❌ --status 값은 success|failure|timeout|skipped 중 하나`));
+        process.exitCode = 1;
+        return;
+      }
+      await cronMarkRun({
+        botId: opts.botId,
+        jobId: opts.jobId,
+        status,
+        startedAt: opts.startedAt,
+        durationMs: opts.durationMs,
+        error: opts.error,
+        outputDigest: opts.outputDigest,
+        metadata: opts.metadata,
+      });
     });
 
   cron
