@@ -2,8 +2,8 @@
 # semo-agents-stop.sh — Graceful shutdown of Architecture B agents
 set -euo pipefail
 
-MAILBOX_DIR="$HOME/.semo-mailbox"
-PID_FILE="$HOME/.semo-agents.pid"
+MAILBOX_DIR="$HOME/.semo/mailbox"
+PID_FILE="$HOME/.semo/agents.pid"
 WORKSPACE_TITLE="SEMO Agents"
 
 BOTS=(semiclaw planclaw designclaw workclaw reviewclaw infraclaw growthclaw)

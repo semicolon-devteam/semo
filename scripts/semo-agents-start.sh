@@ -3,9 +3,9 @@
 set -euo pipefail
 
 SEMO_ROOT="$HOME/Desktop/Sources/semicolon/projects/semo"
-SESSION_DIR="$HOME/.semo-bot-sessions"
-MAILBOX_DIR="$HOME/.semo-mailbox"
-PID_FILE="$HOME/.semo-agents.pid"
+SESSION_DIR="$HOME/.semo/sessions"
+MAILBOX_DIR="$HOME/.semo/mailbox"
+PID_FILE="$HOME/.semo/agents.pid"
 WORKSPACE="SEMO Agents"
 BOT_CONFIG_DIR="$HOME/.claude/snamanager0"  # 봇 전용 계정 (reus7042와 분리)
 

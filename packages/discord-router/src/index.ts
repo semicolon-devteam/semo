@@ -9,8 +9,8 @@
  * 환경변수:
  *   DISCORD_BOT_TOKEN — Discord bot token
  *   DATABASE_URL      — PostgreSQL (라우팅 config + 커밋먼트)
- *   SEMO_MAILBOX_DIR  — 메일박스 루트 (default: ~/.semo-mailbox)
- *   SEMO_SESSION_DIR  — 봇 세션 루트 (default: ~/.semo-bot-sessions)
+ *   SEMO_MAILBOX_DIR  — 메일박스 루트 (default: ~/.semo/mailbox)
+ *   SEMO_SESSION_DIR  — 봇 세션 루트 (default: ~/.semo/sessions)
  */
 
 import * as path from 'path';
@@ -33,8 +33,8 @@ import type { DiscordMessage } from './discord-gateway.js';
 
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || '';
 const DATABASE_URL = process.env.DATABASE_URL || '';
-const MAILBOX_DIR = process.env.SEMO_MAILBOX_DIR || path.join(os.homedir(), '.semo-mailbox');
-const SESSION_DIR = process.env.SEMO_SESSION_DIR || path.join(os.homedir(), '.semo-bot-sessions');
+const MAILBOX_DIR = process.env.SEMO_MAILBOX_DIR || path.join(os.homedir(), '.semo', 'mailbox');
+const SESSION_DIR = process.env.SEMO_SESSION_DIR || path.join(os.homedir(), '.semo', 'sessions');
 const MAX_ESCALATION_DEPTH = 3;
 
 // ── Components ──

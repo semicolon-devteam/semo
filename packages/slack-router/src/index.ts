@@ -10,8 +10,8 @@
  *   SLACK_BOT_TOKEN   — xoxb-...
  *   SLACK_APP_TOKEN   — xapp-...
  *   DATABASE_URL      — PostgreSQL (라우팅 config + 커밋먼트)
- *   SEMO_MAILBOX_DIR  — 메일박스 루트 (default: ~/.semo-mailbox)
- *   SEMO_SESSION_DIR  — 봇 세션 루트 (default: ~/.semo-bot-sessions)
+ *   SEMO_MAILBOX_DIR  — 메일박스 루트 (default: ~/.semo/mailbox)
+ *   SEMO_SESSION_DIR  — 봇 세션 루트 (default: ~/.semo/sessions)
  */
 
 import * as path from 'path';
@@ -34,8 +34,8 @@ import { resolveSpeaker } from '../../platform-common/src/speaker-resolver.js';
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || '';
 const SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN || '';
 const DATABASE_URL = process.env.DATABASE_URL || '';
-const MAILBOX_DIR = process.env.SEMO_MAILBOX_DIR || path.join(os.homedir(), '.semo-mailbox');
-const SESSION_DIR = process.env.SEMO_SESSION_DIR || path.join(os.homedir(), '.semo-bot-sessions');
+const MAILBOX_DIR = process.env.SEMO_MAILBOX_DIR || path.join(os.homedir(), '.semo', 'mailbox');
+const SESSION_DIR = process.env.SEMO_SESSION_DIR || path.join(os.homedir(), '.semo', 'sessions');
 const MAX_ESCALATION_DEPTH = 3;
 
 // ── Components ──
@@ -150,7 +150,7 @@ async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
   // Primary bot이 응답한 경우에도 overflow bot_id로 마감될 수 있음.
   // source_ref = channel:thread_id 매칭, 같은 thread 여러 open commitment가 있으면
   // 가장 오래된 active 하나를 마감한다 (FIFO).
-  const sourceRef = `slack-${msg.channel_id}-${msg.thread_id}`;
+  const sourceRef = `${msg.channel_id}:${msg.thread_id}`;
   try {
     const result = await pool.query(
       `UPDATE semo.bot_commitments

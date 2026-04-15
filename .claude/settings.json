@@ -70,7 +70,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash /Users/reus/.openclaw-shared/hooks/context-router.sh",
+            "command": "bash /Users/reus/.semo/shared/hooks/context-router.sh",
             "timeout": 5
           }
         ]
@@ -87,22 +87,22 @@
           },
           {
             "type": "command",
-            "command": "bash /Users/reus/.openclaw-shared/hooks/kb-first-guard.sh",
+            "command": "bash /Users/reus/.semo/shared/hooks/kb-first-guard.sh",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "bash /Users/reus/.openclaw-shared/hooks/url-validator-guard.sh",
+            "command": "bash /Users/reus/.semo/shared/hooks/url-validator-guard.sh",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "bash /Users/reus/.openclaw-shared/hooks/response-length-guard.sh",
+            "command": "bash /Users/reus/.semo/shared/hooks/response-length-guard.sh",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "bash /Users/reus/.openclaw-shared/hooks/decision-reminder.sh",
+            "command": "bash /Users/reus/.semo/shared/hooks/decision-reminder.sh",
             "timeout": 10
           }
         ]

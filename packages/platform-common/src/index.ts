@@ -9,3 +9,4 @@ export { resolveSpeaker, type SpeakerProfile } from './speaker-resolver.js';
 export { SlackGateway } from './slack-gateway.js';
 export { Router as ChannelRouter } from './channel-router.js';
 export { FALLBACK_BOT_IDS, SLACK_PROFILES, type BotId } from './bot-config.js';
+export { SEMO_PATHS } from './paths.js';

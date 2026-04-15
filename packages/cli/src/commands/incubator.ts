@@ -19,7 +19,7 @@ import { getPool, closeConnection } from '../database';
 // Constants
 // ============================================================
 
-const SESSIONS_ROOT = path.join(os.homedir(), '.semo-sessions');
+const SESSIONS_ROOT = path.join(os.homedir(), '.semo', 'sessions');
 const SHARED_AGENTS = path.join(
   os.homedir(),
   'Desktop',
@@ -518,7 +518,7 @@ export function registerIncubatorCommands(program: Command): void {
 
         // 3. 아카이브
         if (options.archive && fs.existsSync(sessionDir)) {
-          const archiveDir = path.join(os.homedir(), '.semo-sessions-archive');
+          const archiveDir = path.join(os.homedir(), '.semo', 'archive');
           fs.mkdirSync(archiveDir, { recursive: true });
           const archivePath = path.join(archiveDir, options.serviceId);
           fs.renameSync(sessionDir, archivePath);

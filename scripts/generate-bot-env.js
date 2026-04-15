@@ -58,8 +58,8 @@ const OVERFLOW_BOTS = [{ id: 'semiclaw-overflow', primaryId: 'semiclaw' }];
 
 const AGENTS_DIR = path.join(os.homedir(), '.claude', 'agents');
 const SEMO_ROOT = path.resolve(import.meta.dirname, '..');
-const DEFAULT_SESSION_DIR = path.join(os.homedir(), '.semo-bot-sessions');
-const DEFAULT_MAILBOX_DIR = path.join(os.homedir(), '.semo-mailbox');
+const DEFAULT_SESSION_DIR = path.join(os.homedir(), '.semo', 'sessions');
+const DEFAULT_MAILBOX_DIR = path.join(os.homedir(), '.semo', 'mailbox');
 
 // ── CLI args ──
 
@@ -181,7 +181,7 @@ ${
 3. 메시지 내용과 수신 키워드 대조 → 매칭 시 \`escalate(target, reason, context)\`
 4. 비매칭 → 직접 처리
 - 내 담당: \`semo kb get semiclaw delegation\`
-- 에이전트 상태: \`cat ~/.semo-mailbox/{botId}/heartbeat\``
+- 에이전트 상태: \`cat ~/.semo/mailbox/{botId}/heartbeat\``
     : `- **semiclaw는 오케스트레이터/총사령관**이다. 판단 불가 상황은 semiclaw에 escalate.
 - 전문 영역 밖 요청 → \`escalate("semiclaw", reason, context)\`
 - 내 정체성: \`semo kb get ${botId} identity\`

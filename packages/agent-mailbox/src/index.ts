@@ -7,7 +7,7 @@
  *
  * 환경변수:
  *   SEMO_BOT_ID      — 이 세션의 봇 ID (e.g., "semiclaw")
- *   SEMO_MAILBOX_DIR — 메일박스 루트 (default: ~/.semo-mailbox)
+ *   SEMO_MAILBOX_DIR — 메일박스 루트 (default: ~/.semo/mailbox)
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -25,7 +25,7 @@ import type { InboxMessage, OutboxMessage } from './types.js';
 const BOT_ID = process.env.SEMO_BOT_ID || 'semiclaw';
 /** Persona override — overflow sessions post as the primary bot's identity */
 const REPLY_AS = process.env.SEMO_REPLY_AS || BOT_ID;
-const MAILBOX_DIR = process.env.SEMO_MAILBOX_DIR || path.join(os.homedir(), '.semo-mailbox');
+const MAILBOX_DIR = process.env.SEMO_MAILBOX_DIR || path.join(os.homedir(), '.semo', 'mailbox');
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const POLL_INTERVAL_MS = 3_000;
 
