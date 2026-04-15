@@ -79,7 +79,7 @@ async function getBots(): Promise<Bot[]> {
         status: row.status || 'offline',
         lastActive: row.last_active || new Date().toISOString(),
         sessionCount: row.session_count || 0,
-        workspacePath: row.workspace_path || `~/.openclaw-${row.bot_id}/workspace`,
+        workspacePath: row.workspace_path || `~/.semo/workspaces/${row.bot_id}`,
       };
     }),
   );
