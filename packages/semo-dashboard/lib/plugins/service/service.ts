@@ -490,45 +490,99 @@ export async function getPhaseProgress(
   return res.rows;
 }
 
-// ── Materials ──
+// ── Materials (KB-backed) ──
+
+function kbToMaterial(item: {
+  domain: string;
+  key: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+  updated_at?: string;
+}): ServiceMaterial {
+  const m = (item.metadata ?? {}) as Record<string, unknown>;
+  return {
+    material_id: (m.material_id as string) ?? '',
+    service_id: (m.service_id as string) ?? '',
+    content: item.content,
+    phase_mapping: (m.phase_mapping as ServicePhaseMapping[]) ?? null,
+    material_type: ((m.material_type as string) ??
+      'planning-doc') as ServiceMaterial['material_type'],
+    screenshot_data: (m.screenshot_data as string) ?? null,
+    stitch_share_url: (m.stitch_share_url as string) ?? null,
+    created_at: (m.created_at as string) ?? '',
+  } as ServiceMaterial;
+}
 
 export async function createMaterial(data: {
   service_id: string;
   content: string;
   phase_mapping?: ServicePhaseMapping[];
 }): Promise<ServiceMaterial> {
-  const res = await query<ServiceMaterial>(
-    `INSERT INTO semo.service_materials (service_id, content, phase_mapping)
-     VALUES ($1, $2, $3)
-     RETURNING *`,
-    [data.service_id, data.content, data.phase_mapping ? JSON.stringify(data.phase_mapping) : null],
-  );
-  return res.rows[0];
+  const domain = await resolveDomain(data.service_id);
+  const materialId = randomUUID();
+  const now = new Date().toISOString();
+  const item = await kbUpsert(domain, `material/${materialId}`, data.content, 'pm-pipeline', {
+    material_id: materialId,
+    service_id: data.service_id,
+    material_type: 'planning-doc',
+    phase_mapping: data.phase_mapping ?? null,
+    screenshot_data: null,
+    stitch_share_url: null,
+    created_at: now,
+  });
+  return kbToMaterial(item);
 }
 
 export async function listMaterials(serviceId: string): Promise<ServiceMaterial[]> {
-  const res = await query<ServiceMaterial>(
-    'SELECT * FROM semo.service_materials WHERE service_id =$1 ORDER BY created_at DESC',
-    [serviceId],
-  );
-  return res.rows;
+  const domain = await resolveDomain(serviceId);
+  const items = await kbListByKeyPrefix(domain, 'material', '', { orderBy: 'updated_at' });
+  return items.map(kbToMaterial);
 }
 
-// ── Stitch Materials ──
+export async function getMaterial(
+  serviceId: string,
+  materialId: string,
+): Promise<ServiceMaterial | null> {
+  const domain = await resolveDomain(serviceId);
+  const item = await kbGetItem(domain, `material/${materialId}`);
+  if (!item) return null;
+  return kbToMaterial(item);
+}
+
+export async function updateMaterial(
+  serviceId: string,
+  materialId: string,
+  data: { screenshot_data?: string; stitch_share_url?: string },
+): Promise<ServiceMaterial | null> {
+  const domain = await resolveDomain(serviceId);
+  const patch: Record<string, unknown> = {};
+  if (data.screenshot_data !== undefined) patch.screenshot_data = data.screenshot_data;
+  if (data.stitch_share_url !== undefined) patch.stitch_share_url = data.stitch_share_url;
+  if (Object.keys(patch).length === 0) return null;
+  const item = await kbUpdateMetadata(domain, `material/${materialId}`, patch);
+  return item ? kbToMaterial(item) : null;
+}
+
+// ── Stitch Materials (KB-backed) ──
 
 export async function createStitchMaterial(data: {
   service_id: string;
   content: string;
   material_type?: string;
 }): Promise<ServiceMaterial> {
-  const materialType = data.material_type ?? 'stitch-export';
-  const res = await query<ServiceMaterial>(
-    `INSERT INTO semo.service_materials (service_id, content, material_type)
-     VALUES ($1, $2, $3)
-     RETURNING *`,
-    [data.service_id, data.content, materialType],
-  );
-  return res.rows[0];
+  const domain = await resolveDomain(data.service_id);
+  const materialId = randomUUID();
+  const now = new Date().toISOString();
+  const item = await kbUpsert(domain, `material/${materialId}`, data.content, 'pm-pipeline', {
+    material_id: materialId,
+    service_id: data.service_id,
+    material_type: data.material_type ?? 'stitch-export',
+    phase_mapping: null,
+    screenshot_data: null,
+    stitch_share_url: null,
+    created_at: now,
+  });
+  return kbToMaterial(item);
 }
 
 // ── Design Step ──
@@ -914,7 +968,7 @@ export async function checkInfraTrackComplete(serviceId: string): Promise<boolea
   return sections.every((s) => s.status === 'approved');
 }
 
-// ── Deploy Verifications ──
+// ── Deploy Verifications (KB-backed) ──
 
 export async function createDeployVerification(data: {
   service_id: string;
@@ -926,34 +980,59 @@ export async function createDeployVerification(data: {
   const allPassed = Object.entries(data.checks).every(([key, c]) => {
     if (c.status === 'pass') return true;
     if (c.status === 'skip') {
-      // Phase 2: pod_status, health_endpoint는 skip 불가 — InfraClaw callback 필수
       if (isStrictPhase && (key === 'pod_status' || key === 'health_endpoint')) return false;
       return true;
     }
     return false;
   });
   const overall = allPassed ? 'pass' : 'fail';
+  const domain = await resolveDomain(data.service_id);
+  const verificationId = randomUUID();
+  const now = new Date().toISOString();
+  const dateSlug = now.slice(0, 10);
 
-  const res = await query<DeployVerification>(
-    `INSERT INTO semo.deploy_verifications (service_id, infra_phase, checks, overall_status, verified_by)
-     VALUES ($1, $2, $3, $4, $5)
-     RETURNING *`,
-    [data.service_id, data.infra_phase, JSON.stringify(data.checks), overall, data.verified_by],
-  );
-  return res.rows[0];
+  await kbUpsert(domain, `deploy-verify/${data.infra_phase}/${dateSlug}`, '', 'pm-pipeline', {
+    verification_id: verificationId,
+    service_id: data.service_id,
+    infra_phase: data.infra_phase,
+    checks: data.checks,
+    overall_status: overall,
+    verified_by: data.verified_by,
+    created_at: now,
+  });
+
+  return {
+    verification_id: verificationId,
+    service_id: data.service_id,
+    infra_phase: data.infra_phase,
+    checks: data.checks,
+    overall_status: overall as DeployVerification['overall_status'],
+    verified_by: data.verified_by,
+    created_at: now,
+  };
 }
 
 export async function getLatestVerification(
   serviceId: string,
   infraPhase: number,
 ): Promise<DeployVerification | null> {
-  const res = await query<DeployVerification>(
-    `SELECT * FROM semo.deploy_verifications
-     WHERE service_id = $1 AND infra_phase = $2
-     ORDER BY created_at DESC LIMIT 1`,
-    [serviceId, infraPhase],
-  );
-  return res.rows[0] ?? null;
+  const domain = await resolveDomain(serviceId);
+  const items = await kbListByKeyPrefix(domain, 'deploy-verify', `${infraPhase}/`, {
+    orderBy: 'updated_at',
+  });
+  if (items.length === 0) return null;
+  const item = items[0]; // latest by updated_at DESC
+  const m = item.metadata ?? {};
+  return {
+    verification_id: (m.verification_id as string) ?? '',
+    service_id: (m.service_id as string) ?? serviceId,
+    infra_phase: (m.infra_phase as number) ?? infraPhase,
+    checks: (m.checks as DeployVerificationChecks) ?? {},
+    overall_status: ((m.overall_status as string) ??
+      'fail') as DeployVerification['overall_status'],
+    verified_by: (m.verified_by as string) ?? '',
+    created_at: (m.created_at as string) ?? '',
+  };
 }
 
 // ── Service Features (ops mode) ──
@@ -973,12 +1052,70 @@ export interface ServiceFeature {
   updated_at: string;
 }
 
-export async function listFeatures(projectId: string): Promise<ServiceFeature[]> {
-  const res = await query<ServiceFeature>(
-    'SELECT * FROM semo.service_features WHERE service_id = $1 ORDER BY category, sort_order, name',
-    [projectId],
+// ── Features (KB-backed) ──
+
+function slugify(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9가-힣]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 80) || randomUUID().slice(0, 8)
   );
-  return res.rows;
+}
+
+function kbToFeature(item: {
+  domain: string;
+  key: string;
+  content: string;
+  metadata?: Record<string, unknown>;
+  updated_at?: string;
+}): ServiceFeature {
+  const m = (item.metadata ?? {}) as Record<string, unknown>;
+  return {
+    feature_id: (m.feature_id as string) ?? '',
+    service_id: (m.service_id as string) ?? '',
+    name: (m.name as string) ?? '',
+    description: item.content || null,
+    category: (m.category as string) ?? 'core',
+    status: (m.status as string) ?? 'active',
+    parent_id: (m.parent_id as string) ?? null,
+    iteration_id: null, // iteration_id 폐기 (Phase 1)
+    sort_order: (m.sort_order as number) ?? 0,
+    metadata: (m.feature_metadata as Record<string, unknown>) ?? {},
+    created_at: (m.created_at as string) ?? '',
+    updated_at: (item.updated_at as string) ?? '',
+  } as ServiceFeature;
+}
+
+export async function listFeatures(projectId: string): Promise<ServiceFeature[]> {
+  const domain = await resolveDomain(projectId);
+  const items = await kbListByKeyPrefix(domain, 'feature', '');
+  const features = items.map(kbToFeature);
+  features.sort((a, b) => {
+    const catCmp = (a.category ?? '').localeCompare(b.category ?? '');
+    if (catCmp !== 0) return catCmp;
+    const sortCmp = (a.sort_order ?? 0) - (b.sort_order ?? 0);
+    if (sortCmp !== 0) return sortCmp;
+    return (a.name ?? '').localeCompare(b.name ?? '');
+  });
+  return features;
+}
+
+export async function getFeatureById(
+  projectId: string,
+  featureId: string,
+): Promise<ServiceFeature | null> {
+  const domain = await resolveDomain(projectId);
+  // feature_id가 sub_key인 경우
+  const item = await kbGetItem(domain, `feature/${featureId}`);
+  if (item) return kbToFeature(item);
+  // slug 기반인 경우 전체 검색
+  const items = await kbListByKeyPrefix(domain, 'feature', '', {
+    where: { feature_id: featureId },
+  });
+  if (items.length === 0) return null;
+  return kbToFeature(items[0]);
 }
 
 export async function createFeature(data: {
@@ -992,23 +1129,30 @@ export async function createFeature(data: {
   sort_order?: number;
   metadata?: Record<string, unknown>;
 }): Promise<ServiceFeature> {
-  const res = await query<ServiceFeature>(
-    `INSERT INTO semo.service_features (service_id, name, description, category, status, parent_id, iteration_id, sort_order, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-     RETURNING *`,
-    [
-      data.service_id,
-      data.name,
-      data.description ?? null,
-      data.category ?? 'core',
-      data.status ?? 'active',
-      data.parent_id ?? null,
-      data.iteration_id ?? null,
-      data.sort_order ?? 0,
-      JSON.stringify(data.metadata ?? {}),
-    ],
+  const domain = await resolveDomain(data.service_id);
+  const featureId = randomUUID();
+  const slug = slugify(data.name);
+  const now = new Date().toISOString();
+
+  const item = await kbUpsert(
+    domain,
+    `feature/${featureId}`,
+    data.description ?? '',
+    'pm-pipeline',
+    {
+      feature_id: featureId,
+      slug,
+      service_id: data.service_id,
+      name: data.name,
+      category: data.category ?? 'core',
+      status: data.status ?? 'active',
+      parent_id: data.parent_id ?? null,
+      sort_order: data.sort_order ?? 0,
+      feature_metadata: data.metadata ?? {},
+      created_at: now,
+    },
   );
-  return res.rows[0];
+  return kbToFeature(item);
 }
 
 export async function updateFeature(
@@ -1026,59 +1170,59 @@ export async function updateFeature(
       | 'metadata'
     >
   >,
+  serviceId?: string,
 ): Promise<ServiceFeature | null> {
-  const sets: string[] = [];
-  const params: unknown[] = [];
-  let idx = 1;
-
-  if (data.name !== undefined) {
-    sets.push(`name = $${idx++}`);
-    params.push(data.name);
-  }
-  if (data.description !== undefined) {
-    sets.push(`description = $${idx++}`);
-    params.push(data.description);
-  }
-  if (data.category !== undefined) {
-    sets.push(`category = $${idx++}`);
-    params.push(data.category);
-  }
-  if (data.status !== undefined) {
-    sets.push(`status = $${idx++}`);
-    params.push(data.status);
-  }
-  if (data.parent_id !== undefined) {
-    sets.push(`parent_id = $${idx++}`);
-    params.push(data.parent_id);
-  }
-  if (data.iteration_id !== undefined) {
-    sets.push(`iteration_id = $${idx++}`);
-    params.push(data.iteration_id);
-  }
-  if (data.sort_order !== undefined) {
-    sets.push(`sort_order = $${idx++}`);
-    params.push(data.sort_order);
-  }
-  if (data.metadata !== undefined) {
-    sets.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${idx++}::jsonb`);
-    params.push(JSON.stringify(data.metadata));
+  // description 변경 시 content 업데이트 (임베딩 재생성)
+  if (data.description !== undefined && serviceId) {
+    const domain = await resolveDomain(serviceId);
+    const patch: Record<string, unknown> = {};
+    if (data.name !== undefined) patch.name = data.name;
+    if (data.category !== undefined) patch.category = data.category;
+    if (data.status !== undefined) patch.status = data.status;
+    if (data.parent_id !== undefined) patch.parent_id = data.parent_id;
+    if (data.sort_order !== undefined) patch.sort_order = data.sort_order;
+    if (data.metadata !== undefined) patch.feature_metadata = data.metadata;
+    const item = await kbUpsert(
+      domain,
+      `feature/${featureId}`,
+      data.description ?? '',
+      'pm-pipeline',
+      patch,
+    );
+    return kbToFeature(item);
   }
 
-  if (sets.length === 0) return null;
-  params.push(featureId);
-  const res = await query<ServiceFeature>(
-    `UPDATE semo.service_features SET ${sets.join(', ')} WHERE feature_id = $${idx} RETURNING *`,
-    params,
-  );
-  return res.rows[0] ?? null;
+  // metadata만 업데이트 (임베딩 비용 없음)
+  const patch: Record<string, unknown> = {};
+  if (data.name !== undefined) patch.name = data.name;
+  if (data.category !== undefined) patch.category = data.category;
+  if (data.status !== undefined) patch.status = data.status;
+  if (data.parent_id !== undefined) patch.parent_id = data.parent_id;
+  if (data.sort_order !== undefined) patch.sort_order = data.sort_order;
+  if (data.metadata !== undefined) patch.feature_metadata = data.metadata;
+  if (Object.keys(patch).length === 0) return null;
+
+  // serviceId 없으면 cross-domain 검색
+  if (!serviceId) {
+    const { list: kbListAll } = await import('../../core/kb');
+    const found = await kbListAll(undefined, undefined, {
+      key: 'feature',
+      where: { feature_id: featureId },
+    });
+    if (found.length === 0) return null;
+    const item = await kbUpdateMetadata(found[0].domain, `feature/${featureId}`, patch);
+    return item ? kbToFeature(item) : null;
+  }
+
+  const domain = await resolveDomain(serviceId);
+  const item = await kbUpdateMetadata(domain, `feature/${featureId}`, patch);
+  return item ? kbToFeature(item) : null;
 }
 
-export async function deleteFeature(featureId: string): Promise<boolean> {
-  const res = await query(
-    `UPDATE semo.service_features SET status = 'deprecated' WHERE feature_id = $1`,
-    [featureId],
-  );
-  return (res.rowCount ?? 0) > 0;
+export async function deleteFeature(featureId: string, serviceId?: string): Promise<boolean> {
+  // Soft delete: status → deprecated
+  const result = await updateFeature(featureId, { status: 'deprecated' }, serviceId);
+  return result !== null;
 }
 
 // ── Service Overview (KB aggregation for ops mode) ──
@@ -1407,23 +1551,18 @@ export async function bulkCreateFeatures(
   }>,
 ): Promise<ServiceFeature[]> {
   if (features.length === 0) return [];
-
   const results: ServiceFeature[] = [];
   for (const f of features) {
-    const res = await query<ServiceFeature>(
-      `INSERT INTO semo.service_features (service_id, name, description, category, status, parent_id, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [
-        serviceId,
-        f.name,
-        f.description ?? null,
-        f.category ?? 'core',
-        f.status ?? 'active',
-        f.parent_id ?? null,
-        JSON.stringify(f.metadata ?? {}),
-      ],
-    );
-    results.push(res.rows[0]);
+    const feature = await createFeature({
+      service_id: serviceId,
+      name: f.name,
+      description: f.description,
+      category: f.category,
+      status: f.status,
+      parent_id: f.parent_id,
+      metadata: f.metadata,
+    });
+    results.push(feature);
   }
   return results;
 }
