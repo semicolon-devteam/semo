@@ -8,7 +8,7 @@
 1. **Commitment 필수**: 봇에게 작업을 위임할 때 반드시 `bot_commitments` 레코드를 생성
    - **Slack 수신 (Architecture B)**: slack-router가 메시지 수신 시 INSERT, outbox reply 포스팅 후 UPDATE done (`source_type='slack-inbox'`)
    - **로컬 reus Claude Code**: PreToolUse(Task) 훅 → `semo agent-claim` → SubagentStop 훅 → `semo agent-flush` done (`source_type='claude-code-local'`)
-   - **Cron 데몬 세션 (Phase 0)**: 데몬이 잡 실행 후 `semo cron mark-run` → INSERT (마감 상태) (`source_type='cron'`, `session_owner='{botId}-cron-local'`). 동시에 `bot_cron_jobs` rollup(`last_status` / `consecutive_failures`) 갱신.
+   - **Cron 데몬 세션 (Phase 1)**: CronCreate에 `* * * * *` 폴러 1개 등록. 폴러가 매 분 `semo cron tick`으로 due 잡을 SKIP LOCKED로 원자 claim(`last_run=NOW()` 기록) → Task 도구로 각 봇 subagent에 fan-out → 각 봇이 `semo cron mark-run` 으로 INSERT 마감(`source_type='cron'`, `session_owner='{botId}-cron-local'`). 동시에 `bot_cron_jobs` rollup(`last_status` / `consecutive_failures`) 갱신. 폴러 자체는 `semiclaw/cron-poller-tick` 메타 잡으로 heartbeat 기록.
 
 2. **Session 추적 필수**: `bot_sessions` 테이블로 활성 세션 기록
    - 로컬: SessionStart 훅 → `semo session-register` / SessionEnd 훅 → `semo session-terminate`
@@ -31,7 +31,7 @@
 |------|----------------|----------------|-------------|
 | Slack 수신 (Architecture B) | `packages/slack-router/src/index.ts` handleSlackMessage | OutboxReader onReplyPosted → handleReplyPosted | slack-router setInterval 1h |
 | 로컬 reus Claude Code | `semo agent-claim` (PreToolUse 훅) | `semo agent-flush` (SubagentStop 훅) | slack-router setInterval 1h (공유) |
-| Cron 데몬 세션 (Phase 0) | `semo cron mark-run` (단일 호출이 INSERT 마감) | 동일 호출 (start_at + duration_ms로 마감 시각 산출) | slack-router setInterval 1h (공유, source_type 무필터) |
+| Cron 데몬 세션 (Phase 1) | `semo cron tick` (폴러가 SKIP LOCKED claim → `last_run=NOW()`) | 봇 subagent 가 `semo cron mark-run` 호출 (bot_commitments INSERT + bot_cron_jobs rollup) | slack-router setInterval 1h (공유, source_type 무필터) |
 
 ## Architecture B 경계
 

@@ -19,8 +19,12 @@ import chalk from 'chalk';
 import ora from 'ora';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
+import cronParser from 'cron-parser';
 import { getPool, closeConnection } from '../database';
 import { resolveBotWorkspace } from '../paths';
+
+const CRON_TZ = 'Asia/Seoul';
+const POLLER_JOB_ID = 'cron-poller-tick';
 
 // ============================================================
 // Types
@@ -74,7 +78,7 @@ function translateSchedule(schedule: Record<string, unknown>): string | null {
 const WORK_DIR = '/Users/reus/Desktop/Sources/semicolon/projects/semo';
 const DEFAULT_REPORT_CHANNEL = '#bot-ops';
 
-function buildTriggerPrompt(botId: string, job: CronJobRow): string {
+function buildTriggerPrompt(botId: string, job: CronJobRow, opts?: { scheduledAt?: Date }): string {
   const payload = (job.payload as Record<string, unknown> | null) ?? {};
   const message =
     (typeof payload.prompt === 'string' && payload.prompt) ||
@@ -86,7 +90,8 @@ function buildTriggerPrompt(botId: string, job: CronJobRow): string {
   const targetDomain = typeof payload.target_domain === 'string' ? payload.target_domain : null;
   const maxDuration = typeof payload.max_duration === 'number' ? payload.max_duration : null;
   const scheduleExpr = translateSchedule(job.schedule) ?? JSON.stringify(job.schedule);
-  const today = new Date().toISOString().slice(0, 10);
+  const scheduledAt = opts?.scheduledAt ?? new Date();
+  const today = scheduledAt.toISOString().slice(0, 10);
 
   const sections: string[] = [];
 
@@ -117,7 +122,7 @@ Before answering anything about a service, the org, a teammate, or another bot, 
     `- job_id: ${job.job_id}`,
     `- job_name: ${job.name}`,
     `- schedule: ${scheduleExpr}`,
-    `- scheduled_at: ${new Date().toISOString()}`,
+    `- scheduled_at: ${scheduledAt.toISOString()}`,
   ];
   if (targetDomain) ctxLines.push(`- target_domain: ${targetDomain}`);
   if (maxDuration) ctxLines.push(`- max_duration_sec: ${maxDuration}`);
@@ -297,6 +302,191 @@ async function cronExport(opts: { bot?: string }) {
   } finally {
     await closeConnection();
   }
+}
+
+// ============================================================
+// Next-run computation (cron-parser, Asia/Seoul)
+// ============================================================
+
+function computeNextRun(schedule: Record<string, unknown>, from = new Date()): Date | null {
+  if (schedule.kind === 'cron' && typeof schedule.expr === 'string') {
+    const it = cronParser.parseExpression(schedule.expr, { currentDate: from, tz: CRON_TZ });
+    return it.next().toDate();
+  }
+  if (schedule.kind === 'every' && typeof schedule.everyMs === 'number' && schedule.everyMs > 0) {
+    return new Date(from.getTime() + schedule.everyMs);
+  }
+  throw new Error(`unsupported schedule: ${JSON.stringify(schedule)}`);
+}
+
+// ============================================================
+// Backfill next_run — 1회성 폭주 방지 유틸
+// ============================================================
+
+async function cronBackfillNextRun(opts: { dryRun?: boolean }) {
+  const pool = getPool();
+  const res = await pool.query<{
+    bot_id: string;
+    job_id: string;
+    name: string;
+    schedule: Record<string, unknown>;
+  }>(
+    `SELECT bot_id, job_id, name, schedule
+       FROM semo.bot_cron_jobs
+      WHERE enabled = TRUE AND next_run IS NULL`,
+  );
+  const rows = res.rows;
+  console.log(chalk.bold(`\nbackfill 대상: ${rows.length}개 잡\n`));
+
+  const now = new Date();
+  let ok = 0;
+  let fail = 0;
+  for (const row of rows) {
+    try {
+      const next = computeNextRun(row.schedule, now);
+      if (!next) {
+        fail++;
+        console.log(
+          chalk.yellow(`  skip ${row.bot_id}/${row.job_id} — computeNextRun returned null`),
+        );
+        continue;
+      }
+      if (opts.dryRun) {
+        console.log(`  [dry] ${row.bot_id}/${row.job_id} → ${next.toISOString()}`);
+      } else {
+        await pool.query(
+          `UPDATE semo.bot_cron_jobs SET next_run = $1, synced_at = NOW()
+            WHERE bot_id = $2 AND job_id = $3`,
+          [next, row.bot_id, row.job_id],
+        );
+        console.log(chalk.green(`  ✓ ${row.bot_id}/${row.job_id} → ${next.toISOString()}`));
+      }
+      ok++;
+    } catch (e) {
+      fail++;
+      console.log(chalk.red(`  ✗ ${row.bot_id}/${row.job_id} — ${(e as Error).message}`));
+    }
+  }
+  console.log(chalk.bold(`\n완료: ok=${ok} fail=${fail}${opts.dryRun ? ' (dry-run)' : ''}\n`));
+}
+
+// ============================================================
+// Tick — poller가 매 분 호출하는 due-job dispatcher
+// ============================================================
+
+interface TickOutput {
+  bot_id: string;
+  job_id: string;
+  name: string;
+  subagent_type: string;
+  started_at: string;
+  report_channel: string;
+  prompt: string;
+}
+
+async function cronTick(opts: { dryRun?: boolean; limit?: number; json?: boolean }) {
+  const limit = opts.limit ?? 30;
+  const pool = getPool();
+  const client = await pool.connect();
+  const now = new Date();
+  let claimed: CronJobRow[] = [];
+
+  try {
+    // Step A — atomic claim (짧은 트랜잭션)
+    await client.query('BEGIN');
+    const selectRes = await client.query<CronJobRow>(
+      `SELECT bot_id, job_id, name, schedule, enabled, last_run, next_run,
+              session_target, payload, trigger_id, deploy_status, last_deploy_at
+         FROM semo.bot_cron_jobs
+        WHERE enabled = TRUE
+          AND job_id <> $1
+          AND (next_run IS NULL OR next_run <= NOW())
+        ORDER BY COALESCE(next_run, TIMESTAMP 'epoch') ASC
+        LIMIT $2
+        FOR UPDATE SKIP LOCKED`,
+      [POLLER_JOB_ID, limit],
+    );
+    claimed = selectRes.rows;
+
+    if (!opts.dryRun && claimed.length > 0) {
+      const values: string[] = [];
+      const params: unknown[] = [];
+      claimed.forEach((r, i) => {
+        values.push(`($${i * 2 + 1}, $${i * 2 + 2})`);
+        params.push(r.bot_id, r.job_id);
+      });
+      await client.query(
+        `UPDATE semo.bot_cron_jobs SET last_run = NOW(), synced_at = NOW()
+          WHERE (bot_id, job_id) IN (${values.join(',')})`,
+        params,
+      );
+      await client.query('COMMIT');
+    } else {
+      await client.query('ROLLBACK');
+    }
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw e;
+  } finally {
+    client.release();
+  }
+
+  // Step B — per-row next_run 재계산 (트랜잭션 밖, per-row try-catch)
+  if (!opts.dryRun) {
+    for (const row of claimed) {
+      try {
+        const next = computeNextRun(row.schedule, now);
+        if (next) {
+          await pool.query(
+            `UPDATE semo.bot_cron_jobs SET next_run = $1 WHERE bot_id = $2 AND job_id = $3`,
+            [next, row.bot_id, row.job_id],
+          );
+        }
+      } catch (e) {
+        process.stderr.write(
+          `[cron tick] next_run parse fail ${row.bot_id}/${row.job_id}: ${(e as Error).message}\n`,
+        );
+      }
+    }
+  }
+
+  // Step C — 출력
+  const outputs: TickOutput[] = claimed.map((row) => {
+    const payload = (row.payload as Record<string, unknown> | null) ?? {};
+    const reportChannel =
+      (typeof payload.report_channel === 'string' && payload.report_channel) ||
+      DEFAULT_REPORT_CHANNEL;
+    return {
+      bot_id: row.bot_id,
+      job_id: row.job_id,
+      name: row.name,
+      subagent_type: row.bot_id,
+      started_at: now.toISOString(),
+      report_channel: reportChannel,
+      prompt: buildTriggerPrompt(row.bot_id, row, { scheduledAt: now }),
+    };
+  });
+
+  if (opts.json) {
+    console.log(JSON.stringify(outputs, null, 2));
+    return;
+  }
+
+  if (outputs.length === 0) {
+    console.log(
+      chalk.gray(`[cron tick${opts.dryRun ? ' dry' : ''}] no due jobs @ ${now.toISOString()}`),
+    );
+    return;
+  }
+  console.log(
+    chalk.bold(
+      `\n[cron tick${opts.dryRun ? ' dry' : ''}] ${outputs.length} due @ ${now.toISOString()}\n`,
+    ),
+  );
+  for (const o of outputs) {
+    console.log(`  ${chalk.cyan(o.bot_id)}/${o.job_id} — ${o.name}`);
+  }
+  console.log('');
 }
 
 // ============================================================
@@ -952,5 +1142,31 @@ export function registerCronCommands(program: Command): void {
         jobId: opts.jobId,
         triggerId: opts.triggerId,
       });
+    });
+
+  cron
+    .command('backfill-next-run')
+    .description('enabled=true AND next_run IS NULL 인 잡들의 next_run을 선계산 (1회성)')
+    .option('--dry-run', '실제 UPDATE 없이 계산 결과만 출력')
+    .action(async (opts) => {
+      try {
+        await cronBackfillNextRun({ dryRun: !!opts.dryRun });
+      } finally {
+        await closeConnection();
+      }
+    });
+
+  cron
+    .command('tick')
+    .description('[폴러 전용] due 잡 원자 claim 후 실행 페이로드 출력')
+    .option('--dry-run', 'UPDATE 없이 SELECT만 실행 (원자 claim 생략)')
+    .option('--limit <n>', '단일 tick 당 최대 fan-out 개수', (v) => parseInt(v, 10), 30)
+    .option('--json', '폴러 세션이 파싱하기 위한 JSON 출력')
+    .action(async (opts) => {
+      try {
+        await cronTick({ dryRun: !!opts.dryRun, limit: opts.limit, json: !!opts.json });
+      } finally {
+        await closeConnection();
+      }
     });
 }
