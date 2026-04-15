@@ -44,6 +44,7 @@ export const dynamic = 'force-dynamic';
 interface SectionRegenerationPayload {
   type: 'section-regeneration';
   section_id: string;
+  service_id: string;
   content: string;
   bot_id: string;
 }
@@ -206,7 +207,12 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           );
         }
-        const section = await updateSectionContent(body.section_id, body.content, 'pending-review');
+        const section = await updateSectionContent(
+          body.section_id,
+          body.content,
+          'pending-review',
+          body.service_id,
+        );
         if (!section) {
           return NextResponse.json({ error: 'Section not found' }, { status: 404 });
         }
@@ -227,7 +233,10 @@ export async function POST(request: NextRequest) {
             channelId: slackCtx.channelId,
           })
             .then((ts) => {
-              if (ts) updateSectionSlackThread(section.section_id, ts).catch(() => {});
+              if (ts)
+                updateSectionSlackThread(section.section_id, ts, section.service_id).catch(
+                  () => {},
+                );
             })
             .catch((err) => console.error('Slack pending-review notify failed:', err));
         }
@@ -397,7 +406,7 @@ export async function POST(request: NextRequest) {
 
           // Save thread_ts on each section
           for (const [sectionId, threadTs] of threadMap.entries()) {
-            await updateSectionSlackThread(sectionId, threadTs);
+            await updateSectionSlackThread(sectionId, threadTs, body.service_id);
           }
         }
 

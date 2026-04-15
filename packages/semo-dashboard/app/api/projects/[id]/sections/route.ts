@@ -88,7 +88,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     // Answer Q&A items
     if (action === 'answer-qa' && qa_answers) {
-      const section = await answerQAItems(section_id, qa_answers, 'dashboard');
+      const section = await answerQAItems(section_id, qa_answers, 'dashboard', id);
       if (!section) {
         return NextResponse.json(
           { error: 'Section not found or has no Q&A items' },
@@ -126,7 +126,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     // Update content
     if (action === 'update-content' && content !== undefined) {
-      const section = await updateSectionContent(section_id, content, status);
+      const section = await updateSectionContent(section_id, content, status, id);
       return NextResponse.json(section);
     }
 
@@ -158,7 +158,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     // Status transitions that don't need full action logic (draft, pending-review)
     const { updateSectionStatus } = await import('@/lib/service');
-    const section = await updateSectionStatus(section_id, status, reviewer_note);
+    const section = await updateSectionStatus(section_id, status, reviewer_note, id);
     if (!section) {
       return NextResponse.json({ error: 'Section not found' }, { status: 404 });
     }

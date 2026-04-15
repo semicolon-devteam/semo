@@ -92,7 +92,7 @@ export async function executeSectionAction(
     }
   }
 
-  const section = await updateSectionStatus(sectionId, status, reviewerNote);
+  const section = await updateSectionStatus(sectionId, status, reviewerNote, serviceId);
   if (!section) {
     return { section: null as unknown as ServiceSection, error: 'Section not found' };
   }

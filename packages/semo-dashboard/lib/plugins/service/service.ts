@@ -7,7 +7,7 @@
  * KB projection keys: spec/*, pm-status, infra-status (written by pm-pipeline)
  */
 
-import { query, transaction } from '../../db';
+import { query } from '../../db';
 import type {
   ServiceProject,
   ServiceSection,
@@ -243,27 +243,71 @@ export async function updateProject(
   return res.rows[0] ?? null;
 }
 
-// ── Sections ──
+// ── Sections (KB-backed) ──
+// KB key: section/{track}/{phase}/{section_key}
+// section_id는 `{track}/{phase}/{section_key}` 형태 또는 레거시 UUID
+
+function sectionKbKey(track: string, phase: number, sectionKey: string): string {
+  return `section/${track}/${phase}/${sectionKey}`;
+}
+
+function kbToSection(
+  item: {
+    domain: string;
+    key: string;
+    content: string;
+    metadata?: Record<string, unknown>;
+    updated_at?: string;
+  },
+  subKey?: string,
+): ServiceSection {
+  const m = (item.metadata ?? {}) as Record<string, unknown>;
+  // sub_key에서 track/phase/section_key 추출
+  const sk = subKey ?? (item.key.startsWith('section/') ? item.key.slice(8) : '');
+  const parts = sk.split('/');
+  return {
+    section_id: (m.section_id as string) ?? sk,
+    service_id: (m.service_id as string) ?? '',
+    phase: (m.phase as number) ?? (parts.length >= 2 ? parseInt(parts[1]) : 0),
+    track: ((m.track as string) ?? parts[0] ?? 'plan') as ServiceTrack,
+    section_key: (m.section_key as string) ?? (parts.length >= 3 ? parts.slice(2).join('/') : ''),
+    title: (m.title as string) ?? '',
+    content: item.content,
+    ordinal: (m.ordinal as number) ?? 0,
+    status: ((m.status as string) ?? 'draft') as ServiceSectionStatus,
+    reviewer_note: (m.reviewer_note as string) ?? null,
+    source: ((m.source as string) ?? 'manual') as ServiceSection['source'],
+    kb_written_at: (m.kb_written_at as string) ?? null,
+    qa_items: (m.qa_items as ServiceQAItem[]) ?? null,
+    slack_thread_ts: (m.slack_thread_ts as string) ?? null,
+    created_at: (m.created_at as string) ?? '',
+    updated_at: (item.updated_at as string) ?? '',
+  };
+}
 
 export async function listSections(
   serviceId: string,
   phase?: number,
   track?: ServiceTrack,
 ): Promise<ServiceSection[]> {
-  let sql = 'SELECT * FROM semo.service_sections WHERE service_id =$1';
-  const params: unknown[] = [serviceId];
-  let idx = 2;
-  if (phase !== undefined) {
-    sql += ` AND phase = $${idx++}`;
-    params.push(phase);
+  const domain = await resolveDomain(serviceId);
+  let prefix = '';
+  if (track !== undefined && phase !== undefined) {
+    prefix = `${track}/${phase}/`;
+  } else if (track !== undefined) {
+    prefix = `${track}/`;
+  } else if (phase !== undefined) {
+    // phase만 있으면 모든 track에서 필터
+    const items = await kbListByKeyPrefix(domain, 'section', '', { orderBy: 'metadata.ordinal' });
+    return items
+      .map((i) => kbToSection(i, i.key.startsWith('section/') ? i.key.slice(8) : ''))
+      .filter((s) => s.phase === phase)
+      .sort((a, b) => a.phase - b.phase || a.ordinal - b.ordinal);
   }
-  if (track !== undefined) {
-    sql += ` AND track = $${idx++}`;
-    params.push(track);
-  }
-  sql += ' ORDER BY phase, ordinal';
-  const res = await query<ServiceSection>(sql, params);
-  return res.rows;
+  const items = await kbListByKeyPrefix(domain, 'section', prefix, { orderBy: 'metadata.ordinal' });
+  return items
+    .map((i) => kbToSection(i, i.key.startsWith('section/') ? i.key.slice(8) : ''))
+    .sort((a, b) => a.phase - b.phase || a.ordinal - b.ordinal);
 }
 
 export async function upsertSection(data: {
@@ -278,72 +322,65 @@ export async function upsertSection(data: {
   qa_items?: ServiceQAItem[];
   track?: ServiceTrack;
 }): Promise<ServiceSection> {
-  // If qa_items provided without content, auto-generate markdown
-  const content = data.content || (data.qa_items ? renderQAContent(data.qa_items) : '');
   const track = data.track ?? 'plan';
+  const content = data.content || (data.qa_items ? renderQAContent(data.qa_items) : '');
+  const domain = await resolveDomain(data.service_id);
+  const key = sectionKbKey(track, data.phase, data.section_key);
+  const sectionId = `${track}/${data.phase}/${data.section_key}`;
+  const now = new Date().toISOString();
 
-  const res = await query<ServiceSection>(
-    `INSERT INTO semo.service_sections (service_id, phase, section_key, title, content, ordinal, status, source, qa_items, track)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-     ON CONFLICT (service_id, track, phase, section_key) DO UPDATE SET
-       title   = EXCLUDED.title,
-       content = EXCLUDED.content,
-       ordinal = EXCLUDED.ordinal,
-       status  = EXCLUDED.status,
-       source  = EXCLUDED.source,
-       qa_items = EXCLUDED.qa_items
-     RETURNING *`,
-    [
-      data.service_id,
-      data.phase,
-      data.section_key,
-      data.title,
-      content,
-      data.ordinal ?? 0,
-      data.status ?? 'draft',
-      data.source ?? 'manual',
-      data.qa_items ? JSON.stringify(data.qa_items) : null,
-      track,
-    ],
-  );
-  return res.rows[0];
+  const item = await kbUpsert(domain, key, content, data.source ?? 'manual', {
+    section_id: sectionId,
+    service_id: data.service_id,
+    phase: data.phase,
+    track,
+    section_key: data.section_key,
+    title: data.title,
+    ordinal: data.ordinal ?? 0,
+    status: data.status ?? 'draft',
+    source: data.source ?? 'manual',
+    reviewer_note: null,
+    qa_items: data.qa_items ?? null,
+    slack_thread_ts: null,
+    kb_written_at: null,
+    created_at: now,
+  });
+  return kbToSection(item, sectionId);
 }
 
 export async function updateSectionStatus(
   sectionId: string,
   status: ServiceSectionStatus,
   reviewerNote?: string,
+  serviceId?: string,
 ): Promise<ServiceSection | null> {
-  const res = await query<ServiceSection>(
-    `UPDATE semo.service_sections
-     SET status = $1, reviewer_note = $2
-     WHERE section_id = $3
-     RETURNING *`,
-    [status, reviewerNote ?? null, sectionId],
-  );
-  return res.rows[0] ?? null;
+  if (!serviceId) return null;
+  const domain = await resolveDomain(serviceId);
+  const key = `section/${sectionId}`;
+  const patch: Record<string, unknown> = { status };
+  if (reviewerNote !== undefined) patch.reviewer_note = reviewerNote;
+  const item = await kbUpdateMetadata(domain, key, patch);
+  return item ? kbToSection(item, sectionId) : null;
 }
 
 export async function updateSectionContent(
   sectionId: string,
   content: string,
   status?: ServiceSectionStatus,
+  serviceId?: string,
 ): Promise<ServiceSection | null> {
-  const res = await query<ServiceSection>(
-    `UPDATE semo.service_sections
-     SET content = $1, status = COALESCE($2, status)
-     WHERE section_id = $3
-     RETURNING *`,
-    [content, status ?? null, sectionId],
-  );
-  return res.rows[0] ?? null;
+  if (!serviceId) return null;
+  const domain = await resolveDomain(serviceId);
+  const key = `section/${sectionId}`;
+  const patch: Record<string, unknown> = {};
+  if (status) patch.status = status;
+  // content 변경 → 임베딩 재생성 필요
+  const item = await kbUpsert(domain, key, content, 'pm-pipeline', patch);
+  return kbToSection(item, sectionId);
 }
 
 // ── Q&A helpers ──
 
-/**
- * Render qa_items array into readable markdown (for content field, KB write-back, GitHub publish).
- */
 export function renderQAContent(items: ServiceQAItem[]): string {
   return items
     .map((item) => {
@@ -358,24 +395,27 @@ export function renderQAContent(items: ServiceQAItem[]): string {
     .join('\n\n');
 }
 
-/**
- * Save answers to Q&A items on a section. Merges into existing qa_items and regenerates content.
- */
 export async function answerQAItems(
   sectionId: string,
   answers: Array<{ id: string; answer: string }>,
   via: 'dashboard' | 'slack',
+  serviceId?: string,
 ): Promise<ServiceSection | null> {
-  const sectionRes = await query<ServiceSection>(
-    'SELECT * FROM semo.service_sections WHERE section_id = $1',
-    [sectionId],
-  );
-  const section = sectionRes.rows[0];
-  if (!section || !section.qa_items) return null;
+  if (!serviceId) return null;
+  const domain = await resolveDomain(serviceId);
+  const key = `section/${sectionId}`;
+  const existing = await kbGetItem(domain, key);
+  if (!existing) return null;
 
+  const m = existing.metadata ?? {};
   const qaItems: ServiceQAItem[] = (
-    typeof section.qa_items === 'string' ? JSON.parse(section.qa_items) : section.qa_items
+    Array.isArray(m.qa_items)
+      ? m.qa_items
+      : typeof m.qa_items === 'string'
+        ? JSON.parse(m.qa_items as string)
+        : []
   ) as ServiceQAItem[];
+  if (qaItems.length === 0) return null;
 
   const now = new Date().toISOString();
   for (const ans of answers) {
@@ -388,14 +428,9 @@ export async function answerQAItems(
   }
 
   const content = renderQAContent(qaItems);
-  const res = await query<ServiceSection>(
-    `UPDATE semo.service_sections
-     SET qa_items = $1, content = $2
-     WHERE section_id = $3
-     RETURNING *`,
-    [JSON.stringify(qaItems), content, sectionId],
-  );
-  return res.rows[0] ?? null;
+  // content + qa_items 동시 업데이트
+  const updated = await kbUpsert(domain, key, content, 'pm-pipeline', { qa_items: qaItems });
+  return kbToSection(updated, sectionId);
 }
 
 // ── Section management (delete / move) ──
@@ -404,11 +439,14 @@ export async function deleteSection(
   sectionId: string,
   serviceId: string,
 ): Promise<ServiceSection | null> {
-  const res = await query<ServiceSection>(
-    'DELETE FROM semo.service_sections WHERE section_id = $1 AND service_id =$2 RETURNING *',
-    [sectionId, serviceId],
-  );
-  return res.rows[0] ?? null;
+  const domain = await resolveDomain(serviceId);
+  const key = `section/${sectionId}`;
+  const existing = await kbGetItem(domain, key);
+  if (!existing) return null;
+  const section = kbToSection(existing, sectionId);
+  const { deleteItemByKey } = await import('../../core/kb');
+  await deleteItemByKey(domain, key);
+  return section;
 }
 
 export async function moveSection(
@@ -417,44 +455,42 @@ export async function moveSection(
   targetPhase: number,
   targetTrack?: ServiceTrack,
 ): Promise<ServiceSection | null> {
-  // Fetch current section to check existence and get section_key for conflict check
-  const current = await query<ServiceSection>(
-    'SELECT * FROM semo.service_sections WHERE section_id = $1 AND service_id =$2',
-    [sectionId, serviceId],
-  );
-  if (!current.rows[0]) return null;
+  const domain = await resolveDomain(serviceId);
+  const oldKey = `section/${sectionId}`;
+  const existing = await kbGetItem(domain, oldKey);
+  if (!existing) return null;
 
-  const section = current.rows[0];
+  const section = kbToSection(existing, sectionId);
   const track = targetTrack ?? section.track ?? 'plan';
+  const newSectionId = `${track}/${targetPhase}/${section.section_key}`;
+  const newKey = `section/${newSectionId}`;
 
-  // Check UNIQUE constraint (service_id, track, phase, section_key)
-  const conflict = await query<ServiceSection>(
-    `SELECT section_id FROM semo.service_sections
-     WHERE service_id =$1 AND track = $2 AND phase = $3 AND section_key = $4 AND section_id != $5`,
-    [serviceId, track, targetPhase, section.section_key, sectionId],
-  );
-  if (conflict.rows.length > 0) {
+  // Check conflict
+  const conflict = await kbGetItem(domain, newKey);
+  if (conflict && newKey !== oldKey) {
     throw new Error('CONFLICT');
   }
 
-  const res = await query<ServiceSection>(
-    `UPDATE semo.service_sections
-     SET phase = $1, track = $2
-     WHERE section_id = $3 AND service_id =$4
-     RETURNING *`,
-    [targetPhase, track, sectionId, serviceId],
-  );
-  return res.rows[0] ?? null;
+  // Delete old, create new
+  const { deleteItemByKey } = await import('../../core/kb');
+  await deleteItemByKey(domain, oldKey);
+  const item = await kbUpsert(domain, newKey, section.content, 'pm-pipeline', {
+    ...existing.metadata,
+    section_id: newSectionId,
+    phase: targetPhase,
+    track,
+  });
+  return kbToSection(item, newSectionId);
 }
 
-/**
- * Save Slack thread_ts on a section (for answer collection polling).
- */
-export async function updateSectionSlackThread(sectionId: string, threadTs: string): Promise<void> {
-  await query('UPDATE semo.service_sections SET slack_thread_ts = $1 WHERE section_id = $2', [
-    threadTs,
-    sectionId,
-  ]);
+export async function updateSectionSlackThread(
+  sectionId: string,
+  threadTs: string,
+  serviceId?: string,
+): Promise<void> {
+  if (!serviceId) return;
+  const domain = await resolveDomain(serviceId);
+  await kbUpdateMetadata(domain, `section/${sectionId}`, { slack_thread_ts: threadTs });
 }
 
 // ── Phase progress helpers ──
@@ -472,22 +508,35 @@ export async function getPhaseProgress(
   serviceId: string,
   track?: ServiceTrack,
 ): Promise<PhaseProgress[]> {
-  let sql = `SELECT phase,
-            COUNT(*)::int as total,
-            COUNT(*) FILTER (WHERE status = 'approved')::int as approved,
-            COUNT(*) FILTER (WHERE status = 'rejected')::int as rejected,
-            COUNT(*) FILTER (WHERE status = 'pending-review')::int as pending,
-            COUNT(*) FILTER (WHERE status = 'draft')::int as draft
-     FROM semo.service_sections
-     WHERE service_id =$1`;
-  const params: unknown[] = [serviceId];
-  if (track !== undefined) {
-    sql += ' AND track = $2';
-    params.push(track);
+  const domain = await resolveDomain(serviceId);
+  const prefix = track ? `${track}/` : '';
+  const items = await kbListByKeyPrefix(domain, 'section', prefix);
+  const sections = items.map((i) =>
+    kbToSection(i, i.key.startsWith('section/') ? i.key.slice(8) : ''),
+  );
+
+  // Group by phase and count statuses
+  const phaseMap = new Map<number, PhaseProgress>();
+  for (const s of sections) {
+    if (!phaseMap.has(s.phase)) {
+      phaseMap.set(s.phase, {
+        phase: s.phase,
+        total: 0,
+        approved: 0,
+        rejected: 0,
+        pending: 0,
+        draft: 0,
+      });
+    }
+    const p = phaseMap.get(s.phase)!;
+    p.total++;
+    if (s.status === 'approved') p.approved++;
+    else if (s.status === 'rejected') p.rejected++;
+    else if (s.status === 'pending-review') p.pending++;
+    else if (s.status === 'draft') p.draft++;
   }
-  sql += ' GROUP BY phase ORDER BY phase';
-  const res = await query<PhaseProgress>(sql, params);
-  return res.rows;
+
+  return Array.from(phaseMap.values()).sort((a, b) => a.phase - b.phase);
 }
 
 // ── Materials (KB-backed) ──
@@ -759,13 +808,13 @@ export async function writebackPhaseToKB(
 
   await upsertItem(serviceDomain, `spec/${phaseName}`, content, 'pm-pipeline');
 
-  // KB write-back 시각 기록
-  const sectionIds = sections.map((s) => s.section_id);
-  await query(`UPDATE semo.service_sections SET kb_written_at = NOW() WHERE section_id = ANY($1)`, [
-    sectionIds,
-  ]);
+  // KB write-back 시각 기록 (각 섹션의 metadata에 kb_written_at 기록)
+  const now = new Date().toISOString();
+  for (const s of sections) {
+    await kbUpdateMetadata(serviceDomain, `section/${s.section_id}`, { kb_written_at: now });
+  }
   console.log(
-    `[PM] KB write-back: ${serviceDomain} spec/${phaseName} (${sectionIds.length} sections)`,
+    `[PM] KB write-back: ${serviceDomain} spec/${phaseName} (${sections.length} sections)`,
   );
 }
 
@@ -835,32 +884,23 @@ export async function createSectionsFromMapping(
   track: ServiceTrack = 'plan',
 ): Promise<number> {
   let count = 0;
-  await transaction(async (client) => {
-    for (const mapping of mappings) {
-      for (let i = 0; i < mapping.sections.length; i++) {
-        const sec = mapping.sections[i];
-        await client.query(
-          `INSERT INTO semo.service_sections (service_id, phase, section_key, title, content, ordinal, status, source, track)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-           ON CONFLICT (service_id, track, phase, section_key) DO UPDATE SET
-             title = EXCLUDED.title, content = EXCLUDED.content, ordinal = EXCLUDED.ordinal,
-             status = EXCLUDED.status, source = EXCLUDED.source`,
-          [
-            serviceId,
-            mapping.phase,
-            sec.key,
-            sec.title,
-            sec.content,
-            i,
-            'pending-review',
-            'imported',
-            track,
-          ],
-        );
-        count++;
-      }
+  for (const mapping of mappings) {
+    for (let i = 0; i < mapping.sections.length; i++) {
+      const sec = mapping.sections[i];
+      await upsertSection({
+        service_id: serviceId,
+        phase: mapping.phase,
+        section_key: sec.key,
+        title: sec.title,
+        content: sec.content,
+        ordinal: i,
+        status: 'pending-review',
+        source: 'imported',
+        track,
+      });
+      count++;
     }
-  });
+  }
   return count;
 }
 

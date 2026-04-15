@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { query } from '@/lib/db';
+import { listSections } from '@/lib/service';
 import { parseColors } from '@/lib/design-system-parser';
 import { renderPaletteImage } from '@/lib/palette-image-renderer';
 
@@ -13,19 +13,17 @@ export const dynamic = 'force-dynamic';
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  // ds-color* 섹션 조회
-  const res = await query(
-    `SELECT content FROM semo.service_sections
-     WHERE service_id = $1 AND section_key LIKE 'ds-color%' AND status != 'rejected'
-     ORDER BY ordinal LIMIT 1`,
-    [id],
+  // ds-color* 섹션 조회 (phase 4, plan track에서 검색)
+  const sections = await listSections(id, 4, 'plan');
+  const colorSection = sections.find(
+    (s) => s.section_key.startsWith('ds-color') && s.status !== 'rejected',
   );
 
-  if (res.rows.length === 0) {
+  if (!colorSection) {
     return new Response('No color section found', { status: 404 });
   }
 
-  const groups = parseColors(res.rows[0].content as string);
+  const groups = parseColors(colorSection.content);
 
   if (groups.length === 0) {
     return new Response('No colors parsed', { status: 404 });

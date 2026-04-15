@@ -1,43 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
+import { listProjects, getPhaseProgress } from '@/lib/service';
 
 export const dynamic = 'force-dynamic';
-
-interface PhaseRow {
-  service_id: string;
-  phase: number;
-  total: number;
-  approved: number;
-}
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const lifecycle = searchParams.get('lifecycle') || 'build';
 
-    const result = await query<PhaseRow>(
-      `SELECT sp.service_id::text, ss.phase,
-              COUNT(*)::int AS total,
-              COUNT(*) FILTER (WHERE ss.status = 'approved')::int AS approved
-       FROM semo.services sp
-       INNER JOIN semo.service_sections ss
-         ON sp.service_id = ss.service_id AND ss.track = 'plan'
-       WHERE sp.lifecycle = $1
-       GROUP BY sp.service_id, ss.phase
-       ORDER BY sp.service_id, ss.phase`,
-      [lifecycle],
-    );
+    const projects = await listProjects();
+    const filtered = projects.filter((p) => p.lifecycle === lifecycle);
 
-    // Group rows by service_id
     const grouped: Record<string, { phase: number; total: number; approved: number }[]> = {};
-    for (const row of result.rows) {
-      const sid = row.service_id;
-      if (!grouped[sid]) grouped[sid] = [];
-      grouped[sid].push({
-        phase: row.phase,
-        total: row.total,
-        approved: row.approved,
-      });
+    for (const project of filtered) {
+      const progress = await getPhaseProgress(project.service_id, 'plan');
+      if (progress.length > 0) {
+        grouped[project.service_id] = progress.map((p) => ({
+          phase: p.phase,
+          total: p.total,
+          approved: p.approved,
+        }));
+      }
     }
 
     return NextResponse.json(grouped);
