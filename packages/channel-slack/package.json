@@ -12,6 +12,7 @@
     "@modelcontextprotocol/sdk": "^1.4.0",
     "@slack/socket-mode": "^2.0.0",
     "@slack/web-api": "^7.0.0",
+    "@team-semicolon/semo-common": "*",
     "zod": "^3.22.0"
   },
   "devDependencies": {

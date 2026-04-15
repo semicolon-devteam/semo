@@ -17,14 +17,16 @@ import * as path from 'path';
 import * as os from 'os';
 import { Pool } from 'pg';
 
-import { Router } from '../../common/src/channel-router.js';
-import { FALLBACK_BOT_IDS } from '../../common/src/bot-config.js';
-import type { InboxMessage, OutboxMessage } from '../../common/src/types.js';
-
-import { InboxWriter } from '../../common/src/inbox-writer.js';
-import { OutboxReader } from '../../common/src/outbox-reader.js';
-import { HealthMonitor } from '../../common/src/health-monitor.js';
-import { resolveSpeaker } from '../../common/src/speaker-resolver.js';
+import {
+  Router,
+  FALLBACK_BOT_IDS,
+  InboxWriter,
+  OutboxReader,
+  HealthMonitor,
+  resolveSpeaker,
+  type InboxMessage,
+  type OutboxMessage,
+} from '@team-semicolon/semo-common';
 
 import { DiscordGateway } from './discord-gateway.js';
 import type { DiscordMessage } from './discord-gateway.js';

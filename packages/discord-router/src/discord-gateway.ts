@@ -22,8 +22,7 @@ import {
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import type { GatewayAdapter } from '../../common/src/outbox-reader.js';
-import type { AskOption } from '../../common/src/channel-types.js';
+import type { GatewayAdapter, AskOption } from '@team-semicolon/semo-common';
 import { splitDiscordMessage } from './markdown-to-discord.js';
 
 // ── Types ──

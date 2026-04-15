@@ -9,7 +9,8 @@
     "dev": "npx tsx --watch src/index.ts"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.4.0"
+    "@modelcontextprotocol/sdk": "^1.4.0",
+    "@team-semicolon/semo-common": "*"
   },
   "devDependencies": {
     "tsx": "^4.21.0"

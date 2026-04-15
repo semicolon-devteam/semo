@@ -8,6 +8,7 @@
     "dev": "npx tsx --watch src/index.ts"
   },
   "dependencies": {
+    "@team-semicolon/semo-common": "*",
     "discord.js": "^14.18.0",
     "pg": "^8.17.2"
   },

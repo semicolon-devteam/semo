@@ -18,16 +18,18 @@ import * as path from 'path';
 import * as os from 'os';
 import { Pool } from 'pg';
 
-import { SlackGateway } from '../../common/src/slack-gateway.js';
-import { FALLBACK_BOT_IDS } from '../../common/src/bot-config.js';
-import type { SlackMessage } from '../../common/src/channel-types.js';
-import type { InboxMessage, OutboxMessage } from '../../common/src/types.js';
-
-import { InboxWriter } from '../../common/src/inbox-writer.js';
-import { OutboxReader } from '../../common/src/outbox-reader.js';
-import { HealthMonitor } from '../../common/src/health-monitor.js';
-import { BusyDetector } from '../../common/src/busy-detector.js';
-import { resolveSpeaker } from '../../common/src/speaker-resolver.js';
+import {
+  SlackGateway,
+  FALLBACK_BOT_IDS,
+  InboxWriter,
+  OutboxReader,
+  HealthMonitor,
+  BusyDetector,
+  resolveSpeaker,
+  type SlackMessage,
+  type InboxMessage,
+  type OutboxMessage,
+} from '@team-semicolon/semo-common';
 
 // ── Configuration ──
 

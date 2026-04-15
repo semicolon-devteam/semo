@@ -1,3 +1,3 @@
 // Re-export from common (canonical location)
-export type { InboxMessage, OutboxMessage } from '../../common/src/types.js';
-export { PRIORITY_ORDER } from '../../common/src/types.js';
+export type { InboxMessage, OutboxMessage } from '@team-semicolon/semo-common';
+export { PRIORITY_ORDER } from '@team-semicolon/semo-common';

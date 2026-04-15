@@ -7,6 +7,11 @@ export { HealthMonitor } from './health-monitor.js';
 export { BusyDetector } from './busy-detector.js';
 export { resolveSpeaker, type SpeakerProfile } from './speaker-resolver.js';
 export { SlackGateway } from './slack-gateway.js';
-export { Router as ChannelRouter } from './channel-router.js';
+export { Router, Router as ChannelRouter } from './channel-router.js';
 export { FALLBACK_BOT_IDS, SLACK_PROFILES, type BotId } from './bot-config.js';
 export { SEMO_PATHS, resolveBotWorkspace } from './paths.js';
+export {
+  convertMarkdownToMrkdwn,
+  convertMarkdownToBlocks,
+  type SlackPayload,
+} from './markdown-to-slack.js';
