@@ -1,17 +1,17 @@
-export * from './types.js';
-export * from './channel-types.js';
-export { InboxWriter } from './inbox-writer.js';
-export { OutboxReader } from './outbox-reader.js';
-export type { GatewayAdapter } from './outbox-reader.js';
-export { HealthMonitor } from './health-monitor.js';
-export { BusyDetector } from './busy-detector.js';
-export { resolveSpeaker, type SpeakerProfile } from './speaker-resolver.js';
-export { SlackGateway } from './slack-gateway.js';
-export { Router, Router as ChannelRouter } from './channel-router.js';
-export { FALLBACK_BOT_IDS, SLACK_PROFILES, type BotId } from './bot-config.js';
+export * from './mailbox/types.js';
+export * from './slack/channel-types.js';
+export { InboxWriter } from './mailbox/inbox-writer.js';
+export { OutboxReader } from './mailbox/outbox-reader.js';
+export type { GatewayAdapter } from './mailbox/outbox-reader.js';
+export { HealthMonitor } from './monitoring/health-monitor.js';
+export { BusyDetector } from './monitoring/busy-detector.js';
+export { resolveSpeaker, type SpeakerProfile } from './resolver/speaker-resolver.js';
+export { SlackGateway } from './slack/slack-gateway.js';
+export { Router, Router as ChannelRouter } from './router/channel-router.js';
+export { FALLBACK_BOT_IDS, SLACK_PROFILES, type BotId } from './slack/bot-config.js';
 export { SEMO_PATHS, resolveBotWorkspace } from './paths.js';
 export {
   convertMarkdownToMrkdwn,
   convertMarkdownToBlocks,
   type SlackPayload,
-} from './markdown-to-slack.js';
+} from './slack/markdown-to-slack.js';

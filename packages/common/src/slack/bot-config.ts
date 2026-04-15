@@ -2,9 +2,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import type { Pool } from 'pg';
-import type { BotConfig } from './channel-types';
-import { resolveMcpForBot, loadMcpAccessFromDb } from './mcp-config';
-import { resolveBotWorkspace } from './paths';
+import type { BotConfig } from './channel-types.js';
+import { resolveMcpForBot, loadMcpAccessFromDb } from '../mcp-config.js';
+import { resolveBotWorkspace } from '../paths.js';
 
 const AGENTS_DIR = path.join(os.homedir(), '.claude', 'agents');
 

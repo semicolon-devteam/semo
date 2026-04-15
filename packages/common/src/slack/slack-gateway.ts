@@ -4,9 +4,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { convertMarkdownToBlocks } from './markdown-to-slack.js';
-import type { SlackMessage, SlackImage, AskOption } from './channel-types';
-import { SLACK_PROFILES } from './bot-config';
-import type { BotId } from './bot-config';
+import type { SlackMessage, SlackImage, AskOption } from './channel-types.js';
+import { SLACK_PROFILES, type BotId } from './bot-config.js';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || '';
 

@@ -1,6 +1,6 @@
 import { Pool } from 'pg';
-import type { RouteResult, ProjectContext } from './channel-types';
-import { loadRoutingConfig, type RoutingConfig } from './kb-routing';
+import type { RouteResult, ProjectContext } from '../slack/channel-types.js';
+import { loadRoutingConfig, type RoutingConfig } from './kb-routing.js';
 
 // 채널 → 도메인 매핑 캐시 (ontology 기반, services LEFT JOIN)
 interface DomainContext {
