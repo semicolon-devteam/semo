@@ -4,6 +4,7 @@ import * as os from 'os';
 import type { Pool } from 'pg';
 import type { BotConfig } from './channel-types';
 import { resolveMcpForBot, loadMcpAccessFromDb } from './mcp-config';
+import { resolveBotWorkspace } from './paths';
 
 const AGENTS_DIR = path.join(os.homedir(), '.claude', 'agents');
 
@@ -343,7 +344,7 @@ export async function loadAllBotConfigsAsync(pool: Pool): Promise<Map<string, Bo
 export function syncBotSkillSymlinks(botId: string, sessionCwd: string): number {
   const skillsDir = path.join(sessionCwd, '.claude', 'skills');
   fs.mkdirSync(skillsDir, { recursive: true });
-  const srcDir = path.join(os.homedir(), `.openclaw-${botId}`, 'workspace', 'skills');
+  const srcDir = path.join(resolveBotWorkspace(botId), 'skills');
   if (!fs.existsSync(srcDir)) return 0;
 
   let count = 0;

@@ -7,6 +7,6 @@
 -- 봇(incubator 등)은 수동 정리가 필요하다.
 
 UPDATE semo.bot_status
-SET workspace_path = '/Users/reus/.semo/workspaces/' || bot_id
+SET workspace_path = '~/.semo/workspaces/' || bot_id
 WHERE workspace_path LIKE '~/.semo-bot-sessions/%'
    OR workspace_path LIKE '~/.openclaw-%';
