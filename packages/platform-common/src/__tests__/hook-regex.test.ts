@@ -8,11 +8,12 @@ import { describe, it, expect } from 'vitest';
  */
 
 // 8개 훅에서 공통으로 사용하는 봇 세션 감지 regex (Python 호환)
-const BOT_SESSION_REGEX = /openclaw-[a-z]+\/workspace|semo-(bot-)?sessions\/|\.semo\/sessions\//;
+const BOT_SESSION_REGEX =
+  /openclaw-[a-z]+\/workspace|semo-(bot-)?sessions\/|\.semo\/sessions\/|\.semo\/workspaces\//;
 
 // destructive-guard 전용 (이전에 다른 패턴이었으나 통일됨)
 const DESTRUCTIVE_GUARD_REGEX =
-  /openclaw-[a-z]+\/workspace|semo-(bot-)?sessions\/|\.semo\/sessions\//;
+  /openclaw-[a-z]+\/workspace|semo-(bot-)?sessions\/|\.semo\/sessions\/|\.semo\/workspaces\//;
 
 describe('Hook bot session detection regex', () => {
   describe('new consolidated path (~/.semo/sessions/)', () => {
@@ -53,6 +54,16 @@ describe('Hook bot session detection regex', () => {
     });
   });
 
+  describe('new workspace path (~/.semo/workspaces/)', () => {
+    it('matches ~/.semo/workspaces/semiclaw', () => {
+      expect(BOT_SESSION_REGEX.test('/Users/reus/.semo/workspaces/semiclaw')).toBe(true);
+    });
+
+    it('matches ~/.semo/workspaces/reviewclaw/skills', () => {
+      expect(BOT_SESSION_REGEX.test('/Users/reus/.semo/workspaces/reviewclaw/skills')).toBe(true);
+    });
+  });
+
   describe('non-bot paths (should NOT match)', () => {
     it('does not match regular project dir', () => {
       expect(BOT_SESSION_REGEX.test('/Users/reus/Desktop/Sources/semicolon/projects/semo')).toBe(
@@ -81,6 +92,7 @@ describe('Hook bot session detection regex', () => {
     it('destructive-guard regex matches same paths as other hooks', () => {
       const testPaths = [
         '/Users/reus/.semo/sessions/semiclaw',
+        '/Users/reus/.semo/workspaces/reviewclaw',
         '/Users/reus/.semo-bot-sessions/planclaw',
         '/Users/reus/.openclaw-workclaw/workspace',
         '/Users/reus/.semo-sessions/uuid123',
@@ -97,8 +109,11 @@ describe('Bot ID extraction from CWD', () => {
   // commitment-guard.sh와 cron-reregister.sh에서 사용하는 botId 추출 패턴
 
   function extractBotId(cwd: string): string {
-    // Priority order: openclaw → semo-bot-sessions → .semo/sessions
-    let m = cwd.match(/openclaw-([a-z]+)\/workspace/);
+    // Priority order: workspaces → openclaw → semo-bot-sessions → .semo/sessions
+    let m = cwd.match(/\.semo\/workspaces\/([a-zA-Z0-9_-]+)/);
+    if (m) return m[1];
+
+    m = cwd.match(/openclaw-([a-z]+)\/workspace/);
     if (m) return m[1];
 
     m = cwd.match(/semo-(?:bot-)?sessions\/([a-zA-Z0-9_-]+)/);
@@ -109,6 +124,10 @@ describe('Bot ID extraction from CWD', () => {
 
     return '';
   }
+
+  it('extracts from workspaces path ~/.semo/workspaces/reviewclaw', () => {
+    expect(extractBotId('/Users/reus/.semo/workspaces/reviewclaw')).toBe('reviewclaw');
+  });
 
   it('extracts from new path ~/.semo/sessions/semiclaw', () => {
     expect(extractBotId('/Users/reus/.semo/sessions/semiclaw')).toBe('semiclaw');

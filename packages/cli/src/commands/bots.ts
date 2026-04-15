@@ -39,6 +39,7 @@ import {
   WorkspaceStandardRow,
 } from './audit';
 import { getCronJobStats } from './context';
+import { resolveBotWorkspace } from '../paths';
 
 // ============================================================
 // Types (matches actual DB schema)
@@ -139,8 +140,7 @@ function scanBotWorkspaces(_semoSystemDir?: string): ScannedBot[] {
   const bots: ScannedBot[] = [];
 
   for (const botId of KNOWN_BOTS) {
-    // v2.0 SoT: ~/.openclaw-{bot}/workspace/
-    const botDir = path.join(home, `.openclaw-${botId}`, 'workspace');
+    const botDir = resolveBotWorkspace(botId);
     if (!fs.existsSync(botDir)) continue;
 
     // Most recent file mtime
@@ -713,7 +713,7 @@ export function registerBotsCommands(program: Command): void {
       const home = process.env.HOME || '/Users/reus';
 
       const isLocal = options.local === true;
-      const sourceLabel = isLocal ? '~/.claude/semo/bots/' : '~/.openclaw-*/workspace/';
+      const sourceLabel = isLocal ? '~/.claude/semo/bots/' : '~/.semo/workspaces/*/';
       const spinner = ora(`bot-workspaces audit 중... (${sourceLabel})`).start();
 
       const botEntries: { botId: string; botDir: string }[] = [];
@@ -730,9 +730,8 @@ export function registerBotsCommands(program: Command): void {
           }
         }
       } else {
-        // v2.0: SoT는 ~/.openclaw-{bot}/workspace/
         for (const botId of KNOWN_BOTS) {
-          const botDir = path.join(home, `.openclaw-${botId}`, 'workspace');
+          const botDir = resolveBotWorkspace(botId);
           if (fs.existsSync(botDir)) {
             botEntries.push({ botId, botDir });
           }
@@ -826,7 +825,7 @@ export function registerBotsCommands(program: Command): void {
         for (const r of results) {
           const botDir = isLocal
             ? path.join(home, '.claude', 'semo', 'bots', r.botId)
-            : path.join(home, `.openclaw-${r.botId}`, 'workspace');
+            : resolveBotWorkspace(r.botId);
 
           let fixed: number;
           if (dbRules.length > 0) {
@@ -1042,7 +1041,9 @@ export function registerBotsCommands(program: Command): void {
     .action(async () => {
       console.log(chalk.yellow('⚠️  [deprecated] 파일 기반 크론 sync는 제거되었습니다.'));
       console.log(
-        chalk.yellow('   기존 파일에서 임포트: semo cron import ~/.openclaw-{bot}/cron/jobs.json'),
+        chalk.yellow(
+          '   기존 파일에서 임포트: semo cron import ~/.semo/workspaces/{bot}/cron/jobs.json',
+        ),
       );
       console.log(
         chalk.yellow(
@@ -1157,7 +1158,7 @@ export function registerBotsCommands(program: Command): void {
             : skill.bot_ids;
 
           for (const botId of targetBots) {
-            const wsDir = path.join(os.homedir(), `.openclaw-${botId}`, 'workspace');
+            const wsDir = resolveBotWorkspace(botId);
             const skillDir = path.join(wsDir, 'skills', skill.name);
             const filePath = path.join(skillDir, 'SKILL.md');
 
@@ -1235,7 +1236,7 @@ export function registerBotsCommands(program: Command): void {
         const client = await pool.connect();
         try {
           for (const botId of affectedBots) {
-            const wsDir = path.join(os.homedir(), `.openclaw-${botId}`, 'workspace');
+            const wsDir = resolveBotWorkspace(botId);
             if (fs.existsSync(wsDir)) {
               const syncSpinner = ora(`${botId} 워크스페이스 DB 싱크 중...`).start();
               const count = await syncWorkspaceFiles(client, botId, wsDir);

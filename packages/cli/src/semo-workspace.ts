@@ -344,7 +344,7 @@ ${kbFirstBlock}
 |----|------|------|
 | **소스코드** | 각 프로젝트 레포 | API 라우트, 타입, 마이그레이션 |
 | **KB 포함 DB** | semo-kb (PostgreSQL + 벡터 임베딩) | 프로세스, 봇 역할, 온톨로지 |
-| **봇 로컬 파일** | \`~/.openclaw-{botId}/workspace/\` + \`~/.claude/semo/\` | SOUL.md, skills/, memory/ |
+| **봇 로컬 파일** | \`~/.semo/workspaces/{botId}/\` + \`~/.claude/semo/\` | SOUL.md, skills/, memory/ |
 
 **변경 시 체크리스트**:
 1. **소스코드 변경** → KB와 봇 파일에 반영할 내용이 있는가?

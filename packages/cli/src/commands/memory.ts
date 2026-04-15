@@ -13,6 +13,7 @@ import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
 import { getPool, closeConnection } from '../database';
+import { resolveBotWorkspace } from '../paths';
 import { generateEmbedding } from '../kb';
 
 // ============================================================
@@ -80,7 +81,7 @@ function contentHash(content: string): string {
 // ============================================================
 
 function discoverBotMemoryFiles(botId: string, minAgeDays: number): SyncCandidate[] {
-  const memoryDir = path.join(os.homedir(), `.openclaw-${botId}`, 'workspace', 'memory');
+  const memoryDir = path.join(resolveBotWorkspace(botId), 'memory');
 
   if (!fs.existsSync(memoryDir)) return [];
 

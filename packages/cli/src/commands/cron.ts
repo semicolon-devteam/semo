@@ -20,6 +20,7 @@ import ora from 'ora';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 import { getPool, closeConnection } from '../database';
+import { resolveBotWorkspace } from '../paths';
 
 // ============================================================
 // Types
@@ -452,10 +453,9 @@ async function cronImport(opts: { file: string; bot?: string; dryRun?: boolean }
   let filePath = opts.file;
   let botId = opts.bot;
 
-  // Support shorthand: --bot semiclaw → ~/.openclaw-semiclaw/cron/jobs.json
+  // Support shorthand: --bot semiclaw → workspace/cron/jobs.json
   if (!fs.existsSync(filePath) && botId) {
-    const home = require('os').homedir();
-    filePath = require('path').join(home, `.openclaw-${botId}`, 'cron', 'jobs.json');
+    filePath = require('path').join(resolveBotWorkspace(botId), 'cron', 'jobs.json');
   }
 
   if (!fs.existsSync(filePath)) {
@@ -475,7 +475,8 @@ async function cronImport(opts: { file: string; bot?: string; dryRun?: boolean }
 
     // Infer bot from file path if not provided
     if (!botId) {
-      const match = filePath.match(/\.openclaw-([^/]+)\//);
+      const match =
+        filePath.match(/workspaces\/([^/]+)\//) || filePath.match(/\.openclaw-([^/]+)\//);
       botId = match?.[1] ?? 'unknown';
     }
 

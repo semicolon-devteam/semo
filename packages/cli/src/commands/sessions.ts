@@ -23,15 +23,15 @@
  *   { "agent:main:slack:channel:xxx": { updatedAt: <unix ms>, ... }, ... }
  */
 
-import { Command } from "commander";
-import chalk from "chalk";
-import * as fs from "fs";
-import * as path from "path";
-import * as readline from "readline";
-import * as os from "os";
-import { execSync } from "child_process";
-import { PoolClient } from "pg";
-import { getPool, closeConnection, isDbConnected } from "../database";
+import { Command } from 'commander';
+import chalk from 'chalk';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as readline from 'readline';
+import * as os from 'os';
+import { execSync } from 'child_process';
+import { PoolClient } from 'pg';
+import { getPool, closeConnection, isDbConnected } from '../database';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -54,10 +54,10 @@ interface OpenClawConfig {
 // ─── OpenClaw config reader ─────────────────────────────────────────────────
 
 function readOpenClawConfig(botId: string): OpenClawConfig | null {
-  const configPath = path.join(os.homedir(), `.openclaw-${botId}`, "openclaw.json");
+  const configPath = path.join(os.homedir(), `.openclaw-${botId}`, 'openclaw.json');
   if (!fs.existsSync(configPath)) return null;
   try {
-    return JSON.parse(fs.readFileSync(configPath, "utf-8"));
+    return JSON.parse(fs.readFileSync(configPath, 'utf-8'));
   } catch {
     return null;
   }
@@ -75,21 +75,21 @@ async function fetchSessionsFromGateway(botId: string): Promise<GatewaySession[]
 
   try {
     const res = await fetch(url, {
-      method: "POST",
+      method: 'POST',
       headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ tool: "sessions_list", action: "json", args: {} }),
+      body: JSON.stringify({ tool: 'sessions_list', action: 'json', args: {} }),
       signal: AbortSignal.timeout(5000),
     });
     if (!res.ok) return null;
 
-    const outer = await res.json() as any;
+    const outer = (await res.json()) as any;
     if (!outer.ok) return null;
 
     // 이중 JSON 파싱: result.content[0].text가 JSON 문자열
-    const textContent = outer.result?.content?.find((c: any) => c.type === "text")?.text;
+    const textContent = outer.result?.content?.find((c: any) => c.type === 'text')?.text;
     if (!textContent) return null;
 
     const inner = JSON.parse(textContent);
@@ -103,12 +103,17 @@ async function fetchSessionsFromGateway(botId: string): Promise<GatewaySession[]
 
 function readSessionsFromFile(botId: string): GatewaySession[] | null {
   const sessionsPath = path.join(
-    os.homedir(), `.openclaw-${botId}`, "agents", "main", "sessions", "sessions.json"
+    os.homedir(),
+    `.openclaw-${botId}`,
+    'agents',
+    'main',
+    'sessions',
+    'sessions.json',
   );
   if (!fs.existsSync(sessionsPath)) return null;
 
   try {
-    const raw = JSON.parse(fs.readFileSync(sessionsPath, "utf-8"));
+    const raw = JSON.parse(fs.readFileSync(sessionsPath, 'utf-8'));
     return Object.entries(raw).map(([key, val]: [string, any]) => ({
       key,
       updatedAt: val.updatedAt,
@@ -121,13 +126,13 @@ function readSessionsFromFile(botId: string): GatewaySession[] | null {
 // ─── GatewaySession → DB 컬럼 매핑 ─────────────────────────────────────────
 
 function mapSessionToDb(s: GatewaySession) {
-  const kind = s.kind === "group" ? "isolated" : "main";
-  let chatType = s.channel ?? "direct";
+  const kind = s.kind === 'group' ? 'isolated' : 'main';
+  let chatType = s.channel ?? 'direct';
   if (!s.channel) {
-    if (s.key.includes(":slack:")) chatType = "slack";
-    else if (s.key.includes(":cron:")) chatType = "cron";
+    if (s.key.includes(':slack:')) chatType = 'slack';
+    else if (s.key.includes(':cron:')) chatType = 'cron';
   }
-  const label = s.displayName ?? s.key.split(":").slice(-2).join(":");
+  const label = s.displayName ?? s.key.split(':').slice(-2).join(':');
   const lastActivity = s.updatedAt ? new Date(s.updatedAt).toISOString() : null;
   return { kind, chatType, label, lastActivity, totalTokens: s.totalTokens ?? null };
 }
@@ -138,12 +143,15 @@ async function readStdin(): Promise<Record<string, any>> {
   if (process.stdin.isTTY) return {};
 
   return new Promise((resolve) => {
-    let raw = "";
-    process.stdin.setEncoding("utf-8");
-    process.stdin.on("data", (chunk: string) => (raw += chunk));
-    process.stdin.on("end", () => {
-      try { resolve(JSON.parse(raw)); }
-      catch { resolve({}); }
+    let raw = '';
+    process.stdin.setEncoding('utf-8');
+    process.stdin.on('data', (chunk: string) => (raw += chunk));
+    process.stdin.on('end', () => {
+      try {
+        resolve(JSON.parse(raw));
+      } catch {
+        resolve({});
+      }
     });
     setTimeout(() => resolve({}), 500);
   });
@@ -154,11 +162,13 @@ async function readStdin(): Promise<Record<string, any>> {
 function getGitBranch(cwd?: string): string | null {
   try {
     const dir = cwd || process.cwd();
-    return execSync("git rev-parse --abbrev-ref HEAD", {
+    return execSync('git rev-parse --abbrev-ref HEAD', {
       cwd: dir,
-      stdio: ["ignore", "pipe", "ignore"],
+      stdio: ['ignore', 'pipe', 'ignore'],
       timeout: 2000,
-    }).toString().trim();
+    })
+      .toString()
+      .trim();
   } catch {
     return null;
   }
@@ -175,15 +185,17 @@ async function countMessages(transcriptPath: string): Promise<number> {
       input: fs.createReadStream(transcriptPath),
       crlfDelay: Infinity,
     });
-    rl.on("line", (line: string) => {
+    rl.on('line', (line: string) => {
       if (!line.trim()) return;
       try {
         const obj = JSON.parse(line);
-        if (obj.role === "user" || obj.role === "assistant") count++;
-      } catch { /* invalid line skip */ }
+        if (obj.role === 'user' || obj.role === 'assistant') count++;
+      } catch {
+        /* invalid line skip */
+      }
     });
-    rl.on("close", () => resolve(count));
-    rl.on("error", () => resolve(0));
+    rl.on('close', () => resolve(count));
+    rl.on('error', () => resolve(0));
   });
 }
 
@@ -191,7 +203,7 @@ async function countMessages(transcriptPath: string): Promise<number> {
 
 export async function syncBotSessions(
   botIds: string[],
-  client: PoolClient
+  client: PoolClient,
 ): Promise<{ total: number }> {
   let totalUpserted = 0;
 
@@ -217,14 +229,16 @@ export async function syncBotSessions(
              last_activity = COALESCE(EXCLUDED.last_activity, semo.bot_sessions.last_activity),
              message_count = COALESCE(EXCLUDED.message_count, semo.bot_sessions.message_count),
              synced_at     = NOW()`,
-          [botId, s.key, label, kind, chatType, lastActivity, totalTokens]
+          [botId, s.key, label, kind, chatType, lastActivity, totalTokens],
         );
         upserted++;
         if (lastActivity) {
           const d = new Date(lastActivity);
           if (!latestActivity || d > latestActivity) latestActivity = d;
         }
-      } catch { /* 개별 세션 실패 무시 */ }
+      } catch {
+        /* 개별 세션 실패 무시 */
+      }
     }
 
     // session_count는 trg_session_count 트리거가 자동 관리
@@ -240,9 +254,11 @@ export async function syncBotSessions(
              END,
              synced_at = NOW()
          WHERE bot_id = $1`,
-        [botId, latestActivity?.toISOString() ?? null]
+        [botId, latestActivity?.toISOString() ?? null],
       );
-    } catch { /* bot_status 없으면 무시 */ }
+    } catch {
+      /* bot_status 없으면 무시 */
+    }
 
     totalUpserted += upserted;
   }
@@ -253,35 +269,31 @@ export async function syncBotSessions(
 // ─── Command registration ───────────────────────────────────────────────────
 
 export function registerSessionsCommands(program: Command): void {
-  const sessionsCmd = program
-    .command("sessions")
-    .description("세션 추적 (Claude Code 훅 연동)");
+  const sessionsCmd = program.command('sessions').description('세션 추적 (Claude Code 훅 연동)');
 
   // ── semo sessions push ────────────────────────────────────────────────────
   sessionsCmd
-    .command("push")
-    .description("현재 세션을 semo.bot_sessions에 기록 (훅에서 호출)")
-    .requiredOption("--bot-id <id>", "봇 ID (e.g. workclaw)")
-    .option("--event <type>", "이벤트 종류 (start|stop|heartbeat)", "heartbeat")
-    .option("--label <text>", "세션 라벨 (미지정 시 git 브랜치 자동 감지)")
-    .option("--kind <kind>", "세션 종류 (main|isolated)", "main")
+    .command('push')
+    .description('현재 세션을 semo.bot_sessions에 기록 (훅에서 호출)')
+    .requiredOption('--bot-id <id>', '봇 ID (e.g. workclaw)')
+    .option('--event <type>', '이벤트 종류 (start|stop|heartbeat)', 'heartbeat')
+    .option('--label <text>', '세션 라벨 (미지정 시 git 브랜치 자동 감지)')
+    .option('--kind <kind>', '세션 종류 (main|isolated)', 'main')
     .action(async (options) => {
       const botId = options.botId;
       const event = options.event;
 
       const hook = await readStdin();
-      const sessionKey = hook.session_id
-        || process.env.CLAUDE_SESSION_ID
-        || `${botId}-${Date.now()}`;
+      const sessionKey =
+        hook.session_id || process.env.CLAUDE_SESSION_ID || `${botId}-${Date.now()}`;
 
       const branch = getGitBranch(hook.cwd);
-      const label = options.label
-        || branch
-        || path.basename(hook.cwd || process.cwd());
+      const label = options.label || branch || path.basename(hook.cwd || process.cwd());
 
-      const messageCount = event === "stop" && hook.transcript_path
-        ? await countMessages(hook.transcript_path)
-        : undefined;
+      const messageCount =
+        event === 'stop' && hook.transcript_path
+          ? await countMessages(hook.transcript_path)
+          : undefined;
 
       const connected = await isDbConnected();
       if (!connected) {
@@ -293,7 +305,7 @@ export function registerSessionsCommands(program: Command): void {
         const pool = getPool();
         const client = await pool.connect();
 
-        if (event === "start") {
+        if (event === 'start') {
           await client.query(
             `INSERT INTO semo.bot_sessions
                (bot_id, session_key, label, kind, chat_type, last_activity, message_count, synced_at)
@@ -302,17 +314,17 @@ export function registerSessionsCommands(program: Command): void {
                label         = EXCLUDED.label,
                last_activity = NOW(),
                synced_at     = NOW()`,
-            [botId, sessionKey, label, options.kind]
+            [botId, sessionKey, label, options.kind],
           );
           // session_count는 trg_session_count 트리거가 자동 관리
-        } else if (event === "stop") {
+        } else if (event === 'stop') {
           await client.query(
             `UPDATE semo.bot_sessions
              SET last_activity = NOW(),
                  message_count = COALESCE($1, message_count),
                  synced_at     = NOW()
              WHERE bot_id = $2 AND session_key = $3`,
-            [messageCount ?? null, botId, sessionKey]
+            [messageCount ?? null, botId, sessionKey],
           );
         } else {
           // heartbeat
@@ -324,7 +336,7 @@ export function registerSessionsCommands(program: Command): void {
                last_activity = NOW(),
                message_count = COALESCE(EXCLUDED.message_count, semo.bot_sessions.message_count),
                synced_at     = NOW()`,
-            [botId, sessionKey, label, options.kind, messageCount ?? null]
+            [botId, sessionKey, label, options.kind, messageCount ?? null],
           );
           // session_count는 trg_session_count 트리거가 자동 관리
         }
@@ -341,14 +353,14 @@ export function registerSessionsCommands(program: Command): void {
 
   // ── semo sessions sync ────────────────────────────────────────────────────
   sessionsCmd
-    .command("sync")
-    .description("OpenClaw 게이트웨이에서 세션 읽어 DB upsert")
-    .option("--bot-id <id>", "특정 봇만 동기화")
-    .option("--all", "semo.bot_status의 모든 봇 동기화")
+    .command('sync')
+    .description('OpenClaw 게이트웨이에서 세션 읽어 DB upsert')
+    .option('--bot-id <id>', '특정 봇만 동기화')
+    .option('--all', 'semo.bot_status의 모든 봇 동기화')
     .action(async (options) => {
       const connected = await isDbConnected();
       if (!connected) {
-        console.log(chalk.red("❌ DB 연결 실패"));
+        console.log(chalk.red('❌ DB 연결 실패'));
         await closeConnection();
         process.exit(1);
       }
@@ -361,24 +373,24 @@ export function registerSessionsCommands(program: Command): void {
         botIds = [options.botId];
       } else if (options.all) {
         try {
-          const r = await client.query("SELECT bot_id FROM semo.bot_status ORDER BY bot_id");
+          const r = await client.query('SELECT bot_id FROM semo.bot_status ORDER BY bot_id');
           botIds = r.rows.map((row: any) => row.bot_id);
         } catch {
           const home = os.homedir();
-          botIds = fs.readdirSync(home)
-            .filter(d => d.startsWith(".openclaw-"))
-            .map(d => d.replace(".openclaw-", ""))
-            .filter(id => id.length > 0);
+          const wsDir = path.join(home, '.semo', 'workspaces');
+          botIds = fs.existsSync(wsDir)
+            ? fs.readdirSync(wsDir).filter((d) => fs.statSync(path.join(wsDir, d)).isDirectory())
+            : [];
         }
       } else {
-        console.log(chalk.yellow("  --bot-id <id> 또는 --all 옵션 필요"));
+        console.log(chalk.yellow('  --bot-id <id> 또는 --all 옵션 필요'));
         client.release();
         await closeConnection();
         process.exit(1);
       }
 
       if (botIds.length === 0) {
-        console.log(chalk.yellow("  동기화할 봇 없음"));
+        console.log(chalk.yellow('  동기화할 봇 없음'));
         client.release();
         await closeConnection();
         return;
@@ -391,14 +403,14 @@ export function registerSessionsCommands(program: Command): void {
         process.stdout.write(chalk.gray(`  ${botId.padEnd(14)}`));
 
         let sessions = await fetchSessionsFromGateway(botId);
-        let source = "gateway";
+        let source = 'gateway';
         if (!sessions) {
           sessions = readSessionsFromFile(botId);
-          source = "file";
+          source = 'file';
         }
 
         if (!sessions || sessions.length === 0) {
-          console.log(chalk.yellow("세션 없음 (게이트웨이 오프라인, 파일 없음)"));
+          console.log(chalk.yellow('세션 없음 (게이트웨이 오프라인, 파일 없음)'));
           continue;
         }
 
@@ -419,14 +431,16 @@ export function registerSessionsCommands(program: Command): void {
                  last_activity = COALESCE(EXCLUDED.last_activity, semo.bot_sessions.last_activity),
                  message_count = COALESCE(EXCLUDED.message_count, semo.bot_sessions.message_count),
                  synced_at     = NOW()`,
-              [botId, s.key, label, kind, chatType, lastActivity, totalTokens]
+              [botId, s.key, label, kind, chatType, lastActivity, totalTokens],
             );
             upserted++;
             if (lastActivity) {
               const d = new Date(lastActivity);
               if (!latestActivity || d > latestActivity) latestActivity = d;
             }
-          } catch { /* 개별 세션 실패 무시 */ }
+          } catch {
+            /* 개별 세션 실패 무시 */
+          }
         }
 
         // session_count는 trg_session_count 트리거가 자동 관리
@@ -442,14 +456,15 @@ export function registerSessionsCommands(program: Command): void {
                  END,
                  synced_at = NOW()
              WHERE bot_id = $1`,
-            [botId, latestActivity?.toISOString() ?? null]
+            [botId, latestActivity?.toISOString() ?? null],
           );
-        } catch { /* bot_status 없으면 무시 */ }
+        } catch {
+          /* bot_status 없으면 무시 */
+        }
 
         totalUpserted += upserted;
         console.log(
-          chalk.green(`✔ ${upserted}개`) +
-          chalk.gray(` (${source}, total ${sessions.length})`)
+          chalk.green(`✔ ${upserted}개`) + chalk.gray(` (${source}, total ${sessions.length})`),
         );
       }
 
@@ -460,15 +475,15 @@ export function registerSessionsCommands(program: Command): void {
 
   // ── semo sessions list ────────────────────────────────────────────────────
   sessionsCmd
-    .command("list")
-    .description("bot_sessions 테이블 조회")
-    .option("--bot-id <id>", "특정 봇만")
-    .option("--limit <n>", "최대 조회 수", "20")
-    .option("--format <type>", "출력 형식 (table|json)", "table")
+    .command('list')
+    .description('bot_sessions 테이블 조회')
+    .option('--bot-id <id>', '특정 봇만')
+    .option('--limit <n>', '최대 조회 수', '20')
+    .option('--format <type>', '출력 형식 (table|json)', 'table')
     .action(async (options) => {
       const connected = await isDbConnected();
       if (!connected) {
-        console.log(chalk.red("❌ DB 연결 실패"));
+        console.log(chalk.red('❌ DB 연결 실패'));
         await closeConnection();
         process.exit(1);
       }
@@ -478,9 +493,9 @@ export function registerSessionsCommands(program: Command): void {
         const client = await pool.connect();
 
         const params: (string | number)[] = [];
-        let where = "";
+        let where = '';
         if (options.botId) {
-          where = "WHERE bot_id = $1";
+          where = 'WHERE bot_id = $1';
           params.push(options.botId);
         }
         params.push(parseInt(options.limit));
@@ -493,25 +508,23 @@ export function registerSessionsCommands(program: Command): void {
            ${where}
            ORDER BY last_activity DESC NULLS LAST
            LIMIT $${limitIdx}`,
-          params
+          params,
         );
         client.release();
 
-        if (options.format === "json") {
+        if (options.format === 'json') {
           console.log(JSON.stringify(result.rows, null, 2));
         } else {
-          console.log(chalk.cyan.bold("\n📋 세션 목록\n"));
+          console.log(chalk.cyan.bold('\n📋 세션 목록\n'));
           if (result.rows.length === 0) {
-            console.log(chalk.yellow("  세션 없음"));
+            console.log(chalk.yellow('  세션 없음'));
           } else {
             for (const s of result.rows) {
-              const ts = s.last_activity
-                ? new Date(s.last_activity).toLocaleString("ko-KR")
-                : "-";
+              const ts = s.last_activity ? new Date(s.last_activity).toLocaleString('ko-KR') : '-';
               console.log(
                 chalk.cyan(`  ${s.bot_id.padEnd(14)}`) +
-                chalk.white(`${(s.label || s.session_key).padEnd(30)}`) +
-                chalk.gray(`${ts}  ${s.message_count}msg`)
+                  chalk.white(`${(s.label || s.session_key).padEnd(30)}`) +
+                  chalk.gray(`${ts}  ${s.message_count}msg`),
               );
             }
           }
@@ -527,13 +540,13 @@ export function registerSessionsCommands(program: Command): void {
 
   // ── semo sessions digest ──────────────────────────────────────────────────
   sessionsCmd
-    .command("digest")
-    .description("세션 transcript에서 미기록 의사결정 추출")
-    .option("--transcript <path>", "transcript JSONL 파일 경로")
-    .option("--session-dir <dir>", "세션 디렉토리 (최신 transcript 자동 선택)")
-    .option("--hours <n>", "최근 N시간 내 transcript만 (session-dir 사용 시)", "24")
-    .option("--format <type>", "출력 형식 (table|json)", "table")
-    .option("--output <path>", "결과를 파일로 출력")
+    .command('digest')
+    .description('세션 transcript에서 미기록 의사결정 추출')
+    .option('--transcript <path>', 'transcript JSONL 파일 경로')
+    .option('--session-dir <dir>', '세션 디렉토리 (최신 transcript 자동 선택)')
+    .option('--hours <n>', '최근 N시간 내 transcript만 (session-dir 사용 시)', '24')
+    .option('--format <type>', '출력 형식 (table|json)', 'table')
+    .option('--output <path>', '결과를 파일로 출력')
     .action(async (options) => {
       // transcript 파일 찾기
       let transcripts: string[] = [];
@@ -552,37 +565,50 @@ export function registerSessionsCommands(program: Command): void {
         }
         const hours = parseInt(options.hours) || 24;
         const cutoff = Date.now() - hours * 60 * 60 * 1000;
-        const files = fs.readdirSync(dir)
-          .filter(f => f.endsWith(".jsonl"))
-          .map(f => ({ name: f, path: path.join(dir, f), mtime: fs.statSync(path.join(dir, f)).mtimeMs }))
-          .filter(f => f.mtime > cutoff)
+        const files = fs
+          .readdirSync(dir)
+          .filter((f) => f.endsWith('.jsonl'))
+          .map((f) => ({
+            name: f,
+            path: path.join(dir, f),
+            mtime: fs.statSync(path.join(dir, f)).mtimeMs,
+          }))
+          .filter((f) => f.mtime > cutoff)
           .sort((a, b) => b.mtime - a.mtime);
-        transcripts = files.map(f => f.path);
+        transcripts = files.map((f) => f.path);
       } else {
         // 기본: 현재 semo 프로젝트의 세션 디렉토리
         const semoSessionDir = path.join(
-          os.homedir(), ".claude", "projects",
-          "-Users-reus-Desktop-Sources-semicolon-projects-semo"
+          os.homedir(),
+          '.claude',
+          'projects',
+          '-Users-reus-Desktop-Sources-semicolon-projects-semo',
         );
         if (fs.existsSync(semoSessionDir)) {
           const hours = parseInt(options.hours) || 24;
           const cutoff = Date.now() - hours * 60 * 60 * 1000;
-          const files = fs.readdirSync(semoSessionDir)
-            .filter(f => f.endsWith(".jsonl"))
-            .map(f => ({ name: f, path: path.join(semoSessionDir, f), mtime: fs.statSync(path.join(semoSessionDir, f)).mtimeMs }))
-            .filter(f => f.mtime > cutoff)
+          const files = fs
+            .readdirSync(semoSessionDir)
+            .filter((f) => f.endsWith('.jsonl'))
+            .map((f) => ({
+              name: f,
+              path: path.join(semoSessionDir, f),
+              mtime: fs.statSync(path.join(semoSessionDir, f)).mtimeMs,
+            }))
+            .filter((f) => f.mtime > cutoff)
             .sort((a, b) => b.mtime - a.mtime);
-          transcripts = files.map(f => f.path);
+          transcripts = files.map((f) => f.path);
         }
       }
 
       if (transcripts.length === 0) {
-        console.log(chalk.yellow("⚠ 분석할 transcript가 없습니다."));
+        console.log(chalk.yellow('⚠ 분석할 transcript가 없습니다.'));
         process.exit(0);
       }
 
       // 의사결정 키워드 패턴
-      const decisionRe = /(?:도입했|폐기했|전환했|적용했|배포했|마이그레이션|변경했|합의했|결정했|도입합니다|폐기합니다|전환합니다|적용합니다|배포합니다|도입 완료|폐기 완료|전환 완료|적용 완료|배포 완료|표준화했|통합했|분리했|추가했|제거했|Phase \d+ 완료|설정을? 변경|규칙을? 변경|프로세스를? 변경|NON-NEGOTIABLE|신규 생성|전체 배포)/g;
+      const decisionRe =
+        /(?:도입했|폐기했|전환했|적용했|배포했|마이그레이션|변경했|합의했|결정했|도입합니다|폐기합니다|전환합니다|적용합니다|배포합니다|도입 완료|폐기 완료|전환 완료|적용 완료|배포 완료|표준화했|통합했|분리했|추가했|제거했|Phase \d+ 완료|설정을? 변경|규칙을? 변경|프로세스를? 변경|NON-NEGOTIABLE|신규 생성|전체 배포)/g;
       const kbRecordRe = /KB 기록:|semo kb upsert|KB upsert 완료|답변근거: KB/;
 
       interface DecisionCandidate {
@@ -597,7 +623,10 @@ export function registerSessionsCommands(program: Command): void {
       const candidates: DecisionCandidate[] = [];
 
       for (const tPath of transcripts) {
-        const lines = fs.readFileSync(tPath, "utf-8").split("\n").filter(l => l.trim());
+        const lines = fs
+          .readFileSync(tPath, 'utf-8')
+          .split('\n')
+          .filter((l) => l.trim());
         let lastKbUpsertLine = -1;
 
         for (let i = 0; i < lines.length; i++) {
@@ -606,12 +635,12 @@ export function registerSessionsCommands(program: Command): void {
             const msg = entry.message ?? entry;
 
             // KB upsert tool call 추적
-            if (msg.role === "assistant") {
+            if (msg.role === 'assistant') {
               const content = msg.content ?? [];
               for (const block of content) {
-                if (block?.type === "tool_use") {
+                if (block?.type === 'tool_use') {
                   const inp = JSON.stringify(block.input ?? {});
-                  if (inp.includes("kb upsert") || inp.includes("kb_upsert")) {
+                  if (inp.includes('kb upsert') || inp.includes('kb_upsert')) {
                     lastKbUpsertLine = i;
                   }
                 }
@@ -619,24 +648,26 @@ export function registerSessionsCommands(program: Command): void {
             }
 
             // tool result에서 upsert 완료 추적
-            if (msg.role === "tool") {
+            if (msg.role === 'tool') {
               const content = Array.isArray(msg.content)
-                ? msg.content.map((c: any) => typeof c === "string" ? c : c?.text ?? "").join(" ")
-                : String(msg.content ?? "");
-              if (content.includes("upsert 완료")) {
+                ? msg.content
+                    .map((c: any) => (typeof c === 'string' ? c : (c?.text ?? '')))
+                    .join(' ')
+                : String(msg.content ?? '');
+              if (content.includes('upsert 완료')) {
                 lastKbUpsertLine = i;
               }
             }
 
             // assistant 텍스트에서 의사결정 키워드 탐지
-            if (msg.role === "assistant") {
+            if (msg.role === 'assistant') {
               const content = msg.content ?? [];
               for (const block of content) {
-                if (block?.type !== "text") continue;
-                let text = block.text ?? "";
+                if (block?.type !== 'text') continue;
+                let text = block.text ?? '';
 
                 // 코드 블록 제거
-                text = text.replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]+`/g, "");
+                text = text.replace(/```[\s\S]*?```/g, '').replace(/`[^`\n]+`/g, '');
 
                 const matches = text.match(decisionRe);
                 if (matches && matches.length > 0) {
@@ -647,24 +678,33 @@ export function registerSessionsCommands(program: Command): void {
                   candidates.push({
                     file: path.basename(tPath),
                     lineNum: i,
-                    text: text.slice(0, 200).replace(/\n/g, " "),
+                    text: text.slice(0, 200).replace(/\n/g, ' '),
                     keywords: [...new Set(matches)].slice(0, 3) as string[],
                     hasKbRecord: hasKbInText || hasKbNearby,
-                    timestamp: entry.timestamp ? new Date(entry.timestamp).toLocaleString("ko-KR") : undefined,
+                    timestamp: entry.timestamp
+                      ? new Date(entry.timestamp).toLocaleString('ko-KR')
+                      : undefined,
                   });
                 }
               }
             }
-          } catch { /* skip */ }
+          } catch {
+            /* skip */
+          }
         }
       }
 
       // 미기록 건만 필터
-      const unrecorded = candidates.filter(c => !c.hasKbRecord);
-      const recorded = candidates.filter(c => c.hasKbRecord);
+      const unrecorded = candidates.filter((c) => !c.hasKbRecord);
+      const recorded = candidates.filter((c) => c.hasKbRecord);
 
-      if (options.format === "json") {
-        const result = { total: candidates.length, recorded: recorded.length, unrecorded: unrecorded.length, items: unrecorded };
+      if (options.format === 'json') {
+        const result = {
+          total: candidates.length,
+          recorded: recorded.length,
+          unrecorded: unrecorded.length,
+          items: unrecorded,
+        };
         const out = JSON.stringify(result, null, 2);
         if (options.output) {
           fs.writeFileSync(options.output, out);
@@ -674,30 +714,42 @@ export function registerSessionsCommands(program: Command): void {
         }
       } else {
         console.log(chalk.cyan.bold(`\n📋 세션 의사결정 다이제스트\n`));
-        console.log(chalk.gray(`  transcript: ${transcripts.length}개 | 총 감지: ${candidates.length}건 | 기록됨: ${recorded.length}건 | 미기록: ${unrecorded.length}건\n`));
+        console.log(
+          chalk.gray(
+            `  transcript: ${transcripts.length}개 | 총 감지: ${candidates.length}건 | 기록됨: ${recorded.length}건 | 미기록: ${unrecorded.length}건\n`,
+          ),
+        );
 
         if (unrecorded.length === 0) {
-          console.log(chalk.green("  ✅ 미기록 의사결정 없음\n"));
+          console.log(chalk.green('  ✅ 미기록 의사결정 없음\n'));
         } else {
-          console.log(chalk.yellow.bold("  ⚠ 미기록 의사결정:\n"));
+          console.log(chalk.yellow.bold('  ⚠ 미기록 의사결정:\n'));
           for (const c of unrecorded) {
-            console.log(chalk.yellow(`  [${c.file}:${c.lineNum}]`) + chalk.gray(c.timestamp ? ` ${c.timestamp}` : ""));
-            console.log(chalk.white(`    키워드: ${c.keywords.join(", ")}`));
+            console.log(
+              chalk.yellow(`  [${c.file}:${c.lineNum}]`) +
+                chalk.gray(c.timestamp ? ` ${c.timestamp}` : ''),
+            );
+            console.log(chalk.white(`    키워드: ${c.keywords.join(', ')}`));
             console.log(chalk.gray(`    "${c.text.slice(0, 120)}..."\n`));
           }
         }
 
         if (options.output) {
-          const lines = [`# 세션 의사결정 다이제스트`, ``, `총 감지: ${candidates.length}건 | 기록됨: ${recorded.length}건 | 미기록: ${unrecorded.length}건`, ``];
+          const lines = [
+            `# 세션 의사결정 다이제스트`,
+            ``,
+            `총 감지: ${candidates.length}건 | 기록됨: ${recorded.length}건 | 미기록: ${unrecorded.length}건`,
+            ``,
+          ];
           if (unrecorded.length > 0) {
             lines.push(`## 미기록 의사결정`, ``);
             for (const c of unrecorded) {
-              lines.push(`- **[${c.file}:${c.lineNum}]** ${c.keywords.join(", ")}`);
+              lines.push(`- **[${c.file}:${c.lineNum}]** ${c.keywords.join(', ')}`);
               lines.push(`  > ${c.text.slice(0, 150)}...`);
               lines.push(``);
             }
           }
-          fs.writeFileSync(options.output, lines.join("\n"));
+          fs.writeFileSync(options.output, lines.join('\n'));
           console.log(chalk.green(`✔ 결과 저장: ${options.output}`));
         }
       }

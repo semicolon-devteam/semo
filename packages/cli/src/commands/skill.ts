@@ -17,6 +17,7 @@ import { getPool, closeConnection, isDbConnected, getActiveSkills } from '../dat
 import { syncGlobalCache } from '../global-cache';
 import { populateBotMirrors } from '../semo-workspace';
 import { syncSkillsToDB } from './skill-sync';
+import { resolveBotWorkspace } from '../paths';
 import { syncWorkspaceFiles } from './bots';
 
 export function registerSkillCommands(program: Command): void {
@@ -144,7 +145,7 @@ export function registerSkillCommands(program: Command): void {
           if (!canonicalPath || !fs.existsSync(canonicalPath)) {
             console.error(chalk.red(`canonical source를 찾을 수 없습니다: ${canonicalPath}`));
             console.log(
-              chalk.gray(`경로: ~/.openclaw-${targetBotId}/workspace/skills/${skillName}/SKILL.md`),
+              chalk.gray(`경로: ${resolveBotWorkspace(targetBotId)}/skills/${skillName}/SKILL.md`),
             );
             process.exit(1);
           }
@@ -200,7 +201,7 @@ export function registerSkillCommands(program: Command): void {
 
             // d. bot_workspace_files 업데이트
             syncSpinner.text = '④ bot_workspace_files DB 업데이트...';
-            const wsDir = path.join(os.homedir(), `.openclaw-${targetBotId}`, 'workspace');
+            const wsDir = resolveBotWorkspace(targetBotId);
             if (fs.existsSync(wsDir)) {
               await syncWorkspaceFiles(client, targetBotId, wsDir);
             }
@@ -275,14 +276,7 @@ export function registerSkillCommands(program: Command): void {
 
 function resolveCanonicalPath(skillName: string, botId?: string): string | null {
   if (!botId) return null;
-  return path.join(
-    os.homedir(),
-    `.openclaw-${botId}`,
-    'workspace',
-    'skills',
-    skillName,
-    'SKILL.md',
-  );
+  return path.join(resolveBotWorkspace(botId), 'skills', skillName, 'SKILL.md');
 }
 
 function fileHash(filePath: string): string {

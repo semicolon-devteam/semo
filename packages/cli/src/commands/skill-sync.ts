@@ -1,7 +1,7 @@
 /**
  * skill-sync — 봇 워크스페이스 스킬 스캔 + DB 동기화
  *
- * v2.0: ~/.openclaw-{bot}/workspace/skills/ 경로 스캔 (semo-system/ 폐기)
+ * v3.0: ~/.semo/workspaces/{bot}/skills/ 경로 스캔 (resolveBotWorkspace fallback)
  * 봇 목록은 bot_status DB에서 동적 로드, fallback으로 로컬 디렉토리 스캔.
  *
  * semo bots sync (piggyback) 및 semo context sync (세션 훅) 양쪽에서 호출.
@@ -12,6 +12,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { Pool, PoolClient } from 'pg';
+import { resolveBotWorkspace, SEMO_WORKSPACES } from '../paths';
 
 export interface ScannedSkill {
   name: string;
@@ -27,7 +28,7 @@ export interface SkillSyncResult {
 }
 
 /**
- * ~/.openclaw-{bot}/workspace/skills/ 에서 봇 전용 스킬 파일 스캔
+ * ~/.semo/workspaces/{bot}/skills/ 에서 봇 전용 스킬 파일 스캔
  *
  * @param botIds - 스캔 대상 봇 ID 목록
  */
@@ -45,10 +46,9 @@ export function scanSkills(arg: string | string[]): ScannedSkill[] {
 
 function scanSkillsV2(botIds: string[]): ScannedSkill[] {
   const skills: ScannedSkill[] = [];
-  const home = process.env.HOME || '/Users/reus';
 
   for (const botId of botIds) {
-    const skillsDir = path.join(home, `.openclaw-${botId}`, 'workspace', 'skills');
+    const skillsDir = path.join(resolveBotWorkspace(botId), 'skills');
     if (!fs.existsSync(skillsDir)) continue;
 
     let skillEntries: fs.Dirent[];
@@ -174,17 +174,15 @@ export async function getBotIds(pool: Pool): Promise<string[]> {
     /* fallback to local scan */
   }
 
-  // Fallback: scan ~/.openclaw-*/workspace/ directories
-  const home = process.env.HOME || '/Users/reus';
+  // Fallback: scan ~/.semo/workspaces/ directories
   const botIds: string[] = [];
   try {
-    const entries = fs.readdirSync(home);
-    for (const entry of entries) {
-      const match = entry.match(/^\.openclaw-(.+)$/);
-      if (match) {
-        const wsDir = path.join(home, entry, 'workspace');
-        if (fs.existsSync(wsDir)) {
-          botIds.push(match[1]);
+    if (fs.existsSync(SEMO_WORKSPACES)) {
+      const entries = fs.readdirSync(SEMO_WORKSPACES);
+      for (const entry of entries) {
+        const wsDir = path.join(SEMO_WORKSPACES, entry);
+        if (fs.statSync(wsDir).isDirectory()) {
+          botIds.push(entry);
         }
       }
     }

@@ -7,10 +7,11 @@
  * 로컬 스크립트 의존성 없음 — DB가 SoT.
  */
 
-import { Pool } from "pg";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
+import { Pool } from 'pg';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
+import { resolveBotWorkspace } from '../paths';
 
 // ============================================================
 // Types
@@ -37,9 +38,9 @@ interface ContentRules {
 }
 
 export interface TestOutputLine {
-  type: "case" | "summary";
+  type: 'case' | 'summary';
   id?: string;
-  status?: "pass" | "fail" | "warn" | "skip";
+  status?: 'pass' | 'fail' | 'warn' | 'skip';
   label?: string;
   detail?: string;
 }
@@ -69,34 +70,38 @@ function checkGlob(wsPath: string, pattern: string): string[] {
   // Simple glob matching for common patterns
   const matches: string[] = [];
 
-  if (pattern === "*/.git") {
+  if (pattern === '*/.git') {
     // Check subdirectories for .git
     try {
       for (const entry of fs.readdirSync(wsPath)) {
         const sub = path.join(wsPath, entry);
-        if (fs.statSync(sub).isDirectory() && entry !== ".git") {
-          if (fs.existsSync(path.join(sub, ".git"))) {
+        if (fs.statSync(sub).isDirectory() && entry !== '.git') {
+          if (fs.existsSync(path.join(sub, '.git'))) {
             matches.push(entry);
           }
         }
       }
-    } catch { /* */ }
-  } else if (pattern === "node_modules") {
+    } catch {
+      /* */
+    }
+  } else if (pattern === 'node_modules') {
     try {
       const find = (dir: string, depth: number) => {
         if (depth > 3) return;
         for (const entry of fs.readdirSync(dir)) {
           const full = path.join(dir, entry);
-          if (entry === "node_modules" && fs.statSync(full).isDirectory()) {
+          if (entry === 'node_modules' && fs.statSync(full).isDirectory()) {
             matches.push(path.relative(wsPath, full));
-          } else if (fs.statSync(full).isDirectory() && !entry.startsWith(".")) {
+          } else if (fs.statSync(full).isDirectory() && !entry.startsWith('.')) {
             find(full, depth + 1);
           }
         }
       };
       find(wsPath, 0);
-    } catch { /* */ }
-  } else if (pattern.startsWith("*.")) {
+    } catch {
+      /* */
+    }
+  } else if (pattern.startsWith('*.')) {
     // Glob for file extensions in root
     const ext = pattern.slice(1); // ".ovpn", ".pem", etc.
     try {
@@ -105,7 +110,9 @@ function checkGlob(wsPath: string, pattern: string): string[] {
           matches.push(entry);
         }
       }
-    } catch { /* */ }
+    } catch {
+      /* */
+    }
   }
 
   return matches;
@@ -113,11 +120,11 @@ function checkGlob(wsPath: string, pattern: string): string[] {
 
 function checkSymlinkTarget(
   fullPath: string,
-  expectedTarget: string | null
+  expectedTarget: string | null,
 ): { ok: boolean; actual: string | null } {
   if (!expectedTarget) return { ok: true, actual: null };
 
-  const resolved = expectedTarget.replace("$HOME", os.homedir());
+  const resolved = expectedTarget.replace('$HOME', os.homedir());
   try {
     const actual = fs.readlinkSync(fullPath);
     return { ok: actual === resolved, actual };
@@ -128,14 +135,14 @@ function checkSymlinkTarget(
 
 function checkContentRules(
   fullPath: string,
-  rules: ContentRules
+  rules: ContentRules,
 ): { passed: boolean; details: string[] } {
   const details: string[] = [];
   let allPassed = true;
 
   try {
-    const content = fs.readFileSync(fullPath, "utf-8");
-    const lines = content.split("\n");
+    const content = fs.readFileSync(fullPath, 'utf-8');
+    const lines = content.split('\n');
 
     // max_lines
     if (rules.max_lines !== undefined) {
@@ -159,7 +166,7 @@ function checkContentRules(
     // required_patterns (regex)
     if (rules.required_patterns) {
       for (const pat of rules.required_patterns) {
-        const regex = new RegExp(pat, "i");
+        const regex = new RegExp(pat, 'i');
         if (!regex.test(content)) {
           details.push(`패턴 미발견: ${pat}`);
           allPassed = false;
@@ -178,7 +185,7 @@ function checkContentRules(
       }
     }
   } catch {
-    details.push("파일 읽기 실패");
+    details.push('파일 읽기 실패');
     allPassed = false;
   }
 
@@ -189,33 +196,29 @@ function checkContentRules(
 // Main Runner
 // ============================================================
 
-function checkRule(
-  wsPath: string,
-  botId: string,
-  rule: WorkspaceRule
-): TestOutputLine[] {
+function checkRule(wsPath: string, botId: string, rule: WorkspaceRule): TestOutputLine[] {
   const results: TestOutputLine[] = [];
   const label = (msg: string) => `${botId}/${rule.path_pattern}: ${msg}`;
   const caseId = `${botId}/${rule.path_pattern}`;
 
-  if (rule.entry_type === "glob") {
+  if (rule.entry_type === 'glob') {
     // Glob: check for forbidden matches
     const matches = checkGlob(wsPath, rule.path_pattern);
 
-    if (rule.level === "forbidden") {
+    if (rule.level === 'forbidden') {
       if (matches.length === 0) {
         results.push({
-          type: "case",
+          type: 'case',
           id: caseId,
-          status: "pass",
-          label: label("없음"),
+          status: 'pass',
+          label: label('없음'),
         });
       } else {
         for (const m of matches) {
           results.push({
-            type: "case",
+            type: 'case',
             id: `${botId}/${m}`,
-            status: rule.severity === "error" ? "fail" : "warn",
+            status: rule.severity === 'error' ? 'fail' : 'warn',
             label: label(`금지 항목 탐지: ${m}`),
             detail: rule.description || undefined,
           });
@@ -229,47 +232,47 @@ function checkRule(
   const { exists, isSymlink, isDir } = checkExistence(fullPath);
 
   // Required
-  if (rule.level === "required") {
+  if (rule.level === 'required') {
     if (!exists) {
       results.push({
-        type: "case",
+        type: 'case',
         id: caseId,
-        status: "fail",
-        label: label("없음"),
+        status: 'fail',
+        label: label('없음'),
         detail: rule.description || undefined,
       });
       return results;
     }
 
     // Type check
-    if (rule.entry_type === "symlink" && !isSymlink) {
+    if (rule.entry_type === 'symlink' && !isSymlink) {
       results.push({
-        type: "case",
+        type: 'case',
         id: caseId,
-        status: "fail",
-        label: label("심링크 아님"),
+        status: 'fail',
+        label: label('심링크 아님'),
       });
       return results;
     }
 
-    if (rule.entry_type === "dir" && !isDir) {
+    if (rule.entry_type === 'dir' && !isDir) {
       results.push({
-        type: "case",
+        type: 'case',
         id: caseId,
-        status: "fail",
-        label: label("디렉토리 아님"),
+        status: 'fail',
+        label: label('디렉토리 아님'),
       });
       return results;
     }
 
     // Symlink target check
-    if (rule.entry_type === "symlink" && rule.symlink_target) {
+    if (rule.entry_type === 'symlink' && rule.symlink_target) {
       const { ok, actual } = checkSymlinkTarget(fullPath, rule.symlink_target);
       if (!ok) {
         results.push({
-          type: "case",
+          type: 'case',
           id: caseId,
-          status: "fail",
+          status: 'fail',
           label: label(`심링크 타겟 불일치 (actual: ${actual})`),
         });
         return results;
@@ -277,14 +280,14 @@ function checkRule(
     }
 
     // Content rules
-    if (rule.content_rules && rule.entry_type === "file") {
+    if (rule.content_rules && rule.entry_type === 'file') {
       const { passed, details } = checkContentRules(fullPath, rule.content_rules);
       if (!passed) {
         results.push({
-          type: "case",
+          type: 'case',
           id: caseId,
-          status: rule.severity === "error" ? "fail" : "warn",
-          label: label(details.join("; ")),
+          status: rule.severity === 'error' ? 'fail' : 'warn',
+          label: label(details.join('; ')),
         });
         return results;
       }
@@ -292,48 +295,48 @@ function checkRule(
 
     // All checks passed
     results.push({
-      type: "case",
+      type: 'case',
       id: caseId,
-      status: "pass",
-      label: label("OK"),
+      status: 'pass',
+      label: label('OK'),
     });
   }
 
   // Optional — only warn if content rules fail
-  if (rule.level === "optional") {
+  if (rule.level === 'optional') {
     if (!exists) {
       results.push({
-        type: "case",
+        type: 'case',
         id: caseId,
-        status: "warn",
-        label: label("없음 (선택)"),
+        status: 'warn',
+        label: label('없음 (선택)'),
       });
     } else {
       results.push({
-        type: "case",
+        type: 'case',
         id: caseId,
-        status: "pass",
-        label: label("OK"),
+        status: 'pass',
+        label: label('OK'),
       });
     }
   }
 
   // Forbidden
-  if (rule.level === "forbidden") {
+  if (rule.level === 'forbidden') {
     if (exists) {
       results.push({
-        type: "case",
+        type: 'case',
         id: caseId,
-        status: rule.severity === "error" ? "fail" : "warn",
-        label: label("금지 항목 존재"),
+        status: rule.severity === 'error' ? 'fail' : 'warn',
+        label: label('금지 항목 존재'),
         detail: rule.description || undefined,
       });
     } else {
       results.push({
-        type: "case",
+        type: 'case',
         id: caseId,
-        status: "pass",
-        label: label("없음"),
+        status: 'pass',
+        label: label('없음'),
       });
     }
   }
@@ -341,39 +344,33 @@ function checkRule(
   return results;
 }
 
-export async function runDeclarativeWorkspaceAudit(
-  pool: Pool
-): Promise<TestOutputLine[]> {
+export async function runDeclarativeWorkspaceAudit(pool: Pool): Promise<TestOutputLine[]> {
   // 1. Load rules from DB
   const { rows: rules } = await pool.query<WorkspaceRule>(
     `SELECT path_pattern, entry_type, level, severity, category,
             bot_scope, bot_ids, symlink_target, content_rules, description
      FROM semo.bot_workspace_standard
      WHERE spec_version = '2.0'
-     ORDER BY category, level DESC, path_pattern`
+     ORDER BY category, level DESC, path_pattern`,
   );
 
   // 2. Load bot list from DB
   const { rows: bots } = await pool.query<{ bot_id: string }>(
-    `SELECT DISTINCT bot_id FROM semo.bot_status WHERE bot_id != 'shared' ORDER BY bot_id`
+    `SELECT DISTINCT bot_id FROM semo.bot_status WHERE bot_id != 'shared' ORDER BY bot_id`,
   );
 
   const results: TestOutputLine[] = [];
 
   // 3. Bot × Rule matrix
   for (const bot of bots) {
-    const wsPath = path.join(
-      os.homedir(),
-      `.openclaw-${bot.bot_id}`,
-      "workspace"
-    );
+    const wsPath = resolveBotWorkspace(bot.bot_id);
 
     // Check workspace exists
     if (!fs.existsSync(wsPath)) {
       results.push({
-        type: "case",
+        type: 'case',
         id: `${bot.bot_id}/workspace`,
-        status: "fail",
+        status: 'fail',
         label: `${bot.bot_id}: 워크스페이스 없음 (${wsPath})`,
       });
       continue;
@@ -381,16 +378,10 @@ export async function runDeclarativeWorkspaceAudit(
 
     for (const rule of rules) {
       // bot_scope filter
-      if (
-        rule.bot_scope === "include" &&
-        !rule.bot_ids.includes(bot.bot_id)
-      ) {
+      if (rule.bot_scope === 'include' && !rule.bot_ids.includes(bot.bot_id)) {
         continue;
       }
-      if (
-        rule.bot_scope === "exclude" &&
-        rule.bot_ids.includes(bot.bot_id)
-      ) {
+      if (rule.bot_scope === 'exclude' && rule.bot_ids.includes(bot.bot_id)) {
         continue;
       }
 
@@ -404,12 +395,12 @@ export async function runDeclarativeWorkspaceAudit(
     fail = 0,
     warn = 0;
   for (const r of results) {
-    if (r.status === "pass") pass++;
-    else if (r.status === "fail") fail++;
-    else if (r.status === "warn") warn++;
+    if (r.status === 'pass') pass++;
+    else if (r.status === 'fail') fail++;
+    else if (r.status === 'warn') warn++;
   }
 
-  results.push({ type: "summary", pass, fail, warn } as any);
+  results.push({ type: 'summary', pass, fail, warn } as any);
 
   return results;
 }
