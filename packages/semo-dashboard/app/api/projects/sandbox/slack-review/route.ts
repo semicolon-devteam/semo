@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getProject } from '@/lib/service';
-import { listSections } from '@/lib/service';
+import { getProject, listSections, updateProject } from '@/lib/service';
 import { postSlackMessage } from '@/lib/slack';
 import { PHASE_LABELS } from '@/lib/service-phases';
-import { query } from '@/lib/db';
 import type { SandboxConfig } from '@/types';
 
 /**
@@ -38,15 +36,15 @@ export async function POST(request: NextRequest) {
 
   // notify_channel 저장 (후속 Phase 자동 발송용)
   if (!sandbox.notify_channel || sandbox.notify_channel !== channel_id) {
-    await query(
-      `UPDATE semo.services
-       SET metadata = jsonb_set(
-         jsonb_set(metadata, '{sandbox,notify_channel}', $1::jsonb),
-         '{sandbox,notify_thread_ts}', $2::jsonb
-       )
-       WHERE service_id = $3`,
-      [JSON.stringify(channel_id), JSON.stringify(thread_ts || null), service_id],
-    );
+    await updateProject(service_id, {
+      metadata: {
+        sandbox: {
+          ...sandbox,
+          notify_channel: channel_id,
+          notify_thread_ts: thread_ts || null,
+        },
+      },
+    });
   }
 
   const sections = await listSections(service_id);

@@ -178,32 +178,47 @@ export function registerServiceCommands(program: Command): void {
   // ── semo service get ──
   service
     .command('get')
-    .description('서비스 구조화 메타데이터 조회 (services 테이블 SoT)')
+    .description('서비스 구조화 메타데이터 조회 (KB pipeline/config SoT)')
     .argument('<domain>', '서비스 도메인')
     .option('--format <type>', '출력 형식 (json|table)', 'json')
     .action(async (domain: string, options: { format: string }) => {
       const pool = getPool();
       try {
-        const result = await pool.query(
-          `SELECT service_id, project_name, service_domain, owner_name, owner_contact,
-                  status, lifecycle, current_phase, infra_phase,
-                  tech_stack, service_url, bm, repo, slack_channel, discord_channel,
-                  service_type, parent_service_id,
-                  metadata, created_at::text, updated_at::text
-           FROM semo.services WHERE service_domain = $1`,
-          [domain],
-        );
-        if (result.rows.length === 0) {
+        const { kbGet } = await import('../kb.js');
+        const entry = await kbGet(pool, domain, 'pipeline/config');
+        if (!entry) {
           console.error(
-            chalk.red(`서비스 '${domain}'을 찾을 수 없습니다. (services 테이블에 미등록)`),
+            chalk.red(`서비스 '${domain}'을 찾을 수 없습니다. (KB pipeline/config 미등록)`),
           );
           process.exit(1);
         }
-        const row = result.rows[0];
+        const m = (entry.metadata ?? {}) as Record<string, unknown>;
+        const row = {
+          service_id: m.service_id ?? domain,
+          project_name: m.project_name ?? '',
+          service_domain: domain,
+          owner_name: m.owner_name ?? '',
+          owner_contact: m.owner_contact ?? null,
+          status: m.status ?? 'active',
+          lifecycle: m.lifecycle ?? 'build',
+          current_phase: m.current_phase ?? 0,
+          infra_phase: m.infra_phase ?? null,
+          tech_stack: m.tech_stack ?? null,
+          service_url: m.service_url ?? null,
+          bm: m.bm ?? null,
+          repo: m.repo ?? null,
+          slack_channel: m.slack_channel ?? null,
+          discord_channel: m.discord_channel ?? null,
+          service_type: m.service_type ?? 'incubator',
+          parent_service_id: m.parent_service_id ?? null,
+          metadata: m.project_metadata ?? {},
+          created_at: m.created_at ?? '',
+          updated_at: entry.updated_at ?? '',
+        };
         if (options.format === 'json') {
           console.log(JSON.stringify(row, null, 2));
         } else {
-          console.log(chalk.cyan.bold(`\n📦 ${row.project_name}\n`));
+          console.log(chalk.cyan.bold(`\n${row.project_name}\n`));
           console.log(chalk.gray(`  도메인: ${row.service_domain}`));
           console.log(chalk.gray(`  오너: ${row.owner_name}`));
           console.log(chalk.gray(`  상태: ${row.status} (${row.lifecycle})`));
@@ -212,7 +227,10 @@ export function registerServiceCommands(program: Command): void {
           console.log(
             chalk.gray(`  Phase: ${row.current_phase} / Infra: ${row.infra_phase ?? '-'}`),
           );
-          if (row.tech_stack) console.log(chalk.gray(`  기술 스택: ${row.tech_stack.join(', ')}`));
+          if (row.tech_stack) {
+            const ts = Array.isArray(row.tech_stack) ? row.tech_stack.join(', ') : row.tech_stack;
+            console.log(chalk.gray(`  기술 스택: ${ts}`));
+          }
           if (row.service_url) console.log(chalk.gray(`  URL: ${row.service_url}`));
           if (row.repo) console.log(chalk.gray(`  레포: ${row.repo}`));
           if (row.slack_channel) console.log(chalk.gray(`  Slack: ${row.slack_channel}`));
@@ -384,18 +402,17 @@ export function registerServiceCommands(program: Command): void {
             updates.discord_channel = options.discordChannel;
           if (options.serviceType) updates.service_type = options.serviceType;
 
-          // --parent: 도메인 → service_id 변환
+          // --parent: 도메인 → service_id 변환 (KB)
           if (options.parent) {
-            const parentResult = await pool.query(
-              'SELECT service_id FROM semo.services WHERE service_domain = $1',
-              [options.parent],
-            );
-            if (parentResult.rows.length === 0) {
+            const { kbGet } = await import('../kb.js');
+            const parentEntry = await kbGet(pool, options.parent, 'pipeline/config');
+            if (!parentEntry) {
               spinner.fail(`상위 플랫폼 '${options.parent}'을 찾을 수 없습니다.`);
               await closeConnection();
               return;
             }
-            updates.parent_service_id = parentResult.rows[0].service_id;
+            updates.parent_service_id = (parentEntry.metadata as Record<string, unknown>)
+              ?.service_id as string;
           }
 
           if (Object.keys(updates).length === 0) {

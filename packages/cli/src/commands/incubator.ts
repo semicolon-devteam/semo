@@ -350,17 +350,19 @@ export function registerIncubatorCommands(program: Command): void {
         let serviceName = options.name || options.serviceId.slice(0, 8);
         if (!options.name) {
           try {
+            const { kbGet } = await import('../kb.js');
             const pool = getPool();
-            const result = await pool.query(
-              `SELECT name FROM semo.services WHERE service_id = $1
-                 UNION ALL
-                 SELECT value->>'name' FROM semo.knowledge_base
-                 WHERE domain = $1 AND key = 'base-information'
-                 LIMIT 1`,
-              [options.serviceId],
-            );
-            if (result.rows[0]) {
-              serviceName = result.rows[0].name || serviceName;
+            // KB pipeline/config에서 project_name 조회
+            const entry = await kbGet(pool, options.serviceId, 'pipeline', 'config');
+            if (entry?.metadata?.project_name) {
+              serviceName = entry.metadata.project_name as string;
+            } else {
+              // fallback: base-information에서 이름 추출
+              const baseEntry = await kbGet(pool, options.serviceId, 'base-information');
+              if (baseEntry?.content) {
+                const nameMatch = baseEntry.content.match(/^#\s*(.+)/m);
+                if (nameMatch) serviceName = nameMatch[1].trim();
+              }
             }
           } catch {
             // DB 접속 실패 시 UUID 앞 8자리 사용

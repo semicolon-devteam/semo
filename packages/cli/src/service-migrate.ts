@@ -93,13 +93,15 @@ const PROJECTION_KEYS = new Set([
 export async function getUnregisteredServices(
   pool: Pool,
 ): Promise<Array<{ domain: string; description: string | null; created_at: string | null }>> {
+  // ontology service 도메인 중 KB pipeline/config가 없는 것
   const result = await pool.query(
     `SELECT o.domain, o.description, o.created_at::text
      FROM semo.ontology o
      WHERE o.entity_type = 'service'
        AND o.domain NOT LIKE 'e2e-%'
        AND NOT EXISTS (
-         SELECT 1 FROM semo.services sp WHERE sp.service_domain = o.domain
+         SELECT 1 FROM semo.knowledge_base kb
+         WHERE kb.domain = o.domain AND kb.key = 'pipeline' AND kb.sub_key = 'config'
        )
      ORDER BY o.domain`,
   );
@@ -108,7 +110,10 @@ export async function getUnregisteredServices(
 
 export async function getRegisteredServices(pool: Pool): Promise<string[]> {
   const result = await pool.query(
-    `SELECT service_domain FROM semo.services WHERE service_domain IS NOT NULL`,
+    `SELECT kb.domain AS service_domain
+     FROM semo.knowledge_base kb
+     JOIN semo.ontology o ON o.domain = kb.domain AND o.entity_type = 'service'
+     WHERE kb.key = 'pipeline' AND kb.sub_key = 'config'`,
   );
   return result.rows.map((r: { service_domain: string }) => r.service_domain);
 }
@@ -243,22 +248,36 @@ export function buildServiceProjectRow(audit: AuditResult): MigrationRow {
 }
 
 export async function insertServiceProject(pool: Pool, row: MigrationRow): Promise<string> {
-  const result = await pool.query(
-    `INSERT INTO semo.services
-       (project_name, owner_name, service_domain, status, lifecycle, launched_at, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
-     RETURNING service_id`,
-    [
-      row.project_name,
-      row.owner_name,
-      row.service_domain,
-      row.status,
-      row.lifecycle,
-      row.launched_at,
-      JSON.stringify(row.metadata),
-    ],
-  );
-  return result.rows[0].service_id;
+  const { kbUpsert } = await import('./kb.js');
+  const { randomUUID } = await import('crypto');
+  const serviceId = randomUUID();
+  const now = new Date().toISOString();
+  await kbUpsert(pool, {
+    domain: row.service_domain,
+    key: 'pipeline/config',
+    content: row.project_name,
+    metadata: {
+      service_id: serviceId,
+      project_name: row.project_name,
+      owner_name: row.owner_name,
+      status: row.status,
+      lifecycle: row.lifecycle,
+      current_phase: 0,
+      infra_phase: null,
+      service_type: 'general',
+      parent_service_id: null,
+      tech_stack: null,
+      service_url: null,
+      bm: null,
+      repo: null,
+      slack_channel: null,
+      launched_at: row.launched_at,
+      project_metadata: row.metadata,
+      created_at: now,
+    },
+    created_by: 'service-migrate',
+  });
+  return serviceId;
 }
 
 export async function writePmSummaryToKB(
@@ -408,16 +427,26 @@ export async function getServiceProjectByDomain(
   pool: Pool,
   domain: string,
 ): Promise<ServiceProjectRow | null> {
-  const result = await pool.query(
-    `SELECT service_id, project_name, service_domain, owner_name, owner_contact,
-            current_phase, infra_phase, status, lifecycle,
-            launched_at::text, metadata,
-            created_at::text, updated_at::text
-     FROM semo.services
-     WHERE service_domain = $1`,
-    [domain],
-  );
-  return result.rows[0] ?? null;
+  const { kbGet } = await import('./kb.js');
+  const entry = await kbGet(pool, domain, 'pipeline/config');
+  if (!entry) return null;
+  const m = (entry.metadata ?? {}) as Record<string, unknown>;
+  return {
+    service_id: (m.service_id as string) ?? domain,
+    project_name: (m.project_name as string) ?? '',
+    service_domain: domain,
+    owner_name: (m.owner_name as string) ?? '',
+    owner_contact: (m.owner_contact as string) ?? null,
+    current_phase: (m.current_phase as number) ?? 0,
+    infra_phase: (m.infra_phase as number) ?? null,
+    status: (m.status as string) ?? 'active',
+    lifecycle: (m.lifecycle as string) ?? 'build',
+    launched_at: (m.launched_at as string) ?? null,
+    metadata: (m.project_metadata as Record<string, unknown>) ?? {},
+    created_at: (m.created_at as string) ?? '',
+    updated_at: entry.updated_at ?? '',
+    parent_service_id: (m.parent_service_id as string) ?? null,
+  } as ServiceProjectRow;
 }
 
 export interface ServiceProjectUpdate {
@@ -442,85 +471,42 @@ export async function updateServiceProject(
   domain: string,
   updates: ServiceProjectUpdate,
 ): Promise<ServiceProjectRow | null> {
-  const sets: string[] = [];
-  const params: unknown[] = [];
-  let idx = 1;
+  if (Object.keys(updates).length === 0) return getServiceProjectByDomain(pool, domain);
 
-  if (updates.project_name !== undefined) {
-    sets.push(`project_name = $${idx++}`);
-    params.push(updates.project_name);
-  }
-  if (updates.owner_name !== undefined) {
-    sets.push(`owner_name = $${idx++}`);
-    params.push(updates.owner_name);
-  }
-  if (updates.current_phase !== undefined) {
-    sets.push(`current_phase = $${idx++}`);
-    params.push(updates.current_phase);
-  }
-  if (updates.status !== undefined) {
-    sets.push(`status = $${idx++}`);
-    params.push(updates.status);
-  }
+  const { kbUpdateMetadata } = await import('./kb.js');
+  const patch: Record<string, unknown> = {};
+
+  if (updates.project_name !== undefined) patch.project_name = updates.project_name;
+  if (updates.owner_name !== undefined) patch.owner_name = updates.owner_name;
+  if (updates.current_phase !== undefined) patch.current_phase = updates.current_phase;
+  if (updates.status !== undefined) patch.status = updates.status;
   if (updates.lifecycle !== undefined) {
-    sets.push(`lifecycle = $${idx++}`);
-    params.push(updates.lifecycle);
-    // ops 전환 시 launched_at 자동 설정
+    patch.lifecycle = updates.lifecycle;
     if (updates.lifecycle === 'ops') {
-      sets.push(`launched_at = COALESCE(launched_at, NOW())`);
+      const existing = await getServiceProjectByDomain(pool, domain);
+      if (existing && !existing.launched_at) {
+        patch.launched_at = new Date().toISOString();
+      }
     }
   }
   if (updates.metadata !== undefined) {
-    sets.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${idx++}::jsonb`);
-    params.push(JSON.stringify(updates.metadata));
+    const existing = await getServiceProjectByDomain(pool, domain);
+    patch.project_metadata = {
+      ...((existing?.metadata as Record<string, unknown>) ?? {}),
+      ...updates.metadata,
+    };
   }
-  if (updates.tech_stack !== undefined) {
-    sets.push(`tech_stack = $${idx++}`);
-    params.push(updates.tech_stack);
-  }
-  if (updates.service_url !== undefined) {
-    sets.push(`service_url = $${idx++}`);
-    params.push(updates.service_url);
-  }
-  if (updates.bm !== undefined) {
-    sets.push(`bm = $${idx++}`);
-    params.push(updates.bm);
-  }
-  if (updates.repo !== undefined) {
-    sets.push(`repo = $${idx++}`);
-    params.push(updates.repo);
-  }
-  if (updates.slack_channel !== undefined) {
-    sets.push(`slack_channel = $${idx++}`);
-    params.push(updates.slack_channel);
-  }
-  if (updates.discord_channel !== undefined) {
-    sets.push(`discord_channel = $${idx++}`);
-    params.push(updates.discord_channel);
-  }
-  if (updates.service_type !== undefined) {
-    sets.push(`service_type = $${idx++}`);
-    params.push(updates.service_type);
-  }
-  if (updates.parent_service_id !== undefined) {
-    sets.push(`parent_service_id = $${idx++}`);
-    params.push(updates.parent_service_id);
-  }
+  if (updates.tech_stack !== undefined) patch.tech_stack = updates.tech_stack;
+  if (updates.service_url !== undefined) patch.service_url = updates.service_url;
+  if (updates.bm !== undefined) patch.bm = updates.bm;
+  if (updates.repo !== undefined) patch.repo = updates.repo;
+  if (updates.slack_channel !== undefined) patch.slack_channel = updates.slack_channel;
+  if (updates.discord_channel !== undefined) patch.discord_channel = updates.discord_channel;
+  if (updates.service_type !== undefined) patch.service_type = updates.service_type;
+  if (updates.parent_service_id !== undefined) patch.parent_service_id = updates.parent_service_id;
 
-  if (sets.length === 0) return getServiceProjectByDomain(pool, domain);
-
-  params.push(domain);
-  const result = await pool.query(
-    `UPDATE semo.services SET ${sets.join(', ')}
-     WHERE service_domain = $${idx}
-     RETURNING service_id, project_name, service_domain, owner_name, owner_contact,
-               current_phase, infra_phase, status, lifecycle,
-               tech_stack, service_url, bm, repo, slack_channel, discord_channel,
-               service_type, parent_service_id,
-               launched_at::text, metadata, created_at::text, updated_at::text`,
-    params,
-  );
-  return result.rows[0] ?? null;
+  await kbUpdateMetadata(pool, domain, 'pipeline/config', patch);
+  return getServiceProjectByDomain(pool, domain);
 }
 
 // ── Diagnose ──
@@ -661,15 +647,12 @@ export async function diagnoseServiceStatus(pool: Pool, domain: string): Promise
     }
   }
 
-  // section 존재 여부 vs current_phase
+  // section 존재 여부 vs current_phase (KB section/* 키 조회)
   if (sp && sp.lifecycle === 'build' && sp.current_phase > 0) {
-    const sectionResult = await pool.query(
-      `SELECT COUNT(*)::int as cnt
-       FROM semo.service_sections
-       WHERE service_id = $1 AND status = 'approved'`,
-      [sp.service_id],
-    );
-    const approvedSections = sectionResult.rows[0]?.cnt ?? 0;
+    const { kbCountByKeyPrefix } = await import('./kb.js');
+    const approvedSections = await kbCountByKeyPrefix(pool, domain, 'section', '', {
+      status: 'approved',
+    });
     if (approvedSections === 0 && sp.current_phase > 0) {
       mismatches.push({
         field: 'phase',

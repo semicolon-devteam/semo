@@ -1,5 +1,8 @@
 #!/usr/bin/env npx tsx
 /**
+ * DEPRECATED: services 테이블이 KB로 이식됨 (v4.8.0, migration 100-101).
+ * 이 스크립트는 레거시 일회성 마이그레이션용. 재실행 불필요.
+ *
  * migrate-service-roles.ts
  *
  * services.owner_name → KB role/po 엔트리 생성.

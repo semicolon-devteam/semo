@@ -270,9 +270,8 @@ test.describe.serial('GFP→Service 리네이밍 검증', () => {
     expect(body).toHaveProperty('service_id');
     expect(body).not.toHaveProperty('gfp_id');
 
-    // Cleanup
-    const { query } = await import('../../lib/db');
-    await query('DELETE FROM semo.services WHERE service_id = $1', [body.service_id]);
+    // Cleanup (KB-based: sandbox teardown)
+    await request.delete(`/api/projects/sandbox?service_id=${body.service_id}`);
   });
 
   test('Sandbox 프로젝트가 일반 목록에서 필터 가능', async ({ request }) => {

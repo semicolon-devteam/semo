@@ -6,10 +6,12 @@
 import { query } from '../../db';
 import {
   createProject,
+  deleteSection,
   getProject,
   listProjects,
   listSections,
   updateProject,
+  updateSectionStatus,
   upsertSection,
 } from './service';
 import { getScenario, generatePlaceholderSection } from './sandbox-scenarios';
@@ -283,10 +285,7 @@ export async function injectAndReviewProgressive(
     }
 
     // draft → pending-review (섹션 "도착" 연출)
-    await query(
-      `UPDATE semo.service_sections SET status = 'pending-review' WHERE section_id = $1`,
-      [sections[i].section_id],
-    );
+    await updateSectionStatus(sections[i].section_id, 'pending-review', undefined, serviceId);
     sections[i].status = 'pending-review';
 
     // auto-pilot/semi-auto → 즉시 PO 리뷰
@@ -429,10 +428,12 @@ export async function resetToPhase(
   if (!sandbox?.enabled) return { error: '이 프로젝트는 샌드박스가 아닙니다.' };
 
   // targetPhase 이후의 섹션 삭제
-  await query(
-    'DELETE FROM semo.service_sections WHERE service_id = $1 AND phase > $2 AND track = $3',
-    [serviceId, targetPhase, 'plan'],
+  const sectionsToDelete = (await listSections(serviceId)).filter(
+    (s) => s.phase > targetPhase && s.track === 'plan',
   );
+  for (const s of sectionsToDelete) {
+    await deleteSection(s.section_id, serviceId);
+  }
 
   // current_phase 롤백
   await updateProject(serviceId, { current_phase: targetPhase });
@@ -480,13 +481,7 @@ export async function reinitializeSandbox(
     if (!scenario) return { error: `시나리오 '${params.scenario_id}'를 찾을 수 없습니다.` };
   }
 
-  // 1. 전체 plan-track 섹션 삭제
-  await query('DELETE FROM semo.service_sections WHERE service_id = $1 AND track = $2', [
-    serviceId,
-    'plan',
-  ]);
-
-  // 2. KB 도메인 엔트리 정리
+  // 1-2. KB 도메인 엔트리 정리 (sections 포함 — KB가 SoT)
   if (project.service_domain) {
     try {
       const { deleteItemsByDomain } = await import('../../core/kb');

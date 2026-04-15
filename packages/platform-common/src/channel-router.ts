@@ -217,14 +217,15 @@ export class Router {
     if (cached && Date.now() < expiry) return cached;
 
     try {
-      // 1차: ontology 기반 채널 매핑 (Core — 모든 도메인 타입)
+      // 1차: ontology 기반 채널 매핑 (Core — 모든 도메인 타입, KB pipeline/config JOIN)
       const result = await this.pool.query(
         `SELECT o.domain, o.description, o.entity_type,
-                s.service_id::text AS service_id,
-                s.project_name,
-                s.current_phase, COALESCE(s.infra_phase, 0) AS infra_phase
+                kb.metadata->>'service_id' AS service_id,
+                kb.metadata->>'project_name' AS project_name,
+                (kb.metadata->>'current_phase')::int AS current_phase,
+                COALESCE((kb.metadata->>'infra_phase')::int, 0) AS infra_phase
          FROM semo.ontology o
-         LEFT JOIN semo.services s ON s.service_domain = o.domain
+         LEFT JOIN semo.knowledge_base kb ON kb.domain = o.domain AND kb.key = 'pipeline' AND kb.sub_key = 'config'
          WHERE position($1 in o.slack_channel) > 0
             OR o.discord_channel = $1
          LIMIT 1`,
@@ -246,16 +247,18 @@ export class Router {
         return ctx;
       }
 
-      // 2차: incubator_sessions fallback (아직 ontology 미등록 세션)
+      // 2차: incubator_sessions fallback (아직 ontology 미등록 세션, KB pipeline/config JOIN)
       const incResult = await this.pool.query(
         `SELECT i.service_id AS inc_service_id, i.service_name,
-                s.service_id::text AS service_id, s.service_domain,
-                s.project_name, s.current_phase,
-                COALESCE(s.infra_phase, 0) AS infra_phase,
+                kb.metadata->>'service_id' AS service_id,
+                kb.domain AS service_domain,
+                kb.metadata->>'project_name' AS project_name,
+                (kb.metadata->>'current_phase')::int AS current_phase,
+                COALESCE((kb.metadata->>'infra_phase')::int, 0) AS infra_phase,
                 COALESCE(o.entity_type, 'service') AS entity_type
          FROM semo.incubator_sessions i
-         LEFT JOIN semo.services s ON starts_with(s.service_id::text, i.service_id)
-         LEFT JOIN semo.ontology o ON o.domain = s.service_domain
+         LEFT JOIN semo.knowledge_base kb ON kb.domain = i.service_id AND kb.key = 'pipeline' AND kb.sub_key = 'config'
+         LEFT JOIN semo.ontology o ON o.domain = kb.domain
          WHERE i.channel = $1 AND i.status = 'active'
          LIMIT 1`,
         [channelId],
