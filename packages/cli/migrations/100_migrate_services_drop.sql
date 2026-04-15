@@ -48,5 +48,5 @@ DROP VIEW IF EXISTS semo.gfp_materials CASCADE;
 DROP VIEW IF EXISTS semo.gfp_research_tasks CASCADE;
 DROP VIEW IF EXISTS semo.gfp_infra_requests CASCADE;
 
--- 3. services 테이블 DROP
-DROP TABLE IF EXISTS semo.services CASCADE;
+-- 3. services 테이블 DROP → 101_drop_services.sql로 분리
+-- sandbox.ts 에서 semo.services 참조(8곳)가 KB 전환 완료된 후 실행

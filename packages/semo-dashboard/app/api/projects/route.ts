@@ -20,9 +20,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { project_name, owner_name, owner_contact, service_domain, metadata } = body;
-    if (!project_name || !owner_name) {
+    if (!project_name || !owner_name || !service_domain) {
       return NextResponse.json(
-        { error: 'project_name and owner_name are required' },
+        { error: 'project_name, owner_name, and service_domain are required' },
         { status: 400 },
       );
     }

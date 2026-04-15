@@ -44,7 +44,7 @@ export const dynamic = 'force-dynamic';
 interface SectionRegenerationPayload {
   type: 'section-regeneration';
   section_id: string;
-  service_id: string;
+  service_id?: string;
   content: string;
   bot_id: string;
 }

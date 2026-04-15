@@ -386,8 +386,16 @@ export async function updateSectionContent(
   status?: ServiceSectionStatus,
   serviceId?: string,
 ): Promise<ServiceSection | null> {
-  if (!serviceId) return null;
-  const domain = await resolveDomain(serviceId);
+  let domain: string;
+  if (serviceId) {
+    domain = await resolveDomain(serviceId);
+  } else {
+    // service_id 없으면 section_id 기반 cross-domain KB 검색 fallback
+    const { listByKeyAcrossDomains: listAcross } = await import('../../core/kb');
+    const found = await listAcross('service', `section/${sectionId}`);
+    if (found.length === 0) return null;
+    domain = found[0].domain;
+  }
   const key = `section/${sectionId}`;
   const patch: Record<string, unknown> = {};
   if (status) patch.status = status;

@@ -13,7 +13,9 @@ export async function GET(request: NextRequest) {
     // 프로젝트별 집계
     if (groupBy === 'project') {
       const result = await query(`
-        SELECT s.service_id, s.project_name, s.service_domain,
+        SELECT kb.metadata->>'service_id' AS service_id,
+               kb.metadata->>'project_name' AS project_name,
+               kb.domain AS service_domain,
                COUNT(*) AS query_count,
                COALESCE(SUM(c.input_tokens), 0) AS total_input_tokens,
                COALESCE(SUM(c.output_tokens), 0) AS total_output_tokens,
