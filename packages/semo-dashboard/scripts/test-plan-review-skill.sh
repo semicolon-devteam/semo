@@ -7,7 +7,7 @@ set -euo pipefail
 ################################################################################
 # Config
 ################################################################################
-SOURCE_DIR="$HOME/.openclaw-planclaw/workspace/skills/plan-review"
+SOURCE_DIR="$HOME/.semo/workspaces/planclaw/skills/plan-review"
 SOURCE_SKILL="$SOURCE_DIR/SKILL.md"
 SOURCE_REFS="$SOURCE_DIR/references"
 CACHE_DIR="$HOME/.claude/skills/plan-review"

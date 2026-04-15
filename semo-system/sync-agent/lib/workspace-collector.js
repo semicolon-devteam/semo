@@ -102,29 +102,12 @@ function isKBManaged(relativePath) {
 }
 
 /**
- * Read workspace path from openclaw.json config
+ * Get workspace path for a bot
  * @param {string} botId
- * @returns {string|null}
+ * @returns {string}
  */
 function getWorkspacePath(botId) {
-  const homeDir = os.homedir();
-  // Try bot-specific config first, then default (~/.openclaw for semiclaw)
-  const candidates = [
-    path.join(homeDir, `.openclaw-${botId}`, 'openclaw.json'),
-    ...(botId === 'semiclaw' ? [path.join(homeDir, '.openclaw', 'openclaw.json')] : []),
-  ];
-
-  for (const cfgPath of candidates) {
-    try {
-      const raw = require('fs').readFileSync(cfgPath, 'utf-8');
-      const cfg = JSON.parse(raw);
-      const ws = cfg?.agents?.defaults?.workspace;
-      if (ws) return ws;
-    } catch {
-      // try next
-    }
-  }
-  return null;
+  return path.join(os.homedir(), '.semo', 'workspaces', botId);
 }
 
 /**
@@ -193,11 +176,15 @@ async function scanDirectory(dirPath, basePath) {
  * @returns {Promise<Array<{botId: string, files: Array}>>}
  */
 async function collectAllWorkspaceFiles() {
-  const homeDir = os.homedir();
-  const dirEntries = await fs.readdir(homeDir);
-  const botIds = dirEntries
-    .filter(f => f.startsWith('.openclaw-'))
-    .map(f => f.replace('.openclaw-', ''));
+  const wsDir = path.join(os.homedir(), '.semo', 'workspaces');
+  let botIds = [];
+  try {
+    const dirEntries = await fs.readdir(wsDir);
+    botIds = dirEntries.filter(f => !f.startsWith('.'));
+  } catch {
+    console.warn('[WorkspaceCollector] ~/.semo/workspaces not found');
+    return [];
+  }
 
   const results = [];
 

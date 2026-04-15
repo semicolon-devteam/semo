@@ -24,7 +24,7 @@ const entries: { key: string; subKey: string; content: string }[] = [
     content: `# SEMO 데이터 흐름
 
 \`\`\`
-~/.openclaw-{bot}/workspace/  (로컬 전용: 세션 부트 + 실행 파일)
+~/.semo/workspaces/{bot}/  (로컬 전용: 세션 부트 + 실행 파일)
         ↓ sync-agent (1분 주기, 세션 부트 파일만)
 Core DB: semo.bot_workspace_files (축소됨: ~100파일)
         ↓
@@ -40,32 +40,27 @@ Core DB: semo.knowledge_base (KB: bot-config/spec/skill 도메인 포함)
 | 환경 | KB 접근 방법 |
 |------|-------------|
 | **로컬 Claude Code 세션** | semo-kb MCP 도구 — 실시간 MCP 프로토콜 |
-| **OpenClaw 봇** | kb-manager 스킬 → semo CLI (\`semo kb get/search/upsert/ontology\`) |
+| **봇 세션** | kb-manager 스킬 → semo CLI (\`semo kb get/search/upsert/ontology\`) |
 
-봇은 MCP 프로토콜을 지원하지 않으므로, \`exec\` 도구로 semo CLI를 실행합니다.
 스킬은 \`skill_definitions\` 테이블에서 관리되며, \`semo context sync\`로 봇 워크스페이스에 자동 배포됩니다.`,
   },
   {
     key: 'spec',
-    subKey: 'openclaw-config',
-    content: `# OpenClaw 봇 설정
+    subKey: 'bot-infrastructure',
+    content: `# 봇 인프라 (Agent SDK 기반)
 
-## openclaw.json
-각 봇의 \`openclaw.json\`은 \`~/.openclaw-{bot}/openclaw.json\`에 위치.
-\`agents.defaults.workspace\` 필드가 워크스페이스 SoT 경로를 가리킨다.
-
-## gateway-wrapper.sh
-게이트웨이 시작/종료 래퍼. BOT_ID 설정, 포트 바인딩, bot_status 자동 업데이트.
-
-## 게이트웨이 Chat UI 접근
-\`\`\`
-http://127.0.0.1:{포트}/chat?session=agent%3Amain%3Amain&token={토큰}
-\`\`\`
-토큰은 \`~/.openclaw-{bot}/openclaw.json\` → \`gateway.auth.token\`에서 확인.
+## 아키텍처
+Slack Socket Mode → SlackGateway → Router → SessionPool → Claude Agent SDK query()
+봇 정의: \`~/.claude/agents/{botId}/{botId}.md\` (YAML frontmatter)
+세션 상태: \`~/.semo/sessions/.session-state.json\`
+오케스트레이터: \`packages/orchestrator/\`
 
 ## 봇 워크스페이스 접근
-봇 파일을 읽거나 수정할 때는 \`~/.openclaw-{bot}/workspace/\`를 직접 참조.
-\`semo-system/bot-workspaces/\`는 폐기됨 — 사용하지 말 것.`,
+봇 파일을 읽거나 수정할 때는 \`~/.semo/workspaces/{bot}/\`를 직접 참조.
+\`resolveBotWorkspace(botId)\` 헬퍼 사용 (packages/cli/src/paths.ts, packages/platform-common/src/paths.ts).
+
+## 자격증명
+\`~/.semo/credentials/{bot}/\` — Google 서비스 계정 등 봇 전용 자격증명.`,
   },
   {
     key: 'spec',
@@ -80,19 +75,18 @@ http://127.0.0.1:{포트}/chat?session=agent%3Amain%3Amain&token={토큰}
   {
     key: 'spec',
     subKey: 'workspace-v2',
-    content: `# 봇 워크스페이스 구조 (v2.0)
+    content: `# 봇 워크스페이스 구조 (v3.0)
 
-봇 워크스페이스의 SoT는 \`~/.openclaw-{bot}/workspace/\` 디렉토리.
+봇 워크스페이스의 SoT는 \`~/.semo/workspaces/{bot}/\` 디렉토리.
 
 \`\`\`
-~/.openclaw-{bot}/workspace/
+~/.semo/workspaces/{bot}/
 ├── SOUL.md              # 봇 고유: 페르소나 + R&R + 행동강령 (< 120줄)
 ├── AGENTS.md            # 공통: → ~/.semo/shared/AGENTS.md (심링크)
 ├── USER.md              # 봇 고유: 사용자 컨텍스트 (< 15줄)
 ├── MEMORY.md            # 봇 고유: KB 도메인 인덱스 (< 30줄, main 세션만)
 ├── HEARTBEAT.md         # 선택: 크론 작업 (해당 봇만, 현재 semiclaw)
-├── .claude/settings.json # MCP 서버 설정
-├── hooks/               # OpenClaw 훅 (직접 실행)
+├── hooks/               # Claude Code 훅
 ├── memory/              # 일일로그 (YYYY-MM-DD.md)
 ├── shared/              # → ~/.semo/shared/ (심링크)
 ├── skills/              # 봇 전용 스킬
