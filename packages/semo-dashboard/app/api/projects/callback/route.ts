@@ -18,6 +18,8 @@ import {
   getProject,
   updateSectionSlackThread,
   updateFeature,
+  updateMaterial,
+  getFeatureById,
   updateDiscoverySession,
   updateConversationSession,
   createDeployVerification,
@@ -270,10 +272,10 @@ export async function POST(request: NextRequest) {
 
         // 1b. 스크린샷 + 공유 URL 저장 (있는 경우)
         if (body.screenshot_base64 || body.stitch_share_url) {
-          await query(
-            `UPDATE semo.service_materials SET screenshot_data = $1, stitch_share_url = $2 WHERE material_id = $3`,
-            [body.screenshot_base64 ?? null, body.stitch_share_url ?? null, material.material_id],
-          );
+          await updateMaterial(body.service_id, material.material_id, {
+            screenshot_data: body.screenshot_base64 ?? undefined,
+            stitch_share_url: body.stitch_share_url ?? undefined,
+          });
         }
 
         // 2. Phase 4에 결과 섹션 생성 (프롬프트 섹션 키에서 번호 추출)
@@ -565,12 +567,14 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // 먼저 현재 feature 조회하여 pipeline 여부 확인
-        const currentFeature = await query<import('@/types').ServiceFeature>(
-          'SELECT * FROM semo.service_features WHERE feature_id = $1',
-          [body.feature_id],
-        );
-        const isLifecyclePipeline = currentFeature.rows[0]?.metadata?.lifecycle_pipeline;
+        // 먼저 현재 feature 조회하여 pipeline 여부 확인 (KB cross-domain fallback)
+        const { list: kbListFeature } = await import('@/lib/kb');
+        const featureHits = await kbListFeature(undefined, undefined, {
+          key: 'feature',
+          where: { feature_id: body.feature_id },
+        });
+        const currentFeatureMeta = featureHits[0]?.metadata as Record<string, unknown> | undefined;
+        const isLifecyclePipeline = currentFeatureMeta?.lifecycle_pipeline;
 
         if (isLifecyclePipeline) {
           // Lifecycle pipeline: in-dev → in-test (ReviewClaw 자동 디스패치)
@@ -728,15 +732,19 @@ export async function POST(request: NextRequest) {
         }
 
         const { normalizeSpec, mergeSpecs } = await import('@/lib/feature-spec');
-        const featureRes = await query<{ metadata: Record<string, unknown> }>(
-          'SELECT metadata FROM semo.service_features WHERE feature_id = $1',
-          [body.feature_id],
-        );
-        if (!featureRes.rows[0]) {
+        const { list: kbListSpec } = await import('@/lib/kb');
+        const specHits = await kbListSpec(undefined, undefined, {
+          key: 'feature',
+          where: { feature_id: body.feature_id },
+        });
+        if (specHits.length === 0) {
           return NextResponse.json({ error: 'Feature not found' }, { status: 404 });
         }
+        const specFeatureMeta = specHits[0].metadata as Record<string, unknown> | undefined;
 
-        const existing = normalizeSpec(featureRes.rows[0].metadata?.spec);
+        const existing = normalizeSpec(
+          (specFeatureMeta?.feature_metadata as Record<string, unknown>)?.spec,
+        );
         const incoming = body.spec as Partial<import('@/types').FeatureSpec>;
         const merged = mergeSpecs(existing, {
           ...incoming,
