@@ -16,10 +16,7 @@ interface BotStatusRow {
   synced_at: string;
 }
 
-export async function GET(
-  _req: Request,
-  { params }: { params: Promise<{ botId: string }> }
-) {
+export async function GET(_req: Request, { params }: { params: Promise<{ botId: string }> }) {
   try {
     const { botId } = await params;
 
@@ -27,7 +24,7 @@ export async function GET(
       `SELECT bot_id, name, emoji, role, last_active, session_count, workspace_path, status, synced_at
        FROM semo.bot_status
        WHERE bot_id = $1`,
-      [botId]
+      [botId],
     );
 
     if (result.rows.length === 0) {
@@ -42,9 +39,9 @@ export async function GET(
     let role = row.role;
 
     if (!name || !emoji || !role) {
-      const identity = await getFileContent(
-        `~/.openclaw-${botId}/IDENTITY.md`
-      ).catch(() => '');
+      const identity = await getFileContent(`~/.semo/workspaces/${botId}/IDENTITY.md`).catch(
+        () => '',
+      );
       const nameMatch = identity.match(/\*\*Name:\*\*\s*(.+)/);
       const emojiMatch = identity.match(/\*\*Emoji:\*\*\s*(\S+)/);
       const roleMatch = identity.match(/\*\*(?:Creature|Role|직책):\*\*\s*(.+)/);

@@ -21,7 +21,6 @@ import {
   getDelegations,
   getActiveSkills,
 } from '../database';
-import { syncBotSessions } from './sessions';
 import {
   auditBot,
   auditBotFromDb,
@@ -136,7 +135,6 @@ const KNOWN_BOTS = [
 ];
 
 function scanBotWorkspaces(_semoSystemDir?: string): ScannedBot[] {
-  const home = process.env.HOME || '/Users/reus';
   const bots: ScannedBot[] = [];
 
   for (const botId of KNOWN_BOTS) {
@@ -195,28 +193,6 @@ function getAllFileMtimes(dir: string, depth = 0): Date[] {
     /* skip */
   }
   return times;
-}
-
-// ============================================================
-// Gateway status detection
-// ============================================================
-
-async function detectGatewayStatus(botId: string): Promise<'online' | 'offline'> {
-  const configPath = path.join(os.homedir(), `.openclaw-${botId}`, 'openclaw.json');
-  if (!fs.existsSync(configPath)) return 'offline';
-
-  try {
-    const config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
-    const port = config?.gateway?.port;
-    if (!port) return 'offline';
-
-    const res = await fetch(`http://127.0.0.1:${port}/`, {
-      signal: AbortSignal.timeout(1000),
-    });
-    return res.ok ? 'online' : 'offline';
-  } catch {
-    return 'offline';
-  }
 }
 
 // ============================================================
@@ -566,24 +542,11 @@ export function registerBotsCommands(program: Command): void {
       try {
         await client.query('BEGIN');
 
-        // Detect gateway status for all bots in parallel
-        const statusMap = new Map<string, 'online' | 'offline'>();
-        const statusResults = await Promise.all(
-          bots.map(async (bot) => ({
-            botId: bot.botId,
-            status: await detectGatewayStatus(bot.botId),
-          })),
-        );
-        for (const { botId, status } of statusResults) {
-          statusMap.set(botId, status);
-        }
-
-        const onlineCount = statusResults.filter((r) => r.status === 'online').length;
-        spinner.text = `${bots.length}개 봇 DB 반영 중... (게이트웨이: ${onlineCount}개 online)`;
+        spinner.text = `${bots.length}개 봇 DB 반영 중...`;
 
         for (const bot of bots) {
           try {
-            const detectedStatus = statusMap.get(bot.botId) || 'offline';
+            const detectedStatus = 'offline';
             await client.query(
               `INSERT INTO semo.bot_status
                  (bot_id, name, emoji, role, status, last_active, workspace_path, synced_at)
@@ -622,20 +585,6 @@ export function registerBotsCommands(program: Command): void {
         spinner.succeed(`bots sync 완료: ${upserted}개 봇 업서트`);
         if (errors.length > 0) {
           errors.forEach((e) => console.log(chalk.red(`  ❌ ${e}`)));
-        }
-
-        // P2-1: sessions sync 연동 — spawnSync 대신 같은 프로세스에서 직접 호출
-        try {
-          const botIds = bots.map((b) => b.botId);
-          console.log(chalk.gray('  → sessions sync 실행 중...'));
-          const sessionsClient = await pool.connect();
-          const { total } = await syncBotSessions(botIds, sessionsClient);
-          sessionsClient.release();
-          if (total > 0) {
-            console.log(chalk.green(`  → sessions sync 완료: ${total}건 upsert`));
-          }
-        } catch {
-          console.log(chalk.yellow('  ⚠ sessions sync 실패 (무시)'));
         }
 
         // Cron jobs — DB 카운트 표시 (파일 sync 제거됨, Phase 4-A)

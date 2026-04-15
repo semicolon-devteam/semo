@@ -475,8 +475,7 @@ async function cronImport(opts: { file: string; bot?: string; dryRun?: boolean }
 
     // Infer bot from file path if not provided
     if (!botId) {
-      const match =
-        filePath.match(/workspaces\/([^/]+)\//) || filePath.match(/\.openclaw-([^/]+)\//);
+      const match = filePath.match(/workspaces\/([^/]+)\//);
       botId = match?.[1] ?? 'unknown';
     }
 

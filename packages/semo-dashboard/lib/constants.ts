@@ -8,5 +8,5 @@
  * @returns GitHub path for bot workspace
  */
 export function getBotWorkspacePath(botId: string): string {
-  return `~/.openclaw-${botId}/workspace`;
+  return `~/.semo/workspaces/${botId}`;
 }

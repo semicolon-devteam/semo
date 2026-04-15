@@ -1,6 +1,6 @@
 /**
  * GitHub API Wrapper
- * 
+ *
  * Provides methods to access bot workspace files from GitHub repository.
  */
 
@@ -27,7 +27,7 @@ interface GitHubFileResponse {
  */
 export async function getFileContent(path: string): Promise<string> {
   const url = `${GITHUB_API_BASE}/repos/${GITHUB_REPO}/contents/${path}`;
-  
+
   const response = await fetch(url, {
     headers: {
       Authorization: `token ${GITHUB_TOKEN}`,
@@ -48,7 +48,7 @@ export async function getFileContent(path: string): Promise<string> {
  */
 export async function listDirectory(path: string): Promise<GitHubFileResponse[]> {
   const url = `${GITHUB_API_BASE}/repos/${GITHUB_REPO}/contents/${path}`;
-  
+
   const response = await fetch(url, {
     headers: {
       Authorization: `token ${GITHUB_TOKEN}`,
@@ -68,17 +68,15 @@ export async function listDirectory(path: string): Promise<GitHubFileResponse[]>
  * Get list of bot workspace directories
  */
 export async function getBotWorkspaces(): Promise<string[]> {
-  const files = await listDirectory('~/.openclaw-*/workspace');
-  return files
-    .filter(file => file.type === 'dir')
-    .map(file => file.name);
+  const files = await listDirectory('~/.semo/workspaces');
+  return files.filter((file) => file.type === 'dir').map((file) => file.name);
 }
 
 /**
  * Get bot workspace files
  */
 export async function getBotFiles(botId: string, path = ''): Promise<GitHubFileResponse[]> {
-  const fullPath = `~/.openclaw-*/workspace/${botId}/${path}`;
+  const fullPath = `~/.semo/workspaces/${botId}/${path}`;
   return listDirectory(fullPath);
 }
 
