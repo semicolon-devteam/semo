@@ -19,7 +19,10 @@ interface BotStatusRow {
   synced_at: string;
 }
 
-function parseIdentityContent(content: string, botId: string): { name: string; emoji: string; role: string } {
+function parseIdentityContent(
+  content: string,
+  botId: string,
+): { name: string; emoji: string; role: string } {
   const nameMatch = content.match(/\*\*Name:\*\*\s*(.+)/);
   const emojiMatch = content.match(/\*\*Emoji:\*\*\s*(\S+)/);
   const roleMatch = content.match(/\*\*(?:Creature|Role|직책):\*\*\s*(.+)/);
@@ -31,7 +34,9 @@ function parseIdentityContent(content: string, botId: string): { name: string; e
   };
 }
 
-async function parseBotMetadata(botId: string): Promise<{ name: string; emoji: string; role: string }> {
+async function parseBotMetadata(
+  botId: string,
+): Promise<{ name: string; emoji: string; role: string }> {
   try {
     // 1. Try KB first (bot-config domain — SoT after migration)
     try {
@@ -39,20 +44,27 @@ async function parseBotMetadata(botId: string): Promise<{ name: string; emoji: s
       if (kbEntry?.content) {
         return parseIdentityContent(kbEntry.content, botId);
       }
-    } catch { /* KB unavailable */ }
+    } catch {
+      /* KB unavailable */
+    }
 
     // 2. Fallback to bot_workspace_files DB
-    const dbResult = await query<{ content: string }>(`
+    const dbResult = await query<{ content: string }>(
+      `
       SELECT content FROM semo.bot_workspace_files
       WHERE bot_id = $1 AND file_path = 'IDENTITY.md'
-    `, [botId]).catch(() => ({ rows: [] }));
+    `,
+      [botId],
+    ).catch(() => ({ rows: [] }));
 
     if (dbResult.rows.length > 0) {
       return parseIdentityContent(dbResult.rows[0].content, botId);
     }
 
     // 3. Fallback to GitHub (legacy)
-    const identity = await getFileContent(`semo-system/bot-workspaces/${botId}/IDENTITY.md`).catch(() => '');
+    const identity = await getFileContent(`semo-system/bot-workspaces/${botId}/IDENTITY.md`).catch(
+      () => '',
+    );
     return parseIdentityContent(identity, botId);
   } catch (error) {
     console.error(`Error parsing bot metadata for ${botId}:`, error);
@@ -73,9 +85,9 @@ async function fallbackToGitHub(): Promise<Bot[]> {
         status: 'offline',
         lastActive: new Date(0).toISOString(),
         sessionCount: 0,
-        workspacePath: `~/.openclaw-${botId}/workspace`,
+        workspacePath: `~/.semo/workspaces/${botId}`,
       };
-    })
+    }),
   );
 }
 
@@ -116,11 +128,14 @@ export async function GET() {
             role = role || metadata.role;
 
             // Update DB with fetched metadata (optional, async)
-            query(`
+            query(
+              `
               UPDATE semo.bot_status
               SET name = $1, emoji = $2, role = $3
               WHERE bot_id = $4
-            `, [name, emoji, role, row.bot_id]).catch(err => {
+            `,
+              [name, emoji, role, row.bot_id],
+            ).catch((err) => {
               console.warn(`Failed to update metadata for ${row.bot_id}:`, err);
             });
           }
@@ -148,15 +163,12 @@ export async function GET() {
             workspacePath: row.workspace_path,
           };
         }
-      })
+      }),
     );
 
     return NextResponse.json(bots);
   } catch (error) {
     console.error('Error fetching bots:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch bots' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch bots' }, { status: 500 });
   }
 }

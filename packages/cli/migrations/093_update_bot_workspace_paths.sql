@@ -9,4 +9,7 @@
 UPDATE semo.bot_status
 SET workspace_path = '~/.semo/workspaces/' || bot_id
 WHERE workspace_path LIKE '~/.semo-bot-sessions/%'
-   OR workspace_path LIKE '~/.openclaw-%';
+   OR workspace_path LIKE '~/.openclaw-%'
+   OR workspace_path LIKE '/Users/%/.openclaw-%'
+   OR workspace_path LIKE '/Users/%/.semo-bot-sessions/%'
+   OR workspace_path LIKE '/Users/%/.semo/workspaces/%';
