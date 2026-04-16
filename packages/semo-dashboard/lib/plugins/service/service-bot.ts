@@ -7,8 +7,8 @@
  */
 
 import { getPhaseAssignee } from './service-phases';
-import { getPoProfile, buildProfileContext } from './po-profile';
-import type { ServiceTrack } from '@/types';
+import { getPoProfile, buildProfileContext, wrapPoContext } from './po-profile';
+import type { PoProfile, ServiceTrack } from '@/types';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const SEMO_INCUBATOR_BOT_ID = 'U0AR4719LGM'; // @SEMO Incubator
@@ -17,6 +17,7 @@ export async function dispatchBotMessage(
   botId: string,
   message: string,
   channelId?: string,
+  poProfile?: PoProfile,
 ): Promise<{ ok: boolean } | null> {
   if (!SLACK_BOT_TOKEN) {
     console.warn('SLACK_BOT_TOKEN not set — skipping bot dispatch');
@@ -27,7 +28,8 @@ export async function dispatchBotMessage(
   const targetChannel = channelId || process.env.SEMO_INCUBATOR_CHANNEL || 'C0APG495ABZ';
 
   try {
-    const slackMessage = `<@${SEMO_INCUBATOR_BOT_ID}> [Route: ${botId}]\n\n${message}`;
+    const profilePrefix = poProfile ? `${wrapPoContext(poProfile)}\n\n` : '';
+    const slackMessage = `<@${SEMO_INCUBATOR_BOT_ID}> [Route: ${botId}]\n\n${profilePrefix}${message}`;
 
     const res = await fetch('https://slack.com/api/chat.postMessage', {
       method: 'POST',
@@ -80,7 +82,7 @@ export async function dispatchRegeneration(
     const hint = getBotHintForPhase(projectMetadata, phase);
     if (hint) presetContext = `\n## Preset Context\n${hint}\n`;
     const poProfile = getPoProfile(projectMetadata);
-    profileCtx = `\n## PO Profile\n${buildProfileContext(poProfile)}\n`;
+    profileCtx = `\n${wrapPoContext(poProfile)}\n`;
   }
 
   const message = `[Service Section Regeneration: ${sectionId}]

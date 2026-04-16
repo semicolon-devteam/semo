@@ -258,6 +258,38 @@ export async function POST(request: NextRequest) {
         if (!task) {
           return NextResponse.json({ error: 'Task not found' }, { status: 404 });
         }
+
+        // KB upsert: research/{task_id} 에 결과 저장
+        if (task.service_id) {
+          try {
+            const { upsertItem } = await import('@/lib/kb');
+            const researchProject = await getProject(task.service_id);
+            const domain = researchProject?.service_domain || task.service_id;
+            const resultStr =
+              typeof body.result === 'string' ? body.result : JSON.stringify(body.result);
+            await upsertItem(domain, `research/${task.task_id}`, resultStr, body.bot_id, {
+              task_type: task.task_type,
+              status: 'completed',
+              completed_at: new Date().toISOString(),
+            });
+          } catch (kbErr) {
+            console.error(`[Callback] KB upsert for research/${body.task_id} failed:`, kbErr);
+          }
+
+          // 원래 dispatch 스레드에 결과 도착 알림
+          const researchSlackCtx = await resolveServiceSlackContext(task.service_id);
+          if (researchSlackCtx.channelId) {
+            const resultPreview =
+              typeof body.result === 'string'
+                ? body.result.slice(0, 200)
+                : JSON.stringify(body.result).slice(0, 200);
+            postSlackMessage(
+              researchSlackCtx.channelId,
+              `💡 리서치 결과 도착 (${body.task_id.slice(0, 8)})\n${resultPreview}…`,
+            ).catch((err: unknown) => console.error('Research result Slack failed:', err));
+          }
+        }
+
         console.log(`[Callback] Research ${body.task_id} completed by ${body.bot_id}`);
         return NextResponse.json({ ok: true, task });
       }
