@@ -40,7 +40,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       console.error('GrowthClaw dispatch failed:', err),
     );
 
-    await updateResearchTask(task.task_id, { status: 'dispatched' });
+    await updateResearchTask(task.task_id, { status: 'dispatched' }, id);
 
     return NextResponse.json(task, { status: 201 });
   } catch (error) {
@@ -49,8 +49,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   }
 }
 
-export async function PATCH(request: NextRequest) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const { task_id, status, result } = body;
 
@@ -58,7 +59,7 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'task_id is required' }, { status: 400 });
     }
 
-    const task = await updateResearchTask(task_id, { status, result });
+    const task = await updateResearchTask(task_id, { status, result }, id);
     if (!task) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }

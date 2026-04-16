@@ -52,6 +52,7 @@ interface SectionRegenerationPayload {
 interface ResearchResultPayload {
   type: 'research-result';
   task_id: string;
+  service_id?: string;
   result: string;
   bot_id: string;
 }
@@ -251,32 +252,34 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           );
         }
-        const task = await updateResearchTask(body.task_id, {
-          status: 'completed',
-          result: body.result,
-        });
+
+        // service_id 확보: payload에 있으면 사용, 없으면 KB에서 역추적
+        let serviceId: string | undefined = body.service_id;
+        if (!serviceId) {
+          const kbLookup = await query(
+            `SELECT domain FROM semo.knowledge_base WHERE key = 'research' AND sub_key = $1 LIMIT 1`,
+            [body.task_id],
+          );
+          if (kbLookup.rows[0]) {
+            serviceId = kbLookup.rows[0].domain;
+          }
+        }
+
+        const task = await updateResearchTask(
+          body.task_id,
+          {
+            status: 'completed',
+            result: body.result,
+          },
+          serviceId,
+        );
+
         if (!task) {
           return NextResponse.json({ error: 'Task not found' }, { status: 404 });
         }
 
-        // KB upsert: research/{task_id} 에 결과 저장
+        // 원래 dispatch 스레드에 결과 도착 알림
         if (task.service_id) {
-          try {
-            const { upsertItem } = await import('@/lib/kb');
-            const researchProject = await getProject(task.service_id);
-            const domain = researchProject?.service_domain || task.service_id;
-            const resultStr =
-              typeof body.result === 'string' ? body.result : JSON.stringify(body.result);
-            await upsertItem(domain, `research/${task.task_id}`, resultStr, body.bot_id, {
-              task_type: task.task_type,
-              status: 'completed',
-              completed_at: new Date().toISOString(),
-            });
-          } catch (kbErr) {
-            console.error(`[Callback] KB upsert for research/${body.task_id} failed:`, kbErr);
-          }
-
-          // 원래 dispatch 스레드에 결과 도착 알림
           const researchSlackCtx = await resolveServiceSlackContext(task.service_id);
           if (researchSlackCtx.channelId) {
             const resultPreview =

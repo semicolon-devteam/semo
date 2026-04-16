@@ -63,11 +63,10 @@ export function buildProfileContext(profile: PoProfile): string {
       '코드 블록, 커맨드라인 예시 사용 금지. 시각적·비유적 설명 우선.',
     );
   } else if (profile.tech_level === 'basic') {
+    const basicSubset = ['MVP', 'API', 'SaaS', 'UI', 'UX', 'CI/CD'] as const;
     lines.push(
       '기술 용어 사용 시 반드시 한국어 병기:',
-      ...Object.entries(JARGON_ALTERNATIVES)
-        .slice(0, 6)
-        .map(([term, alt]) => `  - ${term}(${alt})`),
+      ...basicSubset.map((term) => `  - ${term}(${JARGON_ALTERNATIVES[term]})`),
       '코드 블록은 최소화하되, 필요 시 간단한 예시 허용.',
     );
   } else if (profile.tech_level === 'advanced') {
