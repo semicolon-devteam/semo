@@ -19,6 +19,7 @@ export interface ScannedSkill {
   prompt: string;
   package: string;
   botId: string;
+  mtime: number;
   referenceFiles?: Record<string, string>;
 }
 
@@ -67,6 +68,8 @@ function scanSkillsV2(botIds: string[]): ScannedSkill[] {
       if (!fs.existsSync(skillMdPath)) continue;
 
       try {
+        const stat = fs.statSync(skillMdPath);
+
         // Scan references/ subdirectory
         let referenceFiles: Record<string, string> | undefined;
         const refsDir = path.join(skillsDir, skillEntry.name, 'references');
@@ -93,6 +96,7 @@ function scanSkillsV2(botIds: string[]): ScannedSkill[] {
           prompt: fs.readFileSync(skillMdPath, 'utf-8'),
           package: 'openclaw',
           botId,
+          mtime: stat.mtimeMs,
           referenceFiles,
         });
       } catch {
@@ -124,6 +128,8 @@ function scanSkillsLegacy(semoSystemDir: string): ScannedSkill[] {
       const skillMdPath = path.join(skillsDir, skillEntry.name, 'SKILL.md');
       if (!fs.existsSync(skillMdPath)) continue;
       try {
+        const stat = fs.statSync(skillMdPath);
+
         // Scan references/ subdirectory
         let referenceFiles: Record<string, string> | undefined;
         const refsDir = path.join(skillsDir, skillEntry.name, 'references');
@@ -150,6 +156,7 @@ function scanSkillsLegacy(semoSystemDir: string): ScannedSkill[] {
           prompt: fs.readFileSync(skillMdPath, 'utf-8'),
           package: 'openclaw',
           botId: botEntry.name,
+          mtime: stat.mtimeMs,
           referenceFiles,
         });
       } catch {
@@ -159,6 +166,46 @@ function scanSkillsLegacy(semoSystemDir: string): ScannedSkill[] {
   }
 
   return skills;
+}
+
+interface DeduplicatedSkill extends ScannedSkill {
+  allBotIds: string[];
+}
+
+/**
+ * 동일 이름 스킬을 그룹핑하여 newest-mtime의 prompt를 선택, bot_ids를 머지.
+ * canonical bot (mtime 최신)이 allBotIds[0]에 위치.
+ */
+function deduplicateSkills(skills: ScannedSkill[]): DeduplicatedSkill[] {
+  const byName = new Map<string, ScannedSkill[]>();
+  for (const s of skills) {
+    const group = byName.get(s.name) || [];
+    group.push(s);
+    byName.set(s.name, group);
+  }
+
+  const result: DeduplicatedSkill[] = [];
+  for (const [, group] of byName) {
+    group.sort((a, b) => b.mtime - a.mtime);
+    const winner = group[0];
+    const canonicalBotId = winner.botId;
+    const otherBotIds = group
+      .filter((s) => s.botId !== canonicalBotId)
+      .map((s) => s.botId)
+      .sort();
+
+    let mergedRefs: Record<string, string> | undefined;
+    for (const s of [...group].reverse()) {
+      if (s.referenceFiles) mergedRefs = { ...(mergedRefs || {}), ...s.referenceFiles };
+    }
+
+    result.push({
+      ...winner,
+      referenceFiles: mergedRefs,
+      allBotIds: [canonicalBotId, ...otherBotIds],
+    });
+  }
+  return result;
 }
 
 /**
@@ -194,15 +241,16 @@ export async function getBotIds(pool: Pool): Promise<string[]> {
 }
 
 /**
- * 스캔된 스킬을 skill_definitions에 upsert
- * flat name + metadata.bot_ids 배열 사용, 동일 스킬명은 bot_ids 머지
+ * 스캔된 스킬을 skill_definitions에 upsert.
+ * deduplicateSkills()로 스킬당 1회만 upsert — newest-mtime의 prompt가 선택됨.
  */
 export async function syncSkillsToDB(client: PoolClient, pool: Pool): Promise<SkillSyncResult> {
   const botIds = await getBotIds(pool);
-  const skills = scanSkills(botIds);
+  const rawSkills = scanSkills(botIds);
+  const skills = deduplicateSkills(rawSkills);
 
   for (const skill of skills) {
-    const metadata: Record<string, unknown> = { bot_ids: [skill.botId] };
+    const metadata: Record<string, unknown> = { bot_ids: skill.allBotIds };
     if (skill.referenceFiles) metadata.reference_files = skill.referenceFiles;
 
     await client.query(
@@ -211,26 +259,14 @@ export async function syncSkillsToDB(client: PoolClient, pool: Pool): Promise<Sk
        ON CONFLICT (name, office_id) DO UPDATE SET
          prompt = EXCLUDED.prompt,
          package = EXCLUDED.package,
-         metadata = jsonb_set(
-           CASE
-             WHEN EXCLUDED.metadata ? 'reference_files'
-             THEN jsonb_set(skill_definitions.metadata, '{reference_files}', EXCLUDED.metadata->'reference_files')
-             ELSE skill_definitions.metadata
-           END,
-           '{bot_ids}',
-           (SELECT jsonb_agg(DISTINCT v)
-            FROM jsonb_array_elements(
-              COALESCE(skill_definitions.metadata->'bot_ids', '[]'::jsonb) ||
-              COALESCE(EXCLUDED.metadata->'bot_ids', '[]'::jsonb)
-            ) AS v)
-         ),
+         metadata = skill_definitions.metadata || EXCLUDED.metadata,
          updated_at = NOW()`,
       [skill.name, skill.prompt, skill.package, JSON.stringify(metadata)],
     );
   }
 
   return {
-    botSpecific: skills.length,
+    botSpecific: rawSkills.length,
     total: skills.length,
   };
 }
