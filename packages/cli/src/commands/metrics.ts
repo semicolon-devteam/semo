@@ -39,7 +39,10 @@ function computeCostUsd(
   cacheCreation: number,
 ): number {
   const entry = PRICING.find(([prefix]) => model.startsWith(prefix));
-  if (!entry) return 0;
+  if (!entry) {
+    process.stderr.write(`[metrics] unknown model pricing: ${model}\n`);
+    return 0;
+  }
   const p = entry[1];
   return (
     (inputTokens * p.input +
@@ -129,6 +132,10 @@ function extractLastTurnUsage(transcriptPath: string): TurnUsage[] {
   const seen = new Set<string>();
   const results: TurnUsage[] = [];
 
+  // 역순 스캔: 마지막 user 엔트리까지의 모든 assistant 엔트리를 수집한다.
+  // 한 턴에 tool 사용이 여러 번이면 assistant 엔트리가 복수개(각각 다른 message.id)이므로
+  // user 경계까지 모두 수집해야 턴 전체 비용을 기록할 수 있다.
+  // message.id dedup으로 extended-thinking 중복(같은 msg_id)을 방지한다.
   for (let i = lines.length - 1; i >= 0; i--) {
     let obj: Record<string, unknown>;
     try {
@@ -179,6 +186,9 @@ export function registerMetricsCommands(program: Command): void {
       const cwd = payload.cwd || '';
 
       if (!transcriptPath || !fs.existsSync(transcriptPath)) {
+        if (!transcriptPath) {
+          process.stderr.write('[metrics] log-turn: no transcript_path in hook payload\n');
+        }
         process.exit(0);
       }
 
@@ -264,7 +274,7 @@ export function registerMetricsCommands(program: Command): void {
             params,
           );
         } else {
-          const days = parseInt(options.days, 10) || 7;
+          const days = Math.max(1, parseInt(options.days, 10) || 7);
           const botFilter = options.bot ? 'AND bot_id = $2' : '';
           const params: (string | number)[] = [days];
           if (options.bot) params.push(options.bot);
