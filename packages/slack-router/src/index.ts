@@ -20,6 +20,7 @@ import { Pool } from 'pg';
 
 import {
   SlackGateway,
+  Router,
   FALLBACK_BOT_IDS,
   InboxWriter,
   OutboxReader,
@@ -43,6 +44,7 @@ const MAX_ESCALATION_DEPTH = 3;
 // ── Components ──
 
 const pool = new Pool({ connectionString: DATABASE_URL });
+const router = new Router(pool);
 const slack = new SlackGateway(SLACK_BOT_TOKEN, SLACK_APP_TOKEN);
 const inboxWriter = new InboxWriter(MAILBOX_DIR);
 const busyDetector = new BusyDetector(MAILBOX_DIR);
@@ -356,7 +358,10 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
     }
   }
 
-  // 3. Fetch thread history
+  // 3. Resolve channel → service domain context (Router for domain only, botId from above)
+  const routeResult = await router.route(msg.channel, msg.text, msg.thread_ts);
+
+  // 4. Fetch thread history
   let threadHistory: InboxMessage['thread_history'];
   if (msg.thread_ts) {
     const history = await slack.getThreadHistory(msg.channel, msg.thread_ts);
@@ -394,6 +399,8 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
           thread_ts: msg.thread_ts || msg.ts,
           sender_id: msg.user,
           route_reason: routeReason,
+          service_domain: routeResult.serviceDomain || undefined,
+          phase: routeResult.phase >= 0 ? routeResult.phase : undefined,
         }),
       ],
     );
@@ -426,10 +433,18 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
         }
       : undefined,
     route_reason: routeReason,
+    service_id: routeResult.serviceId || undefined,
+    service_domain: routeResult.serviceDomain || undefined,
+    phase: routeResult.phase >= 0 ? routeResult.phase : undefined,
+    skill_hint: routeResult.skillHint,
     thread_history: threadHistory,
   });
 
-  console.log(`[router] ${senderName} → ${botId} (${routeReason}) [${msgId.slice(0, 8)}]`);
+  console.log(
+    `[router] ${senderName} → ${botId} (${routeReason}` +
+      `${routeResult.serviceDomain ? `, svc=${routeResult.serviceDomain}` : ''}` +
+      `${routeResult.phase >= 0 ? `, ph=${routeResult.phase}` : ''}) [${msgId.slice(0, 8)}]`,
+  );
 }
 
 // ── Startup ──
@@ -440,10 +455,11 @@ async function start(): Promise<void> {
   console.log(`[slack-router] Sessions: ${SESSION_DIR}`);
   console.log(`[slack-router] Bots: ${[...FALLBACK_BOT_IDS, ...OVERFLOW_BOT_IDS].join(', ')}`);
 
-  // 1. Load incubator channel filter + initial stale reap
+  // 1. Load routing config + incubator channel filter + initial stale reap
+  await router.loadRouting();
   await loadIncubatorChannels();
   reapStale().catch(() => {});
-  console.log('[slack-router] Config loaded');
+  console.log('[slack-router] Config loaded (routing + incubator)');
 
   // 2. Set message handler
   slack.setMessageHandler(handleSlackMessage);
