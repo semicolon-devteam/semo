@@ -82,6 +82,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": ". /Users/reus/.claude/semo/.env 2>/dev/null; semo metrics log-turn 2>/dev/null || true",
+            "timeout": 5
+          },
+          {
+            "type": "command",
             "command": ". /Users/reus/.claude/semo/.env 2>/dev/null; semo context push 2>/dev/null || true",
             "timeout": 30
           },

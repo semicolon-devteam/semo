@@ -52,6 +52,7 @@ import { registerHarnessCommands } from './commands/harness';
 import { registerIncubatorCommands } from './commands/incubator';
 import { registerSkillCommands } from './commands/skill';
 import { registerCronCommands } from './commands/cron';
+import { registerMetricsCommands } from './commands/metrics';
 import { syncGlobalCache } from './global-cache';
 import {
   ensureSemoDir,
@@ -2780,6 +2781,7 @@ registerHarnessCommands(program);
 registerIncubatorCommands(program);
 registerSkillCommands(program);
 registerCronCommands(program);
+registerMetricsCommands(program);
 registerAgentFlushCommands(program);
 registerContextPreserveCommands(program);
 
