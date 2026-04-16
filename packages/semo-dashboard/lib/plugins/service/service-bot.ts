@@ -7,7 +7,7 @@
  */
 
 import { getPhaseAssignee } from './service-phases';
-import { getPoProfile, buildProfileContext, wrapPoContext } from './po-profile';
+import { getPoProfile, wrapPoContext } from './po-profile';
 import type { PoProfile, ServiceTrack } from '@/types';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
