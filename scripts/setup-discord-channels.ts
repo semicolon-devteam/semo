@@ -86,15 +86,20 @@ async function main(): Promise<void> {
       console.log(`[discord] Category exists: ${CATEGORY_NAME} (${category.id})`);
     }
 
-    // 4. 인큐베이터 서비스 목록 DB 조회
+    // 4. 인큐베이터 서비스 목록 KB 조회 (pipeline/config metadata)
     const result = await pool.query<ServiceRow>(
-      `SELECT service_domain, project_name, discord_channel
-       FROM semo.services
-       WHERE service_type = 'incubator' AND status = 'active'
-       ORDER BY service_domain`,
+      `SELECT kb.domain AS service_domain,
+              COALESCE(kb.metadata->>'project_name', kb.domain) AS project_name,
+              kb.metadata->>'discord_channel' AS discord_channel
+       FROM semo.knowledge_base kb
+       JOIN semo.ontology o ON o.domain = kb.domain AND o.entity_type = 'service'
+       WHERE kb.key = 'pipeline' AND kb.sub_key = 'config'
+         AND kb.metadata->>'service_type' = 'incubator'
+         AND kb.metadata->>'status' = 'active'
+       ORDER BY kb.domain`,
     );
     const services = result.rows;
-    console.log(`[db] Found ${services.length} active incubator services`);
+    console.log(`[kb] Found ${services.length} active incubator services`);
 
     if (services.length === 0) {
       console.log('No active incubator services — nothing to do');
@@ -138,12 +143,29 @@ async function main(): Promise<void> {
         created++;
       }
 
-      // 6. DB 등록
-      await pool.query(`UPDATE semo.services SET discord_channel = $2 WHERE service_domain = $1`, [
-        svc.service_domain,
-        channelId,
-      ]);
-      console.log(`  [db] ${svc.service_domain} → discord_channel = ${channelId}`);
+      // 6. KB + ontology 등록 (트랜잭션으로 원자성 보장)
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+        await client.query(
+          `UPDATE semo.knowledge_base
+           SET metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('discord_channel', $2::text),
+               updated_at = NOW()
+           WHERE domain = $1 AND key = 'pipeline' AND sub_key = 'config'`,
+          [svc.service_domain, channelId],
+        );
+        await client.query(`UPDATE semo.ontology SET discord_channel = $2 WHERE domain = $1`, [
+          svc.service_domain,
+          channelId,
+        ]);
+        await client.query('COMMIT');
+      } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+      } finally {
+        client.release();
+      }
+      console.log(`  [kb] ${svc.service_domain} → discord_channel = ${channelId}`);
     }
 
     console.log(`\nDone: ${created} created, ${skipped} skipped, ${services.length} total`);
