@@ -14,6 +14,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { getPool, closeConnection } from '../database';
+import { ensureEnforcementHooks, ensureRulesSymlink } from '../semo-workspace';
 
 // ============================================================
 // Constants
@@ -383,6 +384,10 @@ export function registerIncubatorCommands(program: Command): void {
 
         // 5. settings.json 생성
         writeSettingsJson(sessionDir, options.serviceId, options.channel);
+
+        // 5-b. enforcement 훅 + rules 심링크
+        ensureEnforcementHooks(sessionDir);
+        ensureRulesSymlink(sessionDir);
 
         // 6. memory 파일 생성
         writeMemoryFiles(sessionDir, serviceName);

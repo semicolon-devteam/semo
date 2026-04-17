@@ -401,3 +401,115 @@ ${kbFirstBlock}
 
 // .env는 이제 ~/.claude/semo/.env에 직접 저장됨 (index.ts writeSemoEnvFile)
 // setupConfigEnvLink 제거 — v4.5.0
+
+// ============================================================
+// Session Enforcement (v4.17+)
+// ============================================================
+
+const SHARED_HOOKS = path.join(os.homedir(), '.semo', 'shared', 'hooks');
+const SEMO_PROJECT_RULES = path.join(
+  os.homedir(),
+  'Desktop',
+  'Sources',
+  'semicolon',
+  'projects',
+  'semo',
+  '.claude',
+  'rules',
+);
+
+interface EnforcementHookDef {
+  trigger: string;
+  script: string;
+  timeout: number;
+}
+
+const ENFORCEMENT_HOOKS: EnforcementHookDef[] = [
+  { trigger: 'UserPromptSubmit', script: 'context-router.sh', timeout: 3000 },
+  { trigger: 'Stop', script: 'kb-first-guard.sh', timeout: 5000 },
+  { trigger: 'Stop', script: 'response-length-guard.sh', timeout: 3000 },
+  { trigger: 'Stop', script: 'url-validator-guard.sh', timeout: 3000 },
+  { trigger: 'Stop', script: 'decision-reminder.sh', timeout: 5000 },
+  { trigger: 'Stop', script: 'kb-search-loop-guard.sh', timeout: 5000 },
+];
+
+/**
+ * 봇 세션 settings.json에 enforcement 훅이 없으면 추가.
+ * 기존 훅은 건드리지 않고 누락된 훅만 append.
+ */
+export function ensureEnforcementHooks(sessionDir: string): { added: string[] } {
+  const settingsPath = path.join(sessionDir, '.claude', 'settings.json');
+  if (!fs.existsSync(settingsPath)) return { added: [] };
+
+  let settings: any;
+  try {
+    settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+  } catch {
+    return { added: [] };
+  }
+
+  if (!settings.hooks) settings.hooks = {};
+
+  const added: string[] = [];
+
+  for (const def of ENFORCEMENT_HOOKS) {
+    const scriptPath = path.join(SHARED_HOOKS, def.script);
+    if (!fs.existsSync(scriptPath)) continue;
+
+    const command = `bash ${SHARED_HOOKS}/${def.script}`;
+
+    if (!settings.hooks[def.trigger]) {
+      settings.hooks[def.trigger] = [{ matcher: '', hooks: [] }];
+    }
+
+    const triggerGroup = settings.hooks[def.trigger];
+    // Find the first matcher group (or create one)
+    let group = triggerGroup[0];
+    if (!group) {
+      group = { matcher: '', hooks: [] };
+      triggerGroup.push(group);
+    }
+    if (!group.hooks) group.hooks = [];
+
+    // Check if already present
+    const exists = group.hooks.some((h: any) => h.command && h.command.includes(def.script));
+    if (!exists) {
+      group.hooks.push({ type: 'command', command, timeout: def.timeout });
+      added.push(def.script);
+    }
+  }
+
+  if (added.length > 0) {
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8');
+  }
+
+  return { added };
+}
+
+/**
+ * 봇 세션에 프로젝트 rules/ 심링크 생성.
+ * 이미 존재하면 skip, 타겟이 없으면 skip.
+ * @returns true if symlink was created
+ */
+export function ensureRulesSymlink(sessionDir: string): boolean {
+  if (!fs.existsSync(SEMO_PROJECT_RULES)) return false;
+
+  const linkPath = path.join(sessionDir, '.claude', 'rules');
+  const claudeDir = path.join(sessionDir, '.claude');
+  if (!fs.existsSync(claudeDir)) return false;
+
+  if (fs.existsSync(linkPath)) {
+    const stat = fs.lstatSync(linkPath);
+    if (stat.isSymbolicLink()) {
+      // Already a symlink — check target matches
+      const target = fs.readlinkSync(linkPath);
+      if (target === SEMO_PROJECT_RULES) return false; // already correct
+      fs.unlinkSync(linkPath); // stale symlink, recreate
+    } else {
+      return false; // real directory — don't touch
+    }
+  }
+
+  fs.symlinkSync(SEMO_PROJECT_RULES, linkPath, 'dir');
+  return true;
+}

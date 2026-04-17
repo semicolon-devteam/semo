@@ -1789,21 +1789,25 @@ kbCmd
   .option('--limit <n>', '최대 결과 수', '10')
   .option('--mode <type>', '검색 모드 (hybrid|semantic|text)', 'hybrid')
   .option('--short', '미리보기 모드 (content를 80자로 잘라서 표시)')
+  .option('--min-score <n>', '최소 유사도 필터 (0-1)', '0.75')
   .action(async (query, options) => {
     const spinner = ora(`'${query}' 검색 중...`).start();
     try {
       const pool = getPool();
+      const minScore = parseFloat(options.minScore);
       const results = await kbSearch(pool, query, {
         domain: options.domain,
         service: options.service,
         limit: parseInt(options.limit),
         mode: options.mode,
+        minScore: isNaN(minScore) ? undefined : minScore,
       });
 
       spinner.stop();
 
       if (results.length === 0) {
-        console.log(chalk.yellow(`\n  검색 결과 없음: '${query}'`));
+        const scoreNote = minScore > 0 ? ` (min-score: ${(minScore * 100).toFixed(0)}%)` : '';
+        console.log(chalk.yellow(`\n  검색 결과 없음: '${query}'${scoreNote}`));
       } else {
         console.log(chalk.cyan.bold(`\n🔍 검색 결과: '${query}' (${results.length}건)\n`));
         for (const entry of results) {

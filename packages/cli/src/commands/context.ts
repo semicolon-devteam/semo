@@ -20,7 +20,7 @@ import { KBEntry, generateEmbeddings } from '../kb';
 // [v4.7.0] syncSkillsToDB 복원 — 워크스페이스 → DB 동기화 경로 재활성화
 import { syncSkillsToDB, getBotIds } from './skill-sync';
 import { syncGlobalCache } from '../global-cache';
-import { populateBotMirrors } from '../semo-workspace';
+import { populateBotMirrors, ensureEnforcementHooks, ensureRulesSymlink } from '../semo-workspace';
 
 // ============================================================
 // Memory file mapping
@@ -193,7 +193,33 @@ export function registerContextCommands(program: Command): void {
           }
         }
 
-        // 4. 크론잡 카운트 표시 (DB-first — 파일 sync 제거됨)
+        // 4. 봇 세션 enforcement 훅 + rules 심링크 보장
+        try {
+          spinner.text = '봇 세션 enforcement 확인...';
+          const sessionRoot = path.join(os.homedir(), '.semo', 'sessions');
+          if (fs.existsSync(sessionRoot)) {
+            const sessions = fs
+              .readdirSync(sessionRoot)
+              .filter((d) => fs.existsSync(path.join(sessionRoot, d, '.claude')));
+            let hookCount = 0;
+            let linkCount = 0;
+            for (const s of sessions) {
+              const dir = path.join(sessionRoot, s);
+              const { added } = ensureEnforcementHooks(dir);
+              hookCount += added.length;
+              if (ensureRulesSymlink(dir)) linkCount++;
+            }
+            if (hookCount > 0 || linkCount > 0) {
+              console.log(
+                chalk.green(`  ✓ enforcement: ${hookCount}개 훅 추가, ${linkCount}개 rules 심링크`),
+              );
+            }
+          }
+        } catch {
+          // enforcement 확인 실패는 비치명적
+        }
+
+        // 5. 크론잡 카운트 표시 (DB-first — 파일 sync 제거됨)
         try {
           spinner.text = '크론잡 확인...';
           const cronStats = await getCronJobStats(pool);

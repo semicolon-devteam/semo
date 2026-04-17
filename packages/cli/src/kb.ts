@@ -711,6 +711,7 @@ export async function kbSearch(
     service?: string;
     limit?: number;
     mode?: 'semantic' | 'text' | 'hybrid';
+    minScore?: number;
   },
 ): Promise<KBEntry[]> {
   const client = await pool.connect();
@@ -839,6 +840,15 @@ export async function kbSearch(
       results = Array.from(resultMap.values()).sort(
         (a: any, b: any) => Number(b.score) - Number(a.score),
       );
+    }
+
+    // min-score filter: drop low-relevance noise results
+    if (options.minScore != null) {
+      const threshold = options.minScore;
+      results = results.filter((r: any) => {
+        const score = Number(r.score);
+        return !isNaN(score) && score >= threshold;
+      });
     }
 
     return results.slice(0, limit);
@@ -1258,9 +1268,13 @@ export async function kbUpsert(
                 return `  ${keyDisplay.padEnd(25)} (${s.key_type})${desc}${hint}`;
               })
               .join('\n');
+            const actionItemHint =
+              key.startsWith('action-item') || key === 'action'
+                ? `\n\n💡 액션 아이템은 DB 전용 테이블이 SoT입니다. \`semo action-items create --owner ${entry.domain} --description "..."\` 를 사용하세요.`
+                : '';
             return {
               success: false,
-              error: `키 '${key}'은(는) '${entityType}' 타입의 스키마에 허용되지 않습니다.\n\n사용 가능한 키:\n${schemaGuide}`,
+              error: `키 '${key}'은(는) '${entityType}' 타입의 스키마에 허용되지 않습니다.\n\n사용 가능한 키:\n${schemaGuide}${actionItemHint}`,
             };
           }
           // Projection key 차단: pm-pipeline만 쓰기 허용
