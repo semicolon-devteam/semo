@@ -22,7 +22,6 @@ import {
   FALLBACK_BOT_IDS,
   InboxWriter,
   OutboxReader,
-  HealthMonitor,
   resolveSpeaker,
   type InboxMessage,
   type OutboxMessage,
@@ -36,7 +35,6 @@ import type { DiscordMessage } from './discord-gateway.js';
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || '';
 const DATABASE_URL = process.env.DATABASE_URL || '';
 const MAILBOX_DIR = process.env.SEMO_MAILBOX_DIR || path.join(os.homedir(), '.semo', 'mailbox');
-const SESSION_DIR = process.env.SEMO_SESSION_DIR || path.join(os.homedir(), '.semo', 'sessions');
 const MAX_ESCALATION_DEPTH = 3;
 
 // ── Components ──
@@ -146,24 +144,8 @@ const outboxReader = new OutboxReader({
 });
 
 // ── Health Monitor ──
-
-const healthMonitor = new HealthMonitor({
-  mailboxDir: MAILBOX_DIR,
-  botIds: [...FALLBACK_BOT_IDS],
-  sessionDir: SESSION_DIR,
-  onRestart: async (botId) => {
-    console.log(`[health] ${botId} restarted — posting notification`);
-    try {
-      await discord.postAsBot(
-        'semiclaw',
-        process.env.ADMIN_CHANNEL || '',
-        `[System] ${botId} session restarted (health check failure).`,
-      );
-    } catch {
-      // non-fatal
-    }
-  },
-});
+// NOTE: HealthMonitor lives in slack-router only. Running it here too would
+// cause double /quit+start races against the same bot session.
 
 // ── Message Handler ──
 
@@ -233,7 +215,6 @@ async function handleDiscordMessage(msg: DiscordMessage, senderName: string): Pr
 async function start(): Promise<void> {
   console.log('[discord-router] Starting...');
   console.log(`[discord-router] Mailbox: ${MAILBOX_DIR}`);
-  console.log(`[discord-router] Sessions: ${SESSION_DIR}`);
   console.log(`[discord-router] Bots: ${FALLBACK_BOT_IDS.join(', ')}`);
 
   if (!DISCORD_BOT_TOKEN) {
@@ -271,10 +252,6 @@ async function start(): Promise<void> {
   outboxReader.start();
   console.log('[discord-router] Outbox reader started');
 
-  // 6. Start health monitor
-  healthMonitor.start();
-  console.log('[discord-router] Health monitor started');
-
   console.log('[discord-router] Ready');
 }
 
@@ -282,7 +259,6 @@ async function start(): Promise<void> {
 
 async function shutdown(): Promise<void> {
   console.log('[discord-router] Shutting down...');
-  healthMonitor.stop();
   outboxReader.stop();
   await discord.stop();
   await pool.end();
@@ -292,6 +268,14 @@ async function shutdown(): Promise<void> {
 
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+
+// ── Crash Guard — 소켓/DB 끊김 등 예외 시 프로세스 크래시 방지 ──
+process.on('uncaughtException', (err) => {
+  console.error('[discord-router] uncaughtException (kept alive):', err.message);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[discord-router] unhandledRejection (kept alive):', reason);
+});
 
 start().catch((err) => {
   console.error('[discord-router] Startup failed:', err);

@@ -7,39 +7,21 @@ import * as path from 'path';
 import * as crypto from 'crypto';
 import { exec } from 'child_process';
 import type { InboxMessage } from './types.js';
+import { loadSurfaceMap, type SurfaceMap } from './surface-map.js';
 
 const LOCK_TIMEOUT_MS = 5_000;
 
-/** Load surface mapping from file or use default pane indices */
-function loadSurfaceMap(): { workspace: string; surfaces: Record<string, string> } {
-  const mapPath = process.env.SEMO_SURFACE_MAP || '/tmp/semo-surface-map.json';
-  try {
-    return JSON.parse(fs.readFileSync(mapPath, 'utf8'));
-  } catch {
-    // Fallback: standard pane indices (for semo-agents-start.sh workspace)
-    const workspace = process.env.SEMO_WORKSPACE || 'semo-agents';
-    return {
-      workspace,
-      surfaces: {
-        semiclaw: 'pane:1',
-        planclaw: 'pane:2',
-        designclaw: 'pane:3',
-        workclaw: 'pane:4',
-        reviewclaw: 'pane:5',
-        infraclaw: 'pane:6',
-        growthclaw: 'pane:7',
-      },
-    };
-  }
-}
-
 export class InboxWriter {
   private readonly mailboxDir: string;
-  private readonly surfaceMap: { workspace: string; surfaces: Record<string, string> };
+  private readonly surfaceMap: SurfaceMap;
 
   constructor(mailboxDir: string) {
     this.mailboxDir = mailboxDir;
     this.surfaceMap = loadSurfaceMap();
+  }
+
+  getSurfaceMap(): SurfaceMap {
+    return this.surfaceMap;
   }
 
   /** Write a message to a bot's inbox and nudge the bot to process it */

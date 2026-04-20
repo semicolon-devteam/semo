@@ -1,6 +1,7 @@
 export * from './mailbox/types.js';
 export * from './slack/channel-types.js';
 export { InboxWriter } from './mailbox/inbox-writer.js';
+export { loadSurfaceMap, type SurfaceMap } from './mailbox/surface-map.js';
 export { OutboxReader } from './mailbox/outbox-reader.js';
 export type { GatewayAdapter } from './mailbox/outbox-reader.js';
 export { HealthMonitor } from './monitoring/health-monitor.js';
