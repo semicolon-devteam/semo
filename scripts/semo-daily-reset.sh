@@ -64,8 +64,8 @@ for bot in "${BOTS[@]}"; do
 done
 echo "  Done."
 
-# 4. Restart agents
+# 4. Restart agents with smoke test
 echo "[reset] Restarting agents..."
-bash "$SEMO_ROOT/scripts/semo-agents-start.sh" 2>&1 || true
+bash "$SEMO_ROOT/scripts/semo-agents-start.sh" --smoke 2>&1 || true
 
 echo "=== Daily Reset Complete: $(date +%H:%M:%S) ==="

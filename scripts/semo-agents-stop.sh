@@ -4,10 +4,11 @@ set -euo pipefail
 
 MAILBOX_DIR="$HOME/.semo/mailbox"
 PID_FILE="$HOME/.semo/agents.pid"
-WORKSPACE_TITLE="SEMO Agents"
+WORKSPACE_TITLE="semo-agents"
 
-BOTS=(semiclaw planclaw designclaw workclaw reviewclaw infraclaw growthclaw)
+BOTS=(semiclaw planclaw designclaw workclaw reviewclaw infraclaw growthclaw incubator)
 OVERFLOW_BOTS=(semiclaw-overflow)
+POLLER_BOTS=(cron-poller)
 
 echo "[stop] Stopping SEMO Agents..."
 
@@ -24,15 +25,27 @@ touch "$MAILBOX_DIR/_shutdown"
 echo "  Shutdown flag set"
 
 # 2. Send /quit to each bot (reverse order, detect pane offset)
-# Discord Router present → bots at pane 2+, otherwise pane 1+
+# Pane layout: Router(0) → [Discord(1)] → BOTS → OVERFLOW → POLLER
 TOTAL_PANES=$(cmux tree --workspace "$WORKSPACE_REF" 2>/dev/null | grep -c "pane:" || echo 0)
+EXPECTED_WITHOUT_DISCORD=$((1 + ${#BOTS[@]} + ${#OVERFLOW_BOTS[@]} + ${#POLLER_BOTS[@]}))
 BOT_PANE_OFFSET=1
-if [ "$TOTAL_PANES" -gt $((${#BOTS[@]} + 1)) ]; then
+if [ "$TOTAL_PANES" -gt "$EXPECTED_WITHOUT_DISCORD" ]; then
   BOT_PANE_OFFSET=2  # Discord Router occupies pane 1
 fi
 
-# Stop overflow bots first
 OVERFLOW_PANE_OFFSET=$((${#BOTS[@]} + BOT_PANE_OFFSET))
+POLLER_PANE_OFFSET=$((OVERFLOW_PANE_OFFSET + ${#OVERFLOW_BOTS[@]}))
+
+# Stop poller first (no bot_commitment dependency, safe to quit)
+for i in $(seq ${#POLLER_BOTS[@]} -1 1); do
+  bot="${POLLER_BOTS[$((i - 1))]}"
+  pane=$((i - 1 + POLLER_PANE_OFFSET))
+  echo "  Stopping $bot (pane $pane)..."
+  cmux send --workspace "$WORKSPACE_REF" --surface "pane:$pane" "/quit\n" 2>/dev/null || true
+  sleep 1
+done
+
+# Stop overflow bots
 for i in $(seq ${#OVERFLOW_BOTS[@]} -1 1); do
   bot="${OVERFLOW_BOTS[$((i - 1))]}"
   pane=$((i - 1 + OVERFLOW_PANE_OFFSET))
@@ -72,7 +85,7 @@ cmux close-workspace --workspace "$WORKSPACE_REF" 2>/dev/null || true
 # 7. Verify heartbeats are stale
 echo "  Verifying shutdown..."
 ALL_STOPPED=true
-for bot in "${BOTS[@]}" "${OVERFLOW_BOTS[@]}"; do
+for bot in "${BOTS[@]}" "${OVERFLOW_BOTS[@]}" "${POLLER_BOTS[@]}"; do
   HB_FILE="$MAILBOX_DIR/$bot/heartbeat"
   if [ -f "$HB_FILE" ]; then
     HB_AGE=$(( $(date +%s) - $(date -r "$HB_FILE" +%s 2>/dev/null || echo 0) ))

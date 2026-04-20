@@ -6,11 +6,12 @@ SEMO_ROOT="$HOME/Desktop/Sources/semicolon/projects/semo"
 SESSION_DIR="$HOME/.semo/sessions"
 MAILBOX_DIR="$HOME/.semo/mailbox"
 PID_FILE="$HOME/.semo/agents.pid"
-WORKSPACE="SEMO Agents"
+WORKSPACE="semo-agents"
 BOT_CONFIG_DIR="$HOME/.claude/snamanager0"  # 봇 전용 계정 (reus7042와 분리)
 
 BOTS=(semiclaw planclaw designclaw workclaw reviewclaw infraclaw growthclaw incubator)
 OVERFLOW_BOTS=(semiclaw-overflow)
+POLLER_BOTS=(cron-poller)
 
 # ── Pre-flight checks ──
 
@@ -28,6 +29,18 @@ for var in SLACK_BOT_TOKEN SLACK_APP_TOKEN DATABASE_URL; do
     exit 1
   fi
 done
+
+# DB 터널 리스너 체크 — LaunchAgent가 죽어있으면 재기동
+if ! lsof -i :15432 -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "[start] DB tunnel not listening on :15432 — kickstarting LaunchAgent..."
+  launchctl kickstart -k "gui/$(id -u)/com.semicolon.semo-db-tunnel" 2>/dev/null || true
+  sleep 10
+  if ! lsof -i :15432 -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "[ERROR] DB tunnel still not listening. Check /tmp/semo-db-tunnel.err and launchctl list | grep semo-db-tunnel"
+    exit 1
+  fi
+  echo "[start] DB tunnel up."
+fi
 
 DISCORD_ENABLED=false
 if [ -n "${DISCORD_BOT_TOKEN:-}" ]; then
@@ -62,6 +75,11 @@ for bot in "${BOTS[@]}" "${OVERFLOW_BOTS[@]}"; do
   touch "$MAILBOX_DIR/$bot/inbox.jsonl"
   touch "$MAILBOX_DIR/$bot/outbox.jsonl"
   touch "$MAILBOX_DIR/$bot/inbox.consumed"
+done
+
+# cron-poller는 mailbox 쓰지 않지만 heartbeat 파일은 필요
+for bot in "${POLLER_BOTS[@]}"; do
+  mkdir -p "$MAILBOX_DIR/$bot"
 done
 
 # ── Install deps if needed ──
@@ -145,6 +163,16 @@ for bot in "${OVERFLOW_BOTS[@]}"; do
   sleep 2
 done
 
+# ── Poller sessions (cron-poller) ──
+
+for bot in "${POLLER_BOTS[@]}"; do
+  echo "[start] Starting $bot..."
+  create_split "$bot"
+  cmux send --workspace "$WORKSPACE_REF" --surface "${SURFACES[$bot]}" \
+    $'cd '"$SESSION_DIR/$bot"' && CLAUDE_CONFIG_DIR='"$BOT_CONFIG_DIR"' claude --permission-mode bypassPermissions\n'
+  sleep 2
+done
+
 # ── Generate surface map (for nudge) ──
 
 echo "[start] Generating surface map..."
@@ -197,6 +225,12 @@ else
 fi
 
 echo $$ > "$PID_FILE"
+
+# Optional smoke test — synthetic inbox→outbox round trip (no Slack needed)
+if [[ "$*" == *"--smoke"* ]]; then
+  echo "[start] Running E2E smoke test..."
+  bash "$SEMO_ROOT/scripts/e2e-smoke.sh" || echo "[WARN] Smoke test failed — inspect outbox manually"
+fi
 
 echo ""
 echo "==================================="
