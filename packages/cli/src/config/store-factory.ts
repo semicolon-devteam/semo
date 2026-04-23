@@ -14,15 +14,38 @@ import * as path from 'path';
 import BetterSqlite from 'better-sqlite3';
 import { semoHome } from '../paths.js';
 import type { SemoConfig } from './types.js';
-import {
-  SqliteKbStore,
-  ObsidianKbStore,
-  NotionKbStore,
-  type KbStore,
-  type SqliteEmbeddingProvider,
-} from '@team-semicolon/semo-kb-core';
-import { SqliteOperationalStore, type OperationalStore } from '@team-semicolon/semo-ops-store';
-import { OllamaEmbeddingProvider, OpenAIEmbeddingProvider } from '@team-semicolon/semo-common';
+import type { KbStore, SqliteEmbeddingProvider } from '@team-semicolon/semo-kb-core';
+import type { OperationalStore } from '@team-semicolon/semo-ops-store';
+
+async function loadKbCore() {
+  try {
+    return await import('@team-semicolon/semo-kb-core');
+  } catch (err) {
+    throw new Error(
+      `@team-semicolon/semo-kb-core 로드 실패 (optional 의존성). 설치: npm i -g @team-semicolon/semo-kb-core. 상세: ${(err as Error).message}`,
+    );
+  }
+}
+
+async function loadOpsStore() {
+  try {
+    return await import('@team-semicolon/semo-ops-store');
+  } catch (err) {
+    throw new Error(
+      `@team-semicolon/semo-ops-store 로드 실패 (optional 의존성). 설치: npm i -g @team-semicolon/semo-ops-store. 상세: ${(err as Error).message}`,
+    );
+  }
+}
+
+async function loadCommon() {
+  try {
+    return await import('@team-semicolon/semo-common');
+  } catch (err) {
+    throw new Error(
+      `@team-semicolon/semo-common 로드 실패 (optional 의존성). 설치: npm i -g @team-semicolon/semo-common. 상세: ${(err as Error).message}`,
+    );
+  }
+}
 
 const noopEmbedding: SqliteEmbeddingProvider = {
   async embed() {
@@ -39,9 +62,10 @@ const noopEmbedding: SqliteEmbeddingProvider = {
  * 네트워크 호출 실패는 SqliteKbStore 내부의 `.catch(() => null)` 로 흡수되어
  * 텍스트 검색으로 폴백되므로, 이 팩토리는 provider 를 만들기만 하면 된다.
  */
-export function buildEmbeddingProvider(cfg: SemoConfig): SqliteEmbeddingProvider {
+export async function buildEmbeddingProvider(cfg: SemoConfig): Promise<SqliteEmbeddingProvider> {
   const e = cfg.embedding;
   if (!e || e.provider === 'none') return noopEmbedding;
+  const { OllamaEmbeddingProvider, OpenAIEmbeddingProvider } = await loadCommon();
   switch (e.provider) {
     case 'ollama':
       return new OllamaEmbeddingProvider({
@@ -86,7 +110,7 @@ export async function openStores(
   cfg: SemoConfig,
   embedding?: SqliteEmbeddingProvider,
 ): Promise<StoreHandle> {
-  const resolvedEmbedding = embedding ?? buildEmbeddingProvider(cfg);
+  const resolvedEmbedding = embedding ?? (await buildEmbeddingProvider(cfg));
   const kb = await openKbStore(cfg, resolvedEmbedding);
   const ops = await openOperationalStore(cfg);
   return {
@@ -117,12 +141,14 @@ async function openKbStore(cfg: SemoConfig, embedding: SqliteEmbeddingProvider):
       const p = cfg.kb.sqlite_path ?? path.join(semoHome(), 'kb.db');
       ensureParentDir(p);
       const db = new BetterSqlite(p);
+      const { SqliteKbStore } = await loadKbCore();
       return new SqliteKbStore(db, embedding);
     }
     case 'obsidian': {
       if (!cfg.kb.obsidian_vault) {
         throw new Error('kb.obsidian_vault 가 설정되지 않았습니다.');
       }
+      const { ObsidianKbStore } = await loadKbCore();
       const store = new ObsidianKbStore(cfg.kb.obsidian_vault, embedding);
       await store.ready();
       return store;
@@ -133,6 +159,7 @@ async function openKbStore(cfg: SemoConfig, embedding: SqliteEmbeddingProvider):
       }
       const cachePath = cfg.kb.sqlite_path ?? path.join(semoHome(), 'notion-cache.db');
       ensureParentDir(cachePath);
+      const { NotionKbStore } = await loadKbCore();
       const store = new NotionKbStore(embedding, {
         token: cfg.kb.notion_token,
         databaseId: cfg.kb.notion_database_id,
@@ -161,10 +188,12 @@ async function openOperationalStore(cfg: SemoConfig): Promise<OperationalStore> 
       const p = cfg.ops.sqlite_path ?? path.join(semoHome(), 'ops.db');
       ensureParentDir(p);
       const db = new BetterSqlite(p);
+      const { SqliteOperationalStore } = await loadOpsStore();
       return new SqliteOperationalStore(db);
     }
     case 'memory': {
       const db = new BetterSqlite(':memory:');
+      const { SqliteOperationalStore } = await loadOpsStore();
       return new SqliteOperationalStore(db);
     }
     case 'postgres': {

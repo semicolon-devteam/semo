@@ -7,14 +7,21 @@
  */
 import { Command } from 'commander';
 import chalk from 'chalk';
-import {
-  ruleFactoryIntentParser,
-  defaultTemplateCatalog,
-  type FactoryAction,
-} from '@team-semicolon/semo-common';
+import type { FactoryAction } from '@team-semicolon/semo-common';
 import { loadProfile } from '../config/index.js';
 import { openStores } from '../config/store-factory.js';
 import { createBot, type CreateInput } from './agent-factory.js';
+
+async function loadCommon() {
+  try {
+    return await import('@team-semicolon/semo-common');
+  } catch (err) {
+    console.error(chalk.red('✗ @team-semicolon/semo-common 로드 실패 — optional 의존성입니다.'));
+    console.error(chalk.gray('  설치: npm i -g @team-semicolon/semo-common'));
+    console.error(chalk.gray(`  상세: ${(err as Error).message}`));
+    process.exit(1);
+  }
+}
 
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
@@ -112,6 +119,7 @@ async function confirm(question: string): Promise<boolean> {
 async function applyBotCreate(
   action: Extract<FactoryAction, { kind: 'bot.create' }>,
 ): Promise<void> {
+  const { defaultTemplateCatalog } = await loadCommon();
   const template = action.template ? defaultTemplateCatalog.get(action.template) : null;
   const resolvedRole = action.role || template?.role || action.template || 'general';
   const kbDomains = action.kbDomains?.length
@@ -184,6 +192,7 @@ async function applyKbSearch(action: Extract<FactoryAction, { kind: 'kb.search' 
 }
 
 async function applyOntologyList(): Promise<void> {
+  const { defaultTemplateCatalog } = await loadCommon();
   const list = defaultTemplateCatalog.list();
   console.log(chalk.cyan.bold(`\n📚 가용 템플릿 (${list.length})\n`));
   for (const t of list) {
@@ -267,7 +276,8 @@ export function registerFactoryCommand(program: Command): void {
     .command('plan <message>')
     .description('메시지를 파싱해 제안 action 을 출력 (dry-run)')
     .option('--json', 'JSON 만 출력')
-    .action((message: string, opts: { json?: boolean }) => {
+    .action(async (message: string, opts: { json?: boolean }) => {
+      const { ruleFactoryIntentParser } = await loadCommon();
       const action = ruleFactoryIntentParser.parse(message);
       if (opts.json) {
         console.log(JSON.stringify(action, null, 2));
@@ -279,7 +289,8 @@ export function registerFactoryCommand(program: Command): void {
   cmd
     .command('parse <message>')
     .description('메시지를 파싱해 JSON 만 출력 (agent 연동용)')
-    .action((message: string) => {
+    .action(async (message: string) => {
+      const { ruleFactoryIntentParser } = await loadCommon();
       const action = ruleFactoryIntentParser.parse(message);
       console.log(JSON.stringify(action));
     });
@@ -289,6 +300,7 @@ export function registerFactoryCommand(program: Command): void {
     .description('파싱 후 실행. 기본 확인 프롬프트, --yes 로 자동 승인')
     .option('-y, --yes', '확인 프롬프트 생략')
     .action(async (message: string, opts: { yes?: boolean }) => {
+      const { ruleFactoryIntentParser } = await loadCommon();
       const action = ruleFactoryIntentParser.parse(message);
       await applyAction(action, opts);
     });

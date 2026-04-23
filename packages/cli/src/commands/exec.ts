@@ -1,15 +1,24 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import {
-  defaultRegistry,
-  KbAwareTarget,
-  type ExecutionTarget,
-  type TargetConfig,
-  type TargetKind,
-  type TargetMessage,
+import type {
+  ExecutionTarget,
+  TargetConfig,
+  TargetKind,
+  TargetMessage,
 } from '@team-semicolon/semo-common';
 import { loadProfile } from '../config';
 import { openStores } from '../config/store-factory.js';
+
+async function loadCommon() {
+  try {
+    return await import('@team-semicolon/semo-common');
+  } catch (err) {
+    console.error(chalk.red('✗ @team-semicolon/semo-common 로드 실패 — optional 의존성입니다.'));
+    console.error(chalk.gray('  설치: npm i -g @team-semicolon/semo-common'));
+    console.error(chalk.gray(`  상세: ${(err as Error).message}`));
+    process.exit(1);
+  }
+}
 
 /**
  * `semo exec "<prompt>"` — ExecutionTarget 어댑터 smoke test.
@@ -51,6 +60,7 @@ export function registerExecCommand(program: Command): void {
           kbMinScore: string;
         },
       ) => {
+        const { defaultRegistry, KbAwareTarget } = await loadCommon();
         const kind = opts.target as TargetKind;
         if (!defaultRegistry.has(kind)) {
           console.error(

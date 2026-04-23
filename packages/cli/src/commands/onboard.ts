@@ -10,15 +10,21 @@
  */
 import { Command } from 'commander';
 import chalk from 'chalk';
-import {
-  DEFAULT_ONBOARDING_STEPS,
-  OnboardingEngine,
-  type KbWriteIntent,
-  type OnboardingState,
-} from '@team-semicolon/semo-common';
+import type { KbWriteIntent, OnboardingState } from '@team-semicolon/semo-common';
 import type { KbStore } from '@team-semicolon/semo-kb-core';
 import { loadProfile } from '../config/index.js';
 import { openStores } from '../config/store-factory.js';
+
+async function loadCommon() {
+  try {
+    return await import('@team-semicolon/semo-common');
+  } catch (err) {
+    console.error(chalk.red('✗ @team-semicolon/semo-common 로드 실패 — optional 의존성입니다.'));
+    console.error(chalk.gray('  설치: npm i -g @team-semicolon/semo-common'));
+    console.error(chalk.gray(`  상세: ${(err as Error).message}`));
+    process.exit(1);
+  }
+}
 
 interface OnboardCliOptions {
   status?: boolean;
@@ -79,6 +85,7 @@ async function readOnboardingStatus(kb: KbStore): Promise<{
   completedAt?: string;
   answered: Array<{ key: string; content: string }>;
 }> {
+  const { DEFAULT_ONBOARDING_STEPS } = await loadCommon();
   const marker = await kb.get('me', 'onboarding', 'complete');
   const answered: Array<{ key: string; content: string }> = [];
   for (const s of DEFAULT_ONBOARDING_STEPS) {
@@ -97,17 +104,16 @@ async function readOnboardingStatus(kb: KbStore): Promise<{
   };
 }
 
-function printStatus(status: Awaited<ReturnType<typeof readOnboardingStatus>>): void {
+function printStatus(
+  status: Awaited<ReturnType<typeof readOnboardingStatus>>,
+  totalSteps: number,
+): void {
   if (status.complete) {
     console.log(
       chalk.green(`✔ 온보딩 완료${status.completedAt ? ` (${status.completedAt})` : ''}`),
     );
   } else if (status.answered.length > 0) {
-    console.log(
-      chalk.yellow(
-        `… 온보딩 진행 중 (${status.answered.length}/${DEFAULT_ONBOARDING_STEPS.length})`,
-      ),
-    );
+    console.log(chalk.yellow(`… 온보딩 진행 중 (${status.answered.length}/${totalSteps})`));
   } else {
     console.log(chalk.gray('온보딩 시작 전'));
   }
@@ -120,6 +126,7 @@ function printStatus(status: Awaited<ReturnType<typeof readOnboardingStatus>>): 
 }
 
 async function runOnboarding(kb: KbStore, promptFn: PromptFn): Promise<void> {
+  const { DEFAULT_ONBOARDING_STEPS, OnboardingEngine } = await loadCommon();
   const engine = new OnboardingEngine(DEFAULT_ONBOARDING_STEPS);
   let state: OnboardingState = engine.initial();
 
@@ -176,14 +183,16 @@ export function registerOnboardCommand(program: Command): void {
       const stores = await openStores(cfg);
       try {
         const status = await readOnboardingStatus(stores.kb);
+        const { DEFAULT_ONBOARDING_STEPS } = await loadCommon();
+        const totalSteps = DEFAULT_ONBOARDING_STEPS.length;
 
         if (opts.status) {
-          printStatus(status);
+          printStatus(status, totalSteps);
           return;
         }
 
         if (status.complete && !opts.force) {
-          printStatus(status);
+          printStatus(status, totalSteps);
           console.log('');
           console.log(chalk.gray('이미 완료 — 다시 하려면 `semo onboard --force`'));
           return;

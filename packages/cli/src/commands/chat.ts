@@ -1,12 +1,17 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
-import {
-  StdinSource,
-  defaultRegistry,
-  type TargetConfig,
-  type TargetKind,
-  type TargetMessage,
-} from '@team-semicolon/semo-common';
+import type { TargetConfig, TargetKind, TargetMessage } from '@team-semicolon/semo-common';
+
+async function loadCommon() {
+  try {
+    return await import('@team-semicolon/semo-common');
+  } catch (err) {
+    console.error(chalk.red('✗ @team-semicolon/semo-common 로드 실패 — optional 의존성입니다.'));
+    console.error(chalk.gray('  설치: npm i -g @team-semicolon/semo-common'));
+    console.error(chalk.gray(`  상세: ${(err as Error).message}`));
+    process.exit(1);
+  }
+}
 
 /**
  * `semo chat` — Solo REPL. MessageSource(stdin) + ExecutionTarget 결합.
@@ -23,6 +28,7 @@ export function registerChatCommand(program: Command): void {
     .option('--system <text>', '시스템 프롬프트')
     .action(
       async (opts: { target: string; model?: string; endpoint?: string; system?: string }) => {
+        const { StdinSource, defaultRegistry } = await loadCommon();
         const kind = opts.target as TargetKind;
         if (!defaultRegistry.has(kind)) {
           console.error(

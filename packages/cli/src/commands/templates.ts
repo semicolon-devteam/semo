@@ -6,7 +6,19 @@
  */
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { defaultTemplateCatalog, type BotTemplate } from '@team-semicolon/semo-common';
+import type { BotTemplate } from '@team-semicolon/semo-common';
+
+async function loadCatalog() {
+  try {
+    const mod = await import('@team-semicolon/semo-common');
+    return mod.defaultTemplateCatalog;
+  } catch (err) {
+    console.error(chalk.red('✗ @team-semicolon/semo-common 로드 실패 — optional 의존성입니다.'));
+    console.error(chalk.gray('  설치: npm i -g @team-semicolon/semo-common'));
+    console.error(chalk.gray(`  상세: ${(err as Error).message}`));
+    process.exit(1);
+  }
+}
 
 function truncate(s: string, max: number): string {
   if (s.length <= max) return s;
@@ -40,7 +52,8 @@ export function registerTemplatesCommand(program: Command): void {
     .command('list')
     .description('모든 builtin 템플릿 1줄 요약')
     .option('--json', 'JSON 출력')
-    .action((opts: { json?: boolean }) => {
+    .action(async (opts: { json?: boolean }) => {
+      const defaultTemplateCatalog = await loadCatalog();
       const templates = defaultTemplateCatalog.list();
       if (opts.json) {
         console.log(JSON.stringify(templates, null, 2));
@@ -63,7 +76,8 @@ export function registerTemplatesCommand(program: Command): void {
     .command('show <id>')
     .description('특정 템플릿 상세 보기')
     .option('--json', 'JSON 출력')
-    .action((id: string, opts: { json?: boolean }) => {
+    .action(async (id: string, opts: { json?: boolean }) => {
+      const defaultTemplateCatalog = await loadCatalog();
       const t = defaultTemplateCatalog.get(id);
       if (!t) {
         console.error(chalk.red(`✖ 템플릿 "${id}" 없음. list 로 확인하세요.`));
@@ -88,7 +102,8 @@ export function registerTemplatesCommand(program: Command): void {
     .description('ID/태그/이름/역할 중 키워드 매칭 (한영 혼용)')
     .option('--json', 'JSON 출력')
     .option('--top <n>', 'top N (default 5)', '5')
-    .action((query: string, opts: { json?: boolean; top?: string }) => {
+    .action(async (query: string, opts: { json?: boolean; top?: string }) => {
+      const defaultTemplateCatalog = await loadCatalog();
       const results = defaultTemplateCatalog.search(query);
       const top = parseInt(opts.top ?? '5', 10);
       const sliced = results.slice(0, isNaN(top) ? 5 : top);

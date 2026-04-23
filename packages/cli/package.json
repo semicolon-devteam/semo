@@ -1,6 +1,6 @@
 {
   "name": "@team-semicolon/semo-cli",
-  "version": "4.18.2",
+  "version": "4.18.3",
   "description": "SEMO CLI - AI Agent Orchestration Framework Installer",
   "main": "dist/index.js",
   "bin": {
@@ -32,8 +32,6 @@
     "directory": "packages/cli"
   },
   "dependencies": {
-    "@team-semicolon/semo-kb-core": "*",
-    "@team-semicolon/semo-ops-store": "*",
     "better-sqlite3": "^11.0.0",
     "chalk": "^4.1.2",
     "commander": "^12.0.0",
@@ -44,7 +42,11 @@
     "smol-toml": "^1.6.1"
   },
   "optionalDependencies": {
-    "@team-semicolon/semo-kb-pg": "*"
+    "@team-semicolon/semo-common": "*",
+    "@team-semicolon/semo-discord-router": "*",
+    "@team-semicolon/semo-kb-core": "*",
+    "@team-semicolon/semo-kb-pg": "*",
+    "@team-semicolon/semo-ops-store": "*"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
