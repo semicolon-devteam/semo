@@ -1,7 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase/config';
-import { getSupabaseCookieOptions } from '@/lib/supabase/cookie-options';
 
 function safeNextPath(raw: string | null): string {
   if (!raw) return '/';
@@ -25,7 +24,6 @@ export async function GET(request: NextRequest) {
 
     const supabase = createServerClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { flowType: 'pkce' },
-      cookieOptions: getSupabaseCookieOptions(),
       cookies: {
         getAll() {
           return request.cookies.getAll();
