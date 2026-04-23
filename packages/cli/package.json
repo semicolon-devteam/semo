@@ -38,7 +38,6 @@
     "cron-parser": "^4.9.0",
     "inquirer": "^8.2.6",
     "ora": "^5.4.1",
-    "pg": "^8.17.2",
     "smol-toml": "^1.6.1"
   },
   "optionalDependencies": {
@@ -46,7 +45,8 @@
     "@team-semicolon/semo-discord-router": "*",
     "@team-semicolon/semo-kb-core": "*",
     "@team-semicolon/semo-kb-pg": "*",
-    "@team-semicolon/semo-ops-store": "*"
+    "@team-semicolon/semo-ops-store": "*",
+    "pg": "^8.17.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
