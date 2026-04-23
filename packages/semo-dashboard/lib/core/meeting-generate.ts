@@ -22,6 +22,8 @@ function getApiKey(): string {
   return key;
 }
 
+export type AttributionConfidence = 'high' | 'low' | 'ambiguous';
+
 export interface MeetingAnalysis {
   meeting_time: string;
   meeting_type_label: string;
@@ -32,6 +34,8 @@ export interface MeetingAnalysis {
     background: string;
     assignee: string;
     related_project?: string;
+    confidence?: AttributionConfidence;
+    domain_rationale?: string;
   }[];
   kpi_changes: {
     project: string;
@@ -40,13 +44,14 @@ export interface MeetingAnalysis {
     before: string;
     after: string;
     note: string;
+    confidence?: AttributionConfidence;
   }[];
   action_items: { assignee: string; item: string; deadline: string }[];
   next_meeting: string;
   additional_notes: string;
 }
 
-const SYSTEM_PROMPT = `You are a meeting minutes analyst for Semicolon development team.
+const SYSTEM_PROMPT_TEMPLATE = `You are a meeting minutes analyst for Semicolon development team.
 Analyze the transcript and extract structured information in JSON format.
 
 CRITICAL RULES:
@@ -58,7 +63,16 @@ CRITICAL RULES:
 - Dates should use YYYY-MM-DD format
 - meeting_time: infer from context or use the meeting_date provided
 - meeting_type_label: "정기 회고&회의" for regular, specific type for adhoc
-- For decisions, if the decision is clearly about a specific project/service, set related_project to that project name. If it's about the organization in general, leave related_project as empty string.`;
+
+SERVICE ATTRIBUTION RULES:
+- For each decision and KPI change, set related_project/project to the exact domain name from the SERVICE CONTEXT below.
+- Platform services have sub-services (e.g., "wise-platform" is the parent; "tether-mining", "orbis", "onto-media" are distinct sub-services). Attribute items to the specific sub-service, NOT the parent platform.
+- If attribution is unclear between multiple services, set confidence to "low" and provide domain_rationale explaining the ambiguity.
+- If a topic was explicitly decided or rejected in the meeting, reflect that status accurately. Do not list already-decided items as pending.
+- If an item is about the organization in general (not a specific service), set related_project to empty string.
+- Set confidence to "high" when you are certain of the attribution, "low" when plausible but uncertain, "ambiguous" when multiple services could own it.
+
+{service_context}`;
 
 const USER_PROMPT_TEMPLATE = `Meeting metadata:
 - Type: {meeting_type}
@@ -76,14 +90,20 @@ Extract the following as JSON:
   "meeting_time": "YYYY-MM-DD HH:MM-HH:MM",
   "meeting_type_label": "정기 회고&회의 or descriptive label",
   "agenda_items": "markdown formatted agenda with bullet points",
-  "decisions": [{"title": "...", "content": "...", "background": "...", "assignee": "...", "related_project": "project name or empty string"}],
-  "kpi_changes": [{"project": "...", "kpi": "...", "change": "...", "before": "...", "after": "...", "note": "..."}],
+  "decisions": [{"title": "...", "content": "...", "background": "...", "assignee": "...", "related_project": "exact domain name from SERVICE CONTEXT or empty string", "confidence": "high|low|ambiguous", "domain_rationale": "why this domain (required if confidence is not high)"}],
+  "kpi_changes": [{"project": "exact domain name from SERVICE CONTEXT", "kpi": "...", "change": "...", "before": "...", "after": "...", "note": "...", "confidence": "high|low|ambiguous"}],
   "action_items": [{"assignee": "...", "item": "...", "deadline": "MM/DD"}],
   "next_meeting": "YYYY-MM-DD (요일) HH:MM or empty string",
   "additional_notes": "any notable remarks or empty string"
 }`;
 
 async function analyzeTranscript(meeting: Meeting): Promise<MeetingAnalysis> {
+  // 서비스 컨텍스트 로드 → LLM에 주입하여 정확한 도메인 귀속 유도
+  const domainList = await loadDomainList();
+  const serviceContext = await loadServiceContext(domainList);
+  const serviceContextText = formatServiceContextForPrompt(serviceContext);
+  const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace('{service_context}', serviceContextText);
+
   const userPrompt = USER_PROMPT_TEMPLATE.replace('{meeting_type}', meeting.meeting_type)
     .replace('{meeting_date}', meeting.meeting_date)
     .replace('{title}', meeting.title)
@@ -100,7 +120,7 @@ async function analyzeTranscript(meeting: Meeting): Promise<MeetingAnalysis> {
     body: JSON.stringify({
       model: 'claude-sonnet-4-20250514',
       max_tokens: 8192,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: [{ role: 'user', content: userPrompt }],
     }),
   });
@@ -216,6 +236,8 @@ export interface KBEntry {
   content: string;
   type: 'decision' | 'kpi';
   action: 'create' | 'skip';
+  confidence?: AttributionConfidence;
+  domain_rationale?: string;
 }
 
 /** PostgreSQL DATE → yyyy-mm-dd 문자열 */
@@ -225,9 +247,107 @@ function formatDate(dateStr: string): string {
 }
 
 /** 도메인 목록 로드 (LLM 프롬프트용 + decision 도메인 매칭) */
-async function loadDomainList(): Promise<{ domain: string; description?: string }[]> {
+async function loadDomainList(): Promise<
+  { domain: string; description?: string; entity_type?: string }[]
+> {
   const { listDomains } = await import('./kb');
   return listDomains();
+}
+
+// ── Service Context (서비스 귀속 판단용) ──
+
+interface ServiceContext {
+  domain: string;
+  description?: string;
+  baseInfo: string;
+  parentDomain?: string;
+}
+
+/** 서비스 도메인별 base-information + parent 관계 로드 */
+async function loadServiceContext(
+  domainList: { domain: string; description?: string; entity_type?: string }[],
+): Promise<ServiceContext[]> {
+  const { query: dbQuery } = await import('../db');
+  const serviceDomains = domainList.filter((d) => d.entity_type === 'service').map((d) => d.domain);
+
+  if (serviceDomains.length === 0) return [];
+
+  const [baseInfoResult, parentResult] = await Promise.all([
+    dbQuery<{ domain: string; content: string }>(
+      `SELECT domain, LEFT(content, 500) as content
+       FROM semo.knowledge_base
+       WHERE domain = ANY($1) AND key = 'base-information' AND sub_key = ''`,
+      [serviceDomains],
+    ),
+    dbQuery<{ domain: string; metadata: Record<string, unknown> }>(
+      `SELECT domain, metadata FROM semo.knowledge_base
+       WHERE domain = ANY($1) AND key = 'pipeline' AND sub_key = 'config'`,
+      [serviceDomains],
+    ),
+  ]);
+
+  const baseInfoMap: Record<string, string> = {};
+  for (const row of baseInfoResult.rows) baseInfoMap[row.domain] = row.content;
+
+  const parentMap: Record<string, string> = {};
+  for (const row of parentResult.rows) {
+    const pd = row.metadata?.parent_domain as string | undefined;
+    if (pd) parentMap[row.domain] = pd;
+  }
+
+  return serviceDomains
+    .filter((d) => baseInfoMap[d]) // 정보가 있는 서비스만 포함
+    .map((domain) => ({
+      domain,
+      description: domainList.find((d) => d.domain === domain)?.description,
+      baseInfo: baseInfoMap[domain],
+      parentDomain: parentMap[domain],
+    }));
+}
+
+/** 서비스 컨텍스트를 LLM 프롬프트용 텍스트로 변환 */
+function formatServiceContextForPrompt(services: ServiceContext[]): string {
+  if (services.length === 0) return 'SERVICE CONTEXT:\nNo service domains available.';
+
+  // 부모-자식 관계를 그룹핑하여 표시
+  const parentGroups: Record<string, ServiceContext[]> = {};
+  const standalone: ServiceContext[] = [];
+
+  for (const svc of services) {
+    if (svc.parentDomain) {
+      if (!parentGroups[svc.parentDomain]) parentGroups[svc.parentDomain] = [];
+      parentGroups[svc.parentDomain].push(svc);
+    } else {
+      standalone.push(svc);
+    }
+  }
+
+  const lines: string[] = ['SERVICE CONTEXT (use these exact domain names for related_project):'];
+
+  for (const svc of standalone) {
+    const children = parentGroups[svc.domain];
+    const firstLine = svc.baseInfo.split('\n')[0];
+    lines.push(`- ${svc.domain}: ${firstLine}`);
+    if (children) {
+      lines.push(`  Sub-services of ${svc.domain} (attribute to sub-service, NOT parent):`);
+      for (const child of children) {
+        const childFirst = child.baseInfo.split('\n')[0];
+        lines.push(`  - ${child.domain}: ${childFirst}`);
+      }
+    }
+  }
+
+  // 부모가 목록에 없는 자식 (예외)
+  for (const [parent, children] of Object.entries(parentGroups)) {
+    if (standalone.some((s) => s.domain === parent)) continue;
+    lines.push(`Sub-services of ${parent}:`);
+    for (const child of children) {
+      const childFirst = child.baseInfo.split('\n')[0];
+      lines.push(`  - ${child.domain}: ${childFirst}`);
+    }
+  }
+
+  return lines.join('\n');
 }
 
 /** related_project를 온톨로지 도메인으로 매칭 */
@@ -245,6 +365,55 @@ function resolveProjectDomain(
     (d) => d.domain.includes(lower) || (d.description ?? '').toLowerCase().includes(lower),
   );
   return partial?.domain ?? 'semicolon';
+}
+
+/** LLM 분석 결과의 서비스 귀속을 후처리 검증 */
+function validateAttributions(
+  analysis: MeetingAnalysis,
+  domainList: { domain: string; description?: string; entity_type?: string }[],
+  serviceContext: ServiceContext[],
+): MeetingAnalysis {
+  const validDomains = new Set(domainList.map((d) => d.domain));
+  const childDomains = new Set(serviceContext.filter((s) => s.parentDomain).map((s) => s.domain));
+  const parentDomains = new Set(
+    serviceContext.filter((s) => s.parentDomain).map((s) => s.parentDomain!),
+  );
+
+  for (const decision of analysis.decisions) {
+    const rp = decision.related_project;
+    if (!rp) continue;
+
+    const resolved = rp.toLowerCase().replace(/\s+/g, '-');
+
+    // 1. related_project가 유효한 도메인이 아닌 경우 → low
+    if (!validDomains.has(resolved) && !validDomains.has(rp)) {
+      decision.confidence = 'low';
+      decision.domain_rationale =
+        (decision.domain_rationale ?? '') +
+        ` [검증] "${rp}"은(는) 등록된 도메인이 아닙니다. 가장 유사한 도메인을 확인하세요.`;
+    }
+
+    // 2. 부모 도메인으로 귀속되었으나 하위 서비스가 존재 → low
+    if (parentDomains.has(resolved) && decision.confidence !== 'ambiguous') {
+      decision.confidence = decision.confidence === 'low' ? 'low' : 'low';
+      decision.domain_rationale =
+        (decision.domain_rationale ?? '') +
+        ` [검증] "${rp}"은(는) 상위 플랫폼입니다. 하위 서비스(${[...childDomains].filter((c) => serviceContext.find((s) => s.domain === c)?.parentDomain === resolved).join(', ')}) 중 정확한 귀속을 확인하세요.`;
+    }
+  }
+
+  // KPI 도메인 검증
+  for (const kpi of analysis.kpi_changes) {
+    const resolved = kpi.project.toLowerCase().replace(/\s+/g, '-');
+    if (!validDomains.has(resolved)) {
+      kpi.confidence = 'low';
+    }
+    if (parentDomains.has(resolved)) {
+      kpi.confidence = kpi.confidence === 'ambiguous' ? 'ambiguous' : 'low';
+    }
+  }
+
+  return analysis;
 }
 
 async function buildKBEntries(analysis: MeetingAnalysis, meeting: Meeting): Promise<KBEntry[]> {
@@ -267,6 +436,18 @@ async function buildKBEntries(analysis: MeetingAnalysis, meeting: Meeting): Prom
       })
       .join('\n\n---\n\n');
 
+    // 그룹 내 가장 낮은 confidence를 KB 항목에 전파
+    const lowestConfidence = decisions.reduce<AttributionConfidence | undefined>((worst, d) => {
+      if (!d.confidence || d.confidence === 'high') return worst;
+      if (d.confidence === 'ambiguous') return 'ambiguous';
+      if (d.confidence === 'low') return worst === 'ambiguous' ? 'ambiguous' : 'low';
+      return worst;
+    }, undefined);
+    const rationales = decisions
+      .map((d) => d.domain_rationale)
+      .filter(Boolean)
+      .join('; ');
+
     entries.push({
       domain,
       key: 'decision',
@@ -274,6 +455,8 @@ async function buildKBEntries(analysis: MeetingAnalysis, meeting: Meeting): Prom
       content,
       type: 'decision',
       action: 'create',
+      confidence: lowestConfidence,
+      domain_rationale: rationales || undefined,
     });
   }
 
@@ -287,11 +470,16 @@ async function buildKBEntries(analysis: MeetingAnalysis, meeting: Meeting): Prom
     byProject[k.project].push(k);
   }
   for (const [project, items] of Object.entries(byProject)) {
-    const domain = project.toLowerCase().replace(/\s+/g, '-');
+    const domain = resolveProjectDomain(project, domainList);
     const header = '| KPI | 변경 | 이전 | 이후 | 비고 |\n|-----|------|------|------|------|';
     const rows = items
       .map((k) => `| ${k.kpi} | ${k.change} | ${k.before} | ${k.after} | ${k.note} |`)
       .join('\n');
+    const lowestKpiConfidence = items.reduce<AttributionConfidence | undefined>((worst, k) => {
+      if (!k.confidence || k.confidence === 'high') return worst;
+      if (k.confidence === 'ambiguous') return 'ambiguous';
+      return worst === 'ambiguous' ? 'ambiguous' : 'low';
+    }, undefined);
     entries.push({
       domain,
       key: 'kpi',
@@ -299,6 +487,7 @@ async function buildKBEntries(analysis: MeetingAnalysis, meeting: Meeting): Prom
       content: `## ${project} KPI (${date})\n\n${header}\n${rows}`,
       type: 'kpi',
       action: 'create',
+      confidence: lowestKpiConfidence,
     });
   }
 
@@ -318,7 +507,12 @@ export async function previewMeetingNotes(meeting: Meeting): Promise<PreviewResu
     throw new Error('Meeting has no mapped transcript. Complete speaker mapping first.');
   }
 
-  const analysis = await analyzeTranscript(meeting);
+  const domainList = await loadDomainList();
+  const serviceContext = await loadServiceContext(domainList);
+
+  let analysis = await analyzeTranscript(meeting);
+  analysis = validateAttributions(analysis, domainList, serviceContext);
+
   const body = buildDiscussionBody(meeting, analysis);
   const kbEntries = await buildKBEntries(analysis, meeting);
 
@@ -391,6 +585,47 @@ async function sendSlackNotification(
       text: `📝 회의록 생성 완료\n*제목*: ${title}\n*GitHub*: ${discussionUrl}${notionUrl ? `\n*Notion*: ${notionUrl}` : ''}`,
     }),
   });
+}
+
+// ── Transcript KB Storage ──
+
+/** 회의 녹취록의 도메인별 요약을 KB session/meeting/* 엔트리로 저장 */
+async function storeTranscriptInKB(
+  meeting: Meeting,
+  kbEntries: KBEntry[],
+  discussionUrl: string,
+): Promise<void> {
+  const domains = [...new Set(kbEntries.filter((e) => e.action === 'create').map((e) => e.domain))];
+  if (domains.length === 0) return;
+
+  const date = formatDate(meeting.meeting_date);
+  const attendees = meeting.attendees.join(', ');
+
+  for (const domain of domains) {
+    const domainEntries = kbEntries.filter((e) => e.domain === domain && e.action === 'create');
+    const decisionSummary = domainEntries
+      .filter((e) => e.type === 'decision')
+      .map((e) => e.content.split('\n').slice(0, 3).join('\n'))
+      .join('\n');
+    const kpiSummary = domainEntries
+      .filter((e) => e.type === 'kpi')
+      .map((e) => e.content)
+      .join('\n');
+
+    const sections: string[] = [`## ${meeting.title} (${date})`, `참석자: ${attendees}`];
+    if (decisionSummary) sections.push(`### 관련 의사결정\n${decisionSummary}`);
+    if (kpiSummary) sections.push(`### KPI 변경\n${kpiSummary}`);
+    sections.push(`\n전체 회의록: [Discussion](${discussionUrl})`);
+
+    const content = sections.join('\n\n');
+    const kbKey = `session/meeting/${meeting.meeting_id}`;
+
+    try {
+      await upsertItem(domain, kbKey, content, 'dashboard-meeting');
+    } catch (err) {
+      console.warn(`[meeting-generate] Transcript KB store failed for ${domain}/${kbKey}:`, err);
+    }
+  }
 }
 
 export async function generateMeetingNotes(
@@ -486,6 +721,11 @@ export async function generateMeetingNotes(
       }
     }
   }
+
+  // 2c. Store transcript summaries in KB per domain (non-blocking)
+  await storeTranscriptInKB(meeting, kbEntries, discussion.url).catch((err) => {
+    console.warn('[meeting-generate] Transcript KB storage failed (non-blocking):', err);
+  });
 
   // 3. Notion sync (non-blocking)
   let notionUrl: string | null = null;

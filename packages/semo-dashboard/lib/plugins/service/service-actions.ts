@@ -251,7 +251,7 @@ export async function executeSectionAction(
       console.error('GitHub publish failed:', err),
     );
 
-    // Phase 5(에픽) / Phase 6(기능 스펙) 완료 시 → service_features 자동 추출
+    // Phase 5(에픽) / Phase 6(기능 스펙) 완료 시 → KB feature/* 자동 추출
     if ([5, 6].includes(section.phase) && project.service_domain) {
       import('./feature-extractor')
         .then(({ extractAndCreateFeaturesFromPhase }) =>

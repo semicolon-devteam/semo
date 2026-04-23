@@ -671,41 +671,16 @@ export interface ServiceKPIMetric {
 }
 
 // ── Action Items ──
+// Canonical definition lives in @team-semicolon/dashboard-ui; re-exported here for compatibility.
 
-export type ActionItemStatus = 'open' | 'completed' | 'cancelled';
-export type ActionItemPriority = 'low' | 'normal' | 'high' | 'urgent';
-export type ActionItemSource =
-  | 'manual'
-  | 'bot'
-  | 'dashboard'
-  | 'import'
-  | 'meeting'
-  | 'slack-digest'
-  | 'kb-migration';
+import type { ActionItem } from '@team-semicolon/dashboard-ui';
 
-export interface ActionItem {
-  action_item_id: string;
-  owner_domain: string;
-  target_domain: string | null;
-  iteration_id: string | null;
-  description: string;
-  assignee: string | null;
-  deadline: string | null;
-  status: ActionItemStatus;
-  priority: ActionItemPriority;
-  category: string | null;
-  source: string;
-  related_url: string | null;
-  sort_order: number;
-  completed_at: string | null;
-  metadata: Record<string, unknown>;
-  created_at: string;
-  updated_at: string;
-  // Joined display fields
-  owner_label?: string;
-  owner_entity_type?: string;
-  target_label?: string;
-}
+export type {
+  ActionItem,
+  ActionItemStatus,
+  ActionItemPriority,
+  ActionItemSource,
+} from '@team-semicolon/dashboard-ui';
 
 /** @deprecated Use ActionItem instead */
 export type ServiceActionItem = ActionItem;

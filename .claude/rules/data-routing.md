@@ -16,6 +16,7 @@
 | 산출물 | KB: `semo kb get {service} material/{id}` | 기획서, 디자인 export |
 | 의사결정/프로세스 | KB: `semo kb get semicolon decision {slug}` | 조직 지식 SoT |
 | 인시던트/장애 기록 | KB: `semo kb get {service} incident {slug}` | 서비스별 장애 이력 |
+| 대시보드 URL | `https://semo.semi-colon.space/projects/{service_id}` — service_id는 `pipeline/config` metadata에서 획득 | 고정 패턴, KB 조회 불필요 |
 
 ## 쓰기 라우팅
 | 작업 | 쓰기 대상 |
@@ -68,9 +69,13 @@ SEMO 플랫폼 하위 모듈(`module` 타입)은 자체 KB 도메인을 가진�
 
 아래 데이터는 **KB가 아닌 전용 DB 테이블**이 SoT:
 
+> **액션 아이템 주의**: KB의 `action-item` 키는 Migration 069에서 삭제됨.
+> `semo kb upsert ... action-item ...` 시도 시 스키마 에러 발생.
+> 반드시 `semo action-items` CLI를 사용할 것. 대시보드: `/person/{domain}` 에서도 관리 가능.
+
 | 데이터 타입 | SoT 테이블 | 읽기 | 쓰기 |
 |------------|-----------|------|------|
-| 액션 아이템 | `action_items` | `semo action-items list [--owner {domain}]` | `semo action-items create --owner {domain} --description "..."` |
+| 액션 아이템 | `action_items` | `semo action-items list [--owner {domain}] [--status open]` | `semo action-items create --owner {domain} --description "..." [--deadline YYYY-MM-DD] [--target {service}]` |
 | 커밋먼트 | `bot_commitments` | `semo commitments list [--bot-id {botId}]` | `semo commitments create --bot-id {botId} --title "..."` |
 | KPI 메트릭 | **KB metadata** | `semo kb get {domain} kpi/{YYYY-MM-DD}` | `semo kb upsert {domain} kpi/{YYYY-MM-DD} --metadata '{"metrics":[...]}'` |
 | 회의 | `meetings` | target_domain (ontology FK) 기반 | — |

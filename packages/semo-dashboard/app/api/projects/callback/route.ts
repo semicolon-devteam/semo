@@ -308,7 +308,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // 1. Stitch export를 service_materials에 저장 (+ 스크린샷/공유 URL)
+        // 1. Stitch export를 KB material/*에 저장 (+ 스크린샷/공유 URL)
         const material = await createStitchMaterial({
           service_id: body.service_id,
           content: body.export_content,
@@ -493,7 +493,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // 1. service_materials에 프로토타입 저장
+        // 1. KB material/*에 프로토타입 저장
         const protoMaterial = await createStitchMaterial({
           service_id: body.service_id,
           content: body.html_content,

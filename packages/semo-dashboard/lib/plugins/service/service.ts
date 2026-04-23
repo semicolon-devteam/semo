@@ -2,8 +2,7 @@
  * Service Project DB Layer (formerly GFP — Greenfield Project Pipeline)
  * CRUD operations for service projects, sections, materials, and research tasks.
  *
- * Table mapping: service_projects, service_sections, service_materials,
- *   service_research_tasks, service_infra_requests
+ * All data is KB-backed: section/*, material/*, feature/*, research/*, infra-request/*
  * KB projection keys: spec/*, pm-status, infra-status (written by pm-pipeline)
  */
 

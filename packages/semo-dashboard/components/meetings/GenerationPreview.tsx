@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { KBEntry } from '@/lib/meeting-generate';
+import type { KBEntry, AttributionConfidence } from '@/lib/meeting-generate';
 
 interface KBDomain {
   domain: string;
@@ -16,12 +16,61 @@ interface GenerationPreviewProps {
 }
 
 const TYPE_LABELS: Record<string, { label: string; color: string }> = {
-  decision:      { label: '의사결정',    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400' },
-  'action-item': { label: '액션 아이템', color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' },
-  kpi:           { label: 'KPI',         color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
+  decision: {
+    label: '의사결정',
+    color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  },
+  'action-item': {
+    label: '액션 아이템',
+    color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+  },
+  kpi: {
+    label: 'KPI',
+    color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  },
 };
 
-export default function GenerationPreview({ discussion, kbEntries, onConfirm, generating }: GenerationPreviewProps) {
+const CONFIDENCE_BADGES: Record<string, { label: string; color: string }> = {
+  low: {
+    label: '귀속 확인 필요',
+    color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+  },
+  ambiguous: {
+    label: '도메인 재지정 필요',
+    color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+  },
+};
+
+function ConfidenceBadge({
+  confidence,
+  rationale,
+}: {
+  confidence?: AttributionConfidence;
+  rationale?: string;
+}) {
+  if (!confidence || confidence === 'high') return null;
+  const badge = CONFIDENCE_BADGES[confidence];
+  if (!badge) return null;
+  return (
+    <span className="inline-flex items-center gap-1 group relative">
+      <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${badge.color}`}>
+        {badge.label}
+      </span>
+      {rationale && (
+        <span className="hidden group-hover:block absolute left-0 top-full mt-1 z-10 w-64 p-2 text-xs bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900 rounded-lg shadow-lg">
+          {rationale}
+        </span>
+      )}
+    </span>
+  );
+}
+
+export default function GenerationPreview({
+  discussion,
+  kbEntries,
+  onConfirm,
+  generating,
+}: GenerationPreviewProps) {
   const [title, setTitle] = useState(discussion.title);
   const [body, setBody] = useState(discussion.body);
   const [entries, setEntries] = useState<KBEntry[]>(kbEntries);
@@ -30,13 +79,13 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
 
   useEffect(() => {
     fetch('/api/kb/domains')
-      .then((r) => r.ok ? r.json() : [])
+      .then((r) => (r.ok ? r.json() : []))
       .then((data) => setDomains(Array.isArray(data) ? data : []))
       .catch(() => setDomains([]));
   }, []);
 
   function updateEntry(index: number, updates: Partial<KBEntry>) {
-    setEntries((prev) => prev.map((e, i) => i === index ? { ...e, ...updates } : e));
+    setEntries((prev) => prev.map((e, i) => (i === index ? { ...e, ...updates } : e)));
   }
 
   function removeEntry(index: number) {
@@ -44,14 +93,17 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
   }
 
   function addEntry() {
-    setEntries((prev) => [...prev, {
-      domain: '',
-      key: '',
-      sub_key: '',
-      content: '',
-      type: 'decision' as const,
-      action: 'create' as const,
-    }]);
+    setEntries((prev) => [
+      ...prev,
+      {
+        domain: '',
+        key: '',
+        sub_key: '',
+        content: '',
+        type: 'decision' as const,
+        action: 'create' as const,
+      },
+    ]);
   }
 
   function handleConfirm() {
@@ -61,8 +113,11 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
     });
   }
 
-  const activeEntries = entries.filter(e => e.action === 'create');
-  const skippedEntries = entries.filter(e => e.action === 'skip');
+  const activeEntries = entries.filter((e) => e.action === 'create');
+  const skippedEntries = entries.filter((e) => e.action === 'skip');
+  const warningEntries = entries.filter(
+    (e) => e.confidence === 'low' || e.confidence === 'ambiguous',
+  );
 
   return (
     <div className="space-y-6">
@@ -87,6 +142,11 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
           }`}
         >
           KB 항목 ({activeEntries.length})
+          {warningEntries.length > 0 && (
+            <span className="ml-1 text-xs text-yellow-600 dark:text-yellow-400 font-medium">
+              ({warningEntries.length}개 확인 필요)
+            </span>
+          )}
           {skippedEntries.length > 0 && (
             <span className="ml-1 text-xs text-gray-400">({skippedEntries.length}개 건너뜀)</span>
           )}
@@ -97,7 +157,9 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
       {activeTab === 'discussion' && (
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">제목</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              제목
+            </label>
             <input
               type="text"
               value={title}
@@ -106,7 +168,9 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">본문 (Markdown)</label>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              본문 (Markdown)
+            </label>
             <textarea
               value={body}
               onChange={(e) => setBody(e.target.value)}
@@ -129,22 +193,35 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
                 className={`border rounded-lg p-4 transition-opacity ${
                   entry.action === 'skip'
                     ? 'border-gray-300 dark:border-gray-600 opacity-50'
-                    : 'border-gray-200 dark:border-gray-700'
-                } bg-white dark:bg-gray-800`}
+                    : entry.confidence === 'ambiguous'
+                      ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/20'
+                      : entry.confidence === 'low'
+                        ? 'border-yellow-300 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-950/20'
+                        : 'border-gray-200 dark:border-gray-700'
+                } ${!entry.confidence || entry.confidence === 'high' ? 'bg-white dark:bg-gray-800' : ''}`}
               >
                 {/* Header */}
                 <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${TYPE_LABELS[entry.type]?.color ?? 'bg-gray-100 text-gray-600'}`}>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${TYPE_LABELS[entry.type]?.color ?? 'bg-gray-100 text-gray-600'}`}
+                    >
                       {TYPE_LABELS[entry.type]?.label ?? entry.type}
                     </span>
                     <span className="text-xs font-mono text-gray-500">
-                      {entry.domain}/{entry.key}{entry.sub_key ? `/${entry.sub_key}` : ''}
+                      {entry.domain}/{entry.key}
+                      {entry.sub_key ? `/${entry.sub_key}` : ''}
                     </span>
+                    <ConfidenceBadge
+                      confidence={entry.confidence}
+                      rationale={entry.domain_rationale}
+                    />
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => updateEntry(i, { action: entry.action === 'create' ? 'skip' : 'create' })}
+                      onClick={() =>
+                        updateEntry(i, { action: entry.action === 'create' ? 'skip' : 'create' })
+                      }
                       className={`text-xs px-2 py-1 rounded transition-colors ${
                         entry.action === 'create'
                           ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
@@ -223,9 +300,10 @@ export default function GenerationPreview({ discussion, kbEntries, onConfirm, ge
         disabled={generating || !title.trim() || !body.trim()}
         className={`
           w-full py-4 rounded-lg text-base font-medium transition-colors
-          ${generating
-            ? 'bg-purple-400 text-white cursor-wait'
-            : 'bg-green-600 hover:bg-green-700 text-white'
+          ${
+            generating
+              ? 'bg-purple-400 text-white cursor-wait'
+              : 'bg-green-600 hover:bg-green-700 text-white'
           }
         `}
       >

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
+@source "../../dashboard-ui/src/**/*.{ts,tsx}";
 
 :root {
   --background: #ffffff;

@@ -25,15 +25,30 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const kbData = await getServiceKPIData(project.service_domain, limit);
 
-    // Incidents from DB
-    const incidentsRes = await query(
-      `SELECT * FROM semo.service_incidents WHERE service_id = $1 ORDER BY occurred_at DESC LIMIT $2`,
-      [id, limit],
+    // Incidents from KB (service_incidents table was dropped; KB incident/* is SoT)
+    const incidentsRes = await query<{
+      sub_key: string;
+      content: string;
+      metadata: Record<string, unknown>;
+      updated_at: string;
+    }>(
+      `SELECT sub_key, content, metadata, updated_at::text
+       FROM semo.knowledge_base
+       WHERE domain = $1 AND key = 'incident' AND sub_key != ''
+       ORDER BY COALESCE((metadata->>'occurred_at')::timestamptz, updated_at::timestamptz) DESC
+       LIMIT $2`,
+      [project.service_domain, limit],
     );
 
     return NextResponse.json({
       ...kbData,
-      incidents: incidentsRes.rows,
+      incidents: incidentsRes.rows.map((r) => ({
+        slug: r.sub_key,
+        content: r.content,
+        occurred_at: (r.metadata?.occurred_at as string) ?? r.updated_at,
+        severity: (r.metadata?.severity as string) ?? null,
+        status: (r.metadata?.status as string) ?? null,
+      })),
     });
   } catch (error) {
     console.error('Service KPI error:', error);

@@ -1,6 +1,6 @@
 /**
  * Feature Extractor — Phase 5(에픽) / Phase 6(기능 스펙) 완료 시
- * 승인된 섹션에서 기능을 추출하여 service_features에 자동 등록
+ * 승인된 섹션에서 기능을 추출하여 KB feature/* 엔트리로 자동 등록
  */
 
 import { createFeature, updateFeature, listFeatures } from './service';

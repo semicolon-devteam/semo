@@ -2,10 +2,23 @@
   "name": "@team-semicolon/semo-discord-router",
   "version": "0.1.0",
   "description": "SEMO Discord Router — Discord Gateway + JSONL Mailbox routing",
+  "license": "Apache-2.0",
+  "author": "Semicolon DevTeam",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/semicolon-devteam/semo.git",
+    "directory": "packages/discord-router"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "src/index.ts",
+  "bin": {
+    "semo-discord-router": "src/bin.ts"
+  },
   "scripts": {
-    "start": "npx tsx src/index.ts",
-    "dev": "npx tsx --watch src/index.ts"
+    "start": "npx tsx src/bin.ts",
+    "dev": "npx tsx --watch src/bin.ts"
   },
   "dependencies": {
     "@team-semicolon/semo-common": "*",

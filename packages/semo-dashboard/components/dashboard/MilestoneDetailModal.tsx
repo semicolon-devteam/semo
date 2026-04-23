@@ -1,7 +1,7 @@
 'use client';
 
 import type { Milestone } from '@/types';
-import LayerModal from '../LayerModal';
+import { LayerModal } from '@team-semicolon/dashboard-ui';
 
 interface Props {
   milestone: Milestone | null;
@@ -19,15 +19,13 @@ export default function MilestoneDetailModal({ milestone, color, onClose }: Prop
   if (!milestone) return null;
 
   const { title, project, start_date, end_date, status } = milestone.metadata;
-  const statusInfo = STATUS_LABEL[status] ?? { label: status, className: 'bg-gray-100 text-gray-600' };
+  const statusInfo = STATUS_LABEL[status] ?? {
+    label: status,
+    className: 'bg-gray-100 text-gray-600',
+  };
 
   return (
-    <LayerModal
-      open
-      onClose={onClose}
-      title={title}
-      subtitle={project}
-    >
+    <LayerModal open onClose={onClose} title={title} subtitle={project}>
       <div className="space-y-4">
         {/* Meta row */}
         <div className="flex flex-wrap items-center gap-3 text-sm">

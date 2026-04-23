@@ -2,8 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import DomainCard from '@/components/DomainCard';
-import LayerModal from '@/components/LayerModal';
+import { DomainCard, LayerModal } from '@team-semicolon/dashboard-ui';
 import type { KBEntry, KBDomain, OntologyEntry } from '@/types';
 
 const EMPTY_FORM = { title: '', content: '', bot_id: '', category: '' };
@@ -56,7 +55,7 @@ function KBPage() {
   const searchParams = useSearchParams();
   const initialTab = (searchParams.get('tab') as KBTab) || 'domains';
   const [activeTab, setActiveTab] = useState<KBTab>(
-    ['domains', 'entries', 'ontology'].includes(initialTab) ? initialTab : 'domains'
+    ['domains', 'entries', 'ontology'].includes(initialTab) ? initialTab : 'domains',
   );
 
   // Ontology state
@@ -90,17 +89,19 @@ function KBPage() {
       const res = await fetch(`/api/kb?${params.toString()}`);
       if (!res.ok) throw new Error('Failed to fetch entries');
       const raw = await res.json();
-      const mapped: KBEntry[] = (Array.isArray(raw) ? raw : []).map((item: Record<string, unknown>) => ({
-        id: String(item.kb_id ?? item.id ?? ''),
-        title: String(item.key ?? item.title ?? ''),
-        content: String(item.content ?? ''),
-        bot_id: String(item.bot_id ?? item.created_by ?? ''),
-        category: String(item.domain ?? item.category ?? ''),
-        tags: Array.isArray(item.tags) ? item.tags : [],
-        created_at: String(item.created_at ?? item.updated_at ?? ''),
-        updated_at: String(item.updated_at ?? ''),
-        similarity_pct: item.similarity_pct != null ? Number(item.similarity_pct) : undefined,
-      }));
+      const mapped: KBEntry[] = (Array.isArray(raw) ? raw : []).map(
+        (item: Record<string, unknown>) => ({
+          id: String(item.kb_id ?? item.id ?? ''),
+          title: String(item.key ?? item.title ?? ''),
+          content: String(item.content ?? ''),
+          bot_id: String(item.bot_id ?? item.created_by ?? ''),
+          category: String(item.domain ?? item.category ?? ''),
+          tags: Array.isArray(item.tags) ? item.tags : [],
+          created_at: String(item.created_at ?? item.updated_at ?? ''),
+          updated_at: String(item.updated_at ?? ''),
+          similarity_pct: item.similarity_pct != null ? Number(item.similarity_pct) : undefined,
+        }),
+      );
       setEntries(mapped);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
@@ -137,10 +138,20 @@ function KBPage() {
   }, [activeTab]);
 
   const ONTOLOGY_DOMAIN_ICONS: Record<string, string> = {
-    semicolon: '\u{1F3E2}', team: '\u{1F465}', project: '\u{1F4CB}', decision: '\u2696\uFE0F',
-    process: '\u{1F504}', infra: '\u{1F3D7}\uFE0F', kpi: '\u{1F4CA}', milestone: '\u{1F3AF}',
-    'session-log': '\u{1F4DD}', 'bot-config': '\u2699\uFE0F', spec: '\u{1F4D0}',
-    skill: '\u{1F9E9}', memory: '\u{1F9E0}', service: '\u{1F680}',
+    semicolon: '\u{1F3E2}',
+    team: '\u{1F465}',
+    project: '\u{1F4CB}',
+    decision: '\u2696\uFE0F',
+    process: '\u{1F504}',
+    infra: '\u{1F3D7}\uFE0F',
+    kpi: '\u{1F4CA}',
+    milestone: '\u{1F3AF}',
+    'session-log': '\u{1F4DD}',
+    'bot-config': '\u2699\uFE0F',
+    spec: '\u{1F4D0}',
+    skill: '\u{1F9E9}',
+    memory: '\u{1F9E0}',
+    service: '\u{1F680}',
   };
 
   function getOntologyDomainIcon(domain: string, entityType?: string | null): string {
@@ -334,12 +345,8 @@ function KBPage() {
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            지식
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            KB 항목 관리 — {entries.length}개 항목
-          </p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">지식</h1>
+          <p className="text-gray-600 dark:text-gray-400">KB 항목 관리 — {entries.length}개 항목</p>
         </div>
         <button
           onClick={openNew}
@@ -375,7 +382,9 @@ function KBPage() {
           >
             <option value="">전체 봇</option>
             {botIds.map((id) => (
-              <option key={id} value={id}>{id}</option>
+              <option key={id} value={id}>
+                {id}
+              </option>
             ))}
           </select>
           <select
@@ -385,7 +394,9 @@ function KBPage() {
           >
             <option value="">전체 태그</option>
             {allTags.map((tag) => (
-              <option key={tag} value={tag}>{tag}</option>
+              <option key={tag} value={tag}>
+                {tag}
+              </option>
             ))}
           </select>
         </div>
@@ -394,11 +405,11 @@ function KBPage() {
       {/* Tabs */}
       <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
         <nav className="flex gap-6">
-          {([
+          {[
             { key: 'domains' as const, label: '도메인' },
             { key: 'entries' as const, label: '항목' },
             { key: 'ontology' as const, label: '온톨로지' },
-          ]).map(({ key, label }) => (
+          ].map(({ key, label }) => (
             <button
               key={key}
               onClick={() => setActiveTab(key)}
@@ -446,54 +457,60 @@ function KBPage() {
             <p className="text-lg mb-2">도메인이 없습니다</p>
             <p className="text-sm">데이터가 있으면 KB 도메인이 여기에 표시됩니다.</p>
           </div>
-        ) : (() => {
-          const globalDomains = ontologyDomains.filter((d) => !d.service || d.service === '_global');
-          const byService: Record<string, KBDomain[]> = {};
-          for (const d of ontologyDomains) {
-            if (d.service && d.service !== '_global') {
-              if (!byService[d.service]) byService[d.service] = [];
-              byService[d.service].push(d);
+        ) : (
+          (() => {
+            const globalDomains = ontologyDomains.filter(
+              (d) => !d.service || d.service === '_global',
+            );
+            const byService: Record<string, KBDomain[]> = {};
+            for (const d of ontologyDomains) {
+              if (d.service && d.service !== '_global') {
+                if (!byService[d.service]) byService[d.service] = [];
+                byService[d.service].push(d);
+              }
             }
-          }
-          const serviceEntries = Object.entries(byService).sort(([a], [b]) => a.localeCompare(b));
+            const serviceEntries = Object.entries(byService).sort(([a], [b]) => a.localeCompare(b));
 
-          return (
-            <div className="space-y-8">
-              {globalDomains.length > 0 && (
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">Global</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {globalDomains.map((domain) => (
-                      <DomainCard
-                        key={domain.domain}
-                        domain={domain}
-                        icon={getOntologyDomainIcon(domain.domain, domain.entity_type)}
-                        onClick={() => handleOntologyDomainClick(domain)}
-                      />
-                    ))}
+            return (
+              <div className="space-y-8">
+                {globalDomains.length > 0 && (
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                      Global
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {globalDomains.map((domain) => (
+                        <DomainCard
+                          key={domain.domain}
+                          domain={domain}
+                          icon={getOntologyDomainIcon(domain.domain, domain.entity_type)}
+                          onClick={() => handleOntologyDomainClick(domain)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )}
-              {serviceEntries.map(([service, svcDomains]) => (
-                <div key={service}>
-                  <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">
-                    서비스: {service}
-                  </h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {svcDomains.map((domain) => (
-                      <DomainCard
-                        key={domain.domain}
-                        domain={domain}
-                        icon={getOntologyDomainIcon(domain.domain, domain.entity_type)}
-                        onClick={() => handleOntologyDomainClick(domain)}
-                      />
-                    ))}
+                )}
+                {serviceEntries.map(([service, svcDomains]) => (
+                  <div key={service}>
+                    <h2 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                      서비스: {service}
+                    </h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {svcDomains.map((domain) => (
+                        <DomainCard
+                          key={domain.domain}
+                          domain={domain}
+                          icon={getOntologyDomainIcon(domain.domain, domain.entity_type)}
+                          onClick={() => handleOntologyDomainClick(domain)}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          );
-        })()
+                ))}
+              </div>
+            );
+          })()
+        )
       ) : activeTab === 'domains' ? (
         /* ── Domains Tab ── */
         committedSearch ? (
@@ -573,12 +590,22 @@ function KBPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">도메인</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">키</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">내용</th>
-                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden sm:table-cell">작성자</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">
+                  도메인
+                </th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">
+                  키
+                </th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">
+                  내용
+                </th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden sm:table-cell">
+                  작성자
+                </th>
                 {committedSearch && (
-                  <th className="text-right px-4 py-3 font-medium text-gray-500 dark:text-gray-400 w-16">유사도</th>
+                  <th className="text-right px-4 py-3 font-medium text-gray-500 dark:text-gray-400 w-16">
+                    유사도
+                  </th>
                 )}
               </tr>
             </thead>
@@ -643,7 +670,7 @@ function KBPage() {
           setDeleteConfirm(null);
         }}
         icon={selectedCategory ? getCategoryIcon(selectedCategory) : undefined}
-        title={selectedEntry ? selectedEntry.title : selectedCategory ?? ''}
+        title={selectedEntry ? selectedEntry.title : (selectedCategory ?? '')}
         subtitle={
           selectedEntry
             ? selectedEntry.bot_id
@@ -718,37 +745,35 @@ function KBPage() {
               </pre>
             </div>
           </div>
+        ) : /* View A: Entry List */
+        categoryEntries.length === 0 ? (
+          <p className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+            이 카테고리에 항목이 없습니다
+          </p>
         ) : (
-          /* View A: Entry List */
-          categoryEntries.length === 0 ? (
-            <p className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-              이 카테고리에 항목이 없습니다
-            </p>
-          ) : (
-            <div className="space-y-1">
-              {categoryEntries.map((entry) => (
-                <div
-                  key={entry.id}
-                  onClick={() => handleEntryClick(entry)}
-                  className="flex items-start justify-between gap-4 px-4 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {entry.title}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
-                      {entry.content}
-                    </p>
-                  </div>
-                  {entry.bot_id && (
-                    <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                      {entry.bot_id}
-                    </span>
-                  )}
+          <div className="space-y-1">
+            {categoryEntries.map((entry) => (
+              <div
+                key={entry.id}
+                onClick={() => handleEntryClick(entry)}
+                className="flex items-start justify-between gap-4 px-4 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {entry.title}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
+                    {entry.content}
+                  </p>
                 </div>
-              ))}
-            </div>
-          )
+                {entry.bot_id && (
+                  <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                    {entry.bot_id}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </LayerModal>
 
@@ -760,8 +785,17 @@ function KBPage() {
           setSelectedOntologyEntry(null);
           setOntologyEntries([]);
         }}
-        icon={selectedOntologyDomain ? getOntologyDomainIcon(selectedOntologyDomain.domain, selectedOntologyDomain.entity_type) : undefined}
-        title={selectedOntologyEntry ? selectedOntologyEntry.key : selectedOntologyDomain?.domain ?? ''}
+        icon={
+          selectedOntologyDomain
+            ? getOntologyDomainIcon(
+                selectedOntologyDomain.domain,
+                selectedOntologyDomain.entity_type,
+              )
+            : undefined
+        }
+        title={
+          selectedOntologyEntry ? selectedOntologyEntry.key : (selectedOntologyDomain?.domain ?? '')
+        }
         subtitle={!selectedOntologyEntry ? selectedOntologyDomain?.description : undefined}
         showBack={!!selectedOntologyEntry}
         onBack={() => setSelectedOntologyEntry(null)}
@@ -788,50 +822,45 @@ function KBPage() {
               </div>
             </div>
           )
+        ) : ontologyEntriesLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : ontologyEntries.length === 0 ? (
+          <p className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
+            이 도메인에 항목이 없습니다
+          </p>
         ) : (
-          ontologyEntriesLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : ontologyEntries.length === 0 ? (
-            <p className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-              이 도메인에 항목이 없습니다
-            </p>
-          ) : (
-            <div className="space-y-1">
-              {ontologyEntries.map((entry) => (
-                <div
-                  key={entry.kb_id || entry.key}
-                  onClick={() => handleOntologyEntryClick(entry)}
-                  className="flex items-start justify-between gap-4 px-4 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {entry.key}
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
-                      {entry.content}
-                    </p>
-                  </div>
-                  {entry.created_by && (
-                    <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
-                      {entry.created_by}
-                    </span>
-                  )}
+          <div className="space-y-1">
+            {ontologyEntries.map((entry) => (
+              <div
+                key={entry.kb_id || entry.key}
+                onClick={() => handleOntologyEntryClick(entry)}
+                className="flex items-start justify-between gap-4 px-4 py-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/30 cursor-pointer transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    {entry.key}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-1">
+                    {entry.content}
+                  </p>
                 </div>
-              ))}
-            </div>
-          )
+                {entry.created_by && (
+                  <span className="shrink-0 text-xs text-gray-400 dark:text-gray-500">
+                    {entry.created_by}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </LayerModal>
 
       {/* CRUD Form Modal (z-60, above LayerModal) */}
       {modalOpen && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/50"
-            onClick={() => setModalOpen(false)}
-          />
+          <div className="absolute inset-0 bg-black/50" onClick={() => setModalOpen(false)} />
           <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -884,7 +913,9 @@ function KBPage() {
                   >
                     <option value="">봇 선택</option>
                     {allBotIds.map((id) => (
-                      <option key={id} value={id}>{id}</option>
+                      <option key={id} value={id}>
+                        {id}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -900,7 +931,8 @@ function KBPage() {
                     <option value="">도메인 선택</option>
                     {domains.map((d) => (
                       <option key={d.domain} value={d.domain}>
-                        {d.domain}{d.description ? ` — ${d.description}` : ''}
+                        {d.domain}
+                        {d.description ? ` — ${d.description}` : ''}
                       </option>
                     ))}
                   </select>

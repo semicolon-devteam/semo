@@ -1,6 +1,9 @@
 /**
  * OpenAI 임베딩 생성 라이브러리
  * text-embedding-3-small 모델을 사용하여 텍스트를 1024차원 벡터로 변환
+ *
+ * 공유 추상화는 `@team-semicolon/semo-common`의 `OpenAIEmbeddingProvider` 참조.
+ * 여기선 Next.js 앱 독립성을 위해 동일 로직을 유지한다 (동작 동일, 1024dim).
  */
 
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';

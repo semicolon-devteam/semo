@@ -2,11 +2,16 @@
 
 import { useState } from 'react';
 import type { ActionItem } from '@/types';
-import { useActionItems } from '@/components/action-items/useActionItems';
-import ActionItemList from '@/components/action-items/ActionItemList';
-import ActionItemKanban from '@/components/action-items/ActionItemKanban';
-import ActionItemTimeline from '@/components/action-items/ActionItemTimeline';
-import ActionItemFormModal, { type FormData } from '@/components/action-items/ActionItemFormModal';
+import {
+  useActionItems,
+  ActionItemList,
+  ActionItemKanban,
+  ActionItemTimeline,
+  ActionItemFormModal,
+  type FormData,
+} from '@team-semicolon/dashboard-ui';
+import { fetchActionItemAdapter } from '@/lib/action-items-adapter';
+import NextPersonLink from '@/components/action-items/NextPersonLink';
 
 export default function ActionItemsPage() {
   const {
@@ -28,7 +33,7 @@ export default function ActionItemsPage() {
     handleCreate,
     handleUpdate,
     handleDelete,
-  } = useActionItems();
+  } = useActionItems(fetchActionItemAdapter);
 
   const [showForm, setShowForm] = useState(false);
   const [editItem, setEditItem] = useState<ActionItem | null>(null);
@@ -172,6 +177,7 @@ export default function ActionItemsPage() {
           onToggle={handleToggle}
           onEdit={openEdit}
           onDelete={confirmDelete}
+          PersonLink={NextPersonLink}
         />
       ) : viewMode === 'kanban' ? (
         <ActionItemKanban

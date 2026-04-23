@@ -619,11 +619,7 @@ async function start() {
     // 봇 메시지 필터 — [Route:] 시스템 디스패치만 통과
     const isSystemDispatch = event.text && /\[Route:\s*\w+\]/.test(event.text);
     if (event.bot_id && !isSystemDispatch) return;
-    if (
-      event.channel_type === 'im' ||
-      (event.thread_ts && event.thread_ts !== event.ts) ||
-      isSystemDispatch
-    ) {
+    if (event.channel_type === 'im' || isSystemDispatch) {
       try {
         await forwardToSession(event);
       } catch (err) {

@@ -494,6 +494,14 @@ async function shutdown(): Promise<void> {
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
 
+// ── Crash Guard — 소켓 끊김 등 예외 시 프로세스 크래시 방지 ──
+process.on('uncaughtException', (err) => {
+  console.error('[slack-router] uncaughtException (kept alive):', err.message);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[slack-router] unhandledRejection (kept alive):', reason);
+});
+
 start().catch((err) => {
   console.error('[slack-router] Startup failed:', err);
   process.exit(1);

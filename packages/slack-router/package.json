@@ -2,6 +2,16 @@
   "name": "@team-semicolon/semo-slack-router",
   "version": "0.1.0",
   "description": "Lightweight Slack Router for SEMO multi-session agents — no LLM dependency",
+  "license": "Apache-2.0",
+  "author": "Semicolon DevTeam",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/semicolon-devteam/semo.git",
+    "directory": "packages/slack-router"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "src/index.ts",
   "scripts": {
     "start": "npx tsx src/index.ts",

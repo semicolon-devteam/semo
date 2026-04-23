@@ -193,6 +193,25 @@ echo "[start] Generating surface map..."
 } > /tmp/semo-surface-map.json
 echo "  Surface map: $(cat /tmp/semo-surface-map.json | grep -c 'surface:') bots"
 
+# ── Reload routers with fresh surface map ──
+# Routers were started BEFORE bot splits existed, so they cached a stale map.
+# Ctrl+C + re-send the launch command to rebind InboxWriter to the current map.
+
+echo "[start] Reloading routers with fresh surface map..."
+cmux send --workspace "$WORKSPACE_REF" --surface "${SURFACES[router]}" $'\x03' 2>/dev/null || true
+sleep 2
+cmux send --workspace "$WORKSPACE_REF" --surface "${SURFACES[router]}" \
+  $'cd '"$SEMO_ROOT"' && set -a && source '"$HOME"'/.claude/semo/.env && set +a && SEMO_MAILBOX_DIR='"$MAILBOX_DIR"' SEMO_SESSION_DIR='"$SESSION_DIR"' SEMO_SURFACE_MAP=/tmp/semo-surface-map.json npx tsx packages/slack-router/src/index.ts\n'
+
+if $DISCORD_ENABLED && [ -n "${SURFACES[discord-router]:-}" ]; then
+  cmux send --workspace "$WORKSPACE_REF" --surface "${SURFACES[discord-router]}" $'\x03' 2>/dev/null || true
+  sleep 2
+  cmux send --workspace "$WORKSPACE_REF" --surface "${SURFACES[discord-router]}" \
+    $'cd '"$SEMO_ROOT"' && set -a && source '"$HOME"'/.claude/semo/.env && set +a && SEMO_MAILBOX_DIR='"$MAILBOX_DIR"' SEMO_SESSION_DIR='"$SESSION_DIR"' SEMO_SURFACE_MAP=/tmp/semo-surface-map.json npx tsx packages/discord-router/src/index.ts\n'
+fi
+
+sleep 5
+
 # ── Health gate: wait for heartbeats ──
 
 ALL_BOTS=("${BOTS[@]}" "${OVERFLOW_BOTS[@]}")

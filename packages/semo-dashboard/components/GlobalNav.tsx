@@ -14,6 +14,7 @@ const CORE_NAV = [
   { href: '/kb', label: '지식', key: 'kb' },
   { href: '/meetings', label: '회의', key: 'meetings' },
   { href: '/voice', label: '음성', key: 'voice' },
+  { href: '/board', label: '자료실', key: 'board' },
 ];
 
 const PLUGIN_NAV = [{ href: '/projects', label: '서비스', key: 'incubator' }];

@@ -39,6 +39,7 @@ export const ALL_MENU_KEYS = [
   'incubator',
   'meetings',
   'voice',
+  'board',
 ] as const;
 
 export type MenuKey = (typeof ALL_MENU_KEYS)[number];

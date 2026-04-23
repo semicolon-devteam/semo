@@ -51,11 +51,11 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
     expect(body).toHaveProperty('progress');
   });
 
-  // ── B. 섹션 CRUD (service_sections 테이블) ──
+  // ── B. 섹션 CRUD (KB section/* 키) ──
 
   let sectionId: string;
 
-  test('POST sections — service_sections에 섹션 생성', async ({ request }) => {
+  test('POST sections — KB section/*에 섹션 생성', async ({ request }) => {
     const response = await request.post(`/api/projects/${projectId}/sections`, {
       data: {
         phase: 0,
@@ -85,9 +85,9 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
     expect(body[0].phase).toBe(0);
   });
 
-  // ── C. Infra Track (service_infra_requests 테이블) ──
+  // ── C. Infra Track (KB infra-request/* 키) ──
 
-  test('POST infra-requests — service_infra_requests에 ��성', async ({ request }) => {
+  test('POST infra-requests — KB infra-request/*에 생성', async ({ request }) => {
     const response = await request.post(`/api/projects/${projectId}/infra-requests`, {
       data: {
         source_phase: 0,
@@ -104,9 +104,9 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
     expect(body.status).toBe('pending');
   });
 
-  // ── D. Materials (service_materials 테이블) ──
+  // ── D. Materials (KB material/* 키) ──
 
-  test('POST materials — service_materials에 업로드', async ({ request }) => {
+  test('POST materials — KB material/*에 업로드', async ({ request }) => {
     const response = await request.post(`/api/projects/${projectId}/materials`, {
       data: {
         content: '# 기획서\n\n서비스 마이그레이션 테스트용 기획서입니다.',
@@ -119,9 +119,9 @@ test.describe.serial('Service Migration — 테이블 리네이밍 + Projection 
     expect(body.material).toHaveProperty('material_id');
   });
 
-  // ── E. Research Tasks (service_research_tasks 테이블) ──
+  // ── E. Research Tasks (KB research/* 키) ──
 
-  test('POST research — service_research_tasks에 생성', async ({ request }) => {
+  test('POST research — KB research/*에 생성', async ({ request }) => {
     const response = await request.post(`/api/projects/${projectId}/research`, {
       data: {
         task_type: 'market-research',
