@@ -48,3 +48,14 @@ core-db/
 !.claude/memory/
 !.claude/memory/**
 semo-system/
+
+# === 런타임 상태/캐시 ===
+memory/
+supabase/.branches/
+supabase/.temp/
+__pycache__/
+*.pyc
+
+# === 개인 메모 ===
+packages/cli/PERSONAL_TESTING.md
+증빙-*.md
