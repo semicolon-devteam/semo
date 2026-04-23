@@ -3,7 +3,7 @@ import type {
   ActionItemCreateInput,
   ActionItemListResponse,
   ActionItemUpdateInput,
-} from '@team-semicolon/dashboard-ui';
+} from '@/lib/shared-ui';
 
 const EMPTY: ActionItemListResponse = {
   items: [],

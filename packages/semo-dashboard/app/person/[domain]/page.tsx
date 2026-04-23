@@ -10,7 +10,7 @@ import {
   ActionItemCard,
   ActionItemFormModal,
   type FormData,
-} from '@team-semicolon/dashboard-ui';
+} from '@/lib/shared-ui';
 import { useParams } from 'next/navigation';
 
 interface PersonProfile {

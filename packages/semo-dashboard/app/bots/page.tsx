@@ -1,4 +1,4 @@
-import { BotCard } from '@team-semicolon/dashboard-ui';
+import { BotCard } from '@/lib/shared-ui';
 import type { Bot } from '@/types';
 import { query } from '@/lib/db';
 import { getItem } from '@/lib/kb';

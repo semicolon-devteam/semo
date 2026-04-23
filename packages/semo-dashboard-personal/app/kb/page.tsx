@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { DomainCard } from '@team-semicolon/dashboard-ui';
-import type { KBDomain } from '@team-semicolon/dashboard-ui';
+import { DomainCard } from '@/lib/shared-ui';
+import type { KBDomain } from '@/lib/shared-ui';
 
 const ICON_MAP: Record<string, string> = {
   service: '🧩',

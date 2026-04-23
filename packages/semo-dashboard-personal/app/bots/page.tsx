@@ -1,5 +1,5 @@
-import { BotCard } from '@team-semicolon/dashboard-ui';
-import type { Bot } from '@team-semicolon/dashboard-ui';
+import { BotCard } from '@/lib/shared-ui';
+import type { Bot } from '@/lib/shared-ui';
 import { scanBots } from '@/lib/bots-scanner';
 
 export const dynamic = 'force-dynamic';

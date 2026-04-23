@@ -1,5 +1,5 @@
 import 'server-only';
-import type { KBDomain } from '@team-semicolon/dashboard-ui';
+import type { KBDomain } from '@/lib/shared-ui';
 import { kbDb } from './kb-db';
 
 export function scanKbDomains(): KBDomain[] {

@@ -671,16 +671,16 @@ export interface ServiceKPIMetric {
 }
 
 // ── Action Items ──
-// Canonical definition lives in @team-semicolon/dashboard-ui; re-exported here for compatibility.
+// Canonical definition lives in @/lib/shared-ui; re-exported here for compatibility.
 
-import type { ActionItem } from '@team-semicolon/dashboard-ui';
+import type { ActionItem } from '@/lib/shared-ui';
 
 export type {
   ActionItem,
   ActionItemStatus,
   ActionItemPriority,
   ActionItemSource,
-} from '@team-semicolon/dashboard-ui';
+} from '@/lib/shared-ui';
 
 /** @deprecated Use ActionItem instead */
 export type ServiceActionItem = ActionItem;

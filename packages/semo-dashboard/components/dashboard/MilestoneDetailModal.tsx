@@ -1,7 +1,7 @@
 'use client';
 
 import type { Milestone } from '@/types';
-import { LayerModal } from '@team-semicolon/dashboard-ui';
+import { LayerModal } from '@/lib/shared-ui';
 
 interface Props {
   milestone: Milestone | null;

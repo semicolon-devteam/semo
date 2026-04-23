@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import type { PersonLinkProps } from '@team-semicolon/dashboard-ui';
+import type { PersonLinkProps } from '@/lib/shared-ui';
 
 export default function NextPersonLink({ href, onClick, className, children }: PersonLinkProps) {
   return (

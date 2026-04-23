@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { DomainCard, LayerModal } from '@team-semicolon/dashboard-ui';
+import { DomainCard, LayerModal } from '@/lib/shared-ui';
 import type { KBEntry, KBDomain, OntologyEntry } from '@/types';
 
 const EMPTY_FORM = { title: '', content: '', bot_id: '', category: '' };

@@ -1,5 +1,5 @@
 import 'server-only';
-import type { TeamMember } from '@team-semicolon/dashboard-ui';
+import type { TeamMember } from '@/lib/shared-ui';
 import { kbDb } from './kb-db';
 
 // kb.db 에서 person 엔트리를 찾는 휴리스틱:

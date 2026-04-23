@@ -1,6 +1,6 @@
 'use client';
 
-import { ActionItemList, useActionItems } from '@team-semicolon/dashboard-ui';
+import { ActionItemList, useActionItems } from '@/lib/shared-ui';
 import { fetchActionItemAdapter } from '@/lib/action-items-adapter';
 
 export default function ActionItemsPage() {

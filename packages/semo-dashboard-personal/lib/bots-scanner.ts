@@ -2,7 +2,7 @@ import 'server-only';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import type { Bot } from '@team-semicolon/dashboard-ui';
+import type { Bot } from '@/lib/shared-ui';
 import { opsDb } from './ops-db';
 
 const ONLINE_THRESHOLD_MS = 5 * 60 * 1000;

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { DomainCard, LayerModal } from '@team-semicolon/dashboard-ui';
+import { DomainCard, LayerModal } from '@/lib/shared-ui';
 import SessionCard from '@/components/SessionCard';
 import CronJobCard from '@/components/CronJobCard';
 

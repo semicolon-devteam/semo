@@ -9,7 +9,7 @@ import {
   ActionItemTimeline,
   ActionItemFormModal,
   type FormData,
-} from '@team-semicolon/dashboard-ui';
+} from '@/lib/shared-ui';
 import { fetchActionItemAdapter } from '@/lib/action-items-adapter';
 import NextPersonLink from '@/components/action-items/NextPersonLink';
 

@@ -1,5 +1,5 @@
 import 'server-only';
-import type { ActionItem, TeamMember } from '@team-semicolon/dashboard-ui';
+import type { ActionItem, TeamMember } from '@/lib/shared-ui';
 import { opsDb } from './ops-db';
 import { readTeamMembers } from './team-members-scanner';
 

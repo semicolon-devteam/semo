@@ -5,7 +5,7 @@ import type {
   ActionItemCreateInput,
   ActionItemListResponse,
   ActionItemUpdateInput,
-} from '@team-semicolon/dashboard-ui';
+} from '@/lib/shared-ui';
 
 export const fetchActionItemAdapter: ActionItemAdapter = {
   async list(): Promise<ActionItemListResponse> {
