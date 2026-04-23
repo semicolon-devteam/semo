@@ -13,9 +13,6 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/cli
 
     steps:
       - name: Checkout
@@ -27,23 +24,26 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Install dependencies
+      - name: Install dependencies (monorepo root, workspaces linked)
         run: npm ci --ignore-scripts --legacy-peer-deps
 
-      - name: Build
-        run: npm run build
+      - name: Build semo-cli
+        run: npm run build -w @team-semicolon/semo-cli
 
       - name: Update version (if manual dispatch)
         if: github.event_name == 'workflow_dispatch'
+        working-directory: packages/cli
         run: npm version ${{ github.event.inputs.version }} --no-git-tag-version --allow-same-version
 
       - name: Publish to npm
+        working-directory: packages/cli
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Job Summary
         if: success()
+        working-directory: packages/cli
         run: |
           VERSION=$(node -p "require('./package.json').version")
           echo "## ✅ semo-cli v${VERSION} 배포 성공" >> $GITHUB_STEP_SUMMARY
