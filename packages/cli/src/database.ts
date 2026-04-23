@@ -297,10 +297,30 @@ const FALLBACK_PACKAGES: Package[] = [
 // ============================================================
 
 /**
+ * 같은 name 그룹에서 office_id가 NOT NULL(L2 override)을 우선하여 1개만 유지.
+ * @param rows `office_id` 컬럼을 포함해야 하며 L2 먼저 정렬된 상태로 들어와야 함.
+ */
+function dedupeByNameOfficeFirst<T extends { name: string; office_id?: string | null }>(
+  rows: T[],
+): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const r of rows) {
+    const key = r.name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(r);
+  }
+  return out;
+}
+
+/**
  * 활성 스킬 목록 조회
  * SoT: skill_definitions (prompt as content — CLI 인터페이스 유지)
+ * @param officeId tenant office UUID. 지정 시 L0(NULL) + 해당 L2 스킬을 반환하며
+ *                 같은 name은 L2(office_id != NULL)가 우선.
  */
-export async function getActiveSkills(): Promise<Skill[]> {
+export async function getActiveSkills(officeId?: string | null): Promise<Skill[]> {
   const isConnected = await checkDbConnection();
 
   if (!isConnected) {
@@ -309,20 +329,23 @@ export async function getActiveSkills(): Promise<Skill[]> {
   }
 
   try {
-    const result = await getPool().query(`
-      SELECT id, name, display_name, description,
+    const result = await getPool().query(
+      `SELECT id, name, display_name, description,
              prompt AS content,
              COALESCE(
                ARRAY(SELECT jsonb_array_elements_text(metadata->'bot_ids')),
                ARRAY[]::text[]
              ) AS bot_ids,
              metadata->'reference_files' AS reference_files,
-             category, package, is_active, is_required, install_order, version
+             category, package, is_active, is_required, install_order, version,
+             office_id
       FROM semo.skill_definitions
-      WHERE is_active = true AND office_id IS NULL
-      ORDER BY install_order
-    `);
-    return result.rows;
+      WHERE is_active = true
+        AND (office_id IS NULL OR ($1::uuid IS NOT NULL AND office_id = $1::uuid))
+      ORDER BY CASE WHEN office_id IS NOT NULL THEN 0 ELSE 1 END, install_order`,
+      [officeId ?? null],
+    );
+    return dedupeByNameOfficeFirst(result.rows);
   } catch (error) {
     console.warn('⚠️ 스킬 조회 실패, 폴백 데이터 사용:', error);
     return FALLBACK_SKILLS.filter((s) => s.is_active);
@@ -340,8 +363,12 @@ export async function getActiveSkillNames(): Promise<string[]> {
 /**
  * 특정 봇의 스킬 목록 조회 (공유 + 봇 전용)
  * skill_definitions.target_agents 배열로 매핑 — 전용 스킬 먼저, 공유 스킬 뒤
+ * @param officeId tenant office UUID. L0 + 해당 L2를 반환하며 같은 name은 L2 우선.
  */
-export async function getActiveSkillsForBot(botId: string): Promise<Skill[]> {
+export async function getActiveSkillsForBot(
+  botId: string,
+  officeId?: string | null,
+): Promise<Skill[]> {
   const isConnected = await checkDbConnection();
 
   if (!isConnected) {
@@ -359,17 +386,19 @@ export async function getActiveSkillsForBot(botId: string): Promise<Skill[]> {
               ) AS bot_ids,
               sd.metadata->'reference_files' AS reference_files,
               sd.category, sd.package, sd.is_active, sd.is_required,
-              sd.install_order, sd.version
+              sd.install_order, sd.version,
+              sd.office_id
        FROM semo.skill_definitions sd
        WHERE sd.is_active = true
-         AND sd.office_id IS NULL
+         AND (sd.office_id IS NULL OR ($2::uuid IS NOT NULL AND sd.office_id = $2::uuid))
          AND (NOT sd.metadata ? 'bot_ids' OR sd.metadata->'bot_ids' ? $1)
        ORDER BY
+         CASE WHEN sd.office_id IS NOT NULL THEN 0 ELSE 1 END,
          CASE WHEN sd.metadata->'bot_ids' ? $1 THEN 0 ELSE 1 END,
          sd.install_order`,
-      [botId],
+      [botId, officeId ?? null],
     );
-    return result.rows;
+    return dedupeByNameOfficeFirst(result.rows);
   } catch (error) {
     console.warn('⚠️ 봇 스킬 조회 실패, 폴백 데이터 사용:', error);
     return FALLBACK_SKILLS.filter((s) => s.is_active);
@@ -379,8 +408,9 @@ export async function getActiveSkillsForBot(botId: string): Promise<Skill[]> {
 /**
  * 커맨드 목록 조회
  * SoT: command_definitions (prompt as content — CLI 인터페이스 유지)
+ * @param officeId tenant office UUID. L0 + 해당 L2를 반환하며 같은 (folder, name)은 L2 우선.
  */
-export async function getCommands(): Promise<SemoCommand[]> {
+export async function getCommands(officeId?: string | null): Promise<SemoCommand[]> {
   const isConnected = await checkDbConnection();
 
   if (!isConnected) {
@@ -389,14 +419,26 @@ export async function getCommands(): Promise<SemoCommand[]> {
   }
 
   try {
-    const result = await getPool().query(`
-      SELECT id, name, folder,
+    const result = await getPool().query(
+      `SELECT id, name, folder,
              prompt AS content,
-             description, is_active
+             description, is_active,
+             office_id
       FROM command_definitions
-      WHERE is_active = true AND office_id IS NULL
-    `);
-    return result.rows;
+      WHERE is_active = true
+        AND (office_id IS NULL OR ($1::uuid IS NOT NULL AND office_id = $1::uuid))
+      ORDER BY CASE WHEN office_id IS NOT NULL THEN 0 ELSE 1 END`,
+      [officeId ?? null],
+    );
+    const seen = new Set<string>();
+    const out: SemoCommand[] = [];
+    for (const row of result.rows as (SemoCommand & { office_id?: string | null })[]) {
+      const key = `${row.folder}/${row.name.toLowerCase()}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push(row);
+    }
+    return out;
   } catch (error) {
     console.warn('⚠️ 커맨드 조회 실패, 폴백 데이터 사용:', error);
     return FALLBACK_COMMANDS.filter((c) => c.is_active);
@@ -406,8 +448,9 @@ export async function getCommands(): Promise<SemoCommand[]> {
 /**
  * 에이전트 목록 조회
  * SoT: agent_definitions (persona_prompt as content — CLI 인터페이스 유지)
+ * @param officeId tenant office UUID. L0 + 해당 L2를 반환하며 같은 name은 L2 우선.
  */
-export async function getAgents(): Promise<Agent[]> {
+export async function getAgents(officeId?: string | null): Promise<Agent[]> {
   const isConnected = await checkDbConnection();
 
   if (!isConnected) {
@@ -416,16 +459,19 @@ export async function getAgents(): Promise<Agent[]> {
   }
 
   try {
-    const result = await getPool().query(`
-      SELECT id, name, name AS display_name,
+    const result = await getPool().query(
+      `SELECT id, name, name AS display_name,
              persona_prompt AS content,
              package, is_active, install_order,
-             metadata
+             metadata,
+             office_id
       FROM agent_definitions
-      WHERE is_active = true AND office_id IS NULL
-      ORDER BY install_order
-    `);
-    return result.rows;
+      WHERE is_active = true
+        AND (office_id IS NULL OR ($1::uuid IS NOT NULL AND office_id = $1::uuid))
+      ORDER BY CASE WHEN office_id IS NOT NULL THEN 0 ELSE 1 END, install_order`,
+      [officeId ?? null],
+    );
+    return dedupeByNameOfficeFirst(result.rows);
   } catch (error) {
     console.warn('⚠️ 에이전트 조회 실패, 폴백 데이터 사용:', error);
     return FALLBACK_AGENTS.filter((a) => a.is_active);

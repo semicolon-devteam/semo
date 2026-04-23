@@ -152,15 +152,21 @@ function injectAgentInfo(content: string, botIds: string[]): string {
   return content + agentLine;
 }
 
-export async function syncGlobalCache(claudeDir?: string): Promise<GlobalCacheSyncResult> {
+export async function syncGlobalCache(
+  claudeDir?: string,
+  options?: { officeId?: string | null },
+): Promise<GlobalCacheSyncResult> {
   const dir = claudeDir || path.join(os.homedir(), '.claude');
   fs.mkdirSync(dir, { recursive: true });
 
+  // tenant L2 override: 명시적 옵션 → env → null (L0만)
+  const officeId = options?.officeId ?? process.env.SEMO_OFFICE_ID ?? null;
+
   // 병렬 조회
   const [skills, commands, agents, delegations] = await Promise.all([
-    getActiveSkills(),
-    getCommands(),
-    getAgents(),
+    getActiveSkills(officeId),
+    getCommands(officeId),
+    getAgents(officeId),
     getDelegations(),
   ]);
 
