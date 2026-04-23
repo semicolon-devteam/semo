@@ -2,12 +2,17 @@
 -- 코드는 이미 KB 기반으로 전환됨 (section/{track}/{phase}/{section_key})
 
 -- 1. service_sections → KB section/{track}/{phase}/{section_key}
+-- drift 복구: 이미 DROP 된 소스 테이블은 to_regclass 가드로 skip (2026-04-23)
 DO $$
 DECLARE
   rec RECORD;
   _domain TEXT;
   _sub_key TEXT;
 BEGIN
+  IF to_regclass('semo.service_sections') IS NULL OR to_regclass('semo.services') IS NULL THEN
+    RAISE NOTICE '099-1 skipped: source tables already dropped';
+    RETURN;
+  END IF;
   FOR rec IN SELECT * FROM semo.service_sections LOOP
     SELECT service_domain INTO _domain FROM semo.services WHERE service_id = rec.service_id;
     IF _domain IS NOT NULL THEN

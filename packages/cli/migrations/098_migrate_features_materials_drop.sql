@@ -2,12 +2,17 @@
 -- 코드는 이미 KB 기반으로 전환됨 (Phase 2a+2b)
 
 -- 1. service_features (6건) → KB feature/{feature_id}
+-- drift 복구: 이미 DROP 된 소스 테이블은 to_regclass 가드로 skip (2026-04-23)
 DO $$
 DECLARE
   rec RECORD;
   _domain TEXT;
   _slug TEXT;
 BEGIN
+  IF to_regclass('semo.service_features') IS NULL OR to_regclass('semo.services') IS NULL THEN
+    RAISE NOTICE '098-1 skipped: source tables already dropped';
+    RETURN;
+  END IF;
   FOR rec IN SELECT * FROM semo.service_features LOOP
     SELECT service_domain INTO _domain FROM semo.services WHERE service_id = rec.service_id;
     IF _domain IS NOT NULL THEN
@@ -44,6 +49,10 @@ DECLARE
   rec RECORD;
   _domain TEXT;
 BEGIN
+  IF to_regclass('semo.service_materials') IS NULL OR to_regclass('semo.services') IS NULL THEN
+    RAISE NOTICE '098-2 skipped: source tables already dropped';
+    RETURN;
+  END IF;
   FOR rec IN SELECT * FROM semo.service_materials LOOP
     SELECT service_domain INTO _domain FROM semo.services WHERE service_id = rec.service_id;
     IF _domain IS NOT NULL THEN
@@ -74,6 +83,10 @@ DECLARE
   _domain TEXT;
   _date TEXT;
 BEGIN
+  IF to_regclass('semo.deploy_verifications') IS NULL OR to_regclass('semo.services') IS NULL THEN
+    RAISE NOTICE '098-3 skipped: source tables already dropped';
+    RETURN;
+  END IF;
   FOR rec IN SELECT * FROM semo.deploy_verifications LOOP
     SELECT service_domain INTO _domain FROM semo.services WHERE service_id = rec.service_id;
     IF _domain IS NOT NULL THEN

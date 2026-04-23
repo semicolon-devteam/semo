@@ -2,10 +2,15 @@
 -- 코드는 이미 KB pipeline/config 기반으로 전환됨
 
 -- 1. services → KB pipeline/config
+-- drift 복구: 이미 DROP 된 소스 테이블은 to_regclass 가드로 skip (2026-04-23)
 DO $$
 DECLARE
   rec RECORD;
 BEGIN
+  IF to_regclass('semo.services') IS NULL THEN
+    RAISE NOTICE '100-1 skipped: services already dropped';
+    RETURN;
+  END IF;
   FOR rec IN SELECT * FROM semo.services WHERE service_domain IS NOT NULL LOOP
     INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by, metadata)
     VALUES (

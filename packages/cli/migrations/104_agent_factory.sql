@@ -178,16 +178,18 @@ WHERE domain = 'semobot' AND key IN ('slack-profile','slack-config') AND sub_key
 
 -- 4.7 bot_delegation 복제 — 기존 semiclaw → X 위임을 semobot → X 로 복제
 --     (semiclaw 행은 alias 호환성 유지 차원에서 삭제하지 않음)
+-- 075에서 unique 제약이 (from,to,type,metadata->>'label')의 composite 으로 바뀌어
+-- ON CONFLICT 타겟을 명시하면 매치 실패. DO NOTHING 타겟 생략으로 변경.
 INSERT INTO semo.bot_delegation (
   from_bot_id, to_bot_id, delegation_type, domains, method, channel,
-  max_roundtrips, priority, is_active
+  max_roundtrips, priority, is_active, metadata
 )
 SELECT
   'semobot', to_bot_id, delegation_type, domains, method, channel,
-  max_roundtrips, priority, is_active
+  max_roundtrips, priority, is_active, COALESCE(metadata, '{}'::jsonb)
 FROM semo.bot_delegation
 WHERE from_bot_id = 'semiclaw'
-ON CONFLICT (from_bot_id, to_bot_id, delegation_type) DO NOTHING;
+ON CONFLICT DO NOTHING;
 
 -- ============================================================
 -- 5. bot_seats 초기 행 — snamanager0 (현재 유일한 Claude Max seat)
