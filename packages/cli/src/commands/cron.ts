@@ -1017,7 +1017,7 @@ export function registerCronCommands(program: Command): void {
     .option('--session-target <target>', '세션 타겟 (main|isolated)', 'isolated')
     .option('--disabled', '비활성 상태로 생성')
     .option('--report-channel <channel>', '결과 보고 Slack 채널 (기본: #bot-ops)')
-    .option('--target-domain <domain>', 'ontology 대상 도메인 (예: axoracle, semo)')
+    .option('--target-domain <domain>', 'ontology 대상 도메인 (예: semo, <service-domain>)')
     .option('--max-duration <sec>', '최대 실행 시간 (초) — Phase 0에서는 메타데이터만', (v) =>
       parseInt(v, 10),
     )

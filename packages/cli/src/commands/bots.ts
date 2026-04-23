@@ -39,6 +39,7 @@ import {
 } from './audit';
 import { getCronJobStats } from './context';
 import { resolveBotWorkspace } from '../paths';
+import { registerBotsFactoryCommands } from './bots-factory';
 
 // ============================================================
 // Types (matches actual DB schema)
@@ -346,6 +347,9 @@ export async function syncWorkspaceFiles(
 
 export function registerBotsCommands(program: Command): void {
   const botsCmd = program.command('bots').description('봇 상태 조회 및 관리 (semo.bot_status)');
+
+  // Agent Factory (create / delete / show) — SemoBot 진입점
+  registerBotsFactoryCommands(botsCmd);
 
   // ── semo bots status ────────────────────────────────────────
   botsCmd

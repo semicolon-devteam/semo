@@ -15,12 +15,28 @@ import * as path from 'path';
 import * as os from 'os';
 import { getPool, closeConnection } from '../database';
 import { ensureEnforcementHooks, ensureRulesSymlink } from '../semo-workspace';
+import { semoHome, claudeHome } from '../paths.js';
 
 // ============================================================
-// Constants
+// Paths (lazy — SEMO_HOME 런타임 변경 반영)
 // ============================================================
 
-const SESSIONS_ROOT = path.join(os.homedir(), '.semo', 'sessions');
+function sessionsRoot(): string {
+  return path.join(semoHome(), 'sessions');
+}
+function sharedHooks(): string {
+  return path.join(semoHome(), 'shared', 'hooks');
+}
+function sharedSkills(): string {
+  return path.join(claudeHome(), 'skills');
+}
+function semoEnv(): string {
+  return path.join(claudeHome(), 'semo', '.env');
+}
+function archiveRoot(): string {
+  return path.join(semoHome(), 'archive');
+}
+
 const SHARED_AGENTS = path.join(
   os.homedir(),
   'Desktop',
@@ -31,9 +47,6 @@ const SHARED_AGENTS = path.join(
   '.claude',
   'agents',
 );
-const SHARED_SKILLS = path.join(os.homedir(), '.claude', 'skills');
-const SHARED_HOOKS = path.join(os.homedir(), '.semo', 'shared', 'hooks');
-const SEMO_ENV = path.join(os.homedir(), '.claude', 'semo', '.env');
 const LAUNCHD_DIR = path.join(os.homedir(), 'Library', 'LaunchAgents');
 
 // ============================================================
@@ -47,7 +60,7 @@ interface CreateOptions {
 }
 
 function ensureSessionDir(serviceId: string): string {
-  const sessionDir = path.join(SESSIONS_ROOT, serviceId);
+  const sessionDir = path.join(sessionsRoot(), serviceId);
   const dirs = [sessionDir, path.join(sessionDir, '.claude'), path.join(sessionDir, 'memory')];
   for (const dir of dirs) {
     fs.mkdirSync(dir, { recursive: true });
@@ -58,7 +71,7 @@ function ensureSessionDir(serviceId: string): string {
 function createSymlinks(sessionDir: string): void {
   const links: Array<[string, string]> = [
     [SHARED_AGENTS, path.join(sessionDir, '.claude', 'agents')],
-    [SHARED_SKILLS, path.join(sessionDir, '.claude', 'skills')],
+    [sharedSkills(), path.join(sessionDir, '.claude', 'skills')],
   ];
 
   for (const [target, linkPath] of links) {
@@ -146,12 +159,12 @@ function writeSettingsJson(sessionDir: string, serviceId?: string, channel?: str
           hooks: [
             {
               type: 'command',
-              command: `. ${SEMO_ENV} 2>/dev/null; semo context sync 2>/dev/null || true`,
+              command: `. ${semoEnv()} 2>/dev/null; semo context sync 2>/dev/null || true`,
               timeout: 30,
             },
             {
               type: 'command',
-              command: `bash ${SHARED_HOOKS}/cron-reregister.sh`,
+              command: `bash ${sharedHooks()}/cron-reregister.sh`,
               timeout: 5000,
             },
           ],
@@ -163,7 +176,7 @@ function writeSettingsJson(sessionDir: string, serviceId?: string, channel?: str
           hooks: [
             {
               type: 'command',
-              command: `. ${SEMO_ENV} 2>/dev/null; semo context push 2>/dev/null || true`,
+              command: `. ${semoEnv()} 2>/dev/null; semo context push 2>/dev/null || true`,
               timeout: 30,
             },
           ],
@@ -440,15 +453,16 @@ export function registerIncubatorCommands(program: Command): void {
         } catch {
           // DB 실패 시 로컬 디렉토리 스캔
           spinner.text = '로컬 디렉토리 스캔...';
-          if (fs.existsSync(SESSIONS_ROOT)) {
-            const dirs = fs.readdirSync(SESSIONS_ROOT);
+          const root = sessionsRoot();
+          if (fs.existsSync(root)) {
+            const dirs = fs.readdirSync(root);
             sessions = dirs
-              .filter((d) => fs.existsSync(path.join(SESSIONS_ROOT, d, 'CLAUDE.md')))
+              .filter((d) => fs.existsSync(path.join(root, d, 'CLAUDE.md')))
               .map((d) => ({
                 service_id: d,
                 service_name: d.slice(0, 8),
                 channel: null,
-                session_dir: path.join(SESSIONS_ROOT, d),
+                session_dir: path.join(root, d),
                 status: 'active' as const,
                 created_at: '',
               }));
@@ -500,7 +514,7 @@ export function registerIncubatorCommands(program: Command): void {
       const spinner = ora('세션 중지 중...').start();
 
       try {
-        const sessionDir = path.join(SESSIONS_ROOT, options.serviceId);
+        const sessionDir = path.join(sessionsRoot(), options.serviceId);
         const label = getLaunchdLabel(options.serviceId);
         const plistPath = path.join(LAUNCHD_DIR, `${label}.plist`);
 
@@ -525,7 +539,7 @@ export function registerIncubatorCommands(program: Command): void {
 
         // 3. 아카이브
         if (options.archive && fs.existsSync(sessionDir)) {
-          const archiveDir = path.join(os.homedir(), '.semo', 'archive');
+          const archiveDir = archiveRoot();
           fs.mkdirSync(archiveDir, { recursive: true });
           const archivePath = path.join(archiveDir, options.serviceId);
           fs.renameSync(sessionDir, archivePath);
@@ -555,7 +569,7 @@ export function registerIncubatorCommands(program: Command): void {
     .requiredOption('--service-id <uuid>', '서비스 UUID')
     .action(async (options: { serviceId: string }) => {
       try {
-        const sessionDir = path.join(SESSIONS_ROOT, options.serviceId);
+        const sessionDir = path.join(sessionsRoot(), options.serviceId);
         const label = getLaunchdLabel(options.serviceId);
         const plistPath = path.join(LAUNCHD_DIR, `${label}.plist`);
 

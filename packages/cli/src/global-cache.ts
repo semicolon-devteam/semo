@@ -19,11 +19,77 @@ import {
   Agent,
   BotDelegation,
 } from './database';
+import { tenantDir, ensureSemoLayout } from './paths.js';
 
 export interface GlobalCacheSyncResult {
   skills: number;
   commands: number;
   agents: number;
+  tenantOverlays?: number;
+}
+
+/**
+ * tenant/ 영역의 파일을 merged (= ~/.claude/) 에 오버레이한다.
+ * - tenant/skills/{name}/       → 스킬 통째 덮어씀 (tenant 승리)
+ * - tenant/commands/{folder}/{name}.md → 파일 단위 덮어씀
+ * - tenant/agents/{name}/{name}.md     → 에이전트 통째 덮어씀
+ *
+ * 재귀 복사는 Node fs.cpSync(recursive) 를 사용. 실패는 경고만 남기고 계속 진행.
+ */
+export function applyTenantOverlay(mergedDir: string, tenantRoot: string): number {
+  let overlaid = 0;
+  const sections: Array<{ name: 'skills' | 'commands' | 'agents'; perEntry: boolean }> = [
+    { name: 'skills', perEntry: true },
+    { name: 'commands', perEntry: false },
+    { name: 'agents', perEntry: true },
+  ];
+
+  for (const section of sections) {
+    const srcRoot = path.join(tenantRoot, section.name);
+    const dstRoot = path.join(mergedDir, section.name);
+    if (!fs.existsSync(srcRoot)) continue;
+    fs.mkdirSync(dstRoot, { recursive: true });
+
+    if (section.perEntry) {
+      const entries = fs.readdirSync(srcRoot, { withFileTypes: true });
+      for (const ent of entries) {
+        if (!ent.isDirectory()) continue;
+        const src = path.join(srcRoot, ent.name);
+        const dst = path.join(dstRoot, ent.name);
+        try {
+          if (fs.existsSync(dst)) removeRecursive(dst);
+          fs.cpSync(src, dst, { recursive: true });
+          overlaid++;
+        } catch (err) {
+          console.warn(
+            `⚠️ tenant overlay 실패 (${section.name}/${ent.name}): ${(err as Error).message}`,
+          );
+        }
+      }
+    } else {
+      // commands: folder/name.md 평탄화 복사
+      const folders = fs.readdirSync(srcRoot, { withFileTypes: true });
+      for (const folder of folders) {
+        if (!folder.isDirectory()) continue;
+        const srcFolder = path.join(srcRoot, folder.name);
+        const dstFolder = path.join(dstRoot, folder.name);
+        fs.mkdirSync(dstFolder, { recursive: true });
+        const files = fs.readdirSync(srcFolder);
+        for (const f of files) {
+          if (!f.endsWith('.md')) continue;
+          try {
+            fs.cpSync(path.join(srcFolder, f), path.join(dstFolder, f));
+            overlaid++;
+          } catch (err) {
+            console.warn(
+              `⚠️ tenant overlay 실패 (commands/${folder.name}/${f}): ${(err as Error).message}`,
+            );
+          }
+        }
+      }
+    }
+  }
+  return overlaid;
 }
 
 const isWindows = process.platform === 'win32';
@@ -231,9 +297,18 @@ export async function syncGlobalCache(claudeDir?: string): Promise<GlobalCacheSy
     fs.writeFileSync(path.join(agentFolder, `${agent.name}.md`), content);
   }
 
+  // 4. Tenant overlay — ~/.semo/tenant/* 가 kernel(DB) 산출물을 덮어쓴다.
+  // SEMO_TENANT_OVERLAY=off 로 일시 비활성화 가능 (디버깅/롤백용).
+  let tenantOverlays = 0;
+  if (process.env.SEMO_TENANT_OVERLAY !== 'off') {
+    ensureSemoLayout();
+    tenantOverlays = applyTenantOverlay(dir, tenantDir());
+  }
+
   return {
     skills: skills.length - skippedSkills,
     commands: cmdCount,
     agents: dedupedAgents.length,
+    tenantOverlays,
   };
 }

@@ -22,22 +22,33 @@
     "semicolon"
   ],
   "author": "Semicolon DevTeam",
-  "license": "MIT",
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/semicolon-devteam/semo.git",
     "directory": "packages/cli"
   },
   "dependencies": {
+    "@team-semicolon/semo-kb-core": "*",
+    "@team-semicolon/semo-ops-store": "*",
+    "better-sqlite3": "^11.0.0",
     "chalk": "^4.1.2",
     "commander": "^12.0.0",
     "cron-parser": "^4.9.0",
     "inquirer": "^8.2.6",
     "ora": "^5.4.1",
-    "pg": "^8.17.2"
+    "pg": "^8.17.2",
+    "smol-toml": "^1.6.1"
+  },
+  "optionalDependencies": {
+    "@team-semicolon/semo-kb-pg": "*"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",
+    "@types/better-sqlite3": "^7.6.0",
     "@types/inquirer": "^8.2.0",
     "@types/node": "^20.0.0",
     "@types/pg": "^8.16.0",

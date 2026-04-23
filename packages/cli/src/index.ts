@@ -44,6 +44,7 @@ import { registerMemoryCommands } from './commands/memory';
 import { registerTestCommands } from './commands/test';
 import { registerCommitmentsCommands } from './commands/commitments';
 import { registerActionItemsCommands } from './commands/action-items';
+import { registerCredentialCommands } from './commands/credential';
 import { registerSlackCommands } from './commands/slack';
 import { registerAgentFlushCommands } from './commands/agent-flush';
 import { registerContextPreserveCommands } from './commands/context-preserve';
@@ -53,6 +54,25 @@ import { registerIncubatorCommands } from './commands/incubator';
 import { registerSkillCommands } from './commands/skill';
 import { registerCronCommands } from './commands/cron';
 import { registerMetricsCommands } from './commands/metrics';
+import { registerConfigCommands } from './commands/config';
+import { registerTopologyCommand } from './commands/topology';
+import { registerModelsCommands } from './commands/models';
+import { registerExecCommand } from './commands/exec';
+import { registerMigrateSqliteCommand } from './commands/migrate-sqlite.js';
+import { registerUpdateCommand } from './commands/update.js';
+import { registerHooksCommand } from './commands/hooks-verify.js';
+import { registerInitCommand } from './commands/init.js';
+import { registerChatCommand } from './commands/chat';
+import { registerKbPortableCommands } from './commands/kb';
+import { registerAgentFactoryCommands } from './commands/agent-factory';
+import { registerFactoryCommand } from './commands/factory';
+import { registerOnboardCommand } from './commands/onboard';
+import { registerTemplatesCommand } from './commands/templates';
+import { registerSeatsCommand } from './commands/seats';
+import { registerDoctorCommand } from './commands/doctor';
+import { registerRouterCommand } from './commands/router';
+import { registerDeployCommand } from './commands/deploy';
+import { registerDashboardCommand } from './commands/dashboard';
 import { syncGlobalCache } from './global-cache';
 import {
   ensureSemoDir,
@@ -166,69 +186,15 @@ const isWindows =
   process.env.OSTYPE?.includes('cygwin') ||
   process.env.TERM_PROGRAM === 'mintty';
 
-// === 레거시 환경 감지 및 마이그레이션 ===
-
-interface LegacyDetectionResult {
-  hasLegacy: boolean;
-  legacyPaths: string[];
-  hasSemoSystem: boolean;
-}
-
-/**
- * 레거시 SEMO 환경을 감지합니다.
- * 레거시: 프로젝트 루트에 semo-core/ 가 직접 있는 경우
- * 신규: semo-system/ 하위에 있는 경우
- */
-function detectLegacyEnvironment(cwd: string): LegacyDetectionResult {
-  const legacyPaths: string[] = [];
-
-  // 루트에 직접 있는 레거시 디렉토리 확인
-  const legacyDirs = ['semo-core', 'sax-core', 'sax-skills'];
-  for (const dir of legacyDirs) {
-    const dirPath = path.join(cwd, dir);
-    if (fs.existsSync(dirPath) && !fs.lstatSync(dirPath).isSymbolicLink()) {
-      legacyPaths.push(dir);
-    }
-  }
-
-  // .claude/ 내부의 레거시 구조 확인
-  const claudeDir = path.join(cwd, '.claude');
-  if (fs.existsSync(claudeDir)) {
-    // 심볼릭 링크가 레거시 경로를 가리키는지 확인
-    const checkLegacyLink = (linkName: string) => {
-      const linkPath = path.join(claudeDir, linkName);
-      if (fs.existsSync(linkPath) && fs.lstatSync(linkPath).isSymbolicLink()) {
-        try {
-          const target = fs.readlinkSync(linkPath);
-          // 레거시 경로 패턴: ../semo-core, ../sax-core 등
-          if (target.match(/^\.\.\/(semo|sax)-(core|skills)/)) {
-            legacyPaths.push(`.claude/${linkName} → ${target}`);
-          }
-        } catch {
-          // 읽기 실패 무시
-        }
-      }
-    };
-    checkLegacyLink('agents');
-    checkLegacyLink('skills');
-    checkLegacyLink('commands');
-  }
-
-  return {
-    hasLegacy: legacyPaths.length > 0,
-    legacyPaths,
-    hasSemoSystem: fs.existsSync(path.join(cwd, 'semo-system')),
-  };
-}
-
-// (migrateLegacyEnvironment / removeRecursive removed — semo-system migration no longer needed)
+// (detectLegacyEnvironment / LegacyDetectionResult removed — 레거시 semo-system/*
+//  구조는 v4.x 에서 폐기. 신규 doctor 는 commands/doctor.ts 에 있음.)
 
 const program = new Command();
 
 program
   .name('semo')
   .description('SEMO CLI - AI Agent Orchestration Framework')
-  .version(VERSION, '-V, --version-simple', '버전 번호만 출력');
+  .version(VERSION, '-V, --version', '버전 번호만 출력');
 
 // === version 명령어 (상세 버전 정보) ===
 program
@@ -500,20 +466,6 @@ program
       chalk.gray('  Claude Code에서 프로젝트를 열면 SessionStart 훅이 자동으로 sync합니다.'),
     );
     console.log();
-  });
-
-// === init 명령어 (deprecated — onboarding으로 통합됨) ===
-program
-  .command('init')
-  .description('[deprecated] semo onboarding으로 통합되었습니다')
-  .action(async () => {
-    console.log(chalk.yellow("\n⚠ 'semo init'은 'semo onboarding'으로 통합되었습니다.\n"));
-    console.log(chalk.cyan('  글로벌 설정이 필요하면:'));
-    console.log(chalk.gray('    semo onboarding\n'));
-    console.log(chalk.cyan('  이미 온보딩을 완료했다면:'));
-    console.log(
-      chalk.gray('    Claude Code에서 프로젝트를 열면 SessionStart 훅이 자동으로 sync합니다.\n'),
-    );
   });
 
 // === Standard 설치 (DB 기반, 글로벌 ~/.claude/) ===
@@ -904,11 +856,11 @@ ${domainGuide}
 변경사항은 즉시 \`semo kb upsert\`로 기록한다.
 
 **도메인 라우팅** — upsert 전 소속 도메인을 판단:
-- 조직 전체 공통 (팀 회의 규칙, 인사 정책) → \`semicolon\`
+- 조직 전체 공통 (팀 회의 규칙, 인사 정책) → \`<org-domain>\` (예: 세미콜론 팀은 \`semicolon\`)
 - SEMO 시스템 고유 (봇 운영, 파이프라인, 오케스트레이션) → \`semo\`
-- 특정 서비스 고유 → 해당 서비스 도메인 (\`feel-free\`, \`axoracle\` 등)
-- 특정 봇 고유 → 해당 봇 도메인 (\`semiclaw\`, \`workclaw\` 등)
-- 특정 팀원 고유 → 해당 팀원 도메인 (\`reus\`, \`garden\` 등)
+- 특정 서비스 고유 → 해당 서비스 도메인 (\`<service-domain>\`)
+- 특정 봇 고유 → 해당 봇 도메인 (\`semiclaw\`, \`<bot-domain>\` 등)
+- 특정 팀원 고유 → 해당 팀원 도메인 (\`<team-member-domain>\`)
 `;
 }
 
@@ -1423,10 +1375,11 @@ program
     console.log();
   });
 
-// === update 명령어 ===
+// === update-legacy 명령어 (Team 프로파일 전용: DB 기반 스킬/훅 재생성) ===
+// P1.4 의 새 `semo update` (kernel/tenant/merged 레이아웃) 과 분리.
 program
-  .command('update')
-  .description('SEMO를 최신 버전으로 업데이트합니다')
+  .command('update-legacy')
+  .description('[Team 전용] DB 기반 글로벌 스킬/훅 전체 갱신 (P1.4 이전 동작)')
   .option('--self', 'CLI만 업데이트')
   .option('--global', '글로벌 스킬/커맨드/에이전트를 DB 최신으로 갱신 (~/.claude/)')
   .action(async (options) => {
@@ -1492,8 +1445,58 @@ program
     console.log(chalk.gray('    semo onboarding -f\n'));
   });
 
-// === config 명령어 (설치 후 설정 변경) ===
+// === config 명령어 (설치 후 설정 변경 + 프로파일/설정 조회) ===
 const configCmd = program.command('config').description('SEMO 설정 관리');
+registerConfigCommands(configCmd);
+
+// === models 명령어 (논리명 → 실모델ID 매핑 레지스트리) ===
+const modelsCmd = program
+  .command('models')
+  .description('모델 레지스트리(semo models/catalog) 관리');
+registerModelsCommands(modelsCmd);
+
+// === exec 명령어 (ExecutionTarget 단발 dispatch smoke test) ===
+registerExecCommand(program);
+registerMigrateSqliteCommand(program);
+registerUpdateCommand(program);
+registerHooksCommand(program);
+registerInitCommand(program);
+
+// === topology 명령어 (network.mode 기반 접속 가이드) ===
+registerTopologyCommand(program);
+
+// === chat 명령어 (Solo REPL — StdinSource + ExecutionTarget) ===
+registerChatCommand(program);
+
+// === kb-portable — 프로파일 기반 어댑터(KbStore) 경유 CLI ===
+registerKbPortableCommands(program);
+
+// === agent-factory — 포터블 봇 CRUD (KbStore + OperationalStore) ===
+registerAgentFactoryCommands(program);
+
+// === factory — 자연어 → 구조화된 factory action (bot/KB/ontology) ===
+registerFactoryCommand(program);
+
+// === onboard — Personal 프로파일 대화형 온보딩 (me/* KB 적재) ===
+registerOnboardCommand(program);
+
+// === templates — builtin bot template 카탈로그 조회 ===
+registerTemplatesCommand(program);
+
+// === seats — bot seat pool CRUD (Personal SQLite 경로) ===
+registerSeatsCommand(program);
+
+// === doctor — Personal/Team 프리플라이트 헬스체크 ===
+registerDoctorCommand(program);
+
+// === router — messenger router 데몬 기동 (discord | slack) ===
+registerRouterCommand(program);
+
+// === deploy — Personal 프로파일 원샷 셋업 플레이북 ===
+registerDeployCommand(program);
+
+// === dashboard — Personal 대시보드 로컬 기동 ===
+registerDashboardCommand(program);
 
 configCmd
   .command('env')
@@ -1526,64 +1529,9 @@ configCmd
     console.log(chalk.gray('  다음 Claude Code 세션부터 자동으로 적용됩니다.'));
   });
 
-// === doctor 명령어 (설치 상태 진단) ===
-program
-  .command('doctor')
-  .description('SEMO 설치 상태를 진단하고 문제를 리포트')
-  .action(async () => {
-    console.log(chalk.cyan.bold('\n🩺 SEMO 진단\n'));
-
-    const home = os.homedir();
-    const cwd = process.cwd();
-
-    // 1. 레거시 환경 확인
-    console.log(chalk.cyan('1. 레거시 환경 확인'));
-    const legacyCheck = detectLegacyEnvironment(cwd);
-    if (legacyCheck.hasLegacy) {
-      console.log(chalk.yellow('   ⚠️ 레거시 환경 감지됨'));
-      legacyCheck.legacyPaths.forEach((p) => {
-        console.log(chalk.gray(`      - ${p}`));
-      });
-      console.log(chalk.gray('   💡 레거시 폴더를 수동 삭제하세요 (semo-system/, semo-core/ 등)'));
-    } else {
-      console.log(chalk.green('   ✅ 레거시 환경 없음'));
-    }
-
-    // 2. DB 연결 확인
-    console.log(chalk.cyan('\n2. DB 연결'));
-    const connected = await isDbConnected();
-    if (connected) {
-      console.log(chalk.green('   ✅ DB 연결 정상'));
-    } else {
-      console.log(chalk.red('   ❌ DB 연결 실패'));
-      console.log(chalk.gray('   💡 흔한 원인:'));
-      console.log(chalk.gray('      - SSH 터널 미실행 (로컬 개발 시 필수)'));
-      console.log(chalk.gray('      - ~/.claude/semo/.env의 DATABASE_URL 오류'));
-      console.log(chalk.gray('   💡 해결: SSH 터널 실행 후 semo onboarding 재시도'));
-    }
-
-    // 3. 글로벌 설정 확인
-    console.log(chalk.cyan('\n3. 글로벌 설정 (~/.claude/semo/)'));
-    const globalChecks = [
-      { name: '.env', path: path.join(home, '.claude', 'semo', '.env') },
-      { name: 'SOUL.md', path: path.join(home, '.claude', 'semo', 'SOUL.md') },
-      { name: 'skills/', path: path.join(home, '.claude', 'skills') },
-      { name: 'commands/', path: path.join(home, '.claude', 'commands') },
-      { name: 'agents/', path: path.join(home, '.claude', 'agents') },
-    ];
-
-    for (const check of globalChecks) {
-      const exists = fs.existsSync(check.path);
-      if (exists) {
-        console.log(chalk.green(`   ✅ ${check.name}`));
-      } else {
-        console.log(chalk.yellow(`   ⚠️ ${check.name} 없음`));
-      }
-    }
-
-    await closeConnection();
-    console.log();
-  });
+// === doctor: registerDoctorCommand (commands/doctor.ts) 로 대체 ===
+// 레거시 ~/.claude/semo/* 진단 제거됨. 새 doctor 는 config.toml + 3-layer
+// 레이아웃 + SQLite 마이그레이션 + Ollama + credential 을 모두 커버.
 
 // === KB (Knowledge Base) 관리 ===
 import {
@@ -2779,6 +2727,7 @@ registerMemoryCommands(program);
 registerTestCommands(program);
 registerCommitmentsCommands(program);
 registerActionItemsCommands(program);
+registerCredentialCommands(program);
 registerSlackCommands(program);
 registerServiceCommands(program);
 registerHarnessCommands(program);

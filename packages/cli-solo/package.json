@@ -1,0 +1,54 @@
+{
+  "name": "@team-semicolon/semo-solo",
+  "version": "0.1.0",
+  "description": "SEMO Solo — zero-setup personal AI agent (SQLite + Ollama/MLX/API). No Postgres, no Slack.",
+  "main": "dist/bundle.js",
+  "bin": {
+    "semo-solo": "dist/bundle.js"
+  },
+  "scripts": {
+    "build": "tsc && node scripts/bundle.mjs",
+    "start": "node dist/bundle.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "keywords": [
+    "semo",
+    "solo",
+    "ollama",
+    "mlx",
+    "cli"
+  ],
+  "author": "Semicolon DevTeam",
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/semicolon-devteam/semo.git",
+    "directory": "packages/cli-solo"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0"
+  },
+  "devDependencies": {
+    "@team-semicolon/semo-common": "*",
+    "@team-semicolon/semo-kb-core": "*",
+    "@team-semicolon/semo-ops-store": "*",
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^20.0.0",
+    "chalk": "^4.1.2",
+    "commander": "^12.0.0",
+    "esbuild": "^0.24.0",
+    "smol-toml": "^1.6.1",
+    "ts-node": "^10.0.0",
+    "typescript": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ]
+}

@@ -500,12 +500,62 @@ export async function updateServiceProject(
   if (updates.service_url !== undefined) patch.service_url = updates.service_url;
   if (updates.bm !== undefined) patch.bm = updates.bm;
   if (updates.repo !== undefined) patch.repo = updates.repo;
-  if (updates.slack_channel !== undefined) patch.slack_channel = updates.slack_channel;
-  if (updates.discord_channel !== undefined) patch.discord_channel = updates.discord_channel;
+  if (updates.slack_channel !== undefined) patch.slack_channel = updates.slack_channel || null;
+  if (updates.discord_channel !== undefined)
+    patch.discord_channel = updates.discord_channel || null;
   if (updates.service_type !== undefined) patch.service_type = updates.service_type;
   if (updates.parent_service_id !== undefined) patch.parent_service_id = updates.parent_service_id;
 
-  await kbUpdateMetadata(pool, domain, 'pipeline/config', patch);
+  const needsChannelSync =
+    updates.slack_channel !== undefined || updates.discord_channel !== undefined;
+
+  if (needsChannelSync) {
+    // KB + ontology 채널 매핑을 단일 트랜잭션으로 동기화
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const domainCheck = await client.query('SELECT 1 FROM semo.ontology WHERE domain = $1', [
+        domain,
+      ]);
+      if (domainCheck.rows.length === 0) {
+        throw new Error(`도메인 '${domain}'은(는) 온톨로지에 등록되지 않았습니다.`);
+      }
+
+      await client.query(
+        `UPDATE semo.knowledge_base
+         SET metadata = COALESCE(metadata, '{}'::jsonb) || $4::jsonb, updated_at = NOW()
+         WHERE domain = $1 AND key = $2 AND sub_key = $3`,
+        [domain, 'pipeline', 'config', JSON.stringify(patch)],
+      );
+
+      const setClauses: string[] = [];
+      const params: (string | null)[] = [domain];
+      let idx = 2;
+      if (updates.slack_channel !== undefined) {
+        setClauses.push(`slack_channel = $${idx++}`);
+        params.push(updates.slack_channel || null);
+      }
+      if (updates.discord_channel !== undefined) {
+        setClauses.push(`discord_channel = $${idx++}`);
+        params.push(updates.discord_channel || null);
+      }
+      await client.query(
+        `UPDATE semo.ontology SET ${setClauses.join(', ')} WHERE domain = $1`,
+        params,
+      );
+
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } else {
+    await kbUpdateMetadata(pool, domain, 'pipeline/config', patch);
+  }
+
   return getServiceProjectByDomain(pool, domain);
 }
 

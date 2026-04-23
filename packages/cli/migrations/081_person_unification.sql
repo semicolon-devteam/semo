@@ -20,7 +20,7 @@ ON CONFLICT (type_key, scheme_key) DO NOTHING;
 
 -- 2. person의 role을 collection으로 변경
 UPDATE semo.kb_type_schema SET key_type = 'collection',
-  value_hint = 'role/overall, role/feel-free 등 프로젝트별 역할'
+  value_hint = 'role/overall, role/{project-domain} 등 프로젝트별 역할'
 WHERE type_key = 'person' AND scheme_key = 'role';
 
 -- 3. ontology: team → person 타입 변경
