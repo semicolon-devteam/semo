@@ -407,16 +407,14 @@ ${kbFirstBlock}
 // ============================================================
 
 const SHARED_HOOKS = path.join(os.homedir(), '.semo', 'shared', 'hooks');
-const SEMO_PROJECT_RULES = path.join(
-  os.homedir(),
-  'Desktop',
-  'Sources',
-  'semicolon',
-  'projects',
-  'semo',
-  '.claude',
-  'rules',
-);
+
+function resolveSemoProjectRules(): string {
+  if (process.env.SEMO_PROJECT_RULES) return process.env.SEMO_PROJECT_RULES;
+  if (process.env.SEMO_HOME) return path.join(process.env.SEMO_HOME, '.claude', 'rules');
+  return path.join(process.cwd(), '.claude', 'rules');
+}
+
+const SEMO_PROJECT_RULES = resolveSemoProjectRules();
 
 interface EnforcementHookDef {
   trigger: string;
