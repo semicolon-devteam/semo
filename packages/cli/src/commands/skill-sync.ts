@@ -11,7 +11,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { Pool, PoolClient } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { resolveBotWorkspace, SEMO_WORKSPACES } from '../paths';
 
 export interface ScannedSkill {

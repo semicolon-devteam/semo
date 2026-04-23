@@ -8,7 +8,7 @@
  * v3.15.1: pgvector embedding integration
  */
 
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
 

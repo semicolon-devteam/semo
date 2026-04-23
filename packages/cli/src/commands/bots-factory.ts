@@ -18,7 +18,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { Pool, PoolClient } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { getPool, closeConnection, isDbConnected } from '../database';
 
 interface Delegation {

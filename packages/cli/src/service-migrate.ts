@@ -5,7 +5,7 @@
  * 자동으로 이식. KB 엔트리 전수 조사(audit) 후 매핑/비매핑 분류.
  */
 
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import chalk from 'chalk';
 import { kbGet, kbList, kbUpsert } from './kb';
 

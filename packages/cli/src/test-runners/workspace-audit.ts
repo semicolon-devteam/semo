@@ -7,7 +7,7 @@
  * 로컬 스크립트 의존성 없음 — DB가 SoT.
  */
 
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';

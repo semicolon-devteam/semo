@@ -12,7 +12,7 @@
  *   - semo.skills / semo.agents / semo.commands 는 하위 호환 뷰
  */
 
-import { Pool, PoolClient } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
@@ -70,9 +70,29 @@ function buildDbConfig() {
 // PostgreSQL Pool (싱글톤) — 최초 getPool() 호출 시점에 config 평가
 let pool: Pool | null = null;
 
+// pg 드라이버 lazy load. Personal 프로파일(SQLite-only)에서는 pg 미설치 가능.
+// 타입은 `import type` 으로 받고 런타임에만 require — dependency 를
+// optional 로 내렸을 때 CLI 부트 자체는 깨지지 않게 한다.
+let pgModule: typeof import('pg') | null = null;
+function loadPg(): typeof import('pg') {
+  if (!pgModule) {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      pgModule = require('pg') as typeof import('pg');
+    } catch (err) {
+      throw new Error(
+        'pg 드라이버가 설치되어 있지 않습니다. Team 프로파일이면 `npm i pg` 실행, ' +
+          `Personal 프로파일이면 SQLite 백엔드로 전환하세요. (${(err as Error).message})`,
+      );
+    }
+  }
+  return pgModule;
+}
+
 export function getPool(): Pool {
   if (!pool) {
-    pool = new Pool(buildDbConfig());
+    const { Pool: PoolCtor } = loadPg();
+    pool = new PoolCtor(buildDbConfig());
   }
   return pool;
 }

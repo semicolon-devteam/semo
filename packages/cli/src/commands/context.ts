@@ -14,7 +14,7 @@ import ora from 'ora';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { Pool } from 'pg';
+import type { Pool } from 'pg';
 import { getPool, closeConnection, isDbConnected } from '../database';
 import { KBEntry, generateEmbeddings } from '../kb';
 // [v4.7.0] syncSkillsToDB 복원 — 워크스페이스 → DB 동기화 경로 재활성화

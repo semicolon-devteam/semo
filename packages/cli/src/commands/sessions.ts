@@ -15,7 +15,7 @@ import * as path from 'path';
 import * as readline from 'readline';
 import * as os from 'os';
 import { execSync } from 'child_process';
-import { PoolClient } from 'pg';
+import type { PoolClient } from 'pg';
 import { getPool, closeConnection, isDbConnected } from '../database';
 
 // ─── stdin reader ───────────────────────────────────────────────────────────
