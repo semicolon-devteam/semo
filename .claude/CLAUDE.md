@@ -1,6 +1,6 @@
 # semo — Claude Configuration
 
-> SEMO v4.8.0 (2026-04-15) — services/service_* 13개 테이블 KB 이식 완료
+> SEMO v4.8.0 (2026-04-15) — services/service\_\* 13개 테이블 KB 이식 완료
 > 공통 규칙(KB-First, 3자 동기화, KB CLI)은 `~/.claude/CLAUDE.md` 참조.
 
 ---
@@ -21,10 +21,12 @@ npm run lint && npx tsc --noEmit && npm run build
 
 ### CLI 배포 (팀 전파)
 
-| 패키지 | npm 이름 | 배포 트리거 |
-|--------|----------|------------|
-| `packages/cli` | `@team-semicolon/semo-cli` | `dev` 브랜치 push 시 자동 배포 |
-| `packages/mcp-kb` | `@team-semicolon/semo-mcp-kb` | Git tag `mcp-v*` |
+| 패키지            | npm 이름                      | 배포 트리거                               |
+| ----------------- | ----------------------------- | ----------------------------------------- |
+| `packages/cli`    | `@team-semicolon/semo-cli`    | Git tag `cli-v*` 또는 `workflow_dispatch` |
+| `packages/mcp-kb` | `@team-semicolon/semo-mcp-kb` | Git tag `mcp-v*`                          |
+
+`dev` push 는 dashboard Docker 빌드만 돌린다. CLI 배포 절차는 `.claude/rules/quality-gate.md` 참조.
 
 ---
 

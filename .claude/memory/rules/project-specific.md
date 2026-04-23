@@ -9,7 +9,8 @@
 - **작업 클론**: `/Users/reus/Desktop/Sources/semicolon/projects/semo/`
 - **보조 클론**: `/Users/reus/Desktop/Sources/semicolon/semo/` (동일 레포, 혼동 금지)
 - **기본 브랜치**: `dev` (feature/* → dev → main)
-- **배포**: `dev` push → GitHub Actions → OCI OKE 자동 배포
+- **배포**: `dev` push → GitHub Actions → OCI OKE 자동 배포 (대시보드 Docker 한정)
+- **CLI 배포**: Git tag `cli-v*` 푸시 또는 Actions `workflow_dispatch`. `dev` push 만으로는 npm 배포 안 됨. 절차: `.claude/rules/quality-gate.md`
 
 ---
 

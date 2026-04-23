@@ -47,6 +47,10 @@ core-db/
 .claude/*
 !.claude/memory/
 !.claude/memory/**
+!.claude/rules/
+!.claude/rules/**
+!.claude/CLAUDE.md
+!.claude/settings.json
 semo-system/
 
 # === 런타임 상태/캐시 ===
