@@ -2,6 +2,16 @@
   "name": "@team-semicolon/semo-channel-voice",
   "version": "0.1.0",
   "description": "Claude Code Channel plugin — Voice Call ↔ Session bridge (STT/TTS)",
+  "license": "Apache-2.0",
+  "author": "Semicolon DevTeam",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/semicolon-devteam/semo.git",
+    "directory": "packages/channel-voice"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "src/index.ts",
   "scripts": {
     "start": "npx tsx src/index.ts",

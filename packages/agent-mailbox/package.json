@@ -2,6 +2,16 @@
   "name": "@team-semicolon/semo-agent-mailbox",
   "version": "0.1.0",
   "description": "JSONL file-based mailbox MCP server for SEMO multi-agent sessions",
+  "license": "Apache-2.0",
+  "author": "Semicolon DevTeam",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/semicolon-devteam/semo.git",
+    "directory": "packages/agent-mailbox"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "src/index.ts",
   "scripts": {
     "start": "npx tsx src/index.ts",
@@ -10,7 +20,8 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.4.0",
-    "@team-semicolon/semo-common": "*"
+    "@team-semicolon/semo-common": "*",
+    "pg": "^8.17.2"
   },
   "devDependencies": {
     "tsx": "^4.21.0"

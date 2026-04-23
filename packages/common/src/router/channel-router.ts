@@ -1,6 +1,7 @@
 import { Pool } from 'pg';
 import type { RouteResult, ProjectContext } from '../slack/channel-types.js';
 import { loadRoutingConfig, type RoutingConfig } from './kb-routing.js';
+import { resolveBotId } from './bot-alias.js';
 
 // 채널 → 도메인 매핑 캐시 (ontology 기반, services LEFT JOIN)
 interface DomainContext {
@@ -76,8 +77,9 @@ export class Router {
     // 1. [Route: botId] 태그 직접 라우팅 (최우선)
     const routeTag = text.match(/\[Route:\s*(\w+)\]/);
     if (routeTag) {
-      const candidate = routeTag[1].toLowerCase();
-      const botId = config.validBotIds.includes(candidate) ? candidate : 'semiclaw';
+      const candidate = resolveBotId(config.aliases, routeTag[1].toLowerCase());
+      const orchestrator = resolveBotId(config.aliases, 'semiclaw');
+      const botId = config.validBotIds.includes(candidate) ? candidate : orchestrator;
       const ctx = await this.resolveDomainContext(channelId);
       return {
         botId,
@@ -145,9 +147,10 @@ export class Router {
         : sprintReview.test(text)
           ? 'review-only'
           : null;
+    const orchestratorId = resolveBotId(config.aliases, 'semiclaw');
     if (sprintPreset) {
       return {
-        botId: 'semiclaw',
+        botId: orchestratorId,
         serviceId: ctx?.serviceId || '',
         serviceDomain: ctx?.domain || '',
         phase: ctx?.currentPhase ?? -1,
@@ -161,9 +164,9 @@ export class Router {
 
     // 5. Phase 기반 라우팅 — IT서비스(services 테이블에 phase가 있는 도메인)
     if (ctx?.currentPhase !== undefined && ctx.currentPhase >= 0) {
-      const botId = config.phaseAssignees[ctx.currentPhase] || 'semiclaw';
+      const rawBotId = config.phaseAssignees[ctx.currentPhase] || orchestratorId;
       return {
-        botId,
+        botId: resolveBotId(config.aliases, rawBotId),
         serviceId: ctx.serviceId || '',
         serviceDomain: ctx.domain,
         phase: ctx.currentPhase,
@@ -176,7 +179,7 @@ export class Router {
     // 5.5. 비-서비스 도메인 — domain은 있지만 phase가 없는 경우
     if (ctx) {
       return {
-        botId: 'semiclaw',
+        botId: orchestratorId,
         serviceId: ctx.serviceId || '',
         serviceDomain: ctx.domain,
         phase: -1,
@@ -188,7 +191,7 @@ export class Router {
 
     // 6. 폴백: 채널에 매핑된 도메인 없음
     return {
-      botId: 'semiclaw',
+      botId: orchestratorId,
       serviceId: '',
       serviceDomain: '',
       phase: -1,

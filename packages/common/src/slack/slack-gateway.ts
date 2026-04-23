@@ -63,12 +63,6 @@ export class SlackGateway {
   private messageQueue: Array<{ msg: SlackMessage; senderName: string }> = [];
   private readonly BUSY_TIMEOUT_MS = 5 * 60 * 1000; // 5분 후 자동 해제
 
-  // 봇 참여 스레드 추적 — 멘션 또는 응답 성공한 스레드만 캐시
-  // Map<threadTs, lastActiveAt> — TTL 2시간, 최대 500개, LRU
-  private botThreads = new Map<string, number>();
-  private readonly BOT_THREAD_TTL = 2 * 60 * 60_000; // 2시간
-  private readonly BOT_THREAD_MAX = 500;
-
   // Event dedup — same message ts processed only once (app_mention + message race)
   private processedEvents = new Set<string>();
   private readonly PROCESSED_EVENTS_MAX = 200;
@@ -89,36 +83,42 @@ export class SlackGateway {
     this.botBotId = auth.bot_id || '';
     console.log(`[slack] Bot user: ${this.botUserId}, bot_id: ${this.botBotId}`);
 
-    // app_mention events — 봇 멘션 시 스레드 등록 + 처리
+    // app_mention events — 봇 멘션 시 처리
     this.socket.on('app_mention', async ({ event, ack }) => {
-      await ack();
+      try {
+        await ack();
+      } catch (e) {
+        console.error('[slack] ack failed (app_mention), skipping:', (e as Error).message);
+        return;
+      }
       if (event.bot_id) return; // 봇이 자기 자신을 멘션한 경우 무시
-      // 봇이 멘션된 스레드 기록 (스레드 안 멘션 시 thread_ts, 채널 멘션 시 ts)
-      const threadKey = event.thread_ts || event.ts;
-      this.trackBotThread(threadKey);
       await this.handleEvent(event);
     });
 
-    // message events — DM, 봇 참여 스레드 답글, 시스템 메시지만 처리
+    // message events — DM, 시스템 메시지만 처리 (채널 메시지는 app_mention으로 수신)
     this.socket.on('message', async ({ event, ack }) => {
-      await ack();
+      try {
+        await ack();
+      } catch (e) {
+        console.error('[slack] ack failed (message), skipping:', (e as Error).message);
+        return;
+      }
       const isSysMsg = isSystemMessage(event.text);
       if (event.bot_id && !isSysMsg) return;
 
-      const isThreadReply = event.thread_ts && event.thread_ts !== event.ts;
-
-      if (
-        event.channel_type === 'im' ||
-        isSysMsg ||
-        (isThreadReply && (await this.isBotThread(event.channel, event.thread_ts)))
-      ) {
+      if (event.channel_type === 'im' || isSysMsg) {
         await this.handleEvent(event);
       }
     });
 
     // Interactive (ask_user buttons)
     this.socket.on('interactive', async ({ body, ack }) => {
-      await ack();
+      try {
+        await ack();
+      } catch (e) {
+        console.error('[slack] ack failed (interactive), skipping:', (e as Error).message);
+        return;
+      }
       if (body.type === 'block_actions' && body.actions) {
         for (const action of body.actions) {
           const match = (action.action_id || '').match(/^semo_ask_(.+)_\d+$/);
@@ -319,8 +319,6 @@ export class SlackGateway {
         ...(profile && { username: profile.username, icon_emoji: profile.icon_emoji }),
       });
     }
-    // 응답 성공 후 스레드 등록 — 이후 스레드 답글에 반응하기 위함
-    if (threadTs) this.trackBotThread(threadTs);
   }
 
   async setTypingStatus(channel: string, threadTs: string, status: string): Promise<void> {
@@ -384,70 +382,6 @@ export class SlackGateway {
         }
       }, 120_000);
     });
-  }
-
-  // ── Bot Thread Tracking ──
-
-  /** 봇 참여 스레드 등록 (LRU: delete+set으로 삽입 순서 갱신) */
-  private trackBotThread(threadTs: string): void {
-    this.botThreads.delete(threadTs);
-    this.botThreads.set(threadTs, Date.now());
-    if (this.botThreads.size > this.BOT_THREAD_MAX) {
-      const oldest = this.botThreads.keys().next().value;
-      if (oldest) this.botThreads.delete(oldest);
-    }
-  }
-
-  /** 캐시에서 봇 참여 여부 확인 (TTL + LRU 갱신) */
-  private isBotThreadCached(threadTs: string): boolean {
-    const lastActive = this.botThreads.get(threadTs);
-    if (!lastActive) return false;
-    if (Date.now() - lastActive > this.BOT_THREAD_TTL) {
-      this.botThreads.delete(threadTs);
-      return false;
-    }
-    // LRU 갱신
-    this.botThreads.delete(threadTs);
-    this.botThreads.set(threadTs, Date.now());
-    return true;
-  }
-
-  /** 봇 참여 스레드 여부 확인 — 캐시 미스 시 Slack API lazy-check (재시작 복구) */
-  private inflightChecks = new Map<string, Promise<boolean>>();
-
-  private async isBotThread(channel: string, threadTs: string): Promise<boolean> {
-    if (this.isBotThreadCached(threadTs)) return true;
-    // Cache stampede 방지 — 동일 스레드 동시 요청 시 1회만 API 호출
-    const key = `${channel}:${threadTs}`;
-    if (this.inflightChecks.has(key)) return this.inflightChecks.get(key)!;
-    const p = this.fetchIsBotThread(channel, threadTs).finally(() =>
-      this.inflightChecks.delete(key),
-    );
-    this.inflightChecks.set(key, p);
-    return p;
-  }
-
-  private async fetchIsBotThread(channel: string, threadTs: string): Promise<boolean> {
-    try {
-      const result = await this.web.conversations.replies({
-        channel,
-        ts: threadTs,
-        limit: 30,
-      });
-      const botParticipated = result.messages?.some(
-        (m) =>
-          m.bot_id === this.botBotId ||
-          m.user === this.botUserId ||
-          (m.text || '').includes(`<@${this.botUserId}>`),
-      );
-      if (botParticipated) {
-        this.trackBotThread(threadTs);
-        return true;
-      }
-    } catch {
-      /* API 실패 시 보수적으로 미응답 */
-    }
-    return false;
   }
 
   /** 기존 메시지 내용을 갱신한다 (chat.update). */

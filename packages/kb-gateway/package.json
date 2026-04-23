@@ -1,0 +1,35 @@
+{
+  "name": "@team-semicolon/semo-kb-gateway",
+  "version": "0.1.0",
+  "description": "SEMO KB HTTP Gateway — unified read/write/embedding endpoint for all execution targets",
+  "license": "Apache-2.0",
+  "author": "Semicolon DevTeam",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/semicolon-devteam/semo.git",
+    "directory": "packages/kb-gateway"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "npx tsx src/server.ts",
+    "dev": "npx tsx --watch src/server.ts",
+    "test": "vitest --run"
+  },
+  "dependencies": {
+    "@team-semicolon/semo-common": "*",
+    "@team-semicolon/semo-kb-core": "*",
+    "@team-semicolon/semo-kb-pg": "*",
+    "fastify": "^4.28.1",
+    "pg": "^8.17.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.4"
+  }
+}

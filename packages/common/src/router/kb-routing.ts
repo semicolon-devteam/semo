@@ -6,6 +6,7 @@
  */
 
 import { Pool } from 'pg';
+import { loadBotAliases, type BotAliasMap } from './bot-alias.js';
 
 // ── Interfaces ──
 
@@ -20,6 +21,8 @@ export interface RoutingConfig {
   skillRoutes: Array<{ pattern: RegExp; botId: string; skill: string }>;
   /** 활성 봇 ID 목록 */
   validBotIds: string[];
+  /** alias → canonical bot_id 매핑 (semiclaw → semobot 등) */
+  aliases: BotAliasMap;
   /** 로드 시각 (캐시 TTL용) */
   loadedAt: number;
 }
@@ -181,12 +184,16 @@ export async function loadRoutingConfig(pool: Pool): Promise<RoutingConfig> {
     console.warn('[kb-routing] Failed to load skill routes from bot_delegation:', err);
   }
 
+  // 5. Alias 맵 (semiclaw → semobot 등)
+  const aliases = await loadBotAliases(pool);
+
   const config: RoutingConfig = {
     phaseAssignees,
     infraPhaseAssignees,
     keywordRoutes,
     skillRoutes,
     validBotIds,
+    aliases,
     loadedAt: Date.now(),
   };
 

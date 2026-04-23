@@ -1,13 +1,13 @@
 {
-  "name": "@team-semicolon/semo-common",
+  "name": "@team-semicolon/semo-kb-pg",
   "version": "0.1.0",
-  "description": "SEMO common layer — types, inbox/outbox, slack gateway, router, bot config",
+  "description": "SEMO KB PostgreSQL adapter. Depends on node-postgres; excluded from Solo bundles.",
   "license": "Apache-2.0",
   "author": "Semicolon DevTeam",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/semicolon-devteam/semo.git",
-    "directory": "packages/common"
+    "directory": "packages/kb-pg"
   },
   "publishConfig": {
     "access": "public"
@@ -16,27 +16,16 @@
   "types": "src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./solo": "./src/solo.ts",
     "./package.json": "./package.json"
   },
   "scripts": {
-    "test": "vitest --run",
-    "test:watch": "vitest"
+    "test": "vitest --run"
   },
   "dependencies": {
-    "@slack/socket-mode": "^2.0.0",
-    "@slack/web-api": "^7.0.0"
-  },
-  "peerDependencies": {
+    "@team-semicolon/semo-kb-core": "*",
     "pg": "^8.17.2"
   },
-  "peerDependenciesMeta": {
-    "pg": {
-      "optional": true
-    }
-  },
   "devDependencies": {
-    "@anthropic-ai/claude-agent-sdk": "~0.2.96",
     "@types/pg": "^8.11.0",
     "typescript": "^5.7.0",
     "vitest": "^4.1.4"

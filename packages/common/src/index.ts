@@ -9,6 +9,7 @@ export { BusyDetector } from './monitoring/busy-detector.js';
 export { resolveSpeaker, type SpeakerProfile } from './resolver/speaker-resolver.js';
 export { SlackGateway } from './slack/slack-gateway.js';
 export { Router, Router as ChannelRouter } from './router/channel-router.js';
+export { StaticRouter, type StaticRouterOptions } from './router/static-router.js';
 export { FALLBACK_BOT_IDS, SLACK_PROFILES, type BotId } from './slack/bot-config.js';
 export { SEMO_PATHS, resolveBotWorkspace } from './paths.js';
 export {
@@ -16,3 +17,9 @@ export {
   convertMarkdownToBlocks,
   type SlackPayload,
 } from './slack/markdown-to-slack.js';
+export * from './execution/index.js';
+export * from './embedding/index.js';
+export * from './messaging/index.js';
+export * from './factory/index.js';
+export * from './onboarding/index.js';
+export * from './templates/index.js';
