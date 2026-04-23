@@ -28,6 +28,10 @@ ENV NEXT_PUBLIC_SUPABASE_URL=https://zorienqtiaxyuozhxwdj.supabase.co
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpvcmllbnF0aWF4eXVvemh4d2RqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIyNDA3NzQsImV4cCI6MjA3NzgxNjc3NH0.fMA5B94OwPqUP9aVop1RQZEFFsiFDiirLHOtxLwHFpk
 # Voice signaling server URL
 ENV NEXT_PUBLIC_VOICE_SIGNALING_URL=wss://voice.semi-colon.space/signal
+# SSO cookie domain (parent-domain 쿠키로 introduction 과 세션 공유)
+# dev/prd 분리를 위해 빌드타임 ARG로 주입 (CI에서 --build-arg로 전달)
+ARG NEXT_PUBLIC_COOKIE_DOMAIN=.semi-colon.space
+ENV NEXT_PUBLIC_COOKIE_DOMAIN=$NEXT_PUBLIC_COOKIE_DOMAIN
 
 # Build Next.js app (standalone output)
 RUN npm run build
