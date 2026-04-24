@@ -1,0 +1,64 @@
+name: Publish semo-core
+
+on:
+  push:
+    tags:
+      - 'core-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 0.1.0)'
+        required: true
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies (monorepo root, workspaces linked)
+        run: npm ci --ignore-scripts --legacy-peer-deps
+
+      - name: Build semo-core
+        run: npm run build -w @team-semicolon/semo-core
+
+      - name: Update version (if manual dispatch)
+        if: github.event_name == 'workflow_dispatch'
+        working-directory: packages/cli-core
+        run: npm version ${{ github.event.inputs.version }} --no-git-tag-version --allow-same-version
+
+      - name: Publish to npm
+        working-directory: packages/cli-core
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Job Summary
+        if: success()
+        working-directory: packages/cli-core
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "## ✅ semo-core v${VERSION} 배포 성공" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| 항목 | 값 |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-----|" >> $GITHUB_STEP_SUMMARY
+          echo "| 패키지 | \`@team-semicolon/semo-core\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 버전 | \`${VERSION}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 트리거 | \`${{ github.event_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 설치" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Personal (기본 동봉)" >> $GITHUB_STEP_SUMMARY
+          echo "npm i -g @team-semicolon/semo-core@${VERSION}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Team 추가 시" >> $GITHUB_STEP_SUMMARY
+          echo "npm i -g @team-semicolon/semo-cli" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

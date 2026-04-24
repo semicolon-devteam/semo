@@ -1,7 +1,6 @@
 {
   "name": "@team-semicolon/semo-core",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "SEMO Core — L0 메타프레임워크 entry. profile 판별 후 semo-cli (Team) 또는 semo-solo (Personal) 에 dispatch.",
   "main": "dist/index.js",
   "bin": {
@@ -29,7 +28,16 @@
     "directory": "packages/cli-core"
   },
   "dependencies": {
+    "@team-semicolon/semo-solo": "^0.1.0",
     "smol-toml": "^1.6.1"
+  },
+  "peerDependencies": {
+    "@team-semicolon/semo-cli": "^4.18.0"
+  },
+  "peerDependenciesMeta": {
+    "@team-semicolon/semo-cli": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

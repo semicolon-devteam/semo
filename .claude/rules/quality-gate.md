@@ -8,10 +8,12 @@ npm run lint && npx tsc --noEmit && npm run build
 
 ## CLI 배포 (팀 전파)
 
-| 패키지            | npm 이름                      | 배포 트리거                               | 워크플로우                          |
-| ----------------- | ----------------------------- | ----------------------------------------- | ----------------------------------- |
-| `packages/cli`    | `@team-semicolon/semo-cli`    | Git tag `cli-v*` 또는 `workflow_dispatch` | `.github/workflows/publish-cli.yml` |
-| `packages/mcp-kb` | `@team-semicolon/semo-mcp-kb` | Git tag `mcp-v*`                          | `.github/workflows/publish-mcp.yml` |
+| 패키지              | npm 이름                      | 배포 트리거                                | 워크플로우                           |
+| ------------------- | ----------------------------- | ------------------------------------------ | ------------------------------------ |
+| `packages/cli`      | `@team-semicolon/semo-cli`    | Git tag `cli-v*` 또는 `workflow_dispatch`  | `.github/workflows/publish-cli.yml`  |
+| `packages/cli-core` | `@team-semicolon/semo-core`   | Git tag `core-v*` 또는 `workflow_dispatch` | `.github/workflows/publish-core.yml` |
+| `packages/cli-solo` | `@team-semicolon/semo-solo`   | Git tag `solo-v*` 또는 `workflow_dispatch` | `.github/workflows/publish-solo.yml` |
+| `packages/mcp-kb`   | `@team-semicolon/semo-mcp-kb` | Git tag `mcp-v*`                           | `.github/workflows/publish-mcp.yml`  |
 
 > **중요**: `dev` 브랜치 push 는 `packages/semo-dashboard` Docker 빌드만 트리거한다 (`dev-ci-cd.yml`). CLI npm 배포는 자동이 아니다.
 

@@ -21,10 +21,12 @@ npm run lint && npx tsc --noEmit && npm run build
 
 ### CLI 배포 (팀 전파)
 
-| 패키지            | npm 이름                      | 배포 트리거                               |
-| ----------------- | ----------------------------- | ----------------------------------------- |
-| `packages/cli`    | `@team-semicolon/semo-cli`    | Git tag `cli-v*` 또는 `workflow_dispatch` |
-| `packages/mcp-kb` | `@team-semicolon/semo-mcp-kb` | Git tag `mcp-v*`                          |
+| 패키지              | npm 이름                      | 배포 트리거                                |
+| ------------------- | ----------------------------- | ------------------------------------------ |
+| `packages/cli`      | `@team-semicolon/semo-cli`    | Git tag `cli-v*` 또는 `workflow_dispatch`  |
+| `packages/cli-core` | `@team-semicolon/semo-core`   | Git tag `core-v*` 또는 `workflow_dispatch` |
+| `packages/cli-solo` | `@team-semicolon/semo-solo`   | Git tag `solo-v*` 또는 `workflow_dispatch` |
+| `packages/mcp-kb`   | `@team-semicolon/semo-mcp-kb` | Git tag `mcp-v*`                           |
 
 `dev` push 는 dashboard Docker 빌드만 돌린다. CLI 배포 절차는 `.claude/rules/quality-gate.md` 참조.
 
