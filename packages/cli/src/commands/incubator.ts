@@ -649,7 +649,7 @@ export function registerIncubatorCommands(program: Command): void {
       }) => {
         const dashboardUrl = process.env.SEMO_DASHBOARD_URL || 'https://semo.semi-colon.space';
         const pool = getPool();
-        const { ontoRegister } = await import('../kb.js');
+        const { ontoRegister, generateEmbedding } = await import('../kb.js');
 
         const out: Record<string, unknown> = { domain: options.domain };
         const log = (msg: string) => {
@@ -713,16 +713,22 @@ export function registerIncubatorCommands(program: Command): void {
           };
           if (options.targetLaunch) metadata.target_launch_date = options.targetLaunch;
 
+          // exists early-return 으로 충돌 시점이 거의 없지만, race condition 안전망으로 ON CONFLICT
+          // 유지. 이 시점엔 항상 신규 row 이므로 metadata 는 단순 교체.
+          const embeddingText = `${projectName}: ${options.desc}`;
+          const embedding = await generateEmbedding(embeddingText);
+          const embeddingStr = embedding ? `[${embedding.join(',')}]` : null;
           try {
             await pool.query(
               `INSERT INTO semo.knowledge_base
-                 (domain, key, sub_key, content, metadata, created_by)
-               VALUES ($1, 'pipeline', 'config', $2, $3::jsonb, 'semo-incubator-cli')
+                 (domain, key, sub_key, content, metadata, created_by, embedding)
+               VALUES ($1, 'pipeline', 'config', $2, $3::jsonb, 'semo-incubator-cli', $4::vector)
                ON CONFLICT (domain, key, sub_key) DO UPDATE SET
                  content = EXCLUDED.content,
-                 metadata = COALESCE(semo.knowledge_base.metadata, '{}'::jsonb) || EXCLUDED.metadata,
+                 metadata = EXCLUDED.metadata,
+                 embedding = EXCLUDED.embedding,
                  updated_at = NOW()`,
-              [options.domain, options.desc, JSON.stringify(metadata)],
+              [options.domain, options.desc, JSON.stringify(metadata), embeddingStr],
             );
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
