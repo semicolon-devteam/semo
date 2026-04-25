@@ -621,6 +621,159 @@ export function registerIncubatorCommands(program: Command): void {
     });
 
   // ============================================================
+  // semo incubator start — CP-1 신규/기존 프로젝트 온보딩
+  //   • 도메인 충돌 검사 → 신규면 ontology + KB pipeline/config 등록
+  //   • 대시보드 callback 으로 incubator-checkpoint=1 등록
+  //   • 결과: service_id, dashboard URL, 다음 CP 안내
+  // ============================================================
+
+  incubator
+    .command('start')
+    .description('CP-1 온보딩 — 신규 프로젝트 등록 또는 기존 프로젝트 resume')
+    .requiredOption('--domain <domain>', '서비스 도메인 (예: coffeehub)')
+    .requiredOption('--po <po>', 'PO (담당자 닉네임 또는 도메인)')
+    .requiredOption('--desc <desc>', '한 줄 설명')
+    .option('--name <name>', '프로젝트 이름 (미지정 시 도메인을 사용)')
+    .option('--target-launch <date>', '목표 런칭 시점 (YYYY-MM-DD)')
+    .option('--preset <preset>', '인큐베이터 프리셋 (sequential | parallel)', 'sequential')
+    .option('--json', '결과를 JSON 으로 출력 (봇 파싱용)')
+    .action(
+      async (options: {
+        domain: string;
+        po: string;
+        desc: string;
+        name?: string;
+        targetLaunch?: string;
+        preset: string;
+        json?: boolean;
+      }) => {
+        const dashboardUrl = process.env.SEMO_DASHBOARD_URL || 'https://semo.semi-colon.space';
+        const pool = getPool();
+        const { ontoRegister } = await import('../kb.js');
+
+        const out: Record<string, unknown> = { domain: options.domain };
+        const log = (msg: string) => {
+          if (!options.json) console.log(msg);
+        };
+
+        try {
+          // 1. 기존 등록 확인 (raw SQL — pipeline/config 는 schema 상 singleton 으로 등록되어 있어
+          //    kbGet/kbUpsert 의 splitKey 검증을 피한다. service-migrate.ts 와 동일 패턴.)
+          const existingRes = await pool.query(
+            `SELECT content, metadata FROM semo.knowledge_base
+             WHERE domain = $1 AND key = 'pipeline' AND sub_key = 'config'`,
+            [options.domain],
+          );
+          if (existingRes.rowCount && existingRes.rowCount > 0) {
+            const m = (existingRes.rows[0].metadata ?? {}) as Record<string, unknown>;
+            out.status = 'exists';
+            out.service_id = m.service_id ?? options.domain;
+            out.current_phase = m.current_phase ?? 0;
+            out.dashboard_url = `${dashboardUrl}/projects/${m.service_id ?? options.domain}`;
+            log(chalk.yellow(`이미 등록된 프로젝트: ${options.domain}`));
+            log(chalk.gray(`  service_id: ${out.service_id}`));
+            log(chalk.gray(`  current_phase: ${out.current_phase}`));
+            log(chalk.gray(`  대시보드: ${out.dashboard_url}`));
+            log(
+              chalk.cyan('  → resume 가 필요하면 semo incubator resume --domain ' + options.domain),
+            );
+            if (options.json) console.log(JSON.stringify(out, null, 2));
+            return;
+          }
+
+          // 2. ontology 등록 (없으면 service 타입으로)
+          const ontoRes = await ontoRegister(pool, {
+            domain: options.domain,
+            entity_type: 'service',
+            description: options.desc,
+            tags: ['incubator', 'cp1'],
+          });
+          if (!ontoRes.success && !/이미 등록/.test(ontoRes.error || '')) {
+            console.error(chalk.red(`ontology 등록 실패: ${ontoRes.error}`));
+            process.exit(1);
+          }
+
+          // 3. service_id 발급 + KB pipeline/config upsert (raw SQL)
+          const serviceId = (
+            globalThis.crypto?.randomUUID
+              ? globalThis.crypto.randomUUID()
+              : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}`
+          ) as string;
+          const projectName = options.name || options.domain;
+          const metadata: Record<string, unknown> = {
+            service_id: serviceId,
+            project_name: projectName,
+            owner_name: options.po,
+            status: 'discovery',
+            lifecycle: 'build',
+            current_phase: 0,
+            preset: options.preset,
+            service_type: 'incubator',
+            created_at: new Date().toISOString(),
+          };
+          if (options.targetLaunch) metadata.target_launch_date = options.targetLaunch;
+
+          try {
+            await pool.query(
+              `INSERT INTO semo.knowledge_base
+                 (domain, key, sub_key, content, metadata, created_by)
+               VALUES ($1, 'pipeline', 'config', $2, $3::jsonb, 'semo-incubator-cli')
+               ON CONFLICT (domain, key, sub_key) DO UPDATE SET
+                 content = EXCLUDED.content,
+                 metadata = COALESCE(semo.knowledge_base.metadata, '{}'::jsonb) || EXCLUDED.metadata,
+                 updated_at = NOW()`,
+              [options.domain, options.desc, JSON.stringify(metadata)],
+            );
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(chalk.red(`KB upsert 실패: ${msg}`));
+            process.exit(1);
+          }
+
+          // 4. 대시보드 callback (best-effort)
+          let callbackOk = false;
+          try {
+            const cb = await fetch(`${dashboardUrl}/api/projects/callback`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'incubator-checkpoint',
+                service_id: serviceId,
+                checkpoint: 1,
+                status: 'in-progress',
+                summary: `${projectName} 인큐베이팅 시작 (PO=${options.po})`,
+                bot_id: 'semiclaw',
+              }),
+              signal: AbortSignal.timeout(10000),
+            });
+            callbackOk = cb.ok;
+          } catch {
+            callbackOk = false;
+          }
+
+          out.status = 'created';
+          out.service_id = serviceId;
+          out.project_name = projectName;
+          out.dashboard_url = `${dashboardUrl}/projects/${serviceId}`;
+          out.callback_ok = callbackOk;
+          out.next_cp = 2;
+          out.next_owner = 'planclaw';
+
+          log(chalk.green(`✅ ${projectName} 인큐베이팅 시작 (CP-1 등록 완료)`));
+          log(chalk.gray(`  service_id: ${serviceId}`));
+          log(chalk.gray(`  도메인: ${options.domain}`));
+          log(chalk.gray(`  PO: ${options.po}`));
+          log(chalk.gray(`  대시보드 callback: ${callbackOk ? '성공' : '실패 (KB 등록만 반영)'}`));
+          log(chalk.cyan(`  대시보드: ${out.dashboard_url}`));
+          log(chalk.cyan(`  다음: CP-2 요구사항 디스커버리 → @planclaw`));
+          if (options.json) console.log(JSON.stringify(out, null, 2));
+        } finally {
+          await closeConnection();
+        }
+      },
+    );
+
+  // ============================================================
   // Sandbox subcommands
   // ============================================================
 
