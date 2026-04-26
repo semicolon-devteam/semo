@@ -309,6 +309,41 @@ export function checkSeatPool(opsDbPath: string | undefined): CheckResult {
   }
 }
 
+/**
+ * kernel/skills 디렉터리에 BUILTIN_KERNEL_SKILLS 가 머티리얼라이즈 되었는지.
+ * `semo update` 가 한 번 이상 실행됐는지 판정하는 용도.
+ */
+export function checkKernelSkills(expectedIds: readonly string[]): CheckResult {
+  const id = 'kernel-skills';
+  const label = 'kernel skills 머티리얼라이즈';
+  if (expectedIds.length === 0) {
+    return { id, label, level: 'skip', detail: 'BUILTIN_KERNEL_SKILLS 없음' };
+  }
+  const root = path.join(kernelDir(), 'skills');
+  if (!fs.existsSync(root)) {
+    return {
+      id,
+      label,
+      level: 'fail',
+      detail: `${root} 없음 — \`semo update\` 실행 필요`,
+    };
+  }
+  const missing: string[] = [];
+  for (const skillId of expectedIds) {
+    const file = path.join(root, skillId, 'SKILL.md');
+    if (!fs.existsSync(file)) missing.push(skillId);
+  }
+  if (missing.length > 0) {
+    return {
+      id,
+      label,
+      level: 'fail',
+      detail: `누락: ${missing.join(', ')} — \`semo update\` 실행`,
+    };
+  }
+  return { id, label, level: 'ok', detail: `${expectedIds.length}개` };
+}
+
 /** 임베딩 프로바이더 체크 — Ollama 프로바이더는 checkOllama 가 대신 커버 */
 export function checkEmbedding(cfg: SemoConfig): CheckResult {
   const id = 'embedding';
@@ -362,6 +397,21 @@ export async function runDoctor(
   checks.push(...checkMessagingCredentials(cfg.messaging.sources));
   checks.push(checkExecution(cfg));
   checks.push(checkEmbedding(cfg));
+
+  try {
+    const mod = (await import('@team-semicolon/semo-common')) as {
+      BUILTIN_KERNEL_SKILLS?: ReadonlyArray<{ id: string }>;
+    };
+    const ids = (mod.BUILTIN_KERNEL_SKILLS ?? []).map((s) => s.id);
+    checks.push(checkKernelSkills(ids));
+  } catch {
+    checks.push({
+      id: 'kernel-skills',
+      label: 'kernel skills 머티리얼라이즈',
+      level: 'skip',
+      detail: '@team-semicolon/semo-common 미로딩',
+    });
+  }
 
   const wantedModels: string[] = [];
   const ollamaHost =
@@ -438,6 +488,7 @@ export const __testables = {
   checkExecution,
   checkSeatPool,
   checkEmbedding,
+  checkKernelSkills,
   runDoctor,
   renderReport,
 };

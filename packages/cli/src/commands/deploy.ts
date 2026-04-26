@@ -47,6 +47,10 @@ function buildPersonalPlaybook(
       argv: ['init', '--profile', profile, ...(opts.force ? ['--force'] : [])],
     },
     {
+      label: '3-layer 레이아웃 + kernel 스킬 머티리얼라이즈',
+      argv: ['update'],
+    },
+    {
       label: 'SQLite 마이그레이션 (kb + ops)',
       argv: ['migrate-sqlite'],
     },

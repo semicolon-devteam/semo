@@ -15,6 +15,7 @@ const {
   checkSeatPool,
   checkEmbedding,
   checkOllama,
+  checkKernelSkills,
   runDoctor,
   renderReport,
 } = __testables;
@@ -285,6 +286,42 @@ describe('doctor — checkOllama (mocked fetch)', () => {
     );
     expect(out[1].level).toBe('fail');
     expect(out[1].detail).toContain('ollama pull');
+  });
+});
+
+describe('doctor — checkKernelSkills', () => {
+  it('expectedIds 비어있음 → skip', () => {
+    const r = checkKernelSkills([]);
+    expect(r.level).toBe('skip');
+  });
+
+  it('SEMO_HOME 의 kernel/skills 누락 → fail', () => {
+    const dir = mkTmp();
+    const prev = process.env.SEMO_HOME;
+    process.env.SEMO_HOME = dir;
+    try {
+      const r = checkKernelSkills(['factory-conversation']);
+      expect(r.level).toBe('fail');
+    } finally {
+      if (prev) process.env.SEMO_HOME = prev;
+      else delete process.env.SEMO_HOME;
+    }
+  });
+
+  it('skill 파일 모두 존재 → ok', () => {
+    const dir = mkTmp();
+    const skillDir = path.join(dir, 'kernel', 'skills', 'factory-conversation');
+    fs.mkdirSync(skillDir, { recursive: true });
+    fs.writeFileSync(path.join(skillDir, 'SKILL.md'), 'X');
+    const prev = process.env.SEMO_HOME;
+    process.env.SEMO_HOME = dir;
+    try {
+      const r = checkKernelSkills(['factory-conversation']);
+      expect(r.level).toBe('ok');
+    } finally {
+      if (prev) process.env.SEMO_HOME = prev;
+      else delete process.env.SEMO_HOME;
+    }
   });
 });
 
