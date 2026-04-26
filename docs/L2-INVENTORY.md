@@ -33,7 +33,7 @@ ON CONFLICT (domain) DO UPDATE SET ...;
 - 영향: `semo migrate` 가 신규 PG 인스턴스에 `jungchipan`/`playland` ontology 행을 시드함.
 - 외부 고객은 자기 ontology 가 아닌 세미콜론 L2 서비스를 자동 보유.
 - `semicolon` org row 도 함께 시드 — 이는 해석에 따라 OK (L0 이 "your org" placeholder 로 둘 수 있음).
-- **조치**: 신규 마이그레이션 (`migrations/078_drop_l2_ontology_seeds.sql`) 으로 `jungchipan`, `playland` 행 삭제. `semicolon` 은 `{tenant}` placeholder 로 대체하거나 install 시 `semo init` 가 채우도록 변경.
+- **조치 (적용 완료, 2026-04-26)**: `migrations/108_drop_l2_ontology_seeds.sql` 에서 `jungchipan`, `playland` 행 조건부 삭제 (해당 도메인 KB 데이터 0건일 때만). `semicolon` org row 는 그대로 유지 (현재 `init` 가 자동 placeholder 처리하지 않으므로 P1 에서 처리).
 
 ---
 
