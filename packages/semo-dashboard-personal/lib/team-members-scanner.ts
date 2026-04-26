@@ -3,14 +3,14 @@ import type { TeamMember } from '@/lib/shared-ui';
 import { kbDb } from './kb-db';
 
 // kb.db 에서 person 엔트리를 찾는 휴리스틱:
-//   (key='profile', sub_key='nickname') = 표시용 닉네임
-//   (key='profile', sub_key='role')     = 역할 라벨
+//   key='nickname'                     = 표시용 닉네임 (singleton)
+//   key='role', sub_key='overall'      = 전체 역할 라벨 (collection)
 // 닉네임이 있는 도메인만 팀 멤버로 승격. Personal 초기 설치에는 이 엔트리가 비어있으므로
 // 대부분 readTeamMembers 의 self fallback 이 동작한다. SemoBot 온보딩이 엔트리를 생성하면
 // 자연스럽게 여기서 스캔되어 목록이 채워진다.
 //
-// knowledge_base 에 `UNIQUE(domain, key, sub_key)` 제약이 있으므로 domain 당 각 sub_key
-// 는 최대 1건이다. MAX(CASE ...) 집계는 그 단일 값을 그대로 골라낸다.
+// knowledge_base 에 `UNIQUE(domain, key, sub_key)` 제약이 있으므로 (domain, key, sub_key)
+// 조합당 최대 1건. MAX(CASE ...) 집계는 그 단일 값을 그대로 골라낸다.
 function scanTeamFromKb(): TeamMember[] {
   const db = kbDb();
   if (!db) return [];
@@ -18,10 +18,10 @@ function scanTeamFromKb(): TeamMember[] {
     const rows = db
       .prepare(
         `SELECT domain,
-                MAX(CASE WHEN sub_key='nickname' THEN content END) AS nickname,
-                MAX(CASE WHEN sub_key='role'     THEN content END) AS role
+                MAX(CASE WHEN key='nickname' THEN content END) AS nickname,
+                MAX(CASE WHEN key='role' AND sub_key='overall' THEN content END) AS role
          FROM knowledge_base
-         WHERE key='profile' AND sub_key IN ('nickname','role')
+         WHERE key IN ('nickname', 'role')
          GROUP BY domain
          HAVING nickname IS NOT NULL AND length(nickname) > 0
          ORDER BY domain ASC`,
