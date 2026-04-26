@@ -64,6 +64,8 @@
   },
   "files": [
     "dist",
+    "migrations",
+    "migrations-sqlite",
     "README.md"
   ]
 }
