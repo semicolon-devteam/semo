@@ -23,3 +23,4 @@ export * from './messaging/index.js';
 export * from './factory/index.js';
 export * from './onboarding/index.js';
 export * from './templates/index.js';
+export * from './skills/index.js';

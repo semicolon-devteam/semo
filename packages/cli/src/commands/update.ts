@@ -23,6 +23,50 @@ import {
   type HooksManifest,
 } from './hooks-verify.js';
 
+interface KernelSkillEntry {
+  readonly id: string;
+  readonly summary: string;
+  readonly skillMd: string;
+}
+
+async function loadBuiltinKernelSkills(): Promise<readonly KernelSkillEntry[]> {
+  try {
+    const mod = (await import('@team-semicolon/semo-common')) as {
+      BUILTIN_KERNEL_SKILLS?: readonly KernelSkillEntry[];
+    };
+    return mod.BUILTIN_KERNEL_SKILLS ?? [];
+  } catch {
+    return [];
+  }
+}
+
+interface MaterializeResult {
+  written: string[];
+  unchanged: string[];
+}
+
+export function materializeKernelSkills(
+  skills: readonly KernelSkillEntry[],
+  targetRoot: string = path.join(kernelDir(), 'skills'),
+): MaterializeResult {
+  const written: string[] = [];
+  const unchanged: string[] = [];
+  fs.mkdirSync(targetRoot, { recursive: true });
+  for (const skill of skills) {
+    const dir = path.join(targetRoot, skill.id);
+    const file = path.join(dir, 'SKILL.md');
+    fs.mkdirSync(dir, { recursive: true });
+    const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+    if (existing === skill.skillMd) {
+      unchanged.push(skill.id);
+      continue;
+    }
+    fs.writeFileSync(file, skill.skillMd);
+    written.push(skill.id);
+  }
+  return { written, unchanged };
+}
+
 const PACKAGE_NAME = '@team-semicolon/semo-cli';
 
 interface VersionInfo {
@@ -139,6 +183,22 @@ export function registerUpdateCommand(program: Command): void {
         console.log(chalk.gray('레이아웃 이미 존재'));
       }
 
+      const builtinSkills = await loadBuiltinKernelSkills();
+      if (builtinSkills.length > 0) {
+        const res = materializeKernelSkills(builtinSkills);
+        if (res.written.length > 0) {
+          console.log(
+            chalk.cyan(
+              `kernel skills 적용: ${res.written.length}개 갱신` +
+                (res.unchanged.length > 0 ? `, ${res.unchanged.length}개 변경 없음` : ''),
+            ),
+          );
+          for (const id of res.written) console.log(`  + ${id}`);
+        } else {
+          console.log(chalk.gray(`kernel skills: ${res.unchanged.length}개 변경 없음`));
+        }
+      }
+
       const manifestPath = defaultManifestPath();
       if (fs.existsSync(manifestPath)) {
         try {
@@ -186,4 +246,4 @@ export function registerUpdateCommand(program: Command): void {
     });
 }
 
-export const __testables = { compareSemver, readInstalledVersion };
+export const __testables = { compareSemver, readInstalledVersion, materializeKernelSkills };

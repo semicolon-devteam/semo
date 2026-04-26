@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import { __testables } from './update.js';
 
-const { compareSemver, readInstalledVersion } = __testables;
+const { compareSemver, readInstalledVersion, materializeKernelSkills } = __testables;
 
 describe('semo update — compareSemver', () => {
   it('동일 버전은 0', () => {
@@ -35,5 +38,44 @@ describe('semo update — readInstalledVersion', () => {
     const v = readInstalledVersion();
     expect(typeof v).toBe('string');
     expect(v.length).toBeGreaterThan(0);
+  });
+});
+
+describe('semo update — materializeKernelSkills', () => {
+  function tmpDir(): string {
+    return fs.mkdtempSync(path.join(os.tmpdir(), 'semo-kernel-skills-'));
+  }
+
+  it('빈 디렉터리에 skill 본문 작성', () => {
+    const dir = tmpDir();
+    const res = materializeKernelSkills(
+      [{ id: 'foo', summary: 's', skillMd: '---\nname: foo\n---\nbody' }],
+      dir,
+    );
+    expect(res.written).toEqual(['foo']);
+    expect(res.unchanged).toEqual([]);
+    expect(fs.readFileSync(path.join(dir, 'foo', 'SKILL.md'), 'utf8')).toBe(
+      '---\nname: foo\n---\nbody',
+    );
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  it('동일 본문이면 written 에 포함되지 않는다 (no-op)', () => {
+    const dir = tmpDir();
+    const skill = { id: 'foo', summary: 's', skillMd: 'X' };
+    materializeKernelSkills([skill], dir);
+    const res2 = materializeKernelSkills([skill], dir);
+    expect(res2.written).toEqual([]);
+    expect(res2.unchanged).toEqual(['foo']);
+    fs.rmSync(dir, { recursive: true });
+  });
+
+  it('본문이 다르면 덮어쓴다', () => {
+    const dir = tmpDir();
+    materializeKernelSkills([{ id: 'foo', summary: 's', skillMd: 'A' }], dir);
+    const res = materializeKernelSkills([{ id: 'foo', summary: 's', skillMd: 'B' }], dir);
+    expect(res.written).toEqual(['foo']);
+    expect(fs.readFileSync(path.join(dir, 'foo', 'SKILL.md'), 'utf8')).toBe('B');
+    fs.rmSync(dir, { recursive: true });
   });
 });
