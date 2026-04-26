@@ -258,7 +258,7 @@ describe('P2.2 Personal 컨포먼스 — Ollama dispatch (fetch 모킹)', () => 
 });
 
 describe('P2.3 Personal 컨포먼스 — 임베딩 프로바이더 조립', () => {
-  it('buildEmbeddingProvider: embedding 미지정 → noop (FTS5 only)', () => {
+  it('buildEmbeddingProvider: embedding 미지정 → noop (FTS5 only)', async () => {
     const cfg: SemoConfig = {
       schema_version: '1.0',
       profile: 'solo-offline',
@@ -268,11 +268,8 @@ describe('P2.3 Personal 컨포먼스 — 임베딩 프로바이더 조립', () =
       execution: { target: 'ollama' },
       network: { mode: 'offline' },
     };
-    const p = buildEmbeddingProvider(cfg);
-    // noop 은 빈 벡터를 반환
-    return p.embed('test').then((v) => {
-      expect(v).toEqual([]);
-    });
+    const p = await buildEmbeddingProvider(cfg);
+    expect(await p.embed('test')).toEqual([]);
   });
 
   it('buildEmbeddingProvider: provider=none 도 noop', async () => {
@@ -286,12 +283,11 @@ describe('P2.3 Personal 컨포먼스 — 임베딩 프로바이더 조립', () =
       network: { mode: 'offline' },
       embedding: { provider: 'none' },
     };
-    const p = buildEmbeddingProvider(cfg);
-    const v = await p.embed('test');
-    expect(v).toEqual([]);
+    const p = await buildEmbeddingProvider(cfg);
+    expect(await p.embed('test')).toEqual([]);
   });
 
-  it('buildEmbeddingProvider: provider=ollama → OllamaEmbeddingProvider', () => {
+  it('buildEmbeddingProvider: provider=ollama → OllamaEmbeddingProvider', async () => {
     const cfg: SemoConfig = {
       schema_version: '1.0',
       profile: 'solo-offline',
@@ -302,13 +298,13 @@ describe('P2.3 Personal 컨포먼스 — 임베딩 프로바이더 조립', () =
       network: { mode: 'offline' },
       embedding: { provider: 'ollama', model: 'nomic-embed-text', dim: 768 },
     };
-    const p = buildEmbeddingProvider(cfg);
+    const p = await buildEmbeddingProvider(cfg);
     expect(p).toBeInstanceOf(OllamaEmbeddingProvider);
     expect((p as OllamaEmbeddingProvider).id).toBe('ollama:nomic-embed-text');
     expect((p as OllamaEmbeddingProvider).dim).toBe(768);
   });
 
-  it('buildEmbeddingProvider: provider=openai → OpenAIEmbeddingProvider (api_key_env 해석)', () => {
+  it('buildEmbeddingProvider: provider=openai → OpenAIEmbeddingProvider (api_key_env 해석)', async () => {
     const prev = process.env.TEST_OPENAI_KEY;
     process.env.TEST_OPENAI_KEY = 'sk-test';
     try {
@@ -327,7 +323,7 @@ describe('P2.3 Personal 컨포먼스 — 임베딩 프로바이더 조립', () =
           api_key_env: 'TEST_OPENAI_KEY',
         },
       };
-      const p = buildEmbeddingProvider(cfg);
+      const p = await buildEmbeddingProvider(cfg);
       expect(p).toBeInstanceOf(OpenAIEmbeddingProvider);
       expect((p as OpenAIEmbeddingProvider).id).toBe('openai:text-embedding-3-small');
     } finally {
