@@ -62,7 +62,7 @@ function makeInbox(overrides: Partial<InboxMessage> = {}): Omit<InboxMessage, 'i
     channel_id: 'dm-123',
     thread_id: '',
     message_id: 'msg-1',
-    sender_name: 'reus',
+    sender_name: 'alice',
     sender_id: 'user-1',
     text: '안녕',
     route_reason: 'fallback',

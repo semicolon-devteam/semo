@@ -159,11 +159,11 @@ describe('P2.2 Personal 컨포먼스 — config → migrate → stores', () => {
     const stores = await openStores(cfg);
     try {
       await stores.kb.upsert({
-        domain: 'reus',
+        domain: 'alice',
         key: 'role',
         content: 'SEMO 플랫폼 프로덕션 오너',
       });
-      const got = await stores.kb.get('reus', 'role');
+      const got = await stores.kb.get('alice', 'role');
       expect(got).not.toBeNull();
       expect(got?.content).toContain('SEMO');
 
@@ -361,7 +361,7 @@ describe('P2.3 Personal 컨포먼스 — 임베딩 프로바이더 조립', () =
       const stores = await openStores(cfg);
       try {
         await stores.kb.upsert({
-          domain: 'reus',
+          domain: 'alice',
           key: 'note',
           content: '한국어 임베딩 통합 테스트',
         });

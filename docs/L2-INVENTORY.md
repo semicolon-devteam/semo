@@ -104,7 +104,7 @@ JSDoc 예시: `"axoracle-blog"`, `"growthclaw/axoracle-blog"`.
 
 `'reus'`, `'garden'` 같은 팀원 닉네임이 fixture 로 등장. 외부에 노출되지만 동작 영향 없음.
 
-- **조치**: P1 에서 fixture 를 `'alice'`/`'bob'` 같은 generic 이름으로 교체 (선택).
+- **조치 (적용 완료, 2026-04-26)**: 팀원 닉네임 → generic (`alice`). 두 conformance 테스트 모두 통과.
 
 ### 11. `packages/common/src/onboarding/default-steps.ts:8`
 
@@ -177,7 +177,7 @@ JSDoc 의 도메인명 예시만 generic 화 하면 완료.
 | MEDIUM (실행)           | 1 (migration 015 description)                                | ✅ 015 인라인 + migration 109 적용 완료 |
 | MEDIUM (주석/JSDoc)     | 3 (`templates/types.ts`, `builtin.ts`, `default-steps.ts:8`) | ✅ 일괄 generic 화 완료                 |
 | LOW (dashboard)         | 4                                                            | P4 dashboard 분리 시 처리               |
-| MEDIUM (test fixture)   | 2 (cli/personal-conformance \*.ts)                           | P1 점진적                               |
+| MEDIUM (test fixture)   | 2 (cli/personal-conformance \*.ts)                           | ✅ alice 로 교체 완료                   |
 | OK (계약 테스트/의도적) | 4                                                            | 변경 불필요                             |
 
 **OSS 1차 배포 차단 항목 = 0건**. 남은 작업은 LOW (dashboard 분리) 와 점진적 정리 뿐.
