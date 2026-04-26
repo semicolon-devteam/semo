@@ -7,7 +7,27 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import type { Pool } from 'pg';
 import { getPool, closeConnection, isDbConnected } from '../database';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+async function resolveActionItemId(pool: Pool, input: string): Promise<string> {
+  if (UUID_RE.test(input)) return input;
+  const res = await pool.query(
+    `SELECT action_item_id FROM semo.action_items WHERE action_item_id::text LIKE $1`,
+    [`${input.toLowerCase()}%`],
+  );
+  if (res.rows.length === 0) {
+    throw new Error(`'${input}' 와 일치하는 액션 아이템이 없습니다`);
+  }
+  if (res.rows.length > 1) {
+    throw new Error(
+      `'${input}' 가 ${res.rows.length}건과 일치합니다. 더 긴 prefix 또는 전체 UUID 사용`,
+    );
+  }
+  return res.rows[0].action_item_id;
+}
 
 export function registerActionItemsCommands(program: Command): void {
   const cmd = program.command('action-items').description('액션 아이템 관리 (DB SoT)');
@@ -71,6 +91,7 @@ export function registerActionItemsCommands(program: Command): void {
     .option('--target <domain>', '대상 서비스 필터')
     .option('--status <status>', '상태 필터 (open|completed|cancelled)')
     .option('--limit <n>', '최대 건수', '20')
+    .option('--format <fmt>', '출력 형식 (table|json)', 'table')
     .action(async (opts) => {
       if (!(await isDbConnected())) {
         console.error(chalk.red('DB 연결 실패'));
@@ -105,6 +126,11 @@ export function registerActionItemsCommands(program: Command): void {
            LIMIT $${idx}`,
           params,
         );
+
+        if (opts.format === 'json') {
+          console.log(JSON.stringify(res.rows, null, 2));
+          return;
+        }
 
         if (res.rows.length === 0) {
           console.log(chalk.yellow('액션 아이템 없음'));
@@ -194,7 +220,8 @@ export function registerActionItemsCommands(program: Command): void {
           process.exit(1);
         }
 
-        params.push(id);
+        const resolvedId = await resolveActionItemId(pool, id);
+        params.push(resolvedId);
         const res = await pool.query(
           `UPDATE semo.action_items SET ${sets.join(', ')} WHERE action_item_id = $${idx} RETURNING action_item_id, status, description`,
           params,
@@ -225,10 +252,11 @@ export function registerActionItemsCommands(program: Command): void {
       }
       const pool = getPool();
       try {
+        const resolvedId = await resolveActionItemId(pool, id);
         const res = await pool.query(
           `UPDATE semo.action_items SET status = 'completed', completed_at = NOW()
            WHERE action_item_id = $1 RETURNING action_item_id, description`,
-          [id],
+          [resolvedId],
         );
         if (res.rows.length === 0) {
           console.error(chalk.red(`아이템 ${id} 없음`));
