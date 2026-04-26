@@ -11,7 +11,7 @@ ALTER TABLE semo.bot_commitments
   ADD COLUMN IF NOT EXISTS pipeline_context JSONB DEFAULT '{}';
 
 COMMENT ON COLUMN semo.bot_commitments.assigned_session IS '이 commitment를 처리 중인 세션 키';
-COMMENT ON COLUMN semo.bot_commitments.session_owner IS '세션 소유자 (reus-local, agent-sdk 등)';
+COMMENT ON COLUMN semo.bot_commitments.session_owner IS '세션 소유자 ({user}-local, {bot}-cron-local 등)';
 COMMENT ON COLUMN semo.bot_commitments.pipeline_context IS '파이프라인 컨텍스트 (service_id, phase, section_key 등)';
 
 -- ── Phase 3: bot_sessions 확장 ──
@@ -25,7 +25,7 @@ ALTER TABLE semo.bot_sessions
   ADD COLUMN IF NOT EXISTS ended_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS context JSONB DEFAULT '{}';
 
-COMMENT ON COLUMN semo.bot_sessions.owner IS '세션 소유자 (reus-local, mark-local 등)';
+COMMENT ON COLUMN semo.bot_sessions.owner IS '세션 소유자 ({user}-local, {bot}-cron-local 등)';
 COMMENT ON COLUMN semo.bot_sessions.environment IS '실행 환경 (claude-code, agent-sdk, openclaw)';
 COMMENT ON COLUMN semo.bot_sessions.status IS '세션 상태 (active, idle, terminated)';
 COMMENT ON COLUMN semo.bot_sessions.spawned_by IS '이 세션을 생성한 상위 세션 키';

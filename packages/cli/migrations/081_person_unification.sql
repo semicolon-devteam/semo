@@ -26,16 +26,11 @@ WHERE type_key = 'person' AND scheme_key = 'role';
 -- 3. ontology: team → person 타입 변경
 UPDATE semo.ontology SET entity_type = 'person' WHERE entity_type = 'team';
 
--- 4. 기존 내부 팀원에 organization='semicolon' 자동 삽입
-INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by)
-SELECT o.domain, 'organization', '', 'semicolon', 'migration-076'
-FROM semo.ontology o
-WHERE o.entity_type = 'person'
-  AND o.domain IN ('reus','garden','roki','bon','goni','harry','kai','kevin','kibaek','kyago','mark','bae','yeomso')
-  AND NOT EXISTS (
-    SELECT 1 FROM semo.knowledge_base kb
-    WHERE kb.domain = o.domain AND kb.key = 'organization'
-  );
+-- 4. 기존 person 도메인에 organization 키 placeholder 삽입 (인스턴스별 수동 채움)
+-- 세미콜론 내부 backfill 은 이 migration 이 처음 적용된 시점에 한해 효력 발휘.
+-- OSS fresh install: 이 시점에 person 도메인 자체가 0건이므로 no-op.
+-- (이전 버전은 세미콜론 팀원 13명 닉네임을 IN 절에 포함했으나 누출 방지를 위해 제거됨.)
+-- organization 키 값은 인스턴스가 직접 채워야 한다 — 자동 시드하지 않음.
 
 -- 5. team 타입 스키마 제거
 DELETE FROM semo.kb_type_schema WHERE type_key = 'team';

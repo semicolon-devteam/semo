@@ -334,13 +334,10 @@ export function registerSessionsCommands(program: Command): void {
           .sort((a, b) => b.mtime - a.mtime);
         transcripts = files.map((f) => f.path);
       } else {
-        // 기본: 현재 semo 프로젝트의 세션 디렉토리
-        const semoSessionDir = path.join(
-          os.homedir(),
-          '.claude',
-          'projects',
-          '-Users-reus-Desktop-Sources-semicolon-projects-semo',
-        );
+        // 기본: 현재 작업 디렉토리의 Claude Code 세션 디렉토리
+        // Claude Code 는 cwd 의 '/' 를 '-' 로 치환하여 ~/.claude/projects/ 하위에 저장한다.
+        const projectSlug = process.cwd().replace(/\//g, '-');
+        const semoSessionDir = path.join(os.homedir(), '.claude', 'projects', projectSlug);
         if (fs.existsSync(semoSessionDir)) {
           const hours = parseInt(options.hours) || 24;
           const cutoff = Date.now() - hours * 60 * 60 * 1000;

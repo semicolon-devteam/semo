@@ -663,7 +663,7 @@ export function registerBotsCommands(program: Command): void {
     .option('--no-db', 'DB 저장 건너뛰기')
     .option('--local', '~/.claude/semo/bots/ 로컬 미러 audit')
     .action(async (options) => {
-      const home = process.env.HOME || '/Users/reus';
+      const home = process.env.HOME || os.homedir();
 
       const isLocal = options.local === true;
       const sourceLabel = isLocal ? '~/.claude/semo/bots/' : '~/.semo/workspaces/*/';

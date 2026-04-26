@@ -35,9 +35,65 @@ ON CONFLICT (domain) DO UPDATE SET ...;
 - `semicolon` org row 도 함께 시드 — 이는 해석에 따라 OK (L0 이 "your org" placeholder 로 둘 수 있음).
 - **조치 (적용 완료, 2026-04-26)**: `migrations/108_drop_l2_ontology_seeds.sql` 에서 `jungchipan`, `playland` 행 조건부 삭제 (해당 도메인 KB 데이터 0건일 때만). `semicolon` org row 는 그대로 유지 (현재 `init` 가 자동 placeholder 처리하지 않으므로 P1 에서 처리).
 
+### 1b. `packages/cli/migrations/030_team_ontology.sql:50-61`
+
+세미콜론 팀원 10명 ontology row 자동 시드 (`reus`, `garden`, `roki`, `yeomso`, `bon`, `kyago`, `bae`, `harry`, `goni`, `kai`) — 본명/역할 포함.
+
+- 영향: fresh install 시 외부 고객 DB 에 세미콜론 팀원 ontology 자동 등록.
+- **조치 (적용 완료, 2026-04-26)**: 030 인라인에서 INSERT 블록 제거 (스키마 셋업만 유지) + `migrations/111_drop_l2_team_ontology_seeds.sql` 가 기존 인스턴스의 KB 데이터 0건 row 만 삭제.
+
+### 1c. `packages/cli/migrations/027_kb_manager_skill.sql:10`, `031_kb_manager_domain_register.sql:9`
+
+`skill_definitions(name='kb-manager')` 의 prompt 에 L2 leakage:
+
+- `semo kb get semicolon team reus` (팀원 닉네임)
+- `semo kb get by-buyer po`, `semo kb search "PO" --service by-buyer` (세미콜론 L2 서비스)
+- 027 의 경우 `export SEMO_ROOT="/Users/reus/Desktop/Sources/semicolon/projects/semo"` 하드코딩 경로
+
+- 영향: fresh install 시 봇이 사용하는 kb-manager 스킬 안내문에 reus/by-buyer 예시가 박힘.
+- **조치 (적용 완료, 2026-04-26)**: 027/031 인라인 — 예시를 `<org>`/`alice`/`my-service` 로 일반화. 027 의 SEMO_ROOT/cd 라인 제거. `migrations/110_kb_manager_skill_l2_cleanup.sql` 가 기존 인스턴스의 prompt 에 REPLACE 연산으로 동일 정리 (L2 strings 가 잔존할 때만).
+
+### 1d. `packages/cli/migrations/081_person_unification.sql:34`
+
+세미콜론 팀원 13명 닉네임 (`reus`,`garden`,`roki`,`bon`,`goni`,`harry`,`kai`,`kevin`,`kibaek`,`kyago`,`mark`,`bae`,`yeomso`) 이 IN 절에 박혀 있음.
+
+- 영향: fresh install 에서는 person ontology 가 0건이므로 데이터 leak 은 없음 (no-op). 단 source 파일에 닉네임 가시.
+- **조치 (적용 완료, 2026-04-26)**: 081 인라인에서 INSERT/SELECT 문 제거 (인스턴스가 organization 키 직접 채우는 방식으로 전환). person 도메인 자체는 030 정리로 fresh install 에 0건이므로 backfill 불필요.
+
+### 1e. `packages/cli/src/commands/{bots,audit}.ts` HOME fallback `'/Users/reus'`
+
+5건 (`bots.ts:666`, `audit.ts:140,191,445,538`) 이 `process.env.HOME || '/Users/reus'` 패턴.
+
+- 영향: HOME 환경변수가 없는 컨테이너/CI 에서 reus 의 literal 홈디렉토리 경로 사용 — 실제 동작 버그.
+- **조치 (적용 완료, 2026-04-26)**: `process.env.HOME || os.homedir()` 로 교체 (audit.ts 에 `os` import 추가).
+
+### 1f. `packages/cli/src/commands/sessions.ts:342`
+
+`-Users-reus-Desktop-Sources-semicolon-projects-semo` Claude Code 프로젝트 슬러그 하드코딩.
+
+- 영향: reus 외 사용자에게 동작하지 않음 — 실제 동작 버그.
+- **조치 (적용 완료, 2026-04-26)**: `process.cwd().replace(/\//g, '-')` 로 동적 도출.
+
+### 1g. `packages/cli/src/commands/metrics.ts:69`
+
+`return 'reus-local'` — bot 패턴 미일치 시 fallback 하드코딩.
+
+- 영향: 모든 사용자의 non-bot CLI 호출이 `reus-local` 로 태깅 → 메트릭 분석 왜곡.
+- **조치 (적용 완료, 2026-04-26)**: `${os.userInfo().username}-local` 로 동적 도출 (실패 시 `cli-local` fallback).
+
 ---
 
 ## MEDIUM — JSDoc/주석/스키마 description (P0.2 또는 P1 에서 정리)
+
+### 2a. `packages/cli/migrations/065_hub_spoke_orchestration.sql:14,28`
+
+```sql
+COMMENT ON COLUMN semo.bot_commitments.session_owner IS '세션 소유자 (reus-local, agent-sdk 등)';
+COMMENT ON COLUMN semo.bot_sessions.owner IS '세션 소유자 (reus-local, mark-local 등)';
+```
+
+- DB 컬럼 COMMENT 에 팀원 닉네임 예시. 실행 영향 없음, DB 메타에만 등장.
+- **조치 (적용 완료, 2026-04-26)**: 065 인라인 텍스트를 `({user}-local, {bot}-cron-local 등)` 으로 일반화.
 
 ### 2. `packages/cli/migrations/015_kb_domain_enforcement.sql:40`
 
@@ -171,15 +227,15 @@ JSDoc 의 도메인명 예시만 generic 화 하면 완료.
 
 ## 요약
 
-| 우선순위                | 항목 수                                                      | 상태                                    |
-| ----------------------- | ------------------------------------------------------------ | --------------------------------------- |
-| HIGH                    | 1 (migration 017 ontology seed)                              | ✅ migration 108 적용 완료              |
-| MEDIUM (실행)           | 1 (migration 015 description)                                | ✅ 015 인라인 + migration 109 적용 완료 |
-| MEDIUM (주석/JSDoc)     | 3 (`templates/types.ts`, `builtin.ts`, `default-steps.ts:8`) | ✅ 일괄 generic 화 완료                 |
-| LOW (dashboard)         | 4                                                            | P4 dashboard 분리 시 처리               |
-| MEDIUM (test fixture)   | 2 (cli/personal-conformance \*.ts)                           | ✅ alice 로 교체 완료                   |
-| OK (계약 테스트/의도적) | 4                                                            | 변경 불필요                             |
+| 우선순위                | 항목 수                                                                                       | 상태                                       |
+| ----------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| HIGH                    | 5 (migrations 017 ontology / 030 team seeds / 027+031 kb-manager skill / 081 person backfill) | ✅ 인라인 + cleanup migrations 108/110/111 |
+| MEDIUM (실행)           | 1 (migration 015 description)                                                                 | ✅ 015 인라인 + migration 109 적용 완료    |
+| MEDIUM (주석/JSDoc)     | 4 (`templates/types.ts`, `builtin.ts`, `default-steps.ts:8`, migration 065 column COMMENT)    | ✅ 일괄 generic 화 완료                    |
+| LOW (dashboard)         | 4                                                                                             | P4 dashboard 분리 시 처리                  |
+| MEDIUM (test fixture)   | 2 (cli/personal-conformance \*.ts)                                                            | ✅ alice 로 교체 완료                      |
+| OK (계약 테스트/의도적) | 4                                                                                             | 변경 불필요                                |
 
-**OSS 1차 배포 차단 항목 = 0건**. 남은 작업은 LOW (dashboard 분리) 와 점진적 정리 뿐.
+**OSS 1차 배포 차단 항목 = 0건** (재검증 2026-04-26). 남은 작업은 LOW (dashboard 분리) 와 점진적 정리 뿐.
 
 봇 ID 7개는 L0 카탈로그 자산이므로 OSS 에 그대로 포함된다 (이미 builtin templates).

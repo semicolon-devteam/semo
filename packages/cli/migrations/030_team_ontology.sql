@@ -44,20 +44,11 @@ VALUES
 ON CONFLICT (type_key, scheme_key) DO NOTHING;
 
 -- ============================================================
--- 3. 팀원 10명 ontology 도메인 등록
+-- 3. 팀원 ontology 도메인 — 인스턴스별 수동 등록
 -- ============================================================
-
-INSERT INTO semo.ontology (domain, schema, entity_type, service, description, tags) VALUES
-  ('reus',   '{}', 'team', '_global', '전준영 — 프론트 리드 엔지니어 / 협업 매니저', ARRAY['team', 'leader']),
-  ('garden', '{}', 'team', '_global', '서정원 — 시스템 아키텍처 / 기술 통합 리드',   ARRAY['team', 'architect']),
-  ('roki',   '{}', 'team', '_global', '노영록 — 서비스총괄 / 그로스 디렉터',         ARRAY['team', 'growth']),
-  ('yeomso', '{}', 'team', '_global', '염준현 — 디자인총괄 / CMO',                  ARRAY['team', 'design']),
-  ('bon',    '{}', 'team', '_global', 'bon — 리드급 프론트엔드 엔지니어',            ARRAY['team', 'frontend']),
-  ('kyago',  '{}', 'team', '_global', '강용준 — 백엔드 리더',                       ARRAY['team', 'backend']),
-  ('bae',    '{}', 'team', '_global', 'Bae — 인프라/백엔드 엔지니어',               ARRAY['team', 'infra']),
-  ('harry',  '{}', 'team', '_global', 'Harry Lee — 시니어 프론트엔드 엔지니어',      ARRAY['team', 'frontend']),
-  ('goni',   '{}', 'team', '_global', 'Goni — 서비스 운영 / QA',                   ARRAY['team', 'ops']),
-  ('kai',    '{}', 'team', '_global', 'Kai — 견습 엔지니어',                        ARRAY['team', 'junior'])
-ON CONFLICT (domain) DO NOTHING;
+-- 이 migration 은 'team' (이후 'person' 으로 통합 — 081 참조) 타입 스키마만 등록한다.
+-- 팀원 도메인 자체는 인스턴스별로 다르므로 `semo kb ontology --action register` 또는
+-- `semo onto register <name> --type person` 으로 직접 등록할 것.
+-- (이전 버전은 세미콜론 내부 팀원 10명 시드를 포함했으나 OSS 누출 방지를 위해 제거됨.)
 
 COMMIT;

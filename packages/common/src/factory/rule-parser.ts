@@ -108,7 +108,7 @@ function tryKbUpsert(text: string): KbUpsertAction | null {
   const contentMatch = text.match(/["“'‘]([^"”'’]+)["”'’]/);
   if (!contentMatch) return null;
 
-  // domain / key 추정: "reus 노트에 ..." 같은 문장은 MVP 밖. 기본값 경고를 달고 unknown 처리.
+  // domain / key 추정: "alice 노트에 ..." 같은 문장은 MVP 밖. 기본값 경고를 달고 unknown 처리.
   // 대신 명시적 "domain=X key=Y" 표기는 존중.
   const kv = Object.fromEntries(
     [...text.matchAll(/(domain|key|sub_key|subkey)\s*=\s*([^\s,]+)/gi)].map((m) => [

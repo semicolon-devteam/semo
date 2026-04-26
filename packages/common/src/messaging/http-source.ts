@@ -7,7 +7,7 @@ import type { InboundMessage, OutboundMessage } from './types.js';
  * HttpSource — 단순 HTTP POST 수신 엔드포인트.
  *
  * 모바일 웹앱/Tailscale 접근용. `POST /inbox` 에 JSON body 로 메시지 전송:
- *   {"author":"reus","channel":"web","text":"안녕"}
+ *   {"author":"alice","channel":"web","text":"안녕"}
  *
  * 응답은 in-process queue 에 저장되고, 클라이언트는 `GET /outbox?since=<id>` 로 폴링.
  * 인증은 미들웨어에 위임(이 소스는 raw 서버만 제공).

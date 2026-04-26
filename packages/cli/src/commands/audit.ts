@@ -13,6 +13,7 @@
  */
 
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 import type { Pool, PoolClient } from 'pg';
 import { randomUUID } from 'crypto';
@@ -137,7 +138,7 @@ function symlinkCheck(name: string, relativePath: string, expectedTarget: string
 }
 
 const SHARED_AGENTS_PATH = path.join(
-  process.env.HOME || '/Users/reus',
+  process.env.HOME || os.homedir(),
   '.semo',
   'shared',
   'AGENTS.md',
@@ -188,7 +189,7 @@ function buildChecksFromRow(row: WorkspaceStandardRow): CheckDef[] {
 
   if (row.level === 'required') {
     if (row.entry_type === 'symlink') {
-      const target = row.symlink_target?.replace('$HOME', process.env.HOME || '/Users/reus') || '';
+      const target = row.symlink_target?.replace('$HOME', process.env.HOME || os.homedir()) || '';
       defs.push(symlinkCheck(`${name}-symlink`, row.path_pattern, target));
       defs.push(fileExistsCheck(name, row.path_pattern));
     } else if (row.entry_type === 'dir') {
@@ -442,7 +443,7 @@ export function fixBotFromDb(
 ): { fixed: number; skipped: string[] } {
   let fixed = 0;
   const skipped: string[] = [];
-  const home = process.env.HOME || '/Users/reus';
+  const home = process.env.HOME || os.homedir();
 
   // Build a map of check name → row for quick lookup
   const failedCheckNames = new Set(checks.filter((c) => !c.passed).map((c) => c.name));
@@ -535,7 +536,7 @@ export function syncBotFromDb(
 ): { created: number; violations: string[] } {
   let created = 0;
   const violations: string[] = [];
-  const home = process.env.HOME || '/Users/reus';
+  const home = process.env.HOME || os.homedir();
 
   for (const row of dbRules) {
     if (row.level !== 'required') continue;

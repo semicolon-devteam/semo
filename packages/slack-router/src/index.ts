@@ -239,7 +239,7 @@ setInterval(() => loadIncubatorChannels().catch(() => {}), 5 * 60_000);
  * 24시간 이상 상태 변경 없는 active commitment/session을 자동 정리한다.
  * Architecture B 전환으로 기존 orchestrator reaper가 소멸했으므로
  * 살아있는 프로세스인 slack-router가 동일 책임을 이어받는다.
- * 로컬 reus 세션의 claude-code-local commitment도 같이 reap 대상이다.
+ * 로컬 사용자 세션의 claude-code-local commitment도 같이 reap 대상이다.
  */
 async function reapStale(): Promise<void> {
   try {

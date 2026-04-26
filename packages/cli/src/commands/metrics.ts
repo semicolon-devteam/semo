@@ -11,6 +11,7 @@
 
 import { Command } from 'commander';
 import * as fs from 'fs';
+import * as os from 'os';
 import { getPool, closeConnection, isDbConnected } from '../database';
 
 // ─── Pricing (per 1M tokens, API-equivalent) ────────────────────────────────
@@ -66,7 +67,11 @@ function detectBotId(cwd: string): string {
     const m = cwd.match(re);
     if (m) return m[1];
   }
-  return 'reus-local';
+  try {
+    return `${os.userInfo().username}-local`;
+  } catch {
+    return 'cli-local';
+  }
 }
 
 // ─── stdin helper ───────────────────────────────────────────────────────────

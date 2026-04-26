@@ -334,7 +334,7 @@ export function registerCommitmentsCommands(program: Command): void {
     .command('claim <id>')
     .description('세션이 commitment를 점유 (assigned_session 설정)')
     .requiredOption('--session <key>', '세션 키')
-    .option('--owner <name>', '세션 소유자 (예: reus-local)')
+    .option('--owner <name>', '세션 소유자 (예: alice-local, semiclaw-cron-local)')
     .action(async (id, options) => {
       const connected = await isDbConnected();
       if (!connected) {
