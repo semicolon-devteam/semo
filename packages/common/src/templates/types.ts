@@ -2,7 +2,7 @@
  * Bot template catalog (L0 kernel asset).
  *
  * 템플릿은 "역할 정의 + KB 스코프 + 추천 스킬" 순수 데이터.
- * 세미콜론 도메인(wise-platform/axoracle 등) 은 템플릿에 들어오지 않는다 (L2 전용).
+ * tenant 고유 도메인은 템플릿에 들어오지 않는다 (L2 전용).
  *
  * 설치 시 고객은 `semo templates apply <id>` 로 자기 L2 봇을 생성하고,
  * 그 이후 자유롭게 커스터마이징한다.

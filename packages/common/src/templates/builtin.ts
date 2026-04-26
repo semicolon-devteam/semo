@@ -1,12 +1,12 @@
 /**
  * 7 builtin bot templates — L0 kernel catalog.
  *
- * 세미콜론 팀 운영 봇 정의에서 "도메인 하드코딩" 을 제거하고 역할만 남긴 것.
+ * 봇 정의에서 "도메인 하드코딩" 을 제거하고 역할만 남긴 것.
  * 사용자는 `semo templates apply planclaw --as myplanner` 식으로 복제해서 쓴다.
  *
  * 추가/수정 시 반드시:
  *   - `packages/common/src/__tests__/bot-templates.test.ts` 계약 테스트 통과
- *   - 세미콜론 L2 자산(도메인명 등) 유입 금지
+ *   - tenant L2 자산(고유 도메인명 등) 유입 금지
  */
 import type { BotTemplate } from './types.js';
 
