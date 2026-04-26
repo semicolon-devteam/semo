@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS semo.bot_commitments (
   title           TEXT NOT NULL,             -- "Typography+Layout+Imagery+Motion 섹션 생성"
   description     TEXT,
   source_type     VARCHAR(30),               -- 'github-issue' | 'slack' | 'cron' | 'manual'
-  source_ref      TEXT,                      -- "semicolon-devteam/repo#42" or channel:thread
+  source_ref      TEXT,                      -- "{org}/{repo}#42" or channel:thread
   deadline_at     TIMESTAMPTZ,
   steps           JSONB DEFAULT '[]'::jsonb, -- [{"label":"Typography","done":false}]
   metadata        JSONB DEFAULT '{}'::jsonb, -- 확장용 (session_key, fail_reason, notes 등)

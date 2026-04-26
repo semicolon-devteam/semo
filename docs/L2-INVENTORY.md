@@ -81,6 +81,40 @@ ON CONFLICT (domain) DO UPDATE SET ...;
 - 영향: 모든 사용자의 non-bot CLI 호출이 `reus-local` 로 태깅 → 메트릭 분석 왜곡.
 - **조치 (적용 완료, 2026-04-26)**: `${os.userInfo().username}-local` 로 동적 도출 (실패 시 `cli-local` fallback).
 
+### 1h. `packages/cli/migrations/017_ontology_instance_model.sql:80-87`
+
+세미콜론 L2 ontology row 3건 (`semicolon` org, `jungchipan`/`playland` service) 자동 시드 + 코멘트 6곳에 `jungchipan` 예시 + line 33 의 `'semicolon'` 백필 제외 IN clause.
+
+- 영향: fresh install 에서 이 INSERT 가 그대로 실행되면 외부 고객 DB 에 세미콜론 L2 ontology 가 남음 (108 cleanup 으로 사후 제거되긴 하지만 source 가시성 문제는 잔존).
+- **조치 (적용 완료, 2026-04-26)**: 017 인라인에서 INSERT 블록 제거 + 코멘트 예시 generic 화 (`my-service`, `my-org`) + IN clause 의 `'semicolon'` 제거 (organization 도메인은 entity_type IS NULL 필터에 걸리지 않음). 기존 인스턴스는 108 이 그대로 처리.
+
+### 1i. `packages/cli/src/commands/slack.ts:33,190`
+
+`https://semicolon-devteam.slack.com/...` 슬랙 워크스페이스 URL 하드코딩 (line 190 은 send 후 permalink 출력에 사용).
+
+- 영향: OSS 사용자가 `semo slack send` 호출 시 잘못된 워크스페이스 도메인의 permalink 가 반환됨 — 실제 동작 버그.
+- **조치 (적용 완료, 2026-04-26)**: `chat.getPermalink` API 로 동적 도출 (실패해도 send 자체는 성공). 코멘트 예시는 `{workspace}.slack.com` 으로 generic 화.
+
+### 1j. `SEMO_DASHBOARD_URL` fallback 하드코딩
+
+3 파일 (`packages/channel-slack/src/index.ts:60`, `packages/common/src/slack/bot-config.ts:93`, `packages/cli/src/commands/incubator.ts:650,786`) 이 `https://semo.semi-colon.space` 를 default 로 사용.
+
+- 영향: env 미설정 시 OSS 사용자가 세미콜론 운영 대시보드를 호출하게 됨 — 데이터 leak 까지는 아니지만 동작 미스라우팅.
+- **조치 (적용 완료, 2026-04-26)**: channel-slack/bot-config 는 빈 문자열 fallback (try/catch 로 silent skip), incubator 는 `requireDashboardUrl()` helper 로 명시적 에러 출력.
+
+### 1k. `packages/cli/src/commands/incubator.ts:54-63,153-162`
+
+`SHARED_AGENTS = path.join(os.homedir(), 'Desktop', 'Sources', 'semicolon', 'projects', 'semo', '.claude', 'agents')` 와 동일 패턴의 `CHANNEL_SLACK_DIR` — reus 의 디렉토리 레이아웃에만 동작.
+
+- 영향: 다른 사용자는 incubator/sandbox 명령 자체가 동작 불가 — 실제 동작 버그.
+- **조치 (적용 완료, 2026-04-26)**: `SEMO_REPO_PATH` 환경변수로 분기 — 미설정 시 `~/.claude/agents` (SHARED_AGENTS) 또는 `npx @team-semicolon/channel-slack` (CHANNEL_SLACK_DIR) 사용.
+
+### 1l. `packages/cli/test-context-merge.sh` (삭제)
+
+레거시 `packages/biz/eng/ops` 컨텍스트 병합 테스트 스크립트. 5개월 전 단일 커밋(390a399b)으로 추가됐으나 해당 패키지가 이미 삭제됨 — 어디서도 호출되지 않는 dead code 가 `/Users/reus/Desktop/Sources/semicolon/semo` 경로 + `core-backend`/`core-interface` 등 L2 reference 를 다수 포함.
+
+- **조치 (적용 완료, 2026-04-26)**: 파일 삭제.
+
 ---
 
 ## MEDIUM — JSDoc/주석/스키마 description (P0.2 또는 P1 에서 정리)
@@ -119,6 +153,18 @@ COMMENT ON COLUMN semo.bot_sessions.owner IS '세션 소유자 (reus-local, mark
 ```
 
 - **조치 (적용 완료)**: `세미콜론 L2 자산(도메인명 등)` → `tenant L2 자산(고유 도메인명 등)`.
+
+### 2b. `packages/cli/migrations/040_bot_commitments.sql:11`
+
+`source_ref` 컬럼 코멘트에 `"semicolon-devteam/repo#42"` 예시 박혀 있음.
+
+- **조치 (적용 완료, 2026-04-26)**: `"{org}/{repo}#42"` 로 generic 화.
+
+### 2c. `packages/common/src/__tests__/hook-regex.test.ts` 전 라인
+
+테스트 fixture 가 `/Users/reus/...` 로 시작하는 30+ 경로 literal 사용. regex 동작에는 무관(접미사만 매칭)하나 source 가시성 문제.
+
+- **조치 (적용 완료, 2026-04-26)**: `/Users/reus` → `/Users/alice` 일괄 교체. 21/21 테스트 통과.
 
 ---
 
@@ -227,15 +273,15 @@ JSDoc 의 도메인명 예시만 generic 화 하면 완료.
 
 ## 요약
 
-| 우선순위                | 항목 수                                                                                       | 상태                                       |
-| ----------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| HIGH                    | 5 (migrations 017 ontology / 030 team seeds / 027+031 kb-manager skill / 081 person backfill) | ✅ 인라인 + cleanup migrations 108/110/111 |
-| MEDIUM (실행)           | 1 (migration 015 description)                                                                 | ✅ 015 인라인 + migration 109 적용 완료    |
-| MEDIUM (주석/JSDoc)     | 4 (`templates/types.ts`, `builtin.ts`, `default-steps.ts:8`, migration 065 column COMMENT)    | ✅ 일괄 generic 화 완료                    |
-| LOW (dashboard)         | 4                                                                                             | P4 dashboard 분리 시 처리                  |
-| MEDIUM (test fixture)   | 2 (cli/personal-conformance \*.ts)                                                            | ✅ alice 로 교체 완료                      |
-| OK (계약 테스트/의도적) | 4                                                                                             | 변경 불필요                                |
+| 우선순위                | 항목 수                                                                                                                                  | 상태                                                                            |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| HIGH                    | 12 (017 ontology / 030 team seeds / 027+031 kb-manager skill / 081 person backfill / 1e~1g source / 1h~1k 추가 / 1l 삭제)                | ✅ 인라인 + cleanup migrations 108/110/111 + source 일반화 + dashboard URL gate |
+| MEDIUM (실행)           | 1 (migration 015 description)                                                                                                            | ✅ 015 인라인 + migration 109 적용 완료                                         |
+| MEDIUM (주석/JSDoc)     | 6 (`templates/types.ts`, `builtin.ts`, `default-steps.ts:8`, migration 065 column COMMENT, migration 040 source_ref, hook-regex.test.ts) | ✅ 일괄 generic 화 완료                                                         |
+| LOW (dashboard)         | 4                                                                                                                                        | P4 dashboard 분리 시 처리                                                       |
+| MEDIUM (test fixture)   | 2 (cli/personal-conformance \*.ts)                                                                                                       | ✅ alice 로 교체 완료                                                           |
+| OK (계약 테스트/의도적) | 4                                                                                                                                        | 변경 불필요                                                                     |
 
-**OSS 1차 배포 차단 항목 = 0건** (재검증 2026-04-26). 남은 작업은 LOW (dashboard 분리) 와 점진적 정리 뿐.
+**OSS 1차 배포 차단 항목 = 0건** (3차 재검증 2026-04-26). 남은 작업은 LOW (dashboard 분리) 와 점진적 정리 뿐.
 
 봇 ID 7개는 L0 카탈로그 자산이므로 OSS 에 그대로 포함된다 (이미 builtin templates).

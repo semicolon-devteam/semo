@@ -33,20 +33,29 @@ function sharedSkills(): string {
 function semoEnv(): string {
   return path.join(claudeHome(), 'semo', '.env');
 }
+
+function requireDashboardUrl(): string {
+  const url = process.env.SEMO_DASHBOARD_URL;
+  if (!url) {
+    console.error(
+      chalk.red(
+        'SEMO_DASHBOARD_URL 이 설정되지 않았습니다. semo incubator/sandbox 명령은 SEMO 대시보드와 통신합니다.\n' +
+          '예: export SEMO_DASHBOARD_URL=https://my-semo.example.com',
+      ),
+    );
+    process.exit(1);
+  }
+  return url;
+}
 function archiveRoot(): string {
   return path.join(semoHome(), 'archive');
 }
 
-const SHARED_AGENTS = path.join(
-  os.homedir(),
-  'Desktop',
-  'Sources',
-  'semicolon',
-  'projects',
-  'semo',
-  '.claude',
-  'agents',
-);
+// SEMO 인큐베이터는 SEMO 레포의 `.claude/agents/` 디렉토리를 세션에 심링크한다.
+// SEMO_REPO_PATH 가 지정되어 있으면 그 경로를, 아니면 `~/.claude/agents` 를 사용.
+const SHARED_AGENTS = process.env.SEMO_REPO_PATH
+  ? path.join(process.env.SEMO_REPO_PATH, '.claude', 'agents')
+  : path.join(claudeHome(), 'agents');
 const LAUNCHD_DIR = path.join(os.homedir(), 'Library', 'LaunchAgents');
 
 // ============================================================
@@ -136,16 +145,11 @@ reply() 호출 시 반드시 \`bot_id\` 파라미터를 전달하여 봇 정체�
   fs.writeFileSync(path.join(sessionDir, 'CLAUDE.md'), content, 'utf-8');
 }
 
-const CHANNEL_SLACK_DIR = path.join(
-  os.homedir(),
-  'Desktop',
-  'Sources',
-  'semicolon',
-  'projects',
-  'semo',
-  'packages',
-  'channel-slack',
-);
+// channel-slack 패키지 위치. SEMO_REPO_PATH 가 지정되면 그 경로의 packages/channel-slack,
+// 아니면 npx 로 실행 (npm 배포 후 `@team-semicolon/channel-slack` 으로 호출 가능).
+const CHANNEL_SLACK_DIR = process.env.SEMO_REPO_PATH
+  ? path.join(process.env.SEMO_REPO_PATH, 'packages', 'channel-slack')
+  : '';
 
 function writeSettingsJson(sessionDir: string, serviceId?: string, channel?: string): void {
   const settings: Record<string, unknown> = {
@@ -192,11 +196,15 @@ function writeSettingsJson(sessionDir: string, serviceId?: string, channel?: str
   );
 
   // .mcp.json — Channel Slack 플러그인 등록
+  // SEMO_REPO_PATH 가 지정되면 source tsx 로 실행, 아니면 npx 로 published 패키지 실행.
+  const channelSlackArgs = CHANNEL_SLACK_DIR
+    ? ['tsx', path.join(CHANNEL_SLACK_DIR, 'src', 'index.ts')]
+    : ['@team-semicolon/channel-slack'];
   const mcpConfig: Record<string, unknown> = {
     mcpServers: {
       'semo-channel-slack': {
         command: 'npx',
-        args: ['tsx', path.join(CHANNEL_SLACK_DIR, 'src', 'index.ts')],
+        args: channelSlackArgs,
         env: {
           SLACK_CHANNEL_ID: channel || '',
           SEMO_SERVICE_ID: serviceId || '',
@@ -647,7 +655,7 @@ export function registerIncubatorCommands(program: Command): void {
         preset: string;
         json?: boolean;
       }) => {
-        const dashboardUrl = process.env.SEMO_DASHBOARD_URL || 'https://semo.semi-colon.space';
+        const dashboardUrl = requireDashboardUrl();
         const pool = getPool();
         const { ontoRegister, generateEmbedding } = await import('../kb.js');
 
@@ -783,7 +791,8 @@ export function registerIncubatorCommands(program: Command): void {
   // Sandbox subcommands
   // ============================================================
 
-  const SANDBOX_BASE_URL = process.env.SEMO_DASHBOARD_URL || 'https://semo.semi-colon.space';
+  // Lazy: SEMO_DASHBOARD_URL 미설정 시 sandbox 명령 실행 시점에서만 에러.
+  const sandboxBaseUrl = (): string => requireDashboardUrl();
 
   function sandboxHeaders(): Record<string, string> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -813,7 +822,7 @@ export function registerIncubatorCommands(program: Command): void {
     .action(async (options) => {
       const spinner = ora('샌드박스 생성 중...').start();
       try {
-        const res = await fetch(`${SANDBOX_BASE_URL}/api/projects/sandbox`, {
+        const res = await fetch(`${sandboxBaseUrl()}/api/projects/sandbox`, {
           method: 'POST',
           headers: sandboxHeaders(),
           body: JSON.stringify({
@@ -837,9 +846,9 @@ export function registerIncubatorCommands(program: Command): void {
         console.log(`  프로젝트: ${chalk.cyan(project.project_name)}`);
         console.log(`  ID: ${chalk.gray(project.service_id)}`);
         console.log(
-          `  대시보드: ${chalk.underline(`${SANDBOX_BASE_URL}/gfp/${project.service_id}`)}`,
+          `  대시보드: ${chalk.underline(`${sandboxBaseUrl()}/gfp/${project.service_id}`)}`,
         );
-        console.log(`  관리: ${chalk.underline(`${SANDBOX_BASE_URL}/projects/sandbox`)}`);
+        console.log(`  관리: ${chalk.underline(`${sandboxBaseUrl()}/projects/sandbox`)}`);
       } catch (err) {
         spinner.fail(`생성 실패: ${err instanceof Error ? err.message : err}`);
       }
@@ -851,7 +860,7 @@ export function registerIncubatorCommands(program: Command): void {
     .action(async () => {
       const spinner = ora('목록 조회 중...').start();
       try {
-        const res = await fetch(`${SANDBOX_BASE_URL}/api/projects/sandbox`, {
+        const res = await fetch(`${sandboxBaseUrl()}/api/projects/sandbox`, {
           headers: sandboxHeaders(),
           signal: AbortSignal.timeout(10000),
         });
@@ -893,7 +902,7 @@ export function registerIncubatorCommands(program: Command): void {
       const spinner = ora('리포트 조회 중...').start();
       try {
         const res = await fetch(
-          `${SANDBOX_BASE_URL}/api/projects/sandbox/report?service_id=${encodeURIComponent(options.serviceId)}`,
+          `${sandboxBaseUrl()}/api/projects/sandbox/report?service_id=${encodeURIComponent(options.serviceId)}`,
           { headers: sandboxHeaders(), signal: AbortSignal.timeout(10000) },
         );
 
@@ -947,7 +956,7 @@ export function registerIncubatorCommands(program: Command): void {
       const spinner = ora('샌드박스 정리 중...').start();
       try {
         const qs = options.all ? 'all=true' : `service_id=${encodeURIComponent(options.serviceId)}`;
-        const res = await fetch(`${SANDBOX_BASE_URL}/api/projects/sandbox?${qs}`, {
+        const res = await fetch(`${sandboxBaseUrl()}/api/projects/sandbox?${qs}`, {
           method: 'DELETE',
           headers: sandboxHeaders(),
           signal: AbortSignal.timeout(15000),
@@ -987,7 +996,7 @@ export function registerIncubatorCommands(program: Command): void {
         if (options.poMode) body.po_mode = options.poMode;
         if (options.rejectionRate !== undefined) body.rejection_rate = options.rejectionRate;
 
-        const res = await fetch(`${SANDBOX_BASE_URL}/api/projects/sandbox/advance`, {
+        const res = await fetch(`${sandboxBaseUrl()}/api/projects/sandbox/advance`, {
           method: 'POST',
           headers: sandboxHeaders(),
           body: JSON.stringify(body),

@@ -30,7 +30,7 @@ function getToken(): string {
 
 /** Slack permalink → channel + ts 파싱 */
 function parsePermalink(link: string): { channel: string; ts: string } | null {
-  // https://semicolon-devteam.slack.com/archives/C0A5Q5CL2DR/p1775752002391449
+  // 예: https://{workspace}.slack.com/archives/C0A5Q5CL2DR/p1775752002391449
   const match = link.match(/archives\/([A-Z0-9]+)\/p(\d+)/);
   if (!match) return null;
   // Slack ts는 "1775752002.391449" 형태 (p 이후 10자리.나머지)
@@ -186,8 +186,26 @@ export function registerSlackCommands(program: Command): void {
             process.exit(1);
           }
 
-          const pTs = data.ts!.replace('.', '');
-          const permalink = `https://semicolon-devteam.slack.com/archives/${data.channel}/p${pTs}`;
+          // chat.getPermalink 로 워크스페이스 URL 동적 도출 (실패 시 ts 만 반환).
+          let permalink: string | undefined;
+          try {
+            const permalinkRes = await fetch(
+              `https://slack.com/api/chat.getPermalink?channel=${encodeURIComponent(data.channel!)}&message_ts=${encodeURIComponent(data.ts!)}`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+                signal: AbortSignal.timeout(5000),
+              },
+            );
+            const permalinkData = (await permalinkRes.json()) as {
+              ok: boolean;
+              permalink?: string;
+            };
+            if (permalinkData.ok && permalinkData.permalink) {
+              permalink = permalinkData.permalink;
+            }
+          } catch {
+            // permalink 도출 실패해도 send 자체는 성공으로 본다.
+          }
 
           if (opts.json) {
             console.log(
@@ -195,7 +213,7 @@ export function registerSlackCommands(program: Command): void {
             );
           } else {
             console.log(chalk.green('sent'), data.ts);
-            console.log(permalink);
+            if (permalink) console.log(permalink);
           }
         } catch (err) {
           console.error(

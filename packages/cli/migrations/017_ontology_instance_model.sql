@@ -14,7 +14,7 @@ BEGIN;
 -- 1. entity_type backfill (NULL → 적절한 타입 매핑)
 -- ============================================================
 
--- 서비스 스코프 도메인 (jungchipan.kpi → kpi)
+-- 서비스 스코프 도메인 (my-service.kpi → kpi)
 UPDATE semo.ontology
 SET entity_type = split_part(domain, '.', 2)
 WHERE entity_type IS NULL AND domain LIKE '%.%'
@@ -22,7 +22,9 @@ WHERE entity_type IS NULL AND domain LIKE '%.%'
     SELECT type_key FROM semo.ontology_types
   );
 
--- 서비스 프로필 도메인 (jungchipan → service)
+-- 서비스 프로필 도메인 (my-service → service)
+-- NOTE: organization 도메인은 INSERT 시 entity_type='organization' 이 설정되므로
+-- entity_type IS NULL 필터에 걸리지 않아 별도 제외 목록이 불필요하다.
 UPDATE semo.ontology
 SET entity_type = 'service'
 WHERE entity_type IS NULL
@@ -30,7 +32,7 @@ WHERE entity_type IS NULL
   AND domain NOT IN (
     'team','project','decision','process','infra','kpi',
     'bot-config','spec','skill','milestone','memory','glossary',
-    'session-log','semicolon'
+    'session-log'
   );
 
 -- 나머지 NULL → glossary (안전망)
@@ -77,14 +79,10 @@ INSERT INTO semo.ontology_types (type_key, schema, description) VALUES
   ('session-log',  '{}'::jsonb, '세션 로그')
 ON CONFLICT (type_key) DO NOTHING;
 
-INSERT INTO semo.ontology (domain, entity_type, service, schema, description) VALUES
-  ('semicolon',   'organization', '_global', '{}'::jsonb, 'Semicolon 팀 (글로벌 스코프 = _global.*)'),
-  ('jungchipan',  'service', 'jungchipan',  '{}'::jsonb, '정치판 서비스'),
-  ('playland',    'service', 'playland',    '{}'::jsonb, 'Play Land 서비스')
-ON CONFLICT (domain) DO UPDATE SET
-  entity_type = EXCLUDED.entity_type,
-  service = EXCLUDED.service,
-  description = COALESCE(NULLIF(semo.ontology.description, ''), EXCLUDED.description);
+-- NOTE: 신규 OSS 인스턴스는 organization/service ontology row 를
+-- `semo kb ontology --action register` 로 직접 등록한다.
+-- 과거 세미콜론 인스턴스에 시드되었던 행(`semicolon` org, `jungchipan`/`playland` service)은
+-- migration 108 에서 KB 데이터 0건일 때만 조건부 삭제된다.
 
 -- ============================================================
 -- 4. 글로벌 도메인에 service='_global' 태깅
@@ -98,11 +96,11 @@ WHERE service IS NULL
 -- ============================================================
 -- 5. KB 엔트리 도메인 전환 (flat → service-scoped dot-notation)
 --    team → _global.team, project → _global.project 등
---    단, 이미 dot-notation인 도메인(jungchipan.kpi)은 유지
+--    단, 이미 dot-notation인 도메인(my-service.kpi)은 유지
 -- ============================================================
 
 -- 먼저 대상 도메인을 온톨로지에 등록 (dot-notation)
--- 단, service/organization 인스턴스는 제외 (semicolon, jungchipan 등은 top-level 유지)
+-- 단, service/organization 인스턴스는 제외 (my-org, my-service 등은 top-level 유지)
 INSERT INTO semo.ontology (domain, entity_type, service, schema, description)
 SELECT '_global.' || o.domain, o.entity_type, '_global', o.schema, o.description
 FROM semo.ontology o
@@ -146,7 +144,7 @@ CREATE INDEX IF NOT EXISTS idx_ontology_entity_type_fk
 -- ============================================================
 -- 7. knowledge_base service generated column 갱신
 --    기존: service = split_part(domain, '.', 1) WHERE domain LIKE '%.%'
---    변경 없음 — _global.team → service='_global', jungchipan.kpi → service='jungchipan'
+--    변경 없음 — _global.team → service='_global', my-service.kpi → service='my-service'
 --    generated column은 ALTER 불가이므로 그대로 유지
 -- ============================================================
 

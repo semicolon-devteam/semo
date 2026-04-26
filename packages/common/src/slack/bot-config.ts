@@ -90,7 +90,7 @@ export let SLACK_PROFILES: Record<string, { username: string; icon_emoji: string
   ...FALLBACK_SLACK_PROFILES,
 };
 
-const SEMO_DASHBOARD_URL = process.env.SEMO_DASHBOARD_URL || 'https://semo.semi-colon.space';
+const SEMO_DASHBOARD_URL = process.env.SEMO_DASHBOARD_URL || '';
 
 export async function loadSlackProfilesFromAPI(): Promise<void> {
   try {

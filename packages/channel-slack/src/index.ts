@@ -57,7 +57,7 @@ const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const SLACK_APP_TOKEN = process.env.SLACK_APP_TOKEN;
 const SLACK_CHANNEL_ID = process.env.SLACK_CHANNEL_ID || '';
 const SEMO_SERVICE_ID = process.env.SEMO_SERVICE_ID || 'unknown';
-const SEMO_DASHBOARD_URL = process.env.SEMO_DASHBOARD_URL || 'https://semo.semi-colon.space';
+const SEMO_DASHBOARD_URL = process.env.SEMO_DASHBOARD_URL || '';
 
 if (!SLACK_BOT_TOKEN || !SLACK_APP_TOKEN) {
   console.error('SLACK_BOT_TOKEN and SLACK_APP_TOKEN are required.');

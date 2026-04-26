@@ -18,37 +18,37 @@ const DESTRUCTIVE_GUARD_REGEX =
 describe('Hook bot session detection regex', () => {
   describe('new consolidated path (~/.semo/sessions/)', () => {
     it('matches ~/.semo/sessions/semiclaw', () => {
-      expect(BOT_SESSION_REGEX.test('/Users/reus/.semo/sessions/semiclaw')).toBe(true);
+      expect(BOT_SESSION_REGEX.test('/Users/alice/.semo/sessions/semiclaw')).toBe(true);
     });
 
     it('matches ~/.semo/sessions/planclaw', () => {
-      expect(BOT_SESSION_REGEX.test('/Users/reus/.semo/sessions/planclaw')).toBe(true);
+      expect(BOT_SESSION_REGEX.test('/Users/alice/.semo/sessions/planclaw')).toBe(true);
     });
 
     it('matches ~/.semo/sessions/semiclaw-overflow', () => {
-      expect(BOT_SESSION_REGEX.test('/Users/reus/.semo/sessions/semiclaw-overflow')).toBe(true);
+      expect(BOT_SESSION_REGEX.test('/Users/alice/.semo/sessions/semiclaw-overflow')).toBe(true);
     });
   });
 
   describe('symlink legacy path (~/.semo-bot-sessions/)', () => {
     it('matches ~/.semo-bot-sessions/semiclaw', () => {
-      expect(BOT_SESSION_REGEX.test('/Users/reus/.semo-bot-sessions/semiclaw')).toBe(true);
+      expect(BOT_SESSION_REGEX.test('/Users/alice/.semo-bot-sessions/semiclaw')).toBe(true);
     });
   });
 
   describe('old legacy path (~/.semo-sessions/)', () => {
     it('matches ~/.semo-sessions/uuid-session', () => {
-      expect(BOT_SESSION_REGEX.test('/Users/reus/.semo-sessions/3c6aa753')).toBe(true);
+      expect(BOT_SESSION_REGEX.test('/Users/alice/.semo-sessions/3c6aa753')).toBe(true);
     });
   });
 
   describe('openclaw legacy path', () => {
     it('matches ~/.openclaw-semiclaw/workspace', () => {
-      expect(BOT_SESSION_REGEX.test('/Users/reus/.openclaw-semiclaw/workspace')).toBe(true);
+      expect(BOT_SESSION_REGEX.test('/Users/alice/.openclaw-semiclaw/workspace')).toBe(true);
     });
 
     it('matches ~/.openclaw-growthclaw/workspace/skills', () => {
-      expect(BOT_SESSION_REGEX.test('/Users/reus/.openclaw-growthclaw/workspace/skills')).toBe(
+      expect(BOT_SESSION_REGEX.test('/Users/alice/.openclaw-growthclaw/workspace/skills')).toBe(
         true,
       );
     });
@@ -56,46 +56,46 @@ describe('Hook bot session detection regex', () => {
 
   describe('new workspace path (~/.semo/workspaces/)', () => {
     it('matches ~/.semo/workspaces/semiclaw', () => {
-      expect(BOT_SESSION_REGEX.test('/Users/reus/.semo/workspaces/semiclaw')).toBe(true);
+      expect(BOT_SESSION_REGEX.test('/Users/alice/.semo/workspaces/semiclaw')).toBe(true);
     });
 
     it('matches ~/.semo/workspaces/reviewclaw/skills', () => {
-      expect(BOT_SESSION_REGEX.test('/Users/reus/.semo/workspaces/reviewclaw/skills')).toBe(true);
+      expect(BOT_SESSION_REGEX.test('/Users/alice/.semo/workspaces/reviewclaw/skills')).toBe(true);
     });
   });
 
   describe('non-bot paths (should NOT match)', () => {
     it('does not match regular project dir', () => {
-      expect(BOT_SESSION_REGEX.test('/Users/reus/Desktop/Sources/semicolon/projects/semo')).toBe(
+      expect(BOT_SESSION_REGEX.test('/Users/alice/Desktop/Sources/semicolon/projects/semo')).toBe(
         false,
       );
     });
 
     it('does not match home dir', () => {
-      expect(BOT_SESSION_REGEX.test('/Users/reus')).toBe(false);
+      expect(BOT_SESSION_REGEX.test('/Users/alice')).toBe(false);
     });
 
     it('does not match .claude dir', () => {
-      expect(BOT_SESSION_REGEX.test('/Users/reus/.claude/semo')).toBe(false);
+      expect(BOT_SESSION_REGEX.test('/Users/alice/.claude/semo')).toBe(false);
     });
 
     it('does not match .semo root (without /sessions/)', () => {
-      expect(BOT_SESSION_REGEX.test('/Users/reus/.semo')).toBe(false);
+      expect(BOT_SESSION_REGEX.test('/Users/alice/.semo')).toBe(false);
     });
 
     it('does not match .semo/shared', () => {
-      expect(BOT_SESSION_REGEX.test('/Users/reus/.semo/shared/hooks')).toBe(false);
+      expect(BOT_SESSION_REGEX.test('/Users/alice/.semo/shared/hooks')).toBe(false);
     });
   });
 
   describe('destructive-guard consistency', () => {
     it('destructive-guard regex matches same paths as other hooks', () => {
       const testPaths = [
-        '/Users/reus/.semo/sessions/semiclaw',
-        '/Users/reus/.semo/workspaces/reviewclaw',
-        '/Users/reus/.semo-bot-sessions/planclaw',
-        '/Users/reus/.openclaw-workclaw/workspace',
-        '/Users/reus/.semo-sessions/uuid123',
+        '/Users/alice/.semo/sessions/semiclaw',
+        '/Users/alice/.semo/workspaces/reviewclaw',
+        '/Users/alice/.semo-bot-sessions/planclaw',
+        '/Users/alice/.openclaw-workclaw/workspace',
+        '/Users/alice/.semo-sessions/uuid123',
       ];
 
       for (const p of testPaths) {
@@ -126,26 +126,26 @@ describe('Bot ID extraction from CWD', () => {
   }
 
   it('extracts from workspaces path ~/.semo/workspaces/reviewclaw', () => {
-    expect(extractBotId('/Users/reus/.semo/workspaces/reviewclaw')).toBe('reviewclaw');
+    expect(extractBotId('/Users/alice/.semo/workspaces/reviewclaw')).toBe('reviewclaw');
   });
 
   it('extracts from new path ~/.semo/sessions/semiclaw', () => {
-    expect(extractBotId('/Users/reus/.semo/sessions/semiclaw')).toBe('semiclaw');
+    expect(extractBotId('/Users/alice/.semo/sessions/semiclaw')).toBe('semiclaw');
   });
 
   it('extracts from symlink path ~/.semo-bot-sessions/planclaw', () => {
-    expect(extractBotId('/Users/reus/.semo-bot-sessions/planclaw')).toBe('planclaw');
+    expect(extractBotId('/Users/alice/.semo-bot-sessions/planclaw')).toBe('planclaw');
   });
 
   it('extracts from openclaw path', () => {
-    expect(extractBotId('/Users/reus/.openclaw-workclaw/workspace')).toBe('workclaw');
+    expect(extractBotId('/Users/alice/.openclaw-workclaw/workspace')).toBe('workclaw');
   });
 
   it('extracts overflow bot id', () => {
-    expect(extractBotId('/Users/reus/.semo/sessions/semiclaw-overflow')).toBe('semiclaw-overflow');
+    expect(extractBotId('/Users/alice/.semo/sessions/semiclaw-overflow')).toBe('semiclaw-overflow');
   });
 
   it('returns empty for non-bot path', () => {
-    expect(extractBotId('/Users/reus/Desktop/Sources')).toBe('');
+    expect(extractBotId('/Users/alice/Desktop/Sources')).toBe('');
   });
 });
