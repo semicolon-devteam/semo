@@ -14,6 +14,9 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 async function resolveActionItemId(pool: Pool, input: string): Promise<string> {
   if (UUID_RE.test(input)) return input;
+  if (!/^[0-9a-f-]+$/i.test(input)) {
+    throw new Error(`'${input}' 는 유효한 UUID prefix가 아닙니다 (hex/hyphen만 허용)`);
+  }
   const res = await pool.query(
     `SELECT action_item_id FROM semo.action_items WHERE action_item_id::text LIKE $1`,
     [`${input.toLowerCase()}%`],
@@ -120,7 +123,10 @@ export function registerActionItemsCommands(program: Command): void {
         params.push(parseInt(opts.limit));
 
         const res = await pool.query(
-          `SELECT action_item_id, owner_domain, target_domain, description, assignee, deadline, status, priority, created_at
+          `SELECT action_item_id, owner_domain, target_domain, description, assignee,
+                  to_char(deadline, 'YYYY-MM-DD') AS deadline,
+                  status, priority,
+                  to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') AS created_at
            FROM semo.action_items ${where}
            ORDER BY CASE status WHEN 'open' THEN 0 WHEN 'completed' THEN 1 ELSE 2 END, created_at DESC
            LIMIT $${idx}`,
