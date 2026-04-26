@@ -141,7 +141,9 @@ export class HealthMonitor {
 
       const workspace = this.surfaceMap.workspace;
       const sessionPath = path.join(this.sessionDir, botId);
-      const startCmd = `cd ${sessionPath} && claude --permission-mode dontAsk`;
+      const botConfigDir =
+        process.env.CLAUDE_CONFIG_DIR_BOTS || `${process.env.HOME}/.claude/snamanager0`;
+      const startCmd = `cd ${sessionPath} && CLAUDE_CONFIG_DIR=${botConfigDir} claude --permission-mode bypassPermissions`;
 
       try {
         // /quit the existing session (ignore failure — surface might be at shell already)

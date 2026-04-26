@@ -139,7 +139,7 @@ if $DISCORD_ENABLED; then
   echo "[start] Starting Discord Router..."
   create_split "discord-router"
   cmux send --workspace "$WORKSPACE_REF" --surface "${SURFACES[discord-router]}" \
-    $'cd '"$SEMO_ROOT"' && set -a && source '"$HOME"'/.claude/semo/.env && set +a && SEMO_MAILBOX_DIR='"$MAILBOX_DIR"' SEMO_SESSION_DIR='"$SESSION_DIR"' SEMO_SURFACE_MAP=/tmp/semo-surface-map.json npx tsx packages/discord-router/src/index.ts\n'
+    $'cd '"$SEMO_ROOT"' && set -a && source '"$HOME"'/.claude/semo/.env && set +a && SEMO_MAILBOX_DIR='"$MAILBOX_DIR"' SEMO_SESSION_DIR='"$SESSION_DIR"' SEMO_SURFACE_MAP=/tmp/semo-surface-map.json npx tsx packages/discord-router/src/bin.ts\n'
   sleep 3
 fi
 
@@ -207,7 +207,7 @@ if $DISCORD_ENABLED && [ -n "${SURFACES[discord-router]:-}" ]; then
   cmux send --workspace "$WORKSPACE_REF" --surface "${SURFACES[discord-router]}" $'\x03' 2>/dev/null || true
   sleep 2
   cmux send --workspace "$WORKSPACE_REF" --surface "${SURFACES[discord-router]}" \
-    $'cd '"$SEMO_ROOT"' && set -a && source '"$HOME"'/.claude/semo/.env && set +a && SEMO_MAILBOX_DIR='"$MAILBOX_DIR"' SEMO_SESSION_DIR='"$SESSION_DIR"' SEMO_SURFACE_MAP=/tmp/semo-surface-map.json npx tsx packages/discord-router/src/index.ts\n'
+    $'cd '"$SEMO_ROOT"' && set -a && source '"$HOME"'/.claude/semo/.env && set +a && SEMO_MAILBOX_DIR='"$MAILBOX_DIR"' SEMO_SESSION_DIR='"$SESSION_DIR"' SEMO_SURFACE_MAP=/tmp/semo-surface-map.json npx tsx packages/discord-router/src/bin.ts\n'
 fi
 
 sleep 5
