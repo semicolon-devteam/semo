@@ -37,7 +37,7 @@ UPDATE semo.ontology SET schema = '{
     "metadata": {
       "type": "object",
       "properties": {
-        "project": {"type": "string", "description": "프로젝트 ID (예: gameland, jungchipan)"},
+        "project": {"type": "string", "description": "프로젝트 ID (예: my-service)"},
         "record_type": {"type": "string", "enum": ["current", "weekly", "target"], "description": "current=최신 스냅샷, weekly=주간 기록, target=목표"},
         "week": {"type": "string", "description": "YYYY-WNN 형식 (weekly 타입만)"},
         "measured_at": {"type": "string", "description": "측정일 ISO 8601"}

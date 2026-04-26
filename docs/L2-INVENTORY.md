@@ -46,25 +46,23 @@ ON CONFLICT (domain) DO UPDATE SET ...;
 ```
 
 - JSON Schema description 에 L2 예시. 실행 영향 없음, DB 메타에만 등장.
-- **조치**: 신규 마이그레이션으로 description 텍스트 갱신 (예: "프로젝트 ID (예: my-service)").
+- **조치 (적용 완료, 2026-04-26)**: 015 인라인 텍스트를 `예: my-service` 로 일반화 + 기존 인스턴스를 위한 `migrations/109_generic_ontology_descriptions.sql` 추가 (jsonb_set 으로 정확 매칭 시에만 갱신).
 
 ### 3. `packages/common/src/templates/types.ts:5`
 
 ```ts
-* 세미콜론 도메인(wise-platform/axoracle 등) 은 템플릿에 들어오지 않는다 (L2 전용).
+* tenant 고유 도메인은 템플릿에 들어오지 않는다 (L2 전용).
 ```
 
-- JSDoc 에서 **L2 분리 규칙을 설명**하기 위해 도메인명 인용. 의도적이지만 외부 사용자에게는 무관.
-- **조치**: 텍스트만 일반화 (예: "tenant 고유 도메인은 템플릿에 들어오지 않는다 (L2 전용).") 후 `OK` 로 이동.
+- **조치 (적용 완료)**: JSDoc 일반화 — `세미콜론 도메인(wise-platform/axoracle 등)` → `tenant 고유 도메인`.
 
 ### 4. `packages/common/src/templates/builtin.ts:9`
 
 ```ts
-*   - 세미콜론 L2 자산(도메인명 등) 유입 금지
+*   - tenant L2 자산(고유 도메인명 등) 유입 금지
 ```
 
-- 동일 (의도된 가이드 주석).
-- **조치**: 일반화 ("tenant L2 자산 유입 금지").
+- **조치 (적용 완료)**: `세미콜론 L2 자산(도메인명 등)` → `tenant L2 자산(고유 도메인명 등)`.
 
 ---
 
@@ -111,11 +109,10 @@ JSDoc 예시: `"axoracle-blog"`, `"growthclaw/axoracle-blog"`.
 ### 11. `packages/common/src/onboarding/default-steps.ts:8`
 
 ```
-* 관습적 네임스페이스로, 팀 계정(`reus`, `garden`)과 구분된다.
+* 관습적 네임스페이스로, 팀 계정(`alice`, `bob` 등)과 구분된다.
 ```
 
-- onboarding 가이드 주석에서 팀원 닉네임 예시.
-- **조치**: 일반화 (예: "팀 계정 (alice, bob 등)").
+- **조치 (적용 완료)**: 팀원 닉네임 → generic (`alice`, `bob`).
 
 ---
 
@@ -174,15 +171,15 @@ JSDoc 의 도메인명 예시만 generic 화 하면 완료.
 
 ## 요약
 
-| 우선순위                | 항목 수                                                            | 다음 단계                          |
-| ----------------------- | ------------------------------------------------------------------ | ---------------------------------- |
-| HIGH                    | 1 (migration 017 ontology seed)                                    | P0.2 신규 migration 으로 즉시 격리 |
-| MEDIUM (실행)           | 1 (migration 015 description)                                      | P0.2 신규 migration                |
-| MEDIUM (주석/JSDoc)     | 4 (`templates/types.ts`, `builtin.ts`, `default-steps.ts:8`, etc.) | P0.2 일괄 generic 화               |
-| LOW (dashboard)         | 4                                                                  | P4 dashboard 분리 시 처리          |
-| MEDIUM (test fixture)   | 3                                                                  | P1 점진적                          |
-| OK (계약 테스트/의도적) | 4                                                                  | 변경 불필요                        |
+| 우선순위                | 항목 수                                                      | 상태                                    |
+| ----------------------- | ------------------------------------------------------------ | --------------------------------------- |
+| HIGH                    | 1 (migration 017 ontology seed)                              | ✅ migration 108 적용 완료              |
+| MEDIUM (실행)           | 1 (migration 015 description)                                | ✅ 015 인라인 + migration 109 적용 완료 |
+| MEDIUM (주석/JSDoc)     | 3 (`templates/types.ts`, `builtin.ts`, `default-steps.ts:8`) | ✅ 일괄 generic 화 완료                 |
+| LOW (dashboard)         | 4                                                            | P4 dashboard 분리 시 처리               |
+| MEDIUM (test fixture)   | 2 (cli/personal-conformance \*.ts)                           | P1 점진적                               |
+| OK (계약 테스트/의도적) | 4                                                            | 변경 불필요                             |
 
-**즉시 차단 항목 = 1건** (migration 017 ontology seed). P0.2 에서 처리하면 OSS 신규 설치 시 L2 leakage 0.
+**OSS 1차 배포 차단 항목 = 0건**. 남은 작업은 LOW (dashboard 분리) 와 점진적 정리 뿐.
 
 봇 ID 7개는 L0 카탈로그 자산이므로 OSS 에 그대로 포함된다 (이미 builtin templates).
