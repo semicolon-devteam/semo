@@ -8,6 +8,7 @@ export default defineConfig({
       'node_modules/**',
       'src/commands/commitments.test.ts',
       'src/commands/skill-sync.test.ts',
+      'src/commands/credential.test.ts',
     ],
   },
 });
