@@ -1368,9 +1368,13 @@ export async function kbUpsert(
     if (rule) {
       const missing = rule.fields.filter((f) => !meta[f]);
       if (missing.length > 0) {
+        const hint =
+          key === 'decision' && missing.includes('decided_by')
+            ? ` --decided-by <name> 플래그 또는 env SEMO_DECIDED_BY 사용 가능.`
+            : '';
         return {
           success: false,
-          error: `${rule.label} 엔트리(key='${key}')는 metadata에 [${missing.join(', ')}] 필드가 필수입니다. --metadata '{"${missing[0]}":"..."}' 형태로 전달하세요.`,
+          error: `${rule.label} 엔트리(key='${key}')는 metadata에 [${missing.join(', ')}] 필드가 필수입니다. --metadata '{"${missing[0]}":"..."}' 형태로 전달하세요.${hint}`,
         };
       }
     }

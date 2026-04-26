@@ -1947,17 +1947,33 @@ kbCmd
   .option('--metadata <json>', '추가 메타데이터 (JSON 문자열)')
   .option('--created-by <name>', '작성자 식별자', 'semo-cli')
   .option('--expect-version <n>', 'Optimistic locking — 기대 version (불일치 시 실패)')
+  .option(
+    '--decided-by <name>',
+    'decision 키 전용 — metadata.decided_by (env SEMO_DECIDED_BY fallback)',
+  )
+  .option('--decided-at <date>', 'decision 키 전용 — metadata.decided_at (기본: 오늘, YYYY-MM-DD)')
   .action(async (domain, key, subKey, options) => {
     const spinner = ora('KB upsert 중...').start();
     try {
       const pool = getPool();
-      const metadata = options.metadata ? JSON.parse(options.metadata) : undefined;
+      const metadata: Record<string, unknown> = options.metadata
+        ? JSON.parse(options.metadata)
+        : {};
+
+      if (key === 'decision') {
+        const decidedBy = options.decidedBy ?? process.env.SEMO_DECIDED_BY ?? metadata.decided_by;
+        if (decidedBy) metadata.decided_by = decidedBy;
+        const decidedAt =
+          options.decidedAt ?? metadata.decided_at ?? new Date().toISOString().slice(0, 10);
+        metadata.decided_at = decidedAt;
+      }
+
       const result = await kbUpsert(pool, {
         domain,
         key,
         sub_key: subKey,
         content: options.content,
-        metadata,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         created_by: options.createdBy,
         expect_version: options.expectVersion ? parseInt(options.expectVersion) : undefined,
       });
