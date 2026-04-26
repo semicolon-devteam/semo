@@ -1583,6 +1583,23 @@ const kbCmd = program
   .command('kb')
   .description('KB(Knowledge Base) 관리 — SEMO DB 기반 지식 저장소');
 
+kbCmd.addHelpText(
+  'after',
+  `
+조회 패턴 (정확한 경로를 모를 때):
+  1. semo kb search "<keyword>"
+     → 결과 첫 줄 [domain] key/sub_key 좌표를 그대로 다음 단계에 사용
+  2. semo kb get <domain> <key> [sub_key]
+     → search가 알려준 좌표로 전체 내용 조회
+
+도메인/키 매핑 탐색:
+  semo kb ontology --action routing-table        # 전체 domain → key 매핑
+  semo kb ontology --action instances            # 도메인 인스턴스 목록
+  semo kb ontology --action schema --type <t>    # 타입의 허용 sub_key 목록
+  semo kb ontology --action children --domain <d># 하위 모듈 조회
+`,
+);
+
 kbCmd
   .command('pull')
   .description('DB에서 KB를 로컬 .kb/로 내려받기')
@@ -1756,6 +1773,11 @@ kbCmd
       if (results.length === 0) {
         const scoreNote = minScore > 0 ? ` (min-score: ${(minScore * 100).toFixed(0)}%)` : '';
         console.log(chalk.yellow(`\n  검색 결과 없음: '${query}'${scoreNote}`));
+        console.log(chalk.gray(`\n  → 도메인/키 매핑: semo kb ontology --action routing-table`));
+        console.log(chalk.gray(`  → 도메인 목록  : semo kb ontology --action instances`));
+        console.log(
+          chalk.gray(`  → 타입 스키마  : semo kb ontology --action schema --type <type>`),
+        );
       } else {
         console.log(chalk.cyan.bold(`\n🔍 검색 결과: '${query}' (${results.length}건)\n`));
         for (const entry of results) {
@@ -1769,6 +1791,10 @@ kbCmd
           } else {
             console.log(chalk.gray(`    ${entry.content}`));
           }
+          const getCmd = entry.sub_key
+            ? `semo kb get ${entry.domain} ${entry.key} ${entry.sub_key}`
+            : `semo kb get ${entry.domain} ${entry.key}`;
+          console.log(chalk.gray.dim(`    → ${getCmd}`));
           console.log();
         }
       }
@@ -2387,7 +2413,7 @@ kbCmd
       } else {
         console.log(
           chalk.red(
-            `알 수 없는 action: '${action}'. 사용 가능: list, show, services, types, instances, schema, routing-table, register, create-type, add-key, remove-key, unregister`,
+            `알 수 없는 action: '${action}'. 사용 가능: list, show, services, types, instances, schema, routing-table, children, register, create-type, add-key, remove-key, unregister`,
           ),
         );
         process.exit(1);
