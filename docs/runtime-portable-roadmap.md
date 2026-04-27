@@ -149,6 +149,12 @@ semo kb get semo decision personal-team-split-status-snapshot
 - 입력: ExecutionTarget + HostAdapter 선택. 출력: ProjectionEmitter 흐름.
 - 현 코드: `packages/cli/src/commands/bots.ts`, `packages/orchestrator/`(폐기), `packages/slack-router/src/index.ts` 에 분산. → 단일 harness 로 통합.
 
+**PolicyEngine/HookGateway (P5-7, P5-3.x 에서 재정의 — KB decision policy-engine-vs-tool-gateway-2026-04-27)**
+
+- Claude Code lifecycle hook (`~/.semo/shared/hooks/*.sh` — Stop/UserPromptSubmit/SessionStart) 의 검증·전처리 로직을 위한 별도 인터페이스.
+- ToolGateway (LLM tool_use wrap) 와 책임 분리. 두 추상화 충돌 방지.
+- 진행: 기존 13 sh 유지 + 새 hook 부터 `semo guard run <name>` TS/CLI 패턴 → 빈도 높은 1~2 guard 만 점진 포팅 (운영 영향 최소화).
+
 **HostAdapter**
 
 - Claude Code: 기존 Slack/cmux 통합 유지.

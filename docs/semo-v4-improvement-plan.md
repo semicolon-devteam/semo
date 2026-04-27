@@ -335,7 +335,8 @@ Personal 갈래 LLM 호스트 + 향후 데스크톱 통합 준비.
 22. ✅ P5-4 CodexCliAdapter 시범           — 2026-04-27 완료 (capability/probe/lifecycle + trackFileChanges + bridge helpers)
 23. ✅ P5-5 OllamaAdapter + Hermes stub    — 2026-04-27 완료 (commit 069bd8e4)
 24. ⬜ P5-4b.iii Codex MCP server entry    (보류 — MCP SDK 의존성 트레이드오프 결정 필요)
-25. ⬜ P5-6 ExecutionTarget DB 스키마 확장 (1일, P5-1 + P1-1 의존)
+25. ✅ P5-6 ExecutionTarget DB 스키마 확장 — 2026-04-27 완료 (mig 114, cli-v4.18.20)
+26. ⬜ P5-7 HookGateway/PolicyEngine — Claude lifecycle hook 인터페이스 (P5-3.x 재정의, KB decision policy-engine-vs-tool-gateway-2026-04-27)
 ```
 
 P5 시리즈는 P0~P4 와 독립적으로 병렬 진행 가능 (P5-6 만 P1-1 의존).
