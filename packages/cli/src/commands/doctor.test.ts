@@ -65,6 +65,12 @@ describe('doctor — checkConfig', () => {
     expect(r.level).toBe('ok');
     expect(r.label).toContain('solo-offline');
   });
+
+  it('_source 가 <default:...> 면 warn — init 권장', () => {
+    const r = checkConfig(baseCfg({ _source: '<default:team>' }));
+    expect(r.level).toBe('warn');
+    expect(r.detail).toContain('semo init');
+  });
 });
 
 describe('doctor — checkSqliteTarget', () => {

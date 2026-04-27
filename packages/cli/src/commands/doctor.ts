@@ -53,11 +53,19 @@ export function checkConfig(cfg: SemoConfig): CheckResult {
       detail: warnings.join('; '),
     };
   }
+  if (cfg._source?.startsWith('<default:')) {
+    return {
+      id: 'config',
+      label: 'config.toml',
+      level: 'warn',
+      detail: `없음 — 기본값(profile=${cfg.profile}) 사용 중. \`semo init\` 으로 본인 환경 고정 권장`,
+    };
+  }
   return {
     id: 'config',
     label: `config.toml (schema ${cfg.schema_version}, profile=${cfg.profile})`,
     level: 'ok',
-    detail: cfg._source ?? '<default>',
+    detail: cfg._source,
   };
 }
 
