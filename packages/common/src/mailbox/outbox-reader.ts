@@ -1,11 +1,15 @@
 /**
  * Polls bot outbox files and processes messages (post via gateway, handle escalations).
  * Platform-agnostic: uses GatewayAdapter interface instead of direct Slack dependency.
+ *
+ * P5-2d: ProjectionEmitter 도 옵션으로 받음. 우선순위 = projection > gateway.
+ * 회귀 0 보장 — projection 미주입 시 gateway 그대로 사용.
  */
 import * as fs from 'fs';
 import * as path from 'path';
 import type { OutboxMessage } from './types.js';
 import type { InboxWriter } from './inbox-writer.js';
+import type { ProjectionChannel, ProjectionEmitter } from '../runtime/projection-emitter.js';
 
 const POLL_INTERVAL_MS = 500;
 
@@ -21,6 +25,8 @@ export class OutboxReader {
   private readonly botIds: string[];
   private readonly platform: 'slack' | 'discord';
   private readonly gateway: GatewayAdapter;
+  /** P5-2d: optional projection emitter — 주입 시 reply 흐름이 emitter 로 분기. */
+  private readonly projection?: ProjectionEmitter;
   private readonly inboxWriter: InboxWriter;
   private readonly onEscalation: (msg: OutboxMessage) => Promise<void>;
   private readonly onAskUser: (msg: OutboxMessage) => Promise<void>;
@@ -36,6 +42,8 @@ export class OutboxReader {
     botIds: string[];
     platform: 'slack' | 'discord';
     gateway: GatewayAdapter;
+    /** P5-2d: optional ProjectionEmitter — 주입 시 reply 처리에 우선 사용. */
+    projection?: ProjectionEmitter;
     inboxWriter: InboxWriter;
     onEscalation: (msg: OutboxMessage) => Promise<void>;
     onAskUser: (msg: OutboxMessage) => Promise<void>;
@@ -46,6 +54,7 @@ export class OutboxReader {
     this.botIds = opts.botIds;
     this.platform = opts.platform;
     this.gateway = opts.gateway;
+    this.projection = opts.projection;
     this.inboxWriter = opts.inboxWriter;
     this.onEscalation = opts.onEscalation;
     this.onAskUser = opts.onAskUser;
@@ -185,7 +194,30 @@ export class OutboxReader {
             console.log(
               `[outbox] Posting reply from ${msg.bot_id}: "${msg.text.slice(0, 30)}" (id: ${msg.id?.slice(0, 8)})`,
             );
-            await this.gateway.postAsBot(msg.bot_id, msg.channel_id, msg.text, msg.thread_id);
+            // P5-2d: projection emitter 주입 시 우선 사용, 실패/미주입 시 gateway fallback.
+            let posted = false;
+            if (this.projection) {
+              const channel: ProjectionChannel =
+                this.platform === 'slack' ? 'slack-block' : 'discord-embed';
+              const result = await this.projection.emit(
+                {
+                  channel,
+                  destination: msg.channel_id,
+                  options: { threadTs: msg.thread_id, botId: msg.bot_id },
+                },
+                { text: msg.text },
+              );
+              if (result.ok) {
+                posted = true;
+              } else {
+                console.warn(
+                  `[outbox] projection emit failed (${result.error}) — fallback to gateway`,
+                );
+              }
+            }
+            if (!posted) {
+              await this.gateway.postAsBot(msg.bot_id, msg.channel_id, msg.text, msg.thread_id);
+            }
             console.log(`[outbox] Posted reply from ${msg.bot_id} to ${this.platform}`);
             if (this.onReplyPosted) {
               try {
