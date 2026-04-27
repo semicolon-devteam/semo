@@ -26,20 +26,32 @@ const root = path.resolve(__dirname, '..');
 const entry = path.join(root, 'src', 'index.ts');
 const outfile = path.join(root, 'dist', 'bundle.js');
 
-await build({
-  entryPoints: [entry],
-  outfile,
-  bundle: true,
-  platform: 'node',
-  target: 'node18',
-  format: 'cjs',
-  external: ['better-sqlite3', 'pg', 'pg-native'],
-  // banner shebang 미사용 — src/index.ts 첫 줄에 이미 #!/usr/bin/env node 가 있어
-  // banner 추가 시 shebang 2개로 SyntaxError. (Codex 리뷰 2026-04-27)
-  minify: true,
-  legalComments: 'none',
-  logLevel: 'info',
+// Node 20 unhandled rejection 이 deprecation warning 만 내고 exit 0 으로 빠지는 케이스 차단
+// (workflow 가 dist/bundle.js 없는 상태로 publish 하던 v4.18.20 회귀 방지).
+process.on('unhandledRejection', (err) => {
+  console.error('[bundle] unhandled rejection:', err);
+  process.exit(1);
 });
+
+try {
+  await build({
+    entryPoints: [entry],
+    outfile,
+    bundle: true,
+    platform: 'node',
+    target: 'node18',
+    format: 'cjs',
+    external: ['better-sqlite3', 'pg', 'pg-native'],
+    // banner shebang 미사용 — src/index.ts 첫 줄에 이미 #!/usr/bin/env node 가 있어
+    // banner 추가 시 shebang 2개로 SyntaxError. (Codex 리뷰 2026-04-27)
+    minify: true,
+    legalComments: 'none',
+    logLevel: 'info',
+  });
+} catch (err) {
+  console.error('[bundle] esbuild failed:', err);
+  process.exit(1);
+}
 
 fs.chmodSync(outfile, 0o755);
 console.log(`✓ bundled → ${outfile}`);

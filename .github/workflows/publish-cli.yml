@@ -27,8 +27,15 @@ jobs:
       - name: Install dependencies (monorepo root, workspaces linked)
         run: npm ci --ignore-scripts --legacy-peer-deps
 
-      - name: Build semo-cli
-        run: npm run build -w @team-semicolon/semo-cli
+      - name: Ensure esbuild platform binary (--ignore-scripts skips postinstall)
+        run: npm rebuild esbuild --workspace=@team-semicolon/semo-cli
+
+      - name: Verify build script integrity (fail-fast on bundle.mjs error)
+        run: |
+          set -euo pipefail
+          npm run build -w @team-semicolon/semo-cli
+          test -f packages/cli/dist/bundle.js || (echo "::error::dist/bundle.js missing after build" && exit 1)
+          head -1 packages/cli/dist/bundle.js | grep -q '#!/usr/bin/env node' || (echo "::error::shebang missing in bundle.js" && exit 1)
 
       - name: Update version (if manual dispatch)
         if: github.event_name == 'workflow_dispatch'
