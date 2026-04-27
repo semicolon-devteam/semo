@@ -328,13 +328,14 @@ Personal 갈래 LLM 호스트 + 향후 데스크톱 통합 준비.
 15. ⬜ P3-3 컨텍스트 통계                 (1일, P2-4 후 효과 극대화)
 16. ⬜ P4-1 패키지별 README.md 작성       (2시간, 의존 없음)
 17. ✅ P5-Pre semo-cli 번들 컷오버         — 2026-04-27 완료 (cli-v4.18.13 + 4.18.14 minify)
-18. ⬜ P5-0 인터페이스 4종 + ExecutionTarget 확장   (0.5일, 의존 없음 — RP 시리즈 선행)
-19. ⬜ P5-1 ClaudeCodeAdapter wrap         (1일, P5-0 의존)
-20. ⬜ P5-2 ProjectionEmitter 도입         (1일, P5-1 의존)
-21. ⬜ P5-3 ToolGateway 도입               (2일, P5-2 의존)
-22. ⬜ P5-4 CodexAdapter 시범 구현         (1일, P5-3 의존)
-23. ⬜ P5-5 OllamaAdapter + Hermes stub    (0.5일, P5-4 의존)
-24. ⬜ P5-6 ExecutionTarget DB 스키마 확장 (1일, P5-1 + P1-1 의존)
+18. ✅ P5-0 인터페이스 4종                 — 2026-04-27 완료 (commit 6d870799 + 보강 61f5efcf)
+19. ✅ P5-1 ClaudeCodeAdapter wrap         — 2026-04-27 완료 (commit d3308986)
+20. ✅ P5-2 ProjectionEmitter 도입         — 2026-04-27 완료 (a-e: console/composite, slack/discord emitter, reply 합류, OutboxReader projection 옵션, 라우터 emitter 주입)
+21. ✅ P5-3 ToolGateway 도입               — 2026-04-27 완료 (a-c: InMemoryToolGateway, ask_user/react wrap)
+22. ✅ P5-4 CodexCliAdapter 시범           — 2026-04-27 완료 (capability/probe/lifecycle + trackFileChanges + bridge helpers)
+23. ✅ P5-5 OllamaAdapter + Hermes stub    — 2026-04-27 완료 (commit 069bd8e4)
+24. ⬜ P5-4b.iii Codex MCP server entry    (보류 — MCP SDK 의존성 트레이드오프 결정 필요)
+25. ⬜ P5-6 ExecutionTarget DB 스키마 확장 (1일, P5-1 + P1-1 의존)
 ```
 
 P5 시리즈는 P0~P4 와 독립적으로 병렬 진행 가능 (P5-6 만 P1-1 의존).
