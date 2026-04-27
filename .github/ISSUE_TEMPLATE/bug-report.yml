@@ -1,6 +1,6 @@
-name: "🐛 Bug Report"
-description: "버그 리포트"
-labels: ["bug"]
+name: '🐛 Bug Report'
+description: '버그 리포트'
+labels: ['bug']
 body:
   - type: markdown
     attributes:
@@ -10,45 +10,102 @@ body:
   - type: textarea
     id: description
     attributes:
-      label: "버그 설명"
-      description: "어떤 문제가 발생하는지"
+      label: '버그 설명'
+      description: '어떤 문제가 발생하는지'
     validations:
       required: true
 
   - type: textarea
     id: steps
     attributes:
-      label: "재현 방법"
-      description: "버그를 재현하는 단계"
+      label: '재현 방법'
+      description: '버그를 재현하는 단계'
       value: |
         1. 
         2. 
-        3. 
+        3.
     validations:
       required: true
 
   - type: textarea
     id: expected
     attributes:
-      label: "기대 동작"
-      description: "정상적으로 동작했을 때 예상되는 결과"
+      label: '기대 동작'
+      description: '정상적으로 동작했을 때 예상되는 결과'
     validations:
       required: true
 
   - type: textarea
     id: actual
     attributes:
-      label: "실제 동작"
-      description: "현재 실제로 발생하는 결과"
+      label: '실제 동작'
+      description: '현재 실제로 발생하는 결과'
     validations:
       required: true
+
+  - type: input
+    id: semo-version
+    attributes:
+      label: 'SEMO 버전'
+      description: '`semo --version` 출력. SEMO 사용자만 채워주세요'
+      placeholder: '예: 4.18.10'
+    validations:
+      required: false
+
+  - type: dropdown
+    id: profile
+    attributes:
+      label: '프로파일'
+      description: '`semo init` 시 선택한 프로파일. SEMO 사용자만 채워주세요'
+      options:
+        - '(해당 없음)'
+        - 'personal-discord'
+        - 'personal-offline'
+        - 'solo-connected'
+        - 'team'
+        - 'custom'
+    validations:
+      required: false
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: 'OS'
+      description: '운영 체제'
+      options:
+        - 'macOS (Apple Silicon)'
+        - 'macOS (Intel)'
+        - 'Linux'
+        - 'Windows WSL'
+        - 'Windows (네이티브)'
+        - '기타'
+    validations:
+      required: false
+
+  - type: textarea
+    id: doctor-output
+    attributes:
+      label: '`semo doctor` 출력'
+      description: 'SEMO 설치/실행 관련 버그면 doctor 출력을 붙여주세요'
+      render: shell
+      placeholder: "$ semo doctor\n  ✓ ...\n  ✗ ..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: '추가 환경 정보'
+      description: 'Node.js / Ollama / 브라우저 버전 등 (선택)'
+    validations:
+      required: false
 
   - type: textarea
     id: acceptance-criteria
     attributes:
-      label: "✅ Acceptance Criteria"
+      label: '✅ Acceptance Criteria (내부 팀용)'
       description: |
-        ReviewClaw가 하나씩 체크하는 검증 항목. 각 AC는 독립적이고 기계적으로 확인 가능해야 함.
+        세미콜론 팀이 분류 후 채우는 검증 항목. 외부 베타 사용자는 비워두셔도 됩니다.
       value: |
         ## AC-1: 버그 수정 확인
         - [ ] 재현 방법대로 실행 시 버그 미발생
@@ -60,14 +117,6 @@ body:
 
         ## AC-3: 엣지케이스
         - [ ]
-      placeholder: "각 AC는 독립적으로 검증 가능한 조건이어야 합니다"
-    validations:
-      required: true
-
-  - type: textarea
-    id: environment
-    attributes:
-      label: "환경"
-      description: "OS, 브라우저, 앱 버전 등"
+      placeholder: '각 AC는 독립적으로 검증 가능한 조건이어야 합니다'
     validations:
       required: false
