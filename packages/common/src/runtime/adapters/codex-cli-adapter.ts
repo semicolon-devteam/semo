@@ -19,27 +19,66 @@
  */
 
 import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { promisify } from 'node:util';
-import type { HostAdapter, HostCapability, HostKind, HostSessionRef } from '../host-adapter.js';
+import type {
+  ApprovalPolicy,
+  HostAdapter,
+  HostCapability,
+  HostKind,
+  HostSessionRef,
+  SandboxMode,
+} from '../host-adapter.js';
 
 const execFileP = promisify(execFile);
 
+/**
+ * SEMO 추상 ↔ Codex CLI literal 매핑 (Codex 자기-리뷰 2026-04-27 검증).
+ *
+ * Codex CLI sandbox literal: read-only | workspace-write | danger-full-access
+ * Codex CLI approval literal: untrusted | on-failure | on-request | never
+ *
+ * SEMO 어휘를 호스트 무관하게 통일하기 위해 capability 는 SEMO 추상으로 노출.
+ * 실 spawn 시 어댑터가 아래 매핑으로 변환.
+ */
+export const CODEX_SANDBOX_MAP: Record<SandboxMode, string | null> = {
+  'read-only': 'read-only',
+  'workspace-write': 'workspace-write',
+  network: null, // Codex CLI 에 별도 literal 없음 — workspace-write 에 포함
+  dangerous: 'danger-full-access',
+};
+
+export const CODEX_APPROVAL_MAP: Record<ApprovalPolicy, string> = {
+  'always-ask': 'on-request', // SEMO always-ask 의 가장 가까운 Codex literal
+  'on-write': 'untrusted', // write 시 ask
+  never: 'never',
+};
+
 const CODEX_CLI_CAPABILITY: HostCapability = {
-  // Codex CLI 가 지원하는 sandbox 단계 (실 옵션 매핑).
-  sandboxModes: ['read-only', 'workspace-write', 'network', 'dangerous'],
-  // 기본은 workspace-write 단계의 on-write approval.
-  // dangerous 모드는 --dangerously-bypass-approvals-and-sandbox 명시 시.
-  approvalPolicy: 'on-write',
-  // ~/.codex/sessions/<uuid>.jsonl rollout 으로 resume 지원.
+  // SEMO 추상 — 'network' 는 Codex CLI literal 없으므로 capability 에서도 제외.
+  sandboxModes: ['read-only', 'workspace-write', 'dangerous'],
+  // SEMO 'always-ask' 가 Codex 'on-request' 와 가장 가까움 (실 spawn 시 매핑).
+  approvalPolicy: 'always-ask',
+  // ~/.codex/sessions/YYYY/MM/DD/rollout-...jsonl 로 resume 지원.
   sessionResume: true,
   // codex exec "prompt" 1-shot 지원.
   oneShotIO: true,
   // TUI(daemon-like) 가능하지만 SEMO 관점에선 1-shot 위주 사용.
   daemonMode: false,
 };
+
+/** Codex 실 rollout 경로 합성 — `~/.codex/sessions/YYYY/MM/DD/rollout-<ISO-no-ms>-<uuid>.jsonl`. */
+function composeRolloutPath(rolloutDir: string, sessionUuid: string, now: Date): string {
+  const yyyy = now.getUTCFullYear().toString();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(now.getUTCDate()).padStart(2, '0');
+  // 'YYYY-MM-DDTHH:MM:SS.mmmZ' → ':' 와 '.' 제거 후 ms 잘라 'YYYY-MM-DDTHH-MM-SS'
+  const tsSlice = now.toISOString().slice(0, 19).replace(/[:.]/g, '-');
+  return path.join(rolloutDir, yyyy, mm, dd, `rollout-${tsSlice}-${sessionUuid}.jsonl`);
+}
 
 export interface CodexCliAdapterOptions {
   /** `codex` 바이너리 경로. 기본 PATH 에서 탐색. */
@@ -73,14 +112,14 @@ export class CodexCliAdapter implements HostAdapter {
   }
 
   /**
-   * 세션 ID 생성 + rollout 경로 합성. 실 codex 프로세스는 별도 spawn (RuntimeHarness 책임).
-   * P5-4 시범 단계: 식별자 합성만.
+   * 세션 ID 생성 + rollout 경로 합성 (Codex CLI 실 패턴).
+   * 실 codex 프로세스는 별도 spawn (RuntimeHarness 책임). 이 경로는 resume 시 hint —
+   * Codex CLI 자체가 만드는 실 파일과 정확히 매칭되리라는 보장 X (날짜/시각 동기화 필요).
    */
-  async startSession(input: { botId: string; workspacePath?: string }): Promise<HostSessionRef> {
-    const ts = Date.now();
-    const id = `codex:${input.botId}:${ts}`;
-    const rolloutPath = path.join(this.rolloutDir, `${id}.jsonl`);
-    return { hostSessionId: id, rolloutPath };
+  async startSession(_input: { botId: string; workspacePath?: string }): Promise<HostSessionRef> {
+    const sessionUuid = randomUUID();
+    const rolloutPath = composeRolloutPath(this.rolloutDir, sessionUuid, new Date());
+    return { hostSessionId: sessionUuid, rolloutPath };
   }
 
   /**
