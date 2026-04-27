@@ -510,6 +510,15 @@ export class WebRTCTelephonyAdapter extends EventEmitter implements TelephonyAda
         if (msg.type === 'tts-test') {
           this.emit('tts-test');
         }
+
+        // softphone Web Speech API 결과 — VOICE_STT_PROVIDER=browser 모드에서 사용
+        if (msg.type === 'transcript' && typeof msg.text === 'string') {
+          this.emit('transcript', {
+            callId,
+            text: msg.text,
+            isFinal: !!msg.isFinal,
+          });
+        }
       } catch (err) {
         console.error('[webrtc] Signaling message error:', err);
       }

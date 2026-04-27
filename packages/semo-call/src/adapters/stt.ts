@@ -4,7 +4,8 @@
  * 구현체:
  * - ConsoleSTTAdapter: TCP 소켓 기반 텍스트 시뮬레이션 (Phase 1)
  * - DeepgramSTTAdapter: 클라우드 스트리밍 (Phase 2)
- * - LocalWhisperSTTAdapter: semo-meeting 로컬 (Phase 2)
+ * - BrowserSTTAdapter: softphone Web Speech API 결과를 passthrough (Phase A 보강, 0원)
+ * - LocalWhisperSTTAdapter: semo-meeting 로컬 (Phase B 후속, 미구현)
  *
  * 주의: MCP StdioServerTransport가 process.stdin을 점유하므로
  *       Console 모드에서도 stdin 직접 사용 금지.
@@ -322,5 +323,52 @@ export class DeepgramSTTAdapter extends EventEmitter implements STTAdapter {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+  }
+}
+
+// ============================================================
+// Browser STT (Phase A 보강 — 0원)
+// softphone PWA가 Web Speech API SpeechRecognition으로 마이크를
+// 직접 인식한 뒤 transcript 텍스트만 voice 서버 WebSocket으로
+// 전송 (`{type:'transcript', text, isFinal}`). 서버는 PCM 처리
+// 없이 그 결과를 그대로 STTTranscript 이벤트로 emit.
+//
+// 제약:
+// - HTTPS (또는 localhost) 필수, Chrome/Edge desktop 권장
+// - iOS Safari·안드로이드 백그라운드는 미보장
+// - SpeechRecognition 백엔드는 Google STT (브라우저/OS 의존)
+// ============================================================
+
+export class BrowserSTTAdapter extends EventEmitter implements STTAdapter {
+  private activeCallId = 'browser-call';
+
+  setCallId(callId: string) {
+    this.activeCallId = callId;
+  }
+
+  async start(): Promise<void> {
+    console.error('[browser-stt] Ready — awaiting transcripts from softphone (Web Speech API)');
+  }
+
+  feedAudio(_chunk: Buffer): void {
+    // no-op: PCM은 무시. STT 자체는 클라이언트 브라우저에서 수행.
+  }
+
+  async stop(): Promise<void> {
+    // 클라이언트가 SpeechRecognition.stop() 처리. 서버는 상태 없음.
+  }
+
+  /** softphone에서 도착한 transcript를 STT 결과로 emit */
+  injectTranscript(text: string, isFinal: boolean): void {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const transcript: STTTranscript = {
+      callId: this.activeCallId,
+      text: trimmed,
+      isFinal,
+      confidence: 1.0,
+      durationMs: 0,
+    };
+    this.emit('transcript', transcript);
   }
 }

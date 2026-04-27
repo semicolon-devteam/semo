@@ -222,6 +222,7 @@ btnCall.onclick = async () => {
           if (btnTtsTest) btnTtsTest.disabled = false;
           if (!callStartTime) callStartTime = Date.now();
           if (!statsInterval) statsInterval = setInterval(collectStats, 1000);
+          startBrowserSTT();
         } else if (state === 'disconnected') {
           setStatus('connecting', '재연결 중...');
           metrics.reconnects++;
@@ -367,6 +368,7 @@ function cleanup() {
   callStartTime = null;
   earlyMessages = [];
   pendingCallId = null;
+  stopBrowserSTT();
   if (ringOverlay) ringOverlay.style.display = 'none';
   setStatus('off', '연결 대기');
   btnCall.disabled = false;
@@ -376,6 +378,76 @@ function cleanup() {
   metrics.iceState = '-';
   updateDebugPanel();
   cleaning = false;
+}
+
+// ── Browser STT (Web Speech API) — VOICE_STT_PROVIDER=browser 모드 ──
+// Chrome/Edge desktop, HTTPS or localhost 에서만 동작.
+// 통화 시작 시 SpeechRecognition 활성화 → ws.send({type:'transcript',...})
+
+let recognition = null;
+let recognitionStopRequested = false;
+
+function startBrowserSTT() {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) {
+    log('⚠️ Web Speech API 미지원 — 서버 STT(Deepgram 등)만 동작');
+    return;
+  }
+  if (recognition) return;
+  recognitionStopRequested = false;
+
+  recognition = new SR();
+  recognition.lang = 'ko-KR';
+  recognition.continuous = true;
+  recognition.interimResults = true;
+
+  recognition.onresult = (event) => {
+    for (let i = event.resultIndex; i < event.results.length; i++) {
+      const result = event.results[i];
+      const text = (result[0] && result[0].transcript) || '';
+      const isFinal = !!result.isFinal;
+      if (!text.trim()) continue;
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'transcript', text, isFinal }));
+      }
+    }
+  };
+
+  recognition.onerror = (e) => {
+    if (e.error === 'no-speech' || e.error === 'aborted') return;
+    log('🎤 STT 오류: ' + e.error);
+  };
+
+  recognition.onend = () => {
+    // continuous=true 라도 일정 시간 후 자동 종료됨 → 통화 중이면 재시작
+    if (!recognitionStopRequested && recognition) {
+      try {
+        recognition.start();
+      } catch {
+        /* already started */
+      }
+    }
+  };
+
+  try {
+    recognition.start();
+    log('🎤 Web Speech STT 시작 (ko-KR)');
+  } catch (err) {
+    log('🎤 STT 시작 실패: ' + (err && err.message));
+    recognition = null;
+  }
+}
+
+function stopBrowserSTT() {
+  recognitionStopRequested = true;
+  if (recognition) {
+    try {
+      recognition.stop();
+    } catch {
+      /* ignore */
+    }
+    recognition = null;
+  }
 }
 
 // ── Standby Mode (대기 — 에이전트 발신 수신 대기) ──
@@ -556,6 +628,7 @@ btnAccept.onclick = async () => {
         btnHangup.disabled = false;
         if (!callStartTime) callStartTime = Date.now();
         if (!statsInterval) statsInterval = setInterval(collectStats, 1000);
+        startBrowserSTT();
       } else if (state === 'disconnected') {
         setStatus('connecting', '재연결 중...');
         metrics.reconnects++;

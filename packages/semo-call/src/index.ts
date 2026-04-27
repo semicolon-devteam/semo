@@ -9,7 +9,7 @@
  * 환경변수:
  *   SEMO_SERVICE_ID       — 세션 식별자
  *   VOICE_MODE            — console (기본) | webrtc | twilio
- *   VOICE_STT_PROVIDER    — console (기본) | deepgram | local-whisper
+ *   VOICE_STT_PROVIDER    — console (기본) | deepgram | browser | local-whisper(미구현)
  *   VOICE_TTS_PROVIDER    — console (기본) | openai | edge
  *   DEEPGRAM_API_KEY      — Deepgram STT API 키
  *   OPENAI_API_KEY        — OpenAI TTS API 키
@@ -25,7 +25,7 @@ import * as os from 'os';
 import type { STTAdapter, STTTranscript } from './adapters/stt.js';
 import type { TTSAdapter } from './adapters/tts.js';
 import type { TelephonyAdapter, CallInfo } from './adapters/telephony.js';
-import { ConsoleSTTAdapter, DeepgramSTTAdapter } from './adapters/stt.js';
+import { ConsoleSTTAdapter, DeepgramSTTAdapter, BrowserSTTAdapter } from './adapters/stt.js';
 import { ConsoleTTSAdapter, EdgeTTSAdapter } from './adapters/tts.js';
 import { ConsoleTelephonyAdapter, WebRTCTelephonyAdapter } from './adapters/telephony.js';
 import { TurnManager } from './turn-manager.js';
@@ -78,6 +78,8 @@ function createSTTAdapter(): STTAdapter {
         apiKey: process.env.DEEPGRAM_API_KEY || '',
         language: process.env.VOICE_STT_LANGUAGE || 'ko',
       });
+    case 'browser':
+      return new BrowserSTTAdapter();
     case 'console':
     default:
       return new ConsoleSTTAdapter();
@@ -570,6 +572,16 @@ async function start() {
 
   // 5. STT 이벤트 → TurnManager 경유 디스패치
   sttAdapter.on('transcript', handleSTTTranscript);
+
+  // 5-1. Browser STT 모드: telephony WebSocket으로 들어오는 transcript를 STT 어댑터로 인계
+  if (sttAdapter instanceof BrowserSTTAdapter) {
+    telephonyAdapter.on(
+      'transcript',
+      ({ text, isFinal }: { callId: string; text: string; isFinal: boolean }) => {
+        (sttAdapter as BrowserSTTAdapter).injectTranscript(text, isFinal);
+      },
+    );
+  }
 
   // 6. Telephony 이벤트 핸들러
   telephonyAdapter.on('call:connected', (call: CallInfo) => {
