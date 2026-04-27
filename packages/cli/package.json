@@ -69,6 +69,7 @@
     "migrations",
     "migrations-sqlite",
     "README.md",
+    "PERSONAL_TESTING.md",
     "LICENSE",
     "NOTICE"
   ]
