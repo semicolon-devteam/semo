@@ -13,15 +13,32 @@
  */
 
 import { Command } from 'commander';
+import * as fs from 'fs';
 
-interface ResponseLengthInput {
+interface HookInput {
   cwd?: string;
-  last_assistant_message?: string;
+  last_assistant_message?: string | string[];
+  transcript_path?: string;
 }
 
 const BOT_CWD_RE = /openclaw-[a-z]+\/workspace|semo-(bot-)?sessions\/|\.semo\/sessions\//;
+const BOT_SESSION_ONLY_RE = /\.semo\/sessions\//;
 const CODE_BLOCK_RE = /```[\s\S]*?```/g;
 const LIMIT_DEFAULT = 20;
+const LOOP_TAIL_LINES = 100;
+const LOOP_SEARCH_RE = /semo\s+kb\s+search/;
+const LOOP_GET_RE = /semo\s+kb\s+get/;
+const LOOP_THRESHOLD = 3;
+
+/**
+ * last_assistant_message 가 string 또는 string[] 양쪽 가능 (Claude SDK 변종).
+ * Codex 리뷰 (2026-04-27) 등가성 케이스 반영.
+ */
+function normalizeAssistantMessage(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.filter((v) => typeof v === 'string').join('\n');
+  return '';
+}
 
 /**
  * stdin (Claude Code hook payload) 를 JSON 파싱. 비-JSON 또는 빈 입력 시 null.
@@ -41,6 +58,25 @@ async function readStdinJson<T>(): Promise<T | null> {
   }
 }
 
+/** transcript jsonl tail 안에서 정규식 매칭 line 수 카운트. 파일 없거나 읽기 실패 시 0. */
+function countTranscriptLines(transcriptPath: string, re: RegExp, tailLines: number): number {
+  try {
+    if (!transcriptPath || !fs.existsSync(transcriptPath)) return 0;
+    const all = fs
+      .readFileSync(transcriptPath, 'utf8')
+      .split('\n')
+      .filter((l) => l.trim());
+    const tail = all.slice(-tailLines);
+    let count = 0;
+    for (const line of tail) {
+      if (re.test(line)) count++;
+    }
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
 export function registerGuardCommands(program: Command): void {
   const guardCmd = program
     .command('guard')
@@ -51,17 +87,16 @@ export function registerGuardCommands(program: Command): void {
     .description('등록된 guard 실행 (stdin: Claude Code hook payload JSON)')
     .option('--limit <n>', 'response-length 등 임계 (기본 20)', '20')
     .action(async (name, options) => {
-      const input = await readStdinJson<ResponseLengthInput>();
+      const input = await readStdinJson<HookInput>();
 
       switch (name) {
         case 'response-length': {
           if (!input) {
-            // 입력 없으면 hook 정상 종료 (sh 동작과 동일)
             process.exit(0);
             return;
           }
           const cwd = input.cwd ?? '';
-          const response = input.last_assistant_message ?? '';
+          const response = normalizeAssistantMessage(input.last_assistant_message);
           if (!response || !BOT_CWD_RE.test(cwd)) {
             process.exit(0);
             return;
@@ -77,9 +112,36 @@ export function registerGuardCommands(program: Command): void {
           process.exit(0);
           return;
         }
+        case 'kb-search-loop': {
+          if (!input) {
+            process.exit(0);
+            return;
+          }
+          const cwd = input.cwd ?? '';
+          const transcriptPath = input.transcript_path ?? '';
+          // Bot session only (sh: ~/.semo/sessions/ 만)
+          if (!BOT_SESSION_ONLY_RE.test(cwd)) {
+            process.exit(0);
+            return;
+          }
+          if (!transcriptPath) {
+            process.exit(0);
+            return;
+          }
+          const searchCount = countTranscriptLines(transcriptPath, LOOP_SEARCH_RE, LOOP_TAIL_LINES);
+          const getCount = countTranscriptLines(transcriptPath, LOOP_GET_RE, LOOP_TAIL_LINES);
+          if (searchCount >= LOOP_THRESHOLD && getCount === 0) {
+            console.log(
+              `BLOCK: KB 검색이 ${searchCount}회 반복되었으나 \`semo kb get\`으로 확정 조회된 결과가 없습니다. ` +
+                `'KB에 해당 정보가 없습니다'로 응답하세요.`,
+            );
+          }
+          process.exit(0);
+          return;
+        }
         default:
           console.error(`unknown guard: ${name}`);
-          console.error(`available: response-length`);
+          console.error(`available: response-length, kb-search-loop`);
           process.exit(2);
       }
     });
@@ -90,8 +152,10 @@ export function registerGuardCommands(program: Command): void {
     .action(() => {
       console.log('Available guards:');
       console.log('  response-length  — 봇 응답 20줄 초과 시 WARN');
+      console.log('  kb-search-loop   — KB 검색 3회 + kb get 0회 시 BLOCK 메시지 출력');
       console.log('');
       console.log('호출:');
       console.log('  echo "{...}" | semo guard run response-length [--limit 20]');
+      console.log('  echo "{...}" | semo guard run kb-search-loop');
     });
 }
