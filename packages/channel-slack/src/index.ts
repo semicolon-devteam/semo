@@ -26,7 +26,54 @@ import {
   ConsoleAuditSink,
   InMemoryToolGateway,
   type ToolCallRequest,
+  type ToolDefinition,
 } from '@team-semicolon/semo-common';
+
+// P5-4b.ii: 도구 정의 상수 — MCP tools/list 와 ToolGateway register 양쪽에서 공용.
+const ASK_USER_DEFINITION: ToolDefinition = {
+  name: 'ask_user',
+  description:
+    'Post an interactive question to Slack with buttons. Blocks until the user clicks a button (timeout 120s). Returns the selected option value.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      question: { type: 'string', description: 'The question to ask the user (Slack mrkdwn)' },
+      options: {
+        type: 'array',
+        description: 'Array of option objects: [{label, value}]. Max 4 options.',
+        items: {
+          type: 'object',
+          properties: {
+            label: { type: 'string' },
+            value: { type: 'string' },
+          },
+          required: ['label', 'value'],
+        },
+      },
+      slack_channel: { type: 'string', description: 'Slack channel ID to post in' },
+      thread_ts: { type: 'string', description: 'Thread timestamp for in-thread posting' },
+      bot_id: { type: 'string', description: 'Bot ID for customized sender identity' },
+    },
+    required: ['question', 'options', 'slack_channel'],
+  },
+};
+
+const REACT_DEFINITION: ToolDefinition = {
+  name: 'react',
+  description: 'Add an emoji reaction to a Slack message',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      emoji: {
+        type: 'string',
+        description: "Emoji name without colons (e.g., 'eyes', 'white_check_mark')",
+      },
+      slack_channel: { type: 'string', description: 'Slack channel ID' },
+      timestamp: { type: 'string', description: 'Message timestamp to react to' },
+    },
+    required: ['emoji', 'slack_channel', 'timestamp'],
+  },
+};
 
 // ============================================================
 // Configuration — ~/.claude/semo/.env 자동 로드
@@ -103,7 +150,7 @@ interface AskUserArgs {
   bot_id?: string;
 }
 
-toolGateway.register('ask_user', async (req: ToolCallRequest) => {
+toolGateway.register(ASK_USER_DEFINITION, async (req: ToolCallRequest) => {
   const {
     question,
     options,
@@ -161,7 +208,7 @@ interface ReactArgs {
   timestamp: string;
 }
 
-toolGateway.register('react', async (req: ToolCallRequest) => {
+toolGateway.register(REACT_DEFINITION, async (req: ToolCallRequest) => {
   const { emoji, slack_channel, timestamp } = req.arguments as unknown as ReactArgs;
   await slackWeb.reactions.add({ name: emoji, channel: slack_channel, timestamp });
   return `Reacted with :${emoji}:`;
