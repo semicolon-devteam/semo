@@ -21,6 +21,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { SlackProjectionEmitter } from './slack-projection-emitter.js';
+import {
+  ClaudeCodeAdapter,
+  ConsoleAuditSink,
+  InMemoryToolGateway,
+  type ToolCallRequest,
+} from '@team-semicolon/semo-common';
 
 // ============================================================
 // Configuration — ~/.claude/semo/.env 자동 로드
@@ -81,6 +87,72 @@ const slackSocket = new SocketModeClient({ appToken: SLACK_APP_TOKEN });
 // botProfiles 는 5분 주기로 동적 갱신되므로 getter 로 주입.
 const slackEmitter = new SlackProjectionEmitter(slackWeb, {
   getBotProfiles: () => botProfiles,
+});
+
+// P5-3b: ToolGateway 도입 (ask_user 1건 reference). AlwaysAllowPolicy + audit 만 추가.
+// 핸들러 안에서 기존 side effect (pendingAskResponses 등록, 120초 타임아웃, postMessage) 모두 보존.
+const toolGateway = new InMemoryToolGateway(new ClaudeCodeAdapter(), {
+  audit: new ConsoleAuditSink(true),
+});
+
+interface AskUserArgs {
+  question: string;
+  options: Array<{ label: string; value: string }>;
+  slack_channel: string;
+  thread_ts?: string;
+  bot_id?: string;
+}
+
+toolGateway.register('ask_user', async (req: ToolCallRequest) => {
+  const {
+    question,
+    options,
+    slack_channel,
+    thread_ts,
+    bot_id: askBotId,
+  } = req.arguments as unknown as AskUserArgs;
+
+  const requestId = `ask_${++askRequestCounter}_${Date.now()}`;
+
+  // Block Kit 버튼 메시지 구성
+  const buttons = options.slice(0, 4).map((opt, i) => ({
+    type: 'button' as const,
+    text: { type: 'plain_text' as const, text: opt.label },
+    action_id: `semo_ask_${requestId}_${i}`,
+    value: opt.value,
+  }));
+
+  const askProfile = askBotId ? botProfiles[askBotId] : undefined;
+  await slackWeb.chat.postMessage({
+    channel: slack_channel,
+    thread_ts: thread_ts || undefined,
+    text: question,
+    ...(askProfile && { username: askProfile.username, icon_emoji: askProfile.icon_emoji }),
+    blocks: [
+      {
+        type: 'section',
+        text: { type: 'mrkdwn', text: `:question: ${question}` },
+      },
+      {
+        type: 'actions',
+        block_id: `semo_ask_${requestId}`,
+        elements: buttons,
+      },
+    ],
+  });
+
+  // 응답 대기 (120초 타임아웃) — pendingAskResponses 는 module-level 유지
+  const userChoice = await new Promise<string>((resolve) => {
+    pendingAskResponses.set(requestId, resolve);
+    setTimeout(() => {
+      if (pendingAskResponses.has(requestId)) {
+        pendingAskResponses.delete(requestId);
+        resolve('(timeout — 120초 내 응답 없음)');
+      }
+    }, 120_000);
+  });
+
+  return userChoice;
 });
 
 // Bot user ID (resolved at startup)
@@ -361,66 +433,17 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
   }
 
   if (name === 'ask_user') {
-    const {
-      question,
-      options,
-      slack_channel,
-      thread_ts,
-      bot_id: askBotId,
-    } = args as {
-      question: string;
-      options: Array<{ label: string; value: string }>;
-      slack_channel: string;
-      thread_ts?: string;
-      bot_id?: string;
-    };
-
-    const requestId = `ask_${++askRequestCounter}_${Date.now()}`;
-
-    try {
-      // Block Kit 버튼 메시지 구성
-      const buttons = options.slice(0, 4).map((opt, i) => ({
-        type: 'button' as const,
-        text: { type: 'plain_text' as const, text: opt.label },
-        action_id: `semo_ask_${requestId}_${i}`,
-        value: opt.value,
-      }));
-
-      const askProfile = askBotId ? botProfiles[askBotId] : undefined;
-      await slackWeb.chat.postMessage({
-        channel: slack_channel,
-        thread_ts: thread_ts || undefined,
-        text: question,
-        ...(askProfile && { username: askProfile.username, icon_emoji: askProfile.icon_emoji }),
-        blocks: [
-          {
-            type: 'section',
-            text: { type: 'mrkdwn', text: `:question: ${question}` },
-          },
-          {
-            type: 'actions',
-            block_id: `semo_ask_${requestId}`,
-            elements: buttons,
-          },
-        ],
-      });
-
-      // 응답 대기 (120초 타임아웃)
-      const userChoice = await new Promise<string>((resolve) => {
-        pendingAskResponses.set(requestId, resolve);
-        setTimeout(() => {
-          if (pendingAskResponses.has(requestId)) {
-            pendingAskResponses.delete(requestId);
-            resolve('(timeout — 120초 내 응답 없음)');
-          }
-        }, 120_000);
-      });
-
-      return { content: [{ type: 'text', text: userChoice }] };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return { content: [{ type: 'text', text: `ask_user error: ${msg}` }] };
+    // P5-3b: ToolGateway adapter handler 호출. 핸들러 내부 side effect 보존.
+    const result = await toolGateway.invoke({
+      name: 'ask_user',
+      arguments: args as unknown as Record<string, unknown>,
+      callerId: 'channel-slack',
+      hostSession: { hostSessionId: `channel-slack:${SEMO_SERVICE_ID}` },
+    });
+    if (!result.ok) {
+      return { content: [{ type: 'text', text: `ask_user error: ${result.error}` }] };
     }
+    return { content: [{ type: 'text', text: String(result.output ?? '') }] };
   }
 
   if (name === 'react') {
