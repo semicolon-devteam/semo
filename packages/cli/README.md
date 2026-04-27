@@ -60,9 +60,10 @@ semo doctor                              # ✓ Discord 봇 토큰 확인
 # 4. Router 데몬 기동 (포그라운드, Ctrl+C 종료)
 semo router start --platform discord
 
-# 5. 첫 대화로 KB 채우기 (별 터미널)
-semo chat "내 이름은 OO이고, 직무는 OO입니다"
-# → SemoBot이 'me/profile' 키로 KB 저장
+# 5. 첫 KB 채우기 — 대화형 온보딩 (별 터미널)
+semo onboard          # 닉네임/역할/관심사/목표 → me/* 자동 저장
+# 또는 자연어 factory:
+semo factory apply "오늘 회의에서 Notion 도입 결정됨" --yes
 ```
 
 이제 Discord 채널에서 `@SemoBot 안녕`을 보내면 로컬 Ollama가 KB와 함께 응답한다.
@@ -112,7 +113,8 @@ semo chat "내 이름은 OO이고, 직무는 OO입니다"
 | 봇 템플릿 목록 | `semo templates list`                                      |
 | 봇 생성        | `semo factory apply "기획 봇 만들어줘"`                    |
 | LLM 실행       | `semo exec "프롬프트"`                                     |
-| 채팅           | `semo chat "메시지"`                                       |
+| 채팅 REPL      | `semo chat --target ollama --model qwen2.5-coder:14b`      |
+| 첫 온보딩      | `semo onboard` (me/\* KB 자동 채움)                        |
 | 헬스체크       | `semo doctor`                                              |
 | 업그레이드     | `semo update`                                              |
 

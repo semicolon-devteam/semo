@@ -103,11 +103,13 @@ semo doctor
 ### Phase D — 첫 KB 엔트리 (5분)
 
 ```bash
-semo chat "내 이름은 [이름]이고 [직무] 입니다. 주력 기술은 [스택]입니다."
-semo kb search "내 직무"   # 자동 저장 확인
+semo onboard                                            # 대화형: 닉네임/역할/관심사/목표
+semo kb get me nickname && semo kb get me role         # 저장 확인
+semo factory apply "오늘 회의에서 Notion 도입 결정됨" --yes
+semo kb search "Notion"                                 # 검색 동작 확인
 ```
 
-성공: `[me] profile` 또는 그 사용자 도메인 KB 가 잡힘.
+성공: `me/nickname`, `me/role` 등 KB 키가 채워지고 `factory apply` 결과가 검색에 잡힘.
 
 ---
 
