@@ -2061,6 +2061,8 @@ kbCmd
     'incident 키 전용 — metadata.severity (low|medium|high|critical, env SEMO_INCIDENT_SEVERITY fallback)',
   )
   .option('--status <state>', 'incident 키 전용 — metadata.status (open|investigating|resolved 등)')
+  .option('--validate', 'P3-2: 도메인 ontology 와 metadata/필드 합치 검증 (실패 시 warn, 거부 X)')
+  .option('--strict-validate', 'P3-2: --validate 와 같지만 실패 시 거부 (exit 1)')
   .action(async (domain, key, subKey, options) => {
     const spinner = ora('KB upsert 중...').start();
     try {
@@ -2086,6 +2088,39 @@ kbCmd
         if (severity) metadata.severity = severity;
         const status = options.status ?? metadata.status;
         if (status) metadata.status = status;
+      }
+
+      // P3-2: ontology 검증 (옵트인). upsert 전 candidate 행을 만들어 ontoValidate 호출.
+      if (options.validate || options.strictValidate) {
+        try {
+          const candidate = {
+            domain,
+            key,
+            content: options.content,
+            metadata: Object.keys(metadata).length > 0 ? metadata : {},
+          } as KBEntry;
+          const validation = await ontoValidate(pool, domain, [candidate]);
+          if (validation.invalid.length > 0) {
+            const errors = validation.invalid.flatMap((inv) =>
+              inv.errors.map((e) => `[${inv.key}] ${e}`),
+            );
+            if (options.strictValidate) {
+              spinner.fail(`ontology 검증 실패: ${errors.join(' / ')}`);
+              await closeConnection();
+              process.exit(1);
+            } else {
+              spinner.warn(`ontology 검증 경고: ${errors.join(' / ')}`);
+              spinner.start('KB upsert 중...');
+            }
+          }
+        } catch (vErr) {
+          // ontology 미등록 도메인 등 — strict 모드 아니면 무시
+          if (options.strictValidate) {
+            spinner.fail(`ontology 검증 오류: ${(vErr as Error).message}`);
+            await closeConnection();
+            process.exit(1);
+          }
+        }
       }
 
       const result = await kbUpsert(pool, {
