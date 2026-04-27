@@ -194,24 +194,31 @@ export class OutboxReader {
             console.log(
               `[outbox] Posting reply from ${msg.bot_id}: "${msg.text.slice(0, 30)}" (id: ${msg.id?.slice(0, 8)})`,
             );
-            // P5-2d: projection emitter 주입 시 우선 사용, 실패/미주입 시 gateway fallback.
+            // P5-2d: projection emitter 주입 시 우선 사용, 실패/throw/미주입 시 gateway fallback.
+            // (Codex 리뷰: projection.emit throw 가 outer catch 로 빠지면 fallback 미실행 → 별도 try)
             let posted = false;
             if (this.projection) {
               const channel: ProjectionChannel =
                 this.platform === 'slack' ? 'slack-block' : 'discord-embed';
-              const result = await this.projection.emit(
-                {
-                  channel,
-                  destination: msg.channel_id,
-                  options: { threadTs: msg.thread_id, botId: msg.bot_id },
-                },
-                { text: msg.text },
-              );
-              if (result.ok) {
-                posted = true;
-              } else {
+              try {
+                const result = await this.projection.emit(
+                  {
+                    channel,
+                    destination: msg.channel_id,
+                    options: { threadTs: msg.thread_id, botId: msg.bot_id },
+                  },
+                  { text: msg.text },
+                );
+                if (result.ok) {
+                  posted = true;
+                } else {
+                  console.warn(
+                    `[outbox] projection emit failed (${result.error}) — fallback to gateway`,
+                  );
+                }
+              } catch (emitErr) {
                 console.warn(
-                  `[outbox] projection emit failed (${result.error}) — fallback to gateway`,
+                  `[outbox] projection emit threw (${(emitErr as Error).message}) — fallback to gateway`,
                 );
               }
             }
