@@ -1941,6 +1941,67 @@ kbCmd
   });
 
 kbCmd
+  .command('history <domain> <key> [sub_key]')
+  .description('KB 항목 변경 이력 조회 (P1-5: knowledge_base_history 테이블)')
+  .option('--limit <n>', '최대 행 수 (기본 20)', '20')
+  .option('--format <type>', '출력 형식 (json|table)', 'table')
+  .action(async (domain, key, subKey, options) => {
+    try {
+      const pool = getPool();
+      const limit = Math.max(1, Math.min(500, parseInt(options.limit, 10) || 20));
+      const params: unknown[] = [domain, key];
+      let where = `kb_snapshot->>'domain' = $1 AND kb_snapshot->>'key' = $2`;
+      if (subKey) {
+        params.push(subKey);
+        where += ` AND kb_snapshot->>'sub_key' = $3`;
+      }
+      const res = await pool.query(
+        `SELECT history_id, kb_id, operation, changed_by, changed_at::text AS changed_at, kb_snapshot
+         FROM semo.knowledge_base_history
+         WHERE ${where}
+         ORDER BY changed_at DESC
+         LIMIT ${limit}`,
+        params,
+      );
+      if (res.rows.length === 0) {
+        console.log(
+          chalk.yellow(
+            `\n  이력 없음: ${domain}/${key}${subKey ? '/' + subKey : ''} (테이블 미존재 시 semo db migrate 필요)\n`,
+          ),
+        );
+        await closeConnection();
+        process.exit(1);
+      }
+      if (options.format === 'json') {
+        console.log(JSON.stringify(res.rows, null, 2));
+      } else {
+        console.log(
+          chalk.cyan.bold(
+            `\n📜 [${domain}] ${key}${subKey ? '/' + subKey : ''} — ${res.rows.length}건\n`,
+          ),
+        );
+        for (const row of res.rows) {
+          const op =
+            row.operation === 'delete'
+              ? chalk.red(row.operation.toUpperCase())
+              : row.operation === 'update'
+                ? chalk.yellow(row.operation.toUpperCase())
+                : chalk.green(row.operation.toUpperCase());
+          console.log(
+            `  ${op.padEnd(20)} ${row.changed_at}  by ${row.changed_by ?? '-'}  (#${row.history_id})`,
+          );
+        }
+        console.log();
+      }
+      await closeConnection();
+    } catch (err) {
+      console.error(chalk.red(`이력 조회 실패: ${err}`));
+      await closeConnection();
+      process.exit(1);
+    }
+  });
+
+kbCmd
   .command('upsert <domain> <key> [sub_key]')
   .description('KB 항목 쓰기 (upsert) — 임베딩 자동 생성 + 스키마 검증 (key는 kebab-case만 허용)')
   .requiredOption('--content <text>', '항목 본문')
