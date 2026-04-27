@@ -142,14 +142,19 @@ export class CodexCliAdapter implements HostAdapter {
   }
 
   /**
-   * P5-4c: rollout JSONL 에서 파일 변경 trace 추출.
+   * P5-4c + P5-4c.ii: rollout JSONL 에서 파일 변경 trace 추출.
    *
    * Codex CLI rollout 이벤트 포맷 (Codex 자기-리뷰 2026-04-27):
-   *   {"type":"response_item","payload":{"type":"function_call","name":"apply_patch",
-   *     "arguments":"{\"input\": \"*** Begin Patch\\n*** Update File: path/to/file\\n...\"}"}}
    *
-   * 1차 신호: payload.name === "apply_patch" — patch 내 *** (Add|Update|Delete) File: <path> 추출.
-   * 2차 신호 (TODO): exec_command 의 cmd 가 sed/cat>file 등 파일 변경 명령일 때.
+   *   1차 신호 (apply_patch 도구 호출):
+   *     {"type":"response_item","payload":{"type":"function_call","name":"apply_patch",
+   *       "arguments":"{\"input\": \"*** Begin Patch\\n*** (Add|Update|Delete) File: path\\n...\"}"}}
+   *
+   *   2차 신호 (exec_command 결과):
+   *     {"type":"event_msg","payload":{"type":"exec_command_end",
+   *       "command":["/bin/zsh","-lc","tee file < ..."], "parsed_cmd":[...], "exit_code":0}}
+   *     parsed_cmd 자체는 {writes:[]} 구조 없음 — cmd 문자열 휴리스틱 필요.
+   *     exit_code===0 인 것만 (실패한 명령은 변경 없음).
    *
    * 호출처는 commitment 메타데이터에 첨부 (감사·롤백·중복 작업 감지).
    */
@@ -157,31 +162,78 @@ export class CodexCliAdapter implements HostAdapter {
     if (!ref.rolloutPath || !fs.existsSync(ref.rolloutPath)) return [];
     const content = fs.readFileSync(ref.rolloutPath, 'utf8');
     const files = new Set<string>();
-    const filePathRe = /\*{3}\s+(?:Add|Update|Delete)\s+File:\s+(\S+)/g;
+    const patchFileRe = /\*{3}\s+(?:Add|Update|Delete)\s+File:\s+(\S+)/g;
+
     for (const line of content.split('\n')) {
       if (!line.trim()) continue;
-      let evt: { type?: string; payload?: { type?: string; name?: string; arguments?: string } };
+      let evt: {
+        type?: string;
+        payload?: {
+          type?: string;
+          name?: string;
+          arguments?: string;
+          command?: string[];
+          exit_code?: number;
+        };
+      };
       try {
         evt = JSON.parse(line);
       } catch {
         continue;
       }
-      if (evt.type !== 'response_item' || evt.payload?.type !== 'function_call') continue;
-      if (evt.payload.name !== 'apply_patch') continue;
-      const argsStr = evt.payload.arguments ?? '';
-      let inner: string;
-      try {
-        const parsed = JSON.parse(argsStr) as { input?: string; patch?: string };
-        inner = parsed.input ?? parsed.patch ?? argsStr;
-      } catch {
-        inner = argsStr;
+
+      // 1차: apply_patch
+      if (evt.type === 'response_item' && evt.payload?.type === 'function_call') {
+        if (evt.payload.name !== 'apply_patch') continue;
+        const argsStr = evt.payload.arguments ?? '';
+        let inner: string;
+        try {
+          const parsed = JSON.parse(argsStr) as { input?: string; patch?: string };
+          inner = parsed.input ?? parsed.patch ?? argsStr;
+        } catch {
+          inner = argsStr;
+        }
+        let m: RegExpExecArray | null;
+        patchFileRe.lastIndex = 0;
+        while ((m = patchFileRe.exec(inner)) !== null) {
+          files.add(m[1]);
+        }
+        continue;
       }
-      let m: RegExpExecArray | null;
-      filePathRe.lastIndex = 0;
-      while ((m = filePathRe.exec(inner)) !== null) {
-        files.add(m[1]);
+
+      // 2차: exec_command_end (성공한 것만)
+      if (evt.type === 'event_msg' && evt.payload?.type === 'exec_command_end') {
+        if (evt.payload.exit_code !== 0) continue;
+        const cmd = (evt.payload.command ?? []).join(' ');
+        for (const f of extractFileWrites(cmd)) files.add(f);
       }
     }
     return Array.from(files);
   }
+}
+
+/**
+ * Shell 명령어에서 파일 쓰기 휴리스틱 추출. False positive 가능 (파일 자체 노이즈).
+ * 보수적 패턴만 — 빠진 케이스(awk, ed 등)는 P5-4c.iii 에서 보강.
+ */
+function extractFileWrites(cmd: string): string[] {
+  const found = new Set<string>();
+  // > path / >> path  (단 2>, &> 같은 file descriptor redirect 제외)
+  const redirectRe = /(?:^|\s)(?<!\d|&)>{1,2}\s+(\S+)/g;
+  let m: RegExpExecArray | null;
+  while ((m = redirectRe.exec(cmd)) !== null) found.add(m[1]);
+  // tee [-a] file
+  const teeRe = /\btee\s+(?:-a\s+)?(\S+)/g;
+  while ((m = teeRe.exec(cmd)) !== null) found.add(m[1]);
+  // sed -i ... <last-arg>  (단순 패턴)
+  const sedInplaceRe = /\bsed\s+-i(?:\s+\S+)*\s+(\S+)\s*$/;
+  const sedM = sedInplaceRe.exec(cmd);
+  if (sedM) found.add(sedM[1]);
+  // mv src dst / cp src dst  → dst (write 발생)
+  const mvCpRe = /\b(?:mv|cp)\s+(?:-\S+\s+)?\S+\s+(\S+)/g;
+  while ((m = mvCpRe.exec(cmd)) !== null) found.add(m[1]);
+  // rm path (delete 도 변경)
+  const rmRe = /\brm\s+(?:-\S+\s+)?(\S+)/g;
+  while ((m = rmRe.exec(cmd)) !== null) found.add(m[1]);
+  return Array.from(found);
 }
