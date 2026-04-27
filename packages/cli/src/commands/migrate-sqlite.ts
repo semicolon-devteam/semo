@@ -156,6 +156,18 @@ export function registerMigrateSqliteCommand(program: Command): void {
       else if (opts.target === 'ops') targets.push('ops');
       else targets.push('kb', 'ops');
 
+      const noSqliteAtAll = !cfg.kb.sqlite_path && !cfg.ops.sqlite_path;
+      const isDefaultConfig = cfg._source?.startsWith('<default:') ?? false;
+      if (noSqliteAtAll && isDefaultConfig) {
+        console.log(
+          chalk.yellow(
+            'config.toml 없음 — Personal/SQLite 환경이면 먼저 `semo init --profile personal-discord` 를 실행하세요.',
+          ),
+        );
+        process.exit(2);
+      }
+
+      let skipped = 0;
       for (const t of targets) {
         const dbPath = t === 'kb' ? cfg.kb.sqlite_path : cfg.ops.sqlite_path;
         if (!dbPath) {
@@ -164,10 +176,19 @@ export function registerMigrateSqliteCommand(program: Command): void {
               `[${t}] sqlite_path 없음 — ${cfg.kb.driver}/${cfg.ops.driver} 드라이버에서는 스킵`,
             ),
           );
+          skipped++;
           continue;
         }
         const result = runTarget(dbPath, t, opts);
         describeTarget(t, dbPath, result, opts);
+      }
+
+      if (skipped === targets.length) {
+        console.log(
+          chalk.gray(
+            `(전체 스킵 — Personal 프로파일이면 \`semo init --profile personal-discord\` 후 재실행)`,
+          ),
+        );
       }
     });
 }
