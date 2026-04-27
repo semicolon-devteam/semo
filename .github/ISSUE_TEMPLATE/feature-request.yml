@@ -1,43 +1,44 @@
-name: "✨ Feature Request"
-description: "기능 요청 (PlanClaw 기획 후 생성)"
-labels: ["enhancement"]
+name: '✨ Feature Request'
+description: '기능 요청 / 개선 제안'
+labels: ['enhancement']
 body:
   - type: markdown
     attributes:
       value: |
-        ## 기능 요청
-        PlanClaw이 기획 완료 후 생성하는 이슈 템플릿입니다.
+        ## 기능 요청 / 개선 제안
+        OSS 베타 사용자도 자유롭게 사용해주세요. AC 섹션은 비워두셔도 됩니다.
 
   - type: textarea
     id: summary
     attributes:
-      label: "요약"
-      description: "기능에 대한 간략한 설명"
+      label: '요약'
+      description: '기능에 대한 간략한 설명'
     validations:
       required: true
 
   - type: textarea
     id: background
     attributes:
-      label: "배경 / 목적"
-      description: "왜 이 기능이 필요한지, 어떤 문제를 해결하는지"
+      label: '배경 / 목적 (사용자 스토리)'
+      description: '왜 이 기능이 필요한지, 어떤 상황에서 막혔는지'
+      placeholder: '예: personal-discord 프로파일에서 ~를 하려고 했는데 ~가 막혀서…'
     validations:
       required: true
 
   - type: textarea
     id: spec
     attributes:
-      label: "기능 스펙"
-      description: "구현해야 할 상세 요구사항"
+      label: '원하는 동작'
+      description: '어떻게 동작했으면 하는지 (구체적이어도 좋고 추상적이어도 좋습니다)'
     validations:
       required: true
 
   - type: textarea
     id: acceptance-criteria
     attributes:
-      label: "✅ Acceptance Criteria"
+      label: '✅ Acceptance Criteria (내부 팀용)'
       description: |
-        ReviewClaw가 하나씩 체크하는 검증 항목. 각 AC는 독립적이고 기계적으로 확인 가능해야 함.
+        세미콜론 팀이 기획 후 채우는 검증 항목. 외부 베타 사용자는 비워두셔도 됩니다.
         형식: ## AC-N: [기능/시나리오명] 아래에 체크리스트
       value: |
         ## AC-1: [정상 동작]
@@ -51,14 +52,14 @@ body:
 
         ## AC-3: [에러 처리]
         - [ ]
-      placeholder: "각 AC는 독립적으로 검증 가능한 조건이어야 합니다"
+      placeholder: '각 AC는 독립적으로 검증 가능한 조건이어야 합니다'
     validations:
-      required: true
+      required: false
 
   - type: textarea
     id: notes
     attributes:
-      label: "참고사항"
-      description: "관련 문서, 디자인, 레퍼런스 등"
+      label: '참고사항'
+      description: '관련 문서, 디자인, 레퍼런스 등'
     validations:
       required: false
