@@ -17,3 +17,10 @@ jobs:
       - run: npm run lint
       - run: npx tsc --noEmit --project packages/cli/tsconfig.json
       - run: npm run build
+      - name: CLI bundle smoke (esbuild → single file)
+        run: npm run bundle -w @team-semicolon/semo-cli
+      - name: Bundle sanity (--version + dry-run init)
+        run: |
+          node packages/cli/dist/bundle.js --version
+          SEMO_HOME=$(mktemp -d) SEMO_CONFIG_PATH=$(mktemp)/config.toml \
+            node packages/cli/dist/bundle.js init --profile personal-discord --dry-run
