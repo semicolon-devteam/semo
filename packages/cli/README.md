@@ -1,230 +1,147 @@
 # @team-semicolon/semo-cli
 
-> SEMO CLI v3.0 - AI Agent Orchestration Framework Installer
+> SEMO — 자기 KB 위에 봇 하네스를 올리는 메타 프레임워크 (CLI).
+> 개인은 노트북 한 대로, 팀은 PostgreSQL 위에서 동일 엔진을 공유한다.
 
-## 설치
+[![npm](https://img.shields.io/npm/v/@team-semicolon/semo-cli.svg)](https://www.npmjs.com/package/@team-semicolon/semo-cli)
+[![license](https://img.shields.io/npm/l/@team-semicolon/semo-cli.svg)](https://github.com/semicolon-devteam/semo/blob/main/LICENSE)
+
+---
+
+## 30초 설치
 
 ```bash
 npm install -g @team-semicolon/semo-cli
+semo init                  # 프로파일 선택 → ~/.semo 생성
+semo migrate-sqlite        # KB/Ops 스키마 적용 (Personal 기본)
+semo doctor                # 설치 헬스체크
 ```
 
-## 빠른 시작
+또는 일회성 실행:
 
 ```bash
-# 프로젝트에 SEMO 설치
-semo init
-
-# Extension 패키지 추가
-semo add eng/nextjs
-
-# 버전 확인 및 업데이트 체크
-semo -v
+npx @team-semicolon/semo-cli init
 ```
 
-## 명령어
+---
 
-### `semo init`
+## 프로파일 — 5분 안에 결정
 
-현재 프로젝트에 SEMO를 설치합니다.
+`semo init` 첫 화면에서 선택한다. 운영 환경이 바뀌면 `~/.semo/config.toml` 만 교체하면 된다.
+
+| 프로파일                  | KB          | 실행 타깃                | 메신저          | 용도                                                                 |
+| ------------------------- | ----------- | ------------------------ | --------------- | -------------------------------------------------------------------- |
+| `personal-discord` (기본) | SQLite      | Ollama (로컬 LLM)        | Discord 봇      | 노트북 1대, 자기만의 에이전트 — 데이터 로컬, 인터넷 다운돼도 KB 사용 |
+| `personal-offline`        | SQLite      | Ollama                   | stdin (CLI)     | 메신저 없이 터미널만으로                                             |
+| `solo-connected`          | SQLite      | Anthropic API            | HTTP/Obsidian   | 클라우드 LLM + Tailscale 외부 접근                                   |
+| `team`                    | PostgreSQL  | Claude Code Orchestrator | Slack + Discord | 여러 명이 같은 KB 공유 (팀/스타트업)                                 |
+| `custom`                  | 빈 스켈레톤 | —                        | —               | 직접 편집                                                            |
+
+> **세미콜론 팀도 `team` 프로파일의 한 사용자**일 뿐. SEMO는 메타 프레임워크.
+
+---
+
+## 1분 만에 Personal Discord 봇 띄우기
 
 ```bash
-semo init                    # 기본 설치 (프로젝트 유형 자동 감지)
-semo init --force            # 기존 설정 덮어쓰기
-semo init --skip-mcp         # MCP 설정 생략
-semo init --with next,infra  # 특정 패키지와 함께 설치
+# 1. Ollama 설치 + 모델
+brew install ollama && ollama serve &
+ollama pull qwen2.5-coder:14b
+ollama pull nomic-embed-text
+
+# 2. SEMO 초기화
+semo init --profile personal-discord
+semo migrate-sqlite
+
+# 3. Discord 봇 등록 (https://discord.com/developers/applications 에서 생성 후)
+semo channel discord install
+# → DISCORD_BOT_TOKEN, DISCORD_CLIENT_ID 입력
+
+# 4. 첫 대화로 KB 채우기
+semo chat "내 이름은 OO이고, 직무는 OO입니다"
+# → SemoBot이 'me/profile' 키로 KB 저장
 ```
 
-### `semo add <packages>`
+이제 Discord 채널에서 `@SemoBot 안녕`을 보내면 로컬 Ollama가 KB와 함께 응답한다.
 
-Extension 패키지를 추가로 설치합니다.
+---
 
-```bash
-# 개별 패키지 설치
-semo add eng/nextjs
-semo add biz/discovery
+## 3-Layer 아키텍처 (요약)
 
-# 그룹 일괄 설치
-semo add biz      # Business 전체 (discovery, design, management, poc)
-semo add eng      # Engineering 전체 (nextjs, spring, ms, infra)
-semo add ops      # Operations 전체 (qa, monitor, improve)
+| Layer            | 소유자      | 내용                                                                                   |
+| ---------------- | ----------- | -------------------------------------------------------------------------------------- |
+| **L0 SEMO Core** | npm 공개    | SemoBot 오케스트레이터, KB/Ops 인프라, 봇 템플릿 카탈로그 (`@team-semicolon/semo-cli`) |
+| **L1 Profile**   | 사용자 선택 | `~/.semo/config.toml` — KB 드라이버 / 메신저 / LLM 타깃                                |
+| **L2 Tenant**    | 사용자 소유 | 자기 도메인 KB 엔트리, 봇 인스턴스, 자유 CRUD                                          |
 
-# 여러 패키지 동시 설치
-semo add eng/nextjs,eng/infra
+업그레이드 시 L0 만 `semo update` 로 갱신, L2 데이터는 그대로.
 
-# 레거시 별칭 지원
-semo add next     # → eng/nextjs
-semo add backend  # → eng/spring
-semo add mvp      # → biz/poc
-```
+---
 
-### `semo list`
+## 봇 카탈로그
 
-사용 가능한 모든 패키지를 표시합니다.
+`semo bots templates` 로 사용 가능한 역할 템플릿 목록. SemoBot 외 모든 봇은 **템플릿 → 복사 → 사용자 정의** 흐름.
 
-```bash
-semo list
-```
+| ID                | 역할              | 강점                             |
+| ----------------- | ----------------- | -------------------------------- |
+| `semoclaw` (필수) | 오케스트레이터    | 사용자 의도 → 적절한 봇 dispatch |
+| `planclaw`        | 기획/PRD          | 요구사항 정리, 스펙 작성         |
+| `workclaw`        | 풀스택 구현       | 코드 작성, 마이그레이션          |
+| `reviewclaw`      | 코드 리뷰/QA      | PR 리뷰, 테스트 설계             |
+| `designclaw`      | 디자인/퍼블리싱   | UI 설계, Figma 핸드오프          |
+| `growthclaw`      | SEO/마케팅/그로스 | KPI, 콘텐츠                      |
+| `infraclaw`       | DevOps/배포       | 인프라, CI/CD                    |
 
-### `semo status`
+내 도메인에 맞춰 템플릿을 복사하거나 SemoBot 과의 대화로 새 봇을 만들 수 있다 (`semo factory create`).
 
-SEMO 설치 상태를 확인합니다.
+---
 
-```bash
-semo status
-```
+## 자주 쓰는 명령
 
-### `semo version` / `semo -v`
+| 작업            | 명령                                                       |
+| --------------- | ---------------------------------------------------------- |
+| 초기화          | `semo init [--profile <name>]`                             |
+| KB 검색         | `semo kb search "키워드"`                                  |
+| KB 조회         | `semo kb get <도메인> <키> [<sub_key>]`                    |
+| KB 저장         | `semo kb upsert <도메인> <키> [<sub_key>] --content "..."` |
+| Discord 봇 설치 | `semo channel discord install`                             |
+| Slack 봇 설치   | `semo channel slack install`                               |
+| 봇 템플릿 목록  | `semo bots templates`                                      |
+| 봇 생성         | `semo factory create <id>`                                 |
+| LLM 실행        | `semo exec "프롬프트"`                                     |
+| 채팅            | `semo chat "메시지"`                                       |
+| 헬스체크        | `semo doctor`                                              |
+| 업그레이드      | `semo update`                                              |
 
-버전 정보 및 업데이트 확인을 표시합니다.
+---
 
-```bash
-semo version
-semo -v
-```
+## 환경변수
 
-출력 예시:
-```
-📦 SEMO CLI 버전 정보
+| 변수                | 용도                                                                 |
+| ------------------- | -------------------------------------------------------------------- |
+| `SEMO_HOME`         | 기본 `~/.semo` 변경. 한 머신에서 Team/Personal 프로파일 분리 시 유용 |
+| `SEMO_CONFIG_PATH`  | config.toml 경로 직접 지정                                           |
+| `ANTHROPIC_API_KEY` | `solo-connected` / `team` 프로파일                                   |
+| `DISCORD_BOT_TOKEN` | Discord 메신저 사용 시                                               |
+| `SLACK_BOT_TOKEN`   | Slack 메신저 사용 시                                                 |
+| `OLLAMA_HOST`       | Ollama 호스트 변경 (기본 `http://127.0.0.1:11434`)                   |
 
-  현재 버전: 3.0.7
-  최신 버전: 3.0.7
+---
 
-  ✓ 최신 버전을 사용 중입니다.
-```
+## 설치/AX 컨설팅 문의
 
-### `semo update`
+- 엔진어: 무료 (OSS, Apache-2.0)
+- 설치/온톨로지 컨설팅: 세미콜론 팀에서 유상 제공 (Discord/Slack DM)
+- 베타 사용자: GitHub Issues 또는 [Discord 커뮤니티](https://github.com/semicolon-devteam/semo/discussions)
 
-SEMO를 최신 버전으로 업데이트합니다.
+---
 
-```bash
-semo update              # CLI + semo-system 전체 업데이트
-semo update --self       # CLI만 업데이트
-semo update --system     # semo-system만 업데이트
-semo update --skip-cli   # CLI 업데이트 건너뛰기
-```
+## 참고
 
-## 패키지 구조
-
-### Standard (필수)
-
-모든 프로젝트에 기본 설치됩니다.
-
-| 패키지 | 설명 |
-|--------|------|
-| `semo-core` | 원칙, 오케스트레이터, 공통 커맨드 |
-
-### Extensions (선택)
-
-프로젝트 유형에 맞게 선택적으로 설치합니다.
-
-#### Business Layer (`biz`)
-
-| 패키지 | 설명 | 설치 |
-|--------|------|------|
-| `biz/discovery` | 아이템 발굴, 시장 조사, Epic/Task | `semo add biz/discovery` |
-| `biz/design` | 컨셉 설계, 목업, UX | `semo add biz/design` |
-| `biz/management` | 일정/인력/스프린트 관리 | `semo add biz/management` |
-| `biz/poc` | 빠른 PoC, 패스트트랙 | `semo add biz/poc` |
-
-#### Engineering Layer (`eng`)
-
-| 패키지 | 설명 | 자동 감지 | 설치 |
-|--------|------|----------|------|
-| `eng/nextjs` | Next.js 프론트엔드 개발 | `next.config.*` | `semo add eng/nextjs` |
-| `eng/spring` | Spring Boot 백엔드 개발 | `pom.xml`, `build.gradle` | `semo add eng/spring` |
-| `eng/ms` | 마이크로서비스 아키텍처 | - | `semo add eng/ms` |
-| `eng/infra` | 인프라/배포 관리 | `Dockerfile`, `docker-compose.yml` | `semo add eng/infra` |
-
-#### Operations Layer (`ops`)
-
-| 패키지 | 설명 | 설치 |
-|--------|------|------|
-| `ops/qa` | 테스트/품질 관리 | `semo add ops/qa` |
-| `ops/monitor` | 서비스 현황 모니터링 | `semo add ops/monitor` |
-| `ops/improve` | 개선 제안 | `semo add ops/improve` |
-
-#### Meta
-
-| 패키지 | 설명 | 설치 |
-|--------|------|------|
-| `meta` | SEMO 프레임워크 자체 개발/관리 | `semo add meta` |
-
-## 설치 후 구조
-
-```
-your-project/
-├── .claude/
-│   ├── CLAUDE.md              # 프로젝트 설정 (Extension CLAUDE.md 병합)
-│   ├── settings.json          # MCP 서버 설정
-│   ├── memory/                # Context Mesh (세션 간 컨텍스트)
-│   │   ├── context.md         # 프로젝트 상태
-│   │   ├── decisions.md       # 아키텍처 결정
-│   │   └── rules/             # 프로젝트별 규칙
-│   ├── agents/                # 에이전트 심볼릭 링크
-│   ├── skills/                # 스킬 심볼릭 링크
-│   └── commands/SEMO/         # SEMO 커맨드
-│
-└── semo-system/               # White Box (읽기 전용)
-    ├── semo-core/             # 원칙, 오케스트레이션
-    ├── bot-workspaces/        # 봇 전용 스킬/컨텍스트
-    ├── biz/                   # Business Layer (선택)
-    ├── eng/                   # Engineering Layer (선택)
-    └── ops/                   # Operations Layer (선택)
-```
-
-## MCP 서버
-
-SEMO CLI는 다음 MCP 서버를 자동으로 등록합니다:
-
-| 서버 | 설명 |
-|------|------|
-| `semo-integrations` | GitHub, Slack, Supabase 연동 |
-| `context7` | 라이브러리 문서 조회 |
-| `sequential-thinking` | 순차적 사고 지원 |
-
-### 환경변수
-
-MCP 연동을 위해 다음 환경변수를 설정하세요:
-
-| 변수 | 설명 |
-|------|------|
-| `GITHUB_TOKEN` | GitHub API 토큰 |
-| `SLACK_BOT_TOKEN` | Slack Bot 토큰 |
-| `SUPABASE_URL` | Supabase 프로젝트 URL |
-| `SUPABASE_KEY` | Supabase 서비스 키 |
-
-## 프로젝트 유형 자동 감지
-
-`semo init` 실행 시 프로젝트 파일을 분석하여 적절한 패키지를 추천합니다:
-
-| 감지 파일 | 추천 패키지 |
-|----------|-------------|
-| `next.config.js`, `next.config.mjs`, `next.config.ts` | `eng/nextjs` |
-| `pom.xml`, `build.gradle` | `eng/spring` |
-| `Dockerfile`, `docker-compose.yml` | `eng/infra` |
-| `semo-core` | `meta` |
-
-## 레거시 명령어 호환
-
-이전 버전 사용자를 위해 레거시 패키지명도 지원합니다:
-
-| 레거시 | 현재 |
-|--------|------|
-| `semo add next` | `semo add eng/nextjs` |
-| `semo add backend` | `semo add eng/spring` |
-| `semo add ms` | `semo add eng/ms` |
-| `semo add infra` | `semo add eng/infra` |
-| `semo add qa` | `semo add ops/qa` |
-| `semo add po` | `semo add biz/discovery` |
-| `semo add pm` | `semo add biz/management` |
-| `semo add design` | `semo add biz/design` |
-| `semo add mvp` | `semo add biz/poc` |
-
-## 참조
-
-- [SEMO 레포지토리](https://github.com/semicolon-devteam/semo)
-- [SEMO MCP Server](https://www.npmjs.com/package/@team-semicolon/semo-mcp)
+- 메인 레포: <https://github.com/semicolon-devteam/semo>
+- 3-Layer 설계: `docs/ARCHITECTURE.md`
+- 자주 묻는 질문: `docs/FAQ.md`
 
 ## 라이선스
 
-MIT
+Apache-2.0
