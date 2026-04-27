@@ -41,7 +41,17 @@ try {
     platform: 'node',
     target: 'node18',
     format: 'cjs',
-    external: ['better-sqlite3', 'pg', 'pg-native'],
+    external: [
+      'better-sqlite3',
+      'pg',
+      'pg-native',
+      // discord voice 부수 의존 (prism-media → ffmpeg-static 등). cli 자체는 미사용.
+      'ffmpeg-static',
+      '@discordjs/opus',
+      'opusscript',
+      'sodium-native',
+      'libsodium-wrappers',
+    ],
     // banner shebang 미사용 — src/index.ts 첫 줄에 이미 #!/usr/bin/env node 가 있어
     // banner 추가 시 shebang 2개로 SyntaxError. (Codex 리뷰 2026-04-27)
     minify: true,
