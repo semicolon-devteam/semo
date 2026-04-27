@@ -40,3 +40,4 @@ export type {
 } from './runtime-harness.js';
 
 export * from './adapters/index.js';
+export * from './emitters/index.js';
