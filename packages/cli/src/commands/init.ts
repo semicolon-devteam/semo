@@ -196,10 +196,12 @@ function printNextSteps(cfg: InitConfigShape): void {
     console.log(`  • ${chalk.cyan(cfg.execution.api_key_env)} 환경변수 설정 필요`);
   }
   if (cfg.messaging.sources.includes('discord')) {
-    console.log(`  • Discord 봇 credential 등록: ${chalk.cyan('semo channel discord install')}`);
+    console.log(`  • Discord 봇 토큰 설정: ${chalk.cyan("export DISCORD_TOKEN='...'")}`);
+    console.log(`  • Router 기동: ${chalk.cyan('semo router start --platform discord')}`);
   }
   if (cfg.messaging.sources.includes('slack')) {
-    console.log(`  • Slack 봇 설치: ${chalk.cyan('semo channel slack install')}`);
+    console.log(`  • Slack 봇 토큰 설정: ${chalk.cyan("export SLACK_BOT_TOKEN='...'")}`);
+    console.log(chalk.gray('    (Slack router 는 OSS 1차 미지원, P6.1 예정)'));
   }
   if (cfg.kb.driver === 'sqlite') {
     console.log(`  • KB 스키마 적용: ${chalk.cyan('semo migrate-sqlite')}`);

@@ -90,14 +90,15 @@ semo doctor
 ### Phase C — Discord 봇 (10분)
 
 1. <https://discord.com/developers/applications> 에서 새 앱
-2. Bot 탭 → Token 복사
+2. Bot 탭 → Token 복사 + **MESSAGE CONTENT INTENT** on
 3. OAuth2 URL Generator → `bot` scope + `Send Messages`/`Read Message History` permission → 사용자 본인 서버에 invite
 4. 로컬 셸:
    ```bash
-   semo channel discord install
-   # 토큰 입력 → ~/.semo/.env 자동 저장
+   export DISCORD_TOKEN='your-bot-token'   # ~/.zshrc 또는 direnv 에 영구 저장
+   semo doctor                              # ✓ Discord 봇 토큰
+   semo router start --platform discord     # 포그라운드, Ctrl+C 종료
    ```
-5. Discord 채널에서 `@SemoBot 안녕` → Ollama 응답 확인
+5. 별 터미널에서 Discord 채널에 `@SemoBot 안녕` → Ollama 응답 확인
 
 ### Phase D — 첫 KB 엔트리 (5분)
 

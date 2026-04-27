@@ -54,15 +54,19 @@ semo init --profile personal-discord
 semo migrate-sqlite
 
 # 3. Discord 봇 등록 (https://discord.com/developers/applications 에서 생성 후)
-semo channel discord install
-# → DISCORD_BOT_TOKEN, DISCORD_CLIENT_ID 입력
+export DISCORD_TOKEN='your-bot-token'   # ~/.zshrc 또는 direnv 에 영구 저장 권장
+semo doctor                              # ✓ Discord 봇 토큰 확인
 
-# 4. 첫 대화로 KB 채우기
+# 4. Router 데몬 기동 (포그라운드, Ctrl+C 종료)
+semo router start --platform discord
+
+# 5. 첫 대화로 KB 채우기 (별 터미널)
 semo chat "내 이름은 OO이고, 직무는 OO입니다"
 # → SemoBot이 'me/profile' 키로 KB 저장
 ```
 
 이제 Discord 채널에서 `@SemoBot 안녕`을 보내면 로컬 Ollama가 KB와 함께 응답한다.
+자세한 단계별 절차는 [`packages/cli/PERSONAL_TESTING.md`](./PERSONAL_TESTING.md) 참고.
 
 ---
 
@@ -98,20 +102,19 @@ semo chat "내 이름은 OO이고, 직무는 OO입니다"
 
 ## 자주 쓰는 명령
 
-| 작업            | 명령                                                       |
-| --------------- | ---------------------------------------------------------- |
-| 초기화          | `semo init [--profile <name>]`                             |
-| KB 검색         | `semo kb search "키워드"`                                  |
-| KB 조회         | `semo kb get <도메인> <키> [<sub_key>]`                    |
-| KB 저장         | `semo kb upsert <도메인> <키> [<sub_key>] --content "..."` |
-| Discord 봇 설치 | `semo channel discord install`                             |
-| Slack 봇 설치   | `semo channel slack install`                               |
-| 봇 템플릿 목록  | `semo bots templates`                                      |
-| 봇 생성         | `semo factory create <id>`                                 |
-| LLM 실행        | `semo exec "프롬프트"`                                     |
-| 채팅            | `semo chat "메시지"`                                       |
-| 헬스체크        | `semo doctor`                                              |
-| 업그레이드      | `semo update`                                              |
+| 작업           | 명령                                                       |
+| -------------- | ---------------------------------------------------------- |
+| 초기화         | `semo init [--profile <name>]`                             |
+| KB 검색        | `semo kb search "키워드"`                                  |
+| KB 조회        | `semo kb get <도메인> <키> [<sub_key>]`                    |
+| KB 저장        | `semo kb upsert <도메인> <키> [<sub_key>] --content "..."` |
+| Discord 라우터 | `semo router start --platform discord` (Slack 미지원)      |
+| 봇 템플릿 목록 | `semo templates list`                                      |
+| 봇 생성        | `semo factory apply "기획 봇 만들어줘"`                    |
+| LLM 실행       | `semo exec "프롬프트"`                                     |
+| 채팅           | `semo chat "메시지"`                                       |
+| 헬스체크       | `semo doctor`                                              |
+| 업그레이드     | `semo update`                                              |
 
 ---
 
@@ -122,8 +125,8 @@ semo chat "내 이름은 OO이고, 직무는 OO입니다"
 | `SEMO_HOME`         | 기본 `~/.semo` 변경. 한 머신에서 Team/Personal 프로파일 분리 시 유용 |
 | `SEMO_CONFIG_PATH`  | config.toml 경로 직접 지정                                           |
 | `ANTHROPIC_API_KEY` | `solo-connected` / `team` 프로파일                                   |
-| `DISCORD_BOT_TOKEN` | Discord 메신저 사용 시                                               |
-| `SLACK_BOT_TOKEN`   | Slack 메신저 사용 시                                                 |
+| `DISCORD_TOKEN`     | Discord 봇 토큰 (Personal Discord 프로파일 필수)                     |
+| `SLACK_BOT_TOKEN`   | Slack 봇 토큰 (Team 프로파일)                                        |
 | `OLLAMA_HOST`       | Ollama 호스트 변경 (기본 `http://127.0.0.1:11434`)                   |
 
 ---
