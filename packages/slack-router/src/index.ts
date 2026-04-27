@@ -22,16 +22,17 @@ import {
   SlackGateway,
   Router,
   FALLBACK_BOT_IDS,
+  SLACK_PROFILES,
   InboxWriter,
   OutboxReader,
   HealthMonitor,
   BusyDetector,
   resolveSpeaker,
+  SlackProjectionEmitter,
   type SlackMessage,
   type InboxMessage,
   type OutboxMessage,
 } from '@team-semicolon/semo-common';
-import { SlackProjectionEmitter } from '@team-semicolon/semo-common';
 
 // ── Configuration ──
 
@@ -185,7 +186,11 @@ async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
 
 // P5-2e: SlackProjectionEmitter 를 OutboxReader 에 주입.
 // emit 실패/throw 시 OutboxReader 가 gateway fallback (회귀 0).
-const slackEmitter = new SlackProjectionEmitter(slack.getWebClient());
+// SLACK_PROFILES getter 주입 — bot-config 가 KB 에서 동적 갱신해도 매 emit 시 최신값 사용.
+// (Codex 리뷰: 누락 시 sender persona 회귀)
+const slackEmitter = new SlackProjectionEmitter(slack.getWebClient(), {
+  getBotProfiles: () => SLACK_PROFILES,
+});
 
 const outboxReader = new OutboxReader({
   mailboxDir: MAILBOX_DIR,
