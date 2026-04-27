@@ -9,8 +9,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "postbuild": "cp -r src/templates dist/templates && xattr -cr dist/ 2>/dev/null || true",
-    "bundle": "tsc && node scripts/bundle.mjs && cp -r src/templates dist/templates",
+    "postbuild": "rm -rf dist/templates && cp -r src/templates dist/templates && xattr -cr dist/ 2>/dev/null || true",
+    "bundle": "tsc && node scripts/bundle.mjs && rm -rf dist/templates && cp -r src/templates dist/templates",
     "start": "node dist/index.js",
     "dev": "ts-node src/index.ts",
     "lint": "eslint src/"
