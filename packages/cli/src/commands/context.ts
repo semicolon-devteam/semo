@@ -241,6 +241,105 @@ export function registerContextCommands(program: Command): void {
       }
     });
 
+  // ── semo context stats — P3-3 ────────────────────────────
+  ctxCmd
+    .command('stats')
+    .description('컨텍스트 윈도우 사용량 추정 (.claude/memory/ + bot 파일)')
+    .option('--bot <id>', 'bot 워크스페이스 디렉토리 사용 (~/.semo/workspaces/<bot>/)')
+    .option('--memory-dir <path>', '메모리 디렉토리 직접 지정')
+    .option('--warn-tokens <n>', '경고 임계 토큰 수 (기본 40000 = 200k 의 20%)', '40000')
+    .option('--format <type>', 'json|table 출력 (기본 table)', 'table')
+    .action(async (options) => {
+      const warnTokens = Math.max(1000, parseInt(options.warnTokens, 10) || 40000);
+      const memoryDir = options.memoryDir
+        ? path.resolve(options.memoryDir.replace(/^~/, os.homedir()))
+        : options.bot
+          ? path.join(os.homedir(), '.semo', 'workspaces', options.bot, 'memory')
+          : path.join(os.homedir(), '.claude', 'memory');
+
+      if (!fs.existsSync(memoryDir)) {
+        console.log(chalk.yellow(`\n  메모리 디렉토리 없음: ${memoryDir}\n`));
+        process.exit(1);
+      }
+
+      // 재귀 스캔 (.md 만)
+      function scan(dir: string): Array<{ path: string; bytes: number }> {
+        const out: Array<{ path: string; bytes: number }> = [];
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          if (entry.name.startsWith('.')) continue;
+          const p = path.join(dir, entry.name);
+          if (entry.isDirectory()) out.push(...scan(p));
+          else if (entry.isFile() && entry.name.endsWith('.md')) {
+            try {
+              out.push({ path: p, bytes: fs.statSync(p).size });
+            } catch {
+              /* skip */
+            }
+          }
+        }
+        return out;
+      }
+
+      const files = scan(memoryDir);
+      const totalBytes = files.reduce((s, f) => s + f.bytes, 0);
+      // chars / 4 휴리스틱 (UTF-8 한글은 보수적 추정)
+      const totalTokens = Math.ceil(totalBytes / 4);
+
+      if (options.format === 'json') {
+        console.log(
+          JSON.stringify(
+            {
+              memoryDir,
+              fileCount: files.length,
+              totalBytes,
+              estimatedTokens: totalTokens,
+              warnThreshold: warnTokens,
+              warning: totalTokens > warnTokens,
+              topFiles: [...files]
+                .sort((a, b) => b.bytes - a.bytes)
+                .slice(0, 10)
+                .map((f) => ({
+                  path: path.relative(memoryDir, f.path),
+                  bytes: f.bytes,
+                  estimatedTokens: Math.ceil(f.bytes / 4),
+                })),
+            },
+            null,
+            2,
+          ),
+        );
+        return;
+      }
+
+      console.log(chalk.cyan.bold(`\n📊 Context Stats — ${memoryDir}\n`));
+      console.log(`  파일 수      : ${files.length}`);
+      console.log(`  총 bytes     : ${totalBytes.toLocaleString()}`);
+      console.log(`  추정 토큰     : ${totalTokens.toLocaleString()} (chars/4 휴리스틱)`);
+      console.log(`  경고 임계     : ${warnTokens.toLocaleString()}`);
+      if (totalTokens > warnTokens) {
+        console.log(
+          chalk.yellow(
+            `\n  ⚠️  추정 토큰이 경고 임계를 초과 (${totalTokens.toLocaleString()} > ${warnTokens.toLocaleString()}).\n     P2-4 hot/cold 분리 또는 오래된 항목 archive 검토.`,
+          ),
+        );
+      } else {
+        console.log(
+          chalk.green(
+            `\n  ✅ 임계 이내 (여유 ${(warnTokens - totalTokens).toLocaleString()} 토큰).`,
+          ),
+        );
+      }
+      console.log(chalk.cyan(`\n  Top 10 파일:`));
+      const top = [...files].sort((a, b) => b.bytes - a.bytes).slice(0, 10);
+      for (const f of top) {
+        const tokens = Math.ceil(f.bytes / 4);
+        console.log(
+          `    ${tokens.toString().padStart(7)} tok  ${f.bytes.toString().padStart(7)}B  ${path.relative(memoryDir, f.path)}`,
+        );
+      }
+      console.log();
+    });
+
   // ── semo context push ──────────────────────────────────────
   ctxCmd
     .command('push')
