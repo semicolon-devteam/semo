@@ -140,4 +140,48 @@ export class CodexCliAdapter implements HostAdapter {
   async endSession(_ref: HostSessionRef): Promise<void> {
     // no-op
   }
+
+  /**
+   * P5-4c: rollout JSONL 에서 파일 변경 trace 추출.
+   *
+   * Codex CLI rollout 이벤트 포맷 (Codex 자기-리뷰 2026-04-27):
+   *   {"type":"response_item","payload":{"type":"function_call","name":"apply_patch",
+   *     "arguments":"{\"input\": \"*** Begin Patch\\n*** Update File: path/to/file\\n...\"}"}}
+   *
+   * 1차 신호: payload.name === "apply_patch" — patch 내 *** (Add|Update|Delete) File: <path> 추출.
+   * 2차 신호 (TODO): exec_command 의 cmd 가 sed/cat>file 등 파일 변경 명령일 때.
+   *
+   * 호출처는 commitment 메타데이터에 첨부 (감사·롤백·중복 작업 감지).
+   */
+  async trackFileChanges(ref: HostSessionRef): Promise<string[]> {
+    if (!ref.rolloutPath || !fs.existsSync(ref.rolloutPath)) return [];
+    const content = fs.readFileSync(ref.rolloutPath, 'utf8');
+    const files = new Set<string>();
+    const filePathRe = /\*{3}\s+(?:Add|Update|Delete)\s+File:\s+(\S+)/g;
+    for (const line of content.split('\n')) {
+      if (!line.trim()) continue;
+      let evt: { type?: string; payload?: { type?: string; name?: string; arguments?: string } };
+      try {
+        evt = JSON.parse(line);
+      } catch {
+        continue;
+      }
+      if (evt.type !== 'response_item' || evt.payload?.type !== 'function_call') continue;
+      if (evt.payload.name !== 'apply_patch') continue;
+      const argsStr = evt.payload.arguments ?? '';
+      let inner: string;
+      try {
+        const parsed = JSON.parse(argsStr) as { input?: string; patch?: string };
+        inner = parsed.input ?? parsed.patch ?? argsStr;
+      } catch {
+        inner = argsStr;
+      }
+      let m: RegExpExecArray | null;
+      filePathRe.lastIndex = 0;
+      while ((m = filePathRe.exec(inner)) !== null) {
+        files.add(m[1]);
+      }
+    }
+    return Array.from(files);
+  }
 }
