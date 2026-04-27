@@ -184,6 +184,80 @@ describe('semo guard run assertion', () => {
   });
 });
 
+describe('semo guard run url-validator', () => {
+  it('빈 입력 → exit 0', () => {
+    const r = run(['guard', 'run', 'url-validator'], '');
+    expect(r.code).toBe(0);
+  });
+
+  it('BOT_CWD 미설정 → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'url-validator'],
+      JSON.stringify({ cwd: NON_BOT_CWD, last_assistant_message: 'https://evil.example.com' }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('URL 없음 → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'url-validator'],
+      JSON.stringify({ cwd: BOT_CWD, last_assistant_message: '평범한 텍스트' }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('화이트리스트 도메인 (github.com) → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'url-validator'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        last_assistant_message: '참고: https://github.com/foo/bar',
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('화이트리스트 서브도메인 (foo.vercel.app) → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'url-validator'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        last_assistant_message: 'https://foo.vercel.app',
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('비화이트리스트 도메인 → exit 1 + BLOCK', () => {
+    const r = run(
+      ['guard', 'run', 'url-validator'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        last_assistant_message: '참고: https://evil.example.com/path',
+      }),
+    );
+    expect(r.code).toBe(1);
+    expect(r.stdout).toContain('URL-GUARD');
+    expect(r.stdout).toContain('evil.example.com');
+  });
+
+  it('코드블록 안 URL 은 검증 제외', () => {
+    const r = run(
+      ['guard', 'run', 'url-validator'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        last_assistant_message: '예시:\n```\ncurl https://evil.example.com\n```',
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+});
+
 describe('semo guard run kb-search-loop', () => {
   it('빈 입력 → exit 0', () => {
     const r = run(['guard', 'run', 'kb-search-loop'], '');

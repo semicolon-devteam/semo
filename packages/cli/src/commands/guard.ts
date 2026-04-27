@@ -37,6 +37,47 @@ const ASSERTION_MIN_LINES = 3;
 const ENTITY_NOUNS = /팀원|서비스|배포|버전|설정|인프라|서버|도메인|DB|데이터베이스|API|포트/;
 const ASSERTION_TAIL = /(입니다|됩니다|있습니다|합니다)/;
 const SOURCE_RE = /답변근거.*KB|\[KB\]|semo kb|KB 조회|https?:\/\/|GitHub|출처/;
+const URL_RE = /https?:\/\/[^\s)\]>"']+/g;
+const URL_WHITELIST = new Set([
+  'github.com',
+  'raw.githubusercontent.com',
+  'gist.github.com',
+  'vercel.app',
+  'vercel.com',
+  'supabase.co',
+  'supabase.com',
+  'slack.com',
+  'notion.so',
+  'notion.site',
+  'google.com',
+  'googleapis.com',
+  'docs.google.com',
+  'npmjs.com',
+  'npmjs.org',
+  'registry.npmjs.org',
+  'anthropic.com',
+  'claude.ai',
+  'semi-colon.space',
+  'semicolon.dev',
+  'localhost',
+  '127.0.0.1',
+  'naver.com',
+  'kakao.com',
+  'tistory.com',
+  'pypi.org',
+  'docs.python.org',
+  'developer.mozilla.org',
+  'stackoverflow.com',
+  'linear.app',
+  'figma.com',
+  'miro.com',
+  'sentry.io',
+  'grafana.com',
+  'openai.com',
+  'platform.openai.com',
+  'arxiv.org',
+  'wikipedia.org',
+]);
 
 const PASS: HookResult = { exitCode: 0, level: 'pass' };
 
@@ -133,6 +174,51 @@ const KB_SEARCH_LOOP_GUARD: HookGuard = {
   },
 };
 
+function isWhitelistedUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    const host = u.hostname;
+    for (const allowed of URL_WHITELIST) {
+      if (host === allowed || host.endsWith('.' + allowed)) return true;
+    }
+    return false;
+  } catch {
+    // URL parse 실패 시 차단 안 함 (sh: try/except → True)
+    return true;
+  }
+}
+
+const URL_VALIDATOR_GUARD: HookGuard = {
+  name: 'url-validator',
+  triggers: ['Stop'],
+  botSessionOnly: true,
+  description: '봇 응답 URL 도메인 화이트리스트 검증 (hard block exit 1)',
+  async evaluate(payload: HookPayload | null): Promise<HookResult> {
+    if (!payload) return PASS;
+    const cwd = payload.cwd ?? '';
+    const response = normalizeAssistantMessage(payload.last_assistant_message);
+    if (!response || !BOT_CWD_RE.test(cwd)) return PASS;
+    const stripped = response.replace(CODE_BLOCK_RE, '');
+    const urls = stripped.match(URL_RE) ?? [];
+    if (urls.length === 0) return PASS;
+    const badUrls = urls.filter((u) => !isWhitelistedUrl(u));
+    if (badUrls.length === 0) return PASS;
+    const domains = new Set<string>();
+    for (const u of badUrls) {
+      try {
+        domains.add(new URL(u).hostname);
+      } catch {
+        domains.add(u.slice(0, 50));
+      }
+    }
+    return {
+      exitCode: 1,
+      level: 'block',
+      message: `[URL-GUARD] 화이트리스트에 없는 도메인: ${Array.from(domains).join(', ')}. URL을 확인해주세요.`,
+    };
+  },
+};
+
 const ASSERTION_GUARD: HookGuard = {
   name: 'assertion',
   triggers: ['Stop'],
@@ -172,6 +258,7 @@ function buildGateway(limit: number): InMemoryHookGateway {
   gateway.register(makeResponseLengthGuard(limit));
   gateway.register(KB_SEARCH_LOOP_GUARD);
   gateway.register(ASSERTION_GUARD);
+  gateway.register(URL_VALIDATOR_GUARD);
   return gateway;
 }
 
