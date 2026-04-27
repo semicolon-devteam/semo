@@ -38,3 +38,5 @@ export type {
   HarnessRunResult,
   RuntimeHarness,
 } from './runtime-harness.js';
+
+export * from './adapters/index.js';
