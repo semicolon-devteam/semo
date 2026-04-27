@@ -1952,6 +1952,15 @@ kbCmd
     'decision 키 전용 — metadata.decided_by (env SEMO_DECIDED_BY fallback)',
   )
   .option('--decided-at <date>', 'decision 키 전용 — metadata.decided_at (기본: 오늘, YYYY-MM-DD)')
+  .option(
+    '--occurred-at <date>',
+    'incident 키 전용 — metadata.occurred_at (기본: 오늘, YYYY-MM-DD)',
+  )
+  .option(
+    '--severity <level>',
+    'incident 키 전용 — metadata.severity (low|medium|high|critical, env SEMO_INCIDENT_SEVERITY fallback)',
+  )
+  .option('--status <state>', 'incident 키 전용 — metadata.status (open|investigating|resolved 등)')
   .action(async (domain, key, subKey, options) => {
     const spinner = ora('KB upsert 중...').start();
     try {
@@ -1966,6 +1975,17 @@ kbCmd
         const decidedAt =
           options.decidedAt ?? metadata.decided_at ?? new Date().toISOString().slice(0, 10);
         metadata.decided_at = decidedAt;
+      }
+
+      if (key === 'incident') {
+        const occurredAt =
+          options.occurredAt ?? metadata.occurred_at ?? new Date().toISOString().slice(0, 10);
+        metadata.occurred_at = occurredAt;
+        const severity =
+          options.severity ?? process.env.SEMO_INCIDENT_SEVERITY ?? metadata.severity;
+        if (severity) metadata.severity = severity;
+        const status = options.status ?? metadata.status;
+        if (status) metadata.status = status;
       }
 
       const result = await kbUpsert(pool, {
