@@ -8,14 +8,18 @@
  * 구현체는 P5-1 (ClaudeCodeAdapter wrap) 부터 단계적으로 도입.
  */
 
+import type { ExecutionTarget } from '../execution/types.js';
 import type { HostAdapter, HostSessionRef } from './host-adapter.js';
 import type { ToolGateway } from './tool-gateway.js';
 import type { ProjectionEmitter, ProjectionTarget } from './projection-emitter.js';
 
 export interface HarnessTarget {
   botId: string;
-  /** 호스트 환경 (어디서 돌릴지). */
+  /** 호스트 환경 (어디서 돌릴지 — Claude Code/Codex/Hermes/...). */
   host: HostAdapter;
+  /** LLM 모델 호출 어댑터 (어떤 모델로 응답 생성할지 — anthropic-api/openai/ollama/...).
+   *  HostAdapter 는 환경/sandbox/세션 lifecycle 만, 실제 turn 실행은 ExecutionTarget 이 담당. */
+  executionTarget: ExecutionTarget;
   /** 도구 호출 권한 (어떤 도구 허용·sandbox 단계). */
   toolGateway: ToolGateway;
   /** 결과 투사 채널 (어디로 출력할지). */

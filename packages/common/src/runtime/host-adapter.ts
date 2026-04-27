@@ -18,11 +18,20 @@ export type HostKind =
   | 'os-shell'
   | 'mock';
 
+/** 호스트가 지원하는 파일/명령 권한 단계. ToolGateway 권한 매핑의 기준. */
+export type SandboxMode = 'read-only' | 'workspace-write' | 'network' | 'dangerous';
+
+/** 도구 호출 승인 정책. */
+export type ApprovalPolicy =
+  | 'always-ask' /** 모든 도구 호출에 사용자 승인 (Claude Code 기본). */
+  | 'on-write' /** 파일 변경/네트워크 호출에만 승인 (Codex workspace-write 기본). */
+  | 'never'; /** 자동 승인 (Codex dangerous, Ollama 로컬). */
+
 export interface HostCapability {
-  /** 파일 시스템 쓰기 권한이 단계적으로 격상 가능한가 (sandbox → workspace-write → dangerous). */
-  graduatedFsPermission: boolean;
-  /** 호스트가 자체적으로 도구 호출 결과를 후처리하는가 (e.g., Claude Code permission prompt). */
-  nativeApprovalPrompt: boolean;
+  /** 호스트가 지원하는 sandbox 단계. ToolGateway 가 이 안에서만 권한 격상 가능. */
+  sandboxModes: SandboxMode[];
+  /** 호스트의 도구 호출 승인 정책. */
+  approvalPolicy: ApprovalPolicy;
   /** 세션 ID 기반 resume 지원. */
   sessionResume: boolean;
   /** stdin 으로 prompt 받고 stdout 으로 결과 내보내는 1-shot 모드 지원. */

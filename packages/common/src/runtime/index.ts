@@ -7,7 +7,14 @@
  * 단계 로드맵: docs/runtime-portable-roadmap.md.
  */
 
-export type { HostKind, HostCapability, HostSessionRef, HostAdapter } from './host-adapter.js';
+export type {
+  HostKind,
+  HostCapability,
+  HostSessionRef,
+  HostAdapter,
+  SandboxMode,
+  ApprovalPolicy,
+} from './host-adapter.js';
 
 export type {
   ToolCallRequest,
