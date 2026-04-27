@@ -33,6 +33,10 @@ interface AppliedRow {
  * 두 경우 모두 패키지 루트의 `migrations-sqlite/` 를 가리킨다.
  */
 function migrationsRoot(): string {
+  // 번들 (dist/bundle.js → __dirname=dist) 와 unbundled (dist/commands/migrate-sqlite.js)
+  // 양쪽 호환. v4.18.13 번들 컷오버 후 같은 회귀 발생 방지.
+  const bundled = path.resolve(__dirname, '..', 'migrations-sqlite');
+  if (fs.existsSync(bundled)) return bundled;
   return path.resolve(__dirname, '..', '..', 'migrations-sqlite');
 }
 

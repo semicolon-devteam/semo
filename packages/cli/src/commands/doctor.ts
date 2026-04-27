@@ -476,7 +476,11 @@ export function registerDoctorCommand(program: Command): void {
     .option('--strict', 'warn 도 실패로 간주 (CI 용)')
     .action(async (opts: { json?: boolean; strict?: boolean }) => {
       const cfg = loadProfile();
-      const migrationsRoot = path.resolve(__dirname, '..', '..', 'migrations-sqlite');
+      // 번들/unbundled 호환 (v4.18.13 번들 컷오버 후 회귀 방지)
+      const _bundledMig = path.resolve(__dirname, '..', 'migrations-sqlite');
+      const migrationsRoot = fs.existsSync(_bundledMig)
+        ? _bundledMig
+        : path.resolve(__dirname, '..', '..', 'migrations-sqlite');
       const report = await runDoctor(cfg, migrationsRoot, { strict: opts.strict });
       if (opts.json) {
         console.log(JSON.stringify(report, null, 2));

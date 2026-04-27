@@ -6,18 +6,33 @@
  * semo db migrate --dry-run — 미적용 마이그레이션 미리보기
  */
 
-import { Command } from "commander";
-import chalk from "chalk";
-import ora from "ora";
-import * as fs from "fs";
-import * as path from "path";
-import { getPool, closeConnection, isDbConnected } from "../database";
+import { Command } from 'commander';
+import chalk from 'chalk';
+import ora from 'ora';
+import * as fs from 'fs';
+import * as path from 'path';
+import { getPool, closeConnection, isDbConnected } from '../database';
 
 // ============================================================
 // Migration runner
 // ============================================================
 
-const MIGRATIONS_DIR = path.resolve(__dirname, "..", "..", "migrations");
+/**
+ * migrations/ 디렉토리 위치 — 번들/unbundled 양쪽 호환.
+ *
+ * unbundled (tsc 산출물): dist/commands/db.js → __dirname = dist/commands → ../../ = pkg root → ../../migrations
+ * bundled (esbuild dist/bundle.js): __dirname = dist → ../migrations
+ *
+ * 첫 번째 후보가 없으면 두 번째 시도 (회귀 0 — 양쪽 다 동작).
+ */
+function resolveMigrationsDir(): string {
+  const bundled = path.resolve(__dirname, '..', 'migrations');
+  if (fs.existsSync(bundled)) return bundled;
+  const unbundled = path.resolve(__dirname, '..', '..', 'migrations');
+  return unbundled;
+}
+
+const MIGRATIONS_DIR = resolveMigrationsDir();
 
 interface MigrationRecord {
   version: string;
@@ -43,7 +58,7 @@ async function ensureMigrationsTable(): Promise<void> {
 async function getAppliedMigrations(): Promise<MigrationRecord[]> {
   const pool = getPool();
   const { rows } = await pool.query<MigrationRecord>(
-    `SELECT version, applied_at::text FROM semo.schema_migrations ORDER BY version`
+    `SELECT version, applied_at::text FROM semo.schema_migrations ORDER BY version`,
   );
   return rows;
 }
@@ -55,7 +70,7 @@ function getMigrationFiles(): string[] {
   if (!fs.existsSync(MIGRATIONS_DIR)) return [];
   return fs
     .readdirSync(MIGRATIONS_DIR)
-    .filter((f) => f.endsWith(".sql"))
+    .filter((f) => f.endsWith('.sql'))
     .sort();
 }
 
@@ -66,19 +81,16 @@ async function runMigration(filename: string): Promise<void> {
   const pool = getPool();
   const client = await pool.connect();
   const filePath = path.join(MIGRATIONS_DIR, filename);
-  const sql = fs.readFileSync(filePath, "utf-8");
-  const version = filename.replace(/\.sql$/, "");
+  const sql = fs.readFileSync(filePath, 'utf-8');
+  const version = filename.replace(/\.sql$/, '');
 
   try {
-    await client.query("BEGIN");
+    await client.query('BEGIN');
     await client.query(sql);
-    await client.query(
-      `INSERT INTO semo.schema_migrations (version) VALUES ($1)`,
-      [version]
-    );
-    await client.query("COMMIT");
+    await client.query(`INSERT INTO semo.schema_migrations (version) VALUES ($1)`, [version]);
+    await client.query('COMMIT');
   } catch (err) {
-    await client.query("ROLLBACK");
+    await client.query('ROLLBACK');
     throw err;
   } finally {
     client.release();
@@ -90,19 +102,17 @@ async function runMigration(filename: string): Promise<void> {
 // ============================================================
 
 export function registerDbCommands(program: Command): void {
-  const dbCmd = program
-    .command("db")
-    .description("데이터베이스 관리");
+  const dbCmd = program.command('db').description('데이터베이스 관리');
 
   dbCmd
-    .command("migrate")
-    .description("마이그레이션 실행")
-    .option("--status", "적용된 마이그레이션 목록만 표시")
-    .option("--dry-run", "미적용 마이그레이션 미리보기 (실행하지 않음)")
+    .command('migrate')
+    .description('마이그레이션 실행')
+    .option('--status', '적용된 마이그레이션 목록만 표시')
+    .option('--dry-run', '미적용 마이그레이션 미리보기 (실행하지 않음)')
     .action(async (options: { status?: boolean; dryRun?: boolean }) => {
       const connected = await isDbConnected();
       if (!connected) {
-        console.error(chalk.red("DB 연결 실패"));
+        console.error(chalk.red('DB 연결 실패'));
         await closeConnection();
         process.exit(1);
       }
@@ -117,21 +127,19 @@ export function registerDbCommands(program: Command): void {
         // --status: 적용 상태만 출력
         if (options.status) {
           if (applied.length === 0) {
-            console.log(chalk.yellow("적용된 마이그레이션 없음"));
+            console.log(chalk.yellow('적용된 마이그레이션 없음'));
           } else {
-            console.log(chalk.cyan("적용된 마이그레이션:"));
+            console.log(chalk.cyan('적용된 마이그레이션:'));
             for (const r of applied) {
-              console.log(`  ${chalk.green("✓")} ${r.version}  ${chalk.gray(r.applied_at)}`);
+              console.log(`  ${chalk.green('✓')} ${r.version}  ${chalk.gray(r.applied_at)}`);
             }
           }
 
-          const pending = allFiles.filter(
-            (f) => !appliedSet.has(f.replace(/\.sql$/, ""))
-          );
+          const pending = allFiles.filter((f) => !appliedSet.has(f.replace(/\.sql$/, '')));
           if (pending.length > 0) {
             console.log(chalk.yellow(`\n미적용: ${pending.length}개`));
             for (const f of pending) {
-              console.log(`  ${chalk.yellow("○")} ${f}`);
+              console.log(`  ${chalk.yellow('○')} ${f}`);
             }
           }
 
@@ -140,12 +148,10 @@ export function registerDbCommands(program: Command): void {
         }
 
         // 미적용 마이그레이션 필터
-        const pending = allFiles.filter(
-          (f) => !appliedSet.has(f.replace(/\.sql$/, ""))
-        );
+        const pending = allFiles.filter((f) => !appliedSet.has(f.replace(/\.sql$/, '')));
 
         if (pending.length === 0) {
-          console.log(chalk.green("모든 마이그레이션이 적용됨"));
+          console.log(chalk.green('모든 마이그레이션이 적용됨'));
           await closeConnection();
           return;
         }
@@ -154,7 +160,7 @@ export function registerDbCommands(program: Command): void {
         if (options.dryRun) {
           console.log(chalk.cyan(`미적용 마이그레이션 ${pending.length}개:`));
           for (const f of pending) {
-            console.log(`  ${chalk.yellow("○")} ${f}`);
+            console.log(`  ${chalk.yellow('○')} ${f}`);
           }
           await closeConnection();
           return;
@@ -166,8 +172,8 @@ export function registerDbCommands(program: Command): void {
         for (const file of pending) {
           spinner.text = `적용 중: ${file}`;
           await runMigration(file);
-          spinner.text = `${chalk.green("✓")} ${file}`;
-          console.log(`  ${chalk.green("✓")} ${file}`);
+          spinner.text = `${chalk.green('✓')} ${file}`;
+          console.log(`  ${chalk.green('✓')} ${file}`);
         }
 
         spinner.succeed(`마이그레이션 완료 (${pending.length}개 적용)`);
