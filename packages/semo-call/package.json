@@ -26,6 +26,7 @@
     "@modelcontextprotocol/sdk": "^1.4.0",
     "@roamhq/wrtc": "^0.10.0",
     "msedge-tts": "^2.0.4",
+    "nodejs-whisper": "^0.2.7",
     "tsx": "^4.21.0",
     "ws": "^8.20.0",
     "zod": "^3.22.0"

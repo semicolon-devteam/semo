@@ -8,11 +8,13 @@
  *
  * 환경변수:
  *   SEMO_SERVICE_ID       — 세션 식별자
- *   VOICE_MODE            — console (기본) | webrtc | twilio
- *   VOICE_STT_PROVIDER    — console (기본) | deepgram | browser | local-whisper(미구현)
+ *   VOICE_MODE            — console (기본) | webrtc | discord | twilio(미구현)
+ *   VOICE_STT_PROVIDER    — console (기본) | deepgram | browser | local-whisper
  *   VOICE_TTS_PROVIDER    — console (기본) | openai | edge
  *   DEEPGRAM_API_KEY      — Deepgram STT API 키
  *   OPENAI_API_KEY        — OpenAI TTS API 키
+ *   WHISPER_MODEL         — local-whisper 모델 (small/medium/large-v3, 기본 medium)
+ *   DISCORD_VOICE_API_URL/TOKEN, DISCORD_GUILD_ID/VOICE_CHANNEL_ID/USER_ID — discord 모드
  */
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -25,9 +27,15 @@ import * as os from 'os';
 import type { STTAdapter, STTTranscript } from './adapters/stt.js';
 import type { TTSAdapter } from './adapters/tts.js';
 import type { TelephonyAdapter, CallInfo } from './adapters/telephony.js';
-import { ConsoleSTTAdapter, DeepgramSTTAdapter, BrowserSTTAdapter } from './adapters/stt.js';
+import {
+  ConsoleSTTAdapter,
+  DeepgramSTTAdapter,
+  BrowserSTTAdapter,
+  LocalWhisperSTTAdapter,
+} from './adapters/stt.js';
 import { ConsoleTTSAdapter, EdgeTTSAdapter } from './adapters/tts.js';
 import { ConsoleTelephonyAdapter, WebRTCTelephonyAdapter } from './adapters/telephony.js';
+import { DiscordTelephonyAdapter } from './adapters/telephony-discord.js';
 import { TurnManager } from './turn-manager.js';
 import { EnergyVAD } from './adapters/vad.js';
 
@@ -80,6 +88,8 @@ function createSTTAdapter(): STTAdapter {
       });
     case 'browser':
       return new BrowserSTTAdapter();
+    case 'local-whisper':
+      return new LocalWhisperSTTAdapter();
     case 'console':
     default:
       return new ConsoleSTTAdapter();
@@ -102,6 +112,8 @@ function createTelephonyAdapter(): TelephonyAdapter {
   switch (VOICE_MODE) {
     case 'webrtc':
       return new WebRTCTelephonyAdapter();
+    case 'discord':
+      return new DiscordTelephonyAdapter();
     case 'console':
     default:
       return new ConsoleTelephonyAdapter();

@@ -306,10 +306,30 @@ export async function startDiscordRouter(opts: StartOptions = {}): Promise<StopF
   outboxReader.start();
   console.log('[discord-router] Outbox reader started');
 
+  // SEMO Call voice 백엔드 (선택적). DISCORD_VOICE_API_TOKEN 미설정이면 skip.
+  let voiceApi: { close: () => void } | null = null;
+  if (process.env.DISCORD_VOICE_API_TOKEN) {
+    try {
+      const { startVoiceApi } = await import('./voice-api.js');
+      voiceApi = startVoiceApi(discord.getClient());
+    } catch (err) {
+      console.error('[discord-router] voice-api start failed (non-fatal):', err);
+    }
+  } else {
+    console.log('[discord-router] DISCORD_VOICE_API_TOKEN not set — voice-api skipped');
+  }
+
   console.log('[discord-router] Ready');
 
   return async function stop(): Promise<void> {
     console.log('[discord-router] Shutting down...');
+    if (voiceApi) {
+      try {
+        voiceApi.close();
+      } catch {
+        /* ignore */
+      }
+    }
     outboxReader.stop();
     await discord.stop();
     if (pool) await pool.end();

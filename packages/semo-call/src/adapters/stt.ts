@@ -372,3 +372,135 @@ export class BrowserSTTAdapter extends EventEmitter implements STTAdapter {
     this.emit('transcript', transcript);
   }
 }
+
+// ============================================================
+// Local Whisper STT (Phase A2 보강 — 0원, 로컬 한국어)
+// nodejs-whisper(whisper.cpp) 사용. utterance segment 단위로 transcribe.
+// Discord telephony 어댑터가 자연 utterance segment(EndBehaviorType.AfterSilence)
+// 단위로 PCM chunk를 emit하므로 그 chunk 1개 = 1 utterance 가정.
+// ============================================================
+
+const WHISPER_MODEL = process.env.WHISPER_MODEL || 'medium';
+
+export class LocalWhisperSTTAdapter extends EventEmitter implements STTAdapter {
+  private activeCallId = 'whisper-call';
+  private buffer: Buffer[] = [];
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private transcribing = false;
+
+  setCallId(callId: string) {
+    this.activeCallId = callId;
+  }
+
+  async start(): Promise<void> {
+    console.error(
+      `[whisper-stt] Initialized (model=${WHISPER_MODEL}). 첫 transcribe에서 모델 자동 다운로드`,
+    );
+  }
+
+  feedAudio(chunk: Buffer): void {
+    if (chunk.length === 0) return;
+    this.buffer.push(chunk);
+    // utterance 단위 chunk 1개 = 1 transcribe 가정. 200ms idle 후 flush.
+    if (this.flushTimer) clearTimeout(this.flushTimer);
+    this.flushTimer = setTimeout(() => {
+      void this.flush();
+    }, 200);
+  }
+
+  async stop(): Promise<void> {
+    if (this.flushTimer) clearTimeout(this.flushTimer);
+    await this.flush();
+  }
+
+  private async flush(): Promise<void> {
+    if (this.transcribing) return;
+    if (this.buffer.length === 0) return;
+    const pcm = Buffer.concat(this.buffer);
+    this.buffer = [];
+    this.transcribing = true;
+
+    // PCM 16kHz mono Int16 — 너무 짧으면 skip (< 0.3초)
+    const minBytes = 16000 * 2 * 0.3;
+    if (pcm.length < minBytes) {
+      this.transcribing = false;
+      return;
+    }
+
+    const fs = await import('fs');
+    const path = await import('path');
+    const os = await import('os');
+    const tmpFile = path.join(
+      os.tmpdir(),
+      `semo-whisper-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.wav`,
+    );
+
+    try {
+      writeWavFile(tmpFile, pcm, 16000);
+      // nodejs-whisper 동적 import (큰 모델 deps)
+      const { nodewhisper } = await import('nodejs-whisper');
+      const result = (await nodewhisper(tmpFile, {
+        modelName: WHISPER_MODEL,
+        autoDownloadModelName: WHISPER_MODEL,
+        verbose: false,
+        removeWavFileAfterTranscription: false,
+        whisperOptions: {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          language: 'ko' as any,
+          wordTimestamps: false,
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      })) as any;
+      const text =
+        typeof result === 'string'
+          ? result
+          : (result?.transcription || result?.text || '').toString();
+      const trimmed = text.trim();
+      if (trimmed) {
+        this.emit('transcript', {
+          callId: this.activeCallId,
+          text: trimmed,
+          isFinal: true,
+          confidence: 1.0,
+          durationMs: 0,
+        } satisfies STTTranscript);
+      }
+    } catch (err) {
+      console.error('[whisper-stt] transcribe error:', err);
+      this.emit('error', err instanceof Error ? err : new Error(String(err)));
+    } finally {
+      try {
+        fs.unlinkSync(tmpFile);
+      } catch {
+        /* ignore */
+      }
+      this.transcribing = false;
+    }
+  }
+}
+
+/** PCM 16kHz mono Int16 → WAV 파일 저장 (whisper 입력 포맷) */
+function writeWavFile(filePath: string, pcm: Buffer, sampleRate: number): void {
+  // import는 함수 안에서 (top-level await 없이)
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require('fs') as typeof import('fs');
+  const blockAlign = 2; // mono Int16
+  const byteRate = sampleRate * blockAlign;
+  const dataSize = pcm.length;
+  const fileSize = 36 + dataSize;
+  const header = Buffer.alloc(44);
+  header.write('RIFF', 0);
+  header.writeUInt32LE(fileSize, 4);
+  header.write('WAVE', 8);
+  header.write('fmt ', 12);
+  header.writeUInt32LE(16, 16);
+  header.writeUInt16LE(1, 20); // PCM
+  header.writeUInt16LE(1, 22); // mono
+  header.writeUInt32LE(sampleRate, 24);
+  header.writeUInt32LE(byteRate, 28);
+  header.writeUInt16LE(blockAlign, 32);
+  header.writeUInt16LE(16, 34); // bits per sample
+  header.write('data', 36);
+  header.writeUInt32LE(dataSize, 40);
+  fs.writeFileSync(filePath, Buffer.concat([header, pcm]));
+}

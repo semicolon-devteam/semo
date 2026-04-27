@@ -106,8 +106,14 @@ export class DiscordGateway implements GatewayAdapter {
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.DirectMessages,
         GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildVoiceStates,
       ],
     });
+  }
+
+  /** SEMO Call voice 백엔드가 사용하는 discord client 노출 */
+  getClient(): Client {
+    return this.client;
   }
 
   setMessageHandler(handler: MessageHandler): void {
