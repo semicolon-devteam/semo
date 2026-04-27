@@ -125,6 +125,65 @@ describe('semo guard run response-length', () => {
   });
 });
 
+describe('semo guard run assertion', () => {
+  it('빈 입력 → exit 0', () => {
+    const r = run(['guard', 'run', 'assertion'], '');
+    expect(r.code).toBe(0);
+  });
+
+  it('BOT_CWD 미설정 → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'assertion'],
+      JSON.stringify({
+        cwd: NON_BOT_CWD,
+        last_assistant_message: '서버 1번 입니다\n서비스 2번 입니다\n도메인 3번 입니다',
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('짧은 응답 (3줄 미만) → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'assertion'],
+      JSON.stringify({ cwd: BOT_CWD, last_assistant_message: '서버 X 입니다.' }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('사실 주장 + 출처 없음 → WARN', () => {
+    const text = '안녕하세요.\n서버 X 도메인은 example.com 입니다.\n그 외 자세한 사항은 별도.';
+    const r = run(
+      ['guard', 'run', 'assertion'],
+      JSON.stringify({ cwd: BOT_CWD, last_assistant_message: text }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('WARN: 사실 주장이');
+  });
+
+  it('사실 주장 + KB 출처 표기 → exit 0 (WARN 없음)', () => {
+    const text = '안녕하세요.\n서버 X 도메인은 example.com 입니다.\n[답변근거: KB infra/server]';
+    const r = run(
+      ['guard', 'run', 'assertion'],
+      JSON.stringify({ cwd: BOT_CWD, last_assistant_message: text }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('코드블록 안 사실 주장은 무시', () => {
+    const text =
+      '안녕하세요.\n다음과 같이 동작합니다.\n```\n서버 X 입니다\n도메인 Y 입니다\n포트 Z 입니다\n```\n끝.';
+    const r = run(
+      ['guard', 'run', 'assertion'],
+      JSON.stringify({ cwd: BOT_CWD, last_assistant_message: text }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+});
+
 describe('semo guard run kb-search-loop', () => {
   it('빈 입력 → exit 0', () => {
     const r = run(['guard', 'run', 'kb-search-loop'], '');

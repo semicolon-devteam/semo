@@ -12,3 +12,8 @@ export {
   ConsoleAuditSink,
   type InMemoryToolGatewayOptions,
 } from './inmemory-tool-gateway.js';
+export {
+  InMemoryHookGateway,
+  ConsolePolicyAuditSink,
+  type InMemoryHookGatewayOptions,
+} from './inmemory-hook-gateway.js';

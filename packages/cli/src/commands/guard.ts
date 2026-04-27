@@ -1,48 +1,51 @@
 /**
- * semo guard — P5-7 PolicyEngine/HookGateway 시범.
+ * semo guard — P5-7 PolicyEngine/HookGateway 진입점.
  *
- * Claude Code lifecycle hook (~/.semo/shared/hooks/*.sh) 의 sh 스크립트를 단계적으로
- * TS/CLI 패턴으로 통일. 단일 진입점 (`semo guard run <name>`) + npm 배포 (위치 일관) +
- * 더 견고한 에러 처리 + 향후 ConsoleAuditSink/MetricsSink 통합 가능.
+ * Claude Code lifecycle hook 의 sh 스크립트를 단계적으로 TS/CLI 패턴으로 통일.
+ * 단일 진입점 (`semo guard run <name>`) + npm 배포 (위치 일관) + 견고한 에러 처리.
  *
- * 진행 (Codex 리뷰 2026-04-27): 기존 13 sh 유지 + 새 hook 부터 이 패턴 + 빈도 높은 1~2개만
- * 점진 포팅 (운영 영향 최소화). KB decision: policy-engine-vs-tool-gateway-2026-04-27.
+ * 진행 (Codex 리뷰 2026-04-27): 기존 13 sh 유지 + 새 hook 부터 이 패턴.
+ * KB decision: policy-engine-vs-tool-gateway-2026-04-27.
  *
- * 첫 시범 guard:
- *   response-length: 봇 응답 20줄 초과 시 WARN 출력 (~/.semo/shared/hooks/response-length-guard.sh 와 동일).
+ * 인터페이스 추상화: packages/common/src/runtime/hook-gateway.ts (P5-7 2단계).
+ * 등록된 guard:
+ *   response-length  — 봇 응답 20줄 초과 시 WARN
+ *   kb-search-loop   — KB 검색 3회 + kb get 0회 시 BLOCK 메시지
+ *   assertion        — 사실 주장에 출처 표기 없으면 WARN
  */
 
 import { Command } from 'commander';
 import * as fs from 'fs';
-
-interface HookInput {
-  cwd?: string;
-  last_assistant_message?: string | string[];
-  transcript_path?: string;
-}
+import {
+  ConsolePolicyAuditSink,
+  InMemoryHookGateway,
+  type HookGuard,
+  type HookPayload,
+  type HookResult,
+} from '@team-semicolon/semo-common';
 
 const BOT_CWD_RE = /openclaw-[a-z]+\/workspace|semo-(bot-)?sessions\/|\.semo\/sessions\//;
 const BOT_SESSION_ONLY_RE = /\.semo\/sessions\//;
 const CODE_BLOCK_RE = /```[\s\S]*?```/g;
+const INLINE_CODE_RE = /`[^`\n]+`/g;
 const LIMIT_DEFAULT = 20;
 const LOOP_TAIL_LINES = 100;
 const LOOP_SEARCH_RE = /semo\s+kb\s+search/;
 const LOOP_GET_RE = /semo\s+kb\s+get/;
 const LOOP_THRESHOLD = 3;
+const ASSERTION_MIN_LINES = 3;
+const ENTITY_NOUNS = /팀원|서비스|배포|버전|설정|인프라|서버|도메인|DB|데이터베이스|API|포트/;
+const ASSERTION_TAIL = /(입니다|됩니다|있습니다|합니다)/;
+const SOURCE_RE = /답변근거.*KB|\[KB\]|semo kb|KB 조회|https?:\/\/|GitHub|출처/;
 
-/**
- * last_assistant_message 가 string 또는 string[] 양쪽 가능 (Claude SDK 변종).
- * Codex 리뷰 (2026-04-27) 등가성 케이스 반영.
- */
+const PASS: HookResult = { exitCode: 0, level: 'pass' };
+
 function normalizeAssistantMessage(value: unknown): string {
   if (typeof value === 'string') return value;
   if (Array.isArray(value)) return value.filter((v) => typeof v === 'string').join('\n');
   return '';
 }
 
-/**
- * stdin (Claude Code hook payload) 를 JSON 파싱. 비-JSON 또는 빈 입력 시 null.
- */
 async function readStdinJson<T>(): Promise<T | null> {
   if (process.stdin.isTTY) return null;
   const chunks: Buffer[] = [];
@@ -58,7 +61,6 @@ async function readStdinJson<T>(): Promise<T | null> {
   }
 }
 
-/** transcript jsonl tail 안에서 정규식 매칭 line 수 카운트. 파일 없거나 읽기 실패 시 0. */
 function countTranscriptLines(transcriptPath: string, re: RegExp, tailLines: number): number {
   try {
     if (!transcriptPath || !fs.existsSync(transcriptPath)) return 0;
@@ -77,6 +79,102 @@ function countTranscriptLines(transcriptPath: string, re: RegExp, tailLines: num
   }
 }
 
+// ============================================================
+// Guards (HookGuard 구현체)
+// ============================================================
+
+function makeResponseLengthGuard(limit: number): HookGuard {
+  return {
+    name: 'response-length',
+    triggers: ['Stop'],
+    botSessionOnly: true,
+    description: '봇 응답 20줄 초과 시 WARN',
+    async evaluate(payload: HookPayload | null): Promise<HookResult> {
+      if (!payload) return PASS;
+      const cwd = payload.cwd ?? '';
+      const response = normalizeAssistantMessage(payload.last_assistant_message);
+      if (!response || !BOT_CWD_RE.test(cwd)) return PASS;
+      const stripped = response.replace(CODE_BLOCK_RE, '');
+      const lines = stripped.split('\n').filter((l) => l.trim().length > 0);
+      if (lines.length > limit) {
+        return {
+          exitCode: 0,
+          level: 'warn',
+          message: `WARN: 응답이 ${lines.length}줄입니다 (코드 블록 제외). 봇 응답은 ${limit}줄 이내를 권장합니다.`,
+        };
+      }
+      return PASS;
+    },
+  };
+}
+
+const KB_SEARCH_LOOP_GUARD: HookGuard = {
+  name: 'kb-search-loop',
+  triggers: ['Stop'],
+  botSessionOnly: true,
+  description: 'KB 검색 3회 + kb get 0회 시 BLOCK 메시지 출력',
+  async evaluate(payload: HookPayload | null): Promise<HookResult> {
+    if (!payload) return PASS;
+    const cwd = payload.cwd ?? '';
+    const transcriptPath = payload.transcript_path ?? '';
+    if (!BOT_SESSION_ONLY_RE.test(cwd) || !transcriptPath) return PASS;
+    const searchCount = countTranscriptLines(transcriptPath, LOOP_SEARCH_RE, LOOP_TAIL_LINES);
+    const getCount = countTranscriptLines(transcriptPath, LOOP_GET_RE, LOOP_TAIL_LINES);
+    if (searchCount >= LOOP_THRESHOLD && getCount === 0) {
+      return {
+        exitCode: 0,
+        level: 'block',
+        message:
+          `BLOCK: KB 검색이 ${searchCount}회 반복되었으나 \`semo kb get\`으로 확정 조회된 결과가 없습니다. ` +
+          `'KB에 해당 정보가 없습니다'로 응답하세요.`,
+      };
+    }
+    return PASS;
+  },
+};
+
+const ASSERTION_GUARD: HookGuard = {
+  name: 'assertion',
+  triggers: ['Stop'],
+  botSessionOnly: true,
+  description: '사실 주장에 출처 표기 없으면 WARN',
+  async evaluate(payload: HookPayload | null): Promise<HookResult> {
+    if (!payload) return PASS;
+    const cwd = payload.cwd ?? '';
+    const response = normalizeAssistantMessage(payload.last_assistant_message);
+    if (!response || !BOT_CWD_RE.test(cwd)) return PASS;
+    let cleaned = response.replace(CODE_BLOCK_RE, '');
+    cleaned = cleaned.replace(INLINE_CODE_RE, '');
+    const lines = cleaned.split('\n').filter((l) => l.trim().length > 0);
+    if (lines.length < ASSERTION_MIN_LINES) return PASS;
+    const hasAssertion = cleaned
+      .split('\n')
+      .some((l) => ENTITY_NOUNS.test(l) && ASSERTION_TAIL.test(l));
+    if (!hasAssertion) return PASS;
+    if (SOURCE_RE.test(cleaned)) return PASS;
+    return {
+      exitCode: 0,
+      level: 'warn',
+      message:
+        'WARN: 사실 주장이 포함되어 있으나 출처(KB/URL)가 명시되지 않았습니다. [답변근거: KB ...] 형식 권장.',
+    };
+  },
+};
+
+// ============================================================
+// Singleton gateway 등록
+// ============================================================
+
+function buildGateway(limit: number): InMemoryHookGateway {
+  const gateway = new InMemoryHookGateway({
+    audit: process.env.SEMO_GUARD_AUDIT === '1' ? new ConsolePolicyAuditSink(true) : undefined,
+  });
+  gateway.register(makeResponseLengthGuard(limit));
+  gateway.register(KB_SEARCH_LOOP_GUARD);
+  gateway.register(ASSERTION_GUARD);
+  return gateway;
+}
+
 export function registerGuardCommands(program: Command): void {
   const guardCmd = program
     .command('guard')
@@ -87,75 +185,27 @@ export function registerGuardCommands(program: Command): void {
     .description('등록된 guard 실행 (stdin: Claude Code hook payload JSON)')
     .option('--limit <n>', 'response-length 등 임계 (기본 20)', '20')
     .action(async (name, options) => {
-      const input = await readStdinJson<HookInput>();
-
-      switch (name) {
-        case 'response-length': {
-          if (!input) {
-            process.exit(0);
-            return;
-          }
-          const cwd = input.cwd ?? '';
-          const response = normalizeAssistantMessage(input.last_assistant_message);
-          if (!response || !BOT_CWD_RE.test(cwd)) {
-            process.exit(0);
-            return;
-          }
-          const stripped = response.replace(CODE_BLOCK_RE, '');
-          const lines = stripped.split('\n').filter((l) => l.trim().length > 0);
-          const limit = Math.max(1, parseInt(options.limit, 10) || LIMIT_DEFAULT);
-          if (lines.length > limit) {
-            console.log(
-              `WARN: 응답이 ${lines.length}줄입니다 (코드 블록 제외). 봇 응답은 ${limit}줄 이내를 권장합니다.`,
-            );
-          }
-          process.exit(0);
-          return;
-        }
-        case 'kb-search-loop': {
-          if (!input) {
-            process.exit(0);
-            return;
-          }
-          const cwd = input.cwd ?? '';
-          const transcriptPath = input.transcript_path ?? '';
-          // Bot session only (sh: ~/.semo/sessions/ 만)
-          if (!BOT_SESSION_ONLY_RE.test(cwd)) {
-            process.exit(0);
-            return;
-          }
-          if (!transcriptPath) {
-            process.exit(0);
-            return;
-          }
-          const searchCount = countTranscriptLines(transcriptPath, LOOP_SEARCH_RE, LOOP_TAIL_LINES);
-          const getCount = countTranscriptLines(transcriptPath, LOOP_GET_RE, LOOP_TAIL_LINES);
-          if (searchCount >= LOOP_THRESHOLD && getCount === 0) {
-            console.log(
-              `BLOCK: KB 검색이 ${searchCount}회 반복되었으나 \`semo kb get\`으로 확정 조회된 결과가 없습니다. ` +
-                `'KB에 해당 정보가 없습니다'로 응답하세요.`,
-            );
-          }
-          process.exit(0);
-          return;
-        }
-        default:
-          console.error(`unknown guard: ${name}`);
-          console.error(`available: response-length, kb-search-loop`);
-          process.exit(2);
-      }
+      const limit = Math.max(1, parseInt(options.limit, 10) || LIMIT_DEFAULT);
+      const gateway = buildGateway(limit);
+      const payload = await readStdinJson<HookPayload>();
+      const result = await gateway.run(name, payload);
+      if (result.message) console.log(result.message);
+      process.exit(result.exitCode);
     });
 
   guardCmd
     .command('list')
     .description('등록된 guard 목록')
     .action(() => {
+      const gateway = buildGateway(LIMIT_DEFAULT);
       console.log('Available guards:');
-      console.log('  response-length  — 봇 응답 20줄 초과 시 WARN');
-      console.log('  kb-search-loop   — KB 검색 3회 + kb get 0회 시 BLOCK 메시지 출력');
+      for (const g of gateway.list()) {
+        console.log(`  ${g.name.padEnd(16)} — ${g.description}`);
+      }
       console.log('');
       console.log('호출:');
-      console.log('  echo "{...}" | semo guard run response-length [--limit 20]');
-      console.log('  echo "{...}" | semo guard run kb-search-loop');
+      console.log('  echo "{...}" | semo guard run <name> [--limit 20]');
+      console.log('');
+      console.log('SEMO_GUARD_AUDIT=1 환경변수 설정 시 stderr 에 [guard-audit] 라인 기록.');
     });
 }

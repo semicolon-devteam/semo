@@ -40,6 +40,15 @@ export type {
   RuntimeHarness,
 } from './runtime-harness.js';
 
+export type {
+  HookPayload,
+  HookTrigger,
+  HookResult,
+  HookGuard,
+  PolicyAuditSink,
+  HookGateway,
+} from './hook-gateway.js';
+
 export * from './adapters/index.js';
 export * from './emitters/index.js';
 export * from './gateways/index.js';
