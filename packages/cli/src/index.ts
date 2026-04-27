@@ -1559,6 +1559,7 @@ import {
   ontoRemoveKey,
   ontoUnregister,
   generateEmbedding,
+  generateEmbeddings,
   KBEntry,
 } from './kb';
 
@@ -1808,13 +1809,17 @@ kbCmd
 
 kbCmd
   .command('embed')
-  .description('기존 KB 항목에 임베딩 벡터 생성 (OPENAI_API_KEY 필요)')
+  .description('기존 KB 항목에 임베딩 벡터 생성/backfill (OPENAI_API_KEY 필요) — P3-1 배치 호출')
   .option('--domain <name>', '도메인 필터')
   .option('--force', '이미 임베딩된 항목도 재생성')
+  .option('--dry-run', '실제 호출 없이 대상 건수만 보고')
+  .option('--batch-size <n>', '배치 크기 (기본 50)', '50')
   .action(async (options) => {
-    if (!process.env.OPENAI_API_KEY) {
+    if (!options.dryRun && !process.env.OPENAI_API_KEY) {
       console.log(chalk.red('❌ OPENAI_API_KEY 환경변수가 설정되지 않았습니다.'));
-      console.log(chalk.gray("   export OPENAI_API_KEY='sk-...'"));
+      console.log(
+        chalk.gray("   export OPENAI_API_KEY='sk-...' (또는 --dry-run 으로 대상만 확인)"),
+      );
       process.exit(1);
     }
 
@@ -1823,7 +1828,7 @@ kbCmd
       const pool = getPool();
       const client = await pool.connect();
 
-      let sql = 'SELECT kb_id, domain, key, content FROM semo.knowledge_base WHERE 1=1';
+      let sql = 'SELECT kb_id, domain, key, sub_key, content FROM semo.knowledge_base WHERE 1=1';
       const params: string[] = [];
       let pIdx = 1;
       if (!options.force) sql += ' AND embedding IS NULL';
@@ -1831,11 +1836,11 @@ kbCmd
         sql += ` AND domain = $${pIdx++}`;
         params.push(options.domain);
       }
+      sql += ' ORDER BY kb_id';
 
       const rows = await client.query(sql, params);
-
       const total = rows.rows.length;
-      spinner.succeed(`${total}건 임베딩 대상`);
+      spinner.succeed(`${total}건 임베딩 대상${options.dryRun ? ' (dry-run)' : ''}`);
 
       if (total === 0) {
         console.log(chalk.green('  모든 항목이 이미 임베딩되어 있습니다.'));
@@ -1844,24 +1849,58 @@ kbCmd
         return;
       }
 
-      let done = 0;
-      const embedSpinner = ora(`임베딩 생성 중... 0/${total}`).start();
-
-      for (const row of rows.rows) {
-        const embedding = await generateEmbedding(`${row.key}: ${row.content}`);
-        if (embedding) {
-          await client.query(
-            'UPDATE semo.knowledge_base SET embedding = $1::vector WHERE kb_id = $2',
-            [`[${embedding.join(',')}]`, row.kb_id],
-          );
+      if (options.dryRun) {
+        // 도메인 분포 요약
+        const byDomain = new Map<string, number>();
+        for (const r of rows.rows) {
+          byDomain.set(r.domain, (byDomain.get(r.domain) ?? 0) + 1);
         }
-        done++;
-        embedSpinner.text = `임베딩 생성 중... ${done}/${total}`;
+        console.log(chalk.cyan('\n  도메인 분포:'));
+        for (const [d, c] of [...byDomain.entries()].sort((a, b) => b[1] - a[1])) {
+          console.log(`    ${c.toString().padStart(5)}  ${d}`);
+        }
+        console.log();
+        client.release();
+        await closeConnection();
+        return;
       }
 
-      embedSpinner.succeed(`${done}건 임베딩 완료`);
+      // P3-1: 배치 호출 (generateEmbeddings) — 순차 N 호출 → 1 호출 N 임베딩.
+      const batchSize = Math.max(1, Math.min(200, parseInt(options.batchSize, 10) || 50));
+      let done = 0;
+      let failed = 0;
+      const embedSpinner = ora(`임베딩 생성 중... 0/${total}`).start();
+
+      for (let i = 0; i < rows.rows.length; i += batchSize) {
+        const slice = rows.rows.slice(i, i + batchSize);
+        // sub_key 도 임베딩 텍스트에 포함 (검색 정확도 향상)
+        const texts = slice.map((r) =>
+          r.sub_key
+            ? `${r.domain}/${r.key}/${r.sub_key}: ${r.content}`
+            : `${r.domain}/${r.key}: ${r.content}`,
+        );
+        const embeddings = await generateEmbeddings(texts);
+        for (let j = 0; j < slice.length; j++) {
+          const emb = embeddings[j];
+          if (!emb) {
+            failed++;
+            continue;
+          }
+          await client.query(
+            'UPDATE semo.knowledge_base SET embedding = $1::vector WHERE kb_id = $2',
+            [`[${emb.join(',')}]`, slice[j].kb_id],
+          );
+        }
+        done += slice.length;
+        embedSpinner.text = `임베딩 생성 중... ${done}/${total}${failed > 0 ? ` (실패 ${failed})` : ''}`;
+      }
+
+      embedSpinner.succeed(
+        `${done - failed}건 임베딩 완료${failed > 0 ? ` (${failed}건 실패)` : ''}`,
+      );
       client.release();
       await closeConnection();
+      if (failed > 0) process.exit(1);
     } catch (err) {
       spinner.fail(`임베딩 실패: ${err}`);
       await closeConnection();
