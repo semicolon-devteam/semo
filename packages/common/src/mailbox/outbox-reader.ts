@@ -197,6 +197,7 @@ export class OutboxReader {
             // P5-2d: projection emitter 주입 시 우선 사용, 실패/throw/미주입 시 gateway fallback.
             // (Codex 리뷰: projection.emit throw 가 outer catch 로 빠지면 fallback 미실행 → 별도 try)
             let posted = false;
+            let postedVia: 'projection' | 'gateway' = 'gateway';
             if (this.projection) {
               const channel: ProjectionChannel =
                 this.platform === 'slack' ? 'slack-block' : 'discord-embed';
@@ -211,6 +212,7 @@ export class OutboxReader {
                 );
                 if (result.ok) {
                   posted = true;
+                  postedVia = 'projection';
                 } else {
                   console.warn(
                     `[outbox] projection emit failed (${result.error}) — fallback to gateway`,
@@ -224,8 +226,11 @@ export class OutboxReader {
             }
             if (!posted) {
               await this.gateway.postAsBot(msg.bot_id, msg.channel_id, msg.text, msg.thread_id);
+              postedVia = 'gateway';
             }
-            console.log(`[outbox] Posted reply from ${msg.bot_id} to ${this.platform}`);
+            console.log(
+              `[outbox] Posted reply from ${msg.bot_id} to ${this.platform} via ${postedVia}`,
+            );
             if (this.onReplyPosted) {
               try {
                 await this.onReplyPosted(msg);
