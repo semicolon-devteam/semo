@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * semo-channel-voice — Claude Code Channel Plugin (Voice)
+ * semo-call (구 semo-channel-voice) — Claude Code Channel Plugin (Voice Call Server)
  *
  * 음성 통화 ↔ Claude Code 세션 브릿지.
  * STT로 사용자 음성을 텍스트로 변환하여 세션에 전달하고,
@@ -148,7 +148,7 @@ async function speakToCall(text: string): Promise<Buffer> {
     echoGuardTimer = setTimeout(() => {
       echoMuted = false;
       echoGuardTimer = null;
-      console.error(`[channel-voice] echo guard released after ${Math.round(totalMuteMs)}ms`);
+      console.error(`[semo-call] echo guard released after ${Math.round(totalMuteMs)}ms`);
     }, totalMuteMs);
   }
   return audio;
@@ -162,7 +162,7 @@ function handleSTTTranscript(transcript: STTTranscript) {
       callId: activeCall?.callId || 'console',
       callerName: sanitizeMeta(activeCall?.callerName || activeCall?.callerId || 'console-user'),
     }).catch((err) => {
-      console.error('[channel-voice] forwardToSession error:', err);
+      console.error('[semo-call] forwardToSession error:', err);
       clearBusy();
     });
     return;
@@ -185,9 +185,9 @@ function handleSTTTranscript(transcript: STTTranscript) {
 
 // TurnManager → turn_committed: turnId + text 포함하여 세션 포워딩 또는 ask_user 전달
 function onTurnCommitted({ text }: { turnId: number; text: string }) {
-  console.error(`[channel-voice] onTurnCommitted: text="${text}" activeCall=${!!activeCall}`);
+  console.error(`[semo-call] onTurnCommitted: text="${text}" activeCall=${!!activeCall}`);
   if (!activeCall || !text) {
-    console.error('[channel-voice] DROPPED: no activeCall or empty text');
+    console.error('[semo-call] DROPPED: no activeCall or empty text');
     return;
   }
 
@@ -202,7 +202,7 @@ function onTurnCommitted({ text }: { turnId: number; text: string }) {
       callId: activeCall.callId,
       callerName: sanitizeMeta(activeCall.callerName || activeCall.callerId),
     }).catch((err) => {
-      console.error('[channel-voice] forwardToSession error:', err);
+      console.error('[semo-call] forwardToSession error:', err);
       clearBusy();
     });
   }
@@ -239,7 +239,7 @@ function setBusy() {
   isBusy = true;
   if (busyTimer) clearTimeout(busyTimer);
   busyTimer = setTimeout(() => {
-    console.error('[channel-voice] busy timeout — auto-clearing after 3 minutes');
+    console.error('[semo-call] busy timeout — auto-clearing after 3 minutes');
     clearBusy();
   }, BUSY_TIMEOUT_MS);
 }
@@ -262,7 +262,7 @@ function sanitizeMeta(value: string): string {
 // ============================================================
 
 const mcp = new Server(
-  { name: 'semo-channel-voice', version: '0.1.0' },
+  { name: 'semo-call', version: '0.2.0' },
   {
     capabilities: {
       experimental: {
@@ -270,8 +270,8 @@ const mcp = new Server(
       },
       tools: {},
     },
-    instructions: `You are receiving voice call transcriptions via the semo-channel-voice channel.
-Messages arrive as <channel source="semo-channel-voice" caller="..." call_id="...">
+    instructions: `You are receiving voice call transcriptions via the semo-call channel.
+Messages arrive as <channel source="semo-call" caller="..." call_id="...">
 
 CRITICAL RULES:
 - Every channel message MUST end with a reply() or end_call() tool call. No exceptions.
@@ -478,7 +478,7 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
       if ('setCallId' in sttAdapter) {
         (sttAdapter as import('./adapters/stt.js').ConsoleSTTAdapter).setCallId(callInfo.callId);
       }
-      console.error(`[channel-voice] Outbound call connected: ${callInfo.callId}`);
+      console.error(`[semo-call] Outbound call connected: ${callInfo.callId}`);
 
       // 연결 후 인사말 재생
       turnManager.onAssistantSpeakStart();
@@ -508,15 +508,15 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
 // ============================================================
 
 async function forwardToSession(utterance: QueuedUtterance) {
-  console.error(`[channel-voice] forwardToSession: text="${utterance.text}" busy=${isBusy}`);
+  console.error(`[semo-call] forwardToSession: text="${utterance.text}" busy=${isBusy}`);
   if (isBusy) {
-    console.error('[channel-voice] QUEUED (busy)');
+    console.error('[semo-call] QUEUED (busy)');
     utteranceQueue.push(utterance);
     return;
   }
 
   setBusy();
-  console.error('[channel-voice] Sending MCP notification...');
+  console.error('[semo-call] Sending MCP notification...');
 
   try {
     await mcp.notification({
@@ -530,7 +530,7 @@ async function forwardToSession(utterance: QueuedUtterance) {
       },
     });
   } catch (err) {
-    console.error('[channel-voice] notification dispatch failed:', err);
+    console.error('[semo-call] notification dispatch failed:', err);
     clearBusy();
   }
 }
@@ -545,19 +545,19 @@ async function start() {
 
   // 2. Adapter error listeners — 미등록 시 Node 프로세스 크래시
   sttAdapter.on('error', (err) => {
-    console.error('[channel-voice] STT adapter error:', err);
+    console.error('[semo-call] STT adapter error:', err);
   });
   ttsAdapter.on('error', (err) => {
-    console.error('[channel-voice] TTS adapter error:', err);
+    console.error('[semo-call] TTS adapter error:', err);
   });
   telephonyAdapter.on('error', (err) => {
-    console.error('[channel-voice] Telephony adapter error:', err);
+    console.error('[semo-call] Telephony adapter error:', err);
   });
 
   // 3. TurnManager 이벤트 와이어링
   turnManager.on('turn_committed', onTurnCommitted);
   turnManager.on('barge_in', () => {
-    console.error('[channel-voice] Barge-in — interrupting TTS');
+    console.error('[semo-call] Barge-in — interrupting TTS');
     ttsAdapter.interrupt();
   });
   turnManager.on('log', (entry: Record<string, unknown>) => {
@@ -579,12 +579,12 @@ async function start() {
       (sttAdapter as ConsoleSTTAdapter).setCallId(call.callId);
     }
     console.error(
-      `[channel-voice] Call connected: ${call.callId} (${call.direction}, ${call.callerName || call.callerId})`,
+      `[semo-call] Call connected: ${call.callId} (${call.direction}, ${call.callerName || call.callerId})`,
     );
   });
 
   telephonyAdapter.on('call:ended', ({ callId, reason }: { callId: string; reason: string }) => {
-    console.error(`[channel-voice] Call ended: ${callId} (${reason})`);
+    console.error(`[semo-call] Call ended: ${callId} (${reason})`);
     if (activeCall?.callId === callId) {
       activeCall = null;
     }
@@ -599,12 +599,12 @@ async function start() {
 
   // TTS 테스트 — softphone에서 tts-test 버튼 클릭 시
   telephonyAdapter.on('tts-test', async () => {
-    console.error('[channel-voice] TTS test requested');
+    console.error('[semo-call] TTS test requested');
     try {
       await speakToCall('안녕하세요, TTS 테스트입니다. 음성이 들리시나요?');
-      console.error('[channel-voice] TTS test completed');
+      console.error('[semo-call] TTS test completed');
     } catch (err) {
-      console.error('[channel-voice] TTS test error:', err);
+      console.error('[semo-call] TTS test error:', err);
     }
   });
 
@@ -613,7 +613,7 @@ async function start() {
     audioFrameCount++;
     if (audioFrameCount <= 3 || audioFrameCount % 500 === 0) {
       console.error(
-        `[channel-voice] audio frame #${audioFrameCount} size=${chunk.length} turnState=${turnManager.getState()} echoMuted=${echoMuted}`,
+        `[semo-call] audio frame #${audioFrameCount} size=${chunk.length} turnState=${turnManager.getState()} echoMuted=${echoMuted}`,
       );
     }
     // Half-duplex echo guard: TTS 재생 중 + 여유 시간 동안 STT/VAD 완전 mute
@@ -627,7 +627,7 @@ async function start() {
 
   // 5. Graceful shutdown
   const shutdown = async () => {
-    console.error('[channel-voice] Shutting down...');
+    console.error('[semo-call] Shutting down...');
     if (activeCall) {
       await telephonyAdapter.hangup(activeCall.callId).catch(() => {});
     }
@@ -644,9 +644,7 @@ async function start() {
   await sttAdapter.start();
   await telephonyAdapter.listen();
 
-  console.error(
-    `[channel-voice] Ready (mode=${VOICE_MODE}, stt=${STT_PROVIDER}, tts=${TTS_PROVIDER})`,
-  );
+  console.error(`[semo-call] Ready (mode=${VOICE_MODE}, stt=${STT_PROVIDER}, tts=${TTS_PROVIDER})`);
 }
 
 start().catch((err) => {

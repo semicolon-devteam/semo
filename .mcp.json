@@ -1,3 +1,12 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "semo-call-stub": {
+      "command": "npx",
+      "args": ["tsx", "packages/semo-call/src/stub/index.ts"],
+      "env": {
+        "VOICE_API_URL": "http://localhost:8922",
+        "SEMO_SERVICE_ID": "semo-dev"
+      }
+    }
+  }
 }

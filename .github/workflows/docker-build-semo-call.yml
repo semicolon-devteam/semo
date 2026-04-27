@@ -1,12 +1,12 @@
-name: Build & Push Channel Voice Docker Image
+name: Build & Push SEMO Call Docker Image
 
 on:
   push:
     branches:
       - dev
     paths:
-      - 'packages/channel-voice/**'
-      - '.github/workflows/docker-build-channel-voice.yml'
+      - 'packages/semo-call/**'
+      - '.github/workflows/docker-build-semo-call.yml'
   workflow_dispatch:
     inputs:
       environment:
@@ -20,7 +20,7 @@ on:
 
 env:
   DOCKER_IMAGE: semicolonmanager/semo-voice
-  WORKING_DIR: packages/channel-voice
+  WORKING_DIR: packages/semo-call
 
 jobs:
   build-and-push:

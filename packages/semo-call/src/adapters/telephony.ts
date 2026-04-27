@@ -9,8 +9,10 @@
  */
 
 import { EventEmitter } from 'events';
-import { Server as HTTPServer, createServer } from 'http';
+import { Server as HTTPServer, createServer, IncomingMessage, ServerResponse } from 'http';
 import WebSocket, { WebSocketServer } from 'ws';
+
+import type { OutboundRequest, OutboundResponse } from '../payload.js';
 
 export interface CallInfo {
   callId: string;
@@ -123,6 +125,10 @@ export class WebRTCTelephonyAdapter extends EventEmitter implements TelephonyAda
   private wss: WebSocketServer | null = null;
   private activeSession: WebRTCCallSession | null = null;
 
+  // standby softphones — register-as-standby 등록된 user_id별 WebSocket
+  // 단일 user 1개 클라이언트만 매핑 (연결 갱신 시 이전 ws 자동 close)
+  private pendingClients: Map<string, WebSocket> = new Map();
+
   // Lazy-loaded wrtc module (native addon)
   private wrtcMod: typeof import('@roamhq/wrtc') | null = null;
 
@@ -136,14 +142,27 @@ export class WebRTCTelephonyAdapter extends EventEmitter implements TelephonyAda
   }
 
   async listen(): Promise<void> {
-    // HTTP server for signaling WebSocket + softphone static files
+    // HTTP server for signaling WebSocket + outbound API + softphone static files
     this.httpServer = createServer((req, res) => {
       // Health check
       if (req.url === '/health') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ ok: true, activeCall: !!this.activeSession }));
+        res.end(
+          JSON.stringify({
+            ok: true,
+            activeCall: !!this.activeSession,
+            standby_users: Array.from(this.pendingClients.keys()),
+          }),
+        );
         return;
       }
+
+      // Outbound HTTP API — 봇 stub MCP가 호출
+      if (req.url === '/outbound' && req.method === 'POST') {
+        this.handleOutboundRequest(req, res);
+        return;
+      }
+
       res.writeHead(404);
       res.end();
     });
@@ -174,18 +193,39 @@ export class WebRTCTelephonyAdapter extends EventEmitter implements TelephonyAda
 
       console.error('[webrtc] Signaling client connected');
 
-      // standby 모드: 클라이언트가 접속만 하고 대기 (outbound ring 수신 대기)
+      // standby 모드: 클라이언트가 register-as-standby로 user_id 등록 → outbound ring 대기
       // 클라이언트가 offer를 보내면 inbound → handleSignaling
       // 서버가 incoming-call을 보내면 outbound → dial() 흐름
-      this.pendingClient = ws;
+      let registeredUserId: string | null = null;
 
-      // 첫 메시지에서 분기: offer면 inbound call 시작
+      // 첫 메시지에서 분기: register-as-standby (계속 대기) | offer (inbound 시작)
       const firstMessageHandler = async (data: Buffer | string) => {
         try {
           const msg = JSON.parse(data.toString());
+
+          if (msg.type === 'register-as-standby' && typeof msg.user_id === 'string') {
+            const userId = msg.user_id;
+            const prev = this.pendingClients.get(userId);
+            if (prev && prev !== ws) {
+              try {
+                prev.close(4003, 'Replaced by new standby');
+              } catch {
+                /* ignore */
+              }
+            }
+            this.pendingClients.set(userId, ws);
+            registeredUserId = userId;
+            ws.send(JSON.stringify({ type: 'standby-ack', user_id: userId }));
+            console.error(`[webrtc] Standby registered: user=${userId}`);
+            return; // 계속 listen — outbound ring 또는 offer 대기
+          }
+
           if (msg.type === 'offer' && msg.sdp) {
             ws.removeListener('message', firstMessageHandler);
-            this.pendingClient = null;
+            if (registeredUserId) {
+              this.pendingClients.delete(registeredUserId);
+              registeredUserId = null;
+            }
             // offer SDP를 handleSignaling에 직접 전달 — re-emit 방식 제거
             await this.handleSignaling(ws, msg.sdp);
           }
@@ -196,8 +236,9 @@ export class WebRTCTelephonyAdapter extends EventEmitter implements TelephonyAda
       ws.on('message', firstMessageHandler);
 
       ws.on('close', () => {
-        if (this.pendingClient === ws) {
-          this.pendingClient = null;
+        if (registeredUserId && this.pendingClients.get(registeredUserId) === ws) {
+          this.pendingClients.delete(registeredUserId);
+          console.error(`[webrtc] Standby disconnected: user=${registeredUserId}`);
         }
       });
     });
@@ -208,6 +249,75 @@ export class WebRTCTelephonyAdapter extends EventEmitter implements TelephonyAda
         resolve();
       });
     });
+  }
+
+  private async handleOutboundRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    // Bearer 인증
+    const auth = req.headers.authorization || '';
+    const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+    if (!SIGNALING_TOKEN || token !== SIGNALING_TOKEN) {
+      res.writeHead(401, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Unauthorized' } satisfies OutboundResponse));
+      return;
+    }
+
+    // Body 파싱
+    let bodyText = '';
+    try {
+      for await (const chunk of req) bodyText += chunk;
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Failed to read body' } satisfies OutboundResponse));
+      return;
+    }
+
+    let payload: OutboundRequest;
+    try {
+      payload = JSON.parse(bodyText) as OutboundRequest;
+    } catch {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid JSON' } satisfies OutboundResponse));
+      return;
+    }
+
+    if (!payload.reason || !payload.greeting || !payload.target_user_id) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          error: 'Missing required fields: reason, greeting, target_user_id',
+        } satisfies OutboundResponse),
+      );
+      return;
+    }
+
+    if (this.activeSession) {
+      res.writeHead(409, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Already in a call' } satisfies OutboundResponse));
+      return;
+    }
+
+    const standby = this.pendingClients.get(payload.target_user_id);
+    if (!standby || standby.readyState !== WebSocket.OPEN) {
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(
+        JSON.stringify({
+          error: `No softphone standby for user_id="${payload.target_user_id}"`,
+        } satisfies OutboundResponse),
+      );
+      return;
+    }
+
+    // dial은 사용자 accept까지 await — HTTP 클라이언트(스텁)도 30초 ring timeout 안에서 응답 받음
+    try {
+      const callInfo = await this.dial(payload.reason, payload.target_user_id);
+      this.emit('outbound:context', { callId: callInfo.callId, payload });
+      res.writeHead(202, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ call_id: callInfo.callId } satisfies OutboundResponse));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: msg } satisfies OutboundResponse));
+    }
   }
 
   private async handleSignaling(
@@ -436,21 +546,35 @@ export class WebRTCTelephonyAdapter extends EventEmitter implements TelephonyAda
     }
   }
 
-  // 접속 중이지만 아직 통화 안 한 signaling client (outbound ring 대기용)
-  private pendingClient: WebSocket | null = null;
-
-  /** 아웃바운드 전화 — 접속 중인 softphone에 ring 시그널 전송 */
-  async dial(target: string): Promise<CallInfo> {
+  /** 아웃바운드 전화 — 접속 중인 standby softphone에 ring 시그널 전송 */
+  async dial(target: string, target_user_id?: string): Promise<CallInfo> {
     const callId = `outbound-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const RING_TIMEOUT_MS = 30000;
 
-    // softphone이 접속 중인지 확인
-    if (!this.pendingClient || this.pendingClient.readyState !== WebSocket.OPEN) {
-      throw new Error('No softphone connected — cannot place outbound call');
+    // user_id 기반 라우팅. 미지정이면 standby 1명일 때만 자동 선택(dogfooding 호환)
+    let pickedUserId: string | undefined;
+    let ws: WebSocket | undefined;
+
+    if (target_user_id) {
+      ws = this.pendingClients.get(target_user_id);
+      pickedUserId = target_user_id;
+    } else if (this.pendingClients.size === 1) {
+      const entry = this.pendingClients.entries().next().value as [string, WebSocket] | undefined;
+      if (entry) {
+        [pickedUserId, ws] = entry;
+      }
     }
 
-    const ws = this.pendingClient;
-    this.pendingClient = null;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      throw new Error(
+        target_user_id
+          ? `No softphone standby for user_id="${target_user_id}"`
+          : 'No softphone connected — cannot place outbound call',
+      );
+    }
+
+    // standby 슬롯에서 제거 (이 ws가 통화 세션으로 전환됨)
+    if (pickedUserId) this.pendingClients.delete(pickedUserId);
 
     // ring 시그널 전송
     ws.send(

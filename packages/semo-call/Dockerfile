@@ -1,4 +1,4 @@
-# semo-channel-voice Dockerfile
+# semo-call Dockerfile (구 channel-voice)
 # @roamhq/wrtc requires glibc → debian (not alpine)
 
 # Stage 1: Dependencies

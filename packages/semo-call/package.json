@@ -1,21 +1,26 @@
 {
-  "name": "@team-semicolon/semo-channel-voice",
-  "version": "0.1.0",
-  "description": "Claude Code Channel plugin — Voice Call ↔ Session bridge (STT/TTS)",
+  "name": "@team-semicolon/semo-call",
+  "version": "0.2.0",
+  "description": "SEMO Call — voice call channel server + outbound HTTP stub MCP for bot sessions",
   "license": "Apache-2.0",
   "author": "Semicolon DevTeam",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/semicolon-devteam/semo.git",
-    "directory": "packages/channel-voice"
+    "directory": "packages/semo-call"
   },
   "publishConfig": {
     "access": "public"
   },
   "main": "src/index.ts",
+  "bin": {
+    "semo-call-server": "src/index.ts",
+    "semo-call-stub": "src/stub/index.ts"
+  },
   "scripts": {
     "start": "npx tsx src/index.ts",
-    "dev": "npx tsx --watch src/index.ts"
+    "dev": "npx tsx --watch src/index.ts",
+    "stub": "npx tsx src/stub/index.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.4.0",

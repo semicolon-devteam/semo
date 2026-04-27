@@ -384,6 +384,15 @@ let pendingCallId = null;
 let earlyMessages = []; // P0 fix: pc 생성 전 도착한 signaling 메시지 버퍼
 let cleaning = false; // P0 fix: cleanup 재진입 방지
 
+function getUserId() {
+  let uid = localStorage.getItem('semo_user_id');
+  if (!uid) {
+    uid = prompt('SEMO User ID (전화 수신용 식별자, 예: reus)') || '';
+    if (uid) localStorage.setItem('semo_user_id', uid.trim());
+  }
+  return (uid || '').trim();
+}
+
 btnStandby.onclick = async () => {
   try {
     btnStandby.disabled = true;
@@ -407,8 +416,17 @@ btnStandby.onclick = async () => {
     nextPlayTime = audioCtx.currentTime + 0.1;
 
     ws.onopen = () => {
-      setStatus('on', '대기 중 — 전화 수신 가능');
+      setStatus('on', '대기 중 — 등록 요청 중...');
       log('시그널링 서버 연결 (대기 모드)');
+      const uid = getUserId();
+      if (uid) {
+        ws.send(JSON.stringify({ type: 'register-as-standby', user_id: uid }));
+        log('Standby 등록 요청: user=' + uid);
+      } else {
+        log(
+          '⚠️ user_id 미설정 — 브라우저 콘솔에서 localStorage.setItem("semo_user_id", "...") 후 새로고침',
+        );
+      }
     };
 
     ws.onmessage = async (event) => {
@@ -431,6 +449,11 @@ btnStandby.onclick = async () => {
       }
       try {
         const msg = JSON.parse(event.data);
+
+        if (msg.type === 'standby-ack') {
+          setStatus('on', '대기 중 — user=' + msg.user_id);
+          log('✅ Standby 등록 완료: user=' + msg.user_id);
+        }
 
         if (msg.type === 'incoming-call') {
           pendingCallId = msg.callId;
