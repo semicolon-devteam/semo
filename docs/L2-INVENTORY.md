@@ -285,3 +285,40 @@ JSDoc 의 도메인명 예시만 generic 화 하면 완료.
 **OSS 1차 배포 차단 항목 = 0건** (3차 재검증 2026-04-26). 남은 작업은 LOW (dashboard 분리) 와 점진적 정리 뿐.
 
 봇 ID 7개는 L0 카탈로그 자산이므로 OSS 에 그대로 포함된다 (이미 builtin templates).
+
+---
+
+## OSS 패키징 갭 (E2E 검증 결과 — 2026-04-27)
+
+L2 격리는 완료됐지만 별도의 **패키징** 갭이 발견됨. 임시 SEMO_HOME 으로 빈 머신 시나리오 시뮬레이션:
+
+| 명령                         | 상태 | 비고                                                       |
+| ---------------------------- | ---- | ---------------------------------------------------------- |
+| `semo init`                  | ✅   | config + 8 dirs (kernel/tenant) 생성                       |
+| `semo migrate-sqlite`        | ✅   | kb.db + ops.db DDL 적용                                    |
+| `semo doctor`                | ✅   | schema/dirs/sqlite 헬스체크                                |
+| `semo factory parse`         | ❌   | `@team-semicolon/semo-common` 미배포 — dynamic import 실패 |
+| `semo templates list`        | ❌   | 동일                                                       |
+| `semo exec`                  | ❌   | 동일                                                       |
+| `semo chat`                  | ❌   | 동일                                                       |
+| kernel skills 머티리얼라이즈 | ❌   | 동일 (doctor 가 ○ 로 표시)                                 |
+
+**미배포 패키지 5개** (CLI 가 dynamic import 로 의존):
+
+- `@team-semicolon/semo-common`
+- `@team-semicolon/semo-discord-router`
+- `@team-semicolon/semo-kb-core`
+- `@team-semicolon/semo-kb-pg`
+- `@team-semicolon/semo-ops-store`
+
+`@team-semicolon/semo-solo` 는 esbuild 단일 번들이라 자체 해결 — Personal 경로는 OSS 에서 즉시 동작.
+`@team-semicolon/semo-cli` 는 unbundled — Team OSS 사용자 환경에서 위 명령 실패.
+
+### 해결 옵션
+
+- **A. semo-cli 번들화** (semo-solo 패턴 복제) — 단일 publish, 워크플로우 추가 0
+  - 인프라 준비됨: `packages/cli/scripts/bundle.mjs` + `npm run bundle` 스크립트 + esbuild devDep
+  - publish 시 `main`/`bin` 을 `dist/bundle.js` 로 전환 필요 (현재 `dist/index.js` 유지)
+  - 검증: 외부 환경에서 `cd packages/cli && npm run bundle` 후 `node dist/bundle.js factory parse "테스트"` 동작 확인
+- **B. 5개 패키지 npm 공개** — publish 워크플로우 5개 신규 + dependencies 승격 + tsc 빌드 산출물 준비
+- **C. Personal-only OSS** — `@team-semicolon/semo-solo` 만 광고, Team 은 git clone 안내 (단기 우회)

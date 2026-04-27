@@ -13,7 +13,20 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // ── 템플릿 경로 ──────────────────────────────────────────────
-const TEMPLATES_DIR = path.join(__dirname, '..', 'templates', 'harness');
+// __dirname 은 빌드 산출물 형태에 따라 달라진다:
+//   - tsc 평탄(dist/commands/harness.js) → '..' 로 dist/templates 도달
+//   - esbuild 단일 번들(dist/bundle.js)  → 같은 디렉터리 templates/harness 사용
+function resolveTemplatesDir(): string {
+  const candidates = [
+    path.join(__dirname, 'templates', 'harness'),
+    path.join(__dirname, '..', 'templates', 'harness'),
+  ];
+  for (const c of candidates) {
+    if (fs.existsSync(c)) return c;
+  }
+  return candidates[0];
+}
+const TEMPLATES_DIR = resolveTemplatesDir();
 
 // ── 하네스 체크 항목 ─────────────────────────────────────────
 interface CheckItem {
