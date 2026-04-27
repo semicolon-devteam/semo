@@ -41,3 +41,4 @@ export type {
 
 export * from './adapters/index.js';
 export * from './emitters/index.js';
+export * from './gateways/index.js';
