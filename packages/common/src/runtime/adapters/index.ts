@@ -7,3 +7,4 @@
  */
 
 export { ClaudeCodeAdapter, type ClaudeCodeAdapterOptions } from './claude-code-adapter.js';
+export { CodexCliAdapter, type CodexCliAdapterOptions } from './codex-cli-adapter.js';
