@@ -2,6 +2,10 @@
 
 > SEMO 사용 중 자주 발생하는 질문과 답변
 
+> ⚠️ **이 FAQ는 v3 기준입니다.** v4.18+ Personal Discord 온보딩, 프로파일 선택,
+> Ollama 통합 등 OSS 1차 공개 관련 질문은 [`packages/cli/README.md`](../packages/cli/README.md)
+> 와 [`docs/OSS-BETA-PLAYBOOK.md`](./OSS-BETA-PLAYBOOK.md) 를 우선 참고하세요.
+
 ---
 
 ## 목차
@@ -20,6 +24,7 @@
 ### Q: SEMO를 설치하려면 무엇이 필요한가요?
 
 **A**: 다음이 필요합니다:
+
 - Claude Code CLI 설치
 - Git 설치
 - GitHub CLI (`gh`) 설치 및 인증
@@ -84,6 +89,7 @@ rm -rf .claude/
 ### Q: SEMO가 설치되었는지 어떻게 확인하나요?
 
 **A**:
+
 ```bash
 # 방법 1: 디렉토리 확인
 ls -la .claude/
@@ -125,6 +131,7 @@ ls -la .claude/
 ### Q: 여러 파일을 한 번에 수정할 수 있나요?
 
 **A**: 네, SEMO는 관련된 여러 파일을 함께 수정합니다. 예를 들어 "User 도메인 만들어줘"라고 하면:
+
 - Entity 파일
 - Repository 파일
 - Service 파일
@@ -138,6 +145,7 @@ ls -la .claude/
 ### Q: 이전 대화를 기억하나요?
 
 **A**: 네, Context Mesh를 통해 세션 간 컨텍스트를 유지합니다:
+
 - 아키텍처 결정 사항
 - 팀 선호도
 - 프로젝트 맥락
@@ -157,6 +165,7 @@ ls -la .claude/
 ### Q: 스킬이 로드되지 않아요
 
 **A**: `semo context sync`를 수동 실행하여 DB에서 다시 동기화하세요:
+
 ```bash
 semo context sync
 ```
@@ -174,6 +183,7 @@ semo context sync
 ### Q: Slack 연동은 어떻게 하나요?
 
 **A**:
+
 1. Slack Bot Token 발급
 2. 환경변수 설정:
    ```bash
@@ -205,6 +215,7 @@ gh auth status
 ### Q: DB 연결이 안 돼요
 
 **A**: SSH 터널과 환경변수를 확인하세요:
+
 ```bash
 # 환경 진단
 semo doctor
@@ -218,6 +229,7 @@ semo config db
 ### Q: `semo context sync`가 뭔가요?
 
 **A**: Core DB에서 팀 컨텍스트를 로컬 `~/.claude/memory/` 파일로 동기화하는 명령입니다. SessionStart 훅에 의해 세션 시작 시 자동 실행됩니다. 수동 실행도 가능합니다:
+
 ```bash
 semo context sync
 ```
@@ -235,12 +247,15 @@ semo context sync
 ### Q: SEMO 메시지가 출력되지 않아요
 
 **A**:
+
 1. `.claude/CLAUDE.md` 파일 존재 확인:
+
    ```bash
    cat .claude/CLAUDE.md | head -20
    ```
 
 2. 심볼릭 링크 확인:
+
    ```bash
    ls -la .claude/semo-system/
    ```
@@ -255,6 +270,7 @@ semo context sync
 ### Q: "skill not found" 에러가 나요
 
 **A**:
+
 1. 해당 스킬이 설치된 패키지에 포함되어 있는지 확인
 2. `/SEMO:health`로 스킬 로드 상태 확인
 3. 재설치 시도
@@ -264,13 +280,16 @@ semo context sync
 ### Q: MCP 연결이 실패해요
 
 **A**:
+
 1. 환경변수 확인:
+
    ```bash
    echo $SLACK_BOT_TOKEN
    echo $SUPABASE_URL
    ```
 
 2. settings.json 확인:
+
    ```bash
    cat .claude/settings.json | jq '.mcpServers'
    ```
@@ -282,6 +301,7 @@ semo context sync
 ### Q: 결과가 예상과 다르게 나와요
 
 **A**:
+
 1. 더 구체적으로 요청해보세요
 2. 관련 파일/이슈 번호를 함께 제공하세요
 3. 단계별로 나누어 요청해보세요
@@ -292,6 +312,7 @@ semo context sync
 ### Q: Claude Code가 느려요
 
 **A**:
+
 1. 큰 파일 참조를 피하세요
 2. 불필요한 디렉토리는 `.gitignore`에 추가
 3. Context Mesh 캐시 정리:
@@ -312,6 +333,7 @@ semo context sync
 ### Q: 버그를 발견하면 어떻게 하나요?
 
 **A**:
+
 1. `/SEMO:feedback` 커맨드로 제출
 2. GitHub Issues에 등록
 3. Slack `#_협업` 채널에 공유
@@ -327,11 +349,13 @@ semo context sync
 ### Q: 업데이트는 어떻게 하나요?
 
 **A**:
+
 ```
 /SEMO:update
 ```
 
 또는:
+
 ```bash
 cd .claude/semo-system && git pull
 ```

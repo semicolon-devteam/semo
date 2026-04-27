@@ -2,6 +2,11 @@
 
 > 팀 리더 및 아키텍트를 위한 SEMO 기술 아키텍처 문서
 
+> ⚠️ **이 문서는 v3 기준의 레거시 설명입니다.** v4.18+ 의 3-Layer 메타 프레임워크
+> 모델은 [`packages/cli/README.md`](../packages/cli/README.md) 와
+> [`docs/L2-INVENTORY.md`](./L2-INVENTORY.md) 를 우선 참고하세요. 본 문서는 추후
+> L0/L1/L2 + Profile/Tenant 구조로 갱신 예정.
+
 ---
 
 ## 1. 전체 구조
@@ -62,6 +67,7 @@ semo-core/
 ```
 
 **핵심 원칙**:
+
 - **Orchestrator-First**: 모든 요청은 Orchestrator를 먼저 거침
 - **투명성**: 모든 AI 동작에 `[SEMO]` 메시지 출력
 - **Routing-Only**: Orchestrator는 라우팅만, 직접 구현 금지
@@ -75,6 +81,7 @@ semo-core/
 **저장소**: 중앙 DB (`skill_definitions`, `command_definitions`, `agent_definitions` 테이블)
 
 **동기화 흐름**:
+
 ```
 skill_definitions (DB SoT)
     ↓ semo context sync (SessionStart 자동)
@@ -84,6 +91,7 @@ Claude Code에서 사용
 ```
 
 **공유 vs 봇 전용**:
+
 - 공유 스킬: `target_agents = '{all}'` → 모든 세션에서 사용
 - 봇 전용 스킬: `target_agents = '{botId}'` → 해당 봇만 사용
 
@@ -98,12 +106,14 @@ Claude Code에서 사용
 ### White Box (파일시스템 기반)
 
 **특징**:
+
 - Git으로 버전 관리 가능
 - 코드 리뷰 가능
 - 오프라인에서도 동작
 - 커스터마이징 용이
 
 **구성요소**:
+
 - `CLAUDE.md`: Claude Code가 읽는 진입점
 - `memory/`: Context Mesh (장기 기억)
 - `agents/`, `skills/`: 에이전트/스킬 정의
@@ -112,11 +122,13 @@ Claude Code에서 사용
 ### Black Box (MCP 기반)
 
 **특징**:
+
 - 외부 시스템 연동
 - 런타임 동적 기능
 - 보안 민감 정보 처리
 
 **구성요소**:
+
 - `settings.json`: MCP 서버 설정
 - Slack, GitHub, Supabase 연동
 
@@ -179,13 +191,13 @@ decisions.md → DB (semo.knowledge_base domain='decision')
 
 ### 동기화 방향 정리
 
-| 파일 | 로컬 Claude | OpenClaw 봇 | DB 테이블 |
-|------|------------|-------------|----------|
-| team.md | DB → 로컬 | DB → 봇 | knowledge_base |
-| projects.md | DB → 로컬 | DB → 봇 / 봇→DB | knowledge_base |
-| decisions.md | DB ◄► 로컬 | DB → 봇 | knowledge_base |
-| bots.md | DB → 로컬 | DB → 봇 | bot_status |
-| kb-digest.md | (해당없음) | DB → 봇 | KB + bot_kb_subscriptions |
+| 파일         | 로컬 Claude | OpenClaw 봇     | DB 테이블                 |
+| ------------ | ----------- | --------------- | ------------------------- |
+| team.md      | DB → 로컬   | DB → 봇         | knowledge_base            |
+| projects.md  | DB → 로컬   | DB → 봇 / 봇→DB | knowledge_base            |
+| decisions.md | DB ◄► 로컬  | DB → 봇         | knowledge_base            |
+| bots.md      | DB → 로컬   | DB → 봇         | bot_status                |
+| kb-digest.md | (해당없음)  | DB → 봇         | KB + bot_kb_subscriptions |
 
 ---
 
@@ -257,6 +269,7 @@ decisions.md → DB (semo.knowledge_base domain='decision')
 ```
 
 **SKILL.md 구조**:
+
 ```markdown
 ---
 name: my-skill
@@ -269,9 +282,11 @@ model: inherit
 # My Skill
 
 ## Purpose
+
 ...
 
 ## Workflow
+
 ...
 ```
 
@@ -302,11 +317,11 @@ export const myTool = {
 
 ### 민감 정보 처리
 
-| 정보 | 저장 위치 | 접근 방식 |
-|------|----------|----------|
-| API 키 | 환경변수 | `${VAR_NAME}` |
-| 토큰 | `.env` (gitignore) | MCP 서버에서 주입 |
-| 비밀번호 | Doppler | 런타임 로드 |
+| 정보     | 저장 위치          | 접근 방식         |
+| -------- | ------------------ | ----------------- |
+| API 키   | 환경변수           | `${VAR_NAME}`     |
+| 토큰     | `.env` (gitignore) | MCP 서버에서 주입 |
+| 비밀번호 | Doppler            | 런타임 로드       |
 
 ### .gitignore 권장
 
@@ -338,24 +353,24 @@ export const myTool = {
 
 ## 9. 참조 문서
 
-| 문서 | 위치 | 설명 |
-|------|------|------|
-| SKILL_ARCHITECTURE.md | docs/ | 스킬/커맨드/에이전트 DB 구조 및 동기화 |
-| FAQ.md | docs/ | 자주 묻는 질문 |
-| TESTING.md | docs/ | E2E 테스트 케이스 |
-| commands/README.md | packages/cli/src/commands/ | CLI 커맨드 모듈 설명 |
+| 문서                  | 위치                       | 설명                                   |
+| --------------------- | -------------------------- | -------------------------------------- |
+| SKILL_ARCHITECTURE.md | docs/                      | 스킬/커맨드/에이전트 DB 구조 및 동기화 |
+| FAQ.md                | docs/                      | 자주 묻는 질문                         |
+| TESTING.md            | docs/                      | E2E 테스트 케이스                      |
+| commands/README.md    | packages/cli/src/commands/ | CLI 커맨드 모듈 설명                   |
 
 ---
 
 ## 10. 버전 히스토리
 
-| 단계 | 내용 | 상태 |
-|------|------|------|
-| v2.0 | 기능 기반 구조 전환 | 완료 |
-| v3.0 | DB SoT + Context Mesh + Multi-Agent 협업 | 완료 |
-| v4.0 | 스킬 통합 (76 → ~30), OpenClaw 봇팀 운영 | 완료 |
+| 단계 | 내용                                         | 상태 |
+| ---- | -------------------------------------------- | ---- |
+| v2.0 | 기능 기반 구조 전환                          | 완료 |
+| v3.0 | DB SoT + Context Mesh + Multi-Agent 협업     | 완료 |
+| v4.0 | 스킬 통합 (76 → ~30), OpenClaw 봇팀 운영     | 완료 |
 | v4.1 | KB 변경 다이제스트, 봇별 구독, 워터마크 추적 | 완료 |
 
 ---
 
-*이 문서는 SEMO v4.1 기준으로 최종 업데이트되었습니다.*
+_이 문서는 SEMO v4.1 기준으로 최종 업데이트되었습니다._
