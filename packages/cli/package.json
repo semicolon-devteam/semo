@@ -68,6 +68,8 @@
     "dist",
     "migrations",
     "migrations-sqlite",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "NOTICE"
   ]
 }
