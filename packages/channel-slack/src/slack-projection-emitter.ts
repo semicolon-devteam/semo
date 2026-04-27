@@ -15,8 +15,10 @@ import type {
 import { convertMarkdownToBlocks } from './markdown-to-slack.js';
 
 export interface SlackEmitterOptions {
-  /** bot 식별자별 username/icon_emoji 매핑 (기존 channel-slack 의 botProfiles 와 동일 포맷). */
+  /** bot 식별자별 username/icon_emoji 매핑 (정적). */
   botProfiles?: Record<string, { username: string; icon_emoji: string }>;
+  /** botProfiles 가 동적으로 갱신되는 경우 매 emit 시 호출되는 getter (uses fresh map). */
+  getBotProfiles?: () => Record<string, { username: string; icon_emoji: string }>;
 }
 
 interface SlackEmitOptions {
@@ -40,7 +42,8 @@ export class SlackProjectionEmitter implements ProjectionEmitter {
       };
     }
     const opts = (target.options ?? {}) as SlackEmitOptions;
-    const profile = opts.botId ? this.options.botProfiles?.[opts.botId] : undefined;
+    const profiles = this.options.getBotProfiles?.() ?? this.options.botProfiles ?? {};
+    const profile = opts.botId ? profiles[opts.botId] : undefined;
     const payloads = convertMarkdownToBlocks(payload.text);
 
     let lastTs: string | undefined;

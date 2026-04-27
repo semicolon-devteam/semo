@@ -20,7 +20,7 @@ import { WebClient } from '@slack/web-api';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { convertMarkdownToBlocks } from './markdown-to-slack.js';
+import { SlackProjectionEmitter } from './slack-projection-emitter.js';
 
 // ============================================================
 // Configuration — ~/.claude/semo/.env 자동 로드
@@ -76,6 +76,12 @@ if (!SLACK_CHANNEL_ID) {
 
 const slackWeb = new WebClient(SLACK_BOT_TOKEN);
 const slackSocket = new SocketModeClient({ appToken: SLACK_APP_TOKEN });
+
+// P5-2c: ProjectionEmitter 도입 — reply tool 의 메시지 전송 블록만 emitter 호출로 치환.
+// botProfiles 는 5분 주기로 동적 갱신되므로 getter 로 주입.
+const slackEmitter = new SlackProjectionEmitter(slackWeb, {
+  getBotProfiles: () => botProfiles,
+});
 
 // Bot user ID (resolved at startup)
 let botUserId = '';
@@ -324,25 +330,28 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
     }
 
     try {
-      // 메시지 전송 (타이핑 인디케이터는 자동 해제됨)
+      // P5-2c: 메시지 전송을 SlackProjectionEmitter 로 위임 (타이핑 인디케이터는 자동 해제됨).
+      // 기존 chat.postMessage 호출 의미를 그대로 유지 — convertMarkdownToBlocks 는 emitter 안에서 호출.
       const effectiveBotId = bot_id || 'semiclaw';
-      const profile = botProfiles[effectiveBotId];
-      const payloads = convertMarkdownToBlocks(text);
+      const result = await slackEmitter.emit(
+        {
+          channel: 'slack-block',
+          destination: slack_channel,
+          options: {
+            threadTs: thread_ts || undefined,
+            botId: effectiveBotId,
+            unfurlLinks: false,
+          },
+        },
+        { text },
+      );
 
-      for (const payload of payloads) {
-        await slackWeb.chat.postMessage({
-          channel: slack_channel,
-          text: payload.text,
-          ...(payload.blocks.length > 0 && { blocks: payload.blocks }),
-          thread_ts: thread_ts || undefined,
-          unfurl_links: false,
-          ...(profile && { username: profile.username, icon_emoji: profile.icon_emoji }),
-        });
-      }
-
-      // busy 해제 + 큐 처리
+      // busy 해제 + 큐 처리 (성공/실패 무관, 기존 동작 보존)
       clearBusy();
 
+      if (!result.ok) {
+        return { content: [{ type: 'text', text: `Slack error: ${result.error}` }] };
+      }
       return { content: [{ type: 'text', text: 'Message sent to Slack' }] };
     } catch (err) {
       clearBusy();
