@@ -31,6 +31,7 @@ import {
   type InboxMessage,
   type OutboxMessage,
 } from '@team-semicolon/semo-common';
+import { SlackProjectionEmitter } from '@team-semicolon/semo-common';
 
 // ── Configuration ──
 
@@ -182,11 +183,16 @@ async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
 
 // ── Outbox Reader ──
 
+// P5-2e: SlackProjectionEmitter 를 OutboxReader 에 주입.
+// emit 실패/throw 시 OutboxReader 가 gateway fallback (회귀 0).
+const slackEmitter = new SlackProjectionEmitter(slack.getWebClient());
+
 const outboxReader = new OutboxReader({
   mailboxDir: MAILBOX_DIR,
   botIds: [...FALLBACK_BOT_IDS, ...OVERFLOW_BOT_IDS],
   platform: 'slack',
   gateway: slack,
+  projection: slackEmitter,
   inboxWriter,
   onEscalation: handleEscalation,
   onAskUser: handleAskUser,

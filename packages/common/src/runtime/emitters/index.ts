@@ -8,3 +8,5 @@
 
 export { ConsoleProjectionEmitter, type ConsoleEmitterOptions } from './console-emitter.js';
 export { CompositeProjectionEmitter } from './composite-emitter.js';
+export { SlackProjectionEmitter, type SlackEmitterOptions } from './slack-projection-emitter.js';
+export { DiscordProjectionEmitter } from './discord-projection-emitter.js';

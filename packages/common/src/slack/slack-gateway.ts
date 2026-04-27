@@ -72,6 +72,11 @@ export class SlackGateway {
     this.socket = new SocketModeClient({ appToken });
   }
 
+  /** P5-2e: SlackProjectionEmitter 등 외부에서 WebClient 가 필요할 때 사용. */
+  getWebClient(): WebClient {
+    return this.web;
+  }
+
   setMessageHandler(handler: MessageHandler) {
     this.onMessage = handler;
   }

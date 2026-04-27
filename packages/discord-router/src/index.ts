@@ -39,6 +39,7 @@ import {
   InboxWriter,
   OutboxReader,
   resolveSpeaker,
+  DiscordProjectionEmitter,
   type InboxMessage,
   type OutboxMessage,
   type SpeakerProfile,
@@ -195,11 +196,16 @@ export async function startDiscordRouter(opts: StartOptions = {}): Promise<StopF
       .catch((err) => console.error(`[ask_user] Failed for ${msg.bot_id}:`, err));
   }
 
+  // P5-2e: DiscordProjectionEmitter 를 OutboxReader 에 주입.
+  // emit 실패/throw 시 OutboxReader 가 gateway fallback (회귀 0).
+  const discordEmitter = new DiscordProjectionEmitter(discord);
+
   const outboxReader = new OutboxReader({
     mailboxDir: MAILBOX_DIR,
     botIds: [...FALLBACK_BOT_IDS],
     platform: 'discord',
     gateway: discord,
+    projection: discordEmitter,
     inboxWriter,
     onEscalation: handleEscalation,
     onAskUser: handleAskUser,
