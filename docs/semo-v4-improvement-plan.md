@@ -8,12 +8,12 @@ SEMO v4는 PostgreSQL을 SSoT로 7개 봇 + 로컬 Claude Code 세션 간 컨텍
 
 ## 핵심 파일 경로
 
-| 역할 | 경로 |
-|---|---|
-| CLI 소스 | `/Users/reus/Desktop/Sources/semicolon/projects/semo/packages/cli/src/` |
-| CLI 빌드 결과 | `/Users/reus/.local/lib/node_modules/@team-semicolon/semo-cli/dist/` |
-| 봇 훅 (×7) | `semo-system/bot-workspaces/{bot}/hooks/semo-bot-status/handler.ts` |
-| DB 초기화 | `/Users/reus/workspace/core-central-db/init/` |
+| 역할          | 경로                                                                    |
+| ------------- | ----------------------------------------------------------------------- |
+| CLI 소스      | `/Users/reus/Desktop/Sources/semicolon/projects/semo/packages/cli/src/` |
+| CLI 빌드 결과 | `/Users/reus/.local/lib/node_modules/@team-semicolon/semo-cli/dist/`    |
+| 봇 훅 (×7)    | `semo-system/bot-workspaces/{bot}/hooks/semo-bot-status/handler.ts`     |
+| DB 초기화     | `/Users/reus/workspace/core-central-db/init/`                           |
 
 ---
 
@@ -57,6 +57,7 @@ SEMO v4는 PostgreSQL을 SSoT로 7개 봇 + 로컬 Claude Code 세션 간 컨텍
 **문제:** DB 스키마가 ad-hoc 적용 중. P0-3 트리거, P1-2 인덱스, FK 등 모든 DB 개선의 배포 경로가 없다.
 
 **수정:** `semo db migrate` 커맨드 신규 구현.
+
 - `semo.schema_migrations(version TEXT PK, applied_at TIMESTAMPTZ)` 테이블로 상태 추적
 - `migrations/` 디렉터리의 순번 SQL 파일(`001_initial.sql`, `002_add_indexes.sql` …)을 순서대로 적용
 - 기존 스키마 DDL을 `001_initial.sql`로 문서화
@@ -70,6 +71,7 @@ SEMO v4는 PostgreSQL을 SSoT로 7개 봇 + 로컬 Claude Code 세션 간 컨텍
 **문제:** 매 `context sync`마다 `domain` 필터, 매 `bots sessions`마다 `last_activity` 정렬이 풀 스캔으로 실행. 벡터 검색도 IVFFlat 인덱스 없이 순차 스캔.
 
 **수정:** `migrations/002_add_indexes.sql`:
+
 ```sql
 CREATE INDEX IF NOT EXISTS idx_kb_domain ON semo.knowledge_base(domain);
 CREATE INDEX IF NOT EXISTS idx_sessions_activity ON semo.bot_sessions(last_activity DESC NULLS LAST);
@@ -87,6 +89,7 @@ CREATE INDEX IF NOT EXISTS idx_kb_embedding ON semo.knowledge_base
 **문제:** `bot_sessions.bot_id`에 FK가 없어 존재하지 않는 봇의 세션이 적재될 수 있다. `sessions sync` 실패 시 오류가 무시되어 카운트만 틀어진다.
 
 **수정:**
+
 ```sql
 ALTER TABLE semo.bot_sessions
   ADD CONSTRAINT fk_sessions_bot
@@ -102,6 +105,7 @@ ALTER TABLE semo.bot_sessions
 **문제:** 7개 봇 훅(`handler.ts`)이 `set-status`만 호출하고 `sessions push`를 호출하지 않는다. 로컬 Claude Code 세션은 OpenClaw 게이트웨이를 거치지 않으므로 `bot_sessions`에 아무 데이터가 없다. `sessions push`는 정확히 이 용도로 설계되었다.
 
 **수정:** 모든 7개 봇 `handler.ts`에 추가:
+
 ```typescript
 // action === "new" (SessionStart)
 await exec(`semo sessions push --bot-id ${BOT_ID} --event start`, { input: stdinData });
@@ -109,6 +113,7 @@ await exec(`semo sessions push --bot-id ${BOT_ID} --event start`, { input: stdin
 // action === "stop"
 await exec(`semo sessions push --bot-id ${BOT_ID} --event stop`, { input: stdinData });
 ```
+
 `sessions push`는 이미 DB 오류 시 `exit(0)`으로 조용히 실패하므로 훅 안전성 유지됨.
 
 **파일:** `bot-workspaces/{semiclaw,workclaw,reviewclaw,planclaw,designclaw,growthclaw,infraclaw}/hooks/semo-bot-status/handler.ts` (×7)
@@ -120,6 +125,7 @@ await exec(`semo sessions push --bot-id ${BOT_ID} --event stop`, { input: stdinD
 **문제:** `context push`가 KB를 upsert할 때 이전 내용이 덮어써지며 복구 불가. P0-2 버그로 잘못된 데이터가 들어가면 롤백 수단이 없다.
 
 **수정:**
+
 - `semo.knowledge_base_history(id BIGSERIAL, domain, key, content, changed_by, changed_at, operation)` 테이블 추가
 - `knowledge_base` BEFORE INSERT/UPDATE/DELETE 트리거로 자동 기록
 - `semo kb history --domain <d> --key <k>` 조회 커맨드
@@ -165,6 +171,7 @@ await exec(`semo sessions push --bot-id ${BOT_ID} --event stop`, { input: stdinD
 **문제:** SemiClaw 59개, WorkClaw 35개 메모리 파일이 세션마다 전부 로드될 가능성. 컨텍스트 윈도우 낭비.
 
 **수정:**
+
 - MEMORY.md에 `## Hot` / `## Cold` 섹션 컨벤션 도입
 - `semo memory archive --bot <id> --before <date>` 커맨드로 오래된 파일을 Cold 섹션으로 이동
 - `context sync` 시 Hot 섹션 항목만 로드하는 가이드라인 추가
@@ -190,6 +197,7 @@ await exec(`semo sessions push --bot-id ${BOT_ID} --event stop`, { input: stdinD
 **문제:** `ontoValidate()`가 구현되어 있으나 InfraClaw 외에는 미사용. KB 항목이 스키마 없이 자유 형식으로 저장됨.
 
 **수정:**
+
 - `context push --validate` 플래그로 옵트인 검증 (초기엔 경고만)
 - 30일 경고 후 `decision` 도메인부터 강제 적용
 - 나머지 도메인 온톨로지 스키마를 `semo.ontology`에 적재
@@ -203,11 +211,68 @@ await exec(`semo sessions push --bot-id ${BOT_ID} --event stop`, { input: stdinD
 **문제:** 각 봇의 SEMO 인프라(메모리 파일 + KB sync 결과)가 컨텍스트 윈도우의 몇 %를 차지하는지 알 수 없음.
 
 **수정:** `semo context stats --bot <id>` 커맨드:
+
 - `.claude/memory/` 파일 문자 수 합산 → 토큰 추정 (chars / 4)
 - 40k 토큰(200k의 20%) 초과 시 경고
 - P2-4 hot/cold와 연동해 cold 이동 후보 제안
 
 **파일:** `packages/cli/src/commands/context.ts` (subcommand 추가)
+
+---
+
+## P5 — 런타임 이식성 (Runtime Portable)
+
+> 상위 목표: SEMO 를 Claude / Codex / OpenClaw / Hermes / Ollama 등 특정 모델·호스트에 종속되지 않는 시스템으로 정리. Codex 전환은 1개 adapter 로 흡수, 상위 목표 아님.
+> 상세 로드맵: `docs/runtime-portable-roadmap.md`. KB decision: `semo decision personal-team-split-status-snapshot` (2026-04-27).
+
+### P5-Pre: semo-cli 번들 컷오버 ✅ 완료
+
+`packages/cli/package.json` `main`/`bin` 을 `dist/bundle.js` 로 전환. 5개 미배포 워크스페이스 패키지(common/kb-core/kb-pg/ops-store/discord-router) 의 12개 동적 import 를 esbuild 번들로 인라인. minify 포함 3.4 MB. 9개 영향 명령(--version, templates list, factory/exec/chat/onboard/update/router/doctor) smoke 통과. 빈 머신 npm pack 시뮬레이션 검증 완료.
+
+배포: `cli-v4.18.13` (cutover) + `cli-v4.18.14` (minify).
+
+### P5-0: 인터페이스 4종 + ExecutionTarget 확장 정의
+
+**문제**: 호스트별 기능(Claude Code permission mode / Codex sandbox / Slack Block / Discord Embed)이 코드 곳곳에 분기로 흩어져 있어 새 호스트 추가 시 회귀 위험이 크다.
+
+**수정**: 빈 인터페이스 4종을 코어 패키지에 둔다 (구현체 없이 타입만):
+
+- `HostAdapter` — 런타임 환경 캡슐화 (Claude Code, Codex, Hermes, Ollama, ...)
+- `RuntimeHarness` — 프로세스 lifecycle (start/heartbeat/cancel/shutdown/commitment 마감)
+- `ToolGateway` — LLM 도구 호출 진입점 + 권한/감사
+- `ProjectionEmitter` — 동일 결과를 여러 채널로 emit (Slack/Discord/Claude tool_result/콘솔)
+- `ExecutionTarget` 확장 — `runtime_hint`, `tool_capabilities[]`, `projection_targets[]` 필드 추가
+
+**파일**: `packages/common/src/runtime/` (신규)
+
+### P5-1: ClaudeCodeAdapter 구현 (현 동작 1:1 wrap)
+
+회귀 0 보장. 기존 cmux/Slack 통합을 인터페이스 뒤로 옮김.
+
+### P5-2: ProjectionEmitter 도입 + Slack/Discord outbox 합류
+
+`packages/channel-slack`, `packages/discord-router`, dashboard outbox 의 emit 로직을 단일 인터페이스로.
+
+### P5-3: ToolGateway 도입 + 기존 hooks 단계적 이관
+
+`~/.semo/shared/hooks/` 의 ad-hoc 처리를 코어로.
+
+### P5-4: CodexAdapter 시범 구현 (1개 봇)
+
+stdin/stdout 외 4 계약 명시 (Codex 리뷰 2026-04-27):
+
+1. sandbox/approval 모델 매핑 (Codex read-only / workspace-write / dangerous ↔ ToolGateway 권한)
+2. 세션 resume (Codex 세션 ID + rollout 파일을 commitment 메타에 부착)
+3. tool-call bridge (Codex MCP/function-call ↔ ToolGateway 결과 포맷)
+4. 파일 변경 trace (작성/수정 파일을 commitment 메타로 기록)
+
+### P5-5: OllamaAdapter stub + Hermes stub
+
+Personal 갈래 LLM 호스트 + 향후 데스크톱 통합 준비.
+
+### P5-6: ExecutionTarget DB 스키마 확장
+
+`bot_status`/`bot_delegation` 에 `runtime_hint`, `tool_capabilities`, `projection_targets` 추가. P1-1 마이그레이션 시스템 도입 후.
 
 ---
 
@@ -220,6 +285,7 @@ await exec(`semo sessions push --bot-id ${BOT_ID} --event stop`, { input: stdinD
 **수정:** 각 패키지 루트에 README.md 추가.
 
 **semo-cli README 포함 내용:**
+
 - 시스템 한 줄 정의 (PostgreSQL SSoT + 봇 컨텍스트 동기화)
 - v3 → v4 변경 이유 (MCP 서버·biz/eng/ops 레이어 제거 배경)
 - 전체 커맨드 목록 및 각 커맨드의 역할
@@ -229,12 +295,14 @@ await exec(`semo sessions push --bot-id ${BOT_ID} --event stop`, { input: stdinD
 - 개발/빌드 방법
 
 **semo-dashboard README 포함 내용:**
+
 - 대시보드 역할 (봇 상태 실시간 조회 UI)
 - semo DB와의 연결 방식
 - 주요 화면 및 데이터 흐름
 - 실행 방법
 
 **파일:**
+
 - `packages/cli/README.md` (신규)
 - `packages/semo-dashboard/README.md` (신규)
 
@@ -259,7 +327,17 @@ await exec(`semo sessions push --bot-id ${BOT_ID} --event stop`, { input: stdinD
 14. ⬜ P3-2 온톨로지 검증 확장            (2일, 온톨로지 완성 후)
 15. ⬜ P3-3 컨텍스트 통계                 (1일, P2-4 후 효과 극대화)
 16. ⬜ P4-1 패키지별 README.md 작성       (2시간, 의존 없음)
+17. ✅ P5-Pre semo-cli 번들 컷오버         — 2026-04-27 완료 (cli-v4.18.13 + 4.18.14 minify)
+18. ⬜ P5-0 인터페이스 4종 + ExecutionTarget 확장   (0.5일, 의존 없음 — RP 시리즈 선행)
+19. ⬜ P5-1 ClaudeCodeAdapter wrap         (1일, P5-0 의존)
+20. ⬜ P5-2 ProjectionEmitter 도입         (1일, P5-1 의존)
+21. ⬜ P5-3 ToolGateway 도입               (2일, P5-2 의존)
+22. ⬜ P5-4 CodexAdapter 시범 구현         (1일, P5-3 의존)
+23. ⬜ P5-5 OllamaAdapter + Hermes stub    (0.5일, P5-4 의존)
+24. ⬜ P5-6 ExecutionTarget DB 스키마 확장 (1일, P5-1 + P1-1 의존)
 ```
+
+P5 시리즈는 P0~P4 와 독립적으로 병렬 진행 가능 (P5-6 만 P1-1 의존).
 
 ### 추가 작업 (플랜 외)
 
