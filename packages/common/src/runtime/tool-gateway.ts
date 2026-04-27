@@ -45,6 +45,17 @@ export interface ToolAuditSink {
   record(req: ToolCallRequest, res: ToolCallResult): Promise<void>;
 }
 
+/**
+ * 도구 정의 — bridge (Codex MCP, Claude tool_use 등) 용 메타데이터.
+ * register(definition, handler) 형식으로 등록 시 listDefinitions() 에 노출.
+ */
+export interface ToolDefinition {
+  name: string;
+  description: string;
+  /** JSON schema (input). */
+  inputSchema: Record<string, unknown>;
+}
+
 export interface ToolGateway {
   readonly host: HostAdapter;
   /**
@@ -52,7 +63,15 @@ export interface ToolGateway {
    */
   invoke(req: ToolCallRequest): Promise<ToolCallResult>;
   /**
-   * 도구 등록 (실행 핸들러 매핑).
+   * 도구 등록. 두 시그니처 지원 (P5-4b):
+   *   register(name, handler) — bridge 노출 X (P5-3a 호환).
+   *   register(definition, handler) — bridge 메타데이터 포함, listDefinitions() 에 노출.
    */
   register(name: string, handler: (req: ToolCallRequest) => Promise<unknown>): void;
+  register(definition: ToolDefinition, handler: (req: ToolCallRequest) => Promise<unknown>): void;
+  /**
+   * 등록된 도구 정의 목록 (definition 형태로 등록된 것만).
+   * Codex MCP / Claude tool_use 변환 등 bridge 에서 사용.
+   */
+  listDefinitions(): ToolDefinition[];
 }

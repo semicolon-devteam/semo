@@ -22,6 +22,7 @@ export type {
   ToolPermissionPolicy,
   ToolAuditSink,
   ToolGateway,
+  ToolDefinition,
 } from './tool-gateway.js';
 
 export type {
@@ -42,3 +43,4 @@ export type {
 export * from './adapters/index.js';
 export * from './emitters/index.js';
 export * from './gateways/index.js';
+export * from './bridges/index.js';

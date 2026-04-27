@@ -15,6 +15,7 @@ import type {
   ToolAuditSink,
   ToolCallRequest,
   ToolCallResult,
+  ToolDefinition,
   ToolGateway,
   ToolPermissionPolicy,
 } from '../tool-gateway.js';
@@ -46,6 +47,7 @@ export interface InMemoryToolGatewayOptions {
 export class InMemoryToolGateway implements ToolGateway {
   readonly host: HostAdapter;
   private readonly handlers = new Map<string, (req: ToolCallRequest) => Promise<unknown>>();
+  private readonly definitions = new Map<string, ToolDefinition>();
   private readonly policy: ToolPermissionPolicy;
   private readonly audit?: ToolAuditSink;
 
@@ -55,8 +57,22 @@ export class InMemoryToolGateway implements ToolGateway {
     this.audit = options.audit;
   }
 
-  register(name: string, handler: (req: ToolCallRequest) => Promise<unknown>): void {
-    this.handlers.set(name, handler);
+  register(name: string, handler: (req: ToolCallRequest) => Promise<unknown>): void;
+  register(definition: ToolDefinition, handler: (req: ToolCallRequest) => Promise<unknown>): void;
+  register(
+    nameOrDef: string | ToolDefinition,
+    handler: (req: ToolCallRequest) => Promise<unknown>,
+  ): void {
+    if (typeof nameOrDef === 'string') {
+      this.handlers.set(nameOrDef, handler);
+    } else {
+      this.handlers.set(nameOrDef.name, handler);
+      this.definitions.set(nameOrDef.name, nameOrDef);
+    }
+  }
+
+  listDefinitions(): ToolDefinition[] {
+    return Array.from(this.definitions.values());
   }
 
   async invoke(req: ToolCallRequest): Promise<ToolCallResult> {
