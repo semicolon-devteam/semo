@@ -155,6 +155,18 @@ toolGateway.register('ask_user', async (req: ToolCallRequest) => {
   return userChoice;
 });
 
+interface ReactArgs {
+  emoji: string;
+  slack_channel: string;
+  timestamp: string;
+}
+
+toolGateway.register('react', async (req: ToolCallRequest) => {
+  const { emoji, slack_channel, timestamp } = req.arguments as unknown as ReactArgs;
+  await slackWeb.reactions.add({ name: emoji, channel: slack_channel, timestamp });
+  return `Reacted with :${emoji}:`;
+});
+
 // Bot user ID (resolved at startup)
 let botUserId = '';
 
@@ -447,23 +459,17 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
   }
 
   if (name === 'react') {
-    const { emoji, slack_channel, timestamp } = args as {
-      emoji: string;
-      slack_channel: string;
-      timestamp: string;
-    };
-
-    try {
-      await slackWeb.reactions.add({
-        name: emoji,
-        channel: slack_channel,
-        timestamp,
-      });
-      return { content: [{ type: 'text', text: `Reacted with :${emoji}:` }] };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      return { content: [{ type: 'text', text: `Reaction error: ${msg}` }] };
+    // P5-3c: ToolGateway adapter handler 호출. 외부 응답 시그니처 동일.
+    const result = await toolGateway.invoke({
+      name: 'react',
+      arguments: args as unknown as Record<string, unknown>,
+      callerId: 'channel-slack',
+      hostSession: { hostSessionId: `channel-slack:${SEMO_SERVICE_ID}` },
+    });
+    if (!result.ok) {
+      return { content: [{ type: 'text', text: `Reaction error: ${result.error}` }] };
     }
+    return { content: [{ type: 'text', text: String(result.output ?? '') }] };
   }
 
   throw new Error(`Unknown tool: ${name}`);
