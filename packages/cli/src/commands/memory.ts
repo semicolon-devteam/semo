@@ -345,4 +345,87 @@ export function registerMemoryCommands(program: Command): void {
 
       console.log();
     });
+
+  // ── semo memory archive — P2-4 ──────────────────────────
+  memoryCmd
+    .command('archive')
+    .description('오래된 메모리 파일을 cold/ 서브디렉토리로 이동 (Hot/Cold 분리)')
+    .option('--bot <id>', 'bot 워크스페이스 (~/.semo/workspaces/<id>/memory/)')
+    .option('--memory-dir <path>', '메모리 디렉토리 직접 지정')
+    .option('--before <date>', 'YYYY-MM-DD 이전에 마지막 변경된 파일만 대상 (기본: 90일 전)')
+    .option('--dry-run', '이동 없이 대상만 출력')
+    .action(async (options) => {
+      const memoryDir = options.memoryDir
+        ? path.resolve(options.memoryDir.replace(/^~/, os.homedir()))
+        : options.bot
+          ? path.join(os.homedir(), '.semo', 'workspaces', options.bot, 'memory')
+          : path.join(os.homedir(), '.claude', 'memory');
+
+      if (!fs.existsSync(memoryDir)) {
+        console.log(chalk.yellow(`\n  메모리 디렉토리 없음: ${memoryDir}\n`));
+        process.exit(1);
+      }
+
+      const cutoffDate = options.before
+        ? new Date(options.before)
+        : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      if (isNaN(cutoffDate.getTime())) {
+        console.log(chalk.red(`\n  --before 형식 오류 (YYYY-MM-DD 필요): ${options.before}\n`));
+        process.exit(1);
+      }
+
+      const coldDir = path.join(memoryDir, 'cold');
+      const candidates: Array<{ name: string; mtime: Date; bytes: number }> = [];
+      for (const entry of fs.readdirSync(memoryDir, { withFileTypes: true })) {
+        if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+        if (entry.name === 'MEMORY.md') continue; // 인덱스는 보존
+        const p = path.join(memoryDir, entry.name);
+        const st = fs.statSync(p);
+        if (st.mtime < cutoffDate) {
+          candidates.push({ name: entry.name, mtime: st.mtime, bytes: st.size });
+        }
+      }
+
+      console.log(chalk.cyan.bold(`\n📦 Memory Archive — ${memoryDir}`));
+      console.log(chalk.gray(`  cutoff (mtime <): ${cutoffDate.toISOString().slice(0, 10)}`));
+      console.log(
+        chalk.gray(`  대상: ${candidates.length}건${options.dryRun ? ' (dry-run)' : ''}\n`),
+      );
+
+      if (candidates.length === 0) {
+        console.log(chalk.green('  archive 대상 없음.\n'));
+        return;
+      }
+
+      candidates.sort((a, b) => a.mtime.getTime() - b.mtime.getTime());
+      for (const c of candidates) {
+        console.log(
+          `    ${c.mtime.toISOString().slice(0, 10)}  ${c.bytes.toString().padStart(6)}B  ${c.name}`,
+        );
+      }
+
+      if (options.dryRun) {
+        console.log(chalk.gray(`\n  --dry-run — 실제 이동 안 함. 적용: 옵션 제거 후 재실행.\n`));
+        return;
+      }
+
+      fs.mkdirSync(coldDir, { recursive: true });
+      let moved = 0;
+      for (const c of candidates) {
+        const src = path.join(memoryDir, c.name);
+        const dst = path.join(coldDir, c.name);
+        try {
+          fs.renameSync(src, dst);
+          moved++;
+        } catch (err) {
+          console.log(chalk.red(`    ❌ ${c.name}: ${(err as Error).message}`));
+        }
+      }
+      console.log(chalk.green(`\n  ✅ ${moved}건 archive 완료 → ${coldDir}\n`));
+      console.log(
+        chalk.gray(
+          '  MEMORY.md 인덱스는 자동 갱신되지 않음 — 필요 시 수동 정리 (또는 Cold 섹션 추가).\n',
+        ),
+      );
+    });
 }
