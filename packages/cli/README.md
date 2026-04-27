@@ -84,7 +84,7 @@ semo chat "내 이름은 OO이고, 직무는 OO입니다"
 
 ## 봇 카탈로그
 
-`semo bots templates` 로 사용 가능한 역할 템플릿 목록. SemoBot 외 모든 봇은 **템플릿 → 복사 → 사용자 정의** 흐름.
+`semo templates list` 로 사용 가능한 역할 템플릿 목록. SemoBot 외 모든 봇은 **템플릿 → 복사 → 사용자 정의** 흐름.
 
 | ID                | 역할              | 강점                             |
 | ----------------- | ----------------- | -------------------------------- |
@@ -96,7 +96,7 @@ semo chat "내 이름은 OO이고, 직무는 OO입니다"
 | `growthclaw`      | SEO/마케팅/그로스 | KPI, 콘텐츠                      |
 | `infraclaw`       | DevOps/배포       | 인프라, CI/CD                    |
 
-내 도메인에 맞춰 템플릿을 복사하거나 SemoBot 과의 대화로 새 봇을 만들 수 있다 (`semo factory create`).
+내 도메인에 맞춰 템플릿을 복사하거나 SemoBot 과의 대화로 새 봇을 만들 수 있다 (`semo factory apply "..."`).
 
 ---
 
