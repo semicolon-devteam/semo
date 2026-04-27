@@ -336,7 +336,16 @@ Personal 갈래 LLM 호스트 + 향후 데스크톱 통합 준비.
 23. ✅ P5-5 OllamaAdapter + Hermes stub    — 2026-04-27 완료 (commit 069bd8e4)
 24. ⬜ P5-4b.iii Codex MCP server entry    (보류 — MCP SDK 의존성 트레이드오프 결정 필요)
 25. ✅ P5-6 ExecutionTarget DB 스키마 확장 — 2026-04-27 완료 (mig 114, cli-v4.18.20)
-26. ⬜ P5-7 HookGateway/PolicyEngine — Claude lifecycle hook 인터페이스 (P5-3.x 재정의, KB decision policy-engine-vs-tool-gateway-2026-04-27)
+26. 🟡 P5-7 HookGateway/PolicyEngine — 1차 진행 (2026-04-28). 3 guard 포팅 + semiclaw 1봇 3건 swap. 잔여: KB decision p5-7-handoff-2026-04-28
+    - ✅ HookGateway 인터페이스 (packages/common/src/runtime/hook-gateway.ts)
+    - ✅ InMemoryHookGateway + ConsolePolicyAuditSink
+    - ✅ cli `semo guard run <name>` (response-length / kb-search-loop / assertion / url-validator)
+    - ✅ semiclaw settings.json swap 3건 (response-length / assertion / url-validator)
+    - ✅ vitest 28/28 + sh 등가성 라이브 검증 (cli-v4.18.23~26)
+    - ⬜ semiclaw 잔여 2 sh (commitment-guard / kb-first-guard) 포팅
+    - ⬜ 다른 6 봇 swap 확장 (planclaw / workclaw / designclaw / reviewclaw / infraclaw / growthclaw)
+    - ⬜ 13 sh 전체 통일 후 sh 폐기
+    - ⬜ 운영 1주 모니터링 (SEMO_GUARD_AUDIT=1 stderr)
 ```
 
 P5 시리즈는 P0~P4 와 독립적으로 병렬 진행 가능 (P5-6 만 P1-1 의존).
