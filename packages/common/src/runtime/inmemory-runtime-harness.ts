@@ -34,7 +34,10 @@ export interface InMemoryRuntimeHarnessOptions {
 export class InMemoryRuntimeHarness implements RuntimeHarness {
   readonly target: HarnessTarget;
   private readonly options: InMemoryRuntimeHarnessOptions;
-  private readonly cancelledCommitments = new Set<string>();
+  /** 진행 중 dispatch 의 AbortController — cancel 시 abort() 신호 전파. */
+  private readonly inflight = new Map<string, AbortController>();
+  /** run 시작 전에 이미 cancel 호출된 commitmentId — 1회 소비 후 정상화. */
+  private readonly preCancelled = new Set<string>();
 
   constructor(target: HarnessTarget, options: InMemoryRuntimeHarnessOptions = {}) {
     this.target = target;
@@ -42,8 +45,8 @@ export class InMemoryRuntimeHarness implements RuntimeHarness {
   }
 
   async run(input: HarnessRunInput): Promise<HarnessRunResult> {
-    if (this.cancelledCommitments.has(input.commitmentId)) {
-      this.cancelledCommitments.delete(input.commitmentId);
+    if (this.preCancelled.has(input.commitmentId)) {
+      this.preCancelled.delete(input.commitmentId);
       return {
         replyText: '',
         sessionRef: { hostSessionId: '' },
@@ -54,6 +57,8 @@ export class InMemoryRuntimeHarness implements RuntimeHarness {
     }
 
     const startedAt = Date.now();
+    const abortController = new AbortController();
+    this.inflight.set(input.commitmentId, abortController);
 
     // 매 run 마다 새 세션 시작 (resume 은 호출처가 session ref 직접 주입하는 미래 인터페이스).
     const sessionRef = await this.target.host.startSession({
@@ -68,12 +73,14 @@ export class InMemoryRuntimeHarness implements RuntimeHarness {
       context: input.context,
       cwd: this.options.cwd,
       timeoutMs: this.options.defaultTimeoutMs,
+      signal: abortController.signal,
     };
 
     let dispatchResult;
     try {
       dispatchResult = await this.target.host.dispatch(dispatchInput);
     } catch (err) {
+      this.inflight.delete(input.commitmentId);
       const durationMs = Date.now() - startedAt;
       // dispatch 자체 실패 (binary 부재 등) — projection 은 시도하지 않음.
       return {
@@ -84,6 +91,7 @@ export class InMemoryRuntimeHarness implements RuntimeHarness {
         durationMs,
       };
     }
+    this.inflight.delete(input.commitmentId);
 
     // 성공·실패 무관 응답이 있으면 projection 시도 (실패 endReason 도 텍스트가 있을 수 있음).
     if (dispatchResult.text && this.target.defaultProjectionTargets.length > 0) {
@@ -107,8 +115,14 @@ export class InMemoryRuntimeHarness implements RuntimeHarness {
   }
 
   async cancel(commitmentId: string): Promise<void> {
-    // P6-4: best-effort. 현재 dispatch 가 AbortSignal 미지원 → 다음 run 차단 플래그.
-    // 진행 중인 child process 는 호스트 자체 timeout 으로 종료 대기.
-    this.cancelledCommitments.add(commitmentId);
+    // P6-5: 진행 중 dispatch 가 있으면 AbortSignal 전파 → adapter 가 SIGTERM/SIGKILL 처리.
+    const ctrl = this.inflight.get(commitmentId);
+    if (ctrl) {
+      ctrl.abort();
+      // delete 는 dispatch 종료 시 별도 처리 — race 회피 위해 여기서는 안 한다.
+      return;
+    }
+    // 진행 중이 아니면 다음 run 1회 차단 플래그.
+    this.preCancelled.add(commitmentId);
   }
 }

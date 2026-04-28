@@ -93,6 +93,11 @@ export interface HostDispatchInput {
    * 운영 budget 차단의 1차 방어선은 RuntimeHarness 가 가진다 — 본 필드는 2차 방어용.
    */
   maxBudgetUsd?: number;
+  /**
+   * 강제 취소용 AbortSignal. abort() 호출 시 어댑터가 즉시 자식 프로세스를 SIGTERM → SIGKILL.
+   * RuntimeHarness.cancel 이 이 신호를 통해 진행 중 dispatch 종료 (Codex P6-2/3/4 review 권고).
+   */
+  signal?: AbortSignal;
 }
 
 export interface HostDispatchResult {

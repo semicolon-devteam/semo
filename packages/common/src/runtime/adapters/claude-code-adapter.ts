@@ -172,7 +172,14 @@ export class ClaudeCodeAdapter implements HostAdapter {
     const timeoutMs =
       input.timeoutMs && input.timeoutMs > 0 ? input.timeoutMs : this.defaultTimeoutMs;
 
-    const exec = await runClaudeOneShot(this.binaryPath, args, input.prompt, timeoutMs, input.cwd);
+    const exec = await runClaudeOneShot(
+      this.binaryPath,
+      args,
+      input.prompt,
+      timeoutMs,
+      input.cwd,
+      input.signal,
+    );
 
     const parsed = safeParseClaudeJson(exec.stdout);
     const text = parsed?.result ?? exec.stdout.trim();
@@ -268,8 +275,14 @@ function safeParseClaudeJson(stdout: string): ClaudeJsonResult | null {
 
 function mapEndReason(
   parsed: ClaudeJsonResult | null,
-  exec: { exitCode: number | null; signal: NodeJS.Signals | null; timedOut: boolean },
+  exec: {
+    exitCode: number | null;
+    signal: NodeJS.Signals | null;
+    timedOut: boolean;
+    aborted: boolean;
+  },
 ): HostDispatchResult['endReason'] {
+  if (exec.aborted) return 'cancelled';
   if (exec.timedOut) return 'timeout';
   // is_error 가 우선 — claude CLI 가 'Not logged in' 류 실패 시 terminal_reason='completed'
   // + is_error=true 로 보냄.
@@ -287,6 +300,7 @@ interface OneShotResult {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  aborted: boolean;
 }
 
 function runClaudeOneShot(
@@ -295,6 +309,7 @@ function runClaudeOneShot(
   prompt: string,
   timeoutMs: number,
   cwd: string | undefined,
+  abortSignal: AbortSignal | undefined,
 ): Promise<OneShotResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(binaryPath, args, {
@@ -306,6 +321,7 @@ function runClaudeOneShot(
     let stdout = '';
     let stderr = '';
     let timedOut = false;
+    let aborted = false;
 
     child.stdout?.on('data', (chunk: Buffer) => {
       stdout += chunk.toString('utf8');
@@ -314,32 +330,43 @@ function runClaudeOneShot(
       stderr += chunk.toString('utf8');
     });
 
+    const killChild = () => {
+      child.kill('SIGTERM');
+      setTimeout(() => {
+        if (!child.killed) child.kill('SIGKILL');
+      }, 5_000).unref();
+    };
+
     const timer =
       timeoutMs > 0
         ? setTimeout(() => {
             timedOut = true;
-            child.kill('SIGTERM');
-            // 강제 정리 보장 — 5s 후에도 살아있으면 SIGKILL.
-            setTimeout(() => {
-              if (!child.killed) child.kill('SIGKILL');
-            }, 5_000).unref();
+            killChild();
           }, timeoutMs)
         : null;
 
+    const onAbort = () => {
+      aborted = true;
+      killChild();
+    };
+    if (abortSignal) {
+      if (abortSignal.aborted) {
+        onAbort();
+      } else {
+        abortSignal.addEventListener('abort', onAbort, { once: true });
+      }
+    }
+
     child.on('error', (err) => {
       if (timer) clearTimeout(timer);
+      if (abortSignal) abortSignal.removeEventListener('abort', onAbort);
       reject(err);
     });
 
     child.on('close', (code, signal) => {
       if (timer) clearTimeout(timer);
-      resolve({
-        exitCode: code,
-        signal,
-        stdout,
-        stderr,
-        timedOut,
-      });
+      if (abortSignal) abortSignal.removeEventListener('abort', onAbort);
+      resolve({ exitCode: code, signal, stdout, stderr, timedOut, aborted });
     });
 
     // prompt 를 stdin 으로 — 인자로 넘기면 ARG_MAX 위험.

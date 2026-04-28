@@ -169,6 +169,22 @@ describe('ClaudeCodeAdapter.dispatch (P6-1)', () => {
     expect(String(r3.hostMeta?.stderr_tail ?? '')).toContain('--max-budget-usd\n1.25');
   });
 
+  it('signal abort → endReason=cancelled (자식 강제 종료)', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      binaryPath: FAKE_HANG,
+      defaultTimeoutMs: 60_000, // 길게 잡아 abort 가 먼저 발동되도록.
+    });
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 100);
+    const r = await adapter.dispatch({
+      botId: 'planclaw',
+      session: { hostSessionId: 'claude-code:planclaw:0' },
+      prompt: 'hello',
+      signal: ctrl.signal,
+    });
+    expect(r.endReason).toBe('cancelled');
+  }, 8000);
+
   it('hostSessionId 가 raw UUID 면 그대로 --session-id 로 패스, 아니면 새 UUID 생성', async () => {
     const adapter = new ClaudeCodeAdapter({ binaryPath: FAKE_ECHO_ARGS });
     const passedUuid = '11111111-2222-4333-8444-555555555555';

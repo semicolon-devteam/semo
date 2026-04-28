@@ -126,6 +126,22 @@ describe('CodexCliAdapter.dispatch (P6-3)', () => {
     expect(stderr).toContain('--ignore-rules');
   });
 
+  it('signal abort → endReason=cancelled', async () => {
+    const adapter = new CodexCliAdapter({
+      binaryPath: FAKE_HANG,
+      defaultTimeoutMs: 60_000,
+    });
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 100);
+    const r = await adapter.dispatch({
+      botId: 'reviewclaw',
+      session: { hostSessionId: 's' },
+      prompt: 'hello',
+      signal: ctrl.signal,
+    });
+    expect(r.endReason).toBe('cancelled');
+  }, 8000);
+
   it('defaultModel + defaultSandbox 매핑', async () => {
     const adapter = new CodexCliAdapter({
       binaryPath: FAKE_ECHO_ARGS,

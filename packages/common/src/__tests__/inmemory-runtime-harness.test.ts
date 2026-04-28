@@ -194,6 +194,51 @@ describe('InMemoryRuntimeHarness (P6-4)', () => {
     expect(result.replyText).toBe('fake-reply');
   });
 
+  it('in-flight cancel: 진행 중 dispatch 의 signal.abort 가 호출됨', async () => {
+    let receivedSignal: AbortSignal | undefined;
+    const hostState: FakeHostState = { startCalls: [], dispatchCalls: [] };
+    const host: HostAdapter = {
+      kind: 'mock' as HostKind,
+      capability: STUB_CAPABILITY,
+      async probe() {
+        return { ok: true };
+      },
+      async startSession(input) {
+        hostState.startCalls.push(input);
+        return { hostSessionId: 'mock:1' };
+      },
+      async resumeSession() {},
+      async endSession() {},
+      async dispatch(input) {
+        hostState.dispatchCalls.push(input);
+        receivedSignal = input.signal;
+        return new Promise<HostDispatchResult>((resolve) => {
+          input.signal?.addEventListener('abort', () => {
+            resolve({
+              text: '',
+              session: { hostSessionId: 'mock:1' },
+              endReason: 'cancelled',
+            });
+          });
+        });
+      },
+    };
+    const captured: CapturedEmit[] = [];
+    const projection = makeCapturingEmitter(captured);
+    const harness = new InMemoryRuntimeHarness(makeTarget(host, projection));
+
+    const runP = harness.run({ commitmentId: 'cmt-inflight', userMessage: 'hi' });
+    // dispatch 가 호출되어 signal 을 받았는지 확인 후 cancel.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(receivedSignal).toBeDefined();
+    expect(receivedSignal?.aborted).toBe(false);
+
+    await harness.cancel('cmt-inflight');
+    const r = await runP;
+    expect(r.endReason).toBe('cancelled');
+    expect(receivedSignal?.aborted).toBe(true);
+  });
+
   it('빈 응답이면 projection 호출 안함', async () => {
     const hostState: FakeHostState = {
       startCalls: [],

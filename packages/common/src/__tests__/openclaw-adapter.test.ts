@@ -130,6 +130,39 @@ describe('OpenClawAdapter.dispatch (P6-2)', () => {
     expect(r.endReason).toBe('completed');
   });
 
+  it('signal abort → endReason=cancelled', async () => {
+    const adapter = new OpenClawAdapter({
+      binaryPath: FAKE_HANG,
+      defaultTimeoutMs: 60_000,
+    });
+    const ctrl = new AbortController();
+    setTimeout(() => ctrl.abort(), 100);
+    const r = await adapter.dispatch({
+      botId: 'designclaw',
+      session: { hostSessionId: 's' },
+      prompt: 'hello',
+      signal: ctrl.signal,
+    });
+    expect(r.endReason).toBe('cancelled');
+  }, 8000);
+
+  it('파싱 fallback: stdout 에 JSON 있으면 stdout 우선, raw_channel=stdout 기록', async () => {
+    const fake = writeFake(
+      'fake-openclaw-stdout-json.sh',
+      `cat <<'JSON'
+{"payloads":[{"text":"from-stdout","mediaUrl":null}],"meta":{"agentMeta":{"sessionId":"oc-std-1"}},"stopReason":"stop"}
+JSON`,
+    );
+    const adapter = new OpenClawAdapter({ binaryPath: fake });
+    const r = await adapter.dispatch({
+      botId: 'designclaw',
+      session: { hostSessionId: 's' },
+      prompt: 'hello',
+    });
+    expect(r.text).toBe('from-stdout');
+    expect(r.hostMeta?.raw_channel).toBe('stdout');
+  });
+
   it('startSession: rolloutPath = workspaceParent/.openclaw-{bot}', async () => {
     const adapter = new OpenClawAdapter({
       binaryPath: FAKE_OK,

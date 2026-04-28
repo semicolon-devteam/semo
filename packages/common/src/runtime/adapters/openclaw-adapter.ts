@@ -149,11 +149,18 @@ export class OpenClawAdapter implements HostAdapter {
       input.timeoutMs && input.timeoutMs > 0 ? input.timeoutMs : this.defaultTimeoutMs;
 
     const args = this.buildDispatchArgs(input, sessionId, timeoutMs);
-    const exec = await runOpenClawAgent(this.binaryPath, args, timeoutMs, input.cwd);
+    const exec = await runOpenClawAgent(this.binaryPath, args, timeoutMs, input.cwd, input.signal);
 
-    // openclaw 는 --json 출력을 stderr 로 내보냄 — stderr 우선, 없으면 stdout.
-    const jsonText = exec.stderr.trim() || exec.stdout.trim();
-    const parsed = safeParseOpenClawJson(jsonText);
+    // openclaw 2026.4.x 는 --json 출력을 stderr 로 내보냄 — 향후 stdout 으로 이동할 가능성
+    // 대비해서 양쪽 시도 (Codex P6-2/3/4 review 권고). 어느 쪽에서 파싱했는지 hostMeta 에 기록.
+    const stdoutParsed = safeParseOpenClawJson(exec.stdout.trim());
+    const stderrParsed = stdoutParsed ? null : safeParseOpenClawJson(exec.stderr.trim());
+    const parsed = stdoutParsed ?? stderrParsed;
+    const rawChannel: 'stdout' | 'stderr' | 'none' = stdoutParsed
+      ? 'stdout'
+      : stderrParsed
+        ? 'stderr'
+        : 'none';
 
     const text = parsed?.payloads?.[0]?.text ?? '';
     const endReason = mapEndReason(parsed, exec);
@@ -172,8 +179,10 @@ export class OpenClawAdapter implements HostAdapter {
       aborted: parsed?.meta?.aborted,
       exit_code: exec.exitCode,
       signal: exec.signal,
-      // stderr 자체가 응답 — JSON 파싱 실패 시 디버깅용으로 일부 보존.
-      raw_tail: !parsed && jsonText ? jsonText.slice(-500) : undefined,
+      raw_channel: rawChannel,
+      // 파싱 실패 시 디버깅용으로 양쪽 일부 보존.
+      stdout_tail: !parsed && exec.stdout ? exec.stdout.slice(-500) : undefined,
+      stderr_tail: !parsed && exec.stderr ? exec.stderr.slice(-500) : undefined,
     };
 
     return {
@@ -232,8 +241,14 @@ function safeParseOpenClawJson(text: string): OpenClawJsonResult | null {
 
 function mapEndReason(
   parsed: OpenClawJsonResult | null,
-  exec: { exitCode: number | null; signal: NodeJS.Signals | null; timedOut: boolean },
+  exec: {
+    exitCode: number | null;
+    signal: NodeJS.Signals | null;
+    timedOut: boolean;
+    aborted: boolean;
+  },
 ): HostDispatchResult['endReason'] {
+  if (exec.aborted) return 'cancelled';
   if (exec.timedOut) return 'timeout';
   if (parsed?.error) return 'error';
   if (parsed?.meta?.aborted) return 'cancelled';
@@ -249,6 +264,7 @@ interface OneShotResult {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  aborted: boolean;
 }
 
 function runOpenClawAgent(
@@ -256,6 +272,7 @@ function runOpenClawAgent(
   args: string[],
   timeoutMs: number,
   cwd: string | undefined,
+  abortSignal: AbortSignal | undefined,
 ): Promise<OneShotResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(binaryPath, args, {
@@ -267,6 +284,7 @@ function runOpenClawAgent(
     let stdout = '';
     let stderr = '';
     let timedOut = false;
+    let aborted = false;
 
     child.stdout?.on('data', (chunk: Buffer) => {
       stdout += chunk.toString('utf8');
@@ -275,25 +293,40 @@ function runOpenClawAgent(
       stderr += chunk.toString('utf8');
     });
 
+    const killChild = () => {
+      child.kill('SIGTERM');
+      setTimeout(() => {
+        if (!child.killed) child.kill('SIGKILL');
+      }, 5_000).unref();
+    };
+
     const timer =
       timeoutMs > 0
         ? setTimeout(() => {
             timedOut = true;
-            child.kill('SIGTERM');
-            setTimeout(() => {
-              if (!child.killed) child.kill('SIGKILL');
-            }, 5_000).unref();
+            killChild();
           }, timeoutMs)
         : null;
 
+    const onAbort = () => {
+      aborted = true;
+      killChild();
+    };
+    if (abortSignal) {
+      if (abortSignal.aborted) onAbort();
+      else abortSignal.addEventListener('abort', onAbort, { once: true });
+    }
+
     child.on('error', (err) => {
       if (timer) clearTimeout(timer);
+      if (abortSignal) abortSignal.removeEventListener('abort', onAbort);
       reject(err);
     });
 
     child.on('close', (code, signal) => {
       if (timer) clearTimeout(timer);
-      resolve({ exitCode: code, signal, stdout, stderr, timedOut });
+      if (abortSignal) abortSignal.removeEventListener('abort', onAbort);
+      resolve({ exitCode: code, signal, stdout, stderr, timedOut, aborted });
     });
   });
 }

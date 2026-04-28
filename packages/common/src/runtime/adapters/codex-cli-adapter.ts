@@ -257,7 +257,14 @@ export class CodexCliAdapter implements HostAdapter {
     const timeoutMs =
       input.timeoutMs && input.timeoutMs > 0 ? input.timeoutMs : this.defaultTimeoutMs;
     const args = this.buildDispatchArgs(input);
-    const exec = await runCodexExec(this.binaryPath, args, input.prompt, timeoutMs, input.cwd);
+    const exec = await runCodexExec(
+      this.binaryPath,
+      args,
+      input.prompt,
+      timeoutMs,
+      input.cwd,
+      input.signal,
+    );
 
     const events = parseJsonlEvents(exec.stdout);
     const finalText = pickAgentMessage(events);
@@ -278,6 +285,7 @@ export class CodexCliAdapter implements HostAdapter {
       turnFailed,
       turnCompleted,
       timedOut: exec.timedOut,
+      aborted: exec.aborted,
       exitCode: exec.exitCode,
     });
 
@@ -377,8 +385,10 @@ function mapCodexEndReason(input: {
   turnFailed: boolean;
   turnCompleted: boolean;
   timedOut: boolean;
+  aborted: boolean;
   exitCode: number | null;
 }): HostDispatchResult['endReason'] {
+  if (input.aborted) return 'cancelled';
   if (input.timedOut) return 'timeout';
   if (input.turnFailed) return 'error';
   if (input.turnCompleted) return 'completed';
@@ -392,6 +402,7 @@ interface OneShotResult {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  aborted: boolean;
 }
 
 function runCodexExec(
@@ -400,6 +411,7 @@ function runCodexExec(
   _prompt: string,
   timeoutMs: number,
   cwd: string | undefined,
+  abortSignal: AbortSignal | undefined,
 ): Promise<OneShotResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(binaryPath, args, {
@@ -411,6 +423,7 @@ function runCodexExec(
     let stdout = '';
     let stderr = '';
     let timedOut = false;
+    let aborted = false;
 
     child.stdout?.on('data', (chunk: Buffer) => {
       stdout += chunk.toString('utf8');
@@ -419,25 +432,40 @@ function runCodexExec(
       stderr += chunk.toString('utf8');
     });
 
+    const killChild = () => {
+      child.kill('SIGTERM');
+      setTimeout(() => {
+        if (!child.killed) child.kill('SIGKILL');
+      }, 5_000).unref();
+    };
+
     const timer =
       timeoutMs > 0
         ? setTimeout(() => {
             timedOut = true;
-            child.kill('SIGTERM');
-            setTimeout(() => {
-              if (!child.killed) child.kill('SIGKILL');
-            }, 5_000).unref();
+            killChild();
           }, timeoutMs)
         : null;
 
+    const onAbort = () => {
+      aborted = true;
+      killChild();
+    };
+    if (abortSignal) {
+      if (abortSignal.aborted) onAbort();
+      else abortSignal.addEventListener('abort', onAbort, { once: true });
+    }
+
     child.on('error', (err) => {
       if (timer) clearTimeout(timer);
+      if (abortSignal) abortSignal.removeEventListener('abort', onAbort);
       reject(err);
     });
 
     child.on('close', (code, signal) => {
       if (timer) clearTimeout(timer);
-      resolve({ exitCode: code, signal, stdout, stderr, timedOut });
+      if (abortSignal) abortSignal.removeEventListener('abort', onAbort);
+      resolve({ exitCode: code, signal, stdout, stderr, timedOut, aborted });
     });
   });
 }
