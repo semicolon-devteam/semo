@@ -26,6 +26,8 @@ import * as path from 'node:path';
 import { promisify } from 'node:util';
 import type {
   ApprovalPolicy,
+  HostDispatchInput,
+  HostDispatchResult,
   HostAdapter,
   HostCapability,
   HostKind,
@@ -209,6 +211,13 @@ export class CodexCliAdapter implements HostAdapter {
       }
     }
     return Array.from(files);
+  }
+
+  /**
+   * P6-0 stub. 실 wiring 은 P6-4 에서 `codex exec --json <prompt>` 호출 + rollout 파싱.
+   */
+  async dispatch(_input: HostDispatchInput): Promise<HostDispatchResult> {
+    throw new Error('CodexCliAdapter.dispatch not wired (P6-4 예정)');
   }
 }
 

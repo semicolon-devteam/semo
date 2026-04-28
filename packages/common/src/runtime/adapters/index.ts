@@ -10,3 +10,4 @@ export { ClaudeCodeAdapter, type ClaudeCodeAdapterOptions } from './claude-code-
 export { CodexCliAdapter, type CodexCliAdapterOptions } from './codex-cli-adapter.js';
 export { OllamaCliAdapter, type OllamaCliAdapterOptions } from './ollama-cli-adapter.js';
 export { HermesDesktopAdapter } from './hermes-desktop-adapter.js';
+export { OpenClawAdapter, type OpenClawAdapterOptions } from './openclaw-adapter.js';

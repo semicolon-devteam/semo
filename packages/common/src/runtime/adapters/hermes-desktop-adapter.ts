@@ -5,7 +5,14 @@
  * probe() 는 항상 ok=false (호스트 미구현) 반환.
  */
 
-import type { HostAdapter, HostCapability, HostKind, HostSessionRef } from '../host-adapter.js';
+import type {
+  HostDispatchInput,
+  HostDispatchResult,
+  HostAdapter,
+  HostCapability,
+  HostKind,
+  HostSessionRef,
+} from '../host-adapter.js';
 
 const HERMES_DESKTOP_CAPABILITY: HostCapability = {
   sandboxModes: ['workspace-write'],
@@ -36,5 +43,9 @@ export class HermesDesktopAdapter implements HostAdapter {
 
   async endSession(_ref: HostSessionRef): Promise<void> {
     // unimplemented
+  }
+
+  async dispatch(_input: HostDispatchInput): Promise<HostDispatchResult> {
+    throw new Error('HermesDesktopAdapter.dispatch not wired (placeholder)');
   }
 }

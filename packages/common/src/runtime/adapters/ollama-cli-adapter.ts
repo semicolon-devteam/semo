@@ -12,7 +12,14 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { HostAdapter, HostCapability, HostKind, HostSessionRef } from '../host-adapter.js';
+import type {
+  HostDispatchInput,
+  HostDispatchResult,
+  HostAdapter,
+  HostCapability,
+  HostKind,
+  HostSessionRef,
+} from '../host-adapter.js';
 
 const execFileP = promisify(execFile);
 
@@ -61,5 +68,9 @@ export class OllamaCliAdapter implements HostAdapter {
 
   async endSession(_ref: HostSessionRef): Promise<void> {
     // no-op
+  }
+
+  async dispatch(_input: HostDispatchInput): Promise<HostDispatchResult> {
+    throw new Error('OllamaCliAdapter.dispatch not wired (P6-x 예정)');
   }
 }

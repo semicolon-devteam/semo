@@ -14,6 +14,9 @@ export type {
   HostAdapter,
   SandboxMode,
   ApprovalPolicy,
+  HostDispatchInput,
+  HostDispatchResult,
+  HostDispatchChannel,
 } from './host-adapter.js';
 
 export type {

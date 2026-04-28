@@ -16,7 +16,14 @@
 
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import type { HostAdapter, HostCapability, HostKind, HostSessionRef } from '../host-adapter.js';
+import type {
+  HostAdapter,
+  HostCapability,
+  HostDispatchInput,
+  HostDispatchResult,
+  HostKind,
+  HostSessionRef,
+} from '../host-adapter.js';
 
 const execFileP = promisify(execFile);
 
@@ -84,5 +91,13 @@ export class ClaudeCodeAdapter implements HostAdapter {
 
   async endSession(_ref: HostSessionRef): Promise<void> {
     // P5-1 stub. 외부 훅이 처리.
+  }
+
+  /**
+   * P6-0 stub. 실 wiring 은 P6-1 에서 `claude -p <prompt>` 1-shot 호출.
+   * 현재 호출 시 의도적 unimplemented 예외 — RuntimeHarness 가 fallback 처리.
+   */
+  async dispatch(_input: HostDispatchInput): Promise<HostDispatchResult> {
+    throw new Error('ClaudeCodeAdapter.dispatch not wired (P6-1 예정)');
   }
 }

@@ -15,6 +15,7 @@ export type HostKind =
   | 'codex-cli'
   | 'hermes-desktop'
   | 'ollama-cli'
+  | 'openclaw'
   | 'os-shell'
   | 'mock';
 
@@ -47,6 +48,63 @@ export interface HostSessionRef {
   rolloutPath?: string;
 }
 
+/**
+ * P6-0: 호스트에 단일 prompt 를 보내고 결과를 받는 단위 호출.
+ *
+ * RuntimeHarness 가 한 turn 의 LLM 호출을 위임할 때 사용. 실제 LLM 호출은
+ * ExecutionTarget 이 담당하지만, 호스트 환경 (sandbox/세션 컨텍스트/파일 접근) 안에서
+ * 실행되어야 하므로 dispatch 는 HostAdapter 의 책임이다.
+ *
+ * stub: 모든 Adapter 가 현재 unimplemented (`throw new Error('dispatch not wired')`).
+ * P6-1 (ClaudeCodeAdapter wiring) 부터 단계적으로 실 호출 wiring.
+ */
+/**
+ * 메시지 출처 채널 메타. Slack/Discord/CLI 등 자주 쓰이는 키만 typed 로 노출하고,
+ * 호스트 특화 필드는 context 에 둔다. (Codex P6-0 review 권고)
+ */
+export interface HostDispatchChannel {
+  /** 출처 플랫폼 — slack / discord / github / cli / cron / mock 등. */
+  platform: string;
+  /** 채널/룸/스레드 부모 식별자 (slack channel id, discord channel id). */
+  channelId?: string;
+  /** 스레드 식별자 (slack thread_ts, discord thread id). */
+  threadId?: string;
+  /** 발신자 식별자 (slack user id, discord user id, github actor 등). */
+  userId?: string;
+}
+
+export interface HostDispatchInput {
+  /** 봇/세션 식별자. */
+  botId: string;
+  /** 호스트 세션 컨텍스트. resume 시 prior session 사용. */
+  session: HostSessionRef;
+  /** 사용자 prompt 또는 inbox 메시지 본문. */
+  prompt: string;
+  /** 메시지 출처 채널 메타 (라우팅·감사·reply targeting 용). */
+  channel?: HostDispatchChannel;
+  /** 추가 컨텍스트 (KB lookup 결과, mailbox 메타 등 — channel 외 자유 필드). */
+  context?: Record<string, unknown>;
+  /** 호출 cwd (Adapter 별 특화 — Claude Code 는 봇 세션 디렉토리). */
+  cwd?: string;
+  /** 호출 timeout (ms). 0 또는 undefined 면 호스트 기본값. */
+  timeoutMs?: number;
+}
+
+export interface HostDispatchResult {
+  /** 호스트가 반환한 응답 텍스트 (마지막 turn). */
+  text: string;
+  /** 호출 후 갱신된 세션 참조 (resume 용). */
+  session: HostSessionRef;
+  /** 호출 동안 변경된 파일 목록 (CodexAdapter trackFileChanges 등). */
+  filesChanged?: string[];
+  /** 호출 도중 발생한 도구 호출 횟수 (audit 용). */
+  toolCallCount?: number;
+  /** 종료 사유 — 'completed' / 'cancelled' / 'timeout' / 'error'. */
+  endReason: 'completed' | 'cancelled' | 'timeout' | 'error';
+  /** 호스트 raw 응답 일부 (디버깅·감사). */
+  hostMeta?: Record<string, unknown>;
+}
+
 export interface HostAdapter {
   readonly kind: HostKind;
   readonly capability: HostCapability;
@@ -70,4 +128,11 @@ export interface HostAdapter {
    * 세션 종료 — 호스트 리소스 정리.
    */
   endSession(ref: HostSessionRef): Promise<void>;
+
+  /**
+   * P6-0: 단일 prompt 호출 (실 LLM 호출 wrapper).
+   * 현 stub 단계에서 모든 Adapter 가 `throw new Error('dispatch not wired')`.
+   * P6-1 부터 ClaudeCodeAdapter 실 wiring → CodexAdapter / OllamaAdapter / OpenClawAdapter.
+   */
+  dispatch(input: HostDispatchInput): Promise<HostDispatchResult>;
 }
