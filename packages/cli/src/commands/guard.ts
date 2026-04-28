@@ -16,6 +16,8 @@
 
 import { Command } from 'commander';
 import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
 import {
   ConsolePolicyAuditSink,
   InMemoryHookGateway,
@@ -93,8 +95,11 @@ const DECISION_KEYWORDS_RE =
   /(?:도입했|폐기했|전환했|적용했|배포했|마이그레이션|변경했|합의했|결정했|도입합니다|폐기합니다|전환합니다|적용합니다|배포합니다|도입 완료|폐기 완료|전환 완료|적용 완료|배포 완료|표준화했|통합했|분리했|추가했|제거했|Phase \d+ 완료|설정을? 변경|규칙을? 변경|프로세스를? 변경|NON-NEGOTIABLE|신규 생성|전체 배포)/g;
 const DECISION_TRANSCRIPT_TAIL = 50;
 
-// context-router
-const CONTEXT_ROUTER_CONF_DEFAULT = '/Users/reus/.semo/shared/hooks/context-router.conf';
+// context-router — SEMO_HOME ?? ~/.semo 기반 portable path (Codex 리뷰: OSS 배포 호환)
+function defaultContextRouterConfPath(): string {
+  const semoHome = process.env.SEMO_HOME || path.join(os.homedir(), '.semo');
+  return path.join(semoHome, 'shared', 'hooks', 'context-router.conf');
+}
 const CONTEXT_HINTS: Record<string, string> = {
   KB: '[KB-FIRST] 이 질문은 KB 조회가 필요합니다. semo kb search 또는 semo kb get으로 먼저 확인하세요.',
   LOCAL: '[LOCAL-CONFIG] 로컬 설정/워크스페이스 관련 질문입니다.',
@@ -474,7 +479,7 @@ function buildGateway(limit: number): InMemoryHookGateway {
   gateway.register(URL_VALIDATOR_GUARD);
   gateway.register(KB_FIRST_GUARD);
   gateway.register(DECISION_REMINDER_GUARD);
-  gateway.register(makeContextRouterGuard(CONTEXT_ROUTER_CONF_DEFAULT));
+  gateway.register(makeContextRouterGuard(defaultContextRouterConfPath()));
   return gateway;
 }
 

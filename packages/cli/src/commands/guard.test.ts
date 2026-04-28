@@ -390,6 +390,22 @@ describe('semo guard run context-router', () => {
     expect(r.code).toBe(0);
     expect(r.stdout).not.toContain('KB-FIRST');
   });
+
+  it('SEMO_HOME env 로 conf path override 가능 (OSS portable)', () => {
+    // SEMO_HOME 이 비어있으면 ~/.semo 사용 — 이 환경에서는 실 conf 가 있어 KB-FIRST 출력됨
+    // 빈 디렉토리로 SEMO_HOME 설정 시 conf 없어 hint 미출력
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'semo-home-'));
+    try {
+      const stdout = execFileSync('node', [CLI, 'guard', 'run', 'context-router'], {
+        input: JSON.stringify({ cwd: BOT_CWD, user_message: '팀원 누구야?' }),
+        encoding: 'utf8',
+        env: { ...process.env, SEMO_HOME: tmp },
+      });
+      expect(stdout).toBe('');
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('semo guard run kb-search-loop', () => {
