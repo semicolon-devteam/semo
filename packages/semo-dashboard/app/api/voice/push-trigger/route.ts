@@ -52,5 +52,10 @@ export async function POST(req: Request) {
   }
 
   const result = await sendPushToUser(b.user_id, payload, b.ttl ?? 30);
-  return NextResponse.json({ ok: true, ...result });
+  return NextResponse.json({
+    ok: result.ok > 0,
+    sent: result.ok,
+    gone: result.gone,
+    failed: result.failed,
+  });
 }
