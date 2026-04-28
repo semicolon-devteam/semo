@@ -79,6 +79,30 @@ const URL_WHITELIST = new Set([
   'wikipedia.org',
 ]);
 
+// kb-first
+const KB_TOPICS_RE = /서비스|프로젝트|인프라|배포|KPI|의사결정|인시던트|팀원|담당자|현황|상태/;
+const KB_EVIDENCE_RE = /semo kb|KB.*조회|답변근거.*KB|\[KB\]|kb_search|kb_get|semo service/;
+const KB_TRANSCRIPT_TAIL = 30;
+const KB_TRANSCRIPT_TOOL_RE = /semo kb|semo service|kb_search|kb_get/;
+
+// decision-reminder
+const DECISION_KB_INPROGRESS_RE = /KB 기록:|semo kb upsert|KB upsert 완료|답변근거: KB/;
+const DECISION_DISMISS_RE =
+  /(?:KB 기록 불필요|기록 대상[이가]? 아닙?|false positive|DECISION REMINDER|기록할 필요|실제 의사결정이 아닌?|설명[만일]? 한 것|가상 (?:예시|시나리오)|hook.*(?:반복|루프|개선))/i;
+const DECISION_KEYWORDS_RE =
+  /(?:도입했|폐기했|전환했|적용했|배포했|마이그레이션|변경했|합의했|결정했|도입합니다|폐기합니다|전환합니다|적용합니다|배포합니다|도입 완료|폐기 완료|전환 완료|적용 완료|배포 완료|표준화했|통합했|분리했|추가했|제거했|Phase \d+ 완료|설정을? 변경|규칙을? 변경|프로세스를? 변경|NON-NEGOTIABLE|신규 생성|전체 배포)/g;
+const DECISION_TRANSCRIPT_TAIL = 50;
+
+// context-router
+const CONTEXT_ROUTER_CONF_DEFAULT = '/Users/reus/.semo/shared/hooks/context-router.conf';
+const CONTEXT_HINTS: Record<string, string> = {
+  KB: '[KB-FIRST] 이 질문은 KB 조회가 필요합니다. semo kb search 또는 semo kb get으로 먼저 확인하세요.',
+  LOCAL: '[LOCAL-CONFIG] 로컬 설정/워크스페이스 관련 질문입니다.',
+  GFP: '[GFP] 프로젝트 파이프라인 관련 질문입니다.',
+  INFRA: '[INFRA] 인프라 관련 질문입니다. KB에서 infra 도메인을 먼저 확인하세요.',
+  CODE_CHANGE: '[CODE-CHANGE] 코드 변경 작업입니다. 3자 동기화에 유의하세요.',
+};
+
 const PASS: HookResult = { exitCode: 0, level: 'pass' };
 
 function normalizeAssistantMessage(value: unknown): string {
@@ -118,6 +142,71 @@ function countTranscriptLines(transcriptPath: string, re: RegExp, tailLines: num
   } catch {
     return 0;
   }
+}
+
+/** transcript tail 의 raw 텍스트 합본 (kb-first 의 단순 문자열 검색 용). */
+function tailTranscriptText(transcriptPath: string, tailLines: number): string {
+  try {
+    if (!transcriptPath || !fs.existsSync(transcriptPath)) return '';
+    const all = fs.readFileSync(transcriptPath, 'utf8').split('\n');
+    return all.slice(-tailLines).join('\n');
+  } catch {
+    return '';
+  }
+}
+
+/** transcript tail 의 jsonl 파싱 — decision-reminder 가 사용 (role/content 분석). */
+interface TranscriptEntry {
+  role?: string;
+  content?: unknown;
+  message?: TranscriptEntry;
+}
+function parseTranscriptTail(transcriptPath: string, tailLines: number): TranscriptEntry[] {
+  try {
+    if (!transcriptPath || !fs.existsSync(transcriptPath)) return [];
+    const all = fs
+      .readFileSync(transcriptPath, 'utf8')
+      .split('\n')
+      .filter((l) => l.trim());
+    const tail = all.slice(-tailLines);
+    const out: TranscriptEntry[] = [];
+    for (const line of tail) {
+      try {
+        out.push(JSON.parse(line) as TranscriptEntry);
+      } catch {
+        /* skip */
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+
+/** context-router conf 파일 로드 — 'CATEGORY|kw1|kw2|...' 한 줄씩. 없으면 빈 맵. */
+function loadContextRouterConf(confPath: string): Map<string, string[]> {
+  const out = new Map<string, string[]>();
+  try {
+    if (!fs.existsSync(confPath)) return out;
+    const raw = fs.readFileSync(confPath, 'utf8');
+    for (const line of raw.split('\n')) {
+      const t = line.trim();
+      if (!t || t.startsWith('#')) continue;
+      const idx = t.indexOf('|');
+      if (idx < 0) continue;
+      const cat = t.slice(0, idx).trim();
+      const kws = t
+        .slice(idx + 1)
+        .split('|')
+        .map((k) => k.trim())
+        .filter(Boolean);
+      const prev = out.get(cat) ?? [];
+      out.set(cat, prev.concat(kws));
+    }
+  } catch {
+    /* ignore */
+  }
+  return out;
 }
 
 // ============================================================
@@ -247,6 +336,130 @@ const ASSERTION_GUARD: HookGuard = {
   },
 };
 
+const KB_FIRST_GUARD: HookGuard = {
+  name: 'kb-first',
+  triggers: ['Stop'],
+  botSessionOnly: true,
+  description: 'KB 관련 응답에 KB 조회 흔적 없으면 WARN',
+  async evaluate(payload: HookPayload | null): Promise<HookResult> {
+    if (!payload) return PASS;
+    const cwd = payload.cwd ?? '';
+    const response = normalizeAssistantMessage(payload.last_assistant_message);
+    if (!response || !BOT_CWD_RE.test(cwd)) return PASS;
+    let cleaned = response.replace(CODE_BLOCK_RE, '');
+    cleaned = cleaned.replace(INLINE_CODE_RE, '');
+    if (!KB_TOPICS_RE.test(cleaned)) return PASS;
+    if (KB_EVIDENCE_RE.test(response)) return PASS;
+    const transcriptPath = payload.transcript_path ?? '';
+    if (transcriptPath) {
+      const tail = tailTranscriptText(transcriptPath, KB_TRANSCRIPT_TAIL);
+      if (KB_TRANSCRIPT_TOOL_RE.test(tail)) return PASS;
+    }
+    return {
+      exitCode: 0,
+      level: 'warn',
+      message:
+        'WARN: KB 관련 응답이지만 KB 조회 흔적이 없습니다. semo kb search로 먼저 확인하세요.',
+    };
+  },
+};
+
+const DECISION_REMINDER_GUARD: HookGuard = {
+  name: 'decision-reminder',
+  triggers: ['Stop'],
+  botSessionOnly: false, // sh 와 동일 — bot session 한정 X (로컬 세션 포함)
+  description: '의사결정 키워드 감지 시 KB 기록 안 했으면 BLOCK + JSON reason',
+  async evaluate(payload: HookPayload | null): Promise<HookResult> {
+    if (!payload) return PASS;
+    const lastMsg = normalizeAssistantMessage(payload.last_assistant_message);
+    if (!lastMsg) return PASS;
+    let cleaned = lastMsg.replace(CODE_BLOCK_RE, '');
+    cleaned = cleaned.replace(INLINE_CODE_RE, '');
+    // 이미 KB 기록 중 또는 dismiss 응답이면 통과
+    if (DECISION_KB_INPROGRESS_RE.test(cleaned)) return PASS;
+    if (DECISION_DISMISS_RE.test(cleaned)) return PASS;
+    // decision keywords 매칭
+    const matches = cleaned.match(DECISION_KEYWORDS_RE);
+    if (!matches || matches.length === 0) return PASS;
+    // transcript tail 50줄에서 kb upsert 또는 이전 DECISION REMINDER 있으면 통과
+    const transcriptPath = payload.transcript_path ?? '';
+    if (transcriptPath) {
+      const entries = parseTranscriptTail(transcriptPath, DECISION_TRANSCRIPT_TAIL);
+      let kbRecorded = false;
+      let alreadyReminded = false;
+      for (const entry of entries) {
+        const msg = entry.message ?? entry;
+        const role = msg.role;
+        if (role === 'system' || role === 'user') {
+          const content = typeof msg.content === 'string' ? msg.content : '';
+          if (content.includes('DECISION REMINDER')) alreadyReminded = true;
+        } else if (role === 'assistant') {
+          const blocks = Array.isArray(msg.content) ? msg.content : [];
+          for (const block of blocks) {
+            if (
+              block &&
+              typeof block === 'object' &&
+              (block as { type?: string }).type === 'tool_use'
+            ) {
+              const inp = JSON.stringify((block as { input?: unknown }).input ?? {});
+              if (inp.includes('kb upsert') || inp.includes('kb_upsert')) kbRecorded = true;
+            }
+          }
+        } else if (role === 'tool') {
+          const c = msg.content;
+          const text = Array.isArray(c) ? c.map(String).join(' ') : String(c ?? '');
+          if (text.includes('KB upsert') || text.includes('upsert 완료')) kbRecorded = true;
+        }
+      }
+      if (kbRecorded || alreadyReminded) return PASS;
+    }
+    const unique = Array.from(new Set(matches)).slice(0, 3);
+    const patterns = unique.join('|');
+    const reason = `[DECISION REMINDER] 의사결정/변경 감지: ${patterns}. KB 기록이 필요하면 semo kb upsert <domain> decision/<slug> --content '...'로 기록하세요. 기록 불필요하면 원래 답변을 그대로 다시 보내세요.`;
+    return {
+      exitCode: 0,
+      level: 'block',
+      message: JSON.stringify({ decision: 'block', reason }, undefined, 0),
+    };
+  },
+};
+
+function makeContextRouterGuard(confPath: string): HookGuard {
+  return {
+    name: 'context-router',
+    triggers: ['UserPromptSubmit'],
+    botSessionOnly: false,
+    description: '사용자 메시지 키워드 → KB/GFP/INFRA 컨텍스트 힌트 주입',
+    async evaluate(payload: HookPayload | null): Promise<HookResult> {
+      if (!payload) return PASS;
+      const msg = (payload.user_message as string | undefined) ?? '';
+      const cwd = payload.cwd ?? '';
+      if (!msg) return PASS;
+      const isBot = BOT_CWD_RE.test(cwd);
+      const categories = loadContextRouterConf(confPath);
+      const hintsToPrint: string[] = [];
+      for (const [cat, kws] of categories) {
+        if (kws.length === 0) continue;
+        // sh: re.escape 후 join → 변경 (정규식 special char 보존)
+        const pattern = new RegExp(
+          kws.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|'),
+          'i',
+        );
+        if (!pattern.test(msg)) continue;
+        if (cat === 'KB' && !isBot) continue;
+        const hint = CONTEXT_HINTS[cat];
+        if (hint) hintsToPrint.push(hint);
+      }
+      if (hintsToPrint.length === 0) return PASS;
+      return {
+        exitCode: 0,
+        level: 'pass',
+        message: hintsToPrint.join('\n'),
+      };
+    },
+  };
+}
+
 // ============================================================
 // Singleton gateway 등록
 // ============================================================
@@ -259,6 +472,9 @@ function buildGateway(limit: number): InMemoryHookGateway {
   gateway.register(KB_SEARCH_LOOP_GUARD);
   gateway.register(ASSERTION_GUARD);
   gateway.register(URL_VALIDATOR_GUARD);
+  gateway.register(KB_FIRST_GUARD);
+  gateway.register(DECISION_REMINDER_GUARD);
+  gateway.register(makeContextRouterGuard(CONTEXT_ROUTER_CONF_DEFAULT));
   return gateway;
 }
 

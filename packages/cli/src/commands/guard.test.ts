@@ -258,6 +258,140 @@ describe('semo guard run url-validator', () => {
   });
 });
 
+describe('semo guard run kb-first', () => {
+  it('빈 입력 → exit 0', () => {
+    const r = run(['guard', 'run', 'kb-first'], '');
+    expect(r.code).toBe(0);
+  });
+
+  it('BOT_CWD 미설정 → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'kb-first'],
+      JSON.stringify({ cwd: NON_BOT_CWD, last_assistant_message: '팀원 현황은 ...' }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('KB topic 키워드 없음 → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'kb-first'],
+      JSON.stringify({ cwd: BOT_CWD, last_assistant_message: '안녕하세요. 그냥 잡담입니다.' }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('KB topic + 흔적 없음 → WARN', () => {
+    const r = run(
+      ['guard', 'run', 'kb-first'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        last_assistant_message: '팀원 현황은 다음과 같습니다.',
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('WARN: KB 관련 응답');
+  });
+
+  it('KB topic + 응답에 KB 흔적 (semo kb) → 통과', () => {
+    const r = run(
+      ['guard', 'run', 'kb-first'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        last_assistant_message: 'semo kb get team 으로 확인한 팀원 현황입니다.',
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+});
+
+describe('semo guard run decision-reminder', () => {
+  it('빈 입력 → exit 0', () => {
+    const r = run(['guard', 'run', 'decision-reminder'], '');
+    expect(r.code).toBe(0);
+  });
+
+  it('decision keyword 없음 → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'decision-reminder'],
+      JSON.stringify({ cwd: BOT_CWD, last_assistant_message: '평범한 답변입니다.' }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('이미 KB 기록 중 (semo kb upsert) → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'decision-reminder'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        last_assistant_message: '도입했습니다. 변경했고 semo kb upsert 로 기록했습니다.',
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('dismiss 패턴 (KB 기록 불필요) → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'decision-reminder'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        last_assistant_message: '도입했습니다. 다만 KB 기록 불필요한 임시 변경입니다.',
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('decision keyword + 흔적 없음 → BLOCK JSON', () => {
+    const r = run(
+      ['guard', 'run', 'decision-reminder'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        last_assistant_message: '배포했습니다. 마이그레이션도 적용했습니다.',
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('"decision":"block"');
+    expect(r.stdout).toContain('DECISION REMINDER');
+    expect(r.stdout).toContain('배포했');
+  });
+});
+
+describe('semo guard run context-router', () => {
+  it('빈 입력 → exit 0', () => {
+    const r = run(['guard', 'run', 'context-router'], '');
+    expect(r.code).toBe(0);
+  });
+
+  it('user_message 없음 → exit 0', () => {
+    const r = run(['guard', 'run', 'context-router'], JSON.stringify({ cwd: BOT_CWD }));
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('KB 키워드 (팀원/누구) + 봇 cwd → KB-FIRST hint', () => {
+    const r = run(
+      ['guard', 'run', 'context-router'],
+      JSON.stringify({ cwd: BOT_CWD, user_message: '팀원 누구 담당이야?' }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('KB-FIRST');
+  });
+
+  it('KB 키워드 but 비봇 cwd → KB hint 제외', () => {
+    const r = run(
+      ['guard', 'run', 'context-router'],
+      JSON.stringify({ cwd: NON_BOT_CWD, user_message: '팀원 누구야?' }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).not.toContain('KB-FIRST');
+  });
+});
+
 describe('semo guard run kb-search-loop', () => {
   it('빈 입력 → exit 0', () => {
     const r = run(['guard', 'run', 'kb-search-loop'], '');
