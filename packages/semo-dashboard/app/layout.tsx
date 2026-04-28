@@ -18,6 +18,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: 'SEMO 대시보드',
   description: 'AI 봇 오케스트레이션 모니터링 + KB/벡터 DB 관리',
+  manifest: '/manifest.webmanifest',
+  icons: {
+    apple: '/softphone/icon-192.png',
+  },
 };
 
 export default function RootLayout({

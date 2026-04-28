@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { disablePush, enablePush, getPushStatus, type PushStatus } from '@/lib/push-client';
 
 type CallState = 'idle' | 'connecting' | 'in-call' | 'reconnecting' | 'ended';
 
@@ -18,6 +19,41 @@ export default function VoicePage() {
   const [error, setError] = useState<string | null>(null);
   const [tokenReady, setTokenReady] = useState(false);
   const tokenFetching = useRef(false);
+  const [pushStatus, setPushStatus] = useState<PushStatus | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
+
+  const refreshPushStatus = useCallback(async () => {
+    try {
+      const s = await getPushStatus();
+      setPushStatus(s);
+    } catch (err) {
+      console.error('[push] status error:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshPushStatus();
+  }, [refreshPushStatus]);
+
+  const onEnablePush = useCallback(async () => {
+    setPushBusy(true);
+    try {
+      const s = await enablePush();
+      setPushStatus(s);
+    } finally {
+      setPushBusy(false);
+    }
+  }, []);
+
+  const onDisablePush = useCallback(async () => {
+    setPushBusy(true);
+    try {
+      const s = await disablePush();
+      setPushStatus(s);
+    } finally {
+      setPushBusy(false);
+    }
+  }, []);
 
   const VALID_STATES = new Set<CallState>([
     'idle',
@@ -104,6 +140,47 @@ export default function VoicePage() {
           </button>
         </div>
       )}
+
+      <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-800/40 border border-gray-200 dark:border-gray-700 rounded-lg text-sm flex items-center justify-between gap-3 flex-wrap">
+        <div className="text-gray-700 dark:text-gray-300">
+          <span className="font-medium mr-2">🔔 통화 푸시 알림</span>
+          {pushStatus?.subscribed ? (
+            <span className="text-green-600 dark:text-green-400">활성됨 (이 디바이스)</span>
+          ) : pushStatus?.supported === false ? (
+            <span className="text-yellow-600 dark:text-yellow-400">
+              지원 안 됨 — iOS는 홈 화면에 추가된 PWA에서만 가능
+            </span>
+          ) : pushStatus?.permission === 'denied' ? (
+            <span className="text-yellow-600 dark:text-yellow-400">
+              권한 거부됨 — 브라우저 설정에서 알림 허용 필요
+            </span>
+          ) : (
+            <span className="text-gray-500">비활성</span>
+          )}
+          {pushStatus?.reason && (
+            <span className="ml-2 text-xs text-gray-500">({pushStatus.reason})</span>
+          )}
+        </div>
+        <div className="flex gap-2">
+          {pushStatus?.subscribed ? (
+            <button
+              onClick={onDisablePush}
+              disabled={pushBusy}
+              className="px-3 py-1 text-xs bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+            >
+              비활성화
+            </button>
+          ) : (
+            <button
+              onClick={onEnablePush}
+              disabled={pushBusy || pushStatus?.supported === false}
+              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            >
+              활성화
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg overflow-hidden border border-gray-200 dark:border-gray-700">
         <iframe

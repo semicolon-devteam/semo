@@ -30,6 +30,10 @@ const TTS_INPUT_RATE = 24000; // Edge TTS 기본 출력 sample rate
 const OUTBOUND_PORT = parseInt(process.env.VOICE_SIGNALING_PORT || '8922', 10);
 const OUTBOUND_TOKEN = process.env.VOICE_SIGNALING_TOKEN || '';
 
+// Phase A3 — Dashboard PWA Web Push trigger
+const DASHBOARD_PUSH_URL = (process.env.DASHBOARD_PUSH_URL || '').replace(/\/$/, '');
+const DASHBOARD_PUSH_TOKEN = process.env.DASHBOARD_PUSH_TOKEN || '';
+
 export class DiscordTelephonyAdapter extends EventEmitter implements TelephonyAdapter {
   private ws: WebSocket | null = null;
   private activeCallId: string | null = null;
@@ -176,7 +180,36 @@ export class DiscordTelephonyAdapter extends EventEmitter implements TelephonyAd
     // 2) WS /voice/stream
     await this.openStream(call_id);
 
-    // 3) 즉시 connected emit (실제 사용자 join은 audio 이벤트로 신호됨)
+    // 3) Dashboard PWA Web Push 알림 (fire-and-forget, 실패해도 통화는 계속)
+    if (DASHBOARD_PUSH_URL && DASHBOARD_PUSH_TOKEN) {
+      void fetch(`${DASHBOARD_PUSH_URL}/api/voice/push-trigger`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${DASHBOARD_PUSH_TOKEN}`,
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          title: '📞 SemoBot 통화',
+          body: target,
+          call_id,
+          guild_id: GUILD_ID,
+          channel_id: CHANNEL_ID,
+          ttl: 30,
+        }),
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            console.error(`[discord-tel] push-trigger failed (HTTP ${res.status}): ${txt}`);
+          } else {
+            console.error('[discord-tel] push-trigger sent');
+          }
+        })
+        .catch((err) => console.error('[discord-tel] push-trigger error:', err.message));
+    }
+
+    // 4) 즉시 connected emit (실제 사용자 join은 audio 이벤트로 신호됨)
     const callInfo: CallInfo = {
       callId: call_id,
       direction: 'outbound',
