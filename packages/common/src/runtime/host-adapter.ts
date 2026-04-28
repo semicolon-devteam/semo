@@ -88,6 +88,11 @@ export interface HostDispatchInput {
   cwd?: string;
   /** 호출 timeout (ms). 0 또는 undefined 면 호스트 기본값. */
   timeoutMs?: number;
+  /**
+   * 호출 단위 max budget USD (호스트가 하드 캡 강제). 0/undefined 면 호스트 기본.
+   * 운영 budget 차단의 1차 방어선은 RuntimeHarness 가 가진다 — 본 필드는 2차 방어용.
+   */
+  maxBudgetUsd?: number;
 }
 
 export interface HostDispatchResult {

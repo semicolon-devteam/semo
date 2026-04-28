@@ -123,6 +123,52 @@ describe('ClaudeCodeAdapter.dispatch (P6-1)', () => {
     expect(stderr).not.toContain('{"hooks":{}}');
   });
 
+  it('useBareMode=true 면 --bare 인자 추가 + setting-sources/settings overlay 제외', async () => {
+    const adapter = new ClaudeCodeAdapter({
+      binaryPath: FAKE_ECHO_ARGS,
+      useBareMode: true,
+    });
+    const r = await adapter.dispatch({
+      botId: 'planclaw',
+      session: { hostSessionId: 'claude-code:planclaw:0' },
+      prompt: 'hello',
+    });
+    const stderr = String(r.hostMeta?.stderr_tail ?? '');
+    expect(stderr).toContain('--bare');
+    expect(stderr).not.toContain('--setting-sources');
+    expect(stderr).not.toContain('{"hooks":{}}');
+  });
+
+  it('maxBudgetUsd: input 우선, 없으면 default, 둘 다 없으면 인자 미추가', async () => {
+    const noBudget = new ClaudeCodeAdapter({ binaryPath: FAKE_ECHO_ARGS });
+    const r1 = await noBudget.dispatch({
+      botId: 'planclaw',
+      session: { hostSessionId: 'claude-code:planclaw:0' },
+      prompt: 'hello',
+    });
+    expect(String(r1.hostMeta?.stderr_tail ?? '')).not.toContain('--max-budget-usd');
+
+    const defaultBudget = new ClaudeCodeAdapter({
+      binaryPath: FAKE_ECHO_ARGS,
+      defaultMaxBudgetUsd: 0.5,
+    });
+    const r2 = await defaultBudget.dispatch({
+      botId: 'planclaw',
+      session: { hostSessionId: 'claude-code:planclaw:0' },
+      prompt: 'hello',
+    });
+    expect(String(r2.hostMeta?.stderr_tail ?? '')).toContain('--max-budget-usd\n0.5');
+
+    const r3 = await defaultBudget.dispatch({
+      botId: 'planclaw',
+      session: { hostSessionId: 'claude-code:planclaw:0' },
+      prompt: 'hello',
+      maxBudgetUsd: 1.25,
+    });
+    // input 우선
+    expect(String(r3.hostMeta?.stderr_tail ?? '')).toContain('--max-budget-usd\n1.25');
+  });
+
   it('hostSessionId 가 raw UUID 면 그대로 --session-id 로 패스, 아니면 새 UUID 생성', async () => {
     const adapter = new ClaudeCodeAdapter({ binaryPath: FAKE_ECHO_ARGS });
     const passedUuid = '11111111-2222-4333-8444-555555555555';

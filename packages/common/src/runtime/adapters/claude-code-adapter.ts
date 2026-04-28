@@ -70,10 +70,25 @@ export interface ClaudeCodeAdapterOptions {
    */
   defaultTimeoutMs?: number;
   /**
-   * true 면 user-level settings 를 로드 (project hooks 는 여전히 제외).
+   * dispatch 기본 max budget USD. input.maxBudgetUsd 가 우선.
+   * claude CLI --max-budget-usd 로 전달. 0 또는 미지정 시 미설정.
+   * Codex P6-1 review 권고: budget 차단은 RuntimeHarness 에서 하되,
+   * 하드 캡으로 CLI 차원 차단도 활용.
+   */
+  defaultMaxBudgetUsd?: number;
+  /**
+   * ⚠️ 위험 모드. true 면 user-level settings 를 로드 (project hooks 는 여전히 제외).
+   * 사용자 ~/.claude/settings.json 안에 SEMO 가드 훅이 있으면 dispatch 호출자 본인을
+   * 차단할 수 있음 — dispatch 전용 settings 파일을 따로 두고 사용하거나, 기본 hookless 유지 권장.
    * 기본 false — env SEMO_DISPATCH_HOOKS=1 로도 활성화.
    */
   loadUserHooks?: boolean;
+  /**
+   * --bare 모드 사용. Codex P6-1 review 권고대로 더 안정적인 hookless 보장이지만,
+   * Anthropic 인증이 ANTHROPIC_API_KEY 또는 apiKeyHelper 로 강제됨 (OAuth/keychain 사용 X).
+   * 즉 OAuth 구독으로만 인증된 환경에서는 사용 불가 — 명시적 opt-in.
+   */
+  useBareMode?: boolean;
 }
 
 /**
@@ -87,13 +102,17 @@ export class ClaudeCodeAdapter implements HostAdapter {
   private readonly binaryPath: string;
   private readonly defaultModel?: string;
   private readonly defaultTimeoutMs: number;
+  private readonly defaultMaxBudgetUsd?: number;
   private readonly loadUserHooks: boolean;
+  private readonly useBareMode: boolean;
 
   constructor(options: ClaudeCodeAdapterOptions = {}) {
     this.binaryPath = options.binaryPath ?? 'claude';
     this.defaultModel = options.defaultModel;
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? 120_000;
+    this.defaultMaxBudgetUsd = options.defaultMaxBudgetUsd;
     this.loadUserHooks = options.loadUserHooks ?? process.env.SEMO_DISPATCH_HOOKS === '1';
+    this.useBareMode = options.useBareMode ?? process.env.SEMO_DISPATCH_BARE === '1';
   }
 
   /**
@@ -186,6 +205,12 @@ export class ClaudeCodeAdapter implements HostAdapter {
   private buildDispatchArgs(input: HostDispatchInput, sessionId: string): string[] {
     const args: string[] = ['-p', '--output-format', 'json', '--no-session-persistence'];
 
+    // useBareMode: --bare 가 hooks/LSP/플러그인/auto-memory/CLAUDE.md 모두 OFF (가장 강한 격리).
+    // 단 인증이 ANTHROPIC_API_KEY/apiKeyHelper 로 강제 — OAuth 구독 환경에서는 사용 불가.
+    if (this.useBareMode) {
+      args.push('--bare');
+    }
+
     if (UUID_RE.test(sessionId)) {
       args.push('--session-id', sessionId);
     }
@@ -198,17 +223,27 @@ export class ClaudeCodeAdapter implements HostAdapter {
       args.push('--model', this.defaultModel);
     }
 
-    // 기본 hookless. user-level settings 를 명시적으로 켤 때만 --setting-sources user.
-    if (this.loadUserHooks) {
-      args.push('--setting-sources', 'user');
-    } else {
-      // 어떤 source 도 안 읽음 — 빈 문자열 전달.
-      args.push('--setting-sources', '');
+    const budget = input.maxBudgetUsd ?? this.defaultMaxBudgetUsd;
+    if (budget && budget > 0) {
+      args.push('--max-budget-usd', String(budget));
     }
 
-    // hooks 비활성화 overlay (user 가 켜졌어도 hooks 만 OFF).
-    if (!this.loadUserHooks) {
-      args.push('--settings', JSON.stringify({ hooks: {} }));
+    // --bare 가 이미 hookless 보장 → setting-sources/settings overlay 불필요.
+    if (!this.useBareMode) {
+      // 기본 hookless. user-level settings 를 명시적으로 켤 때만 --setting-sources user.
+      if (this.loadUserHooks) {
+        args.push('--setting-sources', 'user');
+      } else {
+        // 어떤 source 도 안 읽음 — 빈 문자열 전달.
+        // (Codex P6-1 review: 공식 enum 은 user/project/local 뿐. 빈 값은 미정의이므로
+        //  더 강한 격리가 필요하면 useBareMode=true 로 전환할 것.)
+        args.push('--setting-sources', '');
+      }
+
+      // hooks 비활성화 overlay (user 가 켜졌어도 hooks 만 OFF).
+      if (!this.loadUserHooks) {
+        args.push('--settings', JSON.stringify({ hooks: {} }));
+      }
     }
 
     return args;
