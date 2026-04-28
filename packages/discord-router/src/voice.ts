@@ -146,15 +146,35 @@ export class VoiceManager extends EventEmitter {
       cleanup,
     };
 
-    // DM 알림 (mobile push 강함)
-    if (opts.greeting) {
+    // 알림 — DM 우선, 실패 시 voice channel 텍스트(@mention) fallback
+    const notice = opts.greeting
+      ? `📞 SemoBot — ${opts.greeting}\n<#${opts.channelId}> 채널로 들어와주세요. (call_id=${callId})`
+      : `📞 SemoBot 통화 (call_id=${callId})\n<#${opts.channelId}> 채널로 들어와주세요.`;
+
+    let dmOk = false;
+    try {
+      const user = await this.client.users.fetch(opts.userId);
+      await user.send(notice);
+      dmOk = true;
+      console.error(`[voice] DM sent to user=${opts.userId}`);
+    } catch (err) {
+      console.error('[voice] DM send failed:', (err as Error).message);
+    }
+
+    if (!dmOk) {
+      // Discord 14: voice channel 자체도 send() 가능 (voice + text 통합)
       try {
-        const user = await this.client.users.fetch(opts.userId);
-        await user.send(
-          `📞 SemoBot — ${opts.greeting}\n<#${opts.channelId}> 채널로 들어와주세요. (call_id=${callId})`,
-        );
+        const ch = await this.client.channels.fetch(opts.channelId);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sendable = ch as any;
+        if (sendable && typeof sendable.send === 'function') {
+          await sendable.send(`<@${opts.userId}> ${notice}`);
+          console.error(`[voice] channel mention sent to <#${opts.channelId}>`);
+        } else {
+          console.error('[voice] channel does not support send()');
+        }
       } catch (err) {
-        console.error('[voice] DM send failed:', err);
+        console.error('[voice] channel mention failed:', (err as Error).message);
       }
     }
 
