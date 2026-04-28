@@ -15,13 +15,27 @@ import type { ProjectionEmitter, ProjectionTarget } from './projection-emitter.j
 
 export interface HarnessTarget {
   botId: string;
-  /** 호스트 환경 (어디서 돌릴지 — Claude Code/Codex/Hermes/...). */
+  /** 호스트 환경 (어디서 돌릴지 — Claude Code/Codex/OpenClaw/...). */
   host: HostAdapter;
-  /** LLM 모델 호출 어댑터 (어떤 모델로 응답 생성할지 — anthropic-api/openai/ollama/...).
-   *  HostAdapter 는 환경/sandbox/세션 lifecycle 만, 실제 turn 실행은 ExecutionTarget 이 담당. */
-  executionTarget: ExecutionTarget;
-  /** 도구 호출 권한 (어떤 도구 허용·sandbox 단계). */
-  toolGateway: ToolGateway;
+  /**
+   * LLM 모델 호출 어댑터 (anthropic-api/openai/ollama/... 직호출 봇용).
+   *
+   * P6-4 ~ P6-6 시점: HostAdapter.dispatch 가 LLM 호출 + 도구 루프를 모두 흡수하므로
+   * 본 필드는 사용되지 않는 placeholder. P6-7+ 에서 mode='execution' 분기 도입 시 활용.
+   *
+   * mode 분리 시점:
+   *   - mode='host'      → host.dispatch(prompt) 단발, 호스트 CLI 가 자체 멀티턴/도구
+   *   - mode='execution' → executionTarget.dispatch(messages) + Harness 가 toolGateway 로
+   *                        도구 호출 직접 실행하며 messages 누적
+   *
+   * 활용 예정 시점: 첫 ExecutionTarget 직호출 봇 (ollama 로컬, anthropic-api 등) 도입 시.
+   */
+  executionTarget?: ExecutionTarget;
+  /**
+   * 도구 호출 권한·정책. mode='host' 에서는 호스트 CLI 가 자체 강제하므로 미사용.
+   * mode='execution' 도입 시 (P6-7+) Harness 가 직접 invoke.
+   */
+  toolGateway?: ToolGateway;
   /** 결과 투사 채널 (어디로 출력할지). */
   projection: ProjectionEmitter;
   /** 기본 투사 타깃 (응답을 어디 채널/세션에 보낼지). */
