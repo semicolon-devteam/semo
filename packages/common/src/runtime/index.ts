@@ -43,6 +43,11 @@ export type {
   RuntimeHarness,
 } from './runtime-harness.js';
 
+export {
+  InMemoryRuntimeHarness,
+  type InMemoryRuntimeHarnessOptions,
+} from './inmemory-runtime-harness.js';
+
 export type {
   HookPayload,
   HookTrigger,
