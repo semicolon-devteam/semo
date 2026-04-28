@@ -56,6 +56,11 @@ export async function updateSession(request: NextRequest) {
     pathname.startsWith('/api/bots/profiles') ||
     pathname.startsWith('/api/projects/sandbox') ||
     pathname.startsWith('/api/incubator/heartbeat') ||
+    // PWA static assets — must bypass auth redirect (no session in SW/manifest context)
+    pathname === '/sw.js' ||
+    pathname === '/manifest.webmanifest' ||
+    // Voice push-trigger — has its own bearer token auth, no browser session
+    pathname.startsWith('/api/voice/push-trigger') ||
     // 소개사이트(introduction) 자료실: 공개 글 목록/상세/첨부 다운로드
     pathname.startsWith('/api/board/public') ||
     (pathname.startsWith('/api/board/attachments/') &&
