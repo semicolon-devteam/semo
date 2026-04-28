@@ -120,6 +120,68 @@ const DESTRUCTIVE_PATTERNS: Array<[RegExp, string]> = [
   [/dd\s+.*of=\/dev\//i, 'dd write to block device'],
 ];
 
+// compact 짝 — state file + threshold conf (SEMO_HOME 호환)
+function semoStateDir(): string {
+  const semoHome = process.env.SEMO_HOME || path.join(os.homedir(), '.semo');
+  return path.join(semoHome, 'state');
+}
+function autoCompactConfPath(): string {
+  const semoHome = process.env.SEMO_HOME || path.join(os.homedir(), '.semo');
+  return path.join(semoHome, 'shared', 'auto-compact.conf');
+}
+function autoCompactLogPath(): string {
+  const semoHome = process.env.SEMO_HOME || path.join(os.homedir(), '.semo');
+  return path.join(semoHome, 'logs', 'auto-compact.log');
+}
+const AUTO_COMPACT_DEFAULT_THRESHOLD = 50;
+
+function appendAutoCompactLog(msg: string): void {
+  try {
+    const logPath = autoCompactLogPath();
+    fs.mkdirSync(path.dirname(logPath), { recursive: true });
+    const ts = new Date().toISOString();
+    fs.appendFileSync(logPath, `${ts} ${msg}\n`);
+  } catch {
+    /* ignore */
+  }
+}
+
+function loadAutoCompactThreshold(botId: string): number {
+  const conf = autoCompactConfPath();
+  if (!fs.existsSync(conf)) return AUTO_COMPACT_DEFAULT_THRESHOLD;
+  let result = AUTO_COMPACT_DEFAULT_THRESHOLD;
+  let foundDefault = false;
+  try {
+    for (const line of fs.readFileSync(conf, 'utf8').split('\n')) {
+      const t = line.trim();
+      if (!t || t.startsWith('#')) continue;
+      const eq = t.indexOf('=');
+      if (eq < 0) continue;
+      const k = t.slice(0, eq).trim();
+      const v = parseInt(t.slice(eq + 1).trim(), 10);
+      if (Number.isNaN(v)) continue;
+      if (k === botId) {
+        return v; // bot 별 명시 값 우선
+      }
+      if (k === 'DEFAULT' && !foundDefault) {
+        result = v;
+        foundDefault = true;
+      }
+    }
+  } catch {
+    /* ignore */
+  }
+  return result;
+}
+
+function compactBotIdFromCwd(cwd: string): string {
+  let m = cwd.match(/semo[-_](?:bot[-_])?sessions\/([a-z]+)/);
+  if (m) return m[1];
+  m = cwd.match(/\.semo\/sessions\/([a-z]+)/);
+  if (m) return m[1];
+  return '';
+}
+
 // commitment-guard — Korean 미래 약속 패턴
 const COMMITMENT_RE =
   /(?:처리|검토|진행|구현|수정|배포|확인|보고|등록|완료|작성|분석|조사)하겠|할게요|할 예정|약속하겠|약속합니다|드리겠습니다|해드리겠/;
@@ -575,6 +637,134 @@ async function checkActiveCommitments(botId: string): Promise<boolean> {
   }
 }
 
+const COMPACT_RESET_GUARD: HookGuard = {
+  name: 'compact-reset',
+  triggers: ['Stop'], // settings.json 의 PostCompact 매핑은 호출처 책임
+  botSessionOnly: true,
+  description: 'PostCompact: turn counter 리셋 (compact 완료 후)',
+  async evaluate(payload: HookPayload | null): Promise<HookResult> {
+    if (!payload) return PASS;
+    const cwd = payload.cwd ?? '';
+    const botId = compactBotIdFromCwd(cwd);
+    if (!botId) return PASS;
+    const counterPath = path.join(semoStateDir(), botId, 'turn-counter');
+    let prev = 0;
+    if (fs.existsSync(counterPath)) {
+      try {
+        prev = parseInt(fs.readFileSync(counterPath, 'utf8').trim(), 10) || 0;
+      } catch {
+        /* ignore */
+      }
+    }
+    try {
+      fs.mkdirSync(path.dirname(counterPath), { recursive: true });
+      fs.writeFileSync(counterPath, '0');
+    } catch {
+      return PASS;
+    }
+    appendAutoCompactLog(`[${botId}] compact_completed, counter_reset (was ${prev})`);
+    return PASS;
+  },
+};
+
+interface CompactSendCommand {
+  /** compact 트리거 시 호출. 실패 시 throw 또는 false 반환. */
+  send(botId: string): Promise<boolean>;
+}
+
+class CmuxCompactSender implements CompactSendCommand {
+  async send(botId: string): Promise<boolean> {
+    try {
+      const { execFileSync } = await import('node:child_process');
+      const id = execFileSync('cmux', ['identify'], { timeout: 5000, encoding: 'utf8' });
+      const info = JSON.parse(id) as { caller?: { workspace_ref?: string; surface_ref?: string } };
+      const ws = info.caller?.workspace_ref;
+      const surface = info.caller?.surface_ref;
+      if (!ws || !surface) {
+        appendAutoCompactLog(`[${botId}] cmux identify missing ws/surface`);
+        return false;
+      }
+      execFileSync('cmux', ['send', '--workspace', ws, '--surface', surface, '/compact\n'], {
+        timeout: 5000,
+      });
+      appendAutoCompactLog(`[${botId}] cmux send /compact success (ws=${ws}, surface=${surface})`);
+      return true;
+    } catch (err) {
+      appendAutoCompactLog(`[${botId}] cmux send error: ${(err as Error).message}`);
+      return false;
+    }
+  }
+}
+
+class NoopCompactSender implements CompactSendCommand {
+  async send(botId: string): Promise<boolean> {
+    appendAutoCompactLog(`[${botId}] compact-sender disabled (no-op)`);
+    return false;
+  }
+}
+
+function defaultCompactSender(): CompactSendCommand {
+  // env 로 명시적 비활성 가능 — Codex 권고: cli core 에 cmux 강한 의존 회피
+  if (process.env.SEMO_AUTOCOMPACT_DISABLE === '1') return new NoopCompactSender();
+  return new CmuxCompactSender();
+}
+
+function makeAutoCompactCounterGuard(sender: CompactSendCommand): HookGuard {
+  return {
+    name: 'auto-compact-counter',
+    triggers: ['Stop'],
+    botSessionOnly: true,
+    description: '턴 카운터 증가 + threshold 도달 시 compact 트리거 (cmux 옵션)',
+    async evaluate(payload: HookPayload | null): Promise<HookResult> {
+      if (!payload) return PASS;
+      const cwd = payload.cwd ?? '';
+      const botId = compactBotIdFromCwd(cwd);
+      if (!botId) return PASS;
+
+      const threshold = loadAutoCompactThreshold(botId);
+      const counterPath = path.join(semoStateDir(), botId, 'turn-counter');
+      let counter = 0;
+      if (fs.existsSync(counterPath)) {
+        try {
+          counter = parseInt(fs.readFileSync(counterPath, 'utf8').trim(), 10) || 0;
+        } catch {
+          /* ignore */
+        }
+      }
+      counter += 1;
+      try {
+        fs.mkdirSync(path.dirname(counterPath), { recursive: true });
+        fs.writeFileSync(counterPath, String(counter));
+      } catch {
+        return PASS;
+      }
+
+      const warningAt = Math.floor(threshold * 0.8);
+      const remaining = threshold - counter;
+      if (counter === warningAt) {
+        appendAutoCompactLog(
+          `[${botId}] warning: ${remaining}턴 후 auto-compact 예정 (현재 ${counter}/${threshold})`,
+        );
+        return {
+          exitCode: 0,
+          level: 'warn',
+          message: JSON.stringify({
+            decision: 'approve',
+            additionalContext: `[AUTO-COMPACT] compact가 ${remaining}턴 후 실행됩니다. 보존할 컨텍스트가 있으면 ${path.dirname(counterPath)}/compact-context.md에 저장하세요.`,
+          }),
+        };
+      }
+      if (counter >= threshold) {
+        appendAutoCompactLog(
+          `[${botId}] threshold=${threshold}, turns=${counter}, action=compact_sent`,
+        );
+        await sender.send(botId);
+      }
+      return PASS;
+    },
+  };
+}
+
 function makeContextRouterGuard(confPath: string): HookGuard {
   return {
     name: 'context-router',
@@ -629,6 +819,8 @@ function buildGateway(limit: number): InMemoryHookGateway {
   gateway.register(SKILL_MIRROR_GUARD);
   gateway.register(DESTRUCTIVE_GUARD);
   gateway.register(makeCommitmentGuard(checkActiveCommitments));
+  gateway.register(COMPACT_RESET_GUARD);
+  gateway.register(makeAutoCompactCounterGuard(defaultCompactSender()));
   return gateway;
 }
 
