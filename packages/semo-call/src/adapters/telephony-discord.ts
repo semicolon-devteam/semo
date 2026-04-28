@@ -142,9 +142,14 @@ export class DiscordTelephonyAdapter extends EventEmitter implements TelephonyAd
       throw new Error('Already in a call');
     }
 
-    const userId = target_user_id || DEFAULT_USER_ID;
-    if (!userId) {
-      throw new Error('[discord-tel] No target_user_id and DISCORD_USER_ID not set');
+    // Discord user_id 는 snowflake (17~20자리 숫자). stub 의 SEMO_USER_ID 는
+    // 별명("reus")일 수 있으므로 snowflake 가 아니면 .env DISCORD_USER_ID 로 fallback.
+    const isSnowflake = (s: string | undefined): s is string => !!s && /^\d{17,20}$/.test(s);
+    const userId = isSnowflake(target_user_id) ? target_user_id : DEFAULT_USER_ID;
+    if (!isSnowflake(userId)) {
+      throw new Error(
+        `[discord-tel] Invalid user_id (need snowflake). got target="${target_user_id}", DISCORD_USER_ID="${DEFAULT_USER_ID}"`,
+      );
     }
 
     // 1) /voice/dial — router가 voice channel join + DM 송신
