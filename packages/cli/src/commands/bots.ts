@@ -38,7 +38,7 @@ import {
   WorkspaceStandardRow,
 } from './audit';
 import { getCronJobStats } from './context';
-import { resolveBotWorkspace } from '../paths';
+import { resolveBotWorkspace, SEMO_WORKSPACES } from '../paths';
 import { registerBotsFactoryCommands } from './bots-factory';
 
 // ============================================================
@@ -133,21 +133,28 @@ interface ScannedBot {
   workspacePath: string;
 }
 
-const KNOWN_BOTS = [
-  'semiclaw',
-  'workclaw',
-  'reviewclaw',
-  'planclaw',
-  'designclaw',
-  'infraclaw',
-  'growthclaw',
-  'incubator',
-];
+/**
+ * SEMO_WORKSPACES (~/.semo/workspaces/) 디렉토리를 enumerate 해서 봇 ID 목록 반환.
+ * 봇 이름 하드코딩 금지 (NON-NEGOTIABLE) — FS 가 운영 SoT, KB ontology 와 정합.
+ * 새 봇 추가는 디렉토리 생성으로 자동 감지.
+ */
+function discoverBotIds(): string[] {
+  if (!fs.existsSync(SEMO_WORKSPACES)) return [];
+  try {
+    return fs
+      .readdirSync(SEMO_WORKSPACES, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && !e.name.startsWith('.') && !e.name.startsWith('_'))
+      .map((e) => e.name)
+      .sort();
+  } catch {
+    return [];
+  }
+}
 
 function scanBotWorkspaces(_semoSystemDir?: string): ScannedBot[] {
   const bots: ScannedBot[] = [];
 
-  for (const botId of KNOWN_BOTS) {
+  for (const botId of discoverBotIds()) {
     const botDir = resolveBotWorkspace(botId);
     if (!fs.existsSync(botDir)) continue;
 
@@ -727,7 +734,7 @@ export function registerBotsCommands(program: Command): void {
           }
         }
       } else {
-        for (const botId of KNOWN_BOTS) {
+        for (const botId of discoverBotIds()) {
           const botDir = resolveBotWorkspace(botId);
           if (fs.existsSync(botDir)) {
             botEntries.push({ botId, botDir });
