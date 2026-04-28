@@ -55,6 +55,15 @@ interface BotStatus {
   session_count: number;
   workspace_path: string | null;
   synced_at: string | null;
+  /** bot_commitments.updated_at MAX — 실제 활동 SoT (table 의 last_active 는 SOUL.md mtime). */
+  last_commit_at?: string | null;
+  /** 24h 내 commitment 개수. */
+  commit_count_24h?: number;
+  /**
+   * derived 표시 상태 (table 의 status 컬럼 무시):
+   *   active(<=1h) | recent(<=24h) | idle(>24h) | none
+   */
+  derived_status?: 'active' | 'recent' | 'idle' | 'none';
 }
 
 interface BotSession {
@@ -371,17 +380,42 @@ export function registerBotsCommands(program: Command): void {
         const pool = getPool();
         const client = await pool.connect();
 
+        // bot_commitments LEFT JOIN — 실제 활동 SoT.
+        // table.status / table.last_active 는 SOUL.md mtime 기반이라 stale.
+        // derived_status 는 commit_at 기준: <=1h active, <=24h recent, else idle.
         let query = `
-          SELECT bot_id, name, emoji, role, status,
-                 last_active::text, session_count, synced_at::text
-          FROM semo.bot_status
+          SELECT
+            bs.bot_id, bs.name, bs.emoji, bs.role, bs.status,
+            bs.last_active::text, bs.session_count, bs.workspace_path, bs.synced_at::text,
+            agg.last_commit_at::text AS last_commit_at,
+            COALESCE(agg.commit_count_24h, 0)::int AS commit_count_24h,
+            CASE
+              WHEN agg.last_commit_at > NOW() - INTERVAL '1 hour'  THEN 'active'
+              WHEN agg.last_commit_at > NOW() - INTERVAL '24 hours' THEN 'recent'
+              WHEN agg.last_commit_at IS NULL                      THEN 'none'
+              ELSE 'idle'
+            END AS derived_status
+          FROM semo.bot_status bs
+          LEFT JOIN (
+            SELECT bot_id,
+                   MAX(updated_at) AS last_commit_at,
+                   COUNT(*) FILTER (WHERE updated_at > NOW() - INTERVAL '24 hours') AS commit_count_24h
+            FROM semo.bot_commitments
+            GROUP BY bot_id
+          ) agg ON agg.bot_id = bs.bot_id
         `;
         const params: string[] = [];
         if (options.status) {
-          query += ' WHERE status = $1';
+          // active|recent|idle|none 필터로 해석.
+          query += ` WHERE CASE
+              WHEN agg.last_commit_at > NOW() - INTERVAL '1 hour'  THEN 'active'
+              WHEN agg.last_commit_at > NOW() - INTERVAL '24 hours' THEN 'recent'
+              WHEN agg.last_commit_at IS NULL                      THEN 'none'
+              ELSE 'idle'
+            END = $1`;
           params.push(options.status);
         }
-        query += ' ORDER BY bot_id';
+        query += ' ORDER BY agg.last_commit_at DESC NULLS LAST, bs.bot_id';
 
         const result = await client.query(query, params);
         client.release();
@@ -392,32 +426,42 @@ export function registerBotsCommands(program: Command): void {
         if (options.format === 'json') {
           console.log(JSON.stringify(bots, null, 2));
         } else {
-          console.log(chalk.cyan.bold('\n🤖 봇 상태\n'));
+          console.log(chalk.cyan.bold('\n🤖 봇 상태 (commitments 기반 derived)\n'));
 
           if (bots.length === 0) {
             console.log(chalk.yellow('  봇 상태 데이터가 없습니다.'));
             console.log(chalk.gray("  'semo bots sync'로 초기 데이터를 적재하세요."));
           } else {
             console.log(
-              chalk.gray('  봇              이름                    상태       마지막 활동'),
+              chalk.gray('  봇              이름                    상태         24h  마지막 활동'),
             );
-            console.log(chalk.gray('  ' + '─'.repeat(75)));
+            console.log(chalk.gray('  ' + '─'.repeat(80)));
             for (const b of bots) {
               const statusIcon =
-                b.status === 'online' ? chalk.green('● online ') : chalk.red('○ offline');
-              const lastActive = b.last_active
-                ? new Date(b.last_active).toLocaleString('ko-KR')
+                b.derived_status === 'active'
+                  ? chalk.green('🟢 active ')
+                  : b.derived_status === 'recent'
+                    ? chalk.yellow('🟡 recent ')
+                    : b.derived_status === 'idle'
+                      ? chalk.gray('⚫ idle   ')
+                      : chalk.gray('⚪ none   ');
+              const lastActive = b.last_commit_at
+                ? new Date(b.last_commit_at).toLocaleString('ko-KR')
                 : '-';
               const displayName = `${b.emoji || ''} ${b.name || b.bot_id}`.trim();
+              const cnt24 = String(b.commit_count_24h ?? 0).padStart(3);
               console.log(
-                `  ${b.bot_id.padEnd(16)}${displayName.padEnd(24)}${String(statusIcon).padEnd(12)}${lastActive}`,
+                `  ${b.bot_id.padEnd(16)}${displayName.padEnd(24)}${String(statusIcon).padEnd(12)}${cnt24}  ${lastActive}`,
               );
             }
           }
 
           console.log();
-          const online = bots.filter((b) => b.status === 'online').length;
-          console.log(chalk.gray(`  총 ${bots.length}개 봇 (온라인: ${online}개)\n`));
+          const active = bots.filter((b) => b.derived_status === 'active').length;
+          const recent = bots.filter((b) => b.derived_status === 'recent').length;
+          console.log(
+            chalk.gray(`  총 ${bots.length}개 봇 (active: ${active}, recent24h: ${recent})\n`),
+          );
         }
       } catch (err) {
         spinner.fail(`조회 실패: ${err}`);
