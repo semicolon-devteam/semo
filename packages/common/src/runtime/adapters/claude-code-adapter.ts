@@ -1,20 +1,18 @@
 /**
  * ClaudeCodeAdapter — Claude Code CLI (cmux + Slack 라우터) 호스트 어댑터.
  *
- * P5-1 단계: HostAdapter 인터페이스 뒤로 기존 동작을 보수적으로 wrap. 회귀 0 보장 —
- * 이 단계에서는 실제 lifecycle 을 변경하지 않고 capability 와 probe 만 노출한다.
- *
- * SEMO 가 Claude Code 안에서 동작할 때의 실 lifecycle:
- *   - 세션 추적: SessionStart/End 훅 → `semo session-register`/`session-terminate`
- *   - Slack 수신: slack-router → bot_commitments INSERT → Task 도구로 봇 subagent spawn
- *   - 로컬: PreToolUse(Task) 훅 → `semo agent-claim` → SubagentStop → `semo agent-flush`
- *   - Cron: `semo cron tick` 폴러 → SKIP LOCKED claim → Task fan-out → `semo cron mark-run`
- *
- * 위 흐름은 P5-1 에서 변경하지 않는다. P5-2 (ProjectionEmitter), P5-3 (ToolGateway) 에서
- * 단계적으로 인터페이스 뒤로 이관한다.
+ * P5-1: capability/probe + 외부 lifecycle wrap (회귀 0).
+ * P6-1: dispatch() 실 wiring — `claude -p <prompt>` 1-shot 호출 + JSON 파싱.
+ *   - 기본 hookless: --setting-sources 미적용 + --settings '{"hooks":{}}' 오버레이
+ *     → 호출 cwd 의 project hooks (SEMO Stop guards 등) 와 사용자 hooks 가 전부 OFF.
+ *   - SEMO_DISPATCH_HOOKS=1 env 면 user 만 로드 (project 는 여전히 제외).
+ *   - --no-session-persistence 기본 — 호출처가 session 를 명시 관리하지 않는 한 transcript 잔존 X.
+ *   - dispatch 1회 = 새 sessionId (UUID). 호출처가 session.hostSessionId 에 UUID 를 직접 넣어
+ *     보내면 그 ID 로 --session-id 지정 (resume 은 P6-1.x 에서 추가).
  */
 
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { promisify } from 'node:util';
 import type {
   HostAdapter,
@@ -26,6 +24,25 @@ import type {
 } from '../host-adapter.js';
 
 const execFileP = promisify(execFile);
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** claude --output-format json 응답의 우리가 의존하는 필드만 typed. */
+interface ClaudeJsonResult {
+  type?: string;
+  subtype?: string;
+  is_error?: boolean;
+  api_error_status?: string | null;
+  duration_ms?: number;
+  num_turns?: number;
+  result?: string;
+  stop_reason?: string;
+  session_id?: string;
+  total_cost_usd?: number;
+  terminal_reason?: 'completed' | 'cancelled' | 'timeout' | 'error' | string;
+  permission_denials?: unknown[];
+  uuid?: string;
+}
 
 const CLAUDE_CODE_CAPABILITY: HostCapability = {
   // Claude Code 는 default deny → ask → approve 패턴. dangerous 자동 모드 없음.
@@ -42,6 +59,21 @@ const CLAUDE_CODE_CAPABILITY: HostCapability = {
 export interface ClaudeCodeAdapterOptions {
   /** `claude` 바이너리 경로. 기본 PATH 에서 탐색. */
   binaryPath?: string;
+  /**
+   * dispatch 시 사용할 모델. 미지정 시 claude CLI 기본 (사용자 config).
+   * 예: 'sonnet', 'opus', 'haiku', 또는 full id.
+   */
+  defaultModel?: string;
+  /**
+   * dispatch 기본 timeout (ms). input.timeoutMs 가 우선.
+   * 0 또는 음수면 timeout 없음.
+   */
+  defaultTimeoutMs?: number;
+  /**
+   * true 면 user-level settings 를 로드 (project hooks 는 여전히 제외).
+   * 기본 false — env SEMO_DISPATCH_HOOKS=1 로도 활성화.
+   */
+  loadUserHooks?: boolean;
 }
 
 /**
@@ -53,9 +85,15 @@ export class ClaudeCodeAdapter implements HostAdapter {
   readonly capability: HostCapability = CLAUDE_CODE_CAPABILITY;
 
   private readonly binaryPath: string;
+  private readonly defaultModel?: string;
+  private readonly defaultTimeoutMs: number;
+  private readonly loadUserHooks: boolean;
 
   constructor(options: ClaudeCodeAdapterOptions = {}) {
     this.binaryPath = options.binaryPath ?? 'claude';
+    this.defaultModel = options.defaultModel;
+    this.defaultTimeoutMs = options.defaultTimeoutMs ?? 120_000;
+    this.loadUserHooks = options.loadUserHooks ?? process.env.SEMO_DISPATCH_HOOKS === '1';
   }
 
   /**
@@ -94,10 +132,183 @@ export class ClaudeCodeAdapter implements HostAdapter {
   }
 
   /**
-   * P6-0 stub. 실 wiring 은 P6-1 에서 `claude -p <prompt>` 1-shot 호출.
-   * 현재 호출 시 의도적 unimplemented 예외 — RuntimeHarness 가 fallback 처리.
+   * P6-1: `claude -p <prompt>` 1-shot 호출.
+   *
+   * 호출 형태:
+   *   claude -p --output-format json --no-session-persistence
+   *     --session-id <uuid>
+   *     [--add-dir <cwd>]
+   *     [--model <model>]
+   *     [--settings '{"hooks":{}}']
+   *     [--setting-sources user]
+   *     [--max-turns 1]   # not exposed yet
+   *     <prompt>
+   *
+   * 응답 JSON 의 result/session_id/terminal_reason/permission_denials 를 HostDispatchResult 로 매핑.
    */
-  async dispatch(_input: HostDispatchInput): Promise<HostDispatchResult> {
-    throw new Error('ClaudeCodeAdapter.dispatch not wired (P6-1 예정)');
+  async dispatch(input: HostDispatchInput): Promise<HostDispatchResult> {
+    const sessionId = pickSessionId(input.session.hostSessionId);
+    const args = this.buildDispatchArgs(input, sessionId);
+
+    const timeoutMs =
+      input.timeoutMs && input.timeoutMs > 0 ? input.timeoutMs : this.defaultTimeoutMs;
+
+    const exec = await runClaudeOneShot(this.binaryPath, args, input.prompt, timeoutMs, input.cwd);
+
+    const parsed = safeParseClaudeJson(exec.stdout);
+    const text = parsed?.result ?? exec.stdout.trim();
+    const endReason = mapEndReason(parsed, exec);
+
+    const session: HostSessionRef = {
+      hostSessionId: parsed?.session_id ?? sessionId,
+    };
+
+    const hostMeta: Record<string, unknown> = {
+      stop_reason: parsed?.stop_reason,
+      duration_ms: parsed?.duration_ms,
+      total_cost_usd: parsed?.total_cost_usd,
+      api_error_status: parsed?.api_error_status ?? undefined,
+      permission_denials: parsed?.permission_denials,
+      exit_code: exec.exitCode,
+      signal: exec.signal,
+      stderr_tail: exec.stderr ? exec.stderr.slice(-500) : undefined,
+    };
+
+    return {
+      text,
+      session,
+      toolCallCount: parsed?.num_turns,
+      endReason,
+      hostMeta,
+    };
   }
+
+  private buildDispatchArgs(input: HostDispatchInput, sessionId: string): string[] {
+    const args: string[] = ['-p', '--output-format', 'json', '--no-session-persistence'];
+
+    if (UUID_RE.test(sessionId)) {
+      args.push('--session-id', sessionId);
+    }
+
+    if (input.cwd) {
+      args.push('--add-dir', input.cwd);
+    }
+
+    if (this.defaultModel) {
+      args.push('--model', this.defaultModel);
+    }
+
+    // 기본 hookless. user-level settings 를 명시적으로 켤 때만 --setting-sources user.
+    if (this.loadUserHooks) {
+      args.push('--setting-sources', 'user');
+    } else {
+      // 어떤 source 도 안 읽음 — 빈 문자열 전달.
+      args.push('--setting-sources', '');
+    }
+
+    // hooks 비활성화 overlay (user 가 켜졌어도 hooks 만 OFF).
+    if (!this.loadUserHooks) {
+      args.push('--settings', JSON.stringify({ hooks: {} }));
+    }
+
+    return args;
+  }
+}
+
+function pickSessionId(rawHostSessionId: string): string {
+  // hostSessionId 가 raw UUID 면 그대로, 아니면 새 UUID 생성.
+  if (UUID_RE.test(rawHostSessionId)) return rawHostSessionId;
+  return randomUUID();
+}
+
+function safeParseClaudeJson(stdout: string): ClaudeJsonResult | null {
+  const trimmed = stdout.trim();
+  if (!trimmed) return null;
+  try {
+    return JSON.parse(trimmed) as ClaudeJsonResult;
+  } catch {
+    return null;
+  }
+}
+
+function mapEndReason(
+  parsed: ClaudeJsonResult | null,
+  exec: { exitCode: number | null; signal: NodeJS.Signals | null; timedOut: boolean },
+): HostDispatchResult['endReason'] {
+  if (exec.timedOut) return 'timeout';
+  // is_error 가 우선 — claude CLI 가 'Not logged in' 류 실패 시 terminal_reason='completed'
+  // + is_error=true 로 보냄.
+  if (parsed?.is_error) return 'error';
+  if (parsed?.terminal_reason === 'completed') return 'completed';
+  if (parsed?.terminal_reason === 'cancelled') return 'cancelled';
+  if (parsed?.terminal_reason === 'timeout') return 'timeout';
+  if (exec.exitCode === 0 && parsed) return 'completed';
+  return 'error';
+}
+
+interface OneShotResult {
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+}
+
+function runClaudeOneShot(
+  binaryPath: string,
+  args: string[],
+  prompt: string,
+  timeoutMs: number,
+  cwd: string | undefined,
+): Promise<OneShotResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(binaryPath, args, {
+      cwd,
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: process.env,
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+
+    child.stdout?.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf8');
+    });
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+    });
+
+    const timer =
+      timeoutMs > 0
+        ? setTimeout(() => {
+            timedOut = true;
+            child.kill('SIGTERM');
+            // 강제 정리 보장 — 5s 후에도 살아있으면 SIGKILL.
+            setTimeout(() => {
+              if (!child.killed) child.kill('SIGKILL');
+            }, 5_000).unref();
+          }, timeoutMs)
+        : null;
+
+    child.on('error', (err) => {
+      if (timer) clearTimeout(timer);
+      reject(err);
+    });
+
+    child.on('close', (code, signal) => {
+      if (timer) clearTimeout(timer);
+      resolve({
+        exitCode: code,
+        signal,
+        stdout,
+        stderr,
+        timedOut,
+      });
+    });
+
+    // prompt 를 stdin 으로 — 인자로 넘기면 ARG_MAX 위험.
+    child.stdin?.write(prompt);
+    child.stdin?.end();
+  });
 }
