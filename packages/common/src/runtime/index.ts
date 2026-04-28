@@ -34,6 +34,7 @@ export type {
   ProjectionPayload,
   ProjectionResult,
   ProjectionEmitter,
+  ProjectionFailureKind,
 } from './projection-emitter.js';
 
 export type {

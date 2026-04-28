@@ -33,12 +33,30 @@ export interface ProjectionPayload {
   structured?: Record<string, unknown>;
 }
 
+/**
+ * 채널/네트워크 실패 분류 (Codex P6-2/3/4 review (e) 권고).
+ *
+ *  - transient: slack 429/5xx, discord 5xx, network ETIMEDOUT — outbox retry queue 로 재시도
+ *  - permanent: slack invalid_channel/auth/400, discord 403, schema 위반 — 즉시 폐기 + 알림
+ *  - unknown:   미분류 — 보수적으로 transient 와 동일 정책 적용 권장
+ */
+export type ProjectionFailureKind = 'transient' | 'permanent' | 'unknown';
+
 export interface ProjectionResult {
   channel: ProjectionChannel;
   ok: boolean;
   /** 채널별 응답 식별자 (slack ts, discord message id, ...). */
   channelMessageId?: string;
+  /** 사람-읽기용 에러 메시지. */
   error?: string;
+  /** 채널 SDK 가 돌려준 raw 에러 코드 (slack 'rate_limited', http '429' 등). */
+  errorCode?: string;
+  /** 실패 분류 — outbox retry queue 가 retryable 만 재시도. */
+  failureKind?: ProjectionFailureKind;
+  /** retry queue 가 이 결과를 그대로 재시도 가능한가 (failureKind==='transient' 의 편의 alias). */
+  retryable?: boolean;
+  /** 누적 시도 횟수 (1=첫 시도). retry queue 가 증분. */
+  attempts?: number;
 }
 
 export interface ProjectionEmitter {

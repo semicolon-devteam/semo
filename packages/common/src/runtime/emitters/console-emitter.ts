@@ -34,6 +34,10 @@ export class ConsoleProjectionEmitter implements ProjectionEmitter {
         channel: target.channel,
         ok: false,
         error: `ConsoleProjectionEmitter 는 channel='console' 만 지원 (got '${target.channel}')`,
+        errorCode: 'unsupported_channel',
+        failureKind: 'permanent',
+        retryable: false,
+        attempts: 1,
       };
     }
     const line = `${this.prefix} → ${target.destination}: ${payload.text}`;
@@ -43,6 +47,7 @@ export class ConsoleProjectionEmitter implements ProjectionEmitter {
       channel: 'console',
       ok: true,
       channelMessageId: `console:${Date.now()}`,
+      attempts: 1,
     };
   }
 

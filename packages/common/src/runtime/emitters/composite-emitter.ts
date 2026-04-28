@@ -32,15 +32,24 @@ export class CompositeProjectionEmitter implements ProjectionEmitter {
         channel: target.channel,
         ok: false,
         error: `채널 '${target.channel}' 에 등록된 emitter 가 없습니다.`,
+        errorCode: 'no_delegate',
+        failureKind: 'permanent',
+        retryable: false,
+        attempts: 1,
       };
     }
     try {
       return await delegate.emit(target, payload);
     } catch (err) {
+      // delegate 가 ProjectionResult 대신 throw — 보수적으로 unknown 처리.
       return {
         channel: target.channel,
         ok: false,
         error: (err as Error).message,
+        errorCode: 'delegate_threw',
+        failureKind: 'unknown',
+        retryable: true,
+        attempts: 1,
       };
     }
   }

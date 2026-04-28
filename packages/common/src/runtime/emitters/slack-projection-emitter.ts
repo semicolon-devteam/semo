@@ -9,6 +9,7 @@ import type { WebClient } from '@slack/web-api';
 import { convertMarkdownToBlocks } from '../../slack/markdown-to-slack.js';
 import type {
   ProjectionEmitter,
+  ProjectionFailureKind,
   ProjectionPayload,
   ProjectionResult,
   ProjectionTarget,
@@ -39,6 +40,10 @@ export class SlackProjectionEmitter implements ProjectionEmitter {
         channel: target.channel,
         ok: false,
         error: `SlackProjectionEmitter 는 channel='slack-block' 만 지원 (got '${target.channel}')`,
+        errorCode: 'unsupported_channel',
+        failureKind: 'permanent',
+        retryable: false,
+        attempts: 1,
       };
     }
     const opts = (target.options ?? {}) as SlackEmitOptions;
@@ -63,12 +68,18 @@ export class SlackProjectionEmitter implements ProjectionEmitter {
         channel: 'slack-block',
         ok: true,
         channelMessageId: lastTs,
+        attempts: 1,
       };
     } catch (err) {
+      const { code, kind } = classifySlackError(err);
       return {
         channel: 'slack-block',
         ok: false,
         error: (err as Error).message,
+        errorCode: code,
+        failureKind: kind,
+        retryable: kind === 'transient',
+        attempts: 1,
       };
     }
   }
@@ -79,4 +90,54 @@ export class SlackProjectionEmitter implements ProjectionEmitter {
   ): Promise<ProjectionResult[]> {
     return Promise.all(targets.map((t) => this.emit(t, payload)));
   }
+}
+
+/**
+ * Slack WebAPI 에러 분류 (Codex P6-2/3/4 review (e) 권고).
+ *
+ * Slack SDK 에러 객체의 `data.error` 또는 `code` 필드를 검사.
+ * 기본 매핑:
+ *   - 5xx / rate_limited / 429 / network ETIMEDOUT      → transient
+ *   - invalid_auth / not_authed / channel_not_found
+ *     not_in_channel / 4xx (except 429)                  → permanent
+ *   - 미분류                                              → unknown
+ */
+function classifySlackError(err: unknown): {
+  code: string;
+  kind: ProjectionFailureKind;
+} {
+  const e = err as { data?: { error?: string }; code?: string; message?: string; status?: number };
+  const slackErr = e?.data?.error ?? e?.code ?? '';
+  const status = e?.status;
+
+  const PERMANENT = new Set([
+    'invalid_auth',
+    'not_authed',
+    'token_revoked',
+    'channel_not_found',
+    'not_in_channel',
+    'is_archived',
+    'msg_too_long',
+    'invalid_blocks',
+    'invalid_arguments',
+    'no_text',
+  ]);
+  const TRANSIENT = new Set([
+    'rate_limited',
+    'service_unavailable',
+    'fatal_error',
+    'request_timeout',
+    'internal_error',
+  ]);
+
+  if (PERMANENT.has(slackErr)) return { code: slackErr, kind: 'permanent' };
+  if (TRANSIENT.has(slackErr)) return { code: slackErr, kind: 'transient' };
+  if (typeof status === 'number') {
+    if (status === 429 || status >= 500) return { code: String(status), kind: 'transient' };
+    if (status >= 400 && status < 500) return { code: String(status), kind: 'permanent' };
+  }
+  if (e?.code === 'ETIMEDOUT' || e?.code === 'ECONNRESET' || e?.code === 'ENOTFOUND') {
+    return { code: e.code, kind: 'transient' };
+  }
+  return { code: slackErr || 'unknown', kind: 'unknown' };
 }
