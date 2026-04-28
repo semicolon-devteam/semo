@@ -100,6 +100,42 @@ function defaultContextRouterConfPath(): string {
   const semoHome = process.env.SEMO_HOME || path.join(os.homedir(), '.semo');
   return path.join(semoHome, 'shared', 'hooks', 'context-router.conf');
 }
+
+// skill-mirror — bot mirror SKILL.md 경로
+const SKILL_MIRROR_PATH_RE = /\/\.claude\/semo\/bots\/[^/]+\/skills\/([^/]+)\/SKILL\.md$/;
+
+// destructive-guard — Bash 도구의 파괴적 패턴
+const DESTRUCTIVE_PATTERNS: Array<[RegExp, string]> = [
+  [/rm\s+(-[a-zA-Z]*[rf][a-zA-Z]*\s+)*\/(?!tmp)/i, 'rm -rf on root or system paths'],
+  [/rm\s+(-[a-zA-Z]*[rf][a-zA-Z]*\s+)*~/i, 'rm -rf on home directory'],
+  [/git\s+reset\s+--hard/i, 'git reset --hard'],
+  [/git\s+push\s+(--force|-f)\b/i, 'git push --force'],
+  [/git\s+clean\s+-[a-zA-Z]*[fd]/i, 'git clean with force/directory flags'],
+  [/DROP\s+TABLE/i, 'SQL DROP TABLE'],
+  [/DROP\s+SCHEMA/i, 'SQL DROP SCHEMA'],
+  [/TRUNCATE\s+TABLE/i, 'SQL TRUNCATE TABLE'],
+  [/DELETE\s+FROM\s+\w+\s*;/i, 'SQL DELETE FROM without WHERE clause'],
+  [/chmod\s+(-R\s+)?777/i, 'chmod 777'],
+  [/mkfs\./i, 'filesystem format command'],
+  [/dd\s+.*of=\/dev\//i, 'dd write to block device'],
+];
+
+// commitment-guard — Korean 미래 약속 패턴
+const COMMITMENT_RE =
+  /(?:처리|검토|진행|구현|수정|배포|확인|보고|등록|완료|작성|분석|조사)하겠|할게요|할 예정|약속하겠|약속합니다|드리겠습니다|해드리겠/;
+const COMMITMENT_EXCLUDE_RE = /했습니다|였습니다|었습니다|알겠습니다|네.*겠습니다/;
+const COMMITMENT_STRONG_RE = /처리하겠|진행하겠|구현하겠|배포하겠/;
+const COMMITMENT_REGISTERED_RE = /cmt-[a-zA-Z0-9]+|commitment.*등록|약속.*등록/;
+
+function extractBotIdFromCwd(cwd: string): string {
+  let m = cwd.match(/openclaw-([a-z]+)\/workspace/);
+  if (m) return m[1];
+  m = cwd.match(/semo-(?:bot-)?sessions\/([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  m = cwd.match(/\.semo\/sessions\/([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  return '';
+}
 const CONTEXT_HINTS: Record<string, string> = {
   KB: '[KB-FIRST] 이 질문은 KB 조회가 필요합니다. semo kb search 또는 semo kb get으로 먼저 확인하세요.',
   LOCAL: '[LOCAL-CONFIG] 로컬 설정/워크스페이스 관련 질문입니다.',
@@ -429,6 +465,116 @@ const DECISION_REMINDER_GUARD: HookGuard = {
   },
 };
 
+const SKILL_MIRROR_GUARD: HookGuard = {
+  name: 'skill-mirror',
+  triggers: ['PreToolUse'],
+  botSessionOnly: false,
+  description: 'bot mirror SKILL.md 직접 수정 시 WARN (semo skill edit 안내)',
+  async evaluate(payload: HookPayload | null): Promise<HookResult> {
+    if (!payload) return PASS;
+    const toolName = (payload.tool_name as string | undefined) ?? '';
+    if (toolName !== 'Edit' && toolName !== 'Write') return PASS;
+    const filePath =
+      ((payload.tool_input as Record<string, unknown> | undefined)?.file_path as
+        | string
+        | undefined) ?? '';
+    const m = filePath.match(SKILL_MIRROR_PATH_RE);
+    if (!m) return PASS;
+    return {
+      exitCode: 0,
+      level: 'warn',
+      message: `⚠️ 이 경로는 DB sync에 의해 덮어써집니다.\n→ \`semo skill edit ${m[1]}\` 명령을 사용하세요.`,
+    };
+  },
+};
+
+const DESTRUCTIVE_GUARD: HookGuard = {
+  name: 'destructive',
+  triggers: ['PreToolUse'],
+  botSessionOnly: true,
+  description: 'Bash 도구의 파괴적 명령 차단 (deny JSON)',
+  async evaluate(payload: HookPayload | null): Promise<HookResult> {
+    if (!payload) return PASS;
+    const cwd = payload.cwd ?? '';
+    if (!BOT_CWD_RE.test(cwd)) return PASS;
+    const toolName = (payload.tool_name as string | undefined) ?? '';
+    if (toolName !== 'Bash') return PASS;
+    const command =
+      ((payload.tool_input as Record<string, unknown> | undefined)?.command as
+        | string
+        | undefined) ?? '';
+    if (!command) return PASS;
+    const found: string[] = [];
+    for (const [re, desc] of DESTRUCTIVE_PATTERNS) {
+      if (re.test(command)) found.push(desc);
+    }
+    if (found.length === 0) return PASS;
+    const reason = `[DESTRUCTIVE GUARD] 차단: ${found.join(', ')}. 이 명령은 봇 세션에서 실행할 수 없습니다. 안전한 대안을 사용하세요.`;
+    return {
+      exitCode: 0,
+      level: 'block',
+      message: JSON.stringify({ decision: 'deny', reason }, undefined, 0),
+    };
+  },
+};
+
+function makeCommitmentGuard(commitmentsCheck: (botId: string) => Promise<boolean>): HookGuard {
+  return {
+    name: 'commitment',
+    triggers: ['Stop'],
+    botSessionOnly: true,
+    description: 'Korean 미래 약속 패턴 감지 + commitments 미등록 시 BLOCK exit 1',
+    async evaluate(payload: HookPayload | null): Promise<HookResult> {
+      if (!payload) return PASS;
+      const cwd = payload.cwd ?? '';
+      const response = normalizeAssistantMessage(payload.last_assistant_message);
+      if (!response || !BOT_CWD_RE.test(cwd)) return PASS;
+      const botId = extractBotIdFromCwd(cwd);
+      if (!botId) return PASS;
+      let cleaned = response.replace(CODE_BLOCK_RE, '');
+      cleaned = cleaned.replace(INLINE_CODE_RE, '');
+      if (!COMMITMENT_RE.test(cleaned)) return PASS;
+      // 단순 인사 (했습니다/알겠습니다) + strong 패턴 미존재 시 통과
+      if (COMMITMENT_EXCLUDE_RE.test(cleaned) && !COMMITMENT_STRONG_RE.test(cleaned)) return PASS;
+      // 응답에 commitment 등록 흔적 있으면 통과
+      if (COMMITMENT_REGISTERED_RE.test(cleaned)) return PASS;
+      // 활성 commitments 있으면 통과 (CLI 호출)
+      try {
+        const hasActive = await commitmentsCheck(botId);
+        if (hasActive) return PASS;
+      } catch {
+        // CLI 실패 시 차단하지 않음 (sh 동일)
+        return PASS;
+      }
+      const m = cleaned.match(COMMITMENT_RE);
+      const phrase = m ? m[0] : '약속 패턴';
+      return {
+        exitCode: 1,
+        level: 'block',
+        message: `[COMMITMENT-GUARD] 미래 약속 패턴 감지 ("${phrase}"). semo commitments create로 먼저 약속을 등록하세요.`,
+      };
+    },
+  };
+}
+
+/**
+ * 실 commitments 확인 — `semo commitments list --bot-id <id> --status active` 호출 후
+ * stdout 에 'active' 또는 'in_progress' 포함 시 true.
+ */
+async function checkActiveCommitments(botId: string): Promise<boolean> {
+  const { execFileSync } = await import('node:child_process');
+  try {
+    const out = execFileSync(
+      'semo',
+      ['commitments', 'list', '--bot-id', botId, '--status', 'active'],
+      { timeout: 5000, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
+    ).toLowerCase();
+    return out.includes('active') || out.includes('in_progress');
+  } catch {
+    throw new Error('commitments cli failure');
+  }
+}
+
 function makeContextRouterGuard(confPath: string): HookGuard {
   return {
     name: 'context-router',
@@ -480,6 +626,9 @@ function buildGateway(limit: number): InMemoryHookGateway {
   gateway.register(KB_FIRST_GUARD);
   gateway.register(DECISION_REMINDER_GUARD);
   gateway.register(makeContextRouterGuard(defaultContextRouterConfPath()));
+  gateway.register(SKILL_MIRROR_GUARD);
+  gateway.register(DESTRUCTIVE_GUARD);
+  gateway.register(makeCommitmentGuard(checkActiveCommitments));
   return gateway;
 }
 

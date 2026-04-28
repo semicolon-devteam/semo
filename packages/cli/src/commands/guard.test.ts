@@ -408,6 +408,103 @@ describe('semo guard run context-router', () => {
   });
 });
 
+describe('semo guard run skill-mirror', () => {
+  it('Edit + bot mirror SKILL.md 경로 → WARN', () => {
+    const r = run(
+      ['guard', 'run', 'skill-mirror'],
+      JSON.stringify({
+        tool_name: 'Edit',
+        tool_input: { file_path: '/Users/x/.claude/semo/bots/semiclaw/skills/kb-manager/SKILL.md' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('semo skill edit kb-manager');
+  });
+
+  it('다른 도구 (Bash) → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'skill-mirror'],
+      JSON.stringify({ tool_name: 'Bash', tool_input: { command: 'ls' } }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('mirror 외 경로 → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'skill-mirror'],
+      JSON.stringify({ tool_name: 'Edit', tool_input: { file_path: '/tmp/foo.md' } }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+});
+
+describe('semo guard run destructive', () => {
+  it('빈 입력 → exit 0', () => {
+    const r = run(['guard', 'run', 'destructive'], '');
+    expect(r.code).toBe(0);
+  });
+
+  it('비봇 cwd → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({ cwd: NON_BOT_CWD, tool_name: 'Bash', tool_input: { command: 'rm -rf /' } }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('Bash 외 도구 → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({ cwd: BOT_CWD, tool_name: 'Read', tool_input: {} }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('rm -rf /etc → deny JSON', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        tool_name: 'Bash',
+        tool_input: { command: 'rm -rf /etc' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('"decision":"deny"');
+    expect(r.stdout).toContain('rm -rf');
+  });
+
+  it('git push --force → deny', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        tool_name: 'Bash',
+        tool_input: { command: 'git push --force origin main' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('git push --force');
+  });
+
+  it('일반 명령 (ls) → exit 0', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        tool_name: 'Bash',
+        tool_input: { command: 'ls -la' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+});
+
 describe('semo guard run kb-search-loop', () => {
   it('빈 입력 → exit 0', () => {
     const r = run(['guard', 'run', 'kb-search-loop'], '');
