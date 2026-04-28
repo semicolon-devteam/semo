@@ -18,7 +18,7 @@
  *   4. 파일 변경 trace — Codex 가 작성/수정한 파일 목록을 commitment 메타로 (P5-4c)
  */
 
-import { execFile } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -87,6 +87,17 @@ export interface CodexCliAdapterOptions {
   binaryPath?: string;
   /** rollout 파일 디렉토리. 기본 ~/.codex/sessions */
   rolloutDir?: string;
+  /** dispatch 시 모델 (예: 'o3', 'gpt-5'). 미지정 시 codex CLI 기본. */
+  defaultModel?: string;
+  /** dispatch 기본 sandbox. 기본 'workspace-write'. */
+  defaultSandbox?: SandboxMode;
+  /** dispatch 기본 timeout (ms). input.timeoutMs 우선. */
+  defaultTimeoutMs?: number;
+  /**
+   * true 면 user config (`~/.codex/config.toml`) 와 .rules 파일 모두 무시 (--ignore-user-config + --ignore-rules).
+   * 기본 false. 격리가 필요하면 true.
+   */
+  ignoreUserConfig?: boolean;
 }
 
 export class CodexCliAdapter implements HostAdapter {
@@ -95,10 +106,18 @@ export class CodexCliAdapter implements HostAdapter {
 
   private readonly binaryPath: string;
   private readonly rolloutDir: string;
+  private readonly defaultModel?: string;
+  private readonly defaultSandbox: SandboxMode;
+  private readonly defaultTimeoutMs: number;
+  private readonly ignoreUserConfig: boolean;
 
   constructor(options: CodexCliAdapterOptions = {}) {
     this.binaryPath = options.binaryPath ?? 'codex';
     this.rolloutDir = options.rolloutDir ?? path.join(os.homedir(), '.codex', 'sessions');
+    this.defaultModel = options.defaultModel;
+    this.defaultSandbox = options.defaultSandbox ?? 'workspace-write';
+    this.defaultTimeoutMs = options.defaultTimeoutMs ?? 120_000;
+    this.ignoreUserConfig = options.ignoreUserConfig ?? false;
   }
 
   async probe(): Promise<{ ok: boolean; detail?: string }> {
@@ -214,11 +233,213 @@ export class CodexCliAdapter implements HostAdapter {
   }
 
   /**
-   * P6-0 stub. 실 wiring 은 P6-4 에서 `codex exec --json <prompt>` 호출 + rollout 파싱.
+   * P6-3: `codex exec --json` 1-shot 호출 + JSONL 이벤트 파싱.
+   *
+   * 호출 형태:
+   *   codex exec --json --skip-git-repo-check --ephemeral
+   *     --sandbox <mapped>
+   *     [--cd <input.cwd>]
+   *     [--model <defaultModel>]
+   *     [--ignore-user-config --ignore-rules]    # ignoreUserConfig=true 면
+   *     <prompt>
+   *
+   * stdin 은 /dev/null 로 닫음 (codex 가 TTY stdin 대기하는 케이스 회피).
+   *
+   * JSONL 이벤트:
+   *   {"type":"thread.started","thread_id":"<uuid>"}
+   *   {"type":"turn.started"}
+   *   {"type":"item.completed","item":{"id":"item_0","type":"agent_message","text":"..."}}
+   *   {"type":"turn.completed","usage":{"input_tokens":N,"cached_input_tokens":N,
+   *                                     "output_tokens":N,"reasoning_output_tokens":N}}
+   *   {"type":"turn.failed","error":{...}}            # 실패 시
    */
-  async dispatch(_input: HostDispatchInput): Promise<HostDispatchResult> {
-    throw new Error('CodexCliAdapter.dispatch not wired (P6-4 예정)');
+  async dispatch(input: HostDispatchInput): Promise<HostDispatchResult> {
+    const timeoutMs =
+      input.timeoutMs && input.timeoutMs > 0 ? input.timeoutMs : this.defaultTimeoutMs;
+    const args = this.buildDispatchArgs(input);
+    const exec = await runCodexExec(this.binaryPath, args, input.prompt, timeoutMs, input.cwd);
+
+    const events = parseJsonlEvents(exec.stdout);
+    const finalText = pickAgentMessage(events);
+    const threadId = pickThreadId(events);
+    const usage = pickUsage(events);
+    const turnFailed = events.some((e) => e?.type === 'turn.failed');
+    const turnCompleted = events.some((e) => e?.type === 'turn.completed');
+
+    const session: HostSessionRef = {
+      hostSessionId: threadId ?? input.session.hostSessionId,
+      // ephemeral 호출이라 rollout 미보존 — composeRolloutPath 로 hint 만 둔다.
+      rolloutPath: threadId
+        ? composeRolloutPath(this.rolloutDir, threadId, new Date())
+        : input.session.rolloutPath,
+    };
+
+    const endReason = mapCodexEndReason({
+      turnFailed,
+      turnCompleted,
+      timedOut: exec.timedOut,
+      exitCode: exec.exitCode,
+    });
+
+    const hostMeta: Record<string, unknown> = {
+      thread_id: threadId,
+      usage,
+      event_count: events.length,
+      exit_code: exec.exitCode,
+      signal: exec.signal,
+      stderr_tail: exec.stderr ? exec.stderr.slice(-500) : undefined,
+    };
+
+    return {
+      text: finalText,
+      session,
+      toolCallCount: events.filter((e) => e?.type === 'item.completed').length,
+      endReason,
+      hostMeta,
+    };
   }
+
+  private buildDispatchArgs(input: HostDispatchInput): string[] {
+    const args: string[] = [
+      'exec',
+      '--json',
+      '--skip-git-repo-check',
+      '--ephemeral',
+      '--color',
+      'never',
+      '--sandbox',
+      CODEX_SANDBOX_MAP[this.defaultSandbox] ?? 'workspace-write',
+    ];
+
+    if (input.cwd) {
+      args.push('--cd', input.cwd);
+    }
+
+    if (this.defaultModel) {
+      args.push('--model', this.defaultModel);
+    }
+
+    if (this.ignoreUserConfig) {
+      args.push('--ignore-user-config', '--ignore-rules');
+    }
+
+    // prompt 는 마지막 positional 인자 — 인자로 전달 (codex 의 stdin 모드는 TTY 의존성 있음).
+    args.push(input.prompt);
+
+    return args;
+  }
+}
+
+interface CodexEvent {
+  type?: string;
+  thread_id?: string;
+  item?: { id?: string; type?: string; text?: string };
+  usage?: Record<string, unknown>;
+  error?: unknown;
+}
+
+function parseJsonlEvents(stdout: string): CodexEvent[] {
+  const out: CodexEvent[] = [];
+  for (const line of stdout.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      out.push(JSON.parse(trimmed) as CodexEvent);
+    } catch {
+      // 비-JSON 라인 무시 (codex 가 가끔 진단 라인 섞을 수 있음)
+    }
+  }
+  return out;
+}
+
+function pickAgentMessage(events: CodexEvent[]): string {
+  // 마지막 agent_message 텍스트 — 보통 1개지만 여러 turn 시 마지막 것.
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    if (e?.type === 'item.completed' && e.item?.type === 'agent_message') {
+      return e.item.text ?? '';
+    }
+  }
+  return '';
+}
+
+function pickThreadId(events: CodexEvent[]): string | undefined {
+  const started = events.find((e) => e?.type === 'thread.started');
+  return started?.thread_id;
+}
+
+function pickUsage(events: CodexEvent[]): Record<string, unknown> | undefined {
+  const completed = events.find((e) => e?.type === 'turn.completed');
+  return completed?.usage;
+}
+
+function mapCodexEndReason(input: {
+  turnFailed: boolean;
+  turnCompleted: boolean;
+  timedOut: boolean;
+  exitCode: number | null;
+}): HostDispatchResult['endReason'] {
+  if (input.timedOut) return 'timeout';
+  if (input.turnFailed) return 'error';
+  if (input.turnCompleted) return 'completed';
+  if (input.exitCode === 0) return 'completed';
+  return 'error';
+}
+
+interface OneShotResult {
+  exitCode: number | null;
+  signal: NodeJS.Signals | null;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+}
+
+function runCodexExec(
+  binaryPath: string,
+  args: string[],
+  _prompt: string,
+  timeoutMs: number,
+  cwd: string | undefined,
+): Promise<OneShotResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(binaryPath, args, {
+      cwd,
+      stdio: ['ignore', 'pipe', 'pipe'], // stdin 닫음 — codex TTY 대기 회피.
+      env: process.env,
+    });
+
+    let stdout = '';
+    let stderr = '';
+    let timedOut = false;
+
+    child.stdout?.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString('utf8');
+    });
+    child.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString('utf8');
+    });
+
+    const timer =
+      timeoutMs > 0
+        ? setTimeout(() => {
+            timedOut = true;
+            child.kill('SIGTERM');
+            setTimeout(() => {
+              if (!child.killed) child.kill('SIGKILL');
+            }, 5_000).unref();
+          }, timeoutMs)
+        : null;
+
+    child.on('error', (err) => {
+      if (timer) clearTimeout(timer);
+      reject(err);
+    });
+
+    child.on('close', (code, signal) => {
+      if (timer) clearTimeout(timer);
+      resolve({ exitCode: code, signal, stdout, stderr, timedOut });
+    });
+  });
 }
 
 /**
