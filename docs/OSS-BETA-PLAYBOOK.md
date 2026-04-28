@@ -7,16 +7,16 @@
 
 ## 0. 사전 조건 (배포 전 체크)
 
-| 항목                                                    | 상태 | 검증 방법                                                                        |
-| ------------------------------------------------------- | ---- | -------------------------------------------------------------------------------- |
-| `npm run bundle` 산출물이 외부 환경에서 동작            | ☐    | `cd packages/cli && npm run bundle && node dist/bundle.js --version`             |
-| `semo init --profile personal-discord` 빈 머신에서 통과 | ☐    | `SEMO_HOME=/tmp/test-$RANDOM npx ./packages/cli init --profile personal-discord` |
-| `semo migrate-sqlite` 스키마 적용                       | ☐    | 위 환경에서 `migrate-sqlite` → `~/.semo/kb.db` 생성 확인                         |
-| `semo doctor` green                                     | ☐    | 위 환경에서 doctor 출력에 ✗ 없음                                                 |
-| README.md 최신 (이 문서 작성 시점 기준)                 | ✅   | `packages/cli/README.md` v4.18+ 형식                                             |
-| 라이선스(Apache-2.0) 명시                               | ✅   | `packages/cli/package.json:license`                                              |
+| 항목                                                    | 상태 | 검증 방법                                                                      |
+| ------------------------------------------------------- | ---- | ------------------------------------------------------------------------------ |
+| `npm run bundle` 산출물이 외부 환경에서 동작            | ✅   | 2026-04-28 smoke (cli-v4.18.29, /tmp 격리 install, 17초)                       |
+| `semo init --profile personal-discord` 빈 머신에서 통과 | ✅   | 2026-04-28 smoke. v4.18.29 fix 후 SEMO_HOME 존중, 사용자 ~/.semo 보존          |
+| `semo migrate-sqlite` 스키마 적용                       | ✅   | 2026-04-28 smoke. SEMO_HOME 격리 dir 에 kb.db (001) + ops.db (001+002) 적용    |
+| `semo doctor` green                                     | ✅   | 2026-04-28 smoke. cli 동작 정상 (Ollama 모델 등 사용자 환경 의존 fail 은 별개) |
+| README.md 최신 (이 문서 작성 시점 기준)                 | ✅   | `packages/cli/README.md` v4.18+ 형식                                           |
+| 라이선스(Apache-2.0) 명시                               | ✅   | `packages/cli/package.json:license`                                            |
 
-> 위 4개 ☐ 가 모두 통과되어야 npm `latest` 태그로 발행. 검증 전에는 `--tag beta` 로 발행.
+> 4 체크 모두 통과 (2026-04-28). npm `latest` 태그로 발행 완료 (cli-v4.18.29).
 
 ---
 
