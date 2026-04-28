@@ -61,6 +61,9 @@ export async function updateSession(request: NextRequest) {
     pathname === '/manifest.webmanifest' ||
     // Voice push-trigger — has its own bearer token auth, no browser session
     pathname.startsWith('/api/voice/push-trigger') ||
+    // Voice push notification 탭 시 진입하는 fallback 중계 페이지 — 미로그인 상태에서도
+    // discord deep link 로 redirect 해야 하므로 인증 우회
+    pathname.startsWith('/voice/join') ||
     // 소개사이트(introduction) 자료실: 공개 글 목록/상세/첨부 다운로드
     pathname.startsWith('/api/board/public') ||
     (pathname.startsWith('/api/board/attachments/') &&
