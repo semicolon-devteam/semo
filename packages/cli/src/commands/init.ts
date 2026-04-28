@@ -50,8 +50,21 @@ export interface InitConfigShape {
 
 const DEFAULT_CONFIG_PATH = path.join(os.homedir(), '.semo', 'config.toml');
 
+/**
+ * config.toml 출력 위치 결정 — OSS 격리 install 호환 (Codex 리뷰 2026-04-28).
+ *
+ * 우선순위:
+ *   1. SEMO_CONFIG_PATH (full path) — 명시적 override
+ *   2. SEMO_HOME/config.toml — OSS 사용자 격리 install (e.g., 빈 머신 smoke)
+ *   3. ~/.semo/config.toml — 기본 (사용자 home)
+ *
+ * --path 옵션은 호출 측이 별도 처리.
+ */
 export function defaultConfigPath(): string {
-  return process.env.SEMO_CONFIG_PATH ?? DEFAULT_CONFIG_PATH;
+  if (process.env.SEMO_CONFIG_PATH) return process.env.SEMO_CONFIG_PATH;
+  const semoHome = process.env.SEMO_HOME;
+  if (semoHome) return path.join(semoHome, 'config.toml');
+  return DEFAULT_CONFIG_PATH;
 }
 
 export function buildConfigForProfile(profile: InitProfile): InitConfigShape {

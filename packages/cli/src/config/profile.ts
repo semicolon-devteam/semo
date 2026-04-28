@@ -118,14 +118,26 @@ function resolveSchemaVersion(raw: Record<string, unknown>): {
 }
 
 /**
+ * config.toml 위치 결정 — OSS 격리 install 호환 (Codex 리뷰 2026-04-28).
+ * 우선순위: 명시 인자 > SEMO_CONFIG_PATH > SEMO_HOME/config.toml > ~/.semo/config.toml
+ */
+export function resolveConfigPath(configPath?: string): string {
+  if (configPath) return configPath;
+  if (process.env.SEMO_CONFIG_PATH) return process.env.SEMO_CONFIG_PATH;
+  const semoHome = process.env.SEMO_HOME;
+  if (semoHome) return path.join(semoHome, 'config.toml');
+  return DEFAULT_CONFIG_PATH;
+}
+
+/**
  * ~/.semo/config.toml 로드. 파일이 없으면 profile=team 기본값 반환.
- * SEMO_CONFIG_PATH 환경변수로 경로 오버라이드 가능.
+ * SEMO_HOME / SEMO_CONFIG_PATH 환경변수로 경로 오버라이드 가능.
  *
  * forward-compat: schema_version 이 누락되면 '1.0' 으로 간주하고,
  * 누락된 섹션은 프로파일 프리셋으로 채워 넣는다. 구 config 가 신버전 CLI 에서 깨지지 않도록.
  */
 export function loadProfile(configPath?: string): SemoConfig {
-  const resolvedPath = configPath ?? process.env.SEMO_CONFIG_PATH ?? DEFAULT_CONFIG_PATH;
+  const resolvedPath = resolveConfigPath(configPath);
 
   if (!fs.existsSync(resolvedPath)) {
     return {
