@@ -103,19 +103,30 @@ function parseIdentityMd(content: string): BotIdentity {
   };
 }
 
-function parseSoulIdentity(content: string, botId: string): BotIdentity {
-  // v2.0: SOUL.md ## Identity 섹션에서 이름/역할 추출
-  // 첫 줄 "# {name} — SOUL" 패턴 또는 ## Identity 이후 내용
-  const titleMatch = content.match(/^#\s+(.+?)(?:\s*[—–-]\s*SOUL)?$/m);
+export function parseSoulIdentity(content: string, botId: string): BotIdentity {
+  // v2.0: SOUL.md 첫 줄 "# {name} — SOUL[.md]" 또는 "# {name}" 패턴.
+  // 이전 regex 가 ".md" 뒤를 처리 못해 name 에 " — SOUL.md" 가 흡수되던 버그 수정.
+  const titleMatch = content.match(/^#\s+(.+?)(?:\s*[—–-]\s*SOUL(?:\.md)?)?\s*$/m);
   const name = titleMatch ? titleMatch[1].trim() : botId;
 
   // ## R&R 또는 ## Identity 아래 첫 줄에서 역할 추출
   const rrMatch = content.match(/##\s*R&R\s*\n+(?:>\s*)?(.+)/i);
   const role = rrMatch ? rrMatch[1].trim().substring(0, 100) : null;
 
-  // 이모지: 제목이나 첫 줄에서 추출
-  const emojiMatch = content.match(/([\u{1F300}-\u{1FAD6}\u{2600}-\u{27BF}])/u);
-  const emoji = emojiMatch ? emojiMatch[1] : null;
+  // 이모지 추출 우선순위:
+  //  1) ## Identity 블록 내 ":shortcode:" (Slack 표준 — :brain: :shield: :hatching_chick: 등)
+  //  2) ## Identity 블록 내 unicode emoji
+  //  3) (제거) 본문 전체 검색 — ⚠/❌ 같은 검증 경고 prefix 가 잘못 잡히는 케이스 방지
+  const identitySection = content.match(/##\s*Identity[\s\S]*?(?=\n##\s|$)/i)?.[0] ?? '';
+
+  let emoji: string | null = null;
+  const shortcodeMatch = identitySection.match(/(:[a-z0-9_+-]+:)/i);
+  if (shortcodeMatch) {
+    emoji = shortcodeMatch[1];
+  } else {
+    const unicodeMatch = identitySection.match(/([\u{1F300}-\u{1FAD6}\u{2600}-\u{27BF}])/u);
+    if (unicodeMatch) emoji = unicodeMatch[1];
+  }
 
   return { name, emoji, role };
 }
