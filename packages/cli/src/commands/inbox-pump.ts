@@ -179,8 +179,9 @@ export function registerInboxPumpCommand(parent: Command): void {
         process.on('SIGINT', () => onShutdown('SIGINT'));
         process.on('SIGTERM', () => onShutdown('SIGTERM'));
 
-        const sleep = (ms: number) =>
-          new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
+        // .unref() 사용 X — daemon 모드에서는 setTimeout 이 process keep-alive 역할.
+        // .unref() 시 sleep 동안 다른 keep-alive 가 없으면 process 가 즉시 종료됨 (launchctl 에서 발견).
+        const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
         let totalSent = 0;
         let totalSkipped = 0;
