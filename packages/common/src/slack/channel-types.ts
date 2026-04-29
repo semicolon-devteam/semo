@@ -21,15 +21,11 @@ export interface RouteResult {
   phase: number;
   track: 'plan' | 'infra';
   projectType: string;
-  routeReason:
-    | 'route-tag'
-    | 'thread-sticky'
-    | 'incubator-session'
-    | 'keyword'
-    | 'skill-dispatch'
-    | 'phase-based'
-    | 'domain-matched'
-    | 'fallback';
+  /**
+   * 라우팅 사유. 'kb-intent:...' 형식은 Phase 3b-2 매칭 audit (score/matched/runner 포함).
+   * 정확한 enum 유지 시 새 코드가 추가될 때마다 union 늘어나므로 string 으로 격하.
+   */
+  routeReason: string;
   /** 스킬 힌트 — 라우터가 감지한 스킬을 봇에게 전달 */
   skillHint?: string;
   /** 스프린트 워크플로우 */

@@ -1,7 +1,20 @@
 import { Pool } from 'pg';
 import type { RouteResult, ProjectContext } from '../slack/channel-types.js';
-import { loadRoutingConfig, type RoutingConfig } from './kb-routing.js';
+import { loadRoutingConfig, type RoutingConfig, kbIntentMatch } from './kb-routing.js';
 import { resolveBotId } from './bot-alias.js';
+
+/**
+ * Phase 3b-2: kb-intent 라우팅 confidence threshold.
+ *
+ * Codex 권고:
+ *  - top-1 점수가 임계 이상이면 phase/도메인 라우팅을 이긴다.
+ *  - top-2 가 근접하면 (차이 < margin) → semiclaw fallback (UX 우선).
+ *
+ * 1점 매칭은 약함 — 우연한 단어 충돌 가능. 2점 이상이거나 runnerUp 과 충분히 벌어졌을 때만 채택.
+ */
+const KB_INTENT_MIN_SCORE = 1;
+const KB_INTENT_TOP1_STRONG = 2;
+const KB_INTENT_RUNNER_MARGIN = 1; // top-1 - runnerUp 점수 차가 이 이상이면 명확히 채택
 
 // 채널 → 도메인 매핑 캐시 (ontology 기반, services LEFT JOIN)
 interface DomainContext {
@@ -160,6 +173,33 @@ export class Router {
         workflow: 'sprint',
         workflowPreset: sprintPreset,
       };
+    }
+
+    // 4.5. KB intent 매칭 (Phase 3b-2) — 봇 KB delegation "## 수신 키워드" 와 메시지 매칭.
+    //   Codex 권고: 작업 컨텍스트(phase) vs 요청 의도(kb-intent) 분리. 의도가 강하면 phase 이김.
+    //   top-1 가 강한 신호 (>=2점 OR runnerUp 과 차이>=margin) 일 때만 채택.
+    //   약한 신호 (1점 + runnerUp 동률) → phase 라우팅으로 양보.
+    const intent = kbIntentMatch(text, config.kbIntentRoutes);
+    if (intent && intent.score >= KB_INTENT_MIN_SCORE) {
+      const runnerScore = intent.runnerUp?.score ?? 0;
+      const isStrong =
+        intent.score >= KB_INTENT_TOP1_STRONG ||
+        intent.score - runnerScore >= KB_INTENT_RUNNER_MARGIN;
+      if (isStrong && config.validBotIds.includes(intent.botId)) {
+        return {
+          botId: resolveBotId(config.aliases, intent.botId),
+          serviceId: ctx?.serviceId || '',
+          serviceDomain: ctx?.domain || '',
+          phase: ctx?.currentPhase ?? -1,
+          track: 'plan',
+          projectType: ctx?.entityType || 'agent',
+          routeReason: `kb-intent:score=${intent.score},matched=[${intent.matchedKeywords.slice(0, 3).join(',')}]${intent.runnerUp ? `,runner=${intent.runnerUp.botId}(${intent.runnerUp.score})` : ''}`,
+        };
+      }
+      // 약한 매칭은 audit 만 남기고 phase 로 fall-through.
+      console.log(
+        `[router] kb-intent weak: top=${intent.botId}(${intent.score}), runner=${intent.runnerUp?.botId}(${intent.runnerUp?.score ?? 0}) → phase fallback`,
+      );
     }
 
     // 5. Phase 기반 라우팅 — IT서비스(services 테이블에 phase가 있는 도메인)
