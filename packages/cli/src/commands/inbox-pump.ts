@@ -34,10 +34,14 @@ interface BotState {
   lastSentAt: number;
   /** 마지막으로 본 inbox.jsonl 파일 크기 (변화 감지용). */
   lastInboxSize: number;
+  /** 마지막으로 로그한 상태 (busy/dead) + 시각 — spam 방지. */
+  lastLoggedState?: 'busy' | 'dead';
+  lastLoggedAt?: number;
 }
 
 const POLL_INTERVAL_MS = 3_000;
 const MIN_RESEND_GAP_MS = 30_000; // 같은 봇에 30초 내 중복 prompt 금지
+const LOG_REPEAT_GAP_MS = 60_000; // 같은 봇 같은 상태 1분 내 중복 로그 안 함
 
 function loadSurfaceMap(): SurfaceMap {
   const mapPath = process.env.SEMO_SURFACE_MAP || '/tmp/semo-surface-map.json';
@@ -196,14 +200,21 @@ export function registerInboxPumpCommand(parent: Command): void {
             const inboxSize = fs.existsSync(inboxPath) ? fs.statSync(inboxPath).size : 0;
             const prevState = states.get(botId);
 
-            // inbox.jsonl 크기 변화 + pending count 변화 감지
-            if (prevState && prevState.lastInboxSize === inboxSize) continue;
-
+            // pending 항상 계산 — busy/dead 였다가 풀린 케이스 재시도 위해.
+            // size 변화 감지는 "신규 메시지 도착" 로그용으로만 사용.
             const pending = countPending(mboxDir, botId);
+
+            // pending 0 이고 size 변화 없으면 silent skip (정상 idle 상태).
+            if (pending === 0 && prevState && prevState.lastInboxSize === inboxSize) {
+              continue;
+            }
+
             const newState: BotState = {
               pendingCount: pending,
               lastSentAt: prevState?.lastSentAt ?? 0,
               lastInboxSize: inboxSize,
+              lastLoggedState: prevState?.lastLoggedState,
+              lastLoggedAt: prevState?.lastLoggedAt,
             };
 
             if (pending === 0) {
@@ -222,26 +233,42 @@ export function registerInboxPumpCommand(parent: Command): void {
             // 봇 pane 상태 검사
             const paneState = await readBotPane(surfaceMap.workspace, surface);
             const ts = new Date().toISOString().slice(11, 19);
+
+            // dedup: 같은 봇의 같은 상태 (busy/dead) 가 LOG_REPEAT_GAP_MS 내면 silent skip.
+            const shouldLogSkip = (state: 'busy' | 'dead'): boolean => {
+              const last = prevState?.lastLoggedAt ?? 0;
+              const sameState = prevState?.lastLoggedState === state;
+              if (sameState && Date.now() - last < LOG_REPEAT_GAP_MS) return false;
+              newState.lastLoggedState = state;
+              newState.lastLoggedAt = Date.now();
+              return true;
+            };
+
             if (paneState === 'dead') {
-              // Claude Code UI 없음 (zsh shell 등) — send 하면 zsh 가 prompt 를 명령으로 해석.
-              // HealthMonitor 가 재시작 책임. inbox-pump 는 skip + warn.
-              console.log(
-                chalk.yellow(
-                  `[pump] ${ts} ⚠ ${botId} dead (Claude Code UI 없음) — health monitor 영역. skip (pending=${pending})`,
-                ),
-              );
+              if (shouldLogSkip('dead')) {
+                console.log(
+                  chalk.yellow(
+                    `[pump] ${ts} ⚠ ${botId} dead (Claude Code UI 없음) — health monitor 영역. skip (pending=${pending})`,
+                  ),
+                );
+              }
               totalSkipped++;
               states.set(botId, newState);
               continue;
             }
             if (paneState === 'busy') {
-              console.log(
-                chalk.gray(`[pump] ${ts} ${botId} busy — queue 유지 (pending=${pending})`),
-              );
+              if (shouldLogSkip('busy')) {
+                console.log(
+                  chalk.gray(`[pump] ${ts} ${botId} busy — queue 유지 (pending=${pending})`),
+                );
+              }
               totalSkipped++;
               states.set(botId, newState);
               continue;
             }
+            // idle → 다음 send 후 lastLoggedState 클리어 (다음 busy/dead 첫 발생 시 재로그)
+            newState.lastLoggedState = undefined;
+            newState.lastLoggedAt = undefined;
 
             const prompt = buildPrompt(botId, pending);
             if (opts.dryRun) {
