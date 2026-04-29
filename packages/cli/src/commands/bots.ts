@@ -270,6 +270,50 @@ const BINARY_EXTS = new Set([
 ]);
 const MAX_FILE_SIZE = 512 * 1024; // 512KB
 
+/**
+ * SOUL.md 파싱 결과(ScannedBot)를 KB `{bot_id}/identity` 엔트리에 반영.
+ *
+ * 비전(2026-04-29 reus 결정): KB 엔트리가 "어느 봇이 어떤 역할을 한다"의 SoT.
+ * Agent Factory CUD 와 SOUL.md 변경 모두 → KB 자동 동기화 → 라우터가 KB 기반으로 의도 매칭.
+ *
+ * agents 도메인 schema 의 identity 키 hint:
+ *   YAML: name, emoji, tagline, role, agent_type (orchestrator|specialist)
+ *
+ * 직접 kbUpsert(pool) 사용 — `semo kb upsert` 명령과 동일한 경로 (PG 공식, 임베딩 자동 생성,
+ * 스키마 검증 포함). portable adapter (KbStore) 가 PG 어댑터 미설치 환경에서 실패하는 것 회피.
+ * 도메인이 ontology 에 미등록된 경우는 kbUpsert 가 자체 검증 → error 반환.
+ */
+export async function syncBotIdentitiesToKb(
+  scanned: ScannedBot[],
+): Promise<{ synced: number; errors: string[] }> {
+  if (scanned.length === 0) return { synced: 0, errors: [] };
+
+  const { kbUpsert } = await import('../kb.js');
+  const pool = getPool();
+  let synced = 0;
+  const errors: string[] = [];
+  for (const bot of scanned) {
+    if (!bot.name && !bot.emoji && !bot.role) continue;
+    const lines: string[] = [];
+    lines.push(`name: ${bot.name ?? bot.botId}`);
+    if (bot.emoji) lines.push(`emoji: ${bot.emoji}`);
+    if (bot.role) lines.push(`role: ${bot.role}`);
+    try {
+      const r = await kbUpsert(pool, {
+        domain: bot.botId,
+        key: 'identity',
+        content: lines.join('\n'),
+        created_by: 'semo-bots-sync',
+      });
+      if (r.success) synced++;
+      else errors.push(`${bot.botId}: ${r.error?.slice(0, 100) ?? 'unknown'}`);
+    } catch (err) {
+      errors.push(`${bot.botId}: ${(err as Error).message.slice(0, 100)}`);
+    }
+  }
+  return { synced, errors };
+}
+
 export async function syncWorkspaceFiles(
   client: {
     query(sql: string, params?: unknown[]): Promise<{ rows: unknown[]; rowCount?: number | null }>;
@@ -563,8 +607,9 @@ export function registerBotsCommands(program: Command): void {
   // ── semo bots sync ──────────────────────────────────────────
   botsCmd
     .command('sync')
-    .description('bot-workspaces/ 스캔 → semo.bot_status DB upsert')
+    .description('bot-workspaces/ 스캔 → semo.bot_status DB upsert + KB identity 동기화')
     .option('--dry-run', '실제 upsert 없이 미리보기')
+    .option('--skip-kb', 'KB identity 동기화 건너뛰기 (raw bot_status 만 갱신)')
     .action(async (options) => {
       const spinner = ora('bot-workspaces 스캔 중...').start();
       const bots = scanBotWorkspaces();
@@ -703,6 +748,29 @@ export function registerBotsCommands(program: Command): void {
           }
         } catch (filesErr) {
           console.log(chalk.yellow(`  ⚠ files sync 실패 (무시): ${filesErr}`));
+        }
+
+        // KB identity piggyback — SOUL.md 파싱 결과 → KB {bot_id}/identity (라우팅 SoT)
+        // 봇 이름 하드코딩 없음 — bot_status 와 동일한 scanned 결과 사용.
+        if (!options.skipKb) {
+          try {
+            console.log(chalk.gray('  → KB identity sync 실행 중...'));
+            const kbResult = await syncBotIdentitiesToKb(bots);
+            if (kbResult.errors.length === 0) {
+              console.log(
+                chalk.green(`  → KB identity sync 완료: ${kbResult.synced}/${bots.length}개 봇`),
+              );
+            } else {
+              console.log(
+                chalk.yellow(
+                  `  ⚠ KB identity sync 부분 실패: ${kbResult.synced}/${bots.length} (errors: ${kbResult.errors.length})`,
+                ),
+              );
+              kbResult.errors.slice(0, 3).forEach((e) => console.log(chalk.gray(`     ${e}`)));
+            }
+          } catch (kbErr) {
+            console.log(chalk.yellow(`  ⚠ KB identity sync 실패 (무시): ${kbErr}`));
+          }
         }
       } catch (err) {
         await client.query('ROLLBACK');
