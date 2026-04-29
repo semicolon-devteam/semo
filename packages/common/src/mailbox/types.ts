@@ -37,6 +37,18 @@ export interface InboxMessage {
   service_domain?: string;
   phase?: number;
   skill_hint?: string;
+  /**
+   * Phase 3b-2 옵션 C (2026-04-29): 채널-router 의 KB intent matching 결과 hint.
+   * slack-router 는 default semiclaw 로 inbox 쓰지만, 채널-router 가 다른 봇을 추천한 경우
+   * suggested_bot_id 를 메타로 전달 → 받는 봇(semiclaw)이 hint 보고 위임 결정.
+   * 향후 옵션 A (slack-router 가 직접 라우팅) 전환 시 deprecated.
+   */
+  routing_hint?: {
+    suggested_bot_id: string;
+    reason: string;
+    /** kbIntentMatch.score (가능 시). */
+    score?: number;
+  };
 
   // Thread history (pre-fetched by Router)
   thread_history?: Array<{

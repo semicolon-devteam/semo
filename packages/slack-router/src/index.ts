@@ -369,8 +369,24 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
     }
   }
 
-  // 3. Resolve channel → service domain context (Router for domain only, botId from above)
+  // 3. Resolve channel → service domain context + KB intent hint.
+  //    Phase 3b-2 옵션 C (2026-04-29): slack-router 는 default semiclaw 로 inbox 쓰지만,
+  //    채널-router 의 kb-intent matching 이 다른 봇을 추천하면 inbox 메타에 hint 첨부.
+  //    semiclaw 가 hint 보고 위임 결정 (orchestrator 패턴 보존).
   const routeResult = await router.route(msg.channel, msg.text, msg.thread_ts);
+  let routingHint: { suggested_bot_id: string; reason: string; score?: number } | undefined;
+  if (
+    routeResult.botId &&
+    routeResult.botId !== botId &&
+    routeResult.routeReason.startsWith('kb-intent:')
+  ) {
+    const scoreMatch = routeResult.routeReason.match(/score=(\d+)/);
+    routingHint = {
+      suggested_bot_id: routeResult.botId,
+      reason: routeResult.routeReason,
+      score: scoreMatch ? Number(scoreMatch[1]) : undefined,
+    };
+  }
 
   // 4. Fetch thread history
   let threadHistory: InboxMessage['thread_history'];
@@ -412,6 +428,7 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
           route_reason: routeReason,
           service_domain: routeResult.serviceDomain || undefined,
           phase: routeResult.phase >= 0 ? routeResult.phase : undefined,
+          routing_hint: routingHint || undefined,
         }),
       ],
     );
@@ -448,13 +465,15 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
     service_domain: routeResult.serviceDomain || undefined,
     phase: routeResult.phase >= 0 ? routeResult.phase : undefined,
     skill_hint: routeResult.skillHint,
+    routing_hint: routingHint,
     thread_history: threadHistory,
   });
 
   console.log(
     `[router] ${senderName} → ${botId} (${routeReason}` +
       `${routeResult.serviceDomain ? `, svc=${routeResult.serviceDomain}` : ''}` +
-      `${routeResult.phase >= 0 ? `, ph=${routeResult.phase}` : ''}) [${msgId.slice(0, 8)}]`,
+      `${routeResult.phase >= 0 ? `, ph=${routeResult.phase}` : ''}` +
+      `${routingHint ? `, hint=${routingHint.suggested_bot_id}(s${routingHint.score})` : ''}) [${msgId.slice(0, 8)}]`,
   );
 }
 
