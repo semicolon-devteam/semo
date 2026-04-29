@@ -119,7 +119,11 @@ async function copyKbFromTemplate(
  * 트랜잭션 client 위에서 raw SQL INSERT — kbUpsert(pool) 의 검증/임베딩은 후속 sync 에서 갱신.
  * 이유: createBot 는 단일 트랜잭션. kbUpsert 는 자체 connect 로 별 트랜잭션이라 이 트랜잭션과 분리됨.
  */
-async function seedBotKbEntries(client: PoolClient, input: CreateBotInput): Promise<void> {
+/**
+ * 봇 KB 시드 entry 4종의 (key, content) 계산 — seedBotKbEntries / rebuildBotKbEmbeddings 가 공유.
+ * 한 곳에서 계산해야 raw SQL seed 와 kbUpsert (임베딩 생성) 가 동일 content 사용 보장.
+ */
+function computeBotKbSeedEntries(input: CreateBotInput): Array<{ key: string; content: string }> {
   const identityContent = [
     `name: ${input.slackUsername ?? input.botId}`,
     `emoji: ${input.slackIconEmoji ?? ':robot_face:'}`,
@@ -139,7 +143,25 @@ async function seedBotKbEntries(client: PoolClient, input: CreateBotInput): Prom
     `- 담당 밖 요청 → escalate("semiclaw", reason, context)`,
   ].join('\n');
 
-  const seed = async (key: string, content: string) => {
+  const slackProfileContent = [
+    `username: ${input.slackUsername ?? input.botId}`,
+    `icon_emoji: ${input.slackIconEmoji ?? ':robot_face:'}`,
+    `slack_user_id: ''`,
+  ].join('\n');
+
+  return [
+    { key: 'identity', content: identityContent },
+    { key: 'delegation', content: delegationContent },
+    { key: 'status', content: 'online' },
+    { key: 'slack-profile', content: slackProfileContent },
+  ];
+}
+
+async function seedBotKbEntries(client: PoolClient, input: CreateBotInput): Promise<void> {
+  // 트랜잭션 내 raw SQL — atomic 보장 (createBot 트랜잭션 안에서 INSERT/UPDATE).
+  // 임베딩은 누락 (raw SQL 이 자동 생성 안 함). 트랜잭션 commit 후 rebuildBotKbEmbeddings 가 갱신.
+  const entries = computeBotKbSeedEntries(input);
+  for (const { key, content } of entries) {
     await client.query(
       `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, version, created_at, updated_at)
        VALUES ($1, $2, '', $3, '{}'::jsonb, 'semo-bots-factory', 1, NOW(), NOW())
@@ -149,19 +171,39 @@ async function seedBotKbEntries(client: PoolClient, input: CreateBotInput): Prom
          version = semo.knowledge_base.version + 1`,
       [input.botId, key, content],
     );
-  };
+  }
+}
 
-  await seed('identity', identityContent);
-  await seed('delegation', delegationContent);
-  await seed('status', 'online');
-  await seed(
-    'slack-profile',
-    [
-      `username: ${input.slackUsername ?? input.botId}`,
-      `icon_emoji: ${input.slackIconEmoji ?? ':robot_face:'}`,
-      `slack_user_id: ''`,
-    ].join('\n'),
-  );
+/**
+ * createBot 트랜잭션 commit 후 호출. seedBotKbEntries 의 4종을 kbUpsert 경로로 다시 upsert
+ * → 임베딩 자동 생성 + 스키마 검증.
+ *
+ * Codex P2(d) 권고: raw SQL seed 는 임베딩 누락 → 별 트랜잭션 kbUpsert 로 보강.
+ *   실패 시 bot create 는 성공 (이미 commit), kb seed 는 보상 작업 (다음 bots sync 가 identity 재upsert,
+ *   delegation/status/slack-profile 은 명시 호출 필요 — console.warn 으로 사용자에게 알림).
+ */
+async function rebuildBotKbEmbeddings(pool: Pool, input: CreateBotInput): Promise<void> {
+  const { kbUpsert } = await import('../kb.js');
+  const entries = computeBotKbSeedEntries(input);
+  const failures: string[] = [];
+  for (const { key, content } of entries) {
+    try {
+      const r = await kbUpsert(pool, {
+        domain: input.botId,
+        key,
+        content,
+        created_by: 'semo-bots-factory',
+      });
+      if (!r.success) failures.push(`${key}: ${r.error?.slice(0, 80) ?? 'unknown'}`);
+    } catch (err) {
+      failures.push(`${key}: ${(err as Error).message.slice(0, 80)}`);
+    }
+  }
+  if (failures.length > 0) {
+    throw new Error(
+      `kbUpsert 부분 실패 ${failures.length}/${entries.length}: ${failures.join(' / ')}`,
+    );
+  }
 }
 
 async function createBot(pool: Pool, input: CreateBotInput): Promise<void> {
@@ -257,6 +299,23 @@ async function createBot(pool: Pool, input: CreateBotInput): Promise<void> {
       chalk.green(`✔ 봇 "${input.botId}" 생성 완료 — seat=${seat.seatId} (${seat.configDir})`),
     );
   });
+
+  // 7. KB 임베딩 갱신 (트랜잭션 commit 후 별 트랜잭션) — Codex P2(d) 권고.
+  // 실패해도 bot 자체는 이미 생성됨. 다음 'semo bots sync' 가 identity 임베딩은 재upsert,
+  // delegation/status/slack-profile 은 명시 호출 또는 후속 sync 확장 필요.
+  try {
+    await rebuildBotKbEmbeddings(pool, input);
+    console.log(
+      chalk.gray('  → KB 임베딩 갱신 완료 (identity/delegation/status/slack-profile 4종)'),
+    );
+  } catch (kbErr) {
+    console.warn(
+      chalk.yellow(
+        `  ⚠ KB 임베딩 갱신 실패 (bot 생성은 성공). 보상: 'semo kb upsert ${input.botId} {key} ...' 직접 호출 또는 'semo bots sync'.`,
+      ),
+    );
+    console.warn(chalk.gray(`     상세: ${(kbErr as Error).message}`));
+  }
 
   console.log(chalk.gray('  다음 단계:'));
   console.log(chalk.gray(`    1) semo onboarding -f --bot ${input.botId} --skip-mcp`));
