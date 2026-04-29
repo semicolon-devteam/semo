@@ -104,6 +104,66 @@ async function copyKbFromTemplate(
   return result.rowCount ?? 0;
 }
 
+/**
+ * 신규 봇 생성 시 KB `{bot_id}/identity`, `delegation`, `status` 시드.
+ *
+ * 비전(2026-04-29 reus): kb = "어느 봇이 어떤 역할/키워드 처리" 의 sot.
+ * agent factory cud 시 자동 동기화 → router 가 kb 보고 의도 매칭 → 사용자가 봇 외울 필요 없음.
+ *
+ * 입력 데이터 우선:
+ *   - identity: slack_username + slack_icon_emoji + role (CreateBotInput)
+ *   - delegation: input.delegations 의 domains 를 키워드 풀로 사용
+ *     (정교한 키워드는 사후 `semo kb upsert {bot} delegation` 로 보강)
+ *   - status: 'online' (createBot 가 bot_status.status='online' 설정 시점과 동일)
+ *
+ * 트랜잭션 client 위에서 raw SQL INSERT — kbUpsert(pool) 의 검증/임베딩은 후속 sync 에서 갱신.
+ * 이유: createBot 는 단일 트랜잭션. kbUpsert 는 자체 connect 로 별 트랜잭션이라 이 트랜잭션과 분리됨.
+ */
+async function seedBotKbEntries(client: PoolClient, input: CreateBotInput): Promise<void> {
+  const identityContent = [
+    `name: ${input.slackUsername ?? input.botId}`,
+    `emoji: ${input.slackIconEmoji ?? ':robot_face:'}`,
+    `role: ${input.role}`,
+    `agent_type: specialist`,
+  ].join('\n');
+
+  // delegation 키워드 풀 (input.delegations 의 domains 합집합 — 1차 시드, 사후 보강 권장)
+  const keywordPool = Array.from(
+    new Set(input.delegations.flatMap((d) => d.domains).filter(Boolean)),
+  );
+  const delegationContent = [
+    '## 수신 키워드',
+    ...(keywordPool.length > 0 ? keywordPool.map((k) => `- ${k}`) : ['- (TODO: 키워드 백필 필요)']),
+    '',
+    '## 에스컬레이션',
+    `- 담당 밖 요청 → escalate("semiclaw", reason, context)`,
+  ].join('\n');
+
+  const seed = async (key: string, content: string) => {
+    await client.query(
+      `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, version, created_at, updated_at)
+       VALUES ($1, $2, '', $3, '{}'::jsonb, 'semo-bots-factory', 1, NOW(), NOW())
+       ON CONFLICT (domain, key, sub_key) DO UPDATE SET
+         content = EXCLUDED.content,
+         updated_at = NOW(),
+         version = semo.knowledge_base.version + 1`,
+      [input.botId, key, content],
+    );
+  };
+
+  await seed('identity', identityContent);
+  await seed('delegation', delegationContent);
+  await seed('status', 'online');
+  await seed(
+    'slack-profile',
+    [
+      `username: ${input.slackUsername ?? input.botId}`,
+      `icon_emoji: ${input.slackIconEmoji ?? ':robot_face:'}`,
+      `slack_user_id: ''`,
+    ].join('\n'),
+  );
+}
+
 async function createBot(pool: Pool, input: CreateBotInput): Promise<void> {
   if (input.dryRun) {
     console.log(chalk.yellow('🧪 DRY-RUN — 다음 작업을 수행 예정:'));
@@ -167,6 +227,11 @@ async function createBot(pool: Pool, input: CreateBotInput): Promise<void> {
       const copied = await copyKbFromTemplate(client, input.botId, input.templateBotId);
       console.log(chalk.gray(`  KB 키 ${copied}개 복사 (template=${input.templateBotId})`));
     }
+
+    // 5.5. KB identity / delegation / status 자동 seed (라우팅 SoT)
+    // 비전(2026-04-29): kb 엔트리 = "어느 봇이 어떤 역할" sot. cud 시 자동 동기화.
+    // 템플릿이 있으면 복사된 entry 가 이미 있을 수 있으나 input 으로 덮어쓰기 (입력이 정확).
+    await seedBotKbEntries(client, input);
 
     // 6. bot_delegation inserts
     for (const d of input.delegations) {
@@ -232,8 +297,16 @@ async function deleteBot(pool: Pool, botId: string, force: boolean): Promise<voi
         `UPDATE semo.bot_delegation SET is_active=FALSE WHERE from_bot_id=$1 OR to_bot_id=$1`,
         [botId],
       );
+      // KB status 동기화 — 라우터가 'retired' 보고 라우팅 제외 가능 (loadActiveBotIds 가 1차 필터)
+      await client.query(
+        `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, version, created_at, updated_at)
+         VALUES ($1, 'status', '', 'retired', '{}'::jsonb, 'semo-bots-factory', 1, NOW(), NOW())
+         ON CONFLICT (domain, key, sub_key) DO UPDATE SET content='retired', updated_at=NOW(),
+           version = semo.knowledge_base.version + 1`,
+        [botId],
+      );
       await releaseSeat(client, botId);
-      console.log(chalk.green(`✔ 봇 "${botId}" retire 완료 (seat 해제).`));
+      console.log(chalk.green(`✔ 봇 "${botId}" retire 완료 (seat 해제, KB status=retired).`));
     }
   });
 }
