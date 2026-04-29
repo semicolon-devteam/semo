@@ -170,6 +170,7 @@ JSON`,
     });
     const ref = await adapter.startSession({ botId: 'reviewclaw' });
     expect(ref.rolloutPath).toBe('/tmp/oc-test-home/.openclaw-reviewclaw');
-    expect(ref.hostSessionId).toMatch(/^openclaw:reviewclaw:/);
+    // openclaw 가 ":" 를 reject 하므로 hyphen 으로 구분.
+    expect(ref.hostSessionId).toMatch(/^openclaw-reviewclaw-/);
   });
 });

@@ -113,7 +113,8 @@ export class OpenClawAdapter implements HostAdapter {
   async startSession(input: { botId: string; workspacePath?: string }): Promise<HostSessionRef> {
     const ws = input.workspacePath ?? path.join(this.workspaceParent, `.openclaw-${input.botId}`);
     return {
-      hostSessionId: `openclaw:${input.botId}:${Date.now()}`,
+      // openclaw 가 ":" 를 reject 하므로 hyphen 으로 구분.
+      hostSessionId: `openclaw-${input.botId}-${Date.now()}`,
       rolloutPath: ws, // 워크스페이스 자체가 세션 상태 위치
     };
   }
@@ -144,7 +145,9 @@ export class OpenClawAdapter implements HostAdapter {
    *       stopReason / aborted / exitCode → endReason
    */
   async dispatch(input: HostDispatchInput): Promise<HostDispatchResult> {
-    const sessionId = input.session.hostSessionId || `semo:${input.botId}:${Date.now()}`;
+    // openclaw sessionId 제약: ":" 등 특수문자 reject. 기본 alphanum + hyphen 만.
+    const rawSid = input.session.hostSessionId || `semo-${input.botId}-${Date.now()}`;
+    const sessionId = rawSid.replace(/[^a-zA-Z0-9_-]/g, '-');
     const timeoutMs =
       input.timeoutMs && input.timeoutMs > 0 ? input.timeoutMs : this.defaultTimeoutMs;
 
