@@ -40,6 +40,7 @@ import {
 import { getCronJobStats } from './context';
 import { resolveBotWorkspace, SEMO_WORKSPACES } from '../paths';
 import { registerBotsFactoryCommands } from './bots-factory';
+import { registerInboxPumpCommand } from './inbox-pump';
 
 // ============================================================
 // Types (matches actual DB schema)
@@ -421,6 +422,7 @@ export function registerBotsCommands(program: Command): void {
 
   // Agent Factory (create / delete / show) — SemoBot 진입점
   registerBotsFactoryCommands(botsCmd);
+  registerInboxPumpCommand(botsCmd);
 
   // ── semo bots status ────────────────────────────────────────
   botsCmd
