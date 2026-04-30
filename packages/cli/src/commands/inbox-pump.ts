@@ -37,6 +37,12 @@ interface BotState {
   /** 마지막으로 로그한 상태 (busy/dead) + 시각 — spam 방지. */
   lastLoggedState?: 'busy' | 'dead';
   lastLoggedAt?: number;
+  /** S2 metric: 누적 카운트 + 마지막 pane 상태. */
+  sentCount: number;
+  skippedBusyCount: number;
+  skippedDeadCount: number;
+  lastPaneState?: 'idle' | 'busy' | 'dead';
+  lastPaneStateAt?: number;
 }
 
 const POLL_INTERVAL_MS = 3_000;
@@ -112,6 +118,29 @@ async function readBotPane(workspace: string, surface: string): Promise<BotPaneS
   } catch {
     // cmux read 실패 — 보수적으로 busy 처리 (잘못된 send 회피).
     return 'busy';
+  }
+}
+
+/** S2: pump 활동 통계를 ~/.semo/mailbox/{bot}/pump-stats.json 에 기록 — bots status 가 join. */
+function writePumpStats(mboxDir: string, botId: string, state: BotState, pending: number): void {
+  try {
+    const statsPath = path.join(mboxDir, botId, 'pump-stats.json');
+    const stats = {
+      bot_id: botId,
+      pending,
+      sent: state.sentCount,
+      skipped_busy: state.skippedBusyCount,
+      skipped_dead: state.skippedDeadCount,
+      last_pane_state: state.lastPaneState,
+      last_pane_state_at: state.lastPaneStateAt
+        ? new Date(state.lastPaneStateAt).toISOString()
+        : undefined,
+      last_sent_at: state.lastSentAt ? new Date(state.lastSentAt).toISOString() : undefined,
+      pump_alive_at: new Date().toISOString(),
+    };
+    fs.writeFileSync(statsPath, JSON.stringify(stats, null, 2));
+  } catch {
+    // non-fatal
   }
 }
 
@@ -205,8 +234,26 @@ export function registerInboxPumpCommand(parent: Command): void {
             const pending = countPending(mboxDir, botId);
 
             // pending 0 이고 size 변화 없으면 silent skip (정상 idle 상태).
-            if (pending === 0 && prevState && prevState.lastInboxSize === inboxSize) {
-              continue;
+            // pump alive 신호는 갱신 (S2 — bots status 가 daemon 가동 여부 판단).
+            // 첫 cycle (prevState 없음) 에서도 idle 봇 stats 초기화.
+            const blankState: BotState = {
+              pendingCount: 0,
+              lastSentAt: 0,
+              lastInboxSize: inboxSize,
+              sentCount: 0,
+              skippedBusyCount: 0,
+              skippedDeadCount: 0,
+            };
+            if (pending === 0) {
+              if (prevState && prevState.lastInboxSize === inboxSize) {
+                writePumpStats(mboxDir, botId, prevState, 0);
+                continue;
+              }
+              if (!prevState) {
+                states.set(botId, blankState);
+                writePumpStats(mboxDir, botId, blankState, 0);
+                continue;
+              }
             }
 
             const newState: BotState = {
@@ -215,6 +262,11 @@ export function registerInboxPumpCommand(parent: Command): void {
               lastInboxSize: inboxSize,
               lastLoggedState: prevState?.lastLoggedState,
               lastLoggedAt: prevState?.lastLoggedAt,
+              sentCount: prevState?.sentCount ?? 0,
+              skippedBusyCount: prevState?.skippedBusyCount ?? 0,
+              skippedDeadCount: prevState?.skippedDeadCount ?? 0,
+              lastPaneState: prevState?.lastPaneState,
+              lastPaneStateAt: prevState?.lastPaneStateAt,
             };
 
             if (pending === 0) {
@@ -232,6 +284,8 @@ export function registerInboxPumpCommand(parent: Command): void {
 
             // 봇 pane 상태 검사
             const paneState = await readBotPane(surfaceMap.workspace, surface);
+            newState.lastPaneState = paneState;
+            newState.lastPaneStateAt = Date.now();
             const ts = new Date().toISOString().slice(11, 19);
 
             // dedup: 같은 봇의 같은 상태 (busy/dead) 가 LOG_REPEAT_GAP_MS 내면 silent skip.
@@ -252,8 +306,10 @@ export function registerInboxPumpCommand(parent: Command): void {
                   ),
                 );
               }
+              newState.skippedDeadCount++;
               totalSkipped++;
               states.set(botId, newState);
+              writePumpStats(mboxDir, botId, newState, pending);
               continue;
             }
             if (paneState === 'busy') {
@@ -262,8 +318,10 @@ export function registerInboxPumpCommand(parent: Command): void {
                   chalk.gray(`[pump] ${ts} ${botId} busy — queue 유지 (pending=${pending})`),
                 );
               }
+              newState.skippedBusyCount++;
               totalSkipped++;
               states.set(botId, newState);
+              writePumpStats(mboxDir, botId, newState, pending);
               continue;
             }
             // idle → 다음 send 후 lastLoggedState 클리어 (다음 busy/dead 첫 발생 시 재로그)
@@ -280,6 +338,7 @@ export function registerInboxPumpCommand(parent: Command): void {
               try {
                 await sendToPane(surfaceMap.workspace, surface, prompt);
                 newState.lastSentAt = Date.now();
+                newState.sentCount++;
                 totalSent++;
                 console.log(
                   chalk.green(`[pump] ${ts} ✓ ${botId}@${surface} sent (pending=${pending})`),
@@ -294,6 +353,7 @@ export function registerInboxPumpCommand(parent: Command): void {
             }
 
             states.set(botId, newState);
+            writePumpStats(mboxDir, botId, newState, pending);
           }
 
           if (opts.once) break;
