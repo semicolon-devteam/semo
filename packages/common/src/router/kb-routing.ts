@@ -203,11 +203,13 @@ export async function loadRoutingConfig(pool: Pool): Promise<RoutingConfig> {
   const phaseAssignees: Record<number, string> = {};
   const infraPhaseAssignees: Record<number, string> = {};
   try {
+    // ontology 의 봇 도메인은 entity_type='agents' (이전 'bot' 으로 잘못 검색되어 0 row → fallback 강제 사용 중이었음).
+    // role 키 외에 identity/delegation 안에도 "### GFP Phase 담당" 표 둘 수 있도록 multiple 키 허용.
     const kbResult = await pool.query(
       `SELECT kb.domain AS bot_id, kb.content
        FROM semo.knowledge_base kb
-       JOIN semo.ontology o ON o.domain = kb.domain AND o.entity_type = 'bot'
-       WHERE kb.key = 'role' AND (kb.sub_key = '' OR kb.sub_key IS NULL)`,
+       JOIN semo.ontology o ON o.domain = kb.domain AND o.entity_type = 'agents'
+       WHERE kb.key IN ('role', 'identity', 'delegation') AND (kb.sub_key = '' OR kb.sub_key IS NULL)`,
     );
     for (const row of kbResult.rows) {
       // Plan track phases

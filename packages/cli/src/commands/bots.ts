@@ -424,6 +424,96 @@ export function registerBotsCommands(program: Command): void {
   registerBotsFactoryCommands(botsCmd);
   registerInboxPumpCommand(botsCmd);
 
+  // ── semo bots reembed-kb ────────────────────────────────────
+  // 임베딩 누락 자동 백필 — agent factory 가 raw SQL seed 후 별 트랜잭션 kbUpsert 호출이
+  // 실패한 경우 보상 작업. 또는 운영 중 임베딩이 빠진 entry 발견 시 일괄 재생성.
+  botsCmd
+    .command('reembed-kb')
+    .description('agents 도메인의 임베딩 누락 KB entry 일괄 재 kbUpsert (임베딩 자동 생성)')
+    .option(
+      '--keys <csv>',
+      '대상 키 (csv, 기본: identity,delegation,status,slack-profile)',
+      'identity,delegation,status,slack-profile',
+    )
+    .option('--bot <id>', '특정 봇만 처리 (기본: 전체 active 봇)')
+    .option('--dry-run', '대상 entry 만 표시 (실 upsert X)')
+    .action(async (opts: { keys: string; bot?: string; dryRun?: boolean }) => {
+      const connected = await isDbConnected();
+      if (!connected) {
+        console.error(chalk.red('✗ DB 연결 실패'));
+        process.exit(1);
+      }
+      const keys = opts.keys
+        .split(',')
+        .map((k) => k.trim())
+        .filter(Boolean);
+      const pool = getPool();
+      const whereBot = opts.bot ? 'AND kb.domain = $2' : '';
+      const params: unknown[] = [keys];
+      if (opts.bot) params.push(opts.bot);
+      const r = await pool.query(
+        `SELECT kb.domain, kb.key, kb.sub_key, kb.content
+         FROM semo.knowledge_base kb
+         JOIN semo.ontology o ON o.domain = kb.domain
+         JOIN semo.bot_status bs ON bs.bot_id = kb.domain
+         WHERE o.entity_type = 'agents'
+           AND kb.key = ANY($1::text[])
+           AND kb.embedding IS NULL
+           AND bs.status != 'retired'
+           ${whereBot}
+         ORDER BY kb.domain, kb.key`,
+        params,
+      );
+      console.log(
+        chalk.cyan.bold(
+          `\n🔄 reembed-kb — 누락 ${r.rows.length}개 entry${opts.dryRun ? ' (dry-run)' : ''}\n`,
+        ),
+      );
+      if (r.rows.length === 0) {
+        console.log(chalk.green('  ✓ 임베딩 누락 entry 없음'));
+        await closeConnection();
+        return;
+      }
+      if (opts.dryRun) {
+        for (const row of r.rows) {
+          console.log(
+            `  ${row.domain.padEnd(15)} ${row.key}${row.sub_key ? '/' + row.sub_key : ''}`,
+          );
+        }
+        await closeConnection();
+        return;
+      }
+      const { kbUpsert } = await import('../kb.js');
+      let success = 0;
+      const failures: string[] = [];
+      for (const row of r.rows) {
+        try {
+          const result = await kbUpsert(pool, {
+            domain: row.domain,
+            key: row.key,
+            sub_key: row.sub_key,
+            content: row.content,
+            created_by: 'semo-bots-reembed',
+          });
+          if (result.success) {
+            success++;
+            console.log(chalk.green(`  ✓ [${row.domain}] ${row.key}`));
+          } else {
+            failures.push(`${row.domain}/${row.key}: ${result.error}`);
+          }
+        } catch (err) {
+          failures.push(`${row.domain}/${row.key}: ${(err as Error).message.slice(0, 80)}`);
+        }
+      }
+      console.log(
+        chalk.cyan(
+          `\n결과: ${success}/${r.rows.length} 성공${failures.length > 0 ? `, 실패 ${failures.length}` : ''}`,
+        ),
+      );
+      failures.slice(0, 5).forEach((f) => console.log(chalk.red(`  ✗ ${f}`)));
+      await closeConnection();
+    });
+
   // ── semo bots status ────────────────────────────────────────
   botsCmd
     .command('status')
