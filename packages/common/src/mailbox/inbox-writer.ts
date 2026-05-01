@@ -62,11 +62,19 @@ export class InboxWriter {
     }
 
     const cmd = `cmux send --workspace "${this.surfaceMap.workspace}" --surface "${surface}" "check_inbox\\n"`;
-    console.log(`[nudge] ${botId}: ${cmd}`);
+    console.log(`[nudge] ${botId} (best-effort): ${cmd}`);
 
     exec(cmd, { timeout: 5_000 }, (err, stdout, stderr) => {
       if (err) {
-        console.error(`[nudge] ${botId} FAILED: ${stderr || err.message}`);
+        // Nudge failure is non-fatal — inbox.jsonl append is the SoT.
+        // Bot will pick up the message via:
+        //   1) MCP fs.watch notification (agent-mailbox watchInbox),
+        //   2) 3s MCP polling fallback,
+        //   3) Stop hook inbox-drain-prompt (drain on next session idle).
+        // See: semo decision/router-cmux-nudge-persistence (2026-05-01).
+        console.warn(
+          `[nudge] ${botId}: cmux delivery failed (non-fatal): ${stderr || err.message}`,
+        );
       } else {
         console.log(`[nudge] ${botId}: OK`);
       }

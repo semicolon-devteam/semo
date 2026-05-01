@@ -429,6 +429,7 @@ const ENFORCEMENT_HOOKS: EnforcementHookDef[] = [
   { trigger: 'Stop', script: 'url-validator-guard.sh', timeout: 3000 },
   { trigger: 'Stop', script: 'decision-reminder.sh', timeout: 5000 },
   { trigger: 'Stop', script: 'kb-search-loop-guard.sh', timeout: 5000 },
+  { trigger: 'Stop', script: 'inbox-drain-prompt.sh', timeout: 3000 },
 ];
 
 /**
