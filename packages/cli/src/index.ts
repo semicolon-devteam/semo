@@ -87,6 +87,20 @@ import {
 
 const PACKAGE_NAME = '@team-semicolon/semo-cli';
 
+/**
+ * AggregateError(또는 nested AggregateError) 의 underlying error 들을 펼쳐
+ * 한 줄 사람-가독 포맷으로 변환. Codex 샌드박스처럼 TCP 가 EPERM 으로 막힌
+ * 환경에서 pg 드라이버가 묶어 던지는 `connect EPERM ...` 다발을 표면화하기 위함.
+ */
+function formatErr(err: unknown): string {
+  if (err instanceof AggregateError) {
+    const inner = err.errors.map((e) => formatErr(e)).join(' | ');
+    return `AggregateError: ${inner}`;
+  }
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 // package.json에서 버전 동적 로드
 function getCliVersion(): string {
   try {
@@ -1623,7 +1637,7 @@ kbCmd
       console.log(chalk.gray(`\n  저장 위치: .kb/`));
       await closeConnection();
     } catch (err) {
-      spinner.fail(`KB pull 실패: ${err}`);
+      spinner.fail(`KB pull 실패: ${formatErr(err)}`);
       await closeConnection();
       process.exit(1);
     }
@@ -1664,7 +1678,7 @@ kbCmd
       }
       await closeConnection();
     } catch (err) {
-      spinner.fail(`KB push 실패: ${err}`);
+      spinner.fail(`KB push 실패: ${formatErr(err)}`);
       await closeConnection();
       process.exit(1);
     }
@@ -1702,7 +1716,7 @@ kbCmd
       console.log();
       await closeConnection();
     } catch (err) {
-      spinner.fail(`상태 조회 실패: ${err}`);
+      spinner.fail(`상태 조회 실패: ${formatErr(err)}`);
       await closeConnection();
       process.exit(1);
     }
@@ -1744,7 +1758,7 @@ kbCmd
       }
       await closeConnection();
     } catch (err) {
-      console.error(chalk.red(`조회 실패: ${err}`));
+      console.error(chalk.red(`조회 실패: ${formatErr(err)}`));
       await closeConnection();
       process.exit(1);
     }
@@ -1804,11 +1818,7 @@ kbCmd
       }
       await closeConnection();
     } catch (err) {
-      const detail =
-        err instanceof AggregateError
-          ? `AggregateError: ${err.errors.map((e) => (e instanceof Error ? e.message : String(e))).join(' | ')}`
-          : String(err);
-      spinner.fail(`검색 실패: ${detail}`);
+      spinner.fail(`검색 실패: ${formatErr(err)}`);
       await closeConnection();
       process.exit(1);
     }
@@ -1909,7 +1919,7 @@ kbCmd
       await closeConnection();
       if (failed > 0) process.exit(1);
     } catch (err) {
-      spinner.fail(`임베딩 실패: ${err}`);
+      spinner.fail(`임베딩 실패: ${formatErr(err)}`);
       await closeConnection();
       process.exit(1);
     }
@@ -1940,7 +1950,7 @@ kbCmd
       console.log();
       await closeConnection();
     } catch (err) {
-      spinner.fail(`동기화 실패: ${err}`);
+      spinner.fail(`동기화 실패: ${formatErr(err)}`);
       await closeConnection();
       process.exit(1);
     }
@@ -1980,7 +1990,7 @@ kbCmd
       }
       await closeConnection();
     } catch (err) {
-      console.error(chalk.red(`조회 실패: ${err}`));
+      console.error(chalk.red(`조회 실패: ${formatErr(err)}`));
       await closeConnection();
       process.exit(1);
     }
@@ -2041,7 +2051,7 @@ kbCmd
       }
       await closeConnection();
     } catch (err) {
-      console.error(chalk.red(`이력 조회 실패: ${err}`));
+      console.error(chalk.red(`이력 조회 실패: ${formatErr(err)}`));
       await closeConnection();
       process.exit(1);
     }
@@ -2153,7 +2163,7 @@ kbCmd
       }
       await closeConnection();
     } catch (err) {
-      spinner.fail(`KB upsert 실패: ${err}`);
+      spinner.fail(`KB upsert 실패: ${formatErr(err)}`);
       await closeConnection();
       process.exit(1);
     }
@@ -2599,7 +2609,7 @@ kbCmd
 
       await closeConnection();
     } catch (err) {
-      console.error(chalk.red(`온톨로지 조회 실패: ${err}`));
+      console.error(chalk.red(`온톨로지 조회 실패: ${formatErr(err)}`));
       await closeConnection();
       process.exit(1);
     }
@@ -2666,7 +2676,7 @@ ontoCmd
       }
       await closeConnection();
     } catch (err) {
-      console.error(chalk.red(`조회 실패: ${err}`));
+      console.error(chalk.red(`조회 실패: ${formatErr(err)}`));
       await closeConnection();
       process.exit(1);
     }
@@ -2697,7 +2707,7 @@ ontoCmd
       }
       await closeConnection();
     } catch (err) {
-      console.error(chalk.red(`조회 실패: ${err}`));
+      console.error(chalk.red(`조회 실패: ${formatErr(err)}`));
       await closeConnection();
       process.exit(1);
     }
@@ -2731,7 +2741,7 @@ ontoCmd
       console.log();
       await closeConnection();
     } catch (err) {
-      console.error(chalk.red(`조회 실패: ${err}`));
+      console.error(chalk.red(`조회 실패: ${formatErr(err)}`));
       await closeConnection();
       process.exit(1);
     }
