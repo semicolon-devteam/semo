@@ -9,6 +9,21 @@ import { SLACK_PROFILES, type BotId } from './bot-config.js';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || '';
 
+/**
+ * 채널 ID allowlist — 이 채널들에서는 사용자가 봇을 @mention 하지 않아도 모든
+ * 사용자 메시지를 ingest 한다. #bot-ops 등 봇 운영 전용 채널에 사용.
+ * 기본 동작 (멘션 없으면 drop) 은 #일반 채널 noise 차단을 위함이지만, 봇 운영
+ * 채널에서는 사용자가 매번 멘션을 붙이는 것이 비현실적이라 envvar 로 화이트리스트.
+ *
+ * 형식: 콤마 구분 channel ID. 예: SEMO_FULL_INGEST_CHANNELS=C0AFBQ209E0,C09KNL91QBZ
+ */
+const FULL_INGEST_CHANNELS = new Set(
+  (process.env.SEMO_FULL_INGEST_CHANNELS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
+
 /** magic bytes로 실제 이미지 파일인지 검증 */
 function isValidImageMagic(buf: Buffer): boolean {
   if (buf.length < 4) return false;
@@ -111,7 +126,7 @@ export class SlackGateway {
       const isSysMsg = isSystemMessage(event.text);
       if (event.bot_id && !isSysMsg) return;
 
-      if (event.channel_type === 'im' || isSysMsg) {
+      if (event.channel_type === 'im' || isSysMsg || FULL_INGEST_CHANNELS.has(event.channel)) {
         await this.handleEvent(event);
       }
     });

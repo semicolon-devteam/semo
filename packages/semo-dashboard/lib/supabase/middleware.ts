@@ -61,6 +61,8 @@ export async function updateSession(request: NextRequest) {
     pathname === '/manifest.webmanifest' ||
     // Voice push-trigger — has its own bearer token auth, no browser session
     pathname.startsWith('/api/voice/push-trigger') ||
+    // VAPID public key — 공개 키, 인증 불필요
+    pathname === '/api/voice/vapid-key' ||
     // Voice push notification 탭 시 진입하는 fallback 중계 페이지 — 미로그인 상태에서도
     // discord deep link 로 redirect 해야 하므로 인증 우회
     pathname.startsWith('/voice/join') ||

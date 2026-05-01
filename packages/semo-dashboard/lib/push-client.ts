@@ -3,7 +3,22 @@
  * Service Worker register + permission + subscribe + 서버 endpoint 등록.
  */
 
-const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || '';
+// VAPID public key — runtime fetch (빌드타임 NEXT_PUBLIC_* 의존 제거)
+let _vapidKeyCache: string | null = null;
+async function fetchVapidKey(): Promise<string> {
+  if (_vapidKeyCache) return _vapidKeyCache;
+  const buildTimeKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  if (buildTimeKey) {
+    _vapidKeyCache = buildTimeKey;
+    return buildTimeKey;
+  }
+  const res = await fetch('/api/voice/vapid-key', { credentials: 'same-origin' });
+  if (!res.ok) throw new Error(`vapid-key fetch failed: HTTP ${res.status}`);
+  const { key } = (await res.json()) as { key: string };
+  if (!key) throw new Error('vapid-key empty response');
+  _vapidKeyCache = key;
+  return key;
+}
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   const padding = '='.repeat((4 - (base64.length % 4)) % 4);
@@ -55,12 +70,15 @@ export async function enablePush(): Promise<PushStatus> {
       reason: 'browser_unsupported',
     };
   }
-  if (!VAPID_PUBLIC_KEY) {
+  let vapidKey: string;
+  try {
+    vapidKey = await fetchVapidKey();
+  } catch (err) {
     return {
       supported: true,
       permission: Notification.permission,
       subscribed: false,
-      reason: 'NEXT_PUBLIC_VAPID_PUBLIC_KEY not set',
+      reason: `vapid-key fetch failed: ${(err as Error).message}`,
     };
   }
 
@@ -77,7 +95,7 @@ export async function enablePush(): Promise<PushStatus> {
   if (!sub) {
     sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY) as unknown as ArrayBuffer,
+      applicationServerKey: urlBase64ToUint8Array(vapidKey) as unknown as ArrayBuffer,
     });
   }
 

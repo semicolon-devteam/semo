@@ -32,6 +32,9 @@ ENV NEXT_PUBLIC_VOICE_SIGNALING_URL=wss://voice.semi-colon.space/signal
 # dev/prd 분리를 위해 빌드타임 ARG로 주입 (CI에서 --build-arg로 전달)
 ARG NEXT_PUBLIC_COOKIE_DOMAIN=.semi-colon.space
 ENV NEXT_PUBLIC_COOKIE_DOMAIN=$NEXT_PUBLIC_COOKIE_DOMAIN
+# Web Push VAPID public key (클라이언트 번들에 인라인됨)
+ARG NEXT_PUBLIC_VAPID_PUBLIC_KEY
+ENV NEXT_PUBLIC_VAPID_PUBLIC_KEY=$NEXT_PUBLIC_VAPID_PUBLIC_KEY
 
 # Build Next.js app (standalone output)
 RUN npm run build
