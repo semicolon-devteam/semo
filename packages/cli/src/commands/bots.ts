@@ -452,6 +452,136 @@ export function registerBotsCommands(program: Command): void {
   registerBotsFactoryCommands(botsCmd);
   registerInboxPumpCommand(botsCmd);
 
+  // ── semo bots routing-audit ────────────────────────────────
+  // S1 (Codex 권고): hint suggested_bot vs 최종 escalation target 불일치 추출.
+  // 사용자 재질문 ambiguity 는 별개 metric (이번 명령에 미포함).
+  botsCmd
+    .command('routing-audit')
+    .description('routing_hint vs escalation 결과 mismatch 추출 (kb delegation 키워드 보강 cycle)')
+    .option('--since <duration>', '기간 (예: 7d, 24h, 1h)', '7d')
+    .option('--mismatch-only', 'hint != escalation target 만 표시')
+    .option('--format <type>', 'table | json', 'table')
+    .action(async (opts: { since: string; mismatchOnly?: boolean; format: string }) => {
+      const connected = await isDbConnected();
+      if (!connected) {
+        console.error(chalk.red('✗ DB 연결 실패'));
+        process.exit(1);
+      }
+      const intervalMatch = opts.since.match(/^(\d+)([hdm])$/);
+      if (!intervalMatch) {
+        console.error(chalk.red('✗ --since 형식: 7d / 24h / 30m'));
+        process.exit(1);
+      }
+      const [, n, unit] = intervalMatch;
+      const intervalSql = unit === 'd' ? `${n} days` : unit === 'h' ? `${n} hours` : `${n} minutes`;
+
+      const pool = getPool();
+      // 1. routing_hint 있는 commitment 조회
+      const r = await pool.query(
+        `SELECT
+             c.id,
+             c.bot_id AS landed_bot,
+             c.pipeline_context->'routing_hint'->>'suggested_bot_id' AS suggested_bot,
+             c.pipeline_context->'routing_hint'->>'score' AS score,
+             c.pipeline_context->>'route_reason' AS reason,
+             c.pipeline_context->>'channel' AS channel,
+             c.pipeline_context->>'thread_ts' AS thread_ts,
+             c.title,
+             c.created_at::text AS created_at
+           FROM semo.bot_commitments c
+           WHERE c.pipeline_context->'routing_hint' IS NOT NULL
+             AND c.created_at > NOW() - INTERVAL '${intervalSql}'
+           ORDER BY c.created_at DESC`,
+      );
+
+      // 2. 각 commitment 의 outbox escalation 찾기 — landed_bot 의 outbox.jsonl 에서
+      //    같은 thread_ts 의 type='escalation' 추출
+      const mboxDir = process.env.SEMO_MAILBOX_DIR ?? path.join(os.homedir(), '.semo', 'mailbox');
+      interface AuditRow {
+        created: string;
+        channel: string | null;
+        suggested: string | null;
+        landed: string;
+        actual: string | null;
+        score: string | null;
+        title: string;
+        mismatch: boolean;
+        reason: string | null;
+      }
+      const audit: AuditRow[] = [];
+      for (const c of r.rows) {
+        const outboxPath = path.join(mboxDir, c.landed_bot, 'outbox.jsonl');
+        let actual: string | null = null;
+        let escalationReason: string | null = null;
+        if (fs.existsSync(outboxPath)) {
+          for (const line of fs.readFileSync(outboxPath, 'utf8').split('\n')) {
+            if (!line.trim()) continue;
+            try {
+              const msg = JSON.parse(line);
+              if (msg.type === 'escalation' && msg.thread_id === c.thread_ts && msg.target_bot_id) {
+                actual = msg.target_bot_id;
+                escalationReason = msg.escalation_reason ?? null;
+                break;
+              }
+            } catch {
+              // skip
+            }
+          }
+        }
+        const mismatch = actual !== null && actual !== c.suggested_bot;
+        if (opts.mismatchOnly && !mismatch) continue;
+        audit.push({
+          created: new Date(c.created_at).toLocaleString('ko-KR'),
+          channel: c.channel,
+          suggested: c.suggested_bot,
+          landed: c.landed_bot,
+          actual,
+          score: c.score,
+          title: (c.title ?? '').slice(0, 40),
+          mismatch,
+          reason: escalationReason ? escalationReason.slice(0, 80) : null,
+        });
+      }
+
+      if (opts.format === 'json') {
+        console.log(JSON.stringify(audit, null, 2));
+      } else {
+        console.log(
+          chalk.cyan.bold(
+            `\n📊 routing-audit (since ${opts.since}, ${audit.length}건${opts.mismatchOnly ? ', mismatch only' : ''})\n`,
+          ),
+        );
+        if (audit.length === 0) {
+          console.log(chalk.green('  ✓ 매칭 결과 없음'));
+        } else {
+          console.log(
+            chalk.gray(
+              '  hint→landed→actual                    score  title                                     created',
+            ),
+          );
+          console.log(chalk.gray('  ' + '─'.repeat(120)));
+          for (const a of audit) {
+            const flow = `${(a.suggested ?? '-').padEnd(12)} → ${a.landed.padEnd(10)} → ${(a.actual ?? '∅').padEnd(12)}`;
+            const flowColored = a.mismatch ? chalk.red(flow) : chalk.green(flow);
+            console.log(
+              `  ${flowColored} ${(a.score ?? '-').padStart(3)}    ${a.title.padEnd(40)}  ${a.created}`,
+            );
+            if (a.reason) console.log(chalk.gray(`    └ ${a.reason}`));
+          }
+          const matched = audit.filter((a) => !a.mismatch && a.actual).length;
+          const mismatched = audit.filter((a) => a.mismatch).length;
+          const noEscalation = audit.filter((a) => !a.actual).length;
+          console.log();
+          console.log(
+            chalk.gray(
+              `  총 ${audit.length}건 (matched: ${matched}, mismatched: ${mismatched}, no-escalation: ${noEscalation})\n`,
+            ),
+          );
+        }
+      }
+      await closeConnection();
+    });
+
   // ── semo bots reembed-kb ────────────────────────────────────
   // 임베딩 누락 자동 백필 — agent factory 가 raw SQL seed 후 별 트랜잭션 kbUpsert 호출이
   // 실패한 경우 보상 작업. 또는 운영 중 임베딩이 빠진 entry 발견 시 일괄 재생성.
