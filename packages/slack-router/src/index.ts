@@ -29,10 +29,15 @@ import {
   BusyDetector,
   resolveSpeaker,
   SlackProjectionEmitter,
+  acquireSingletonLock,
   type SlackMessage,
   type InboxMessage,
   type OutboxMessage,
 } from '@team-semicolon/semo-common';
+
+// Singleton guard — prevent duplicate Socket Mode connections + log truncation.
+// Background: 2026-05-01 incident; see semo decision/router-cmux-nudge-persistence.
+acquireSingletonLock({ name: 'slack-router', cmdMatch: 'slack-router/src/index.ts' });
 
 // ── Configuration ──
 

@@ -12,6 +12,7 @@ export { Router, Router as ChannelRouter } from './router/channel-router.js';
 export { StaticRouter, type StaticRouterOptions } from './router/static-router.js';
 export { FALLBACK_BOT_IDS, SLACK_PROFILES, type BotId } from './slack/bot-config.js';
 export { SEMO_PATHS, resolveBotWorkspace } from './paths.js';
+export { acquireSingletonLock, type SingletonLockOptions } from './lock/singleton.js';
 export {
   convertMarkdownToMrkdwn,
   convertMarkdownToBlocks,

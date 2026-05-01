@@ -6,7 +6,12 @@
  * 돌린다. library 로 쓰고 싶을 땐 `import { startDiscordRouter } from '...'` 로
  * index.ts 를 직접 import 한다 (bin.ts 의 side-effect 를 피하려고 분리).
  */
+import { acquireSingletonLock } from '@team-semicolon/semo-common';
 import { startDiscordRouter, type StopFn } from './index.js';
+
+// Singleton guard — prevent duplicate Discord gateway connections.
+// Background: 2026-05-01 incident; see semo decision/router-cmux-nudge-persistence.
+acquireSingletonLock({ name: 'discord-router', cmdMatch: 'discord-router/src/bin.ts' });
 
 async function main(): Promise<void> {
   let stop: StopFn;
