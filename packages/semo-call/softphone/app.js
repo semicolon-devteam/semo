@@ -185,9 +185,7 @@ btnCall.onclick = async () => {
       log('시그널링 서버 연결');
 
       // 3. PeerConnection 생성
-      pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-      });
+      pc = new RTCPeerConnection({ iceServers: buildIceServers() });
 
       localStream.getAudioTracks().forEach((track) => {
         pc.addTrack(track, localStream);
@@ -450,6 +448,19 @@ function stopBrowserSTT() {
   }
 }
 
+// ── ICE servers (STUN + TURN, NAT traversal 보강) ──
+function buildIceServers() {
+  return [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    {
+      urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443'],
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+  ];
+}
+
 // ── Standby Mode (대기 — 에이전트 발신 수신 대기) ──
 
 let pendingCallId = null;
@@ -600,7 +611,7 @@ btnAccept.onclick = async () => {
     setStatus('connecting', '연결 중...');
 
     // PeerConnection 생성 + offer
-    pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+    pc = new RTCPeerConnection({ iceServers: buildIceServers() });
     localStream.getAudioTracks().forEach((t) => pc.addTrack(t, localStream));
 
     pc.ontrack = (event) => {

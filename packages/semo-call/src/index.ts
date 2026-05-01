@@ -10,9 +10,12 @@
  *   SEMO_SERVICE_ID       — 세션 식별자
  *   VOICE_MODE            — console (기본) | webrtc | discord | twilio(미구현)
  *   VOICE_STT_PROVIDER    — console (기본) | deepgram | browser | local-whisper
- *   VOICE_TTS_PROVIDER    — console (기본) | openai | edge
+ *   VOICE_TTS_PROVIDER    — console (기본) | edge | elevenlabs
  *   DEEPGRAM_API_KEY      — Deepgram STT API 키
- *   OPENAI_API_KEY        — OpenAI TTS API 키
+ *   ELEVENLABS_API_KEY    — ElevenLabs TTS API 키
+ *   ELEVENLABS_VOICE_ID   — ElevenLabs voice id (필수, archetype별 매핑)
+ *   ELEVENLABS_MODEL_ID   — 기본 eleven_flash_v2_5 (저지연)
+ *   ELEVENLABS_OUTPUT_FORMAT — 기본 pcm_24000 (raw, ffmpeg 우회)
  *   WHISPER_MODEL         — local-whisper 모델 (small/medium/large-v3, 기본 medium)
  *   DISCORD_VOICE_API_URL/TOKEN, DISCORD_GUILD_ID/VOICE_CHANNEL_ID/USER_ID — discord 모드
  */
@@ -33,7 +36,7 @@ import {
   BrowserSTTAdapter,
   LocalWhisperSTTAdapter,
 } from './adapters/stt.js';
-import { ConsoleTTSAdapter, EdgeTTSAdapter } from './adapters/tts.js';
+import { ConsoleTTSAdapter, EdgeTTSAdapter, ElevenLabsTTSAdapter } from './adapters/tts.js';
 import { ConsoleTelephonyAdapter, WebRTCTelephonyAdapter } from './adapters/telephony.js';
 import { DiscordTelephonyAdapter } from './adapters/telephony-discord.js';
 import { TurnManager } from './turn-manager.js';
@@ -98,6 +101,19 @@ function createSTTAdapter(): STTAdapter {
 
 function createTTSAdapter(): TTSAdapter {
   switch (TTS_PROVIDER) {
+    case 'elevenlabs': {
+      const apiKey = process.env.ELEVENLABS_API_KEY || '';
+      const voiceId = process.env.ELEVENLABS_VOICE_ID || '';
+      if (!apiKey || !voiceId) {
+        console.error(
+          '[semo-call] elevenlabs requested but ELEVENLABS_API_KEY/ELEVENLABS_VOICE_ID missing — falling back to edge',
+        );
+        return new EdgeTTSAdapter({
+          voice: process.env.VOICE_TTS_VOICE || 'ko-KR-SunHiNeural',
+        });
+      }
+      return new ElevenLabsTTSAdapter({ apiKey, voiceId });
+    }
     case 'edge':
       return new EdgeTTSAdapter({
         voice: process.env.VOICE_TTS_VOICE || 'ko-KR-SunHiNeural',
@@ -564,6 +580,10 @@ async function start() {
   ttsAdapter.on('error', (err) => {
     console.error('[semo-call] TTS adapter error:', err);
   });
+  ttsAdapter.on('metrics', (m: Record<string, unknown>) => {
+    // 단일 라인 JSON: 향후 KPI 수집 파이프라인이 grep 가능하도록 prefix 고정
+    console.error(`[semo-call] tts.metrics ${JSON.stringify(m)}`);
+  });
   telephonyAdapter.on('error', (err) => {
     console.error('[semo-call] Telephony adapter error:', err);
   });
@@ -667,6 +687,18 @@ async function start() {
   // 6. STT + Telephony 시작
   await sttAdapter.start();
   await telephonyAdapter.listen();
+
+  // 7. ElevenLabs cold-start 흡수 — startup 직후 dummy 1자 speak로 워밍업
+  if (ttsAdapter instanceof ElevenLabsTTSAdapter) {
+    try {
+      const warm = await ttsAdapter.warmup();
+      console.error(
+        `[semo-call] elevenlabs warmup ok first_byte=${warm.first_byte_ms}ms total=${warm.total_ms}ms`,
+      );
+    } catch (err) {
+      console.error('[semo-call] elevenlabs warmup failed (non-fatal):', err);
+    }
+  }
 
   console.error(`[semo-call] Ready (mode=${VOICE_MODE}, stt=${STT_PROVIDER}, tts=${TTS_PROVIDER})`);
 }

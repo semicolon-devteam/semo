@@ -103,6 +103,35 @@ export class ConsoleTelephonyAdapter extends EventEmitter implements TelephonyAd
 const SIGNALING_PORT = parseInt(process.env.VOICE_SIGNALING_PORT || '8922', 10);
 const SIGNALING_TOKEN = process.env.VOICE_SIGNALING_TOKEN || '';
 const OFFER_TIMEOUT_MS = 10000; // signaling 연결 후 offer 대기 최대 10초
+
+/** ICE servers — STUN(default) + TURN(env 있으면 추가). NAT traversal 보강. */
+interface IceServerEntry {
+  urls: string | string[];
+  username?: string;
+  credential?: string;
+}
+function buildIceServers(): IceServerEntry[] {
+  const servers: IceServerEntry[] = [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ];
+  const turnUrl = process.env.TURN_URL;
+  if (turnUrl) {
+    servers.push({
+      urls: turnUrl, // 예: turn:openrelay.metered.ca:80
+      username: process.env.TURN_USERNAME || '',
+      credential: process.env.TURN_CREDENTIAL || '',
+    });
+  } else {
+    // 1차 dogfooding fallback — OpenRelay 무료 TURN (신뢰도 보통)
+    servers.push({
+      urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443'],
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    });
+  }
+  return servers;
+}
 const SESSION_MAX_DURATION_MS = 60 * 60 * 1000; // 최대 세션 1시간
 const ICE_RESTART_MAX = 2;
 
@@ -334,7 +363,7 @@ export class WebRTCTelephonyAdapter extends EventEmitter implements TelephonyAda
     let remoteDescSet = false;
 
     const pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      iceServers: buildIceServers(),
     });
 
     // Outbound audio source — TTS 결과를 브라우저로 전송
