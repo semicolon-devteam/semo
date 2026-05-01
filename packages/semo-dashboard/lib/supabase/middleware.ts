@@ -59,6 +59,8 @@ export async function updateSession(request: NextRequest) {
     // PWA static assets — must bypass auth redirect (no session in SW/manifest context)
     pathname === '/sw.js' ||
     pathname === '/manifest.webmanifest' ||
+    // Softphone PWA static — iframe 안 JS/HTML/icon (로그인 미들웨어로 가두면 흰 화면)
+    pathname.startsWith('/softphone/') ||
     // Voice push-trigger — has its own bearer token auth, no browser session
     pathname.startsWith('/api/voice/push-trigger') ||
     // VAPID public key — 공개 키, 인증 불필요
