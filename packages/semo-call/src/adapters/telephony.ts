@@ -596,6 +596,39 @@ export class WebRTCTelephonyAdapter extends EventEmitter implements TelephonyAda
     );
     this.emit('log', { event: 'outbound_ring', callId, target });
 
+    // Dashboard PWA Web Push 알림 (Phase A3 인프라 재활용) — fire-and-forget
+    // softphone 브라우저 탭이 백그라운드라도 OS lock screen 알림으로 깨움
+    const DASHBOARD_PUSH_URL = (process.env.DASHBOARD_PUSH_URL || '').replace(/\/$/, '');
+    const DASHBOARD_PUSH_TOKEN = process.env.DASHBOARD_PUSH_TOKEN || '';
+    if (DASHBOARD_PUSH_URL && DASHBOARD_PUSH_TOKEN && pickedUserId) {
+      void fetch(`${DASHBOARD_PUSH_URL}/api/voice/push-trigger`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${DASHBOARD_PUSH_TOKEN}`,
+        },
+        body: JSON.stringify({
+          user_id: pickedUserId,
+          title: '📞 SemoBot 통화',
+          body: target,
+          call_id: callId,
+          // PWA 모드 — softphone PWA 안에서 통화 받기. /voice 로 안내
+          guild_id: 'pwa',
+          channel_id: 'pwa',
+          ttl: 30,
+        }),
+      })
+        .then(async (res) => {
+          if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            console.error(`[webrtc] push-trigger failed (HTTP ${res.status}): ${txt}`);
+          } else {
+            console.error('[webrtc] push-trigger sent — softphone OS notification');
+          }
+        })
+        .catch((err) => console.error('[webrtc] push-trigger error:', err.message));
+    }
+
     // 사용자 수락 대기
     return new Promise<CallInfo>((resolve, reject) => {
       const ringTimer = setTimeout(() => {

@@ -41,26 +41,36 @@ self.addEventListener('push', (event) => {
   );
 });
 
-// 알림 탭 → /voice/join 중계 페이지 열기 (Codex 권장 fallback)
+// 알림 탭 처리 — guild_id 에 따라 분기
+//   - 'pwa' → /voice (softphone 자체 ring overlay 가 이미 떠 있음)
+//   - 그 외 → /voice/join (Discord deep link 중계, Phase A3)
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   if (event.action === 'reject') return;
 
   const data = event.notification.data || {};
-  const params = new URLSearchParams({
-    call_id: String(data.call_id || ''),
-    guild: String(data.guild_id || ''),
-    channel: String(data.channel_id || ''),
-  });
-  const url = `/voice/join?${params.toString()}`;
+  const isPwa = String(data.guild_id || '') === 'pwa';
+
+  let url;
+  if (isPwa) {
+    url = '/voice';
+  } else {
+    const params = new URLSearchParams({
+      call_id: String(data.call_id || ''),
+      guild: String(data.guild_id || ''),
+      channel: String(data.channel_id || ''),
+    });
+    url = `/voice/join?${params.toString()}`;
+  }
 
   event.waitUntil(
     (async () => {
       const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      // 같은 url 이미 열린 탭 있으면 focus
       for (const c of allClients) {
-        if (c.url.includes('/voice/join') && 'focus' in c) {
+        if (c.url.includes(isPwa ? '/voice' : '/voice/join') && 'focus' in c) {
           await c.focus();
-          await c.navigate(url).catch(() => {});
+          if ('navigate' in c) await c.navigate(url).catch(() => {});
           return;
         }
       }
