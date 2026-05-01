@@ -150,6 +150,34 @@ interface ScannedBot {
  * 봇 이름 하드코딩 금지 (NON-NEGOTIABLE) — FS 가 운영 SoT, KB ontology 와 정합.
  * 새 봇 추가는 디렉토리 생성으로 자동 감지.
  */
+/** S2: pump-stats.json 형식 (inbox-pump.ts writePumpStats 와 정합). */
+interface PumpStats {
+  bot_id: string;
+  pending: number;
+  sent: number;
+  skipped_busy: number;
+  skipped_dead: number;
+  last_pane_state?: 'idle' | 'busy' | 'dead';
+  last_pane_state_at?: string;
+  last_sent_at?: string;
+  pump_alive_at: string;
+}
+
+function loadPumpStats(botIds: string[]): Map<string, PumpStats> {
+  const out = new Map<string, PumpStats>();
+  const mboxDir = process.env.SEMO_MAILBOX_DIR ?? path.join(os.homedir(), '.semo', 'mailbox');
+  for (const bot of botIds) {
+    const p = path.join(mboxDir, bot, 'pump-stats.json');
+    if (!fs.existsSync(p)) continue;
+    try {
+      out.set(bot, JSON.parse(fs.readFileSync(p, 'utf8')) as PumpStats);
+    } catch {
+      // skip
+    }
+  }
+  return out;
+}
+
 function discoverBotIds(): string[] {
   if (!fs.existsSync(SEMO_WORKSPACES)) return [];
   try {
@@ -577,35 +605,59 @@ export function registerBotsCommands(program: Command): void {
         const bots: BotStatus[] = result.rows;
         spinner.stop();
 
+        // S2: pump-stats.json join — inbox-pump 활동 메트릭 (sent/skipped/dead/pending).
+        const pumpStats = loadPumpStats(bots.map((b) => b.bot_id));
+
         if (options.format === 'json') {
-          console.log(JSON.stringify(bots, null, 2));
+          console.log(
+            JSON.stringify(
+              bots.map((b) => ({ ...b, pump_stats: pumpStats.get(b.bot_id) ?? null })),
+              null,
+              2,
+            ),
+          );
         } else {
-          console.log(chalk.cyan.bold('\n🤖 봇 상태 (commitments 기반 derived)\n'));
+          console.log(chalk.cyan.bold('\n🤖 봇 상태 (commitments + inbox-pump 기반)\n'));
 
           if (bots.length === 0) {
             console.log(chalk.yellow('  봇 상태 데이터가 없습니다.'));
             console.log(chalk.gray("  'semo bots sync'로 초기 데이터를 적재하세요."));
           } else {
             console.log(
-              chalk.gray('  봇              이름                    상태         24h  마지막 활동'),
+              chalk.gray(
+                '  봇              이름                  활동      24h  pane    pending sent skip-d  마지막 활동',
+              ),
             );
-            console.log(chalk.gray('  ' + '─'.repeat(80)));
+            console.log(chalk.gray('  ' + '─'.repeat(110)));
             for (const b of bots) {
               const statusIcon =
                 b.derived_status === 'active'
-                  ? chalk.green('🟢 active ')
+                  ? chalk.green('🟢 act ')
                   : b.derived_status === 'recent'
-                    ? chalk.yellow('🟡 recent ')
+                    ? chalk.yellow('🟡 rcnt')
                     : b.derived_status === 'idle'
-                      ? chalk.gray('⚫ idle   ')
-                      : chalk.gray('⚪ none   ');
+                      ? chalk.gray('⚫ idle')
+                      : chalk.gray('⚪ none');
               const lastActive = b.last_commit_at
                 ? new Date(b.last_commit_at).toLocaleString('ko-KR')
                 : '-';
               const displayName = `${b.emoji || ''} ${b.name || b.bot_id}`.trim();
               const cnt24 = String(b.commit_count_24h ?? 0).padStart(3);
+              const ps = pumpStats.get(b.bot_id);
+              const pane = ps?.last_pane_state ?? '-';
+              const paneColored =
+                pane === 'idle'
+                  ? chalk.green(pane.padEnd(6))
+                  : pane === 'busy'
+                    ? chalk.yellow(pane.padEnd(6))
+                    : pane === 'dead'
+                      ? chalk.red(pane.padEnd(6))
+                      : chalk.gray(pane.toString().padEnd(6));
+              const pending = String(ps?.pending ?? '-').padStart(4);
+              const sent = String(ps?.sent ?? '-').padStart(4);
+              const skipDead = String(ps?.skipped_dead ?? '-').padStart(4);
               console.log(
-                `  ${b.bot_id.padEnd(16)}${displayName.padEnd(24)}${String(statusIcon).padEnd(12)}${cnt24}  ${lastActive}`,
+                `  ${b.bot_id.padEnd(16)}${displayName.padEnd(22)}${String(statusIcon).padEnd(8)}${cnt24}  ${paneColored} ${pending}  ${sent} ${skipDead}    ${lastActive}`,
               );
             }
           }
@@ -613,8 +665,13 @@ export function registerBotsCommands(program: Command): void {
           console.log();
           const active = bots.filter((b) => b.derived_status === 'active').length;
           const recent = bots.filter((b) => b.derived_status === 'recent').length;
+          const pumpAlive = Array.from(pumpStats.values()).filter(
+            (ps) => Date.now() - new Date(ps.pump_alive_at).getTime() < 60_000,
+          ).length;
           console.log(
-            chalk.gray(`  총 ${bots.length}개 봇 (active: ${active}, recent24h: ${recent})\n`),
+            chalk.gray(
+              `  총 ${bots.length}개 봇 (active: ${active}, recent24h: ${recent}, inbox-pump alive: ${pumpAlive})\n`,
+            ),
           );
         }
       } catch (err) {
