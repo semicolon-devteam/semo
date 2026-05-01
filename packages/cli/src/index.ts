@@ -1804,7 +1804,11 @@ kbCmd
       }
       await closeConnection();
     } catch (err) {
-      spinner.fail(`검색 실패: ${err}`);
+      const detail =
+        err instanceof AggregateError
+          ? `AggregateError: ${err.errors.map((e) => (e instanceof Error ? e.message : String(e))).join(' | ')}`
+          : String(err);
+      spinner.fail(`검색 실패: ${detail}`);
       await closeConnection();
       process.exit(1);
     }
