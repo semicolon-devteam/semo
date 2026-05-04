@@ -7,6 +7,7 @@
 
 import { Command } from 'commander';
 import chalk from 'chalk';
+import { isUsageRejection } from '@team-semicolon/semo-common';
 
 const SLACK_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
   semiclaw: { username: 'SemiClaw', icon_emoji: ':clipboard:' },
@@ -146,6 +147,18 @@ export function registerSlackCommands(program: Command): void {
         as?: string;
         json: boolean;
       }) => {
+        // Usage-rejection guard (2026-05-04 incident, third occurrence):
+        // 봇이 Bash 로 `semo slack post` 를 호출해 거부 텍스트를 그대로 게시하는 경로 차단.
+        if (isUsageRejection(opts.text)) {
+          console.error(
+            chalk.yellow(
+              `[slack post] BLOCKED — usage-rejection text. ` +
+                `claude.ai/settings/usage 충전 또는 윈도우 리셋 대기 후 재시도.`,
+            ),
+          );
+          process.exit(2);
+        }
+
         const token = getToken();
 
         const body: Record<string, unknown> = {

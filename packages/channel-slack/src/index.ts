@@ -25,6 +25,7 @@ import {
   ClaudeCodeAdapter,
   ConsoleAuditSink,
   InMemoryToolGateway,
+  isUsageRejection,
   type ToolCallRequest,
   type ToolDefinition,
 } from '@team-semicolon/semo-common';
@@ -444,6 +445,27 @@ mcp.setRequestHandler(CallToolRequestSchema, async (req) => {
       bot_id?: string;
       mode?: string;
     };
+
+    // Usage-rejection guard (2026-05-04 incident, second occurrence):
+    // OutboxReader 가드는 outbox.jsonl 경로만 보호. 봇이 channel-slack MCP 의 reply
+    // 도구를 직접 호출하면 그 가드를 우회하므로 여기서도 동일 패턴을 차단한다.
+    // 거부 텍스트가 그대로 chat.postMessage 로 흘러 나가서 운영 채널에 도배되는 것을 막음.
+    if (mode !== 'update' && isUsageRejection(text)) {
+      console.warn(
+        `[channel-slack] BLOCKED usage-rejection reply from bot=${bot_id || '(none)'}: ` +
+          `"${text.slice(0, 120)}"`,
+      );
+      return {
+        content: [
+          {
+            type: 'text',
+            text:
+              'Slack send blocked: text matched usage-rejection pattern. ' +
+              'Charge claude.ai/settings/usage or wait for window reset.',
+          },
+        ],
+      };
+    }
 
     // update 모드: 타이핑 인디케이터 상태 텍스트 변경 (busy 유지)
     if (mode === 'update') {

@@ -197,6 +197,24 @@ const slackEmitter = new SlackProjectionEmitter(slack.getWebClient(), {
   getBotProfiles: () => SLACK_PROFILES,
 });
 
+// Usage-rejection alerter — fired (throttled per-bot) when OutboxReader blocks
+// a reply because the text matches Claude Code's "out of extra usage" pattern.
+// (2026-05-04 incident: PlanClaw spammed #bot-ops with rejection text.)
+async function handleUsageRejection(botId: string, text: string): Promise<void> {
+  const channel = process.env.BOT_OPS_CHANNEL || '#bot-ops';
+  const snippet = text.slice(0, 200).replace(/\s+/g, ' ');
+  const body =
+    `:warning: *${botId}* 세션이 Claude 구독 사용량 한도에 도달했습니다 — 이후 응답을 임시 차단 중.\n` +
+    `해소: <https://claude.ai/settings/usage|claude.ai/settings/usage> 에서 extra usage 충전 또는 5시간 윈도우 리셋 대기.\n` +
+    `(원본: \`${snippet}\`)`;
+  try {
+    await slack.postAsBot('semiclaw', channel, body);
+    console.log(`[usage-guard] Alerted #bot-ops about ${botId} usage rejection.`);
+  } catch (err) {
+    console.error(`[usage-guard] Failed to post alert for ${botId}:`, err);
+  }
+}
+
 const outboxReader = new OutboxReader({
   mailboxDir: MAILBOX_DIR,
   botIds: [...FALLBACK_BOT_IDS, ...OVERFLOW_BOT_IDS],
@@ -207,6 +225,7 @@ const outboxReader = new OutboxReader({
   onEscalation: handleEscalation,
   onAskUser: handleAskUser,
   onReplyPosted: handleReplyPosted,
+  onUsageRejection: handleUsageRejection,
 });
 
 // ── Health Monitor ──
@@ -294,10 +313,21 @@ setInterval(() => reapStale().catch(() => {}), 60 * 60_000);
 /**
  * CronCreate 폴러가 매 분 `semiclaw/cron-poller-tick` 의 last_run 을 갱신해야 한다.
  * 5분 이상 정지하면 CronCreate 세션 만료/폴러 크래시/cmux 패인 종료 중 하나이므로
- * 즉시 #bot-ops 에 알린다. 회복되면 한 번만 recovery 통지.
+ * 즉시 #bot-ops 에 알린다.
+ *
+ * 2026-05-04 incident: 이전 구현은 stale 진입 시 alert 1회 후 silent — 사용자가 그 1회를
+ * 놓치면 11일째 정지되도록 묻혔음. 보강:
+ *   - REMINDER_INTERVAL 마다 같은 채널에 reminder 재게시 (여전히 정지 상태일 때)
+ *   - ESCALATION_THRESHOLD 도달 시 본문에 :rotating_light: ESCALATION 강조 + 별도 채널
+ *     (POLLER_ESCALATION_CHANNEL env) 으로 1회 escalation
+ *   - postAsBot 실패는 silent 가 아니라 console.error 로 명시 로그 (silent fail 제거)
  */
 const POLLER_STALE_THRESHOLD_MS = 5 * 60_000;
+const POLLER_REMINDER_INTERVAL_MS = 6 * 60 * 60_000; // 6h
+const POLLER_ESCALATION_THRESHOLD_MS = 24 * 60 * 60_000; // 24h
 let pollerAlertActive = false;
+let pollerAlertSentAt = 0;
+let pollerEscalated = false;
 
 async function checkPollerHeartbeat(): Promise<void> {
   try {
@@ -309,23 +339,62 @@ async function checkPollerHeartbeat(): Promise<void> {
     const lastRun = res.rows[0].last_run as Date | null;
     const ageMs = lastRun ? Date.now() - new Date(lastRun).getTime() : Number.POSITIVE_INFINITY;
     const channel = process.env.BOT_OPS_CHANNEL || '#bot-ops';
+    const escalationChannel = process.env.POLLER_ESCALATION_CHANNEL || channel;
 
-    if (ageMs > POLLER_STALE_THRESHOLD_MS && !pollerAlertActive) {
-      pollerAlertActive = true;
+    if (ageMs > POLLER_STALE_THRESHOLD_MS) {
       const mins = Math.round(ageMs / 60_000);
-      console.error(`[poller-watchdog] stale — last_run ${mins}m ago`);
-      await slack
-        .postAsBot(
+      const sinceLastAlert = Date.now() - pollerAlertSentAt;
+      const isFirst = !pollerAlertActive;
+      const isReminder = pollerAlertActive && sinceLastAlert >= POLLER_REMINDER_INTERVAL_MS;
+
+      if (isFirst || isReminder) {
+        pollerAlertActive = true;
+        pollerAlertSentAt = Date.now();
+        const tag = isReminder ? 'reminder' : 'stale';
+        console.error(`[poller-watchdog] ${tag} — last_run ${mins}m ago`);
+        try {
+          await slack.postAsBot(
+            'semiclaw',
+            channel,
+            `:rotating_light: cron-poller heartbeat ${tag} (${mins}m). ` +
+              `CronCreate 세션/폴러 패인 확인 필요. ` +
+              `복구 절차: ~/.semo/sessions/cron-poller/CLAUDE.md`,
+          );
+        } catch (err) {
+          console.error('[poller-watchdog] alert post failed:', err);
+        }
+      }
+
+      // 24h 이상 지속 → escalation (한 번만, 다른 채널이 설정돼 있으면 그쪽으로)
+      if (ageMs > POLLER_ESCALATION_THRESHOLD_MS && !pollerEscalated) {
+        pollerEscalated = true;
+        const hrs = Math.round(ageMs / (60 * 60_000));
+        console.error(`[poller-watchdog] ESCALATION — stale ${hrs}h`);
+        try {
+          await slack.postAsBot(
+            'semiclaw',
+            escalationChannel,
+            `:rotating_light: *ESCALATION* — cron-poller heartbeat 정지 ${hrs}h. ` +
+              `전체 cron 시스템이 멎은 상태입니다. ` +
+              `즉시 \`~/.semo/sessions/cron-poller/CLAUDE.md\` 의 "CronCreate 7일 만료 복구" 절차 실행 필요.`,
+          );
+        } catch (err) {
+          console.error('[poller-watchdog] escalation post failed:', err);
+        }
+      }
+    } else if (pollerAlertActive) {
+      pollerAlertActive = false;
+      pollerAlertSentAt = 0;
+      pollerEscalated = false;
+      try {
+        await slack.postAsBot(
           'semiclaw',
           channel,
-          `:rotating_light: cron-poller heartbeat stale (${mins}m). CronCreate 세션/폴러 패인 확인 필요.`,
-        )
-        .catch(() => {});
-    } else if (ageMs <= POLLER_STALE_THRESHOLD_MS && pollerAlertActive) {
-      pollerAlertActive = false;
-      await slack
-        .postAsBot('semiclaw', channel, ':white_check_mark: cron-poller heartbeat recovered.')
-        .catch(() => {});
+          ':white_check_mark: cron-poller heartbeat recovered.',
+        );
+      } catch (err) {
+        console.error('[poller-watchdog] recovery post failed:', err);
+      }
     }
   } catch (err) {
     console.error('[poller-watchdog] failed:', err);

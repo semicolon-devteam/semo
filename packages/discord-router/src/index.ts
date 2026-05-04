@@ -209,6 +209,14 @@ export async function startDiscordRouter(opts: StartOptions = {}): Promise<StopF
     inboxWriter,
     onEscalation: handleEscalation,
     onAskUser: handleAskUser,
+    // Usage-rejection alerts are surfaced via Slack #bot-ops by slack-router.
+    // discord-router only logs (avoid duplicate alerts; #bot-ops is Slack-only).
+    // 2026-05-04 incident: see semo decision/usage-rejection-guard.
+    onUsageRejection: async (botId, text) => {
+      console.warn(
+        `[discord-router] Blocked usage-rejection reply from ${botId}: ${text.slice(0, 120)}`,
+      );
+    },
   });
 
   async function handleDiscordMessage(msg: DiscordMessage, senderName: string): Promise<void> {

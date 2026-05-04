@@ -10,8 +10,11 @@ import * as path from 'path';
 import type { OutboxMessage } from './types.js';
 import type { InboxWriter } from './inbox-writer.js';
 import type { ProjectionChannel, ProjectionEmitter } from '../runtime/projection-emitter.js';
+import { isUsageRejection } from './usage-rejection.js';
 
 const POLL_INTERVAL_MS = 500;
+/** Per-bot throttle for usage-rejection alerts: at most one alert per hour per bot. */
+const USAGE_REJECTION_NOTIFY_INTERVAL_MS = 60 * 60_000;
 
 /** Platform-agnostic gateway interface for posting messages */
 export interface GatewayAdapter {
@@ -31,11 +34,18 @@ export class OutboxReader {
   private readonly onEscalation: (msg: OutboxMessage) => Promise<void>;
   private readonly onAskUser: (msg: OutboxMessage) => Promise<void>;
   private readonly onReplyPosted?: (msg: OutboxMessage) => Promise<void>;
+  /**
+   * Fired (throttled) when a bot's reply text matches a Claude Code usage-rejection
+   * pattern. Router decides how to surface it (Slack #bot-ops, console, etc.).
+   */
+  private readonly onUsageRejection?: (botId: string, text: string) => Promise<void>;
   /** Track byte offset per bot to only read new content */
   private fileOffsets = new Map<string, number>();
   /** Prevent concurrent processOutbox for same bot */
   private processing = new Set<string>();
   private watchers: fs.FSWatcher[] = [];
+  /** Per-bot last usage-rejection alert epoch ms (throttle). */
+  private usageRejectionNotifiedAt = new Map<string, number>();
 
   constructor(opts: {
     mailboxDir: string;
@@ -49,6 +59,12 @@ export class OutboxReader {
     onAskUser: (msg: OutboxMessage) => Promise<void>;
     /** Fired after a successful `reply` post — used by router to mark commitments done */
     onReplyPosted?: (msg: OutboxMessage) => Promise<void>;
+    /**
+     * Fired when an outgoing reply is blocked because its text matches a Claude Code
+     * usage-rejection pattern (extra usage exhausted, LLM request rejected, etc.).
+     * Throttled per-bot to avoid #bot-ops spam.
+     */
+    onUsageRejection?: (botId: string, text: string) => Promise<void>;
   }) {
     this.mailboxDir = opts.mailboxDir;
     this.botIds = opts.botIds;
@@ -59,6 +75,7 @@ export class OutboxReader {
     this.onEscalation = opts.onEscalation;
     this.onAskUser = opts.onAskUser;
     this.onReplyPosted = opts.onReplyPosted;
+    this.onUsageRejection = opts.onUsageRejection;
   }
 
   start(): void {
@@ -190,6 +207,35 @@ export class OutboxReader {
     switch (msg.type) {
       case 'reply':
         if (msg.text) {
+          // Usage-rejection guard (2026-05-04 incident): if the reply text is a
+          // Claude Code "out of extra usage" / "LLM request rejected" message,
+          // do NOT post it to Slack/Discord. Instead, fire onUsageRejection at
+          // most once per hour per bot so router can alert #bot-ops.
+          if (isUsageRejection(msg.text)) {
+            const last = this.usageRejectionNotifiedAt.get(msg.bot_id) ?? 0;
+            const elapsed = Date.now() - last;
+            const shouldNotify = elapsed >= USAGE_REJECTION_NOTIFY_INTERVAL_MS;
+            console.warn(
+              `[outbox] BLOCKED usage-rejection reply from ${msg.bot_id} ` +
+                `(notify=${shouldNotify}, "${msg.text.slice(0, 80)}")`,
+            );
+            if (shouldNotify) {
+              this.usageRejectionNotifiedAt.set(msg.bot_id, Date.now());
+              if (this.onUsageRejection) {
+                try {
+                  await this.onUsageRejection(msg.bot_id, msg.text);
+                } catch (err) {
+                  console.error(
+                    `[outbox] onUsageRejection callback failed for ${msg.bot_id}:`,
+                    err,
+                  );
+                }
+              }
+            }
+            // Skip posting + skip onReplyPosted (commitment will be reaped as stale_auto).
+            break;
+          }
+
           try {
             console.log(
               `[outbox] Posting reply from ${msg.bot_id}: "${msg.text.slice(0, 30)}" (id: ${msg.id?.slice(0, 8)})`,
