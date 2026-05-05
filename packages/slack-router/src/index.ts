@@ -228,25 +228,49 @@ const outboxReader = new OutboxReader({
   onUsageRejection: handleUsageRejection,
 });
 
-// ── Health Monitor ──
-
-const healthMonitor = new HealthMonitor({
-  mailboxDir: MAILBOX_DIR,
-  botIds: [...FALLBACK_BOT_IDS, ...OVERFLOW_BOT_IDS],
-  sessionDir: SESSION_DIR,
-  onRestart: async (botId) => {
-    console.log(`[health] ${botId} restarted — posting notification`);
-    try {
-      await slack.postAsBot(
-        'semiclaw',
-        process.env.ADMIN_CHANNEL || '',
-        `[System] ${botId} session restarted (health check failure).`,
-      );
-    } catch {
-      // non-fatal
-    }
-  },
-});
+// ── Health Monitor (Architecture B 전용) ──
+// 2026-05-06: OpenClaw 공존 운영을 위해 monitor 대상을 명시적으로 좁힘.
+//   - SEMO_HEALTH_AUTO_RESTART_BOTS env 미설정 시 비활성 (false dead alert 방지)
+//   - 설정 시 콤마 구분 botId 목록만 monitor (예: "incubator,semiclaw-overflow")
+//   - OpenClaw 가 관리하는 7봇은 절대 monitor 대상이 아님 (semiclaw, planclaw, designclaw,
+//     workclaw, reviewclaw, infraclaw, growthclaw)
+const HEALTH_BOTS_RAW = (process.env.SEMO_HEALTH_AUTO_RESTART_BOTS || '').trim();
+const OPENCLAW_BOTS = new Set([
+  'semiclaw',
+  'planclaw',
+  'designclaw',
+  'workclaw',
+  'reviewclaw',
+  'infraclaw',
+  'growthclaw',
+]);
+const HEALTH_BOT_IDS = HEALTH_BOTS_RAW
+  ? HEALTH_BOTS_RAW.split(',')
+      .map((b) => b.trim())
+      .filter((b) => b && !OPENCLAW_BOTS.has(b))
+  : [];
+const healthMonitor = HEALTH_BOT_IDS.length
+  ? new HealthMonitor({
+      mailboxDir: MAILBOX_DIR,
+      botIds: HEALTH_BOT_IDS,
+      sessionDir: SESSION_DIR,
+      onRestart: async (botId) => {
+        console.log(`[health] ${botId} restarted — posting notification`);
+        try {
+          await slack.postAsBot(
+            'semiclaw',
+            process.env.SLACK_ROUTER_OPS_CHANNEL || process.env.ADMIN_CHANNEL || '',
+            `[System] ${botId} session restarted (health check failure).`,
+          );
+        } catch {
+          // non-fatal
+        }
+      },
+    })
+  : null;
+console.log(
+  `[health-monitor] ${HEALTH_BOT_IDS.length ? `monitoring [${HEALTH_BOT_IDS.join(',')}]` : 'disabled (SEMO_HEALTH_AUTO_RESTART_BOTS empty)'}`,
+);
 
 // ── Incubator Channel Filter ──
 
@@ -331,14 +355,20 @@ let pollerEscalated = false;
 
 async function checkPollerHeartbeat(): Promise<void> {
   try {
-    const res = await pool.query(
-      `SELECT last_run FROM semo.bot_cron_jobs
+    // 2026-05-06: cron-poller-tick 잡이 disabled 면 watchdog 자체를 skip.
+    // OpenClaw 공존 운영 시 Architecture B cron-poller 는 deprecated 가능 — 이 분기로 noise 차단.
+    const jobRes = await pool.query(
+      `SELECT enabled, last_run FROM semo.bot_cron_jobs
         WHERE bot_id = 'semiclaw' AND job_id = 'cron-poller-tick'`,
     );
-    if (!res.rows.length) return;
-    const lastRun = res.rows[0].last_run as Date | null;
+    if (!jobRes.rows.length) return;
+    const enabled = jobRes.rows[0].enabled !== false;
+    if (!enabled) return; // 잡 disabled → 알림 안 함
+
+    const lastRun = jobRes.rows[0].last_run as Date | null;
     const ageMs = lastRun ? Date.now() - new Date(lastRun).getTime() : Number.POSITIVE_INFINITY;
-    const channel = process.env.BOT_OPS_CHANNEL || '#bot-ops';
+    const channel =
+      process.env.SLACK_ROUTER_OPS_CHANNEL || process.env.BOT_OPS_CHANNEL || '#bot-ops';
     const escalationChannel = process.env.POLLER_ESCALATION_CHANNEL || channel;
 
     if (ageMs > POLLER_STALE_THRESHOLD_MS) {
@@ -576,9 +606,13 @@ async function start(): Promise<void> {
   outboxReader.start();
   console.log('[slack-router] Outbox reader started');
 
-  // 5. Start health monitor
-  healthMonitor.start();
-  console.log('[slack-router] Health monitor started');
+  // 5. Start health monitor (대상이 있을 때만)
+  if (healthMonitor) {
+    healthMonitor.start();
+    console.log('[slack-router] Health monitor started');
+  } else {
+    console.log('[slack-router] Health monitor skipped (no SEMO_HEALTH_AUTO_RESTART_BOTS)');
+  }
 
   console.log('[slack-router] Ready');
 }
@@ -587,7 +621,7 @@ async function start(): Promise<void> {
 
 async function shutdown(): Promise<void> {
   console.log('[slack-router] Shutting down...');
-  healthMonitor.stop();
+  healthMonitor?.stop();
   outboxReader.stop();
   await slack.stop();
   await pool.end();
