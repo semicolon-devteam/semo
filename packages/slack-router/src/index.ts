@@ -235,15 +235,16 @@ const outboxReader = new OutboxReader({
 //   - OpenClaw 가 관리하는 7봇은 절대 monitor 대상이 아님 (semiclaw, planclaw, designclaw,
 //     workclaw, reviewclaw, infraclaw, growthclaw)
 const HEALTH_BOTS_RAW = (process.env.SEMO_HEALTH_AUTO_RESTART_BOTS || '').trim();
-const OPENCLAW_BOTS = new Set([
-  'semiclaw',
-  'planclaw',
-  'designclaw',
-  'workclaw',
-  'reviewclaw',
-  'infraclaw',
-  'growthclaw',
-]);
+// OPENCLAW_NATIVE_BOTS env 로 override 가능 (콤마 구분). 미설정 시 fallback.
+// (Codex 권장: 추후 KB/서비스 metadata 로 이동 — 현재 env override 만 지원)
+const OPENCLAW_BOTS_RAW = (process.env.OPENCLAW_NATIVE_BOTS || '').trim();
+const OPENCLAW_BOTS = new Set(
+  OPENCLAW_BOTS_RAW
+    ? OPENCLAW_BOTS_RAW.split(',')
+        .map((b) => b.trim())
+        .filter(Boolean)
+    : ['semiclaw', 'planclaw', 'designclaw', 'workclaw', 'reviewclaw', 'infraclaw', 'growthclaw'],
+);
 const HEALTH_BOT_IDS = HEALTH_BOTS_RAW
   ? HEALTH_BOTS_RAW.split(',')
       .map((b) => b.trim())
@@ -514,8 +515,8 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
     await pool.query(
       `INSERT INTO semo.bot_commitments
          (id, bot_id, status, title, source_type, source_ref,
-          session_owner, assigned_session, pipeline_context)
-       VALUES ($1, $2, 'active', $3, 'slack-inbox', $4, $5, $6, $7)
+          session_owner, assigned_session, pipeline_context, runtime_source)
+       VALUES ($1, $2, 'active', $3, 'slack-inbox', $4, $5, $6, $7, 'slack-router')
        ON CONFLICT DO NOTHING`,
       [
         commitmentId,
