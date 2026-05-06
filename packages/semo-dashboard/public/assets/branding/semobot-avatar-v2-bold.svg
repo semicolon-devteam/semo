@@ -1,0 +1,44 @@
+<!--
+  SemoBot Slack Avatar — Radar Eye · Variation 2 "Bold"
+  메인안 대비: 링 수 줄임(3개), 선 굵기 업, 중앙 점 대형 + 외곽 틱 제거
+  → 소형 사이즈(36×36 채널 목록)에서 선명도 우선
+  Palette : Dark Navy #0F172A (bg) · Electric Teal #22D3EE (fg)
+  Created : 2026-05-06 · DesignClaw
+  Brief   : semo/decision/semobot-avatar-brief
+-->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 512 512"
+  width="512"
+  height="512"
+  role="img"
+  aria-label="SemoBot avatar – Radar Eye Bold"
+>
+  <style>
+    .bg        { fill: #0F172A; }
+    .ring-b    { fill: none; stroke: #22D3EE; stroke-linecap: round; }
+    .rb-1      { stroke-width: 3;   opacity: 0.30; }
+    .rb-2      { stroke-width: 4;   opacity: 0.55; }
+    .rb-3      { stroke-width: 5;   opacity: 0.85; }
+    .glow-b    { fill: none; stroke: #22D3EE; stroke-width: 20; opacity: 0.06; }
+    .iris-b    { fill: none; stroke: #22D3EE; stroke-width: 5; opacity: 0.95; }
+    .pupil-b   { fill: #22D3EE; }
+  </style>
+
+  <circle class="bg" cx="256" cy="256" r="256"/>
+
+  <!-- 외곽 소프트 글로우 -->
+  <circle class="glow-b" cx="256" cy="256" r="210"/>
+
+  <!-- 동심원 3링 (bold) -->
+  <circle class="ring-b rb-1" cx="256" cy="256" r="180"/>
+  <circle class="ring-b rb-2" cx="256" cy="256" r="120"/>
+  <circle class="ring-b rb-3" cx="256" cy="256" r="62"/>
+
+  <!-- 아이리스 -->
+  <circle class="iris-b" cx="256" cy="256" r="32"/>
+
+  <!-- 중앙 퓨필 — 대형 -->
+  <circle class="pupil-b" cx="256" cy="256" r="14"/>
+  <circle cx="250" cy="250" r="4.5" fill="#FFFFFF" opacity="0.50"/>
+</svg>

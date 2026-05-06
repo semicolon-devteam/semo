@@ -1,0 +1,80 @@
+<!--
+  SemoBot Slack Avatar — Radar Eye · Variation 3 "Scan"
+  메인안 대비: 스캔 섹터(쐐기형 하이라이트) 추가 → 레이더 스캔 중 느낌
+  링 4개 유지, 쐐기 그라데이션으로 동적인 인상 강조
+  Palette : Dark Navy #0F172A (bg) · Electric Teal #22D3EE (fg)
+  Created : 2026-05-06 · DesignClaw
+  Brief   : semo/decision/semobot-avatar-brief
+-->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 512 512"
+  width="512"
+  height="512"
+  role="img"
+  aria-label="SemoBot avatar – Radar Eye Scan"
+>
+  <defs>
+    <!-- 스캔 섹터 그라데이션 (중앙에서 바깥으로) -->
+    <radialGradient id="scanGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#22D3EE" stop-opacity="0.00"/>
+      <stop offset="40%"  stop-color="#22D3EE" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#22D3EE" stop-opacity="0.22"/>
+    </radialGradient>
+    <!-- 중앙 글로우 -->
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%"   stop-color="#22D3EE" stop-opacity="0.80"/>
+      <stop offset="100%" stop-color="#22D3EE" stop-opacity="0.00"/>
+    </radialGradient>
+    <!-- 배경 클립 -->
+    <clipPath id="circleClip">
+      <circle cx="256" cy="256" r="244"/>
+    </clipPath>
+  </defs>
+
+  <style>
+    .bg        { fill: #0F172A; }
+    .ring-s    { fill: none; stroke: #22D3EE; stroke-linecap: round; }
+    .rs-1      { stroke-width: 2; opacity: 0.20; }
+    .rs-2      { stroke-width: 2; opacity: 0.36; }
+    .rs-3      { stroke-width: 2.5; opacity: 0.55; }
+    .rs-4      { stroke-width: 3; opacity: 0.80; }
+    .scan-line { stroke: #22D3EE; stroke-width: 2; opacity: 0.65; stroke-linecap: round; }
+    .iris-s    { fill: none; stroke: #22D3EE; stroke-width: 3; opacity: 0.90; }
+    .pupil-s   { fill: #22D3EE; }
+  </style>
+
+  <!-- 배경 -->
+  <circle class="bg" cx="256" cy="256" r="256"/>
+
+  <!-- 스캔 섹터 (약 45° 쐐기, 우상단 방향) — 레이더 스캔 중 느낌 -->
+  <g clip-path="url(#circleClip)">
+    <!-- 쐐기: 중앙(256,256) 에서 약 -30°~+15° 방향 -->
+    <path
+      d="M256,256 L456,100 A210,210 0 0,0 370,60 Z"
+      fill="url(#scanGrad)"
+    />
+    <!-- 스캔 라인 (쐐기 선두) -->
+    <line class="scan-line" x1="256" y1="256" x2="456" y2="100"/>
+  </g>
+
+  <!-- 동심원 링 4개 -->
+  <circle class="ring-s rs-1" cx="256" cy="256" r="195"/>
+  <circle class="ring-s rs-2" cx="256" cy="256" r="148"/>
+  <circle class="ring-s rs-3" cx="256" cy="256" r="102"/>
+  <circle class="ring-s rs-4" cx="256" cy="256" r="58"/>
+
+  <!-- 십자 크로스헤어 (내부 짧은 틱만) -->
+  <line class="scan-line" x1="256" y1="148" x2="256" y2="172" opacity="0.40"/>
+  <line class="scan-line" x1="256" y1="340" x2="256" y2="364" opacity="0.40"/>
+  <line class="scan-line" x1="148" y1="256" x2="172" y2="256" opacity="0.40"/>
+  <line class="scan-line" x1="340" y1="256" x2="364" y2="256" opacity="0.40"/>
+
+  <!-- 아이리스 -->
+  <circle class="iris-s" cx="256" cy="256" r="30"/>
+
+  <!-- 중앙 글로우 + 퓨필 -->
+  <circle cx="256" cy="256" r="22" fill="url(#centerGlow)"/>
+  <circle class="pupil-s" cx="256" cy="256" r="9"/>
+  <circle cx="252" cy="252" r="3" fill="#FFFFFF" opacity="0.55"/>
+</svg>

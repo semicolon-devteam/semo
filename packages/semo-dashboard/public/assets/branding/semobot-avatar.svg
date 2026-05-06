@@ -1,0 +1,66 @@
+<!--
+  SemoBot Slack Avatar — Radar Eye (1차 확정안)
+  Concept : 동심원 레이더 + 중앙 관찰 포인트 (Sentinel / Monitoring 톤)
+  Palette : Dark Navy #0F172A (bg) · Electric Teal #22D3EE (fg)
+  Created : 2026-05-06 · DesignClaw
+  Brief   : semo/decision/semobot-avatar-brief
+  Size    : 512 × 512 (Slack App icon 권장 규격)
+-->
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 512 512"
+  width="512"
+  height="512"
+  role="img"
+  aria-label="SemoBot avatar – Radar Eye"
+>
+  <style>
+    .bg        { fill: #0F172A; }
+    .ring      { fill: none; stroke: #22D3EE; stroke-linecap: round; }
+    .ring-1    { stroke-width: 2.5; opacity: 0.22; }
+    .ring-2    { stroke-width: 2.5; opacity: 0.34; }
+    .ring-3    { stroke-width: 2.5; opacity: 0.48; }
+    .ring-4    { stroke-width: 3;   opacity: 0.64; }
+    .ring-5    { stroke-width: 3;   opacity: 0.82; }
+    .crosshair { stroke: #22D3EE; stroke-linecap: round; }
+    .ch-outer  { stroke-width: 1.5; opacity: 0.28; }
+    .ch-inner  { stroke-width: 1.5; opacity: 0.50; }
+    .iris      { fill: none; stroke: #22D3EE; stroke-width: 3; opacity: 0.90; }
+    .pupil     { fill: #22D3EE; }
+    .glow-ring { fill: none; stroke: #22D3EE; stroke-width: 12; opacity: 0.08; }
+  </style>
+
+  <!-- 배경 — 정원형 마스크로 Slack 아이콘 형태에 맞춤 -->
+  <circle class="bg" cx="256" cy="256" r="256"/>
+
+  <!-- 외곽 글로우 (가장 부드러운 광선 느낌) -->
+  <circle class="glow-ring" cx="256" cy="256" r="220"/>
+
+  <!-- 동심원 레이더 링 — 5단계, 바깥→안쪽 순 -->
+  <circle class="ring ring-1" cx="256" cy="256" r="200"/>
+  <circle class="ring ring-2" cx="256" cy="256" r="160"/>
+  <circle class="ring ring-3" cx="256" cy="256" r="122"/>
+  <circle class="ring ring-4" cx="256" cy="256" r="86"/>
+  <circle class="ring ring-5" cx="256" cy="256" r="52"/>
+
+  <!-- 크로스헤어 — 외곽 (긴 라인) -->
+  <line class="crosshair ch-outer" x1="256" y1="40"  x2="256" y2="100"/>
+  <line class="crosshair ch-outer" x1="256" y1="412" x2="256" y2="472"/>
+  <line class="crosshair ch-outer" x1="40"  y1="256" x2="100" y2="256"/>
+  <line class="crosshair ch-outer" x1="412" y1="256" x2="472" y2="256"/>
+
+  <!-- 크로스헤어 — 내부 (짧은 틱) -->
+  <line class="crosshair ch-inner" x1="256" y1="148" x2="256" y2="180"/>
+  <line class="crosshair ch-inner" x1="256" y1="332" x2="256" y2="364"/>
+  <line class="crosshair ch-inner" x1="148" y1="256" x2="180" y2="256"/>
+  <line class="crosshair ch-inner" x1="332" y1="256" x2="364" y2="256"/>
+
+  <!-- 아이리스 원 (눈 느낌 강조) -->
+  <circle class="iris" cx="256" cy="256" r="30"/>
+
+  <!-- 중앙 퓨필 — 관찰 포인트 -->
+  <circle class="pupil" cx="256" cy="256" r="9"/>
+
+  <!-- 퓨필 내부 하이라이트 (입체감) -->
+  <circle cx="252" cy="252" r="3" fill="#FFFFFF" opacity="0.55"/>
+</svg>
