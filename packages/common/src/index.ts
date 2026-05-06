@@ -44,3 +44,12 @@ export {
   type AlertClaim,
   type EscalationQueryable,
 } from './escalation/commitment-pattern.js';
+
+export {
+  appendCommitmentEvent,
+  deriveIdempotencyKey,
+  projectCommitmentFromEvents,
+  type CommitmentEventType,
+  type CommitmentEventInput,
+  type ProjectedCommitmentState,
+} from './escalation/commitment-events.js';

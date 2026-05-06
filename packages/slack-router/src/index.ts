@@ -33,6 +33,7 @@ import {
   assertCmuxAncestry,
   recordCommitmentFailure,
   recordCommitmentSuccess,
+  appendCommitmentEvent,
   claimNotifiedAlert,
   claimPagedAlert,
   type SlackMessage,
@@ -210,6 +211,19 @@ async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
       console.log(`[commitment] done: ${row.id} (${msg.bot_id}) ← ${sourceRef}`);
       // C3 PR2: pattern escalation 카운터 reset. 실패해도 원래 흐름 막지 않음.
       await recordCommitmentSuccess(pool, row.bot_id, row.title);
+      // C5 dual-write: status_changed event for replay/audit.
+      try {
+        await appendCommitmentEvent(pool, {
+          commitment_id: row.id,
+          event_type: 'status_changed',
+          occurred_at: new Date(),
+          bot_id: row.bot_id,
+          source_type: 'slack-inbox',
+          payload: { to_status: 'done', trigger_source: 'slack-router-outbox-reply' },
+        });
+      } catch (err) {
+        console.warn('[commitment-events] outbox-done append failed', err);
+      }
     }
   } catch (err) {
     console.error(`[commitment] UPDATE done failed for ${msg.bot_id}:`, err);
@@ -390,8 +404,21 @@ async function reapStale(): Promise<void> {
       // C3 PR2: 자동 stale-reap 도 패턴 카운터에 적재. 한 번에 다수 row 가 reap
       // 될 수 있으므로 각각 독립적으로 escalation 호출 — 같은 패턴이 한 번에
       // 여러 row 로 떠 있던 경우 각 row 가 1회 실패로 카운트된다.
+      const reapedAt = new Date();
       for (const row of commitRes.rows) {
         await recordCommitmentFailure(pool, row.bot_id, row.title);
+        // C5 dual-write: stale_reaped event for replay/audit.
+        try {
+          await appendCommitmentEvent(pool, {
+            commitment_id: row.id,
+            event_type: 'stale_reaped',
+            occurred_at: reapedAt,
+            bot_id: row.bot_id,
+            payload: { reason: 'stale_auto' },
+          });
+        } catch (err) {
+          console.warn('[commitment-events] stale-reap append failed', err);
+        }
       }
     }
 

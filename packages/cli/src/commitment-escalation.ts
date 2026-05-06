@@ -17,10 +17,13 @@ import {
   recordCommitmentSuccess as recordCommitmentSuccessWithPool,
   claimNotifiedAlert as claimNotifiedAlertWithPool,
   claimPagedAlert as claimPagedAlertWithPool,
+  appendCommitmentEvent as appendCommitmentEventWithPool,
   ESCALATION_THRESHOLDS,
   type EscalationResult,
   type EscalationState,
   type AlertClaim,
+  type CommitmentEventInput,
+  type EscalationQueryable,
 } from '@team-semicolon/semo-common';
 
 import { getPool } from './database';
@@ -69,4 +72,30 @@ export async function claimPagedAlert(patternId: string): Promise<AlertClaim | n
   const pool = poolOrNull();
   if (!pool) return null;
   return claimPagedAlertWithPool(pool, patternId);
+}
+
+/**
+ * C5 dual-write: best-effort append to semo.commitment_events. Swallows errors
+ * during dual-write phase (bot_commitments remains read source). After flip to
+ * event-source-of-truth this becomes load-bearing — caller policy will tighten.
+ *
+ * Pass `queryable` (a PoolClient inside an open transaction) when the original
+ * mutation is transactional, so the event write rolls back together. Otherwise
+ * pass nothing to use cli's singleton pool autocommit.
+ */
+export async function recordCommitmentEvent(
+  input: CommitmentEventInput,
+  queryable?: EscalationQueryable,
+): Promise<void> {
+  try {
+    const target = queryable ?? poolOrNull();
+    if (!target) return;
+    await appendCommitmentEventWithPool(target, input);
+  } catch (err) {
+    console.warn('[commitment-events] append failed', {
+      event_type: input.event_type,
+      commitment_id: input.commitment_id,
+      err: err instanceof Error ? err.message : String(err),
+    });
+  }
 }
