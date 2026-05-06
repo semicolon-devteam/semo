@@ -22,6 +22,7 @@ import * as crypto from 'crypto';
 import cronParser from 'cron-parser';
 import { getPool, closeConnection } from '../database';
 import { resolveBotWorkspace } from '../paths';
+import { recordCommitmentFailure, recordCommitmentSuccess } from '@team-semicolon/semo-common';
 
 const CRON_TZ = 'Asia/Seoul';
 const POLLER_JOB_ID = 'cron-poller-tick';
@@ -552,6 +553,7 @@ async function cronMarkRun(opts: {
 
     const finishedAt = new Date(new Date(opts.startedAt).getTime() + opts.durationMs).toISOString();
 
+    const commitmentTitle = `cron: ${job.name}`;
     await client.query(
       `INSERT INTO semo.bot_commitments
          (id, bot_id, status, title, description,
@@ -568,7 +570,7 @@ async function cronMarkRun(opts: {
         commitmentId,
         opts.botId,
         commitmentStatus,
-        `cron: ${job.name}`,
+        commitmentTitle,
         `schedule=${scheduleExpr} run_status=${opts.status} duration=${opts.durationMs}ms`,
         `cron:${opts.jobId}`,
         sessionTag,
@@ -578,6 +580,15 @@ async function cronMarkRun(opts: {
         opts.startedAt,
       ],
     );
+
+    // C3 PR2: cron 마감을 패턴 escalation 카운터에 적재. 같은 transaction
+    // client 를 넘겨서 cron transaction 이 이후 단계에서 rollback 되면 패턴
+    // 카운터 갱신도 함께 되돌려진다 (separate connection autocommit 방지).
+    if (commitmentStatus === 'failed') {
+      await recordCommitmentFailure(client, opts.botId, commitmentTitle);
+    } else if (commitmentStatus === 'done') {
+      await recordCommitmentSuccess(client, opts.botId, commitmentTitle);
+    }
 
     let consecutiveFailures = 0;
     if (opts.status === 'skipped') {

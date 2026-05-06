@@ -20,6 +20,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { getPool, closeConnection, isDbConnected } from '../database';
+import { recordCommitmentFailure, recordCommitmentSuccess } from '../commitment-escalation';
 
 // ─── Sidecar helpers ─────────────────────────────────────────────────────────
 
@@ -200,6 +201,8 @@ export function registerAgentFlushCommands(program: Command): void {
           );
           for (const row of result.rows) {
             process.stderr.write(`[agent-flush] done: ${row.id} (${row.bot_id}) — ${row.title}\n`);
+            // C3 PR2: pattern escalation 카운터 reset.
+            await recordCommitmentSuccess(row.bot_id, row.title);
           }
           truncateSidecar(parentSessionId);
         } else if (options.bot) {
@@ -208,18 +211,20 @@ export function registerAgentFlushCommands(program: Command): void {
           // cron은 데몬이 mark-run으로 직접 마감하므로 둘 다 여기서는 건드리지 않는다
           // — 봇 Stop 훅이 살아있는 외부 작업을 조기 마감하는 것을 방지
           const sessionKey = parentSessionId ? localSessionKey(parentSessionId) : '';
-          const result = await pool.query(
+          const result = await pool.query<{ id: string; bot_id: string; title: string }>(
             `UPDATE semo.bot_commitments
              SET status = 'done'
              WHERE bot_id = $1
                AND status IN ('pending', 'active')
                AND source_type NOT IN ('slack-inbox', 'cron')
                AND ($2 = '' OR assigned_session = $2)
-             RETURNING id, title`,
+             RETURNING id, bot_id, title`,
             [options.bot, sessionKey],
           );
           for (const row of result.rows) {
             process.stderr.write(`[agent-flush:fallback] done: ${row.id} — ${row.title}\n`);
+            // C3 PR2: pattern escalation 카운터 reset.
+            await recordCommitmentSuccess(row.bot_id, row.title);
           }
         }
       } catch (err) {
@@ -287,13 +292,18 @@ export function registerAgentFlushCommands(program: Command): void {
         // 1. 잔여 commitment 정리 (session-end-orphan)
         if (entries.length > 0) {
           const ids = entries.map((e) => e.id);
-          await pool.query(
+          const orphanResult = await pool.query<{ id: string; bot_id: string; title: string }>(
             `UPDATE semo.bot_commitments
              SET status = 'failed',
-                 metadata = metadata || jsonb_build_object('fail_reason', 'session-end-orphan')
-             WHERE id = ANY($1::text[]) AND status IN ('pending', 'active')`,
+                 metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('fail_reason', 'session-end-orphan')
+             WHERE id = ANY($1::text[]) AND status IN ('pending', 'active')
+             RETURNING id, bot_id, title`,
             [ids],
           );
+          // C3 PR2: orphan reaped failure 도 패턴 카운터에 적재.
+          for (const row of orphanResult.rows) {
+            await recordCommitmentFailure(row.bot_id, row.title);
+          }
           truncateSidecar(parentSessionId);
         }
 
