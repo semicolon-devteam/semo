@@ -5,11 +5,14 @@
  * 예: 한 봇의 표시명이 바뀌어도 기존 inbox/메일박스/FK 를 유지하기 위해 alias 행을
  * 추가하고 입력 별칭을 canonical 로 변환한다.
  *
- * ⚠️ SemoBot 은 SemiClaw 의 별 alias/리브랜드가 아니라 *별 에이전트* 이다 (semo
- * decision/semobot-independent-agent-2026-05-06). 둘 사이의 alias 행은 의도 X —
- * 발견 시 retired_at 처리 후 코드/메시지 라우팅 영향 분석 필요.
- *
  * 라우팅 진입점에서 입력 bot_id를 canonical로 정규화해야 위임/메일박스/FK가 일관성을 유지한다.
+ *
+ * ⚠️ SemoBot 은 SemiClaw 의 alias/리브랜드가 아니라 *독립 에이전트* 이다
+ * (KB: semo decision/semobot-independent-agent-2026-05-06).
+ *  - migration 104 (2026-04-23) 가 리브랜드 1단계로 'semiclaw → semobot' alias 를 깔았으나,
+ *    2026-05-06 결정으로 분리됨에 따라 migration 118 에서 retired_at 처리됨.
+ *  - 두 봇 사이에 새 alias 행을 깔지 말 것 — orchestrator 트래픽이 persona-only SemoBot
+ *    으로 흘러가서 inbox 부재로 침묵 실패한다.
  */
 
 import { Pool } from 'pg';
