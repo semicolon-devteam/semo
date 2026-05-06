@@ -33,6 +33,8 @@ import {
   assertCmuxAncestry,
   recordCommitmentFailure,
   recordCommitmentSuccess,
+  claimNotifiedAlert,
+  claimPagedAlert,
   type SlackMessage,
   type InboxMessage,
   type OutboxMessage,
@@ -395,6 +397,87 @@ async function reapStale(): Promise<void> {
 
 // Reap every hour
 setInterval(() => reapStale().catch(() => {}), 60 * 60_000);
+
+// ── Commitment Pattern Escalation Alert Scanner ──
+
+/**
+ * commitment_pattern_health 테이블에서 미발송 escalation alert 를 스캔해서
+ * #bot-ops 에 포스팅한다. PR2 가 적재한 (state, NULL claim_at) row 가 대상.
+ *
+ * 발송 흐름 (race-safe):
+ *   1. 후보 조회 (state set, 해당 claim 컬럼 IS NULL) — 인덱스 사용.
+ *   2. 각 row 별 claimNotifiedAlert / claimPagedAlert — Postgres row lock 으로
+ *      첫 caller 만 row 받음.
+ *   3. claim 성공 row 만 #bot-ops 포스트.
+ *
+ * Post 실패 시: claim 컬럼은 이미 set 됐으므로 자동 재시도 없음. 운영자 개입
+ * 필요 — pattern_id/state 로 별도 운영 도구 (또는 parameterized SQL) 로 해당
+ * `notified_at` / `paged_at` 컬럼을 NULL 로 되돌리면 다음 스캔에 재발송된다.
+ * 자동 retry 는 PR4 (alert outbox 또는 posted_at/last_error 컬럼) 에서 도입.
+ *
+ * 검증: /tmp/ouroboros-sandbox/evidence/c3_results.json — replay 결과 7 cron 패턴
+ * 이 paged 도달했으므로 scanner 활성화 시점에 대량 alert 가능. PR3 머지 직후
+ * 소량 throttle 고려 필요 시 LIMIT 또는 channel rate-limit 도입.
+ */
+async function scanAndPostEscalationAlerts(): Promise<void> {
+  const channel = process.env.BOT_OPS_CHANNEL || process.env.SLACK_ROUTER_OPS_CHANNEL || '#bot-ops';
+  if (!channel) return;
+
+  try {
+    const { rows } = await pool.query<{
+      pattern_id: string;
+      state: 'notified' | 'paged';
+    }>(
+      `SELECT pattern_id, state
+       FROM semo.commitment_pattern_health
+       WHERE (state = 'notified' AND notified_at IS NULL)
+          OR (state = 'paged' AND paged_at IS NULL)
+       ORDER BY last_failure_at DESC
+       LIMIT 20`,
+    );
+    if (rows.length === 0) return;
+
+    for (const candidate of rows) {
+      const claim =
+        candidate.state === 'paged'
+          ? await claimPagedAlert(pool, candidate.pattern_id)
+          : await claimNotifiedAlert(pool, candidate.pattern_id);
+      if (!claim) continue;
+
+      const tierEmoji = claim.state === 'paged' ? ':rotating_light:' : ':warning:';
+      const tierLabel = claim.state === 'paged' ? 'PAGED' : 'NOTIFIED';
+      // pattern_id 와 title_prefix 는 commitment title 에서 파생되므로 운영자
+      // 입력으로 흘러들어갈 수 있다. 메시지 본문에 SQL 을 미리 조립하지 말고
+      // 운영자가 안전하게 parameterized 쿼리로 재시도할 수 있도록 raw 값만 노출.
+      const body =
+        `${tierEmoji} *Commitment pattern ${tierLabel}* — ${claim.bot_id}\n` +
+        `\`${claim.title_prefix}\` 패턴이 ${claim.consecutive_failures}회 연속 실패. ` +
+        `Ouroboros C3 escalation.\n` +
+        `• \`pattern_id\` (그대로 복사): \`${claim.pattern_id}\`\n` +
+        `• state: \`${claim.state}\` → 재알림 시 \`${claim.state}_at\` 컬럼을 NULL 로. ` +
+        `복귀는 패턴 원인 진단 후 별도 SQL/CLI 로 진행.`;
+
+      try {
+        await slack.postAsBot('semiclaw', channel, body);
+        console.log(
+          `[escalation-alert] posted ${claim.state} for ${claim.pattern_id} (${claim.consecutive_failures} fails)`,
+        );
+      } catch (err) {
+        // Claim 은 이미 set — 재시도 없음. 운영자가 NULL 로 되돌려 재발송.
+        console.error(
+          `[escalation-alert] post failed for ${claim.pattern_id} (claim retained, manual retry needed):`,
+          err,
+        );
+      }
+    }
+  } catch (err) {
+    console.error('[escalation-alert] scan failed:', err);
+  }
+}
+
+// 30s 주기 — 빠른 반응 vs DB 부하 절충. 실패 패턴 카운터는 commitments fail 직후
+// 갱신되므로 N초 지연은 허용. notified (2회) 도달 시 다음 스캔에 즉시 발송.
+setInterval(() => scanAndPostEscalationAlerts().catch(() => {}), 30 * 1000);
 
 // ── Cron Poller Watchdog ──
 
