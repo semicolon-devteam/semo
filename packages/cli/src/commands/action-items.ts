@@ -32,6 +32,93 @@ async function resolveActionItemId(pool: Pool, input: string): Promise<string> {
   return res.rows[0].action_item_id;
 }
 
+// ─── Ouroboros C1 — Ambiguity Ranker (phase 1: deterministic heuristic) ─────
+// 디자인: /tmp/ouroboros-sandbox/evidence/c1_results.json (LLM 기반 sandbox 결과 —
+// 'default floor 가 빡세서 0/8 통과') 의 후속. LLM 호출 없이 description text 만으로
+// goal / constraint / success 3축을 0~1 로 점수화한다. 운영 noise 0 (분석/조회 전용).
+//
+// LLM 기반 phase 2 는 PR4 outbox/lifecycle 도착 후 별도 트랙. 둘이 공존해도 문제 없도록
+// 구조 분리.
+
+interface AmbiguityScore {
+  goal: number;
+  constraint: number;
+  success: number;
+  overall: number;
+  flags: string[];
+}
+
+function scoreActionItem(description: string): AmbiguityScore {
+  const desc = description.trim();
+  const lower = desc.toLowerCase();
+  const len = desc.length;
+  const flags: string[] = [];
+
+  // Goal: actionable verb + specific subject
+  let goal = 0.5;
+  if (/\b(add|create|implement|fix|delete|update|remove|enable|migrate|wire|publish)\b/i.test(desc))
+    goal += 0.15;
+  if (/(추가|생성|구현|수정|삭제|업데이트|제거|활성화|마이그레이션|배포|작성|등록)/.test(desc))
+    goal += 0.15;
+  // 구체적 주체 표시 — 파일경로, 패키지, 테이블명 등
+  if (/\bpackages?\/|\bsrc\/|\.(ts|tsx|sql|json|md|yml)\b/i.test(desc)) goal += 0.1;
+  if (/\bsemo\.\w+|\bbot_\w+|\bmigration\b/i.test(desc)) goal += 0.1;
+  if (len < 30) {
+    goal -= 0.2;
+    flags.push('too-short');
+  }
+  goal = Math.max(0, Math.min(1, goal));
+
+  // Constraint: scope qualifiers, structured items, bounds
+  let constraint = 0.5;
+  // 구조화된 리스트 (1) (2) (3) 또는 - 항목들
+  const structuredItems =
+    (desc.match(/\((\d+)\)/g) || []).length + (desc.match(/(?:^|\n)\s*[-•]\s/g) || []).length;
+  if (structuredItems >= 2) constraint += 0.2;
+  if (structuredItems >= 4) constraint += 0.1;
+  // 시간/리소스 한계
+  if (/(\d+(시간|분|일|주|월|h|d|m)\b|\b(deadline|마감|by\s|까지))/i.test(desc)) constraint += 0.1;
+  // 외부 참조 — KB / PR / issue / URL / commit
+  if (
+    /\b(KB:|kb\s+get|kb\s+upsert|PR\s*#?\d+|issue\s*#?\d+|https?:\/\/|commit\s+[0-9a-f]{7})/i.test(
+      desc,
+    )
+  )
+    constraint += 0.15;
+  // 명시 dependency / blocked by
+  if (/blocked|의존|선행|이후|다음|먼저|prerequisite/i.test(desc)) constraint += 0.05;
+  if (len < 50 && structuredItems === 0) {
+    constraint -= 0.15;
+    flags.push('no-scope');
+  }
+  constraint = Math.max(0, Math.min(1, constraint));
+
+  // Success: measurable outcome / verification path
+  let success = 0.45;
+  // verification keywords
+  if (/(검증|확인|verify|test|smoke|sample|case|건|개|회|번|회수)/i.test(desc)) success += 0.15;
+  // numeric thresholds
+  if (/\b\d+(\s*(건|개|%|회|배|배수|ms|s|분|시간|일|회수))/.test(desc)) success += 0.15;
+  // 명시 PR / merge / publish / close
+  if (/(merge|머지|publish|close|resolve|complete|완료|종료|적용)/i.test(desc)) success += 0.1;
+  // CI/QG 통과
+  if (/\b(CI|QG|quality\s*gate|workflow|pipeline)\b/i.test(desc)) success += 0.1;
+  // vague closure verbs — 점수 차감
+  if (/(알아보기|검토만|조사만|논의\s*$|라운드\s*$|살펴보기|체크해보기)/i.test(desc)) {
+    success -= 0.2;
+    flags.push('vague-verb');
+  }
+  // 단일 단문 + 액션 성공조건 부재
+  if (len < 60 && !/[\d건개%]/i.test(desc)) {
+    success -= 0.1;
+    flags.push('no-measurable');
+  }
+  success = Math.max(0, Math.min(1, success));
+
+  const overall = 0.4 * goal + 0.3 * constraint + 0.3 * success;
+  return { goal, constraint, success, overall, flags };
+}
+
 export function registerActionItemsCommands(program: Command): void {
   const cmd = program.command('action-items').description('액션 아이템 관리 (DB SoT)');
 
@@ -241,6 +328,116 @@ export function registerActionItemsCommands(program: Command): void {
         console.log(`  status: ${res.rows[0].status} | desc: ${res.rows[0].description}`);
       } catch (err) {
         console.error(chalk.red('업데이트 실패:'), err instanceof Error ? err.message : err);
+        process.exit(1);
+      } finally {
+        await closeConnection();
+      }
+    });
+
+  // ── semo action-items rank ──
+  // Ouroboros C1 — Ambiguity Ranker, phase 1 (deterministic heuristic, no LLM).
+  // 평가 축: goal / constraint / success (각 [0,1]) + overall = 0.4*goal + 0.3*constraint + 0.3*success.
+  // 디폴트 floor 는 LLM 기반 sandbox 보다 permissive — 운영 noise 회피 + per-tenant 재캘리브레이션 여지.
+  // CLI-only 분석 도구 — Slack 알림이나 DB 변경 없음.
+  cmd
+    .command('rank')
+    .description('액션 아이템 ambiguity 점수 (offline heuristic, C1 phase 1)')
+    .option('--owner <domain>', '특정 담당자만')
+    .option('--target <domain>', '특정 서비스만')
+    .option('--status <state>', '상태 필터 (open|completed)', 'open')
+    .option('--threshold <n>', 'overall 점수 < threshold 인 항목만 (0~1)', '1')
+    .option('--limit <n>', '최대 결과 수', '50')
+    .option('--format <type>', '출력 형식 (table|json)', 'table')
+    .action(async (options) => {
+      if (!(await isDbConnected())) {
+        console.error(chalk.red('DB 연결 실패'));
+        process.exit(1);
+      }
+      const pool = getPool();
+      try {
+        const params: unknown[] = [];
+        const where: string[] = [];
+        if (options.status === 'open' || options.status === 'completed') {
+          where.push(`status = $${params.length + 1}`);
+          params.push(options.status);
+        }
+        if (options.owner) {
+          where.push(`owner_domain = $${params.length + 1}`);
+          params.push(options.owner);
+        }
+        if (options.target) {
+          where.push(`target_domain = $${params.length + 1}`);
+          params.push(options.target);
+        }
+        const limit = Math.max(1, Math.min(parseInt(options.limit, 10) || 50, 500));
+        const threshold = Math.max(0, Math.min(parseFloat(options.threshold) || 1, 1));
+
+        params.push(limit);
+        const res = await pool.query<{
+          action_item_id: string;
+          owner_domain: string;
+          target_domain: string | null;
+          description: string;
+          priority: string;
+          deadline: Date | null;
+        }>(
+          `SELECT action_item_id, owner_domain, target_domain, description, priority, deadline
+           FROM semo.action_items
+           ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+           ORDER BY created_at DESC
+           LIMIT $${params.length}`,
+          params,
+        );
+
+        const ranked = res.rows
+          .map((r) => ({ row: r, score: scoreActionItem(r.description) }))
+          .filter((x) => x.score.overall < threshold)
+          .sort((a, b) => a.score.overall - b.score.overall);
+
+        if (options.format === 'json') {
+          console.log(
+            JSON.stringify(
+              ranked.map((x) => ({
+                action_item_id: x.row.action_item_id,
+                owner: x.row.owner_domain,
+                target: x.row.target_domain,
+                priority: x.row.priority,
+                description_preview: x.row.description.slice(0, 80),
+                ...x.score,
+              })),
+              null,
+              2,
+            ),
+          );
+        } else {
+          console.log(
+            chalk.bold(
+              `\n🎯 Ambiguity Rank — ${ranked.length}/${res.rows.length} items below threshold ${threshold}\n`,
+            ),
+          );
+          if (ranked.length === 0) {
+            console.log(chalk.green('  ✓ no items flagged'));
+          } else {
+            for (const x of ranked) {
+              const id8 = x.row.action_item_id.slice(0, 8);
+              const overall = x.score.overall.toFixed(2);
+              const g = x.score.goal.toFixed(2);
+              const c = x.score.constraint.toFixed(2);
+              const s = x.score.success.toFixed(2);
+              const flagsStr = x.score.flags.length
+                ? chalk.yellow(`  [${x.score.flags.join(', ')}]`)
+                : '';
+              console.log(
+                `  ${chalk.cyan(id8)} ${chalk.gray(x.row.owner_domain.padEnd(12))} ` +
+                  `overall=${overall} (g=${g} c=${c} s=${s})${flagsStr}`,
+              );
+              console.log(`    ${chalk.gray(x.row.description.slice(0, 100))}`);
+            }
+          }
+          console.log();
+        }
+      } catch (err) {
+        console.error(chalk.red('rank 실패:'), err instanceof Error ? err.message : err);
         process.exit(1);
       } finally {
         await closeConnection();
