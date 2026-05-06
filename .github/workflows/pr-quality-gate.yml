@@ -34,7 +34,15 @@ jobs:
             || ls node_modules/@tailwindcss/oxide-linux-x64-gnu/
       - run: npm run lint
       - run: npx tsc --noEmit --project packages/cli/tsconfig.json
-      - run: npm run build
+      # Dashboard packages throw at build time if NEXT_PUBLIC_SUPABASE_* are missing
+      # (lib/supabase/config.ts). Pass placeholder values so the static page-data
+      # collection in `next build` doesn't trip the env guard. Real values are
+      # supplied in production via DEV_ENV_FILE_CONTENT (dev-ci-cd.yml docker build).
+      - name: Build (with placeholder NEXT_PUBLIC_SUPABASE_* for static analysis)
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: placeholder-anon-key-for-ci-build-only
+        run: npm run build
       - name: CLI bundle smoke (esbuild → single file)
         run: npm run bundle -w @team-semicolon/semo-cli
       - name: Bundle sanity (--version + dry-run init)
