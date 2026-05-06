@@ -22,13 +22,13 @@ jobs:
       # tailwindcss v4 + @tailwindcss/postcss → lightningcss requires its native binary
       # package (lightningcss-linux-x64-gnu) at runtime; without it the dashboard build
       # fails with "Cannot find module '../lightningcss.linux-x64-gnu.node'".
-      # Force-install the missing platform binaries (no lockfile changes via --no-save +
-      # --no-package-lock).
-      - name: Force-install platform-specific lightningcss binary
+      # --no-save preserves package.json; we keep the existing lockfile (no --no-package-lock)
+      # so the rest of the dependency tree is unchanged, and just add the one missing binary.
+      - name: Install platform-specific lightningcss binary
         run: |
-          npm install --no-save --no-package-lock --force \
+          npm install --no-save --ignore-scripts \
             lightningcss-linux-x64-gnu@1.31.1
-          ls node_modules/lightningcss-linux-x64-gnu/ || true
+          test -f node_modules/lightningcss-linux-x64-gnu/lightningcss.linux-x64-gnu.node
       - run: npm run lint
       - run: npx tsc --noEmit --project packages/cli/tsconfig.json
       - run: npm run build
