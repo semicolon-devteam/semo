@@ -597,8 +597,9 @@ setInterval(() => checkPollerHeartbeat().catch(() => {}), 3 * 60_000);
  * deterministic command words sent to SemoBot are answered directly by slack-router
  * with the SemoBot persona, never delegated to SemiClaw orchestrator.
  *
- * Scope (v1):
- *   - `status` — system snapshot (router pid/uptime, pattern_health, recent commitment activity)
+ * Scope:
+ *   - `status` (5a) — system snapshot (router pid/uptime, pattern_health, recent commitment activity)
+ *   - `incident` / `incidents` (5b) — open SEMO incident summary or per-slug detail
  *
  * Out of scope: LLM responses, multi-turn dialogue, inbox/mailbox for SemoBot.
  * These remain SemiClaw's territory until later phases.
@@ -644,10 +645,89 @@ async function composeSemoBotStatus(): Promise<string> {
 
   lines.push(`• slack-router: pid=${process.pid}, uptime=${Math.round(process.uptime())}s`);
   lines.push(
-    `_더 자세한 가이드/incident 는 \`incident\` 명령 (Phase 5b) 또는 KB 직접 조회 — semo decision/semobot-independent-agent-2026-05-06_`,
+    `_open incident 목록은 \`incident\` 명령, 특정 사고는 \`incident <slug>\` — KB SoT: semo decision/semobot-independent-agent-2026-05-06_`,
   );
 
   return lines.join('\n');
+}
+
+/**
+ * `@SemoBot incident` (slug 미지정) — 열린 SEMO incident 요약.
+ * `@SemoBot incident <slug>` — 해당 incident 의 본문 + metadata.
+ *
+ * `domain='semo'` 한정 (SemoBot 의 system management/guidance 영역). 다른 도메인의
+ * incident 는 의도적으로 표시하지 않음 — 운영 가이드 발신자 역할 유지.
+ *
+ * 출력은 운영자에게 *상황 안내* 만 — SemoBot 은 해결자가 아니라 정보 전달자.
+ */
+async function composeSemoBotIncident(slug: string | null): Promise<string> {
+  if (slug) {
+    try {
+      const { rows } = await pool.query<{
+        sub_key: string;
+        content: string;
+        metadata: Record<string, unknown> | null;
+        updated_at: Date;
+      }>(
+        `SELECT sub_key, content, metadata, updated_at
+         FROM semo.knowledge_base
+         WHERE domain = 'semo' AND key = 'incident' AND sub_key = $1`,
+        [slug],
+      );
+      if (rows.length === 0) {
+        return `:warning: incident not found: \`semo/incident/${slug}\``;
+      }
+      const r = rows[0];
+      const m = r.metadata ?? {};
+      const status = String(m.status ?? 'unknown');
+      const severity = String(m.severity ?? 'unknown');
+      const occurred = String(m.occurred_at ?? 'unknown');
+      const preview = (r.content ?? '').replace(/\s+/g, ' ').trim().slice(0, 300);
+      return [
+        `:rotating_light: *Incident — ${slug}*`,
+        `• status: \`${status}\` · severity: \`${severity}\` · occurred_at: \`${occurred}\``,
+        `• updated_at: ${r.updated_at.toISOString()}`,
+        `> ${preview}${(r.content?.length ?? 0) > 300 ? '…' : ''}`,
+        `_full content: \`semo kb get semo incident ${slug}\`_`,
+      ].join('\n');
+    } catch (err) {
+      return `:warning: DB query failed: ${err instanceof Error ? err.message : String(err)}`;
+    }
+  }
+
+  // List mode — open incidents (status not in resolved/closed terminal set).
+  try {
+    const { rows } = await pool.query<{
+      sub_key: string;
+      status: string | null;
+      severity: string | null;
+      occurred_at: string | null;
+    }>(
+      `SELECT
+         sub_key,
+         metadata->>'status' AS status,
+         metadata->>'severity' AS severity,
+         metadata->>'occurred_at' AS occurred_at
+       FROM semo.knowledge_base
+       WHERE domain = 'semo' AND key = 'incident'
+         AND COALESCE(metadata->>'status', 'open') NOT IN ('resolved', 'postmortem', 'closed')
+       ORDER BY metadata->>'occurred_at' DESC NULLS LAST
+       LIMIT 10`,
+    );
+    if (rows.length === 0) {
+      return ':white_check_mark: *SemoBot incident*\n_open SEMO incident 없음._';
+    }
+    const lines = [`:rotating_light: *SemoBot — open SEMO incidents (${rows.length})*`];
+    for (const r of rows) {
+      lines.push(
+        `• \`${r.sub_key}\` — status: \`${r.status ?? 'open'}\`, severity: \`${r.severity ?? '?'}\`, occurred: \`${r.occurred_at ?? '?'}\``,
+      );
+    }
+    lines.push(`_세부: \`@SemoBot incident <slug>\` 또는 \`semo kb get semo incident <slug>\`_`);
+    return lines.join('\n');
+  } catch (err) {
+    return `:warning: DB query failed: ${err instanceof Error ? err.message : String(err)}`;
+  }
 }
 
 /**
@@ -655,8 +735,10 @@ async function composeSemoBotStatus(): Promise<string> {
  * 스킵). 매칭 없으면 false → handleSlackMessage 가 정상 라우팅으로 진행.
  */
 async function maybeHandleSemoBotCommand(msg: SlackMessage): Promise<boolean> {
-  const text = msg.text.trim().toLowerCase();
-  const firstWord = text.split(/\s+/)[0] ?? '';
+  const text = msg.text.trim();
+  const lowerText = text.toLowerCase();
+  const tokens = lowerText.split(/\s+/);
+  const firstWord = tokens[0] ?? '';
 
   if (firstWord === 'status' || firstWord === '/status') {
     try {
@@ -665,6 +747,22 @@ async function maybeHandleSemoBotCommand(msg: SlackMessage): Promise<boolean> {
       console.log(`[semobot-cmd] status responded in ${msg.channel}`);
     } catch (err) {
       console.error('[semobot-cmd] status failed:', err);
+    }
+    return true;
+  }
+
+  if (firstWord === 'incident' || firstWord === 'incidents' || firstWord === '/incident') {
+    // sub_key from raw (case-preserving) text — KB sub_key 가 case-sensitive 일 수 있음.
+    // 안전하게 \w. - 만 허용. 첫 토큰 뒤 첫 인자.
+    const rawTokens = text.split(/\s+/);
+    const slugCandidate = (rawTokens[1] ?? '').replace(/[^A-Za-z0-9_.\-]/g, '');
+    const slug = slugCandidate.length > 0 ? slugCandidate : null;
+    try {
+      const body = await composeSemoBotIncident(slug);
+      await postSystemMessage(msg.channel, body, msg.thread_ts);
+      console.log(`[semobot-cmd] incident${slug ? ` ${slug}` : ''} responded in ${msg.channel}`);
+    } catch (err) {
+      console.error('[semobot-cmd] incident failed:', err);
     }
     return true;
   }
