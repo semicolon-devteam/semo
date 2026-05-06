@@ -18,12 +18,17 @@ jobs:
           node-version: 20
       - run: npm ci
       # Workaround for npm/cli#4828: npm ci skips platform-specific optionalDependencies
-      # when lockfile was generated on a different platform (macOS → linux runner).
-      # tailwindcss v4 + @tailwindcss/postcss → lightningcss requires the matching
-      # native binary package (lightningcss-linux-x64-gnu). Without it the dashboard
-      # build fails with "Cannot find module '../lightningcss.linux-x64-gnu.node'".
-      - name: Ensure platform-specific native binaries
-        run: npm install --no-save --include=optional --ignore-scripts
+      # when the lockfile was generated on a different platform (macOS → linux runner).
+      # tailwindcss v4 + @tailwindcss/postcss → lightningcss requires its native binary
+      # package (lightningcss-linux-x64-gnu) at runtime; without it the dashboard build
+      # fails with "Cannot find module '../lightningcss.linux-x64-gnu.node'".
+      # Force-install the missing platform binaries (no lockfile changes via --no-save +
+      # --no-package-lock).
+      - name: Force-install platform-specific lightningcss binary
+        run: |
+          npm install --no-save --no-package-lock --force \
+            lightningcss-linux-x64-gnu@1.31.1
+          ls node_modules/lightningcss-linux-x64-gnu/ || true
       - run: npm run lint
       - run: npx tsc --noEmit --project packages/cli/tsconfig.json
       - run: npm run build
