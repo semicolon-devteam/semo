@@ -8,7 +8,12 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { getPool, closeConnection, isDbConnected } from '../database';
-import { recordCommitmentFailure, recordCommitmentSuccess } from '../commitment-escalation';
+import {
+  recordCommitmentFailure,
+  recordCommitmentSuccess,
+  recordCommitmentEvent,
+} from '../commitment-escalation';
+import { projectCommitmentFromEvents } from '@team-semicolon/semo-common';
 
 // ─── ID 생성 ─────────────────────────────────────────────────────────────────
 
@@ -90,6 +95,19 @@ export function registerCommitmentsCommands(program: Command): void {
             JSON.stringify(steps),
           ],
         );
+        await recordCommitmentEvent({
+          commitment_id: id,
+          event_type: 'commitment_created',
+          occurred_at: new Date(),
+          bot_id: options.botId,
+          source_type: options.sourceType ?? null,
+          payload: {
+            title: options.title,
+            source_ref: options.sourceRef ?? null,
+            deadline_at: deadlineAt,
+            initial_steps: steps.length,
+          },
+        });
         console.log(chalk.green(`✔ commitment created: ${id}`));
         if (!options.sourceType) {
           console.log(chalk.yellow(`⚠ source-type 미지정: 자동 검증 불가. --source-type 권장.`));
@@ -129,13 +147,23 @@ export function registerCommitmentsCommands(program: Command): void {
         const pool = getPool();
 
         if (options.heartbeat) {
-          await pool.query(
+          const hbResult = await pool.query<{ bot_id: string; status: string }>(
             `UPDATE semo.bot_commitments
              SET last_heartbeat_at = NOW(),
                  status = CASE WHEN status = 'pending' THEN 'active' ELSE status END
-             WHERE id = $1`,
+             WHERE id = $1
+             RETURNING bot_id, status`,
             [id],
           );
+          if (hbResult.rowCount && hbResult.rowCount > 0) {
+            await recordCommitmentEvent({
+              commitment_id: id,
+              event_type: 'heartbeat',
+              occurred_at: new Date(),
+              bot_id: hbResult.rows[0].bot_id,
+              payload: {},
+            });
+          }
           console.log(chalk.green(`✔ heartbeat updated: ${id}`));
         }
 
@@ -170,8 +198,15 @@ export function registerCommitmentsCommands(program: Command): void {
             );
           } else {
             console.log(chalk.green(`✔ status → ${targetStatus}: ${id}`));
-            // C3: 실제 terminal transition 일 때만 패턴 카운터 갱신.
             const row = result.rows[0];
+            await recordCommitmentEvent({
+              commitment_id: row.id,
+              event_type: 'status_changed',
+              occurred_at: new Date(),
+              bot_id: row.bot_id,
+              payload: { to_status: row.status, trigger_source: 'cli-update-status' },
+            });
+            // C3: 실제 terminal transition 일 때만 패턴 카운터 갱신.
             if (row.status === 'failed') {
               const esc = await recordCommitmentFailure(row.bot_id, row.title);
               if (esc?.state_changed) {
@@ -189,7 +224,7 @@ export function registerCommitmentsCommands(program: Command): void {
         }
 
         if (options.stepDone) {
-          await pool.query(
+          const stepResult = await pool.query<{ bot_id: string }>(
             `UPDATE semo.bot_commitments
              SET steps = (
                SELECT jsonb_agg(
@@ -200,9 +235,19 @@ export function registerCommitmentsCommands(program: Command): void {
                )
                FROM jsonb_array_elements(steps) AS elem
              )
-             WHERE id = $1`,
+             WHERE id = $1
+             RETURNING bot_id`,
             [id, options.stepDone],
           );
+          if (stepResult.rowCount && stepResult.rowCount > 0) {
+            await recordCommitmentEvent({
+              commitment_id: id,
+              event_type: 'step_done',
+              occurred_at: new Date(),
+              bot_id: stepResult.rows[0].bot_id,
+              payload: { step_label: options.stepDone },
+            });
+          }
           console.log(chalk.green(`✔ step done "${options.stepDone}": ${id}`));
         }
       } catch (err) {
@@ -235,6 +280,13 @@ export function registerCommitmentsCommands(program: Command): void {
           console.error(chalk.yellow(`⚠ commitment 없거나 이미 종료됨: ${id}`));
         } else {
           console.log(chalk.green(`✔ commitment done: ${id}`));
+          await recordCommitmentEvent({
+            commitment_id: id,
+            event_type: 'status_changed',
+            occurred_at: new Date(),
+            bot_id: result.rows[0].bot_id,
+            payload: { to_status: 'done', trigger_source: 'cli-done' },
+          });
           // C3: 패턴 단위 escalation 카운터 reset. 실패해도 원래 흐름 막지 않음.
           await recordCommitmentSuccess(result.rows[0].bot_id, result.rows[0].title);
         }
@@ -274,6 +326,17 @@ export function registerCommitmentsCommands(program: Command): void {
           console.error(chalk.yellow(`⚠ commitment 없거나 이미 종료됨: ${id}`));
         } else {
           console.log(chalk.green(`✔ commitment failed: ${id}`));
+          await recordCommitmentEvent({
+            commitment_id: id,
+            event_type: 'status_changed',
+            occurred_at: new Date(),
+            bot_id: result.rows[0].bot_id,
+            payload: {
+              to_status: 'failed',
+              trigger_source: 'cli-fail',
+              fail_reason: options.reason ?? null,
+            },
+          });
           // C3: 패턴 단위 escalation 카운터 증가. 실패해도 원래 흐름 막지 않음.
           const esc = await recordCommitmentFailure(result.rows[0].bot_id, result.rows[0].title);
           if (esc?.state_changed) {
@@ -693,6 +756,163 @@ export function registerCommitmentsCommands(program: Command): void {
         }
       } catch (err) {
         console.error(chalk.red(`❌ summary 실패: ${err}`));
+        process.exit(1);
+      } finally {
+        await closeConnection();
+      }
+    });
+
+  // ── semo commitments replay ────────────────────────────────────────────────
+  // C5 dual-write 검증: commitment_events 만으로 재구성한 상태 vs 실제
+  // bot_commitments 행 비교. divergence 0 이 7일 유지되면 read source flip 후보.
+  cmd
+    .command('replay')
+    .description('C5 dual-write replay: commitment_events 재구성 결과를 bot_commitments 와 비교')
+    .option('--id <commitment-id>', '특정 commitment 만 검사')
+    .option('--verify', 'verify 모드 — divergence 만 출력 (분석/CI 용)')
+    .option('--limit <n>', '최근 N건 (기본 100)', '100')
+    .option('--since <date>', 'recorded_at >= ISO 날짜')
+    .option('--format <type>', '출력 형식 (json|table)', 'json')
+    .action(async (options) => {
+      const connected = await isDbConnected();
+      if (!connected) {
+        console.error(chalk.red('❌ DB 연결 실패'));
+        await closeConnection();
+        process.exit(1);
+      }
+
+      try {
+        const pool = getPool();
+        const limit = Math.max(1, Math.min(parseInt(options.limit, 10) || 100, 5000));
+
+        // 검사 대상 commitment id 모음
+        let idsToCheck: string[];
+        if (options.id) {
+          idsToCheck = [options.id];
+        } else {
+          const params: unknown[] = [limit];
+          let where = '1=1';
+          if (options.since) {
+            where = `recorded_at >= $2`;
+            params.push(options.since);
+          }
+          const recent = await pool.query<{ commitment_id: string }>(
+            `SELECT DISTINCT commitment_id
+             FROM semo.commitment_events
+             WHERE ${where}
+             ORDER BY commitment_id DESC
+             LIMIT $1`,
+            params,
+          );
+          idsToCheck = recent.rows.map((r) => r.commitment_id);
+        }
+
+        if (idsToCheck.length === 0) {
+          console.log(
+            chalk.yellow('대상 commitment 없음 (events 테이블이 비어있거나 since 범위 밖).'),
+          );
+          return;
+        }
+
+        const divergences: Array<{
+          commitment_id: string;
+          field: string;
+          actual: unknown;
+          projected: unknown;
+        }> = [];
+        const summary: Array<{ commitment_id: string; events_seen: number; ok: boolean }> = [];
+
+        for (const cid of idsToCheck) {
+          const projected = await projectCommitmentFromEvents(pool, cid);
+          const actualRes = await pool.query<{
+            status: string | null;
+            completed_at: Date | null;
+            last_heartbeat_at: Date | null;
+            metadata: { fail_reason?: string | null } | null;
+            steps: Array<{ label: string; done: boolean }> | null;
+          }>(
+            `SELECT status, completed_at, last_heartbeat_at, metadata, steps
+             FROM semo.bot_commitments WHERE id = $1`,
+            [cid],
+          );
+          const actual = actualRes.rows[0];
+          if (!actual) {
+            divergences.push({
+              commitment_id: cid,
+              field: '__row_missing__',
+              actual: null,
+              projected: projected.status,
+            });
+            summary.push({ commitment_id: cid, events_seen: projected.events_seen, ok: false });
+            continue;
+          }
+
+          let ok = true;
+          if (actual.status !== projected.status) {
+            divergences.push({
+              commitment_id: cid,
+              field: 'status',
+              actual: actual.status,
+              projected: projected.status,
+            });
+            ok = false;
+          }
+          const actualReason = actual.metadata?.fail_reason ?? null;
+          if (actualReason !== projected.fail_reason) {
+            divergences.push({
+              commitment_id: cid,
+              field: 'fail_reason',
+              actual: actualReason,
+              projected: projected.fail_reason,
+            });
+            ok = false;
+          }
+          const actualSteps = (actual.steps ?? [])
+            .filter((s) => s.done)
+            .map((s) => s.label)
+            .sort();
+          if (JSON.stringify(actualSteps) !== JSON.stringify(projected.steps_done)) {
+            divergences.push({
+              commitment_id: cid,
+              field: 'steps_done',
+              actual: actualSteps,
+              projected: projected.steps_done,
+            });
+            ok = false;
+          }
+          summary.push({ commitment_id: cid, events_seen: projected.events_seen, ok });
+        }
+
+        const result = {
+          checked: idsToCheck.length,
+          divergent: divergences.length,
+          ok: divergences.length === 0,
+          divergences,
+          ...(options.verify ? {} : { summary }),
+        };
+
+        if (options.format === 'json') {
+          console.log(JSON.stringify(result, null, 2));
+        } else {
+          console.log(chalk.bold(`\n🔁 Replay verify — ${idsToCheck.length} commitments\n`));
+          if (divergences.length === 0) {
+            console.log(chalk.green('  ✓ no divergences'));
+          } else {
+            console.log(chalk.red(`  ✗ ${divergences.length} divergence(s):\n`));
+            for (const d of divergences) {
+              console.log(
+                `    ${chalk.cyan(d.commitment_id)} ${chalk.yellow(d.field)}: ` +
+                  `actual=${JSON.stringify(d.actual)} projected=${JSON.stringify(d.projected)}`,
+              );
+            }
+          }
+          console.log();
+        }
+        if (divergences.length > 0 && options.verify) {
+          process.exitCode = 1;
+        }
+      } catch (err) {
+        console.error(chalk.red(`❌ replay 실패: ${err}`));
         process.exit(1);
       } finally {
         await closeConnection();

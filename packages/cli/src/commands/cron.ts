@@ -22,7 +22,11 @@ import * as crypto from 'crypto';
 import cronParser from 'cron-parser';
 import { getPool, closeConnection } from '../database';
 import { resolveBotWorkspace } from '../paths';
-import { recordCommitmentFailure, recordCommitmentSuccess } from '@team-semicolon/semo-common';
+import {
+  recordCommitmentFailure,
+  recordCommitmentSuccess,
+  appendCommitmentEvent,
+} from '@team-semicolon/semo-common';
 
 const CRON_TZ = 'Asia/Seoul';
 const POLLER_JOB_ID = 'cron-poller-tick';
@@ -588,6 +592,34 @@ async function cronMarkRun(opts: {
       await recordCommitmentFailure(client, opts.botId, commitmentTitle);
     } else if (commitmentStatus === 'done') {
       await recordCommitmentSuccess(client, opts.botId, commitmentTitle);
+    }
+
+    // C5 dual-write: cron mark-run 은 commitment INSERT + 즉시 terminal 마감인 single-row
+    // pattern. cron_run_recorded 단일 이벤트로 캡처해서 replay 가 status/duration/run_status
+    // 를 재구성할 수 있도록 한다. 같은 client 를 넘겨 transaction 보장 (실패 시 함께 rollback).
+    try {
+      await appendCommitmentEvent(client, {
+        commitment_id: commitmentId,
+        event_type: 'cron_run_recorded',
+        occurred_at: new Date(opts.startedAt),
+        bot_id: opts.botId,
+        source_type: 'cron',
+        runtime_source: `${opts.botId}-cron-local`,
+        payload: {
+          run_status: opts.status,
+          duration_ms: opts.durationMs,
+          job_id: opts.jobId,
+          job_name: job.name,
+          schedule_expr: scheduleExpr,
+          error: opts.error ?? null,
+          output_digest: opts.outputDigest ?? null,
+        },
+      });
+    } catch (err) {
+      console.warn('[commitment-events] cron append failed', {
+        commitment_id: commitmentId,
+        err: err instanceof Error ? err.message : String(err),
+      });
     }
 
     let consecutiveFailures = 0;
