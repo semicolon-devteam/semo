@@ -8,6 +8,7 @@
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { getPool, closeConnection, isDbConnected } from '../database';
+import { recordCommitmentFailure, recordCommitmentSuccess } from '../commitment-escalation';
 
 // ─── ID 생성 ─────────────────────────────────────────────────────────────────
 
@@ -139,11 +140,52 @@ export function registerCommitmentsCommands(program: Command): void {
         }
 
         if (options.status) {
-          await pool.query(`UPDATE semo.bot_commitments SET status = $1 WHERE id = $2`, [
-            options.status,
-            id,
-          ]);
-          console.log(chalk.green(`✔ status → ${options.status}: ${id}`));
+          const targetStatus = options.status;
+          const allowed = new Set(['active', 'pending', 'done', 'failed']);
+          if (!allowed.has(targetStatus)) {
+            console.error(
+              chalk.red(`❌ invalid status "${targetStatus}". Allowed: active|pending|done|failed`),
+            );
+            process.exit(1);
+          }
+          // 비-terminal target 은 어디서나 가능. terminal target (done/failed) 은
+          // 실제 전이 (pending/active → terminal) 일 때만 허용 — 이미 terminal 인
+          // row 에 같은 명령을 또 쳐도 escalation 카운터가 중복 증가하지 않게 한다.
+          const isTerminal = targetStatus === 'done' || targetStatus === 'failed';
+          const guard = isTerminal ? `AND status IN ('pending', 'active')` : '';
+          const result = await pool.query<{
+            id: string;
+            bot_id: string;
+            title: string;
+            status: string;
+          }>(
+            `UPDATE semo.bot_commitments SET status = $1 WHERE id = $2 ${guard} RETURNING id, bot_id, title, status`,
+            [targetStatus, id],
+          );
+          if (result.rowCount === 0) {
+            console.error(
+              chalk.yellow(
+                isTerminal ? `⚠ commitment 없거나 이미 종료됨: ${id}` : `⚠ commitment 없음: ${id}`,
+              ),
+            );
+          } else {
+            console.log(chalk.green(`✔ status → ${targetStatus}: ${id}`));
+            // C3: 실제 terminal transition 일 때만 패턴 카운터 갱신.
+            const row = result.rows[0];
+            if (row.status === 'failed') {
+              const esc = await recordCommitmentFailure(row.bot_id, row.title);
+              if (esc?.state_changed) {
+                console.log(
+                  chalk.yellow(
+                    `↳ pattern escalation: ${esc.prev_state} → ${esc.state} ` +
+                      `(${esc.consecutive_failures} consecutive failures, pattern=${esc.pattern_id})`,
+                  ),
+                );
+              }
+            } else if (row.status === 'done') {
+              await recordCommitmentSuccess(row.bot_id, row.title);
+            }
+          }
         }
 
         if (options.stepDone) {
@@ -185,14 +227,16 @@ export function registerCommitmentsCommands(program: Command): void {
 
       try {
         const pool = getPool();
-        const result = await pool.query(
-          `UPDATE semo.bot_commitments SET status = 'done' WHERE id = $1 AND status IN ('pending', 'active') RETURNING id`,
+        const result = await pool.query<{ id: string; bot_id: string; title: string }>(
+          `UPDATE semo.bot_commitments SET status = 'done' WHERE id = $1 AND status IN ('pending', 'active') RETURNING id, bot_id, title`,
           [id],
         );
         if (result.rowCount === 0) {
           console.error(chalk.yellow(`⚠ commitment 없거나 이미 종료됨: ${id}`));
         } else {
           console.log(chalk.green(`✔ commitment done: ${id}`));
+          // C3: 패턴 단위 escalation 카운터 reset. 실패해도 원래 흐름 막지 않음.
+          await recordCommitmentSuccess(result.rows[0].bot_id, result.rows[0].title);
         }
       } catch (err) {
         console.error(chalk.red(`❌ done 실패: ${err}`));
@@ -218,18 +262,28 @@ export function registerCommitmentsCommands(program: Command): void {
       try {
         const pool = getPool();
         const metadataUpdate = options.reason
-          ? `, metadata = metadata || jsonb_build_object('fail_reason', $2::text)`
+          ? `, metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('fail_reason', $2::text)`
           : '';
         const params = options.reason ? [id, options.reason] : [id];
 
-        const result = await pool.query(
-          `UPDATE semo.bot_commitments SET status = 'failed'${metadataUpdate} WHERE id = $1 AND status IN ('pending', 'active') RETURNING id`,
+        const result = await pool.query<{ id: string; bot_id: string; title: string }>(
+          `UPDATE semo.bot_commitments SET status = 'failed'${metadataUpdate} WHERE id = $1 AND status IN ('pending', 'active') RETURNING id, bot_id, title`,
           params,
         );
         if (result.rowCount === 0) {
           console.error(chalk.yellow(`⚠ commitment 없거나 이미 종료됨: ${id}`));
         } else {
           console.log(chalk.green(`✔ commitment failed: ${id}`));
+          // C3: 패턴 단위 escalation 카운터 증가. 실패해도 원래 흐름 막지 않음.
+          const esc = await recordCommitmentFailure(result.rows[0].bot_id, result.rows[0].title);
+          if (esc?.state_changed) {
+            console.log(
+              chalk.yellow(
+                `↳ pattern escalation: ${esc.prev_state} → ${esc.state} ` +
+                  `(${esc.consecutive_failures} consecutive failures, pattern=${esc.pattern_id})`,
+              ),
+            );
+          }
         }
       } catch (err) {
         console.error(chalk.red(`❌ fail 실패: ${err}`));
