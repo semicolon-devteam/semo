@@ -58,6 +58,13 @@ const MAILBOX_DIR = process.env.SEMO_MAILBOX_DIR || path.join(os.homedir(), '.se
 const SESSION_DIR = process.env.SEMO_SESSION_DIR || path.join(os.homedir(), '.semo', 'sessions');
 const MAX_ESCALATION_DEPTH = 3;
 
+// SemoBot 분리 Phase 2 (semo decision/semobot-independent-agent-2026-05-06):
+// system-level 메시지 (usage rejection, watchdog, escalation 등) 의 발송 페르소나를 env 로 추상화.
+// 기본값은 'semiclaw' 로 두어 행동 변경 0 (Phase 2 = pure refactor).
+// Phase 3 시 .env 에 SYSTEM_BOT_ID=semobot 설정하면 SemoBot 페르소나로 전환됨.
+// SLACK_PROFILES 에 'semobot' fallback 등록됨 (packages/common/src/slack/bot-config.ts).
+const SYSTEM_BOT_ID = process.env.SYSTEM_BOT_ID || 'semiclaw';
+
 // ── Components ──
 
 const pool = new Pool({ connectionString: DATABASE_URL });
@@ -65,6 +72,15 @@ const router = new Router(pool);
 const slack = new SlackGateway(SLACK_BOT_TOKEN, SLACK_APP_TOKEN);
 const inboxWriter = new InboxWriter(MAILBOX_DIR);
 const busyDetector = new BusyDetector(MAILBOX_DIR);
+
+/**
+ * System-level Slack 알림 발송 단일 진입점.
+ * 페르소나 (`SYSTEM_BOT_ID`) 만 env 로 추상화 — 메시지 본문/채널/포맷은 호출자 책임.
+ * Phase 2 기본값 'semiclaw' (행동 변경 0). Phase 3 에서 .env 로 'semobot' 전환 예정.
+ */
+async function postSystemMessage(channel: string, text: string, threadTs?: string): Promise<void> {
+  await slack.postAsBot(SYSTEM_BOT_ID, channel, text, threadTs);
+}
 
 // ── Overflow Configuration ──
 
@@ -221,7 +237,7 @@ async function handleUsageRejection(botId: string, text: string): Promise<void> 
     `해소: <https://claude.ai/settings/usage|claude.ai/settings/usage> 에서 extra usage 충전 또는 5시간 윈도우 리셋 대기.\n` +
     `(원본: \`${snippet}\`)`;
   try {
-    await slack.postAsBot('semiclaw', channel, body);
+    await postSystemMessage(channel, body);
     console.log(`[usage-guard] Alerted #bot-ops about ${botId} usage rejection.`);
   } catch (err) {
     console.error(`[usage-guard] Failed to post alert for ${botId}:`, err);
@@ -316,8 +332,7 @@ function buildHealthMonitor(): void {
         onRestart: async (botId) => {
           console.log(`[health] ${botId} restarted — posting notification`);
           try {
-            await slack.postAsBot(
-              'semiclaw',
+            await postSystemMessage(
               process.env.SLACK_ROUTER_OPS_CHANNEL || process.env.ADMIN_CHANNEL || '',
               `[System] ${botId} session restarted (health check failure).`,
             );
@@ -458,7 +473,7 @@ async function scanAndPostEscalationAlerts(): Promise<void> {
         `복귀는 패턴 원인 진단 후 별도 SQL/CLI 로 진행.`;
 
       try {
-        await slack.postAsBot('semiclaw', channel, body);
+        await postSystemMessage(channel, body);
         console.log(
           `[escalation-alert] posted ${claim.state} for ${claim.pattern_id} (${claim.consecutive_failures} fails)`,
         );
@@ -530,8 +545,7 @@ async function checkPollerHeartbeat(): Promise<void> {
         const tag = isReminder ? 'reminder' : 'stale';
         console.error(`[poller-watchdog] ${tag} — last_run ${mins}m ago`);
         try {
-          await slack.postAsBot(
-            'semiclaw',
+          await postSystemMessage(
             channel,
             `:rotating_light: cron-poller heartbeat ${tag} (${mins}m). ` +
               `CronCreate 세션/폴러 패인 확인 필요. ` +
@@ -548,8 +562,7 @@ async function checkPollerHeartbeat(): Promise<void> {
         const hrs = Math.round(ageMs / (60 * 60_000));
         console.error(`[poller-watchdog] ESCALATION — stale ${hrs}h`);
         try {
-          await slack.postAsBot(
-            'semiclaw',
+          await postSystemMessage(
             escalationChannel,
             `:rotating_light: *ESCALATION* — cron-poller heartbeat 정지 ${hrs}h. ` +
               `전체 cron 시스템이 멎은 상태입니다. ` +
@@ -564,11 +577,7 @@ async function checkPollerHeartbeat(): Promise<void> {
       pollerAlertSentAt = 0;
       pollerEscalated = false;
       try {
-        await slack.postAsBot(
-          'semiclaw',
-          channel,
-          ':white_check_mark: cron-poller heartbeat recovered.',
-        );
+        await postSystemMessage(channel, ':white_check_mark: cron-poller heartbeat recovered.');
       } catch (err) {
         console.error('[poller-watchdog] recovery post failed:', err);
       }
