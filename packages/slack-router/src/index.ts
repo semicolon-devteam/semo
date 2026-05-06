@@ -590,10 +590,95 @@ async function checkPollerHeartbeat(): Promise<void> {
 // Check every 3 minutes
 setInterval(() => checkPollerHeartbeat().catch(() => {}), 3 * 60_000);
 
+// ── SemoBot Command Pre-Dispatch (Phase 5) ──
+
+/**
+ * Phase 5 of SemoBot separation (semo decision/semobot-independent-agent-2026-05-06):
+ * deterministic command words sent to SemoBot are answered directly by slack-router
+ * with the SemoBot persona, never delegated to SemiClaw orchestrator.
+ *
+ * Scope (v1):
+ *   - `status` — system snapshot (router pid/uptime, pattern_health, recent commitment activity)
+ *
+ * Out of scope: LLM responses, multi-turn dialogue, inbox/mailbox for SemoBot.
+ * These remain SemiClaw's territory until later phases.
+ */
+async function composeSemoBotStatus(): Promise<string> {
+  const lines: string[] = [':robot_face: *SemoBot status*'];
+
+  try {
+    const stateRes = await pool.query<{ state: string; n: string }>(
+      `SELECT state, COUNT(*)::text AS n FROM semo.commitment_pattern_health GROUP BY state`,
+    );
+    const counts = Object.fromEntries(stateRes.rows.map((r) => [r.state, r.n]));
+    lines.push(
+      `• commitment_pattern_health: notified=${counts.notified ?? 0}, paged=${counts.paged ?? 0}, none=${counts.none ?? 0}`,
+    );
+
+    const cronRes = await pool.query<{ enabled_count: string; stale_count: string }>(
+      `SELECT
+         COUNT(*) FILTER (WHERE enabled = true)::text AS enabled_count,
+         COUNT(*) FILTER (
+           WHERE enabled = true
+             AND (last_run IS NULL OR last_run < NOW() - INTERVAL '1 day')
+         )::text AS stale_count
+       FROM semo.bot_cron_jobs`,
+    );
+    const cron = cronRes.rows[0];
+    lines.push(`• bot_cron_jobs: enabled=${cron.enabled_count}, stale_24h=${cron.stale_count}`);
+
+    const commitRes = await pool.query<{ active: string; done24h: string; failed24h: string }>(
+      `SELECT
+         COUNT(*) FILTER (WHERE status IN ('pending', 'active'))::text AS active,
+         COUNT(*) FILTER (WHERE status = 'done' AND completed_at >= NOW() - INTERVAL '24 hours')::text AS done24h,
+         COUNT(*) FILTER (WHERE status = 'failed' AND completed_at >= NOW() - INTERVAL '24 hours')::text AS failed24h
+       FROM semo.bot_commitments`,
+    );
+    const cmt = commitRes.rows[0];
+    lines.push(
+      `• bot_commitments (24h): active=${cmt.active}, done=${cmt.done24h}, failed=${cmt.failed24h}`,
+    );
+  } catch (err) {
+    lines.push(`• DB query failed: ${err instanceof Error ? err.message : String(err)}`);
+  }
+
+  lines.push(`• slack-router: pid=${process.pid}, uptime=${Math.round(process.uptime())}s`);
+  lines.push(
+    `_더 자세한 가이드/incident 는 \`incident\` 명령 (Phase 5b) 또는 KB 직접 조회 — semo decision/semobot-independent-agent-2026-05-06_`,
+  );
+
+  return lines.join('\n');
+}
+
+/**
+ * SemoBot deterministic command 처리. 매칭 시 응답 발송 후 true 반환 (호출자가 일반 라우팅
+ * 스킵). 매칭 없으면 false → handleSlackMessage 가 정상 라우팅으로 진행.
+ */
+async function maybeHandleSemoBotCommand(msg: SlackMessage): Promise<boolean> {
+  const text = msg.text.trim().toLowerCase();
+  const firstWord = text.split(/\s+/)[0] ?? '';
+
+  if (firstWord === 'status' || firstWord === '/status') {
+    try {
+      const body = await composeSemoBotStatus();
+      await postSystemMessage(msg.channel, body, msg.thread_ts);
+      console.log(`[semobot-cmd] status responded in ${msg.channel}`);
+    } catch (err) {
+      console.error('[semobot-cmd] status failed:', err);
+    }
+    return true;
+  }
+
+  return false;
+}
+
 // ── Message Handler ──
 
 async function handleSlackMessage(msg: SlackMessage, senderName: string): Promise<void> {
-  // 0. [Route: botId] 태그 → 해당 봇 직접 라우팅 (최우선)
+  // 0a. SemoBot deterministic command (Phase 5) — 'status' 등의 운영 명령은 SemiClaw 위임 X.
+  if (await maybeHandleSemoBotCommand(msg)) return;
+
+  // 0b. [Route: botId] 태그 → 해당 봇 직접 라우팅 (최우선)
   const routeTag = msg.text.match(/\[Route:\s*(\w+)\]/);
   let botId = 'semiclaw';
   let routeReason = 'orchestrator';
