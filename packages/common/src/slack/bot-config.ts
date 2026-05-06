@@ -78,6 +78,9 @@ export function resolveModelForMessage(botId: BotId, baseModel: string, message:
 // Bot Slack profiles — KB 기반 동적 로드, 하드코딩 fallback
 const FALLBACK_SLACK_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
   semiclaw: { username: 'SemiClaw', icon_emoji: ':clipboard:' },
+  // SemoBot — SEMO 시스템 관리/가이드 에이전트 (semo decision/semobot-independent-agent-2026-05-06).
+  // SemiClaw (orchestrator) 와 분리. system-level 알림 (usage, watchdog, escalation 등) 의 Slack 페르소나.
+  semobot: { username: 'SemoBot', icon_emoji: ':robot_face:' },
   planclaw: { username: 'PlanClaw', icon_emoji: ':bar_chart:' },
   designclaw: { username: 'DesignClaw', icon_emoji: ':art:' },
   workclaw: { username: 'WorkClaw', icon_emoji: ':hammer_and_wrench:' },
@@ -103,7 +106,9 @@ export async function loadSlackProfilesFromAPI(): Promise<void> {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = (await res.json()) as Record<string, { username: string; icon_emoji: string }>;
     if (Object.keys(data).length > 0) {
-      SLACK_PROFILES = data;
+      // FALLBACK 위에 API 데이터 merge — semobot 같이 KB API 가 모르는 fallback-only 페르소나가
+      // 사라지지 않도록 보호. API 가 명시한 키는 fallback 을 override 함.
+      SLACK_PROFILES = { ...FALLBACK_SLACK_PROFILES, ...data };
       console.log(`[bot-config] Loaded ${Object.keys(data).length} bot profiles from KB`);
     }
   } catch {
