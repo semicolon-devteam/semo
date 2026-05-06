@@ -1575,6 +1575,8 @@ import {
   ontoAddKey,
   ontoRemoveKey,
   ontoUnregister,
+  ontoUpdateDomain,
+  ontoUpdateKey,
   generateEmbedding,
   generateEmbeddings,
   KBEntry,
@@ -2235,20 +2237,27 @@ kbCmd
   .description('온톨로지 조회 — 도메인/타입/스키마/라우팅 테이블')
   .option(
     '--action <type>',
-    '동작 (list|show|services|types|instances|schema|routing-table|register|unregister|children|create-type|add-key|remove-key)',
+    '동작 (list|show|services|types|instances|schema|routing-table|register|unregister|update-domain|children|create-type|add-key|remove-key|update-key)',
     'list',
   )
-  .option('--domain <name>', 'action=show|register|children 시 도메인')
-  .option('--type <name>', 'action=schema|register|add-key|remove-key 시 타입 키')
-  .option('--key <name>', 'action=add-key|remove-key 시 스키마 키')
-  .option('--key-type <type>', 'action=add-key 시 키 유형 (singleton|collection)', 'singleton')
-  .option('--required', 'action=add-key 시 필수 여부')
-  .option('--hint <text>', 'action=add-key 시 값 힌트')
-  .option('--ref-type <type>', 'action=add-key 시 참조 대상 온톨로지 타입 (예: organization)')
-  .option('--description <text>', 'action=register|add-key 시 설명')
-  .option('--service <name>', 'action=register 시 서비스 그룹')
-  .option('--parent <name>', 'action=register 시 상위 도메인 (모듈인 경우)')
-  .option('--tags <tags>', 'action=register 시 태그 (쉼표 구분)')
+  .option('--domain <name>', 'action=show|register|children|update-domain 시 도메인')
+  .option('--type <name>', 'action=schema|register|add-key|remove-key|update-key 시 타입 키')
+  .option('--key <name>', 'action=add-key|remove-key|update-key 시 스키마 키')
+  .option(
+    '--key-type <type>',
+    'action=add-key|update-key 시 키 유형 (singleton|collection)',
+    'singleton',
+  )
+  .option('--required', 'action=add-key|update-key 시 필수 여부')
+  .option('--hint <text>', 'action=add-key|update-key 시 값 힌트')
+  .option(
+    '--ref-type <type>',
+    'action=add-key|update-key 시 참조 대상 온톨로지 타입 (예: organization)',
+  )
+  .option('--description <text>', 'action=register|add-key|update-domain|update-key 시 설명')
+  .option('--service <name>', 'action=register|update-domain 시 서비스 그룹')
+  .option('--parent <name>', 'action=register|update-domain 시 상위 도메인 (모듈인 경우)')
+  .option('--tags <tags>', 'action=register|update-domain 시 태그 (쉼표 구분)')
   .option('--no-init', 'action=register 시 필수 KB entry 자동 생성 건너뛰기')
   .option('--force', 'action=unregister 시 잔존 KB 항목도 모두 삭제')
   .option('--yes', 'action=unregister 시 확인 프롬프트 건너뛰기')
@@ -2508,6 +2517,87 @@ kbCmd
           console.log(chalk.red(`\n❌ 스키마 키 삭제 실패: ${result.error}\n`));
           process.exit(1);
         }
+      } else if (action === 'update-domain') {
+        if (!options.domain) {
+          console.log(chalk.red('--domain 옵션이 필요합니다.'));
+          process.exit(1);
+        }
+        const updates: {
+          description?: string;
+          service?: string;
+          parent?: string;
+          tags?: string[];
+        } = {};
+        if (options.description !== undefined) updates.description = options.description;
+        if (options.service !== undefined) updates.service = options.service;
+        if (options.parent !== undefined) updates.parent = options.parent;
+        if (options.tags !== undefined) {
+          updates.tags = (options.tags as string).split(',').map((t: string) => t.trim());
+        }
+        if (Object.keys(updates).length === 0) {
+          console.log(
+            chalk.red(
+              '업데이트할 필드가 없습니다. --description / --service / --parent / --tags 중 하나 이상 지정.',
+            ),
+          );
+          process.exit(1);
+        }
+        const result = await ontoUpdateDomain(pool, options.domain, updates);
+        if (result.success) {
+          console.log(chalk.green(`\n✅ 도메인 '${options.domain}' 업데이트 완료`));
+          for (const [k, v] of Object.entries(updates)) {
+            console.log(chalk.gray(`  ${k}: ${Array.isArray(v) ? v.join(', ') : v}`));
+          }
+          console.log();
+        } else {
+          console.log(chalk.red(`\n❌ 업데이트 실패: ${result.error}\n`));
+          process.exit(1);
+        }
+      } else if (action === 'update-key') {
+        if (!options.type) {
+          console.log(chalk.red('--type 옵션이 필요합니다.'));
+          process.exit(1);
+        }
+        if (!options.key) {
+          console.log(chalk.red('--key 옵션이 필요합니다.'));
+          process.exit(1);
+        }
+        const updates: {
+          description?: string;
+          value_hint?: string;
+          key_type?: 'singleton' | 'collection';
+          required?: boolean;
+          ref_type?: string;
+        } = {};
+        if (options.description !== undefined) updates.description = options.description;
+        if (options.hint !== undefined) updates.value_hint = options.hint;
+        // commander는 default 값을 채우므로 사용자가 명시한 경우만 반영하기 위해
+        // process.argv 직접 검사로 user-supplied 여부 판정
+        if (process.argv.includes('--key-type')) {
+          updates.key_type = options.keyType as 'singleton' | 'collection';
+        }
+        if (process.argv.includes('--required')) updates.required = true;
+        if (options.refType !== undefined) updates.ref_type = options.refType;
+
+        if (Object.keys(updates).length === 0) {
+          console.log(
+            chalk.red(
+              '업데이트할 필드가 없습니다. --description / --hint / --key-type / --required / --ref-type 중 하나 이상 지정.',
+            ),
+          );
+          process.exit(1);
+        }
+        const result = await ontoUpdateKey(pool, options.type, options.key, updates);
+        if (result.success) {
+          console.log(chalk.green(`\n✅ 스키마 키 업데이트 완료: ${options.type}.${options.key}`));
+          for (const [k, v] of Object.entries(updates)) {
+            console.log(chalk.gray(`  ${k}: ${v}`));
+          }
+          console.log();
+        } else {
+          console.log(chalk.red(`\n❌ 업데이트 실패: ${result.error}\n`));
+          process.exit(1);
+        }
       } else if (action === 'children') {
         if (!options.domain) {
           console.log(chalk.red('--domain 옵션이 필요합니다.'));
@@ -2601,7 +2691,7 @@ kbCmd
       } else {
         console.log(
           chalk.red(
-            `알 수 없는 action: '${action}'. 사용 가능: list, show, services, types, instances, schema, routing-table, children, register, create-type, add-key, remove-key, unregister`,
+            `알 수 없는 action: '${action}'. 사용 가능: list, show, services, types, instances, schema, routing-table, children, register, create-type, add-key, remove-key, update-domain, update-key, unregister`,
           ),
         );
         process.exit(1);

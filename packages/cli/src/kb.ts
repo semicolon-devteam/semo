@@ -1951,6 +1951,150 @@ export async function ontoRemoveKey(
 }
 
 /**
+ * Update mutable fields on an existing ontology domain.
+ * Only fields explicitly passed (not undefined) are updated; null clears the field.
+ */
+export async function ontoUpdateDomain(
+  pool: Pool,
+  domain: string,
+  updates: {
+    description?: string | null;
+    service?: string | null;
+    parent?: string | null;
+    tags?: string[] | null;
+  },
+): Promise<{ success: boolean; error?: string }> {
+  const client = await pool.connect();
+  try {
+    const exists = await client.query('SELECT domain FROM semo.ontology WHERE domain = $1', [
+      domain,
+    ]);
+    if (exists.rows.length === 0) {
+      return { success: false, error: `도메인 '${domain}'은(는) 존재하지 않습니다.` };
+    }
+
+    if (updates.parent !== undefined && updates.parent !== null) {
+      const parentCheck = await client.query('SELECT domain FROM semo.ontology WHERE domain = $1', [
+        updates.parent,
+      ]);
+      if (parentCheck.rows.length === 0) {
+        return {
+          success: false,
+          error: `상위 도메인 '${updates.parent}'이(가) 존재하지 않습니다.`,
+        };
+      }
+      if (updates.parent === domain) {
+        return { success: false, error: `자기 자신을 parent 로 설정할 수 없습니다.` };
+      }
+    }
+
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    let i = 1;
+    if (updates.description !== undefined) {
+      sets.push(`description = $${i++}`);
+      params.push(updates.description);
+    }
+    if (updates.service !== undefined) {
+      sets.push(`service = $${i++}`);
+      params.push(updates.service ?? '_global');
+    }
+    if (updates.parent !== undefined) {
+      sets.push(`parent = $${i++}`);
+      params.push(updates.parent);
+    }
+    if (updates.tags !== undefined) {
+      sets.push(`tags = $${i++}`);
+      params.push(updates.tags);
+    }
+
+    if (sets.length === 0) {
+      return { success: false, error: '업데이트할 필드가 지정되지 않았습니다.' };
+    }
+
+    sets.push(`version = COALESCE(version, 1) + 1`);
+    params.push(domain);
+    await client.query(`UPDATE semo.ontology SET ${sets.join(', ')} WHERE domain = $${i}`, params);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * Update mutable fields on an existing schema key.
+ * Only fields explicitly passed (not undefined) are updated.
+ */
+export async function ontoUpdateKey(
+  pool: Pool,
+  typeKey: string,
+  schemeKey: string,
+  updates: {
+    description?: string | null;
+    value_hint?: string | null;
+    key_type?: 'singleton' | 'collection';
+    required?: boolean;
+    ref_type?: string | null;
+  },
+): Promise<{ success: boolean; error?: string }> {
+  const client = await pool.connect();
+  try {
+    const exists = await client.query(
+      'SELECT id FROM semo.kb_type_schema WHERE type_key = $1 AND scheme_key = $2',
+      [typeKey, schemeKey],
+    );
+    if (exists.rows.length === 0) {
+      return {
+        success: false,
+        error: `키 '${schemeKey}'은(는) '${typeKey}' 타입에 존재하지 않습니다.`,
+      };
+    }
+
+    const sets: string[] = [];
+    const params: unknown[] = [];
+    let i = 1;
+    if (updates.description !== undefined) {
+      sets.push(`scheme_description = $${i++}`);
+      params.push(updates.description);
+    }
+    if (updates.value_hint !== undefined) {
+      sets.push(`value_hint = $${i++}`);
+      params.push(updates.value_hint);
+    }
+    if (updates.key_type !== undefined) {
+      sets.push(`key_type = $${i++}`);
+      params.push(updates.key_type);
+    }
+    if (updates.required !== undefined) {
+      sets.push(`required = $${i++}`);
+      params.push(updates.required);
+    }
+    if (updates.ref_type !== undefined) {
+      sets.push(`ref_type = $${i++}`);
+      params.push(updates.ref_type);
+    }
+
+    if (sets.length === 0) {
+      return { success: false, error: '업데이트할 필드가 지정되지 않았습니다.' };
+    }
+
+    params.push(typeKey, schemeKey);
+    await client.query(
+      `UPDATE semo.kb_type_schema SET ${sets.join(', ')}
+       WHERE type_key = $${i++} AND scheme_key = $${i}`,
+      params,
+    );
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: String(err) };
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Write ontology schemas to local cache
  */
 export async function ontoPullToLocal(pool: Pool, cwd: string): Promise<number> {
