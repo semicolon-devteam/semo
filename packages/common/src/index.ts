@@ -15,6 +15,11 @@ export { FALLBACK_BOT_IDS, SLACK_PROFILES, type BotId } from './slack/bot-config
 export { SEMO_PATHS, resolveBotWorkspace } from './paths.js';
 export { acquireSingletonLock, type SingletonLockOptions } from './lock/singleton.js';
 export {
+  assertCmuxAncestry,
+  type CmuxAncestryCheckOptions,
+  type CmuxAncestryCheckResult,
+} from './lock/cmux-ancestry.js';
+export {
   convertMarkdownToMrkdwn,
   convertMarkdownToBlocks,
   type SlackPayload,

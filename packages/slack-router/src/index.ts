@@ -30,10 +30,16 @@ import {
   resolveSpeaker,
   SlackProjectionEmitter,
   acquireSingletonLock,
+  assertCmuxAncestry,
   type SlackMessage,
   type InboxMessage,
   type OutboxMessage,
 } from '@team-semicolon/semo-common';
+
+// Cmux ancestry guard — daemon(launchd/nohup) 화 감지 시 즉시 종료.
+// 배경: cmux nudge 는 cmux pane 자손 프로세스만 허용하므로 daemon 화되면 침묵 실패.
+// router-operations.md NON-NEGOTIABLE.
+assertCmuxAncestry({ name: 'slack-router' });
 
 // Singleton guard — prevent duplicate Socket Mode connections + log truncation.
 // Background: 2026-05-01 incident; see semo decision/router-cmux-nudge-persistence.
@@ -228,50 +234,95 @@ const outboxReader = new OutboxReader({
   onUsageRejection: handleUsageRejection,
 });
 
+// ── OpenClaw Native Bots (KB-driven) ──
+// 2026-05-06: OpenClaw 공존 운영을 위해 OpenClaw 가 관리하는 봇 목록을 명시.
+// SoT 우선순위:
+//   1) OPENCLAW_NATIVE_BOTS env (break-glass / 운영 override, 콤마 구분)
+//   2) KB `semo bot-ids` metadata.runtime_source 에서 'openclaw' 값 필터
+//   3) hardcoded fallback (semiclaw,planclaw,designclaw,workclaw,reviewclaw,infraclaw,growthclaw)
+// 부팅 시 1회 await 로드. 변경 시 router 재기동 필요.
+const OPENCLAW_BOTS_FALLBACK = [
+  'semiclaw',
+  'planclaw',
+  'designclaw',
+  'workclaw',
+  'reviewclaw',
+  'infraclaw',
+  'growthclaw',
+];
+const OPENCLAW_BOTS_ENV_RAW = (process.env.OPENCLAW_NATIVE_BOTS || '').trim();
+let OPENCLAW_BOTS: Set<string> = new Set(OPENCLAW_BOTS_FALLBACK);
+
+async function loadOpenClawBots(): Promise<{
+  bots: Set<string>;
+  source: 'env' | 'kb' | 'fallback';
+}> {
+  if (OPENCLAW_BOTS_ENV_RAW) {
+    const list = OPENCLAW_BOTS_ENV_RAW.split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return { bots: new Set(list), source: 'env' };
+  }
+  try {
+    const res = await pool.query(
+      `SELECT metadata FROM semo.knowledge_base
+       WHERE domain = 'semo' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '')
+       LIMIT 1`,
+    );
+    const meta = res.rows[0]?.metadata as
+      | { runtime_source?: Record<string, string> }
+      | null
+      | undefined;
+    const map = meta?.runtime_source ?? {};
+    const list = Object.entries(map)
+      .filter(([, v]) => v === 'openclaw')
+      .map(([k]) => k);
+    if (list.length) {
+      return { bots: new Set(list), source: 'kb' };
+    }
+  } catch (err) {
+    console.warn('[openclaw-bots] KB load failed:', (err as Error).message);
+  }
+  return { bots: new Set(OPENCLAW_BOTS_FALLBACK), source: 'fallback' };
+}
+
 // ── Health Monitor (Architecture B 전용) ──
 // 2026-05-06: OpenClaw 공존 운영을 위해 monitor 대상을 명시적으로 좁힘.
 //   - SEMO_HEALTH_AUTO_RESTART_BOTS env 미설정 시 비활성 (false dead alert 방지)
 //   - 설정 시 콤마 구분 botId 목록만 monitor (예: "incubator,semiclaw-overflow")
-//   - OpenClaw 가 관리하는 7봇은 절대 monitor 대상이 아님 (semiclaw, planclaw, designclaw,
-//     workclaw, reviewclaw, infraclaw, growthclaw)
+//   - OpenClaw 가 관리하는 봇 (KB metadata.runtime_source = 'openclaw') 은 monitor 대상 아님.
 const HEALTH_BOTS_RAW = (process.env.SEMO_HEALTH_AUTO_RESTART_BOTS || '').trim();
-// OPENCLAW_NATIVE_BOTS env 로 override 가능 (콤마 구분). 미설정 시 fallback.
-// (Codex 권장: 추후 KB/서비스 metadata 로 이동 — 현재 env override 만 지원)
-const OPENCLAW_BOTS_RAW = (process.env.OPENCLAW_NATIVE_BOTS || '').trim();
-const OPENCLAW_BOTS = new Set(
-  OPENCLAW_BOTS_RAW
-    ? OPENCLAW_BOTS_RAW.split(',')
+let healthMonitor: HealthMonitor | null = null;
+
+function buildHealthMonitor(): void {
+  const HEALTH_BOT_IDS = HEALTH_BOTS_RAW
+    ? HEALTH_BOTS_RAW.split(',')
         .map((b) => b.trim())
-        .filter(Boolean)
-    : ['semiclaw', 'planclaw', 'designclaw', 'workclaw', 'reviewclaw', 'infraclaw', 'growthclaw'],
-);
-const HEALTH_BOT_IDS = HEALTH_BOTS_RAW
-  ? HEALTH_BOTS_RAW.split(',')
-      .map((b) => b.trim())
-      .filter((b) => b && !OPENCLAW_BOTS.has(b))
-  : [];
-const healthMonitor = HEALTH_BOT_IDS.length
-  ? new HealthMonitor({
-      mailboxDir: MAILBOX_DIR,
-      botIds: HEALTH_BOT_IDS,
-      sessionDir: SESSION_DIR,
-      onRestart: async (botId) => {
-        console.log(`[health] ${botId} restarted — posting notification`);
-        try {
-          await slack.postAsBot(
-            'semiclaw',
-            process.env.SLACK_ROUTER_OPS_CHANNEL || process.env.ADMIN_CHANNEL || '',
-            `[System] ${botId} session restarted (health check failure).`,
-          );
-        } catch {
-          // non-fatal
-        }
-      },
-    })
-  : null;
-console.log(
-  `[health-monitor] ${HEALTH_BOT_IDS.length ? `monitoring [${HEALTH_BOT_IDS.join(',')}]` : 'disabled (SEMO_HEALTH_AUTO_RESTART_BOTS empty)'}`,
-);
+        .filter((b) => b && !OPENCLAW_BOTS.has(b))
+    : [];
+  healthMonitor = HEALTH_BOT_IDS.length
+    ? new HealthMonitor({
+        mailboxDir: MAILBOX_DIR,
+        botIds: HEALTH_BOT_IDS,
+        sessionDir: SESSION_DIR,
+        onRestart: async (botId) => {
+          console.log(`[health] ${botId} restarted — posting notification`);
+          try {
+            await slack.postAsBot(
+              'semiclaw',
+              process.env.SLACK_ROUTER_OPS_CHANNEL || process.env.ADMIN_CHANNEL || '',
+              `[System] ${botId} session restarted (health check failure).`,
+            );
+          } catch {
+            // non-fatal
+          }
+        },
+      })
+    : null;
+  console.log(
+    `[health-monitor] ${HEALTH_BOT_IDS.length ? `monitoring [${HEALTH_BOT_IDS.join(',')}]` : 'disabled (SEMO_HEALTH_AUTO_RESTART_BOTS empty)'}`,
+  );
+}
 
 // ── Incubator Channel Filter ──
 
@@ -590,24 +641,32 @@ async function start(): Promise<void> {
   console.log(`[slack-router] Sessions: ${SESSION_DIR}`);
   console.log(`[slack-router] Bots: ${[...FALLBACK_BOT_IDS, ...OVERFLOW_BOT_IDS].join(', ')}`);
 
-  // 1. Load routing config + incubator channel filter + initial stale reap
+  // 1. Load OpenClaw native-bots (env > KB > hardcoded fallback) + build health monitor
+  const { bots: openclawBots, source: openclawSource } = await loadOpenClawBots();
+  OPENCLAW_BOTS = openclawBots;
+  console.log(
+    `[openclaw-bots] source=${openclawSource} bots=[${[...openclawBots].sort().join(',')}]`,
+  );
+  buildHealthMonitor();
+
+  // 2. Load routing config + incubator channel filter + initial stale reap
   await router.loadRouting();
   await loadIncubatorChannels();
   reapStale().catch(() => {});
   console.log('[slack-router] Config loaded (routing + incubator)');
 
-  // 2. Set message handler
+  // 3. Set message handler
   slack.setMessageHandler(handleSlackMessage);
 
-  // 3. Start Slack Socket Mode
+  // 4. Start Slack Socket Mode
   await slack.start();
   console.log('[slack-router] Slack connected');
 
-  // 4. Start outbox reader
+  // 5. Start outbox reader
   outboxReader.start();
   console.log('[slack-router] Outbox reader started');
 
-  // 5. Start health monitor (대상이 있을 때만)
+  // 6. Start health monitor (대상이 있을 때만)
   if (healthMonitor) {
     healthMonitor.start();
     console.log('[slack-router] Health monitor started');
