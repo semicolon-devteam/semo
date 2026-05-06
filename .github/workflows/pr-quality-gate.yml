@@ -24,11 +24,14 @@ jobs:
       # fails with "Cannot find module '../lightningcss.linux-x64-gnu.node'".
       # --no-save preserves package.json; we keep the existing lockfile (no --no-package-lock)
       # so the rest of the dependency tree is unchanged, and just add the one missing binary.
-      - name: Install platform-specific lightningcss binary
+      - name: Install platform-specific native binaries
         run: |
           npm install --no-save --ignore-scripts \
-            lightningcss-linux-x64-gnu@1.31.1
+            lightningcss-linux-x64-gnu@1.31.1 \
+            @tailwindcss/oxide-linux-x64-gnu@4.2.1
           test -f node_modules/lightningcss-linux-x64-gnu/lightningcss.linux-x64-gnu.node
+          test -f node_modules/@tailwindcss/oxide-linux-x64-gnu/tailwindcss-oxide.linux-x64-gnu.node \
+            || ls node_modules/@tailwindcss/oxide-linux-x64-gnu/
       - run: npm run lint
       - run: npx tsc --noEmit --project packages/cli/tsconfig.json
       - run: npm run build
