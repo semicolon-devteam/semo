@@ -32,3 +32,15 @@ export * from './onboarding/index.js';
 export * from './templates/index.js';
 export * from './skills/index.js';
 export * from './runtime/index.js';
+export {
+  commitmentPatternId,
+  recordCommitmentFailure,
+  recordCommitmentSuccess,
+  claimNotifiedAlert,
+  claimPagedAlert,
+  ESCALATION_THRESHOLDS,
+  type EscalationState,
+  type EscalationResult,
+  type AlertClaim,
+  type EscalationQueryable,
+} from './escalation/commitment-pattern.js';

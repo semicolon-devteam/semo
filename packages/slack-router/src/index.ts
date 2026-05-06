@@ -31,6 +31,8 @@ import {
   SlackProjectionEmitter,
   acquireSingletonLock,
   assertCmuxAncestry,
+  recordCommitmentFailure,
+  recordCommitmentSuccess,
   type SlackMessage,
   type InboxMessage,
   type OutboxMessage,
@@ -169,7 +171,7 @@ async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
   // 가장 오래된 active 하나를 마감한다 (FIFO).
   const sourceRef = `${msg.channel_id}:${msg.thread_id}`;
   try {
-    const result = await pool.query(
+    const result = await pool.query<{ id: string; bot_id: string; title: string }>(
       `UPDATE semo.bot_commitments
        SET status = 'done',
            metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('completed_at', NOW())
@@ -182,11 +184,14 @@ async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
          ORDER BY created_at ASC
          LIMIT 1
        )
-       RETURNING id`,
+       RETURNING id, bot_id, title`,
       [msg.bot_id, sourceRef],
     );
     if (result.rowCount && result.rowCount > 0) {
-      console.log(`[commitment] done: ${result.rows[0].id} (${msg.bot_id}) ← ${sourceRef}`);
+      const row = result.rows[0];
+      console.log(`[commitment] done: ${row.id} (${msg.bot_id}) ← ${sourceRef}`);
+      // C3 PR2: pattern escalation 카운터 reset. 실패해도 원래 흐름 막지 않음.
+      await recordCommitmentSuccess(pool, row.bot_id, row.title);
     }
   } catch (err) {
     console.error(`[commitment] UPDATE done failed for ${msg.bot_id}:`, err);
@@ -354,16 +359,22 @@ setInterval(() => loadIncubatorChannels().catch(() => {}), 5 * 60_000);
  */
 async function reapStale(): Promise<void> {
   try {
-    const commitRes = await pool.query(
+    const commitRes = await pool.query<{ id: string; bot_id: string; title: string }>(
       `UPDATE semo.bot_commitments
        SET status = 'failed',
            metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('fail_reason', 'stale_auto', 'reaped_at', NOW())
        WHERE status IN ('pending', 'active')
          AND created_at < NOW() - INTERVAL '24 hours'
-       RETURNING id, bot_id`,
+       RETURNING id, bot_id, title`,
     );
     if (commitRes.rowCount && commitRes.rowCount > 0) {
       console.log(`[reaper] Marked ${commitRes.rowCount} stale commitments as failed`);
+      // C3 PR2: 자동 stale-reap 도 패턴 카운터에 적재. 한 번에 다수 row 가 reap
+      // 될 수 있으므로 각각 독립적으로 escalation 호출 — 같은 패턴이 한 번에
+      // 여러 row 로 떠 있던 경우 각 row 가 1회 실패로 카운트된다.
+      for (const row of commitRes.rows) {
+        await recordCommitmentFailure(pool, row.bot_id, row.title);
+      }
     }
 
     const sessRes = await pool.query(
