@@ -23,7 +23,7 @@ export interface RoutingConfig {
   kbIntentRoutes: Array<{ botId: string; keywords: string[] }>;
   /** 활성 봇 ID 목록 */
   validBotIds: string[];
-  /** alias → canonical bot_id 매핑 (semiclaw → semobot 등) */
+  /** alias → canonical bot_id 매핑. 표시명 리네이밍을 흡수. SemoBot ≠ SemiClaw alias (별 에이전트). */
   aliases: BotAliasMap;
   /** 로드 시각 (캐시 TTL용) */
   loadedAt: number;
@@ -275,11 +275,13 @@ export async function loadRoutingConfig(pool: Pool): Promise<RoutingConfig> {
     console.warn('[kb-routing] Failed to load skill routes from bot_delegation:', err);
   }
 
-  // 5. Alias 맵 (semiclaw → semobot 등)
+  // 5. Alias 맵 — 표시명 리네이밍 정규화. SemoBot 은 SemiClaw 의 별 alias 가 아니므로 두
+  // 사이의 alias 행은 의도 X (semo decision/semobot-independent-agent-2026-05-06).
   const aliases = await loadBotAliases(pool);
 
   // 6. KB intent routes (Phase 3b) — agents 도메인의 delegation 키 파싱.
-  // active 봇만 (status != 'retired'). semobot/orchestrator 류는 KB delegation 키워드가 비어있을 수 있음 — skip.
+  // active 봇만 (status != 'retired'). orchestrator (SemiClaw) 는 KB delegation 키워드가 비어있을 수 있음 — skip.
+  // SemoBot 은 system_management 페르소나로 routing target 이 아님 (semo bot-ids metadata.runtime_source.semobot=slack-router-system).
   const kbIntentRoutes: RoutingConfig['kbIntentRoutes'] = [];
   try {
     const intentResult = await pool.query(
