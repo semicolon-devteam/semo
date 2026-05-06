@@ -278,11 +278,12 @@ async function loadOpenClawBots(): Promise<{
       | { runtime_source?: Record<string, string> }
       | null
       | undefined;
-    const map = meta?.runtime_source ?? {};
-    const list = Object.entries(map)
-      .filter(([, v]) => v === 'openclaw')
-      .map(([k]) => k);
-    if (list.length) {
+    // KB row + metadata.runtime_source 가 존재하면 — 빈 set(전체 마이그레이션 완료) 도 의도된 결과.
+    // 둘 중 하나라도 없으면 hardcoded fallback 사용.
+    if (res.rows[0] && meta?.runtime_source) {
+      const list = Object.entries(meta.runtime_source)
+        .filter(([, v]) => v === 'openclaw')
+        .map(([k]) => k);
       return { bots: new Set(list), source: 'kb' };
     }
   } catch (err) {
