@@ -3,10 +3,14 @@
  *
  * P5-2e: common 으로 이동. channel-slack/discord-router 양쪽 라우터가 공용으로 import 가능.
  * 기존 channel-slack/src/slack-projection-emitter.ts 는 re-export facade 로 유지.
+ *
+ * 2026-05-07: username/icon_emoji 위장 제거. 발신 시 botId 별 WebClient 풀에서
+ * 진짜 봇 Slack App 토큰을 골라 chat.postMessage 한다. 토큰 누락 시 fallback WebClient.
  */
 
 import type { WebClient } from '@slack/web-api';
 import { convertMarkdownToBlocks } from '../../slack/markdown-to-slack.js';
+import { getWebClientForBot } from '../../slack/bot-web-client-pool.js';
 import type {
   ProjectionEmitter,
   ProjectionFailureKind,
@@ -16,10 +20,11 @@ import type {
 } from '../projection-emitter.js';
 
 export interface SlackEmitterOptions {
-  /** bot 식별자별 username/icon_emoji 매핑 (정적). */
-  botProfiles?: Record<string, { username: string; icon_emoji: string }>;
-  /** botProfiles 가 동적으로 갱신되는 경우 매 emit 시 호출되는 getter. */
-  getBotProfiles?: () => Record<string, { username: string; icon_emoji: string }>;
+  /**
+   * botId → WebClient 매핑을 override 할 때 사용 (테스트용).
+   * 기본값은 bot-web-client-pool.getWebClientForBot.
+   */
+  resolveWebClient?: (botId: string | undefined) => WebClient;
 }
 
 interface SlackEmitOptions {
@@ -30,9 +35,16 @@ interface SlackEmitOptions {
 
 export class SlackProjectionEmitter implements ProjectionEmitter {
   constructor(
-    private readonly slackWeb: WebClient,
+    /** Fallback WebClient — botId 없거나 풀에서 못 찾으면 이걸 사용. */
+    private readonly fallbackWeb: WebClient,
     private readonly options: SlackEmitterOptions = {},
   ) {}
+
+  private resolveClient(botId: string | undefined): WebClient {
+    if (this.options.resolveWebClient) return this.options.resolveWebClient(botId);
+    if (!botId) return this.fallbackWeb;
+    return getWebClientForBot(botId);
+  }
 
   async emit(target: ProjectionTarget, payload: ProjectionPayload): Promise<ProjectionResult> {
     if (target.channel !== 'slack-block') {
@@ -47,20 +59,18 @@ export class SlackProjectionEmitter implements ProjectionEmitter {
       };
     }
     const opts = (target.options ?? {}) as SlackEmitOptions;
-    const profiles = this.options.getBotProfiles?.() ?? this.options.botProfiles ?? {};
-    const profile = opts.botId ? profiles[opts.botId] : undefined;
+    const web = this.resolveClient(opts.botId);
     const payloads = convertMarkdownToBlocks(payload.text);
 
     let lastTs: string | undefined;
     try {
       for (const p of payloads) {
-        const res = await this.slackWeb.chat.postMessage({
+        const res = await web.chat.postMessage({
           channel: target.destination,
           text: p.text,
           ...(p.blocks.length > 0 && { blocks: p.blocks }),
           thread_ts: opts.threadTs,
           unfurl_links: opts.unfurlLinks ?? false,
-          ...(profile && { username: profile.username, icon_emoji: profile.icon_emoji }),
         });
         if (res.ts) lastTs = res.ts;
       }

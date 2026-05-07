@@ -25,6 +25,7 @@ import {
   ClaudeCodeAdapter,
   ConsoleAuditSink,
   InMemoryToolGateway,
+  getWebClientForBot,
   isUsageRejection,
   type ToolCallRequest,
   type ToolDefinition,
@@ -132,10 +133,8 @@ const slackWeb = new WebClient(SLACK_BOT_TOKEN);
 const slackSocket = new SocketModeClient({ appToken: SLACK_APP_TOKEN });
 
 // P5-2c: ProjectionEmitter 도입 — reply tool 의 메시지 전송 블록만 emitter 호출로 치환.
-// botProfiles 는 5분 주기로 동적 갱신되므로 getter 로 주입.
-const slackEmitter = new SlackProjectionEmitter(slackWeb, {
-  getBotProfiles: () => botProfiles,
-});
+// 2026-05-07: 위장 제거 — emitter 가 봇별 WebClient 풀에서 진짜 봇 토큰을 골라 발신.
+const slackEmitter = new SlackProjectionEmitter(slackWeb);
 
 // P5-3b: ToolGateway 도입 (ask_user 1건 reference). AlwaysAllowPolicy + audit 만 추가.
 // 핸들러 안에서 기존 side effect (pendingAskResponses 등록, 120초 타임아웃, postMessage) 모두 보존.
@@ -170,12 +169,12 @@ toolGateway.register(ASK_USER_DEFINITION, async (req: ToolCallRequest) => {
     value: opt.value,
   }));
 
-  const askProfile = askBotId ? botProfiles[askBotId] : undefined;
-  await slackWeb.chat.postMessage({
+  // 2026-05-07: 위장 제거. ask 발송 봇의 진짜 토큰으로 직접 chat.postMessage.
+  const askWeb = getWebClientForBot(askBotId);
+  await askWeb.chat.postMessage({
     channel: slack_channel,
     thread_ts: thread_ts || undefined,
     text: question,
-    ...(askProfile && { username: askProfile.username, icon_emoji: askProfile.icon_emoji }),
     blocks: [
       {
         type: 'section',
@@ -218,33 +217,8 @@ toolGateway.register(REACT_DEFINITION, async (req: ToolCallRequest) => {
 // Bot user ID (resolved at startup)
 let botUserId = '';
 
-// Bot identity profiles — KB 기반 동적 로드, 하드코딩 fallback
-const FALLBACK_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
-  semiclaw: { username: 'SemiClaw', icon_emoji: ':clipboard:' },
-  planclaw: { username: 'PlanClaw', icon_emoji: ':bar_chart:' },
-  designclaw: { username: 'DesignClaw', icon_emoji: ':art:' },
-  workclaw: { username: 'WorkClaw', icon_emoji: ':hammer_and_wrench:' },
-  reviewclaw: { username: 'ReviewClaw', icon_emoji: ':mag:' },
-  infraclaw: { username: 'InfraClaw', icon_emoji: ':gear:' },
-  growthclaw: { username: 'GrowthClaw', icon_emoji: ':chart_with_upwards_trend:' },
-};
-let botProfiles: Record<string, { username: string; icon_emoji: string }> = {
-  ...FALLBACK_PROFILES,
-};
-
-async function loadBotProfiles(): Promise<void> {
-  try {
-    const res = await fetch(`${SEMO_DASHBOARD_URL}/api/bots/profiles`);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = (await res.json()) as Record<string, { username: string; icon_emoji: string }>;
-    if (Object.keys(data).length > 0) {
-      botProfiles = data;
-      console.error(`[channel-slack] Loaded ${Object.keys(data).length} bot profiles from KB`);
-    }
-  } catch (err) {
-    console.error('[channel-slack] Failed to load bot profiles from API, using fallback:', err);
-  }
-}
+// 2026-05-07: bot identity profile (username/icon_emoji) 로딩 제거.
+// 봇별 발신은 bot-web-client-pool.getWebClientForBot 로 대체 (진짜 봇 Slack App 토큰 사용).
 
 // Pending ask_user responses: requestId → resolve function
 const pendingAskResponses = new Map<string, (value: string) => void>();
@@ -698,9 +672,7 @@ async function start() {
   // 1. MCP 연결 (stdio transport — Claude Code가 프로세스를 스폰)
   await mcp.connect(new StdioServerTransport());
 
-  // 2. Bot profiles — KB 기반 동적 로드
-  await loadBotProfiles();
-  setInterval(loadBotProfiles, 5 * 60 * 1000); // 5분 갱신
+  // 2. (removed 2026-05-07) Bot profiles loader — username/icon_emoji 위장 폐기로 불필요.
 
   // 3. Bot User ID 조회
   try {

@@ -1,25 +1,43 @@
 /**
- * semo slack — Slack 메시지 읽기/조회
+ * semo slack — Slack 메시지 읽기/조회/발송
  *
- * 봇이 Slack permalink에서 메시지 본문을 읽을 수 있도록 하는 CLI.
- * SLACK_BOT_TOKEN 환경변수 필요 (~/.claude/semo/.env에서 로드).
+ * 2026-05-07: --as <botId> 가 주어지면 그 봇의 Slack App 토큰
+ * ({BOTID}_SLACK_BOT_TOKEN) 으로 발송한다 (진짜 봇 명의). 토큰 누락 시
+ * SemoBot 본진(SLACK_BOT_TOKEN) 으로 fallback. username/icon_emoji 위장 폐기.
  */
 
 import { Command } from 'commander';
 import chalk from 'chalk';
 import { isUsageRejection } from '@team-semicolon/semo-common';
 
-const SLACK_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
-  semiclaw: { username: 'SemiClaw', icon_emoji: ':clipboard:' },
-  planclaw: { username: 'PlanClaw', icon_emoji: ':bar_chart:' },
-  designclaw: { username: 'DesignClaw', icon_emoji: ':art:' },
-  workclaw: { username: 'WorkClaw', icon_emoji: ':hammer_and_wrench:' },
-  reviewclaw: { username: 'ReviewClaw', icon_emoji: ':mag:' },
-  infraclaw: { username: 'InfraClaw', icon_emoji: ':gear:' },
-  growthclaw: { username: 'GrowthClaw', icon_emoji: ':chart_with_upwards_trend:' },
-};
+/**
+ * 봇 ID 추론 우선순위 (--as 미지정 시):
+ *   1. process.env.SEMO_BOT_ID
+ *   2. cwd 기반: ~/.semo/{sessions|workspaces}/{botId}/...
+ *   3. undefined → SemoBot 본진 토큰 fallback
+ */
+function inferBotId(): string | undefined {
+  if (process.env.SEMO_BOT_ID) return process.env.SEMO_BOT_ID;
+  const cwd = process.cwd();
+  const m = cwd.match(/\/\.semo\/(?:sessions|workspaces)\/([a-z0-9][a-z0-9-]*)(?:\/|$)/);
+  return m?.[1];
+}
 
-function getToken(): string {
+function getToken(botId?: string): string {
+  if (botId) {
+    const key = `${botId.replace(/-/g, '_').toUpperCase()}_SLACK_BOT_TOKEN`;
+    const dedicated = process.env[key];
+    if (dedicated) return dedicated;
+    // SemoBot 흡수 봇 (incubator/kb-sidekick) 또는 토큰 미발급 봇은 조용히 fallback.
+    const SEMOBOT_FALLBACK = new Set(['semobot', 'incubator', 'kb-sidekick']);
+    if (!SEMOBOT_FALLBACK.has(botId)) {
+      console.error(
+        chalk.yellow(
+          `[slack] No dedicated token for '${botId}' (env ${key} missing) — falling back to SemoBot token`,
+        ),
+      );
+    }
+  }
   const token = process.env.SLACK_BOT_TOKEN;
   if (!token) {
     console.error(chalk.red('SLACK_BOT_TOKEN 환경변수가 설정되지 않았습니다.'));
@@ -137,7 +155,10 @@ export function registerSlackCommands(program: Command): void {
     .requiredOption('-c, --channel <channel>', '채널 ID 또는 #channel-name')
     .requiredOption('-t, --text <text>', '메시지 본문 (mrkdwn 지원)')
     .option('--thread <ts>', '스레드 답글 (thread_ts)')
-    .option('--as <botId>', '봇 페르소나 (semiclaw, planclaw 등)')
+    .option(
+      '--as <botId>',
+      '봇 명의로 발송 (해당 봇의 Slack App 토큰 사용; 누락 시 SemoBot fallback)',
+    )
     .option('--json', 'JSON 형식으로 결과 출력', false)
     .action(
       async (opts: {
@@ -159,7 +180,8 @@ export function registerSlackCommands(program: Command): void {
           process.exit(2);
         }
 
-        const token = getToken();
+        const effectiveAs = opts.as ?? inferBotId();
+        const token = getToken(effectiveAs);
 
         const body: Record<string, unknown> = {
           channel: opts.channel,
@@ -167,14 +189,6 @@ export function registerSlackCommands(program: Command): void {
           unfurl_links: false,
         };
         if (opts.thread) body.thread_ts = opts.thread;
-        if (opts.as) {
-          const profile = SLACK_PROFILES[opts.as] || {
-            username: opts.as,
-            icon_emoji: ':robot_face:',
-          };
-          body.username = profile.username;
-          body.icon_emoji = profile.icon_emoji;
-        }
 
         try {
           const res = await fetch('https://slack.com/api/chat.postMessage', {
@@ -194,7 +208,9 @@ export function registerSlackCommands(program: Command): void {
           };
 
           if (!data.ok) {
-            const hint = data.error === 'not_in_channel' ? ' (SemoBot을 채널에 초대하세요)' : '';
+            const senderLabel = effectiveAs ? `'${effectiveAs}'` : 'SemoBot';
+            const hint =
+              data.error === 'not_in_channel' ? ` (${senderLabel} 봇을 채널에 초대하세요)` : '';
             console.error(chalk.red(`Slack API 오류: ${data.error}${hint}`));
             process.exit(1);
           }
@@ -237,4 +253,235 @@ export function registerSlackCommands(program: Command): void {
         }
       },
     );
+
+  cmd
+    .command('invite-bots')
+    .description('봇별 Slack App을 SemoBot이 멤버인 채널에 일괄 invite (이미 멤버면 skip; 멱등).')
+    .option(
+      '--bots <ids>',
+      '대상 봇 ID 콤마 구분 (생략 시 .env의 모든 {BOTID}_SLACK_BOT_TOKEN 자동 검출)',
+    )
+    .option(
+      '--channels <ids>',
+      '대상 채널 ID 콤마 구분 (생략 시 SemoBot이 멤버인 모든 public/private 채널)',
+    )
+    .option('--dry-run', '실제 invite 호출 없이 누락 채널만 출력', false)
+    .option('--json', 'JSON 형식 결과 출력', false)
+    .action(async (opts: { bots?: string; channels?: string; dryRun: boolean; json: boolean }) => {
+      await inviteBots(opts);
+    });
+}
+
+interface SlackChannel {
+  id: string;
+  name?: string;
+  is_archived?: boolean;
+  is_member?: boolean;
+}
+
+async function slackApi<T = Record<string, unknown>>(
+  token: string,
+  method: string,
+  body: Record<string, unknown> | URLSearchParams,
+): Promise<T & { ok: boolean; error?: string }> {
+  const isForm = body instanceof URLSearchParams;
+  const res = await fetch(`https://slack.com/api/${method}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': isForm ? 'application/x-www-form-urlencoded' : 'application/json',
+    },
+    body: isForm ? body.toString() : JSON.stringify(body),
+    signal: AbortSignal.timeout(15000),
+  });
+  return (await res.json()) as T & { ok: boolean; error?: string };
+}
+
+async function inviteBots(opts: {
+  bots?: string;
+  channels?: string;
+  dryRun: boolean;
+  json: boolean;
+}): Promise<void> {
+  const semobotToken = process.env.SLACK_BOT_TOKEN;
+  if (!semobotToken) {
+    console.error(chalk.red('SLACK_BOT_TOKEN 미설정 — SemoBot 본진 토큰이 inviter 권한 보유자.'));
+    process.exit(1);
+  }
+
+  // 1) 대상 봇 ID + 토큰 결정
+  const explicitBots = opts.bots
+    ?.split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const candidateBots = explicitBots ?? [
+    'semiclaw',
+    'planclaw',
+    'reviewclaw',
+    'infraclaw',
+    'workclaw',
+    'designclaw',
+    'growthclaw',
+  ];
+  const botEntries: Array<{ botId: string; userId: string; token: string }> = [];
+  for (const botId of candidateBots) {
+    const key = `${botId.replace(/-/g, '_').toUpperCase()}_SLACK_BOT_TOKEN`;
+    const token = process.env[key];
+    if (!token) {
+      console.error(chalk.yellow(`[skip] ${botId}: ${key} 미설정`));
+      continue;
+    }
+    const auth = await slackApi<{ user_id?: string }>(token, 'auth.test', {});
+    if (!auth.ok || !auth.user_id) {
+      console.error(chalk.red(`[skip] ${botId}: auth.test 실패 (${auth.error})`));
+      continue;
+    }
+    botEntries.push({ botId, userId: auth.user_id, token });
+  }
+
+  if (botEntries.length === 0) {
+    console.error(chalk.red('대상 봇이 없습니다.'));
+    process.exit(1);
+  }
+
+  // 2) 채널 목록 결정
+  let targetChannels: SlackChannel[] = [];
+  if (opts.channels) {
+    const ids = opts.channels
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    targetChannels = ids.map((id) => ({ id }));
+  } else {
+    // SemoBot 이 멤버인 public + private 채널만
+    let cursor: string | undefined;
+    do {
+      const params = new URLSearchParams({
+        types: 'public_channel,private_channel',
+        exclude_archived: 'true',
+        limit: '200',
+      });
+      if (cursor) params.set('cursor', cursor);
+      const list = await slackApi<{
+        channels?: SlackChannel[];
+        response_metadata?: { next_cursor?: string };
+      }>(semobotToken, 'users.conversations', params);
+      if (!list.ok) {
+        console.error(chalk.red(`users.conversations 실패: ${list.error}`));
+        process.exit(1);
+      }
+      for (const ch of list.channels ?? []) {
+        if (!ch.is_archived) targetChannels.push(ch);
+      }
+      cursor = list.response_metadata?.next_cursor || undefined;
+    } while (cursor);
+  }
+
+  if (targetChannels.length === 0) {
+    console.error(
+      chalk.yellow('대상 채널이 없습니다. SemoBot이 어떤 채널에도 invite 되어있지 않습니다.'),
+    );
+    process.exit(0);
+  }
+
+  // 3) 각 채널마다 멤버십 확인 + 누락 봇 invite
+  const summary: Array<{
+    channel: string;
+    name?: string;
+    invited: string[];
+    already: string[];
+    failed: Array<{ botId: string; error: string }>;
+  }> = [];
+
+  for (const ch of targetChannels) {
+    const members = new Set<string>();
+    let cursor: string | undefined;
+    let memberFetchOk = true;
+    do {
+      const params = new URLSearchParams({ channel: ch.id, limit: '500' });
+      if (cursor) params.set('cursor', cursor);
+      const r = await slackApi<{
+        members?: string[];
+        response_metadata?: { next_cursor?: string };
+      }>(semobotToken, 'conversations.members', params);
+      if (!r.ok) {
+        console.error(
+          chalk.yellow(`[${ch.name ?? ch.id}] conversations.members 실패: ${r.error} — skip`),
+        );
+        memberFetchOk = false;
+        break;
+      }
+      for (const m of r.members ?? []) members.add(m);
+      cursor = r.response_metadata?.next_cursor || undefined;
+    } while (cursor);
+    if (!memberFetchOk) continue;
+
+    const missing = botEntries.filter((b) => !members.has(b.userId));
+    const already = botEntries.filter((b) => members.has(b.userId)).map((b) => b.botId);
+
+    const invited: string[] = [];
+    const failed: Array<{ botId: string; error: string }> = [];
+
+    if (missing.length > 0 && !opts.dryRun) {
+      const r = await slackApi<{ error?: string }>(semobotToken, 'conversations.invite', {
+        channel: ch.id,
+        users: missing.map((m) => m.userId).join(','),
+      });
+      if (r.ok) {
+        for (const m of missing) invited.push(m.botId);
+      } else if (r.error === 'already_in_channel') {
+        for (const m of missing) already.push(m.botId);
+      } else {
+        // 일부 봇만 실패할 수도 있어 1:1 재시도
+        for (const m of missing) {
+          const single = await slackApi<{ error?: string }>(semobotToken, 'conversations.invite', {
+            channel: ch.id,
+            users: m.userId,
+          });
+          if (single.ok || single.error === 'already_in_channel') {
+            (single.ok ? invited : already).push(m.botId);
+          } else {
+            failed.push({ botId: m.botId, error: single.error ?? 'unknown' });
+          }
+        }
+      }
+    } else if (missing.length > 0 && opts.dryRun) {
+      for (const m of missing) invited.push(m.botId); // dry-run: would invite
+    }
+
+    summary.push({
+      channel: ch.id,
+      name: ch.name,
+      invited,
+      already,
+      failed,
+    });
+  }
+
+  if (opts.json) {
+    console.log(JSON.stringify({ ok: true, dryRun: opts.dryRun, summary }, null, 2));
+    return;
+  }
+
+  let totalInvited = 0;
+  let totalFailed = 0;
+  for (const s of summary) {
+    if (s.invited.length === 0 && s.failed.length === 0) continue;
+    const label = chalk.cyan(`#${s.name ?? s.channel}`);
+    if (s.invited.length > 0) {
+      console.log(
+        `${label} ${opts.dryRun ? chalk.yellow('would invite') : chalk.green('invited')}: ${s.invited.join(', ')}`,
+      );
+      totalInvited += s.invited.length;
+    }
+    for (const f of s.failed) {
+      console.log(`${label} ${chalk.red('failed')} ${f.botId}: ${f.error}`);
+      totalFailed += 1;
+    }
+  }
+  console.log(
+    chalk.gray(
+      `\nchannels=${summary.length} bots=${botEntries.length} ${opts.dryRun ? 'would-invite' : 'invited'}=${totalInvited} failed=${totalFailed}`,
+    ),
+  );
 }

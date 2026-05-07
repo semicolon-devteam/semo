@@ -22,7 +22,6 @@ import {
   SlackGateway,
   Router,
   FALLBACK_BOT_IDS,
-  SLACK_PROFILES,
   InboxWriter,
   OutboxReader,
   HealthMonitor,
@@ -234,11 +233,9 @@ async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
 
 // P5-2e: SlackProjectionEmitter 를 OutboxReader 에 주입.
 // emit 실패/throw 시 OutboxReader 가 gateway fallback (회귀 0).
-// SLACK_PROFILES getter 주입 — bot-config 가 KB 에서 동적 갱신해도 매 emit 시 최신값 사용.
-// (Codex 리뷰: 누락 시 sender persona 회귀)
-const slackEmitter = new SlackProjectionEmitter(slack.getWebClient(), {
-  getBotProfiles: () => SLACK_PROFILES,
-});
+// 2026-05-07: 위장 제거 — emitter 가 botId 별 WebClient 풀에서 진짜 봇 토큰을 골라 발신.
+// fallback WebClient 는 SemoBot 본진 토큰.
+const slackEmitter = new SlackProjectionEmitter(slack.getWebClient());
 
 // Usage-rejection alerter — fired (throttled per-bot) when OutboxReader blocks
 // a reply because the text matches Claude Code's "out of extra usage" pattern.

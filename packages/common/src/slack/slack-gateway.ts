@@ -5,7 +5,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { convertMarkdownToBlocks } from './markdown-to-slack.js';
 import type { SlackMessage, SlackImage, AskOption } from './channel-types.js';
-import { SLACK_PROFILES, type BotId } from './bot-config.js';
+import { type BotId } from './bot-config.js';
+import { getWebClientForBot } from './bot-web-client-pool.js';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || '';
 
@@ -326,17 +327,18 @@ export class SlackGateway {
   }
 
   async postAsBot(botId: string, channel: string, text: string, threadTs?: string): Promise<void> {
-    const profile = SLACK_PROFILES[botId];
+    // 2026-05-07: username/icon_emoji 위장 제거. 봇별 Slack App 토큰의 WebClient 로 직접 발신.
+    // 봇별 토큰이 없으면 SemoBot fallback (bot-web-client-pool 내부에서 처리).
+    const web = getWebClientForBot(botId);
     const payloads = convertMarkdownToBlocks(text);
 
     for (const payload of payloads) {
-      await this.web.chat.postMessage({
+      await web.chat.postMessage({
         channel,
         text: payload.text,
         ...(payload.blocks.length > 0 && { blocks: payload.blocks }),
         thread_ts: threadTs || undefined,
         unfurl_links: false,
-        ...(profile && { username: profile.username, icon_emoji: profile.icon_emoji }),
       });
     }
   }
@@ -373,7 +375,7 @@ export class SlackGateway {
     threadTs?: string,
   ): Promise<string> {
     const requestId = `ask_${++this.askCounter}_${Date.now()}`;
-    const profile = SLACK_PROFILES[botId];
+    const web = getWebClientForBot(botId);
 
     const buttons = options.slice(0, 4).map((opt, i) => ({
       type: 'button' as const,
@@ -382,11 +384,10 @@ export class SlackGateway {
       value: opt.value,
     }));
 
-    await this.web.chat.postMessage({
+    await web.chat.postMessage({
       channel,
       thread_ts: threadTs || undefined,
       text: question,
-      ...(profile && { username: profile.username, icon_emoji: profile.icon_emoji }),
       blocks: [
         { type: 'section', text: { type: 'mrkdwn', text: `:question: ${question}` } },
         { type: 'actions', block_id: `semo_ask_${requestId}`, elements: buttons },

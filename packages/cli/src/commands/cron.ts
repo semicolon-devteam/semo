@@ -140,7 +140,14 @@ ${message}`);
   // 6. Report channel fallback
   sections.push(
     `## Report Destination
-On completion (success or failure), post a short result summary to Slack channel \`${reportChannel}\`. Format: \`[${job.name}] 결과: ...\` (3 lines max).`,
+On completion (success or failure), post a short result summary to Slack channel \`${reportChannel}\`.
+Format: \`[${job.name}] 결과: ...\` (3 lines max).
+**Sender:** Always pass \`--as ${botId}\` to \`semo slack send\` so the message is posted under the real ${botId} Slack App author. Without it, the message will appear as SemoBot.
+
+Example:
+\`\`\`
+semo slack send --as ${botId} -c ${reportChannel} -t '[${job.name}] 결과: success — ...'
+\`\`\``,
   );
 
   // 7. Completion obligation
