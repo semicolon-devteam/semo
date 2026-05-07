@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SEMO host-signals sidecar — pushes pgrep/PID/auth-profile signals to semo.host_signals.
+
+  Spec: KB semo decision/dashboard-host-signals-sidecar-2026-05-07
+  Action item: 4ddac18f
+
+  Install:
+    cp packages/cli/templates/launchd/ai.semo.host-signals-sidecar.plist \
+       ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/ai.semo.host-signals-sidecar.plist
+
+  Verify:
+    launchctl list | grep host-signals
+    semo host-signals show --limit 20
+
+  Polling: every 90 seconds (StartInterval). 5-minute dashboard freshness window
+  means missing 3 cycles → stale_count increments → daemon detection alert.
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>ai.semo.host-signals-sidecar</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/semo</string>
+    <string>host-signals</string>
+    <string>push</string>
+    <string>--quiet</string>
+  </array>
+  <key>StartInterval</key><integer>90</integer>
+  <key>StandardOutPath</key><string>/Users/reus/.semo/logs/host-signals-sidecar.log</string>
+  <key>StandardErrorPath</key><string>/Users/reus/.semo/logs/host-signals-sidecar.log</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>HOME</key><string>/Users/reus</string>
+    <key>PATH</key><string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+</dict>
+</plist>

@@ -60,6 +60,7 @@ import { registerTopologyCommand } from './commands/topology';
 import { registerModelsCommands } from './commands/models';
 import { registerExecCommand } from './commands/exec';
 import { registerRuntimeCommands } from './commands/runtime';
+import { registerHostSignalsCommands } from './commands/host-signals';
 import { registerMigrateSqliteCommand } from './commands/migrate-sqlite.js';
 import { registerUpdateCommand } from './commands/update.js';
 import { registerHooksCommand } from './commands/hooks-verify.js';
@@ -1474,6 +1475,7 @@ registerModelsCommands(modelsCmd);
 // === exec 명령어 (ExecutionTarget 단발 dispatch smoke test) ===
 registerExecCommand(program);
 registerRuntimeCommands(program);
+registerHostSignalsCommands(program);
 registerMigrateSqliteCommand(program);
 registerUpdateCommand(program);
 registerHooksCommand(program);
