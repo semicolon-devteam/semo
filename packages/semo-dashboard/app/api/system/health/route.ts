@@ -11,12 +11,16 @@ export const dynamic = 'force-dynamic';
  *
  * Spec: KB semo decision/dashboard-health-split-spec
  *
- * 현재 단계 (BE-1 v1): DB-only 시그널.
+ * 현재 단계 (BE-1 v2): DB-only 시그널 + host_signals 테이블 통합.
  *   - bot_status (online/offline)
  *   - bot_commitments runtime_source 분포 (24h)
  *   - bot_cron_jobs last_status / consecutive_failures
+ *   - semo.host_signals 의 신선한 (≤5분) 스냅샷 — sidecar daemon 이 push (별 트랙)
  *
- * 후속 (BE-1 v2): 파일 시스템 시그널 (pgrep, auth-profiles.json) — sidecar 분리 검토.
+ * dashboard 자체는 host 파일에 접근 안 함 (OKE Docker pod 격리). host_signals 가
+ * 비어있으면 host_signals 필드는 빈 객체로 응답 — v1 동작과 호환.
+ *
+ * 자세한 sidecar 계약: KB semo decision/dashboard-host-signals-sidecar-2026-05-07
  */
 
 type Status = 'healthy' | 'degraded' | 'dead' | 'unknown';
@@ -30,6 +34,21 @@ interface SystemHealthSummary {
   recent_commitments_24h: number;
   recent_failures_24h: number;
 }
+
+interface HostSignalRow {
+  source_host: string;
+  signal_type: string;
+  target_id: string;
+  status: string;
+  payload: Record<string, unknown>;
+  observed_at: string;
+  recorded_at: string;
+  expires_at: string | null;
+  age_sec: number;
+  fresh: boolean;
+}
+
+const HOST_SIGNAL_FRESHNESS_SEC = 300; // 5분 — sidecar 가 1~2분 주기로 push 한다고 가정하면 충분
 
 const OPENCLAW_DEFAULT = [
   'semiclaw',
@@ -124,6 +143,62 @@ export async function GET() {
       };
     };
 
+    // BE-1 v2: host_signals — sidecar 가 push 한 host filesystem/process 시그널.
+    // 테이블이 비어있거나 모두 stale 이면 빈 객체. 파싱 실패해도 v1 응답은 유지.
+    let hostSignals: {
+      fresh_count: number;
+      stale_count: number;
+      by_target: Record<string, HostSignalRow[]>;
+    } = { fresh_count: 0, stale_count: 0, by_target: {} };
+    try {
+      const sigRes = await query<{
+        source_host: string;
+        signal_type: string;
+        target_id: string;
+        status: string;
+        payload: Record<string, unknown> | null;
+        observed_at: Date;
+        recorded_at: Date;
+        expires_at: Date | null;
+        age_sec: string;
+      }>(
+        `SELECT source_host, signal_type, target_id, status,
+                COALESCE(payload, '{}'::jsonb) AS payload,
+                observed_at, recorded_at, expires_at,
+                EXTRACT(EPOCH FROM (NOW() - recorded_at))::text AS age_sec
+         FROM semo.host_signals
+         WHERE recorded_at > NOW() - INTERVAL '1 hour'
+         ORDER BY recorded_at DESC`,
+      );
+
+      const byTarget: Record<string, HostSignalRow[]> = {};
+      let freshCount = 0;
+      let staleCount = 0;
+      for (const row of sigRes.rows) {
+        const ageSec = Number(row.age_sec);
+        const fresh = ageSec <= HOST_SIGNAL_FRESHNESS_SEC;
+        if (fresh) freshCount += 1;
+        else staleCount += 1;
+        const enriched: HostSignalRow = {
+          source_host: row.source_host,
+          signal_type: row.signal_type,
+          target_id: row.target_id,
+          status: row.status,
+          payload: row.payload ?? {},
+          observed_at: row.observed_at.toISOString(),
+          recorded_at: row.recorded_at.toISOString(),
+          expires_at: row.expires_at ? row.expires_at.toISOString() : null,
+          age_sec: ageSec,
+          fresh,
+        };
+        (byTarget[row.target_id] ??= []).push(enriched);
+      }
+      hostSignals = { fresh_count: freshCount, stale_count: staleCount, by_target: byTarget };
+    } catch (err) {
+      // host_signals 테이블이 없거나 쿼리 실패해도 v1 응답은 유지 — graceful degrade.
+      console.warn('[/api/system/health] host_signals query failed:', err);
+    }
+
     return NextResponse.json({
       generated_at: new Date().toISOString(),
       groups: [
@@ -134,6 +209,7 @@ export async function GET() {
         slack_router: slackRouterBots,
         openclaw: openclawList,
       },
+      host_signals: hostSignals,
     });
   } catch (err) {
     console.error('[/api/system/health] error:', err);
