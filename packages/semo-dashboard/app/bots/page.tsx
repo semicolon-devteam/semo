@@ -3,6 +3,7 @@ import type { Bot } from '@/types';
 import { query } from '@/lib/db';
 import { getItem } from '@/lib/kb';
 import RuntimeSourceChart from '@/components/RuntimeSourceChart';
+import SystemHealthBanner from '@/components/SystemHealthBanner';
 
 export const dynamic = 'force-dynamic';
 
@@ -102,6 +103,10 @@ export default async function BotsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">봇 팀 현황</h1>
         <p className="text-gray-600 dark:text-gray-400">모든 봇의 활동과 상태를 모니터링합니다</p>
+      </div>
+
+      <div className="mb-6">
+        <SystemHealthBanner />
       </div>
 
       <div className="mb-8">
