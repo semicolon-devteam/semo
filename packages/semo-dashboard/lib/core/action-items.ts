@@ -36,7 +36,11 @@ export async function listActionItems(filters: ActionItemFilters = {}): Promise<
     `SELECT ai.*,
             COALESCE(nk.content, INITCAP(o_owner.domain)) AS owner_label,
             o_owner.entity_type AS owner_entity_type,
-            COALESCE(kb_pn.metadata->>'project_name', o_target.description, ai.target_domain) AS target_label
+            COALESCE(
+              kb_pn.metadata->>'project_name',
+              NULLIF(BTRIM(SPLIT_PART(SPLIT_PART(o_target.description, E'\n', 1), ' — ', 1)), ''),
+              ai.target_domain
+            ) AS target_label
      FROM semo.action_items ai
      JOIN semo.ontology o_owner ON ai.owner_domain = o_owner.domain
      LEFT JOIN semo.knowledge_base nk ON nk.domain = ai.owner_domain AND nk.key = 'nickname'
