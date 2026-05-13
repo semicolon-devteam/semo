@@ -10,12 +10,17 @@ import * as path from 'node:path';
 
 const CLI = path.resolve(__dirname, '..', '..', 'dist', 'bundle.js');
 
-function run(args: string[], stdin: string): { code: number; stdout: string; stderr: string } {
+function run(
+  args: string[],
+  stdin: string,
+  envOverride?: Record<string, string>,
+): { code: number; stdout: string; stderr: string } {
   try {
     const stdout = execFileSync('node', [CLI, ...args], {
       input: stdin,
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
+      env: envOverride ? { ...process.env, ...envOverride } : process.env,
     });
     return { code: 0, stdout, stderr: '' };
   } catch (err) {
@@ -611,6 +616,49 @@ describe('semo guard run destructive', () => {
     );
     expect(r.code).toBe(0);
     expect(r.stdout).toBe('');
+  });
+
+  // ── Local careful mode (SEMO_CAREFUL_MODE) — 2026-05-13 ──
+
+  it('NON_BOT_CWD + SEMO_CAREFUL_MODE unset + rm -rf /etc → pass (회귀 보호)', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({
+        cwd: NON_BOT_CWD,
+        tool_name: 'Bash',
+        tool_input: { command: 'rm -rf /etc' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('NON_BOT_CWD + SEMO_CAREFUL_MODE=1 + rm -rf /etc → deny', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({
+        cwd: NON_BOT_CWD,
+        tool_name: 'Bash',
+        tool_input: { command: 'rm -rf /etc' },
+      }),
+      { SEMO_CAREFUL_MODE: '1' },
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('"decision":"deny"');
+  });
+
+  it('NON_BOT_CWD + SEMO_CAREFUL_MODE=ask + rm -rf /etc → ask permission', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({
+        cwd: NON_BOT_CWD,
+        tool_name: 'Bash',
+        tool_input: { command: 'rm -rf /etc' },
+      }),
+      { SEMO_CAREFUL_MODE: 'ask' },
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('"permissionDecision":"ask"');
   });
 });
 

@@ -586,12 +586,15 @@ const SKILL_MIRROR_GUARD: HookGuard = {
 const DESTRUCTIVE_GUARD: HookGuard = {
   name: 'destructive',
   triggers: ['PreToolUse'],
-  botSessionOnly: true,
-  description: 'Bash 도구의 파괴적 명령 차단 (deny JSON)',
+  botSessionOnly: false, // 봇은 항상, 로컬은 SEMO_CAREFUL_MODE 시 활성
+  description: 'Bash 도구의 파괴적 명령 차단 (봇: 항상 / 로컬: SEMO_CAREFUL_MODE 필요)',
   async evaluate(payload: HookPayload | null): Promise<HookResult> {
     if (!payload) return PASS;
     const cwd = payload.cwd ?? '';
-    if (!BOT_CWD_RE.test(cwd)) return PASS;
+    const isBot = BOT_CWD_RE.test(cwd);
+    const carefulMode = (process.env.SEMO_CAREFUL_MODE ?? '').trim();
+    if (!isBot && !carefulMode) return PASS;
+    const askMode = !isBot && carefulMode === 'ask';
     const toolName = (payload.tool_name as string | undefined) ?? '';
     if (toolName !== 'Bash') return PASS;
     const command =
@@ -606,11 +609,15 @@ const DESTRUCTIVE_GUARD: HookGuard = {
       if (re.test(command)) found.push(desc);
     }
     if (found.length === 0) return PASS;
-    const reason = `[DESTRUCTIVE GUARD] 차단: ${found.join(', ')}. 이 명령은 봇 세션에서 실행할 수 없습니다. 안전한 대안을 사용하세요.`;
+    const where = isBot ? '봇 세션에서 실행할 수 없습니다' : 'careful mode 에서 차단되었습니다';
+    const reason = `[DESTRUCTIVE GUARD] 차단: ${found.join(', ')}. 이 명령은 ${where}. 안전한 대안을 사용하세요.`;
+    const decisionPayload = askMode
+      ? { permissionDecision: 'ask', permissionDecisionReason: reason }
+      : { decision: 'deny', reason };
     return {
       exitCode: 0,
       level: 'block',
-      message: JSON.stringify({ decision: 'deny', reason }, undefined, 0),
+      message: JSON.stringify(decisionPayload, undefined, 0),
     };
   },
 };
