@@ -287,6 +287,18 @@ function generateSettings(botId, meta) {
           ],
         },
       ],
+      UserPromptSubmit: [
+        {
+          matcher: '',
+          hooks: [
+            {
+              type: 'command',
+              command: '/usr/local/bin/semo guard run delegation-check',
+              timeout: 4000,
+            },
+          ],
+        },
+      ],
       PreToolUse: [
         {
           matcher: 'Bash',
