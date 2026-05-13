@@ -503,6 +503,115 @@ describe('semo guard run destructive', () => {
     expect(r.code).toBe(0);
     expect(r.stdout).toBe('');
   });
+
+  // ── gstack /careful 흡수 패턴 (2026-05-13) ──
+
+  it('git checkout . → deny', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        tool_name: 'Bash',
+        tool_input: { command: 'git checkout .' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('"decision":"deny"');
+    expect(r.stdout).toContain('checkout');
+  });
+
+  it('git restore . → deny', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        tool_name: 'Bash',
+        tool_input: { command: 'git restore .' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('"decision":"deny"');
+  });
+
+  it('DROP DATABASE foo → deny', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        tool_name: 'Bash',
+        tool_input: { command: 'psql -c "DROP DATABASE foo"' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('DROP DATABASE');
+  });
+
+  it('kubectl delete pod → deny', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        tool_name: 'Bash',
+        tool_input: { command: 'kubectl delete pod foo' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('kubectl delete');
+  });
+
+  it('docker system prune -af → deny', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        tool_name: 'Bash',
+        tool_input: { command: 'docker system prune -af' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('docker system prune');
+  });
+
+  // ── Safe exceptions — 빌드 산출물 clean 허용 ──
+
+  it('rm -rf node_modules → pass (safe target)', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        tool_name: 'Bash',
+        tool_input: { command: 'rm -rf node_modules' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('rm -rf dist → pass (safe target)', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        tool_name: 'Bash',
+        tool_input: { command: 'rm -rf dist' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('rm -rf ./.next → pass (safe target with relative prefix)', () => {
+    const r = run(
+      ['guard', 'run', 'destructive'],
+      JSON.stringify({
+        cwd: BOT_CWD,
+        tool_name: 'Bash',
+        tool_input: { command: 'rm -rf ./.next' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
 });
 
 describe('semo guard run kb-search-loop', () => {

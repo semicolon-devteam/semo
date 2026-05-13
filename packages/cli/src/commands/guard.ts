@@ -111,14 +111,47 @@ const DESTRUCTIVE_PATTERNS: Array<[RegExp, string]> = [
   [/git\s+reset\s+--hard/i, 'git reset --hard'],
   [/git\s+push\s+(--force|-f)\b/i, 'git push --force'],
   [/git\s+clean\s+-[a-zA-Z]*[fd]/i, 'git clean with force/directory flags'],
+  // gstack /careful 흡수 패턴 (2026-05-13, KB decision/superpowers-gstack-adoption-...)
+  [/git\s+(checkout|restore)\s+\.\s*$/i, 'git checkout/restore working tree'],
   [/DROP\s+TABLE/i, 'SQL DROP TABLE'],
   [/DROP\s+SCHEMA/i, 'SQL DROP SCHEMA'],
+  [/DROP\s+DATABASE/i, 'SQL DROP DATABASE'],
   [/TRUNCATE\s+TABLE/i, 'SQL TRUNCATE TABLE'],
   [/DELETE\s+FROM\s+\w+\s*;/i, 'SQL DELETE FROM without WHERE clause'],
   [/chmod\s+(-R\s+)?777/i, 'chmod 777'],
   [/mkfs\./i, 'filesystem format command'],
   [/dd\s+.*of=\/dev\//i, 'dd write to block device'],
+  [/kubectl\s+delete\b/i, 'kubectl delete'],
+  [/docker\s+rm\s+-[a-zA-Z]*f/i, 'docker rm --force'],
+  [/docker\s+system\s+prune(\s+-[a-zA-Z]*a)?/i, 'docker system prune'],
 ];
+
+// Safe rm targets — 빌드 산출물은 봇이 clean 가능 (gstack /careful 패턴)
+const SAFE_RM_TARGETS = new Set([
+  'node_modules',
+  '.next',
+  'dist',
+  '__pycache__',
+  '.cache',
+  'build',
+  '.turbo',
+  'coverage',
+]);
+
+/** `rm -rf <targets>` 가 모두 안전 디렉토리(빌드 산출물)만 대상으로 하면 true. */
+function isOnlySafeRm(command: string): boolean {
+  // "rm <flags> <targets>" 만 처리. 다른 명령과 결합되면 false (보수적)
+  if (!/^\s*rm\s+/i.test(command)) return false;
+  if (/[;&|]|\$\(|`/.test(command)) return false; // shell composition → 보수 처리
+  const after = command.replace(/^\s*rm\s+/i, '');
+  const tokens = after.split(/\s+/).filter(Boolean);
+  const targets = tokens.filter((t) => !t.startsWith('-'));
+  if (targets.length === 0) return false;
+  return targets.every((t) => {
+    const norm = t.replace(/^\.\//, '').replace(/\/+$/, '');
+    return SAFE_RM_TARGETS.has(norm);
+  });
+}
 
 // compact 짝 — state file + threshold conf (SEMO_HOME 호환)
 function semoStateDir(): string {
@@ -566,6 +599,8 @@ const DESTRUCTIVE_GUARD: HookGuard = {
         | string
         | undefined) ?? '';
     if (!command) return PASS;
+    // gstack-style safe exception — 봇이 빌드 산출물 clean 가능하게
+    if (isOnlySafeRm(command)) return PASS;
     const found: string[] = [];
     for (const [re, desc] of DESTRUCTIVE_PATTERNS) {
       if (re.test(command)) found.push(desc);
