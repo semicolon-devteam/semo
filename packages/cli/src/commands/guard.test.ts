@@ -2,7 +2,7 @@
  * P5-7 guard 등가성 — sh 동작과 1:1 매칭 케이스 (Codex 리뷰 반영).
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -659,6 +659,77 @@ describe('semo guard run destructive', () => {
     );
     expect(r.code).toBe(0);
     expect(r.stdout).toContain('"permissionDecision":"ask"');
+  });
+});
+
+describe('semo guard run freeze', () => {
+  const FREEZE_STATE = path.join(os.homedir(), '.semo', 'state', 'freeze-dir.txt');
+
+  beforeEach(() => {
+    try {
+      fs.unlinkSync(FREEZE_STATE);
+    } catch {
+      /* ignore */
+    }
+  });
+
+  it('freeze state 없음 → Edit pass', () => {
+    const r = run(
+      ['guard', 'run', 'freeze'],
+      JSON.stringify({
+        cwd: '/tmp',
+        tool_name: 'Edit',
+        tool_input: { file_path: '/tmp/x.txt' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('freeze 디렉토리 안 Edit → pass', () => {
+    fs.mkdirSync(path.dirname(FREEZE_STATE), { recursive: true });
+    fs.writeFileSync(FREEZE_STATE, '/tmp/allowed/');
+    const r = run(
+      ['guard', 'run', 'freeze'],
+      JSON.stringify({
+        cwd: '/tmp',
+        tool_name: 'Edit',
+        tool_input: { file_path: '/tmp/allowed/foo.txt' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
+  });
+
+  it('freeze 디렉토리 밖 Edit → deny', () => {
+    fs.mkdirSync(path.dirname(FREEZE_STATE), { recursive: true });
+    fs.writeFileSync(FREEZE_STATE, '/tmp/allowed/');
+    const r = run(
+      ['guard', 'run', 'freeze'],
+      JSON.stringify({
+        cwd: '/tmp',
+        tool_name: 'Edit',
+        tool_input: { file_path: '/tmp/elsewhere/foo.txt' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toContain('"decision":"deny"');
+    expect(r.stdout.toLowerCase()).toContain('freeze');
+  });
+
+  it('Bash → pass (Edit/Write 만 가드)', () => {
+    fs.mkdirSync(path.dirname(FREEZE_STATE), { recursive: true });
+    fs.writeFileSync(FREEZE_STATE, '/tmp/allowed/');
+    const r = run(
+      ['guard', 'run', 'freeze'],
+      JSON.stringify({
+        cwd: '/tmp/elsewhere',
+        tool_name: 'Bash',
+        tool_input: { command: 'ls' },
+      }),
+    );
+    expect(r.code).toBe(0);
+    expect(r.stdout).toBe('');
   });
 });
 

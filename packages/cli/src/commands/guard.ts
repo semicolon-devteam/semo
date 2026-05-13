@@ -158,6 +158,41 @@ function semoStateDir(): string {
   const semoHome = process.env.SEMO_HOME || path.join(os.homedir(), '.semo');
   return path.join(semoHome, 'state');
 }
+
+// freeze guard — 디렉토리 락 (gstack /freeze 패턴, 2026-05-13)
+function freezeStateFile(): string {
+  return path.join(semoStateDir(), 'freeze-dir.txt');
+}
+
+function readFreezeDir(): string | null {
+  try {
+    const p = freezeStateFile();
+    if (!fs.existsSync(p)) return null;
+    const dir = fs.readFileSync(p, 'utf8').trim();
+    if (!dir) return null;
+    return dir.endsWith('/') ? dir : dir + '/';
+  } catch {
+    return null;
+  }
+}
+
+function writeFreezeDir(dir: string): void {
+  const p = freezeStateFile();
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  const norm = dir.endsWith('/') ? dir : dir + '/';
+  fs.writeFileSync(p, norm);
+}
+
+function clearFreezeDir(): boolean {
+  try {
+    const p = freezeStateFile();
+    if (!fs.existsSync(p)) return false;
+    fs.unlinkSync(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
 function autoCompactConfPath(): string {
   const semoHome = process.env.SEMO_HOME || path.join(os.homedir(), '.semo');
   return path.join(semoHome, 'shared', 'auto-compact.conf');
@@ -622,6 +657,33 @@ const DESTRUCTIVE_GUARD: HookGuard = {
   },
 };
 
+const FREEZE_GUARD: HookGuard = {
+  name: 'freeze',
+  triggers: ['PreToolUse'],
+  botSessionOnly: false,
+  description: 'freeze 디렉토리 밖 Edit/Write 차단 (gstack /freeze 패턴)',
+  async evaluate(payload: HookPayload | null): Promise<HookResult> {
+    if (!payload) return PASS;
+    const toolName = (payload.tool_name as string | undefined) ?? '';
+    if (toolName !== 'Edit' && toolName !== 'Write') return PASS;
+    const freezeDir = readFreezeDir();
+    if (!freezeDir) return PASS;
+    const filePath =
+      ((payload.tool_input as Record<string, unknown> | undefined)?.file_path as
+        | string
+        | undefined) ?? '';
+    if (!filePath) return PASS;
+    const absPath = path.isAbsolute(filePath) ? filePath : path.resolve(filePath);
+    if (absPath.startsWith(freezeDir)) return PASS;
+    const reason = `[FREEZE GUARD] 편집 차단: ${absPath} 은 freeze 디렉토리(${freezeDir}) 밖입니다. semo guard unfreeze 로 해제하거나 freeze 디렉토리 안에서 작업하세요.`;
+    return {
+      exitCode: 0,
+      level: 'block',
+      message: JSON.stringify({ decision: 'deny', reason }, undefined, 0),
+    };
+  },
+};
+
 function makeCommitmentGuard(commitmentsCheck: (botId: string) => Promise<boolean>): HookGuard {
   return {
     name: 'commitment',
@@ -860,6 +922,7 @@ function buildGateway(limit: number): InMemoryHookGateway {
   gateway.register(makeContextRouterGuard(defaultContextRouterConfPath()));
   gateway.register(SKILL_MIRROR_GUARD);
   gateway.register(DESTRUCTIVE_GUARD);
+  gateway.register(FREEZE_GUARD);
   gateway.register(makeCommitmentGuard(checkActiveCommitments));
   gateway.register(COMPACT_RESET_GUARD);
   gateway.register(makeAutoCompactCounterGuard(defaultCompactSender()));
@@ -898,5 +961,27 @@ export function registerGuardCommands(program: Command): void {
       console.log('  echo "{...}" | semo guard run <name> [--limit 20]');
       console.log('');
       console.log('SEMO_GUARD_AUDIT=1 환경변수 설정 시 stderr 에 [guard-audit] 라인 기록.');
+    });
+
+  guardCmd
+    .command('freeze <dir>')
+    .description('freeze 디렉토리 락 활성 — 그 밖 Edit/Write 차단 (gstack /freeze)')
+    .action((dir: string) => {
+      const abs = path.resolve(dir);
+      if (!fs.existsSync(abs)) {
+        console.error(`Directory not found: ${abs}`);
+        process.exit(2);
+      }
+      writeFreezeDir(abs);
+      console.log(`[freeze] Edits restricted to: ${abs}/`);
+      console.log(`[freeze] state file: ${freezeStateFile()}`);
+    });
+
+  guardCmd
+    .command('unfreeze')
+    .description('freeze 디렉토리 락 해제')
+    .action(() => {
+      const removed = clearFreezeDir();
+      console.log(removed ? '[unfreeze] Lock cleared.' : '[unfreeze] No active lock.');
     });
 }
