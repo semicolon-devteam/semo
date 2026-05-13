@@ -159,6 +159,106 @@ function semoStateDir(): string {
   return path.join(semoHome, 'state');
 }
 
+// delegation-check guard — KB delegation 룰 캐시 + 키워드 매칭 (2026-05-14)
+interface DelegationRules {
+  [botId: string]: string[];
+}
+
+function delegationCachePath(): string {
+  return path.join(semoStateDir(), 'delegation-cache.json');
+}
+
+const DELEGATION_BOTS = [
+  'semiclaw',
+  'planclaw',
+  'reviewclaw',
+  'infraclaw',
+  'workclaw',
+  'designclaw',
+  'growthclaw',
+  'semobot',
+  'incubator',
+];
+
+function extractDelegationKeywords(content: string): string[] {
+  const lines = content.split('\n');
+  let inKeywords = false;
+  const result: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^##\s+(수신\s+키워드|keyword|trigger)/i.test(trimmed)) {
+      inKeywords = true;
+      continue;
+    }
+    if (inKeywords) {
+      if (trimmed.startsWith('##')) break;
+      const m = line.match(/^-\s+(.+)$/);
+      if (m) {
+        const kw = m[1].trim().toLowerCase();
+        if (kw.length >= 2) result.push(kw);
+      }
+    }
+  }
+  return result;
+}
+
+async function loadDelegationCache(): Promise<DelegationRules> {
+  const cachePath = delegationCachePath();
+  const TTL_MS = 60 * 60 * 1000;
+  if (fs.existsSync(cachePath)) {
+    try {
+      const stat = fs.statSync(cachePath);
+      if (Date.now() - stat.mtimeMs < TTL_MS) {
+        return JSON.parse(fs.readFileSync(cachePath, 'utf8')) as DelegationRules;
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  const { execFileSync } = await import('node:child_process');
+  const rules: DelegationRules = {};
+  for (const bot of DELEGATION_BOTS) {
+    try {
+      const out = execFileSync('semo', ['kb', 'get', bot, 'delegation'], {
+        timeout: 4000,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      const parsed = JSON.parse(out) as { content?: string };
+      rules[bot] = extractDelegationKeywords(parsed.content ?? '');
+    } catch {
+      rules[bot] = [];
+    }
+  }
+  try {
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+    fs.writeFileSync(cachePath, JSON.stringify(rules, null, 2));
+  } catch {
+    /* ignore */
+  }
+  return rules;
+}
+
+function findBestKeywordMatch(
+  message: string,
+  rules: DelegationRules,
+): { bot: string; matched: string } | null {
+  const lower = message.toLowerCase();
+  let best: { bot: string; matched: string } | null = null;
+  let bestLen = 0;
+  for (const [bot, keywords] of Object.entries(rules)) {
+    for (const kw of keywords) {
+      if (kw.length < 3) continue;
+      if (!lower.includes(kw)) continue;
+      if (kw.length > bestLen) {
+        best = { bot, matched: kw };
+        bestLen = kw.length;
+      }
+    }
+  }
+  return best;
+}
+
 // freeze guard — 디렉토리 락 (gstack /freeze 패턴, 2026-05-13)
 function freezeStateFile(): string {
   return path.join(semoStateDir(), 'freeze-dir.txt');
@@ -657,6 +757,38 @@ const DESTRUCTIVE_GUARD: HookGuard = {
   },
 };
 
+const DELEGATION_CHECK_GUARD: HookGuard = {
+  name: 'delegation-check',
+  triggers: ['UserPromptSubmit'],
+  botSessionOnly: true,
+  description: '봇이 KB delegation 키워드 외 작업 받을 시 escalate 안내 inject',
+  async evaluate(payload: HookPayload | null): Promise<HookResult> {
+    if (!payload) return PASS;
+    const cwd = payload.cwd ?? '';
+    if (!BOT_CWD_RE.test(cwd)) return PASS;
+    const botId = extractBotIdFromCwd(cwd);
+    if (!botId) return PASS;
+    const msg = (payload.user_message as string | undefined) ?? '';
+    if (!msg || msg.length < 5) return PASS;
+    const rules = await loadDelegationCache();
+    const myKeywords = rules[botId] ?? [];
+    const others: DelegationRules = {};
+    for (const [b, k] of Object.entries(rules)) {
+      if (b !== botId) others[b] = k;
+    }
+    const otherMatch = findBestKeywordMatch(msg, others);
+    if (!otherMatch) return PASS;
+    const myMatch = findBestKeywordMatch(msg, { [botId]: myKeywords });
+    if (myMatch && myMatch.matched.length >= otherMatch.matched.length) return PASS;
+    const hint = `[DELEGATION-CHECK] 이 메시지는 \`${otherMatch.bot}\` 봇 키워드 "${otherMatch.matched}" 에 매칭. 자기(${botId}) 영역 아니면 escalate("${otherMatch.bot}", reason, context) 호출을 우선 고려하세요. 직접 처리하려면 응답에 직접 처리 사유를 명시하세요.`;
+    return {
+      exitCode: 0,
+      level: 'pass',
+      message: hint,
+    };
+  },
+};
+
 const FREEZE_GUARD: HookGuard = {
   name: 'freeze',
   triggers: ['PreToolUse'],
@@ -923,6 +1055,7 @@ function buildGateway(limit: number): InMemoryHookGateway {
   gateway.register(SKILL_MIRROR_GUARD);
   gateway.register(DESTRUCTIVE_GUARD);
   gateway.register(FREEZE_GUARD);
+  gateway.register(DELEGATION_CHECK_GUARD);
   gateway.register(makeCommitmentGuard(checkActiveCommitments));
   gateway.register(COMPACT_RESET_GUARD);
   gateway.register(makeAutoCompactCounterGuard(defaultCompactSender()));
