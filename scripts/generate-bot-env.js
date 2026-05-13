@@ -9,6 +9,7 @@
  *   node scripts/generate-bot-env.js --all
  *   node scripts/generate-bot-env.js --bot semiclaw
  *   node scripts/generate-bot-env.js --bot semiclaw --dry-run
+ *   node scripts/generate-bot-env.js --all --renderer agent-spec --dry-run
  */
 
 import * as fs from 'fs';
@@ -61,13 +62,20 @@ const SEMO_ROOT = path.resolve(import.meta.dirname, '..');
 const DEFAULT_SESSION_DIR = path.join(os.homedir(), '.semo', 'sessions');
 const DEFAULT_MAILBOX_DIR = path.join(os.homedir(), '.semo', 'mailbox');
 
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
 // ── CLI args ──
 
 const args = process.argv.slice(2);
 const dryRun = args.includes('--dry-run');
+const force = args.includes('--force');
 const allBots = args.includes('--all');
 const botIdx = args.indexOf('--bot');
 const targetBot = botIdx >= 0 ? args[botIdx + 1] : null;
+const rendererIdx = args.indexOf('--renderer');
+const renderer = rendererIdx >= 0 ? args[rendererIdx + 1] : 'legacy';
 const sessionDir = (() => {
   const idx = args.indexOf('--session-dir');
   return idx >= 0 ? args[idx + 1] : DEFAULT_SESSION_DIR;
@@ -79,7 +87,44 @@ const mailboxDir = (() => {
 
 const bots = allBots ? BOT_IDS : targetBot ? [targetBot] : [];
 if (bots.length === 0) {
-  console.error('Usage: node scripts/generate-bot-env.js --all | --bot <botId> [--dry-run]');
+  console.error(
+    'Usage: node scripts/generate-bot-env.js --all | --bot <botId> [--dry-run] [--renderer legacy|agent-spec]',
+  );
+  process.exit(1);
+}
+
+if (renderer === 'agent-spec') {
+  const ids = bots.join(',');
+  const cliArgs = [
+    path.join(SEMO_ROOT, 'packages', 'cli', 'src', 'index.ts'),
+    'agent-factory',
+    'sync',
+    '--ids',
+    ids,
+    '--targets',
+    'claude-code',
+    '--semo-root',
+    SEMO_ROOT,
+    '--session-dir',
+    sessionDir,
+    '--mailbox-dir',
+    mailboxDir,
+    ...(dryRun ? ['--dry-run'] : []),
+    ...(force ? ['--force'] : []),
+  ];
+  const cmd = [
+    'set -a',
+    'source ~/.claude/semo/.env 2>/dev/null || true',
+    'set +a',
+    `npx tsx ${cliArgs.map(shellQuote).join(' ')}`,
+  ].join('; ');
+  console.log(`[agent-spec] Delegating generation to AgentSpec renderer (${ids})`);
+  execSync(cmd, { stdio: 'inherit', shell: '/bin/bash' });
+  process.exit(0);
+}
+
+if (renderer !== 'legacy') {
+  console.error(`Unknown renderer: ${renderer} (expected legacy|agent-spec)`);
   process.exit(1);
 }
 
@@ -238,6 +283,33 @@ function generateSettings(botId, meta) {
               type: 'command',
               command: 'source ~/.claude/semo/.env 2>/dev/null; echo "[mailbox] Session started"',
               timeout: 5000,
+            },
+          ],
+        },
+      ],
+      PreToolUse: [
+        {
+          matcher: 'Bash',
+          hooks: [
+            {
+              type: 'command',
+              command: '/usr/local/bin/semo guard run destructive',
+              timeout: 3000,
+            },
+          ],
+        },
+        {
+          matcher: 'Edit|Write',
+          hooks: [
+            {
+              type: 'command',
+              command: '/usr/local/bin/semo guard run skill-mirror',
+              timeout: 3000,
+            },
+            {
+              type: 'command',
+              command: '/usr/local/bin/semo guard run freeze',
+              timeout: 3000,
             },
           ],
         },
