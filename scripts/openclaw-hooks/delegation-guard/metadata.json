@@ -1,0 +1,6 @@
+{
+  "name": "delegation-guard",
+  "events": ["before_dispatch"],
+  "export": "default",
+  "description": "KB delegation 룰 강제 — 봇이 자기 키워드 외 메시지 받을 시 escalate 안내 후 agent invoke 차단"
+}

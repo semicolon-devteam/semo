@@ -56,7 +56,7 @@ export interface RenderContext {
   openclawHomeDir?: string;
 }
 
-export type RenderedAgentArtifactFormat = 'markdown' | 'json';
+export type RenderedAgentArtifactFormat = 'markdown' | 'json' | 'javascript';
 
 export interface RenderedAgentArtifact {
   target: AgentRuntimeProjectionTarget;
