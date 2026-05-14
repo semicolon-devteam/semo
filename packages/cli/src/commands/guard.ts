@@ -1217,4 +1217,17 @@ export function registerGuardCommands(program: Command): void {
       const removed = clearFreezeDir();
       console.log(removed ? '[unfreeze] Lock cleared.' : '[unfreeze] No active lock.');
     });
+
+  guardCmd
+    .command('cache-bust')
+    .description('delegation-check 캐시 즉시 무효화 (KB delegation 룰 변경 후)')
+    .action(() => {
+      const p = delegationCachePath();
+      if (fs.existsSync(p)) {
+        fs.unlinkSync(p);
+        console.log(`[cache-bust] cleared: ${p}`);
+      } else {
+        console.log(`[cache-bust] no cache at ${p}`);
+      }
+    });
 }

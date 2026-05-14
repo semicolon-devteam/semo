@@ -44,6 +44,8 @@ export class HealthMonitor {
   private readonly lastState: Map<string, BotState> = new Map();
   /** Per-bot auto-restart cooldown */
   private readonly lastRestartAt: Map<string, number> = new Map();
+  /** Per-bot 'stuck' state entry timestamp — for OS-level recovery after threshold */
+  private readonly stuckSince: Map<string, number> = new Map();
 
   constructor(opts: {
     mailboxDir: string;
@@ -284,19 +286,48 @@ export class HealthMonitor {
 
       const paneState = await this.readPaneState(workspace, surface);
       if (paneState !== 'idle') {
-        if (this.shouldLogFailure(botId, `pane-${paneState}`)) {
-          if (paneState === 'stuck') {
-            console.error(
-              `[health] ${botId}: pane_state=stuck (Claude Code modal/welcome blocking prompt). ` +
-                `cmux send nudge → silent failure. inbox 누적 가능성. ` +
-                `Recovery: cmux pane process kill + 새 Claude 세션 (OS-level). ` +
-                `KB: semo incident/semobot-quota-and-modal-wake-failure-2026-05-14`,
-            );
-          } else {
+        // 'stuck' OS-level recovery — modal/welcome 차단 시 일정 시간 지나면 process kill
+        if (paneState === 'stuck') {
+          const killAfterMs = Number(
+            process.env.SEMO_HEALTH_STUCK_KILL_AFTER_MS ?? 5 * 60 * 1000,
+          );
+          const sinceStuck = this.stuckSince.get(botId);
+          if (!sinceStuck) {
+            this.stuckSince.set(botId, Date.now());
+            if (this.shouldLogFailure(botId, 'pane-stuck-enter')) {
+              console.error(
+                `[health] ${botId}: pane_state=stuck (modal/welcome blocking). ` +
+                  `T+${Math.round(killAfterMs / 1000)}s 후 OS-level recovery (Claude process kill).`,
+              );
+            }
+            return;
+          }
+          if (Date.now() - sinceStuck < killAfterMs) {
+            if (this.shouldLogFailure(botId, 'pane-stuck-wait')) {
+              console.log(
+                `[health] ${botId}: still stuck (${Math.round((Date.now() - sinceStuck) / 1000)}s) — waiting`,
+              );
+            }
+            return;
+          }
+          // Threshold 초과 → OS-level recovery (cooldown/allowlist 보장 위에)
+          console.error(
+            `[health] ${botId}: stuck > ${Math.round(killAfterMs / 1000)}s — proceeding to OS-level recovery (Claude process kill + restart)`,
+          );
+          this.stuckSince.delete(botId);
+          // fall through to restart logic below — cooldown/lock/allowlist 검사 유지
+        } else {
+          if (this.shouldLogFailure(botId, `pane-${paneState}`)) {
             console.log(`[health] ${botId}: pane_state=${paneState} — skip auto-restart`);
           }
+          // busy/dead 는 기존대로 skip
+          return;
         }
-        return;
+      } else {
+        // idle 복귀 시 stuck 추적 클리어
+        if (this.stuckSince.has(botId)) {
+          this.stuckSince.delete(botId);
+        }
       }
 
       if (this.hasRecentOutbox(botId)) {
