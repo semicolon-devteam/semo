@@ -19,7 +19,10 @@ const FAILURE_LOG_REPEAT_MS = 60_000;
 const DEFAULT_RESTART_COOLDOWN_MS = 10 * 60_000;
 
 type BotState = 'ok' | 'stale' | 'no-heartbeat' | 'no-surface' | 'restart-sent';
-type PaneState = 'idle' | 'busy' | 'dead';
+// 'stuck' (2026-05-14): Claude Code 의 feedback modal / welcome 화면 / interactive picker 가
+// prompt 영역 차지해 cmux send nudge 가 input 으로 흡수되는 상태. KB:
+// semo incident/semobot-quota-and-modal-wake-failure-2026-05-14
+type PaneState = 'idle' | 'busy' | 'dead' | 'stuck';
 
 export class HealthMonitor {
   private readonly mailboxDir: string;
@@ -121,8 +124,19 @@ export class HealthMonitor {
       );
       const isAlive = /bypass permissions|shift\+tab to cycle/.test(stdout);
       if (!isAlive) return 'dead';
+      // 'stuck' — Claude Code modal/welcome 이 prompt 영역 차지. cmux send nudge 가
+      // input 으로 흡수되어 봇 깨우지 못함 (incident semobot-quota-and-modal-wake-failure-2026-05-14).
+      // Codex review: empirical 검증 결과 MCP notification surface 안 됨 →
+      // OS-level signal 외 wake 불가. 1차 fix 는 'stuck' 인식만 (escalate 보고용).
       if (
-        /esc to interrupt|Noodling|Sautéed for|Brewed for|Accomplishing|Fluttering|thinking/i.test(
+        /How is Claude doing this session|1:\s*Bad\s+2:\s*Fine\s+3:\s*Good|Welcome back!|What's new/i.test(
+          stdout,
+        )
+      ) {
+        return 'stuck';
+      }
+      if (
+        /esc to interrupt|Noodling|Sautéed for|Brewed for|Accomplishing|Fluttering|thinking|Sketching|Thundering|Simmering/i.test(
           stdout,
         )
       ) {
@@ -271,7 +285,16 @@ export class HealthMonitor {
       const paneState = await this.readPaneState(workspace, surface);
       if (paneState !== 'idle') {
         if (this.shouldLogFailure(botId, `pane-${paneState}`)) {
-          console.log(`[health] ${botId}: pane_state=${paneState} — skip auto-restart`);
+          if (paneState === 'stuck') {
+            console.error(
+              `[health] ${botId}: pane_state=stuck (Claude Code modal/welcome blocking prompt). ` +
+                `cmux send nudge → silent failure. inbox 누적 가능성. ` +
+                `Recovery: cmux pane process kill + 새 Claude 세션 (OS-level). ` +
+                `KB: semo incident/semobot-quota-and-modal-wake-failure-2026-05-14`,
+            );
+          } else {
+            console.log(`[health] ${botId}: pane_state=${paneState} — skip auto-restart`);
+          }
         }
         return;
       }
