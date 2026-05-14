@@ -828,6 +828,41 @@ const DELEGATION_CHECK_GUARD: HookGuard = {
   },
 };
 
+// data-routing guard (2026-05-14) — 봇이 로컬 markdown 에 ACTION_ITEMS / commitments 같은
+// DB SoT 데이터를 적재 시도하면 deny. KB incident/semiclaw-action-items-local-file-violation-2026-05-14
+const DATA_ROUTING_LOCAL_FILE_RE = /\/(ACTION[_-]?ITEMS|action[_-]?items|COMMITMENTS|commitments)\.md$/i;
+
+const DATA_ROUTING_GUARD: HookGuard = {
+  name: 'data-routing',
+  triggers: ['PreToolUse'],
+  botSessionOnly: true,
+  description: 'DB SoT 데이터 (action_items/commitments) 를 로컬 markdown 에 적재 시도 차단',
+  async evaluate(payload: HookPayload | null): Promise<HookResult> {
+    if (!payload) return PASS;
+    const cwd = payload.cwd ?? '';
+    if (!BOT_CWD_RE.test(cwd)) return PASS;
+    const toolName = (payload.tool_name as string | undefined) ?? '';
+    if (toolName !== 'Edit' && toolName !== 'Write') return PASS;
+    const filePath =
+      ((payload.tool_input as Record<string, unknown> | undefined)?.file_path as
+        | string
+        | undefined) ?? '';
+    if (!filePath) return PASS;
+    if (!DATA_ROUTING_LOCAL_FILE_RE.test(filePath)) return PASS;
+    const fname = filePath.split('/').pop() ?? filePath;
+    const isCommitments = /commitments/i.test(fname);
+    const cli = isCommitments
+      ? 'semo commitments create --bot-id {bot} --title "..."'
+      : 'semo action-items create --owner {domain} --target {service} --description "..."';
+    const reason = `[DATA-ROUTING] 차단: ${fname} 은 DB SoT 데이터입니다. 로컬 markdown 적재 금지. CLI 사용: ${cli}. KB \`.claude/rules/data-routing.md\` 참조.`;
+    return {
+      exitCode: 0,
+      level: 'block',
+      message: JSON.stringify({ decision: 'deny', reason }, undefined, 0),
+    };
+  },
+};
+
 const FREEZE_GUARD: HookGuard = {
   name: 'freeze',
   triggers: ['PreToolUse'],
@@ -1094,6 +1129,7 @@ function buildGateway(limit: number): InMemoryHookGateway {
   gateway.register(SKILL_MIRROR_GUARD);
   gateway.register(DESTRUCTIVE_GUARD);
   gateway.register(FREEZE_GUARD);
+  gateway.register(DATA_ROUTING_GUARD);
   gateway.register(DELEGATION_CHECK_GUARD);
   gateway.register(makeCommitmentGuard(checkActiveCommitments));
   gateway.register(COMPACT_RESET_GUARD);
