@@ -828,33 +828,58 @@ const DELEGATION_CHECK_GUARD: HookGuard = {
   },
 };
 
-// data-routing guard (2026-05-14) — 봇이 로컬 markdown 에 ACTION_ITEMS / commitments 같은
-// DB SoT 데이터를 적재 시도하면 deny. KB incident/semiclaw-action-items-local-file-violation-2026-05-14
-const DATA_ROUTING_LOCAL_FILE_RE = /\/(ACTION[_-]?ITEMS|action[_-]?items|COMMITMENTS|commitments)\.md$/i;
+// data-routing guard (2026-05-14, Codex review a6ea9221 확장) — DB/KB SoT 데이터를 로컬
+// markdown 에 적재 시도 차단. Edit/Write + Bash (echo/cat/tee/sed -i/printf/node/python > file)
+// 양쪽 가드. KB incident/semiclaw-action-items-local-file-violation-2026-05-14
+const DATA_ROUTING_LOCAL_FILE_RE =
+  /\/(ACTION[_-]?ITEMS|action[_-]?items|COMMITMENTS|commitments|DECISIONS|decisions|INFRA[_-]?REQUESTS|infra[_-]?requests|MATERIALS|materials)\.md$/i;
+
+// Bash 우회 — echo / printf / cat / tee / sed -i / perl -pi / node -e / python -c 가 위 파일에 redirect
+const DATA_ROUTING_BASH_BYPASS_RE =
+  /(?:^|[;&|]\s*)(?:echo|printf|cat\s|tee|sed\s+-i|perl\s+-pi|node\s+-e|python\d?\s+-c)[\s\S]*(?:>>?|tee\s+-a|appendFileSync|writeFileSync)[\s\S]*\/(?:ACTION[_-]?ITEMS|action[_-]?items|COMMITMENTS|commitments|DECISIONS|decisions|INFRA[_-]?REQUESTS|infra[_-]?requests|MATERIALS|materials)\.md\b/i;
+
+function dataRoutingCli(fname: string): string {
+  if (/commitments/i.test(fname)) return 'semo commitments create --bot-id {bot} --title "..."';
+  if (/decisions/i.test(fname))
+    return 'semo kb upsert {domain} decision {slug} --content "..." --decided-by {who}';
+  if (/infra[_-]?requests/i.test(fname))
+    return 'semo kb upsert {domain} infra-request/{uuid} --content "..."';
+  if (/materials/i.test(fname))
+    return 'semo kb upsert {domain} material/{uuid} --content "..."';
+  return 'semo action-items create --owner {domain} --target {service} --description "..."';
+}
 
 const DATA_ROUTING_GUARD: HookGuard = {
   name: 'data-routing',
   triggers: ['PreToolUse'],
   botSessionOnly: true,
-  description: 'DB SoT 데이터 (action_items/commitments) 를 로컬 markdown 에 적재 시도 차단',
+  description: 'DB/KB SoT 데이터를 로컬 markdown 에 적재 시도 차단 (Edit/Write + Bash 우회)',
   async evaluate(payload: HookPayload | null): Promise<HookResult> {
     if (!payload) return PASS;
     const cwd = payload.cwd ?? '';
     if (!BOT_CWD_RE.test(cwd)) return PASS;
     const toolName = (payload.tool_name as string | undefined) ?? '';
-    if (toolName !== 'Edit' && toolName !== 'Write') return PASS;
-    const filePath =
-      ((payload.tool_input as Record<string, unknown> | undefined)?.file_path as
-        | string
-        | undefined) ?? '';
-    if (!filePath) return PASS;
-    if (!DATA_ROUTING_LOCAL_FILE_RE.test(filePath)) return PASS;
-    const fname = filePath.split('/').pop() ?? filePath;
-    const isCommitments = /commitments/i.test(fname);
-    const cli = isCommitments
-      ? 'semo commitments create --bot-id {bot} --title "..."'
-      : 'semo action-items create --owner {domain} --target {service} --description "..."';
-    const reason = `[DATA-ROUTING] 차단: ${fname} 은 DB SoT 데이터입니다. 로컬 markdown 적재 금지. CLI 사용: ${cli}. KB \`.claude/rules/data-routing.md\` 참조.`;
+    const input = (payload.tool_input as Record<string, unknown> | undefined) ?? {};
+
+    let blocked: { fname: string; via: string } | null = null;
+    if (toolName === 'Edit' || toolName === 'Write') {
+      const filePath = (input.file_path as string | undefined) ?? '';
+      if (filePath && DATA_ROUTING_LOCAL_FILE_RE.test(filePath)) {
+        blocked = { fname: filePath.split('/').pop() ?? filePath, via: toolName };
+      }
+    } else if (toolName === 'Bash') {
+      const command = (input.command as string | undefined) ?? '';
+      const m = command.match(DATA_ROUTING_BASH_BYPASS_RE);
+      if (m) {
+        // 추출: 매칭된 파일명
+        const fnameMatch = m[0].match(/(ACTION[_-]?ITEMS|action[_-]?items|COMMITMENTS|commitments|DECISIONS|decisions|INFRA[_-]?REQUESTS|infra[_-]?requests|MATERIALS|materials)\.md/i);
+        blocked = { fname: fnameMatch?.[0] ?? 'unknown.md', via: 'Bash bypass' };
+      }
+    }
+
+    if (!blocked) return PASS;
+    const cli = dataRoutingCli(blocked.fname);
+    const reason = `[DATA-ROUTING] 차단 (${blocked.via}): ${blocked.fname} 은 DB/KB SoT 데이터입니다. 로컬 markdown 적재 금지. CLI 사용: ${cli}. KB \`.claude/rules/data-routing.md\` 참조.`;
     return {
       exitCode: 0,
       level: 'block',

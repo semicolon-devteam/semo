@@ -203,6 +203,11 @@ export class ClaudeCodeAgentRenderer implements AgentRenderer {
                 command: '/usr/local/bin/semo guard run destructive',
                 timeout: 3000,
               },
+              {
+                type: 'command',
+                command: '/usr/local/bin/semo guard run data-routing',
+                timeout: 3000,
+              },
             ],
           },
           {
