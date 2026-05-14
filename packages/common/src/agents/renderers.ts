@@ -453,6 +453,16 @@ import os from 'node:os';
 
 const CACHE_PATH = path.join(os.homedir(), '.semo', 'state', 'delegation-cache.json');
 const SELF_BOT_ID = ${JSON.stringify(botId)};
+const INVOKE_MARKER = path.join(os.homedir(), '.openclaw-' + SELF_BOT_ID, 'logs', 'delegation-guard-invocations.jsonl');
+
+function recordInvoke(payload) {
+  try {
+    fs.mkdirSync(path.dirname(INVOKE_MARKER), { recursive: true });
+    fs.appendFileSync(INVOKE_MARKER, JSON.stringify({ ts: new Date().toISOString(), bot: SELF_BOT_ID, ...payload }) + '\\n');
+  } catch {
+    /* non-fatal */
+  }
+}
 
 function readCache() {
   try {
@@ -483,18 +493,31 @@ function findBestKeywordMatch(message, rules) {
 
 export default async function delegationGuard(hookContext) {
   const content = (hookContext?.content ?? hookContext?.body ?? '').toString();
-  if (content.length < 5) return { handled: false };
+  if (content.length < 5) {
+    recordInvoke({ stage: 'skip-empty', content_len: content.length });
+    return { handled: false };
+  }
   const rules = readCache();
-  if (!rules) return { handled: false };
+  if (!rules) {
+    recordInvoke({ stage: 'skip-no-cache', content_len: content.length });
+    return { handled: false };
+  }
   const myKeywords = rules[SELF_BOT_ID] ?? [];
   const others = {};
   for (const [b, k] of Object.entries(rules)) {
     if (b !== SELF_BOT_ID) others[b] = k;
   }
   const otherMatch = findBestKeywordMatch(content, others);
-  if (!otherMatch) return { handled: false };
+  if (!otherMatch) {
+    recordInvoke({ stage: 'pass-no-other-match', content_preview: content.slice(0, 60) });
+    return { handled: false };
+  }
   const myMatch = findBestKeywordMatch(content, { [SELF_BOT_ID]: myKeywords });
-  if (myMatch && myMatch.matched.length >= otherMatch.matched.length) return { handled: false };
+  if (myMatch && myMatch.matched.length >= otherMatch.matched.length) {
+    recordInvoke({ stage: 'pass-own-keyword-wins', my: myMatch.matched, other: otherMatch });
+    return { handled: false };
+  }
+  recordInvoke({ stage: 'BLOCKED', other: otherMatch, content_preview: content.slice(0, 60) });
   return {
     handled: true,
     text: \`이 작업은 \\\`\${otherMatch.bot}\\\` 봇 영역입니다 (키워드 "\${otherMatch.matched}" 매칭). 해당 봇 또는 SemiClaw 에 escalate 부탁드립니다.\\n\\n자기(\${SELF_BOT_ID})가 직접 처리해야 할 사유가 있다면 메시지 첫 줄에 \\\`[직접 처리 사유: ...]\\\` 와 함께 다시 요청해주세요. (delegation-guard before_dispatch hook)\`,
