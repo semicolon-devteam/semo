@@ -384,6 +384,15 @@ export class OpenClawAgentRenderer implements AgentRenderer {
         configPatch,
       ),
       jsonArtifact(this.target, path.join(openclawRoot, 'agent-spec.meta.json'), agentSpecMeta),
+      // HOOK.md 가 OpenClaw 의 plugin discovery SoT — workspace-8yyLJcvq.js:118-125 의
+      // loadHookFromDir() 가 이 파일만 읽음. metadata.json 은 무시되므로 frontmatter 에 명세.
+      // Codex review id abe3857bea0cd46a0 (2026-05-14)
+      markdownArtifact(
+        this.target,
+        path.join(openclawRoot, 'plugins', 'delegation-guard', 'HOOK.md'),
+        openclawDelegationGuardHookMd(spec.botId),
+      ),
+      // metadata.json 는 참고용으로만 보존 (OpenClaw loader 는 안 읽음)
       jsonArtifact(
         this.target,
         path.join(openclawRoot, 'plugins', 'delegation-guard', 'metadata.json'),
@@ -404,6 +413,23 @@ export class OpenClawAgentRenderer implements AgentRenderer {
       },
     ];
   }
+}
+
+function openclawDelegationGuardHookMd(botId: string): string {
+  return `---
+name: delegation-guard
+description: "KB delegation rule enforcement — before_dispatch agent invoke 차단 (bot: ${botId})"
+metadata:
+  openclaw:
+    events: [before_dispatch]
+    export: default
+---
+# Delegation Guard (${botId})
+
+KB \`semo decision/delegation-enforcement-2-layer-2026-05-14\` Layer C.
+handler.js 의 default export 가 \`{ handled, text }\` 반환 시 OpenClaw agent invoke 차단 + Slack 응답.
+캐시: \`~/.semo/state/delegation-cache.json\` (semo guard run delegation-check 와 공유).
+`;
 }
 
 function openclawDelegationGuardHandler(botId: string): string {

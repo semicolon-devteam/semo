@@ -199,6 +199,7 @@ describe('AgentSpec + renderers', () => {
       '/codex/skills/semo-agent-reviewclaw/SKILL.md',
       '/home/reus/.openclaw-reviewclaw/openclaw.agent-spec.patch.json',
       '/home/reus/.openclaw-reviewclaw/agent-spec.meta.json',
+      '/home/reus/.openclaw-reviewclaw/plugins/delegation-guard/HOOK.md',
       '/home/reus/.openclaw-reviewclaw/plugins/delegation-guard/metadata.json',
       '/home/reus/.openclaw-reviewclaw/plugins/delegation-guard/handler.js',
     ]);
