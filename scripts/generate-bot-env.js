@@ -244,6 +244,17 @@ ${
 - 결과만 보고 — 중간 과정 로그 불필요
 - 한국어 기본, 사용자 언어에 맞춤
 - KB 인용 시 [답변근거: KB {domain} {key}] 출처 표기
+
+## Delegation Rules (NON-NEGOTIABLE)
+
+매 user message 처리 시 다음 절차 강제:
+
+1. **자기 수신 키워드 확인**: \`semo kb get ${botId} delegation\` — 본인 영역 명확화
+2. **메시지 키워드 매칭**: 다른 봇 키워드 (workclaw=구현/코딩/PR/버그수정, planclaw=기획/스펙, designclaw=디자인/UI, reviewclaw=리뷰/QA, infraclaw=인프라/배포, growthclaw=SEO/KPI) 에 매칭되고 자기 영역 아니면 **즉시 escalate("{matching-bot}", reason, context)** 호출 — 직접 처리 금지
+3. **[DELEGATION-CHECK] hint 존중**: UserPromptSubmit hook 이 [DELEGATION-CHECK] 메시지 inject 하면 권유된 봇으로 escalate 우선
+4. **직접 처리 예외**: 자기 영역인데 직접 처리할 경우 응답 첫 줄에 \`[직접 처리 사유: ...]\` 명시
+
+⚠️ 위반 사례: KB \`incident/semiclaw-delegation-violation-butler-fix-2026-05-14\` — SemiClaw 가 workclaw 키워드 (버그 수정/PR) 직접 처리하다 sandbox 차단. 재발 금지.
 `;
 }
 

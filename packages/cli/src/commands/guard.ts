@@ -202,41 +202,80 @@ function extractDelegationKeywords(content: string): string[] {
   return result;
 }
 
+function readDelegationCacheFile(cachePath: string): DelegationRules | null {
+  try {
+    if (!fs.existsSync(cachePath)) return null;
+    return JSON.parse(fs.readFileSync(cachePath, 'utf8')) as DelegationRules;
+  } catch {
+    return null;
+  }
+}
+
+async function fetchOneBotDelegation(bot: string): Promise<[string, string[] | null]> {
+  const { execFile } = await import('node:child_process');
+  return new Promise((resolve) => {
+    execFile(
+      'semo',
+      ['kb', 'get', bot, 'delegation'],
+      { timeout: 3000, encoding: 'utf8' },
+      (err, stdout) => {
+        if (err) {
+          resolve([bot, null]);
+          return;
+        }
+        try {
+          const parsed = JSON.parse(stdout) as { content?: string };
+          resolve([bot, extractDelegationKeywords(parsed.content ?? '')]);
+        } catch {
+          resolve([bot, null]);
+        }
+      },
+    );
+  });
+}
+
 async function loadDelegationCache(): Promise<DelegationRules> {
   const cachePath = delegationCachePath();
   const TTL_MS = 60 * 60 * 1000;
+  // 1) Fresh cache hit
   if (fs.existsSync(cachePath)) {
     try {
       const stat = fs.statSync(cachePath);
       if (Date.now() - stat.mtimeMs < TTL_MS) {
-        return JSON.parse(fs.readFileSync(cachePath, 'utf8')) as DelegationRules;
+        const cached = readDelegationCacheFile(cachePath);
+        if (cached) return cached;
       }
     } catch {
       /* fall through */
     }
   }
-  const { execFileSync } = await import('node:child_process');
-  const rules: DelegationRules = {};
-  for (const bot of DELEGATION_BOTS) {
-    try {
-      const out = execFileSync('semo', ['kb', 'get', bot, 'delegation'], {
-        timeout: 4000,
-        encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      const parsed = JSON.parse(out) as { content?: string };
-      rules[bot] = extractDelegationKeywords(parsed.content ?? '');
-    } catch {
-      rules[bot] = [];
+  // 2) Refresh — parallel fetch with allSettled + per-bot timeout
+  const results = await Promise.allSettled(DELEGATION_BOTS.map((b) => fetchOneBotDelegation(b)));
+  const fresh: DelegationRules = {};
+  let successCount = 0;
+  for (const r of results) {
+    if (r.status === 'fulfilled') {
+      const [bot, kws] = r.value;
+      if (kws !== null) {
+        fresh[bot] = kws;
+        successCount += 1;
+      }
     }
   }
+  // 3) Refresh 실패 (예: DB 단절) — stale cache fallback (fail-closed 가드)
+  if (successCount === 0) {
+    const stale = readDelegationCacheFile(cachePath);
+    if (stale) return stale;
+    return {};
+  }
+  // 4) Write fresh cache (refresh 성공 봇만)
   try {
     fs.mkdirSync(path.dirname(cachePath), { recursive: true });
-    fs.writeFileSync(cachePath, JSON.stringify(rules, null, 2));
+    fs.writeFileSync(cachePath, JSON.stringify(fresh, null, 2));
   } catch {
     /* ignore */
   }
-  return rules;
+  return fresh;
 }
 
 function findBestKeywordMatch(
