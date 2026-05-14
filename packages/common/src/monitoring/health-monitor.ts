@@ -4,18 +4,22 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { exec } from 'child_process';
+import * as os from 'os';
+import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { loadSurfaceMap, type SurfaceMap } from '../mailbox/surface-map.js';
 
-const execAsync = promisify(exec);
+const execFileP = promisify(execFile);
 
 const HEARTBEAT_STALE_MS = 120_000; // 2 minutes
 const CHECK_INTERVAL_MS = 30_000;
 const INITIAL_GRACE_MS = 60_000;
 const LOG_REPEAT_MS = 10 * 60_000; // re-log same-state warning every 10 min
+const FAILURE_LOG_REPEAT_MS = 60_000;
+const DEFAULT_RESTART_COOLDOWN_MS = 10 * 60_000;
 
 type BotState = 'ok' | 'stale' | 'no-heartbeat' | 'no-surface' | 'restart-sent';
+type PaneState = 'idle' | 'busy' | 'dead';
 
 export class HealthMonitor {
   private readonly mailboxDir: string;
@@ -31,8 +35,12 @@ export class HealthMonitor {
   private readonly restarting: Set<string> = new Set();
   /** Dedup key: `${botId}:${state}` → last-logged timestamp */
   private readonly lastLog: Map<string, number> = new Map();
+  /** Dedup key: `${botId}:${errorKind}` → last-logged timestamp */
+  private readonly lastFailureLog: Map<string, number> = new Map();
   /** Per-bot worst-known state (for recovery message) */
   private readonly lastState: Map<string, BotState> = new Map();
+  /** Per-bot auto-restart cooldown */
+  private readonly lastRestartAt: Map<string, number> = new Map();
 
   constructor(opts: {
     mailboxDir: string;
@@ -78,6 +86,101 @@ export class HealthMonitor {
       }
     }
     this.lastState.set(botId, 'ok');
+  }
+
+  private shouldLogFailure(botId: string, key: string): boolean {
+    const dedupKey = `${botId}:${key}`;
+    const prev = this.lastFailureLog.get(dedupKey);
+    const now = Date.now();
+    if (prev === undefined || now - prev > FAILURE_LOG_REPEAT_MS) {
+      this.lastFailureLog.set(dedupKey, now);
+      return true;
+    }
+    return false;
+  }
+
+  private autoRestartAllowed(botId: string): boolean {
+    const raw = process.env.SEMO_HEALTH_AUTO_RESTART_BOTS ?? '';
+    const allowed = raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+    return allowed.includes('*') || allowed.includes(botId);
+  }
+
+  private restartCooldownMs(): number {
+    return Number(process.env.SEMO_HEALTH_RESTART_COOLDOWN_MS ?? DEFAULT_RESTART_COOLDOWN_MS);
+  }
+
+  private async readPaneState(workspace: string, surface: string): Promise<PaneState> {
+    try {
+      const { stdout } = await execFileP(
+        'cmux',
+        ['read-screen', '--workspace', workspace, '--surface', surface, '--lines', '30'],
+        { timeout: 5_000 },
+      );
+      const isAlive = /bypass permissions|shift\+tab to cycle/.test(stdout);
+      if (!isAlive) return 'dead';
+      if (
+        /esc to interrupt|Noodling|Sautéed for|Brewed for|Accomplishing|Fluttering|thinking/i.test(
+          stdout,
+        )
+      ) {
+        return 'busy';
+      }
+      return 'idle';
+    } catch {
+      return 'busy';
+    }
+  }
+
+  private hasRecentOutbox(botId: string): boolean {
+    const outboxPath = path.join(this.mailboxDir, botId, 'outbox.jsonl');
+    try {
+      const st = fs.statSync(outboxPath);
+      return Date.now() - st.mtimeMs < 60_000;
+    } catch {
+      return false;
+    }
+  }
+
+  private acquireRestartLock(botId: string): string | null {
+    const lockDir = path.join(os.homedir(), '.semo', 'state', 'health-monitor');
+    fs.mkdirSync(lockDir, { recursive: true });
+    const lockPath = path.join(lockDir, `${botId}.restart.lock`);
+    try {
+      const fd = fs.openSync(lockPath, 'wx');
+      fs.writeFileSync(fd, `${process.pid}\n${new Date().toISOString()}\n`);
+      fs.closeSync(fd);
+      return lockPath;
+    } catch {
+      return null;
+    }
+  }
+
+  private releaseRestartLock(lockPath: string | null): void {
+    if (!lockPath) return;
+    try {
+      fs.unlinkSync(lockPath);
+    } catch {
+      // non-fatal
+    }
+  }
+
+  private async cmuxSend(workspace: string, surface: string, text: string): Promise<void> {
+    await execFileP('cmux', ['send', '--workspace', workspace, '--surface', surface, text], {
+      timeout: 5_000,
+    });
+  }
+
+  private async sendRecoveryKeys(workspace: string, surface: string): Promise<void> {
+    await this.cmuxSend(workspace, surface, '\x03'); // Ctrl-C
+    await new Promise((r) => setTimeout(r, 500));
+    await this.cmuxSend(workspace, surface, '\x1b'); // Escape
+    await new Promise((r) => setTimeout(r, 500));
+    await this.cmuxSend(workspace, surface, '1');
+    await this.cmuxSend(workspace, surface, '\n');
+    await new Promise((r) => setTimeout(r, 1_000));
   }
 
   private async check(): Promise<void> {
@@ -144,31 +247,81 @@ export class HealthMonitor {
       const botConfigDir =
         process.env.CLAUDE_CONFIG_DIR_BOTS || `${process.env.HOME}/.claude/snamanager0`;
       const startCmd = `cd ${sessionPath} && CLAUDE_CONFIG_DIR=${botConfigDir} claude --permission-mode bypassPermissions`;
+      const now = Date.now();
+      const lastRestartAt = this.lastRestartAt.get(botId) ?? 0;
+      const cooldownMs = this.restartCooldownMs();
+      if (now - lastRestartAt < cooldownMs) {
+        if (this.shouldLogFailure(botId, 'cooldown')) {
+          console.log(
+            `[health] ${botId}: restart cooldown active (${Math.round((cooldownMs - (now - lastRestartAt)) / 1000)}s left)`,
+          );
+        }
+        return;
+      }
+
+      if (!this.autoRestartAllowed(botId)) {
+        if (this.shouldLogFailure(botId, 'not-allowlisted')) {
+          console.log(
+            `[health] ${botId}: auto-restart not allowlisted — set SEMO_HEALTH_AUTO_RESTART_BOTS=${botId} to enable`,
+          );
+        }
+        return;
+      }
+
+      const paneState = await this.readPaneState(workspace, surface);
+      if (paneState !== 'idle') {
+        if (this.shouldLogFailure(botId, `pane-${paneState}`)) {
+          console.log(`[health] ${botId}: pane_state=${paneState} — skip auto-restart`);
+        }
+        return;
+      }
+
+      if (this.hasRecentOutbox(botId)) {
+        if (this.shouldLogFailure(botId, 'recent-outbox')) {
+          console.log(`[health] ${botId}: recent outbox activity — skip auto-restart`);
+        }
+        return;
+      }
+
+      const lockPath = this.acquireRestartLock(botId);
+      if (!lockPath) {
+        if (this.shouldLogFailure(botId, 'lock-held')) {
+          console.log(`[health] ${botId}: restart lock held — skip auto-restart`);
+        }
+        return;
+      }
 
       try {
+        const dryRun = process.env.SEMO_HEALTH_AUTO_RESTART_DRY_RUN === '1';
+        if (dryRun) {
+          console.log(
+            `[health] ${botId}: dry-run auto-restart would send recovery keys + start command to ${workspace}/${surface}`,
+          );
+          this.lastRestartAt.set(botId, Date.now());
+          return;
+        }
+
+        await this.sendRecoveryKeys(workspace, surface);
+
         // /quit the existing session (ignore failure — surface might be at shell already)
-        await execAsync(`cmux send --workspace "${workspace}" --surface "${surface}" '/quit'`, {
-          timeout: 5_000,
-        }).catch(() => {});
-        await execAsync(`cmux send --workspace "${workspace}" --surface "${surface}" $'\\n'`, {
-          timeout: 5_000,
-        }).catch(() => {});
+        await this.cmuxSend(workspace, surface, '/quit').catch(() => {});
+        await this.cmuxSend(workspace, surface, '\n').catch(() => {});
         await new Promise((r) => setTimeout(r, 2_000));
 
         // Start fresh claude session
-        await execAsync(
-          `cmux send --workspace "${workspace}" --surface "${surface}" ${JSON.stringify(startCmd)}`,
-          { timeout: 5_000 },
-        );
-        await execAsync(`cmux send --workspace "${workspace}" --surface "${surface}" $'\\n'`, {
-          timeout: 5_000,
-        });
+        await this.cmuxSend(workspace, surface, startCmd);
+        await this.cmuxSend(workspace, surface, '\n');
+        this.lastRestartAt.set(botId, Date.now());
         if (this.shouldLog(botId, 'restart-sent')) {
           console.log(`[health] ${botId}: restart sent to ${workspace}/${surface}`);
         }
       } catch (err) {
-        console.error(`[health] ${botId}: cmux restart failed:`, (err as Error).message);
+        if (this.shouldLogFailure(botId, 'cmux-failed')) {
+          console.error(`[health] ${botId}: cmux restart failed:`, (err as Error).message);
+        }
         return;
+      } finally {
+        this.releaseRestartLock(lockPath);
       }
 
       if (this.onRestart) {
