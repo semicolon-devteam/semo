@@ -12,6 +12,9 @@ BOT_CONFIG_DIR="$HOME/.claude/snamanager0"  # 봇 전용 계정 (reus7042와 분
 BOTS=(semiclaw planclaw designclaw workclaw reviewclaw infraclaw growthclaw incubator)
 OVERFLOW_BOTS=(semiclaw-overflow)
 POLLER_BOTS=(cron-poller)
+# NLP_BOTS: deterministic-name-direct (router) + cmux Claude session for natural-language.
+# semo decision/semobot-natural-language-cmux-session-2026-05-08
+NLP_BOTS=(semobot)
 
 # ── Pre-flight checks ──
 
@@ -42,6 +45,11 @@ if ! lsof -i :15432 -sTCP:LISTEN >/dev/null 2>&1; then
   echo "[start] DB tunnel up."
 fi
 
+# 봇 전용 Claude 계정 (snamanager0) 의 agents/skills 심볼릭 링크 보장.
+# cron-poller Claude 세션이 Task(subagent_type=...) fan-out 하려면 필수.
+echo "[start] Syncing snamanager0 shared resources..."
+bash "$SEMO_ROOT/scripts/sync-snamanager0.sh"
+
 DISCORD_ENABLED=false
 if [ -n "${DISCORD_BOT_TOKEN:-}" ]; then
   DISCORD_ENABLED=true
@@ -70,7 +78,7 @@ node "$SEMO_ROOT/scripts/generate-bot-env.js" --all --session-dir "$SESSION_DIR"
 
 # ── Ensure mailbox directories ──
 
-for bot in "${BOTS[@]}" "${OVERFLOW_BOTS[@]}"; do
+for bot in "${BOTS[@]}" "${OVERFLOW_BOTS[@]}" "${NLP_BOTS[@]}"; do
   mkdir -p "$MAILBOX_DIR/$bot/archive"
   touch "$MAILBOX_DIR/$bot/inbox.jsonl"
   touch "$MAILBOX_DIR/$bot/outbox.jsonl"
@@ -173,7 +181,24 @@ for bot in "${POLLER_BOTS[@]}"; do
   sleep 2
 done
 
+# ── NLP sessions (semobot) ──
+# semobot 은 deterministic 명령은 slack-router 직접 처리, 자연어는 cmux Claude 세션.
+# 결정: semo decision/semobot-natural-language-cmux-session-2026-05-08
+
+for bot in "${NLP_BOTS[@]}"; do
+  echo "[start] Starting $bot (NLP cmux session)..."
+  create_split "$bot"
+  cmux send --workspace "$WORKSPACE_REF" --surface "${SURFACES[$bot]}" \
+    $'cd '"$SESSION_DIR/$bot"' && CLAUDE_CONFIG_DIR='"$BOT_CONFIG_DIR"' claude --permission-mode bypassPermissions\n'
+  sleep 2
+done
+
 # ── Generate surface map (for nudge) ──
+#
+# 2026-05-09: NLP_BOTS (semobot) 도 surface-map 에 포함. router 의 InboxWriter 가
+# fs.watch 로 surface-map.json 변경을 감지·자동 reload (semo decision/
+# inbox-writer-dynamic-surface-map-reload-2026-05-09) 하므로 router 재시작 단계
+# 폐기. Ctrl+C 기반 재시작은 race condition + 부분 종료 위험.
 
 echo "[start] Generating surface map..."
 {
@@ -181,7 +206,7 @@ echo "[start] Generating surface map..."
   echo "  \"workspace\": \"$WORKSPACE_REF\","
   echo "  \"surfaces\": {"
   first=true
-  for bot in "${BOTS[@]}" "${OVERFLOW_BOTS[@]}"; do
+  for bot in "${BOTS[@]}" "${OVERFLOW_BOTS[@]}" "${NLP_BOTS[@]}"; do
     if [ -n "${SURFACES[$bot]:-}" ]; then
       if $first; then first=false; else echo ","; fi
       printf '    "%s": "%s"' "$bot" "${SURFACES[$bot]}"
@@ -193,24 +218,12 @@ echo "[start] Generating surface map..."
 } > /tmp/semo-surface-map.json
 echo "  Surface map: $(cat /tmp/semo-surface-map.json | grep -c 'surface:') bots"
 
-# ── Reload routers with fresh surface map ──
-# Routers were started BEFORE bot splits existed, so they cached a stale map.
-# Ctrl+C + re-send the launch command to rebind InboxWriter to the current map.
+# ── Routers auto-reload surface map (no manual restart) ──
+# InboxWriter 의 fs.watch 가 변경을 감지하고 자동 reload. ~200ms 후 적용.
+sleep 1
+echo "[start] Routers will auto-reload surface map (fs.watch)."
 
-echo "[start] Reloading routers with fresh surface map..."
-cmux send --workspace "$WORKSPACE_REF" --surface "${SURFACES[router]}" $'\x03' 2>/dev/null || true
-sleep 2
-cmux send --workspace "$WORKSPACE_REF" --surface "${SURFACES[router]}" \
-  $'cd '"$SEMO_ROOT"' && set -a && source '"$HOME"'/.claude/semo/.env && set +a && SEMO_MAILBOX_DIR='"$MAILBOX_DIR"' SEMO_SESSION_DIR='"$SESSION_DIR"' SEMO_SURFACE_MAP=/tmp/semo-surface-map.json npx tsx packages/slack-router/src/index.ts\n'
-
-if $DISCORD_ENABLED && [ -n "${SURFACES[discord-router]:-}" ]; then
-  cmux send --workspace "$WORKSPACE_REF" --surface "${SURFACES[discord-router]}" $'\x03' 2>/dev/null || true
-  sleep 2
-  cmux send --workspace "$WORKSPACE_REF" --surface "${SURFACES[discord-router]}" \
-    $'cd '"$SEMO_ROOT"' && set -a && source '"$HOME"'/.claude/semo/.env && set +a && SEMO_MAILBOX_DIR='"$MAILBOX_DIR"' SEMO_SESSION_DIR='"$SESSION_DIR"' SEMO_SURFACE_MAP=/tmp/semo-surface-map.json npx tsx packages/discord-router/src/bin.ts\n'
-fi
-
-sleep 5
+sleep 4
 
 # ── Health gate: wait for heartbeats ──
 

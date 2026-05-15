@@ -1,5 +1,4 @@
 {
-  "mcpServers": {},
   "hooks": {
     "SessionStart": [
       {
@@ -70,7 +69,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash /Users/reus/.semo/shared/hooks/context-router.sh",
+            "command": "/usr/local/bin/semo guard run context-router",
             "timeout": 5
           }
         ]
@@ -92,26 +91,30 @@
           },
           {
             "type": "command",
-            "command": "bash /Users/reus/.semo/shared/hooks/kb-first-guard.sh",
+            "command": "/usr/local/bin/semo guard run kb-first",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "bash /Users/reus/.semo/shared/hooks/url-validator-guard.sh",
+            "command": "/usr/local/bin/semo guard run url-validator",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "bash /Users/reus/.semo/shared/hooks/response-length-guard.sh",
+            "command": "/usr/local/bin/semo guard run response-length",
             "timeout": 5
           },
           {
             "type": "command",
-            "command": "bash /Users/reus/.semo/shared/hooks/decision-reminder.sh",
+            "command": "/usr/local/bin/semo guard run decision-reminder",
             "timeout": 10
           }
         ]
       }
     ]
+  },
+  "mcpServers": {},
+  "enabledPlugins": {
+    "codex@openai-codex": true
   }
 }

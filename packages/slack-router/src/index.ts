@@ -257,7 +257,9 @@ async function handleUsageRejection(botId: string, text: string): Promise<void> 
 
 const outboxReader = new OutboxReader({
   mailboxDir: MAILBOX_DIR,
-  botIds: [...FALLBACK_BOT_IDS, ...OVERFLOW_BOT_IDS],
+  // 'semobot' 은 자연어 응답을 처리하는 hybrid Claude 세션 — outbox 도 watch 한다.
+  // 결정: semo decision/semobot-natural-language-cmux-session-2026-05-08
+  botIds: [...FALLBACK_BOT_IDS, ...OVERFLOW_BOT_IDS, 'semobot'],
   platform: 'slack',
   gateway: slack,
   projection: slackEmitter,
@@ -622,6 +624,7 @@ setInterval(() => checkPollerHeartbeat().catch(() => {}), 3 * 60_000);
  * with the SemoBot persona, never delegated to SemiClaw orchestrator.
  *
  * Scope:
+ *   - `ping` / `핑` (5a-lite) — router liveness check without DB access
  *   - `status` (5a) — system snapshot (router pid/uptime, pattern_health, recent commitment activity)
  *   - `incident` / `incidents` (5b) — open SEMO incident summary or per-slug detail
  *
@@ -758,16 +761,51 @@ async function composeSemoBotIncident(slug: string | null): Promise<string> {
  * SemoBot deterministic command 처리. 매칭 시 응답 발송 후 true 반환 (호출자가 일반 라우팅
  * 스킵). 매칭 없으면 false → handleSlackMessage 가 정상 라우팅으로 진행.
  */
-async function maybeHandleSemoBotCommand(msg: SlackMessage): Promise<boolean> {
+const PING_ALIASES = new Set([
+  'ping',
+  '/ping',
+  '핑',
+  'test',
+  '/test',
+  '테스트',
+  'alive',
+  'echo',
+  'hello',
+  'hi',
+  '안녕',
+  'ㅎㅇ',
+]);
+
+async function maybeHandleSemoBotCommand(
+  msg: SlackMessage,
+  senderName: string,
+): Promise<boolean> {
   const text = msg.text.trim();
   const lowerText = text.toLowerCase();
   const tokens = lowerText.split(/\s+/);
   const firstWord = tokens[0] ?? '';
+  // 답글은 항상 스레드 안에서. top-level 메시지라면 그 메시지 ts 를 anchor 로 새 스레드 생성.
+  const replyThreadTs = msg.thread_ts || msg.ts;
+
+  // ping alias 는 단어가 단독일 때만 매치. "테스트 어쩌고" 같은 자연어 질문은 help 로.
+  if (PING_ALIASES.has(firstWord) && tokens.length === 1) {
+    try {
+      await postSystemMessage(
+        msg.channel,
+        `:robot_face: 퐁 — SemoBot router alive. pid=${process.pid}, uptime=${Math.round(process.uptime())}s`,
+        replyThreadTs,
+      );
+      console.log(`[semobot-cmd] ping responded in ${msg.channel} (alias="${firstWord}")`);
+    } catch (err) {
+      console.error('[semobot-cmd] ping failed:', err);
+    }
+    return true;
+  }
 
   if (firstWord === 'status' || firstWord === '/status') {
     try {
       const body = await composeSemoBotStatus();
-      await postSystemMessage(msg.channel, body, msg.thread_ts);
+      await postSystemMessage(msg.channel, body, replyThreadTs);
       console.log(`[semobot-cmd] status responded in ${msg.channel}`);
     } catch (err) {
       console.error('[semobot-cmd] status failed:', err);
@@ -783,7 +821,7 @@ async function maybeHandleSemoBotCommand(msg: SlackMessage): Promise<boolean> {
     const slug = slugCandidate.length > 0 ? slugCandidate : null;
     try {
       const body = await composeSemoBotIncident(slug);
-      await postSystemMessage(msg.channel, body, msg.thread_ts);
+      await postSystemMessage(msg.channel, body, replyThreadTs);
       console.log(`[semobot-cmd] incident${slug ? ` ${slug}` : ''} responded in ${msg.channel}`);
     } catch (err) {
       console.error('[semobot-cmd] incident failed:', err);
@@ -791,14 +829,79 @@ async function maybeHandleSemoBotCommand(msg: SlackMessage): Promise<boolean> {
     return true;
   }
 
-  return false;
+  // [Route: botId] 태그가 있으면 명시적 강제 라우팅 의도 — 외부 핸들러에 위임.
+  if (/\[Route:\s*\w+\]/i.test(text)) {
+    return false;
+  }
+
+  // 자연어 fallback — SemoBot 의 cmux pane Claude 세션 (Claude Max subscription) 으로 위임.
+  // semo decision/semobot-natural-language-cmux-session-2026-05-08:
+  // SemoBot 은 hybrid 운영 — deterministic 명령은 router 직접 처리, 자연어는
+  // ~/.semo/sessions/semobot/ Claude 세션이 처리. role separation 유지.
+  //
+  // 2026-05-10: thread_history 도 동봉. "스레드 안에서 본문 가리키며 멘션" 케이스
+  // (예: "이거 내 action item 으로 기록") 에서 SemoBot 이 본문 못 보던 버그 fix.
+  let semobotThreadHistory: InboxMessage['thread_history'];
+  if (msg.thread_ts) {
+    try {
+      const history = await slack.getThreadHistory(msg.channel, msg.thread_ts);
+      semobotThreadHistory = history.map((h) => ({
+        display_name: h.displayName,
+        text: h.text,
+        is_bot: h.isBotMessage,
+      }));
+    } catch (err) {
+      console.warn('[semobot-cmd] thread history fetch failed:', (err as Error).message);
+    }
+  }
+
+  try {
+    const msgId = await inboxWriter.write('semobot', {
+      type: 'message',
+      priority: 'normal',
+      platform: 'slack' as const,
+      channel_id: msg.channel,
+      thread_id: replyThreadTs,
+      message_id: msg.ts,
+      sender_name: senderName,
+      sender_id: msg.user,
+      text,
+      images: msg.images?.map((img) => ({
+        name: img.name,
+        media_type: img.media_type,
+        local_path: img.localPath,
+      })),
+      thread_history: semobotThreadHistory,
+      route_reason: 'semobot-nlp',
+    });
+    console.log(
+      `[semobot-cmd] natural-language → semobot inbox [${msgId}] in ${msg.channel} ` +
+        `(thread_history=${semobotThreadHistory?.length ?? 0})`,
+    );
+  } catch (err) {
+    console.error('[semobot-cmd] inbox write failed, falling back to help:', err);
+    try {
+      await postSystemMessage(
+        msg.channel,
+        [
+          ':warning: SemoBot 자연어 세션이 응답할 수 없는 상태입니다.',
+          'deterministic 명령: `@SemoBot 핑`, `@SemoBot status`, `@SemoBot incident [<slug>]`',
+        ].join('\n'),
+        replyThreadTs,
+      );
+    } catch (postErr) {
+      console.error('[semobot-cmd] help-fallback post failed:', postErr);
+    }
+  }
+  return true;
 }
 
 // ── Message Handler ──
 
 async function handleSlackMessage(msg: SlackMessage, senderName: string): Promise<void> {
-  // 0a. SemoBot deterministic command (Phase 5) — 'status' 등의 운영 명령은 SemiClaw 위임 X.
-  if (await maybeHandleSemoBotCommand(msg)) return;
+  // 0a. SemoBot 처리 (Phase 5 + 자연어 hybrid): deterministic 명령은 직접 응답, 자연어는
+  // semobot cmux pane Claude 세션으로 inbox-route. 둘 다 outer routing 막음.
+  if (await maybeHandleSemoBotCommand(msg, senderName)) return;
 
   // 0b. [Route: botId] 태그 → 해당 봇 직접 라우팅 (최우선)
   const routeTag = msg.text.match(/\[Route:\s*(\w+)\]/);
