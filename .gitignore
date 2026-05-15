@@ -51,6 +51,7 @@ core-db/
 !.claude/rules/**
 !.claude/CLAUDE.md
 !.claude/settings.json
+*.agent-spec-last-rendered.json
 semo-system/
 
 # === 런타임 상태/캐시 ===

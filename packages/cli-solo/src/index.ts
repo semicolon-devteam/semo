@@ -19,6 +19,10 @@ import {
   type TargetKind,
   type TargetMessage,
   type MessageSource,
+  buildAgentSpec,
+  renderAgentSpec,
+  type AgentSpec,
+  type AgentRuntimeProjectionTarget,
 } from '@team-semicolon/semo-common/solo';
 import { SqliteKbStore, type SqliteEmbeddingProvider } from '@team-semicolon/semo-kb-core';
 import { SqliteOperationalStore } from '@team-semicolon/semo-ops-store/sqlite';
@@ -26,6 +30,7 @@ import { renderConfigToml, runWizard } from './wizard.js';
 
 const DEFAULT_CONFIG_DIR = process.env.SEMO_HOME ?? path.join(os.homedir(), '.semo');
 const DEFAULT_DB_PATH = path.join(DEFAULT_CONFIG_DIR, 'kb.db');
+const DEFAULT_AGENT_ID = 'default-agent';
 
 const program = new Command();
 program
@@ -63,6 +68,71 @@ function pickMessageSource(
       return new ObsidianFileSource({ vaultPath: opts.vault });
     default:
       throw new Error(`지원하지 않는 source: ${sourceId}`);
+  }
+}
+
+function buildDefaultAgentSpec(): AgentSpec {
+  return buildAgentSpec({
+    profile: 'personal',
+    agent: {
+      name: DEFAULT_AGENT_ID,
+      displayName: 'SEMO Personal',
+      content: `---
+name: ${DEFAULT_AGENT_ID}
+description: "Personal SEMO default agent"
+tools:
+  - Read
+  - Glob
+  - Grep
+  - Bash
+---
+# SEMO Personal Default Agent
+
+You are the single local SEMO Personal agent.
+
+Use local SQLite KB and local files as source of truth. Do not assume Slack, Discord, cmux, Claude Code mailbox, Team bot roster, or Team Agent Factory runtime is available.
+
+When team state is needed but missing locally, say what is missing and ask the user to sync or provide context. Keep external publication opt-in.
+`,
+      metadata: {
+        source: 'semo-solo',
+      },
+    },
+    botStatus: {
+      bot_id: DEFAULT_AGENT_ID,
+      name: 'SEMO Personal',
+      role: 'Personal local SEMO assistant',
+      kb_domains: ['personal'],
+    },
+  });
+}
+
+function parseAgentTargets(raw: string): AgentRuntimeProjectionTarget[] {
+  const allowed = new Set(['claude-code', 'codex-skill']);
+  const targets = raw
+    .split(',')
+    .map((target) => target.trim())
+    .filter(Boolean);
+  for (const target of targets) {
+    if (!allowed.has(target)) {
+      throw new Error(`Personal agent target not supported: ${target}`);
+    }
+  }
+  return targets as AgentRuntimeProjectionTarget[];
+}
+
+function writeRenderedArtifacts(
+  artifacts: Array<{ path: string; content: string }>,
+  dryRun: boolean,
+): void {
+  for (const artifact of artifacts) {
+    if (dryRun) {
+      console.log(chalk.gray(`render ${artifact.path}`));
+      continue;
+    }
+    fs.mkdirSync(path.dirname(artifact.path), { recursive: true });
+    fs.writeFileSync(artifact.path, artifact.content, 'utf8');
+    console.log(chalk.green(`write ${artifact.path}`));
   }
 }
 
@@ -156,6 +226,52 @@ kbCmd
     }
   });
 
+// === agents: Personal profile exposes exactly one default-agent ===
+const agentsCmd = program.command('agents').description('Personal AgentSpec 조회/렌더링');
+agentsCmd
+  .command('list')
+  .description('Personal default-agent 표시')
+  .option('--json', 'JSON 출력')
+  .action((opts: { json?: boolean }) => {
+    const spec = buildDefaultAgentSpec();
+    if (opts.json) {
+      console.log(JSON.stringify([spec], null, 2));
+      return;
+    }
+    console.log(`${chalk.cyan(spec.botId)}  ${spec.displayName} — ${spec.role}`);
+  });
+
+agentsCmd
+  .command('render')
+  .description('Personal default-agent artifact 렌더링')
+  .option('--targets <csv>', 'claude-code,codex-skill', 'claude-code')
+  .option('--session-dir <path>', 'ClaudeCode session dir', path.join(DEFAULT_CONFIG_DIR, 'sessions'))
+  .option('--codex-skills-dir <path>', 'Codex skills dir', path.join(DEFAULT_CONFIG_DIR, 'skills'))
+  .option('--write', '파일 쓰기')
+  .option('--json', 'JSON 출력')
+  .action(
+    (opts: {
+      targets: string;
+      sessionDir: string;
+      codexSkillsDir: string;
+      write?: boolean;
+      json?: boolean;
+    }) => {
+      const spec = buildDefaultAgentSpec();
+      const targets = parseAgentTargets(opts.targets);
+      const artifacts = renderAgentSpec(spec, targets, {
+        profile: 'personal',
+        sessionDir: opts.sessionDir,
+        codexSkillsDir: opts.codexSkillsDir,
+      });
+      if (opts.json) {
+        console.log(JSON.stringify({ spec, artifacts }, null, 2));
+        return;
+      }
+      writeRenderedArtifacts(artifacts, !opts.write);
+    },
+  );
+
 // === chat: stdin REPL + ExecutionTarget ===
 program
   .command('chat')
@@ -184,9 +300,12 @@ program
       }
       const target = defaultRegistry.resolve({ kind, model: opts.model, endpoint: opts.endpoint });
       const source = pickMessageSource(opts.source, { vault: opts.vault, port: opts.port });
+      const agentSpec = buildDefaultAgentSpec();
 
       const history: TargetMessage[] = [];
-      console.log(chalk.bold(`SEMO Solo — target=${kind}, source=${source.id}`));
+      console.log(
+        chalk.bold(`SEMO Solo — agent=${agentSpec.botId}, target=${kind}, source=${source.id}`),
+      );
       if (source.id === 'http') {
         const addr = (source as HttpSource).address();
         if (addr) console.log(chalk.gray(`HTTP listening on ${addr.host}:${addr.port}`));
@@ -201,9 +320,9 @@ program
         history.push({ role: 'user', content: msg.text });
         try {
           const out = await target.dispatch({
-            botId: 'semo-solo',
+            botId: agentSpec.botId,
             sessionKey: `solo-${process.pid}`,
-            systemPrompt: opts.system,
+            systemPrompt: opts.system ?? agentSpec.personaPrompt,
             messages: history,
           });
           history.push({ role: 'assistant', content: out.replyText });

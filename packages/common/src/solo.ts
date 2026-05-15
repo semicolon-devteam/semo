@@ -24,3 +24,6 @@ export {
 } from './messaging/obsidian-file-source.js';
 
 export { SEMO_PATHS, resolveBotWorkspace } from './paths.js';
+
+// AgentSpec projection is storage-free and safe for Solo. Do not add Team loaders here.
+export * from './agents/index.js';

@@ -36,6 +36,7 @@ export * from './factory/index.js';
 export * from './onboarding/index.js';
 export * from './templates/index.js';
 export * from './skills/index.js';
+export * from './agents/index.js';
 export * from './runtime/index.js';
 export {
   commitmentPatternId,

@@ -181,6 +181,21 @@ export interface BotDelegation {
   is_active: boolean;
 }
 
+export interface BotStatusProjection {
+  bot_id: string;
+  name: string | null;
+  emoji: string | null;
+  role: string | null;
+  kb_domains: string[] | null;
+  budget_per_message: string | null;
+  slack_username: string | null;
+  slack_icon_emoji: string | null;
+  derived_from: string | null;
+  reply_as: string | null;
+  is_helper: boolean | null;
+  skip_projection_targets: string[] | null;
+}
+
 export interface BotProtocol {
   id: number;
   key: string;
@@ -495,6 +510,36 @@ export async function getAgents(officeId?: string | null): Promise<Agent[]> {
   } catch (error) {
     console.warn('⚠️ 에이전트 조회 실패, 폴백 데이터 사용:', error);
     return FALLBACK_AGENTS.filter((a) => a.is_active);
+  }
+}
+
+export async function getAgentByName(
+  name: string,
+  officeId?: string | null,
+): Promise<Agent | null> {
+  const agents = await getAgents(officeId);
+  return agents.find((a) => a.name.toLowerCase() === name.toLowerCase()) ?? null;
+}
+
+export async function getBotStatusProjection(botId: string): Promise<BotStatusProjection | null> {
+  const isConnected = await checkDbConnection();
+  if (!isConnected) return null;
+
+  try {
+    const result = await getPool().query(
+      `SELECT bot_id, name, emoji, role, kb_domains,
+              budget_per_message::text AS budget_per_message,
+              slack_username, slack_icon_emoji,
+              derived_from, reply_as,
+              is_helper, skip_projection_targets
+       FROM semo.bot_status
+       WHERE bot_id = $1
+       LIMIT 1`,
+      [botId],
+    );
+    return result.rows[0] ?? null;
+  } catch {
+    return null;
   }
 }
 
