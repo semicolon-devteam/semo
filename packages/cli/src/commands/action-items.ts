@@ -12,6 +12,41 @@ import { getPool, closeConnection, isDbConnected } from '../database';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+function parseJsonOption(value: string | undefined, label: string): Record<string, unknown> {
+  if (!value) return {};
+  const parsed = JSON.parse(value) as unknown;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error(`${label} 는 JSON object 여야 합니다`);
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function normalizeTextOption(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function inferActionActor(): string {
+  return (
+    process.env.SEMO_BOT_ID ||
+    process.env.OPENCLAW_PROFILE ||
+    process.env.HERMESS_AGENT_ID ||
+    process.env.CODEX_AGENT_ID ||
+    process.env.USER ||
+    'unknown'
+  );
+}
+
+function inferActionActorKind(): string {
+  if (process.env.OPENCLAW_PROFILE) return 'openclaw';
+  if (process.env.HERMESS_AGENT_ID) return 'hermess';
+  if (process.env.CODEX_AGENT_ID || process.env.CODEX_HOME) return 'codex';
+  if (process.env.CLAUDE_CONFIG_DIR || process.env.CLAUDECODE) return 'claude-code';
+  if (process.env.SEMO_BOT_ID) return 'semo-agent';
+  return 'local';
+}
+
 async function resolveActionItemId(pool: Pool, input: string): Promise<string> {
   if (UUID_RE.test(input)) return input;
   if (!/^[0-9a-f-]+$/i.test(input)) {
@@ -142,7 +177,7 @@ export function registerActionItemsCommands(program: Command): void {
       }
       const pool = getPool();
       try {
-        const metadata = opts.metadata ? JSON.parse(opts.metadata) : {};
+        const metadata = parseJsonOption(opts.metadata, '--metadata');
         const res = await pool.query(
           `INSERT INTO semo.action_items
             (owner_domain, target_domain, description, assignee, deadline, priority, source, related_url, metadata)
@@ -212,7 +247,7 @@ export function registerActionItemsCommands(program: Command): void {
         const res = await pool.query(
           `SELECT action_item_id, owner_domain, target_domain, description, assignee,
                   to_char(deadline, 'YYYY-MM-DD') AS deadline,
-                  status, priority,
+                  status, priority, completed_at, metadata,
                   to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') AS created_at
            FROM semo.action_items ${where}
            ORDER BY CASE status WHEN 'open' THEN 0 WHEN 'completed' THEN 1 ELSE 2 END, created_at DESC
@@ -259,6 +294,7 @@ export function registerActionItemsCommands(program: Command): void {
     .option('--deadline <date>', '기한')
     .option('--priority <level>', '우선순위')
     .option('--assignee <name>', '담당자')
+    .option('--metadata <json>', 'metadata JSON object를 기존 metadata에 merge')
     .action(async (id, opts) => {
       if (!(await isDbConnected())) {
         console.error(chalk.red('DB 연결 실패'));
@@ -307,6 +343,11 @@ export function registerActionItemsCommands(program: Command): void {
           sets.push(`assignee = $${idx++}`);
           params.push(opts.assignee);
         }
+        if (opts.metadata) {
+          const metadata = parseJsonOption(opts.metadata, '--metadata');
+          sets.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${idx++}::jsonb`);
+          params.push(JSON.stringify(metadata));
+        }
 
         if (sets.length === 0) {
           console.error(chalk.yellow('변경할 항목을 지정하세요'));
@@ -316,7 +357,8 @@ export function registerActionItemsCommands(program: Command): void {
         const resolvedId = await resolveActionItemId(pool, id);
         params.push(resolvedId);
         const res = await pool.query(
-          `UPDATE semo.action_items SET ${sets.join(', ')} WHERE action_item_id = $${idx} RETURNING action_item_id, status, description`,
+          `UPDATE semo.action_items SET ${sets.join(', ')} WHERE action_item_id = $${idx}
+           RETURNING action_item_id, status, description, metadata`,
           params,
         );
 
@@ -448,7 +490,19 @@ export function registerActionItemsCommands(program: Command): void {
   cmd
     .command('complete <id>')
     .description('액션 아이템 완료 처리')
-    .action(async (id) => {
+    .option('--actor <id>', '처리 주체 ID/이름')
+    .option(
+      '--actor-kind <kind>',
+      '처리 주체 종류 (codex|claude-code|openclaw|hermess|semo-agent|human)',
+    )
+    .option('--model <name>', '사용 모델명')
+    .option('--method <text>', '처리 방식 요약')
+    .option('--verification <text>', '검증 결과')
+    .option('--follow-up <text>', '후속 테스트/확인 요청')
+    .option('--notified-channel <channel>', '완료 보고를 보낸 메신저 채널')
+    .option('--notification-url <url>', '완료 보고 permalink')
+    .option('--metadata <json>', '추가 metadata JSON object')
+    .action(async (id, opts) => {
       if (!(await isDbConnected())) {
         console.error(chalk.red('DB 연결 실패'));
         process.exit(1);
@@ -456,16 +510,64 @@ export function registerActionItemsCommands(program: Command): void {
       const pool = getPool();
       try {
         const resolvedId = await resolveActionItemId(pool, id);
-        const res = await pool.query(
-          `UPDATE semo.action_items SET status = 'completed', completed_at = NOW()
-           WHERE action_item_id = $1 RETURNING action_item_id, description`,
+        const currentRes = await pool.query(
+          `SELECT description, owner_domain, target_domain
+           FROM semo.action_items
+           WHERE action_item_id = $1`,
           [resolvedId],
+        );
+        if (currentRes.rows.length === 0) {
+          console.error(chalk.red(`아이템 ${id} 없음`));
+          process.exit(1);
+        }
+        const currentItem = currentRes.rows[0];
+        const completedAt = new Date().toISOString();
+        const extraMetadata = parseJsonOption(opts.metadata, '--metadata');
+        const completionEntry = {
+          action_item_id: resolvedId,
+          action_description: currentItem.description,
+          owner_domain: currentItem.owner_domain,
+          target_domain: currentItem.target_domain,
+          actor: opts.actor || inferActionActor(),
+          actor_kind: opts.actorKind || inferActionActorKind(),
+          model: normalizeTextOption(opts.model) || null,
+          method: normalizeTextOption(opts.method) || null,
+          verification: normalizeTextOption(opts.verification) || null,
+          follow_up: normalizeTextOption(opts.followUp) || null,
+          notified_channel: normalizeTextOption(opts.notifiedChannel) || null,
+          notification_url: normalizeTextOption(opts.notificationUrl) || null,
+          completed_at: completedAt,
+        };
+        const metadataPatch = {
+          ...extraMetadata,
+          completion: completionEntry,
+        };
+        const res = await pool.query(
+          `UPDATE semo.action_items
+           SET status = 'completed',
+               completed_at = $2::timestamptz,
+               metadata = COALESCE(metadata, '{}'::jsonb)
+                 || $3::jsonb
+                 || jsonb_build_object(
+                      'completion_log',
+                      COALESCE(metadata->'completion_log', '[]'::jsonb) || jsonb_build_array($4::jsonb)
+                    )
+           WHERE action_item_id = $1
+           RETURNING action_item_id, description, completed_at, metadata`,
+          [
+            resolvedId,
+            completedAt,
+            JSON.stringify(metadataPatch),
+            JSON.stringify(completionEntry),
+          ],
         );
         if (res.rows.length === 0) {
           console.error(chalk.red(`아이템 ${id} 없음`));
           process.exit(1);
         }
         console.log(chalk.green(`✅ 완료: ${res.rows[0].description}`));
+        console.log(`  actor: ${completionEntry.actor_kind}/${completionEntry.actor}`);
+        console.log(`  completed_at: ${completedAt}`);
       } catch (err) {
         console.error(chalk.red('완료 처리 실패:'), err instanceof Error ? err.message : err);
         process.exit(1);
