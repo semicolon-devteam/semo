@@ -13,6 +13,7 @@
 export type HostKind =
   | 'claude-code'
   | 'codex-cli'
+  | 'hermes-cli'
   | 'hermes-desktop'
   | 'ollama-cli'
   | 'openclaw'

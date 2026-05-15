@@ -22,6 +22,7 @@ interface CommonRuntime {
   CodexCliAdapter: new (opts?: Record<string, unknown>) => HostAdapterLike;
   OpenClawAdapter: new (opts?: Record<string, unknown>) => HostAdapterLike;
   OllamaCliAdapter: new (opts?: Record<string, unknown>) => HostAdapterLike;
+  HermesCliAdapter: new (opts?: Record<string, unknown>) => HostAdapterLike;
   HermesDesktopAdapter: new (opts?: Record<string, unknown>) => HostAdapterLike;
 }
 
@@ -48,6 +49,29 @@ interface HostAdapterLike {
     endReason: string;
     hostMeta?: Record<string, unknown>;
   }>;
+}
+
+interface RuntimeOutputEnvelope {
+  reply_text?: unknown;
+  kb_status?: unknown;
+  needs_user_confirmation?: unknown;
+  actions_taken?: unknown;
+  files_changed?: unknown;
+  suggested_delegation?: unknown;
+}
+
+interface NormalizedDispatchOutput {
+  replyText: string;
+  kbStatus: 'written' | 'not-needed' | 'pending';
+  needsUserConfirmation: boolean;
+  envelope?: {
+    reply_text: string;
+    kb_status?: 'written' | 'not-needed' | 'pending';
+    needs_user_confirmation?: boolean;
+    actions_taken?: unknown[];
+    files_changed?: unknown[];
+    suggested_delegation?: unknown;
+  };
 }
 
 async function loadCommon(): Promise<CommonRuntime> {
@@ -83,7 +107,19 @@ interface InboxMessage {
 /** bot_status 조회 결과 (필요 필드만). */
 interface BotRecord {
   bot_id: string;
-  config: { host_kind?: string; openclaw_workspace?: string; openclaw_profile?: string } | null;
+  config: {
+    host_kind?: string;
+    openclaw_workspace?: string;
+    openclaw_profile?: string;
+    hermes_home?: string;
+    hermes_profile?: string;
+    hermes_provider?: string;
+    hermes_model?: string;
+    hermes_toolsets?: string;
+    hermes_skills?: string;
+    hermes_max_turns?: number;
+    hermes_role?: string;
+  } | null;
   workspace_path: string | null;
 }
 
@@ -105,7 +141,17 @@ function buildAdapterFromHostKind(
   m: CommonRuntime,
   hostKind: string,
   bot: BotRecord,
-  opts: { openclawBinary?: string },
+  opts: {
+    openclawBinary?: string;
+    hermesBinary?: string;
+    hermesHome?: string;
+    hermesProvider?: string;
+    hermesModel?: string;
+    hermesToolsets?: string;
+    hermesSkills?: string;
+    hermesMaxTurns?: number;
+    hermesRole?: string;
+  },
 ): HostAdapterLike | null {
   const ctorOpts: Record<string, unknown> = {};
   switch (hostKind) {
@@ -119,7 +165,27 @@ function buildAdapterFromHostKind(
       return new m.OpenClawAdapter(ctorOpts);
     case 'ollama-cli':
       return new m.OllamaCliAdapter(ctorOpts);
+    case 'hermes-cli':
+      if (opts.hermesBinary) ctorOpts.binaryPath = opts.hermesBinary;
+      ctorOpts.hermesHome = opts.hermesHome ?? bot.config?.hermes_home;
+      ctorOpts.profile = bot.config?.hermes_profile ?? `semo-${bot.bot_id}`;
+      ctorOpts.provider = opts.hermesProvider ?? bot.config?.hermes_provider;
+      ctorOpts.model = opts.hermesModel ?? bot.config?.hermes_model;
+      ctorOpts.toolsets = opts.hermesToolsets ?? bot.config?.hermes_toolsets;
+      ctorOpts.skills = opts.hermesSkills ?? bot.config?.hermes_skills;
+      ctorOpts.maxTurns = opts.hermesMaxTurns ?? bot.config?.hermes_max_turns;
+      ctorOpts.semoRole = opts.hermesRole ?? bot.config?.hermes_role;
+      return new m.HermesCliAdapter(ctorOpts);
     case 'hermes-desktop':
+      if (opts.hermesBinary) ctorOpts.binaryPath = opts.hermesBinary;
+      ctorOpts.hermesHome = opts.hermesHome ?? bot.config?.hermes_home;
+      ctorOpts.profile = bot.config?.hermes_profile ?? `semo-${bot.bot_id}`;
+      ctorOpts.provider = opts.hermesProvider ?? bot.config?.hermes_provider;
+      ctorOpts.model = opts.hermesModel ?? bot.config?.hermes_model;
+      ctorOpts.toolsets = opts.hermesToolsets ?? bot.config?.hermes_toolsets;
+      ctorOpts.skills = opts.hermesSkills ?? bot.config?.hermes_skills;
+      ctorOpts.maxTurns = opts.hermesMaxTurns ?? bot.config?.hermes_max_turns;
+      ctorOpts.semoRole = opts.hermesRole ?? bot.config?.hermes_role;
       return new m.HermesDesktopAdapter(ctorOpts);
     default:
       return null;
@@ -135,6 +201,7 @@ function listAdapters(): AdapterDef[] {
     { name: 'codex-cli', factory: (m, o) => new m.CodexCliAdapter(o) },
     { name: 'openclaw', factory: (m, o) => new m.OpenClawAdapter(o) },
     { name: 'ollama-cli', factory: (m, o) => new m.OllamaCliAdapter(o) },
+    { name: 'hermes-cli', factory: (m, o) => new m.HermesCliAdapter(o) },
     { name: 'hermes-desktop', factory: (m, o) => new m.HermesDesktopAdapter(o) },
   ];
 }
@@ -146,8 +213,10 @@ export function registerRuntimeCommands(program: Command): void {
     .command('probe')
     .description('모든 HostAdapter 의 probe() 실행 → CLI/바이너리 가용성 표시')
     .option('--openclaw-binary <path>', 'openclaw 바이너리 절대경로 (PATH 미등록 환경용)')
+    .option('--hermes-binary <path>', 'hermes 바이너리 절대경로 (PATH 미등록 환경용)')
+    .option('--hermes-home <path>', 'Hermes HERMES_HOME 격리 디렉토리')
     .option('--json', 'JSON 출력')
-    .action(async (opts: { openclawBinary?: string; json?: boolean }) => {
+    .action(async (opts: { openclawBinary?: string; hermesBinary?: string; hermesHome?: string; json?: boolean }) => {
       const m = await loadCommon();
 
       const adapters = listAdapters();
@@ -162,6 +231,12 @@ export function registerRuntimeCommands(program: Command): void {
         const ctorOpts: Record<string, unknown> = {};
         if (def.name === 'openclaw' && opts.openclawBinary) {
           ctorOpts.binaryPath = opts.openclawBinary;
+        }
+        if (def.name.startsWith('hermes') && opts.hermesBinary) {
+          ctorOpts.binaryPath = opts.hermesBinary;
+        }
+        if (def.name.startsWith('hermes') && opts.hermesHome) {
+          ctorOpts.hermesHome = opts.hermesHome;
         }
         const adapter = def.factory(m, ctorOpts);
         const r = await adapter.probe();
@@ -197,10 +272,18 @@ export function registerRuntimeCommands(program: Command): void {
   runtime
     .command('dispatch <prompt>')
     .description('지정 어댑터로 1-shot dispatch — smoke 검증 (운영 흐름 미침투)')
-    .requiredOption('--adapter <name>', 'claude-code | codex-cli | openclaw | ollama-cli')
+    .requiredOption('--adapter <name>', 'claude-code | codex-cli | openclaw | ollama-cli | hermes-cli')
     .option('--bot-id <id>', '봇 식별자 (호스트별 의미 다름)', 'probe-bot')
     .option('--timeout <ms>', 'timeout (ms)', '60000')
     .option('--openclaw-binary <path>', 'openclaw 바이너리 절대경로')
+    .option('--hermes-binary <path>', 'hermes 바이너리 절대경로')
+    .option('--hermes-home <path>', 'Hermes HERMES_HOME 격리 디렉토리')
+    .option('--hermes-provider <provider>', 'Hermes provider override')
+    .option('--hermes-model <model>', 'Hermes model override')
+    .option('--hermes-toolsets <csv>', 'Hermes toolsets override')
+    .option('--hermes-skills <csv>', 'Hermes skills override')
+    .option('--hermes-max-turns <n>', 'Hermes max turns override')
+    .option('--hermes-role <role>', 'Hermes SEMO role-bounded worker role')
     .option('--cwd <dir>', '호출 cwd')
     .action(
       async (
@@ -210,6 +293,14 @@ export function registerRuntimeCommands(program: Command): void {
           botId: string;
           timeout: string;
           openclawBinary?: string;
+          hermesBinary?: string;
+          hermesHome?: string;
+          hermesProvider?: string;
+          hermesModel?: string;
+          hermesToolsets?: string;
+          hermesSkills?: string;
+          hermesMaxTurns?: string;
+          hermesRole?: string;
           cwd?: string;
         },
       ) => {
@@ -227,6 +318,30 @@ export function registerRuntimeCommands(program: Command): void {
         const ctorOpts: Record<string, unknown> = {};
         if (def.name === 'openclaw' && opts.openclawBinary) {
           ctorOpts.binaryPath = opts.openclawBinary;
+        }
+        if (def.name.startsWith('hermes') && opts.hermesBinary) {
+          ctorOpts.binaryPath = opts.hermesBinary;
+        }
+        if (def.name.startsWith('hermes') && opts.hermesHome) {
+          ctorOpts.hermesHome = opts.hermesHome;
+        }
+        if (def.name.startsWith('hermes') && opts.hermesProvider) {
+          ctorOpts.provider = opts.hermesProvider;
+        }
+        if (def.name.startsWith('hermes') && opts.hermesModel) {
+          ctorOpts.model = opts.hermesModel;
+        }
+        if (def.name.startsWith('hermes') && opts.hermesToolsets) {
+          ctorOpts.toolsets = opts.hermesToolsets;
+        }
+        if (def.name.startsWith('hermes') && opts.hermesSkills) {
+          ctorOpts.skills = opts.hermesSkills;
+        }
+        if (def.name.startsWith('hermes') && opts.hermesMaxTurns) {
+          ctorOpts.maxTurns = Number(opts.hermesMaxTurns);
+        }
+        if (def.name.startsWith('hermes') && opts.hermesRole) {
+          ctorOpts.semoRole = opts.hermesRole;
         }
         const adapter = def.factory(m, ctorOpts);
 
@@ -275,6 +390,14 @@ export function registerRuntimeCommands(program: Command): void {
     .option('--interval-ms <n>', '폴링 주기 ms', '5000')
     .option('--once', '한 번만 처리하고 종료 (테스트용)')
     .option('--openclaw-binary <path>', 'openclaw 바이너리 절대경로 (PATH 미등록 환경)')
+    .option('--hermes-binary <path>', 'hermes 바이너리 절대경로 (PATH 미등록 환경)')
+    .option('--hermes-home <path>', 'Hermes HERMES_HOME 격리 디렉토리')
+    .option('--hermes-provider <provider>', 'Hermes provider override')
+    .option('--hermes-model <model>', 'Hermes model override')
+    .option('--hermes-toolsets <csv>', 'Hermes toolsets override')
+    .option('--hermes-skills <csv>', 'Hermes skills override')
+    .option('--hermes-max-turns <n>', 'Hermes max turns override')
+    .option('--hermes-role <role>', 'Hermes SEMO role-bounded worker role')
     .option('--timeout-ms <n>', 'dispatch 1회 timeout ms', '120000')
     .action(
       async (opts: {
@@ -282,6 +405,14 @@ export function registerRuntimeCommands(program: Command): void {
         intervalMs: string;
         once?: boolean;
         openclawBinary?: string;
+        hermesBinary?: string;
+        hermesHome?: string;
+        hermesProvider?: string;
+        hermesModel?: string;
+        hermesToolsets?: string;
+        hermesSkills?: string;
+        hermesMaxTurns?: string;
+        hermesRole?: string;
         timeoutMs: string;
       }) => {
         const connected = await isDbConnected();
@@ -304,6 +435,14 @@ export function registerRuntimeCommands(program: Command): void {
         const m = await loadCommon();
         const adapter = buildAdapterFromHostKind(m, hostKind, bot, {
           openclawBinary: opts.openclawBinary,
+          hermesBinary: opts.hermesBinary,
+          hermesHome: opts.hermesHome,
+          hermesProvider: opts.hermesProvider,
+          hermesModel: opts.hermesModel,
+          hermesToolsets: opts.hermesToolsets,
+          hermesSkills: opts.hermesSkills,
+          hermesMaxTurns: opts.hermesMaxTurns ? Number(opts.hermesMaxTurns) : undefined,
+          hermesRole: opts.hermesRole,
         });
         if (!adapter) {
           console.error(chalk.red(`✗ host_kind='${hostKind}' 지원 어댑터 없음`));
@@ -323,6 +462,7 @@ export function registerRuntimeCommands(program: Command): void {
         const inboxPath = path.join(mboxDir, 'inbox.jsonl');
         const consumedPath = path.join(mboxDir, 'inbox.consumed');
         const outboxPath = path.join(mboxDir, 'outbox.jsonl');
+        const auditPath = path.join(mboxDir, 'audit.jsonl');
         const heartbeatPath = path.join(mboxDir, 'heartbeat');
 
         const intervalMs = Math.max(1000, Number(opts.intervalMs));
@@ -374,25 +514,49 @@ export function registerRuntimeCommands(program: Command): void {
                   prompt: composePrompt(msg),
                   timeoutMs,
                 });
+                const elapsedMs = Date.now() - t0;
+                const audit = buildRuntimeAudit({
+                  botId: opts.bot,
+                  hostKind,
+                  elapsedMs,
+                  timeoutMs,
+                  result: r,
+                });
+                appendAudit(auditPath, {
+                  id: randomUUID(),
+                  in_reply_to: msg.id,
+                  timestamp: new Date().toISOString(),
+                  ...audit,
+                });
                 if (r.text && r.endReason === 'completed') {
+                  const output = normalizeDispatchOutput(r.text);
                   appendOutbox(outboxPath, {
                     id: randomUUID(),
                     in_reply_to: msg.id,
                     timestamp: new Date().toISOString(),
                     type: 'reply',
                     bot_id: opts.bot,
-                    text: r.text,
+                    text: output.replyText,
+                    output_contract: {
+                      kb_status: output.kbStatus,
+                      needs_user_confirmation: output.needsUserConfirmation,
+                      envelope_present: Boolean(output.envelope),
+                      actions_taken: output.envelope?.actions_taken ?? [],
+                      files_changed: output.envelope?.files_changed ?? [],
+                      suggested_delegation: output.envelope?.suggested_delegation ?? null,
+                    },
+                    runtime_audit: audit,
                     platform: msg.platform ?? 'slack',
                     channel_id: msg.channel_id ?? '',
                     thread_id: msg.thread_id ?? '',
                   });
                   totalProcessed++;
                   console.log(
-                    chalk.green(`✓ ${r.endReason} (${Date.now() - t0}ms, ${r.text.length}b)`),
+                    chalk.green(`✓ ${r.endReason} (${elapsedMs}ms, ${output.replyText.length}b)`),
                   );
                 } else {
                   totalErrors++;
-                  console.log(chalk.red(`✗ endReason=${r.endReason} (${Date.now() - t0}ms)`));
+                  console.log(chalk.red(formatDispatchFailureForLog(r, elapsedMs)));
                 }
               } catch (err) {
                 totalErrors++;
@@ -415,6 +579,114 @@ export function registerRuntimeCommands(program: Command): void {
         process.exit(0);
       },
     );
+}
+
+export function normalizeDispatchOutput(text: string): NormalizedDispatchOutput {
+  const trimmed = text.trim();
+  const candidate = extractJsonCandidate(trimmed);
+  if (candidate) {
+    try {
+      const parsed = JSON.parse(candidate) as RuntimeOutputEnvelope;
+      if (typeof parsed.reply_text === 'string' && parsed.reply_text.trim()) {
+        const kbStatus = normalizeKbStatus(parsed.kb_status);
+        return {
+          replyText: parsed.reply_text,
+          kbStatus,
+          needsUserConfirmation: parsed.needs_user_confirmation === true,
+          envelope: {
+            reply_text: parsed.reply_text,
+            kb_status: kbStatus,
+            needs_user_confirmation: parsed.needs_user_confirmation === true,
+            actions_taken: Array.isArray(parsed.actions_taken) ? parsed.actions_taken : [],
+            files_changed: Array.isArray(parsed.files_changed) ? parsed.files_changed : [],
+            suggested_delegation: parsed.suggested_delegation ?? null,
+          },
+        };
+      }
+    } catch {
+      // Tolerant contract: invalid JSON never blocks plain-text fallback.
+    }
+  }
+
+  return {
+    replyText: text,
+    kbStatus: 'not-needed',
+    needsUserConfirmation: false,
+  };
+}
+
+export function buildRuntimeAudit(input: {
+  botId: string;
+  hostKind: string;
+  elapsedMs: number;
+  timeoutMs: number;
+  result: { text?: string; endReason: string; hostMeta?: Record<string, unknown> };
+}): Record<string, unknown> {
+  const hostMeta = input.result.hostMeta ?? {};
+  const out: Record<string, unknown> = {
+    bot_id: input.botId,
+    host_kind: input.hostKind,
+    end_reason: input.result.endReason,
+    elapsed_ms: input.elapsedMs,
+    timeout_ms: input.timeoutMs,
+  };
+  for (const [auditKey, metaKey] of [
+    ['profile', 'profile'],
+    ['provider', 'provider'],
+    ['model', 'model'],
+    ['semo_role', 'semo_role'],
+    ['exit_code', 'exit_code'],
+    ['signal', 'signal'],
+  ] as const) {
+    const value = hostMeta[metaKey];
+    if (value !== undefined && value !== null) out[auditKey] = value;
+  }
+  if (hostMeta.stderr_tail !== undefined && hostMeta.stderr_tail !== null) {
+    out.stderr_tail = redactSensitive(oneLine(String(hostMeta.stderr_tail))).slice(-1000);
+  }
+  return out;
+}
+
+export function formatDispatchFailureForLog(
+  result: { text?: string; endReason: string; hostMeta?: Record<string, unknown> },
+  elapsedMs: number,
+): string {
+  const parts = [`✗ endReason=${result.endReason}`, `(${elapsedMs}ms)`];
+  const hostMeta = result.hostMeta ?? {};
+  const exitCode = hostMeta.exit_code;
+  const signal = hostMeta.signal;
+  const stderrTail = hostMeta.stderr_tail;
+  if (exitCode !== undefined && exitCode !== null) parts.push(`exit_code=${String(exitCode)}`);
+  if (signal !== undefined && signal !== null) parts.push(`signal=${String(signal)}`);
+  if (stderrTail !== undefined && stderrTail !== null && String(stderrTail).trim()) {
+    parts.push(`stderr_tail=${redactSensitive(oneLine(String(stderrTail))).slice(0, 500)}`);
+  }
+  if (result.text && result.text.trim()) {
+    parts.push(`text=${oneLine(result.text).slice(0, 300)}`);
+  }
+  return parts.join(' ');
+}
+
+function oneLine(text: string): string {
+  return text.replace(/\s+/g, ' ').trim();
+}
+
+function extractJsonCandidate(text: string): string | null {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenced?.[1]) return fenced[1].trim();
+  if (text.startsWith('{') && text.endsWith('}')) return text;
+  return null;
+}
+
+function normalizeKbStatus(value: unknown): 'written' | 'not-needed' | 'pending' {
+  return value === 'written' || value === 'pending' || value === 'not-needed' ? value : 'not-needed';
+}
+
+function redactSensitive(text: string): string {
+  return text
+    .replace(/Bearer\s+[^\s]+/gi, 'Bearer [REDACTED]')
+    .replace(/(api[_-]?key|token|secret|password)=([^\s&]+)/gi, '$1=[REDACTED]')
+    .replace(/(api[_-]?key|token|secret|password):\s*([^\s]+)/gi, '$1: [REDACTED]');
 }
 
 function readNewInboxMessages(inboxPath: string, consumedPath: string): InboxMessage[] {
@@ -448,6 +720,10 @@ function appendConsumed(consumedPath: string, id: string): void {
 
 function appendOutbox(outboxPath: string, msg: Record<string, unknown>): void {
   fs.appendFileSync(outboxPath, JSON.stringify(msg) + '\n');
+}
+
+function appendAudit(auditPath: string, msg: Record<string, unknown>): void {
+  fs.appendFileSync(auditPath, JSON.stringify(msg) + '\n');
 }
 
 function composePrompt(msg: InboxMessage): string {
