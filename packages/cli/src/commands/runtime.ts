@@ -44,6 +44,7 @@ interface HostAdapterLike {
     session: { hostSessionId: string; rolloutPath?: string };
     prompt: string;
     timeoutMs?: number;
+    context?: Record<string, unknown>;
   }): Promise<{
     text: string;
     session?: { hostSessionId: string; rolloutPath?: string };
@@ -160,6 +161,7 @@ function buildAdapterFromHostKind(
     hermesSkills?: string;
     hermesMaxTurns?: number;
     hermesRole?: string;
+    enableSessionResume?: boolean;
   },
 ): HostAdapterLike | null {
   const ctorOpts: Record<string, unknown> = {};
@@ -184,6 +186,7 @@ function buildAdapterFromHostKind(
       ctorOpts.skills = opts.hermesSkills ?? bot.config?.hermes_skills;
       ctorOpts.maxTurns = opts.hermesMaxTurns ?? bot.config?.hermes_max_turns;
       ctorOpts.semoRole = opts.hermesRole ?? bot.config?.hermes_role;
+      ctorOpts.enableSessionResume = opts.enableSessionResume === true;
       return new m.HermesCliAdapter(ctorOpts);
     case 'hermes-desktop':
       if (opts.hermesBinary) ctorOpts.binaryPath = opts.hermesBinary;
@@ -195,6 +198,7 @@ function buildAdapterFromHostKind(
       ctorOpts.skills = opts.hermesSkills ?? bot.config?.hermes_skills;
       ctorOpts.maxTurns = opts.hermesMaxTurns ?? bot.config?.hermes_max_turns;
       ctorOpts.semoRole = opts.hermesRole ?? bot.config?.hermes_role;
+      ctorOpts.enableSessionResume = opts.enableSessionResume === true;
       return new m.HermesDesktopAdapter(ctorOpts);
     default:
       return null;
@@ -407,6 +411,7 @@ export function registerRuntimeCommands(program: Command): void {
     .option('--hermes-skills <csv>', 'Hermes skills override')
     .option('--hermes-max-turns <n>', 'Hermes max turns override')
     .option('--hermes-role <role>', 'Hermes SEMO role-bounded worker role')
+    .option('--enable-session-resume', 'Enable host session resume for reused thread session mappings')
     .option('--session-ttl-ms <n>', 'Thread session mapping TTL ms', '86400000')
     .option('--reset-session-map', 'Clear this bot runtime session map before serving')
     .option('--timeout-ms <n>', 'dispatch 1회 timeout ms', '120000')
@@ -424,6 +429,7 @@ export function registerRuntimeCommands(program: Command): void {
         hermesSkills?: string;
         hermesMaxTurns?: string;
         hermesRole?: string;
+        enableSessionResume?: boolean;
         sessionTtlMs: string;
         resetSessionMap?: boolean;
         timeoutMs: string;
@@ -456,6 +462,7 @@ export function registerRuntimeCommands(program: Command): void {
           hermesSkills: opts.hermesSkills,
           hermesMaxTurns: opts.hermesMaxTurns ? Number(opts.hermesMaxTurns) : undefined,
           hermesRole: opts.hermesRole,
+          enableSessionResume: opts.enableSessionResume === true,
         });
         if (!adapter) {
           console.error(chalk.red(`✗ host_kind='${hostKind}' 지원 어댑터 없음`));
@@ -533,6 +540,7 @@ export function registerRuntimeCommands(program: Command): void {
                   session,
                   prompt: composePrompt(msg),
                   timeoutMs,
+                  context: { runtimeSessionReused: sessionReused, runtimeSessionKey: sessionKey },
                 });
                 const elapsedMs = Date.now() - t0;
                 const audit = buildRuntimeAudit({
@@ -661,6 +669,9 @@ export function buildRuntimeAudit(input: {
     ['provider', 'provider'],
     ['model', 'model'],
     ['semo_role', 'semo_role'],
+    ['session_resume_enabled', 'session_resume_enabled'],
+    ['session_resume_requested', 'session_resume_requested'],
+    ['hermes_session_id', 'hermes_session_id'],
     ['exit_code', 'exit_code'],
     ['signal', 'signal'],
   ] as const) {

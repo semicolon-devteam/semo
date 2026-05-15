@@ -253,7 +253,40 @@ hermes --profile semo-hermes-canary chat --query "Return exactly: HERMES_CANARY_
 
 ---
 
-## Phase 6: Explicitly Deferred Items
+## Phase 6: Opt-in Hermes Session Resume Boundary
+
+### Task 6.1: Confirm Hermes CLI resume support
+
+**Observed CLI support:** `hermes chat --help` exposes both `--resume SESSION_ID` and `--continue [SESSION_NAME]`.
+
+**Chosen boundary:** SEMO uses explicit `--resume <session_id>` only. `--continue` remains disabled because it can select recent sessions by name/default and is harder to reason about for thread isolation.
+
+### Task 6.2: Add feature-flagged actual resume
+
+**Implemented behavior:**
+- `runtime serve` exposes `--enable-session-resume`; default is disabled.
+- The flag is passed to `HermesCliAdapter` only for Hermes host kinds.
+- `HermesCliAdapter` appends `--resume <session_id>` only when all conditions hold:
+  - `enableSessionResume === true`
+  - SEMO runtime context says `runtimeSessionReused === true`
+  - the stored host session id matches Hermes's timestamp session id shape: `YYYYMMDD_HHMMSS_<suffix>`
+- First turns and synthetic `hermes-<profile>-<timestamp>` placeholder ids never resume.
+- If Hermes emits a valid `session_id: ...` line on stdout/stderr, the adapter updates the returned host session ref and SEMO persists it for future turns.
+
+### Task 6.3: Audit and isolation smoke coverage
+
+**Audit additions:** `session_resume_enabled`, `session_resume_requested`, and `hermes_session_id` are copied from host meta into runtime audit.
+
+**Fake-binary smoke/tests:**
+- Same-thread reused session with opt-in sends `--resume <session_id>` and stores the new Hermes session id.
+- First turn with opt-in does not send `--resume`.
+- Existing Phase 5 tests still verify cross-thread/no-thread mapping isolation and TTL pruning.
+
+**Important boundary:** Phase 6 provides a guarded implementation path. Production use should still start disabled and only enable `--enable-session-resume` for a canary worker after a live same-thread/cross-thread mailbox smoke confirms no leakage in the target Hermes version/profile.
+
+---
+
+## Phase 7: Explicitly Deferred Items
 
 These are intentionally out of scope until a separate decision:
 

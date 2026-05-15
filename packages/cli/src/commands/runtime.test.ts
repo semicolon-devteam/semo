@@ -97,6 +97,9 @@ describe('runtime audit metadata', () => {
           provider: 'openai-codex',
           model: 'gpt-5.5',
           semo_role: 'research/code-inspection/plan-review',
+          session_resume_enabled: true,
+          session_resume_requested: true,
+          hermes_session_id: '20260515_102345_abcdef',
           exit_code: 124,
           stderr_tail: 'Authorization: Bearer *** failed',
         },
@@ -109,6 +112,9 @@ describe('runtime audit metadata', () => {
     expect(audit.provider).toBe('openai-codex');
     expect(audit.model).toBe('gpt-5.5');
     expect(audit.semo_role).toBe('research/code-inspection/plan-review');
+    expect(audit.session_resume_enabled).toBe(true);
+    expect(audit.session_resume_requested).toBe(true);
+    expect(audit.hermes_session_id).toBe('20260515_102345_abcdef');
     expect(audit.end_reason).toBe('timeout');
     expect(audit.timeout_ms).toBe(300000);
     expect(audit.exit_code).toBe(124);

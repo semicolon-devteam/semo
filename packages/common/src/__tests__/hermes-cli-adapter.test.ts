@@ -36,6 +36,18 @@ printf 'HERMES_HOME=%s\\n' "$HERMES_HOME"`,
 
 const FAKE_HANG = writeFake('fake-hermes-hang.sh', `exec sleep 30`);
 
+const FAKE_SESSION_ID = writeFake(
+  'fake-hermes-session-id.sh',
+  `if [[ "$1" == "--version" ]]; then
+  echo "hermes 0.0.fake"
+  exit 0
+fi
+printf 'ARGS:'
+for a in "$@"; do printf ' [%s]' "$a"; done
+printf '\\n'
+printf 'session_id: 20260515_102345_abcdef\\n' >&2`,
+);
+
 afterAll(() => {
   rmSync(FAKE_DIR, { recursive: true, force: true });
 });
@@ -112,6 +124,41 @@ describe('HermesCliAdapter', () => {
     });
     expect(r.endReason).toBe('timeout');
   }, 8000);
+
+  it('dispatch: enableSessionResume=true 이고 reused runtime session이면 --resume을 붙이고 Hermes session_id를 저장', async () => {
+    const adapter = new HermesCliAdapter({
+      binaryPath: FAKE_SESSION_ID,
+      enableSessionResume: true,
+    });
+    const r = await adapter.dispatch({
+      botId: 'hermes-canary',
+      session: { hostSessionId: '20260515_101010_123abc' },
+      prompt: 'hello again',
+      context: { runtimeSessionReused: true },
+    });
+
+    expect(r.endReason).toBe('completed');
+    expect(r.text).toContain('[--resume] [20260515_101010_123abc]');
+    expect(r.session.hostSessionId).toBe('20260515_102345_abcdef');
+    expect(r.hostMeta?.session_resume_enabled).toBe(true);
+    expect(r.hostMeta?.session_resume_requested).toBe(true);
+    expect(r.hostMeta?.hermes_session_id).toBe('20260515_102345_abcdef');
+  });
+
+  it('dispatch: resume opt-in이어도 reused가 아니면 --resume을 붙이지 않는다', async () => {
+    const adapter = new HermesCliAdapter({
+      binaryPath: FAKE_SESSION_ID,
+      enableSessionResume: true,
+    });
+    const r = await adapter.dispatch({
+      botId: 'hermes-canary',
+      session: { hostSessionId: '20260515_101010_123abc' },
+      prompt: 'first turn',
+    });
+
+    expect(r.text).not.toContain('[--resume]');
+    expect(r.hostMeta?.session_resume_requested).toBe(false);
+  });
 
   it('HermesDesktopAdapter remains a legacy alias with hermes-desktop kind', () => {
     const adapter = new HermesDesktopAdapter({ binaryPath: FAKE_VERSION });

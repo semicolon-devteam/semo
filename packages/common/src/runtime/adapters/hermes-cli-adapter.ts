@@ -3,7 +3,8 @@
  *
  * Canary scope:
  *   - gateway/daemon 은 켜지 않는다.
- *   - `hermes chat -q ... -Q` one-shot 호출만 지원한다.
+ *   - 기본은 `hermes chat -q ... -Q` one-shot 호출이다.
+ *   - session resume 은 명시적 opt-in 일 때만 `--resume <session_id>` 를 붙인다.
  *   - Slack/Discord 는 SEMO mailbox/outbox 가 유일한 transport 다.
  *
  * Hermes CLI reference:
@@ -54,6 +55,8 @@ export interface HermesCliAdapterOptions {
   maxTurns?: number;
   /** SEMO role-bounded worker role. 예: research/code-inspection/plan-review. */
   semoRole?: string;
+  /** Enable Hermes `--resume <session_id>` for reused SEMO runtime sessions. Default false. */
+  enableSessionResume?: boolean;
   /** user config 를 무시하고 built-in defaults 사용. credentials/.env 는 Hermes 정책에 따름. */
   ignoreUserConfig?: boolean;
   /** AGENTS.md/SOUL.md/rules/memory 자동 주입 무시. 기본 false. */
@@ -75,6 +78,7 @@ export class HermesCliAdapter implements HostAdapter {
   private readonly skills?: string;
   private readonly maxTurns?: number;
   private readonly semoRole?: string;
+  private readonly enableSessionResume: boolean;
   private readonly ignoreUserConfig: boolean;
   private readonly ignoreRules: boolean;
   private readonly defaultTimeoutMs: number;
@@ -89,6 +93,7 @@ export class HermesCliAdapter implements HostAdapter {
     this.skills = options.skills;
     this.maxTurns = options.maxTurns;
     this.semoRole = options.semoRole;
+    this.enableSessionResume = options.enableSessionResume ?? false;
     this.ignoreUserConfig = options.ignoreUserConfig ?? false;
     this.ignoreRules = options.ignoreRules ?? false;
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? 600_000;
@@ -134,11 +139,12 @@ export class HermesCliAdapter implements HostAdapter {
 
     const text = stripAnsi(exec.stdout).trim();
     const endReason = mapEndReason(exec);
+    const hermesSessionId = parseHermesSessionId(exec.stdout, exec.stderr);
 
     return {
       text,
       session: {
-        hostSessionId: input.session.hostSessionId,
+        hostSessionId: hermesSessionId ?? input.session.hostSessionId,
         rolloutPath: this.hermesHome ?? path.join(os.homedir(), '.hermes'),
       },
       endReason,
@@ -150,6 +156,9 @@ export class HermesCliAdapter implements HostAdapter {
         skills: this.skills,
         max_turns: this.maxTurns,
         semo_role: this.semoRole,
+        session_resume_enabled: this.enableSessionResume,
+        session_resume_requested: this.shouldResume(input),
+        hermes_session_id: hermesSessionId,
         exit_code: exec.exitCode,
         signal: exec.signal,
         stderr_tail: exec.stderr ? stripAnsi(exec.stderr).slice(-1000) : undefined,
@@ -163,6 +172,7 @@ export class HermesCliAdapter implements HostAdapter {
     if (this.ignoreRules) args.push('--ignore-rules');
 
     args.push('chat', '--query', this.wrapPrompt(input), '--quiet');
+    if (this.shouldResume(input)) args.push('--resume', input.session.hostSessionId);
 
     if (this.provider) args.push('--provider', this.provider);
     if (this.model) args.push('--model', this.model);
@@ -193,6 +203,14 @@ export class HermesCliAdapter implements HostAdapter {
       'User prompt:',
       input.prompt,
     ].join('\n');
+  }
+
+  private shouldResume(input: HostDispatchInput): boolean {
+    return (
+      this.enableSessionResume &&
+      input.context?.runtimeSessionReused === true &&
+      isHermesSessionId(input.session.hostSessionId)
+    );
   }
 
   private env(): NodeJS.ProcessEnv {
@@ -300,4 +318,14 @@ function mapEndReason(exec: OneShotResult): HostDispatchResult['endReason'] {
 function stripAnsi(text: string): string {
   // eslint-disable-next-line no-control-regex
   return text.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+}
+
+function parseHermesSessionId(stdout: string, stderr: string): string | undefined {
+  const combined = `${stdout}\n${stderr}`;
+  const match = combined.match(/session[_ -]?id\s*[:=]\s*([A-Za-z0-9_.-]+)/i);
+  return match?.[1] && isHermesSessionId(match[1]) ? match[1] : undefined;
+}
+
+function isHermesSessionId(value: string): boolean {
+  return /^\d{8}_\d{6}_[A-Za-z0-9]+$/.test(value);
 }
