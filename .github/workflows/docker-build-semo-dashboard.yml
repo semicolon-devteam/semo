@@ -66,6 +66,8 @@ jobs:
           tags: |
             ${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.tag }}
             ${{ env.DOCKER_IMAGE }}:${{ steps.tag.outputs.latest }}
+          build-args: |
+            NEXT_PUBLIC_VAPID_PUBLIC_KEY=${{ secrets.NEXT_PUBLIC_VAPID_PUBLIC_KEY }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64
