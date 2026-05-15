@@ -1,7 +1,8 @@
-# cmux 직접 협업 규칙 (SEMO Agents 특수 케이스)
+# cmux 직접 협업 규칙 (SEMO 로컬 세션)
 
-> reus가 SEMO 워크스페이스에서 cmux send로 봇 세션에 직접 작업을 전송하는 경우에 적용.
-> Slack 라우팅·Cron과 달리 commitment 자동 생성이 없는 비공식 경로이므로 별도 규칙이 필요하다.
+> 자세한 프로토콜은 `cmux-collaboration` skill을 따른다.
+> 실행은 raw `cmux send`가 아니라 `scripts/cmux-send-safe.sh`, `scripts/cmux-task-send.sh`, `scripts/cmux-task-wait.sh`를 사용한다.
+> Slack 라우팅·Cron과 달리 commitment 자동 생성이 없는 비공식 로컬 협업 경로이므로 별도 추적이 필요하다.
 
 ## 1. 질문 금지 — 자율 완료 후 보고
 
@@ -37,12 +38,15 @@ semo commitments update {commitment-id} --status done
 
 ## 4. cmux send 전송 규칙 (발신 측)
 
-cmux send로 봇에게 메시지를 보낼 때:
+직접 전송이 불가피할 때도 메시지와 개행을 분리한다:
 
 ```bash
-# 메시지와 개행을 별도 호출로 분리
 cmux send --workspace {ws} --surface {surface} '작업 내용'
 cmux send --workspace {ws} --surface {surface} $'\n'
 ```
 
-`$'메시지\n'` 한 번에 보내면 한글·특수문자로 인해 개행이 누락될 수 있다.
+다만 표준은 helper script 사용이다. Claude Code/Codex 입력창은 위 분리 호출만으로 실행되지 않을 수 있으므로, helper가 `send-key Enter` fallback까지 수행한다.
+
+## 5. 수신 대상 제한
+
+cmux task 수신 대상은 `cmux tree`에 존재하는 live surface다. SEMO bot id, Agent Factory roster, OpenClaw 7봇 runtime을 cmux 수신 가능 세션으로 간주하지 않는다.

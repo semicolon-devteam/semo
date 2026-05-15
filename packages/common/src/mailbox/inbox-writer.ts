@@ -10,18 +10,101 @@ import type { InboxMessage } from './types.js';
 import { loadSurfaceMap, type SurfaceMap } from './surface-map.js';
 
 const LOCK_TIMEOUT_MS = 5_000;
+const SURFACE_MAP_RELOAD_DEBOUNCE_MS = 200;
 
 export class InboxWriter {
   private readonly mailboxDir: string;
-  private readonly surfaceMap: SurfaceMap;
+  private surfaceMap: SurfaceMap;
+  private readonly surfaceMapPath: string;
+  private surfaceMapWatcher: fs.FSWatcher | null = null;
+  private surfaceMapDirWatcher: fs.FSWatcher | null = null;
+  private surfaceMapReloadTimer: NodeJS.Timeout | null = null;
 
   constructor(mailboxDir: string) {
     this.mailboxDir = mailboxDir;
+    this.surfaceMapPath = process.env.SEMO_SURFACE_MAP || '/tmp/semo-surface-map.json';
     this.surfaceMap = loadSurfaceMap();
+    this.startSurfaceMapWatch();
   }
 
   getSurfaceMap(): SurfaceMap {
     return this.surfaceMap;
+  }
+
+  /** stop fs.watch (test/teardown) */
+  stop(): void {
+    this.surfaceMapWatcher?.close();
+    this.surfaceMapWatcher = null;
+    this.surfaceMapDirWatcher?.close();
+    this.surfaceMapDirWatcher = null;
+    if (this.surfaceMapReloadTimer) {
+      clearTimeout(this.surfaceMapReloadTimer);
+      this.surfaceMapReloadTimer = null;
+    }
+  }
+
+  /**
+   * Watch surface-map.json for changes and reload on update. Handles the case
+   * where the file doesn't exist yet at boot (router started before
+   * semo-agents-start.sh wrote the map): we fall back to dir-watch and switch
+   * to file-watch once the file appears.
+   *
+   * 2026-05-09: Added after race condition incident
+   * (semo incident/inbox-writer-stale-surface-map-2026-05-09).
+   */
+  private startSurfaceMapWatch(): void {
+    const scheduleReload = (reason: string) => {
+      if (this.surfaceMapReloadTimer) clearTimeout(this.surfaceMapReloadTimer);
+      this.surfaceMapReloadTimer = setTimeout(() => {
+        this.surfaceMapReloadTimer = null;
+        try {
+          const fresh = loadSurfaceMap();
+          this.surfaceMap = fresh;
+          const surfaceCount = Object.keys(fresh.surfaces).length;
+          console.log(
+            `[inbox-writer] surface map reloaded (${reason}): workspace=${fresh.workspace} surfaces=${surfaceCount}`,
+          );
+        } catch (err) {
+          console.warn(`[inbox-writer] surface map reload failed: ${(err as Error).message}`);
+        }
+      }, SURFACE_MAP_RELOAD_DEBOUNCE_MS);
+    };
+
+    const tryWatchFile = () => {
+      try {
+        this.surfaceMapWatcher = fs.watch(
+          this.surfaceMapPath,
+          { persistent: false },
+          (eventType) => {
+            scheduleReload(`file ${eventType}`);
+          },
+        );
+        console.log(`[inbox-writer] watching surface map: ${this.surfaceMapPath}`);
+      } catch {
+        // File may not exist yet — fall back to dir-watch.
+        const dir = path.dirname(this.surfaceMapPath);
+        const base = path.basename(this.surfaceMapPath);
+        try {
+          this.surfaceMapDirWatcher = fs.watch(dir, { persistent: false }, (_evt, filename) => {
+            if (filename !== base) return;
+            // File appeared — promote to file-watch.
+            this.surfaceMapDirWatcher?.close();
+            this.surfaceMapDirWatcher = null;
+            scheduleReload('file appeared');
+            tryWatchFile();
+          });
+          console.log(
+            `[inbox-writer] surface map ${this.surfaceMapPath} not found — watching dir for creation`,
+          );
+        } catch (err) {
+          console.warn(
+            `[inbox-writer] failed to watch surface map dir: ${(err as Error).message}`,
+          );
+        }
+      }
+    };
+
+    tryWatchFile();
   }
 
   /** Write a message to a bot's inbox and nudge the bot to process it */

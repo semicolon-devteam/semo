@@ -95,29 +95,52 @@ function countPending(mailboxDir: string, botId: string): number {
  * 'busy':  alive + 응답 생성 중 (esc to interrupt / thinking)
  * 'dead':  Claude Code UI 없음 (zsh shell 등) — cmux send 시 zsh 가 prompt 를 명령으로 해석
  */
-type BotPaneState = 'idle' | 'busy' | 'dead';
+export type BotPaneState = 'idle' | 'busy' | 'dead';
 
-async function readBotPane(workspace: string, surface: string): Promise<BotPaneState> {
-  try {
-    const { stdout } = await execFileP(
-      'cmux',
-      ['read-screen', '--workspace', workspace, '--surface', surface, '--lines', '30'],
-      { timeout: 5_000 },
-    );
-    // Claude Code alive 신호 — bypass permissions footer 또는 ⏵⏵ marker
-    const isAlive = /bypass permissions|shift\+tab to cycle/.test(stdout);
-    if (!isAlive) return 'dead';
-    if (
-      /esc to interrupt|Noodling|Sautéed for|Brewed for|Accomplishing|Fluttering|thinking/i.test(
-        stdout,
-      )
-    ) {
+export interface DeliveryTarget {
+  workspace: string;
+  surface: string;
+}
+
+export interface DeliveryAdapter {
+  readPaneState(target: DeliveryTarget): Promise<BotPaneState>;
+  sendPrompt(target: DeliveryTarget, text: string): Promise<void>;
+}
+
+export class CmuxDeliveryAdapter implements DeliveryAdapter {
+  async readPaneState(target: DeliveryTarget): Promise<BotPaneState> {
+    try {
+      const { stdout } = await execFileP(
+        'cmux',
+        ['read-screen', '--workspace', target.workspace, '--surface', target.surface, '--lines', '30'],
+        { timeout: 5_000 },
+      );
+      // Claude Code alive 신호 — bypass permissions footer 또는 ⏵⏵ marker
+      const isAlive = /bypass permissions|shift\+tab to cycle/.test(stdout);
+      if (!isAlive) return 'dead';
+      if (
+        /esc to interrupt|Noodling|Sautéed for|Brewed for|Accomplishing|Fluttering|thinking/i.test(
+          stdout,
+        )
+      ) {
+        return 'busy';
+      }
+      return 'idle';
+    } catch {
+      // cmux read 실패 — 보수적으로 busy 처리 (잘못된 send 회피).
       return 'busy';
     }
-    return 'idle';
-  } catch {
-    // cmux read 실패 — 보수적으로 busy 처리 (잘못된 send 회피).
-    return 'busy';
+  }
+
+  async sendPrompt(target: DeliveryTarget, text: string): Promise<void> {
+    await execFileP('cmux', ['send', '--workspace', target.workspace, '--surface', target.surface, text], {
+      timeout: 5_000,
+    });
+    // newline 별도 전송 — 한글/특수문자 시 1 send에 포함하면 newline 누락 케이스 회피
+    // (KB feedback_cmux-send-newline 참조).
+    await execFileP('cmux', ['send', '--workspace', target.workspace, '--surface', target.surface, '\n'], {
+      timeout: 5_000,
+    });
   }
 }
 
@@ -142,17 +165,6 @@ function writePumpStats(mboxDir: string, botId: string, state: BotState, pending
   } catch {
     // non-fatal
   }
-}
-
-async function sendToPane(workspace: string, surface: string, text: string): Promise<void> {
-  await execFileP('cmux', ['send', '--workspace', workspace, '--surface', surface, text], {
-    timeout: 5_000,
-  });
-  // newline 별도 전송 — 한글/특수문자 시 1 send에 포함하면 newline 누락 케이스 회피
-  // (KB feedback_cmux-send-newline 참조).
-  await execFileP('cmux', ['send', '--workspace', workspace, '--surface', surface, '\n'], {
-    timeout: 5_000,
-  });
 }
 
 function buildPrompt(botId: string, pendingCount: number): string {
@@ -193,6 +205,7 @@ export function registerInboxPumpCommand(parent: Command): void {
         const mboxDir = semoMailboxDir();
         const intervalMs = Math.max(1000, Number(opts.intervalMs));
         const states = new Map<string, BotState>();
+        const delivery: DeliveryAdapter = new CmuxDeliveryAdapter();
 
         console.log(chalk.cyan.bold('\n📬 inbox-pump\n'));
         console.log(`  workspace:  ${chalk.green(surfaceMap.workspace)}`);
@@ -283,7 +296,8 @@ export function registerInboxPumpCommand(parent: Command): void {
             }
 
             // 봇 pane 상태 검사
-            const paneState = await readBotPane(surfaceMap.workspace, surface);
+            const target: DeliveryTarget = { workspace: surfaceMap.workspace, surface };
+            const paneState = await delivery.readPaneState(target);
             newState.lastPaneState = paneState;
             newState.lastPaneStateAt = Date.now();
             const ts = new Date().toISOString().slice(11, 19);
@@ -336,7 +350,7 @@ export function registerInboxPumpCommand(parent: Command): void {
               console.log(chalk.gray(`         prompt: ${prompt.slice(0, 80)}...`));
             } else {
               try {
-                await sendToPane(surfaceMap.workspace, surface, prompt);
+                await delivery.sendPrompt(target, prompt);
                 newState.lastSentAt = Date.now();
                 newState.sentCount++;
                 totalSent++;
