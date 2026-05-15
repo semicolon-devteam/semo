@@ -48,6 +48,17 @@ printf '\\n'
 printf 'session_id: 20260515_102345_abcdef\\n' >&2`,
 );
 
+const FAKE_RESUME_BANNER = writeFake(
+  'fake-hermes-resume-banner.sh',
+  `if [[ "$1" == "--version" ]]; then
+  echo "hermes 0.0.fake"
+  exit 0
+fi
+printf '↻ Resumed session 20260515_101010_123abc (1 user message, 2 total messages)\\r\\n'
+printf 'RESUME_OK:PHASE7_ALPHA\\n'
+printf 'session_id: 20260515_101010_123abc\\n' >&2`,
+);
+
 afterAll(() => {
   rmSync(FAKE_DIR, { recursive: true, force: true });
 });
@@ -158,6 +169,25 @@ describe('HermesCliAdapter', () => {
 
     expect(r.text).not.toContain('[--resume]');
     expect(r.hostMeta?.session_resume_requested).toBe(false);
+  });
+
+  it('dispatch: Hermes resume status banner는 user-facing text에서 제거한다', async () => {
+    const adapter = new HermesCliAdapter({
+      binaryPath: FAKE_RESUME_BANNER,
+      enableSessionResume: true,
+    });
+    const r = await adapter.dispatch({
+      botId: 'hermes-canary',
+      session: { hostSessionId: '20260515_101010_123abc' },
+      prompt: 'hello again',
+      context: { runtimeSessionReused: true },
+    });
+
+    expect(r.endReason).toBe('completed');
+    expect(r.text).toBe('RESUME_OK:PHASE7_ALPHA');
+    expect(r.text).not.toContain('Resumed session');
+    expect(r.hostMeta?.session_resume_requested).toBe(true);
+    expect(r.hostMeta?.hermes_session_id).toBe('20260515_101010_123abc');
   });
 
   it('HermesDesktopAdapter remains a legacy alias with hermes-desktop kind', () => {

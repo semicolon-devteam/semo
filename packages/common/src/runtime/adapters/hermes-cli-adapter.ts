@@ -137,7 +137,7 @@ export class HermesCliAdapter implements HostAdapter {
     const args = this.buildDispatchArgs(input, profile);
     const exec = await runHermesChat(this.binaryPath, args, timeoutMs, input.cwd, input.signal, this.env());
 
-    const text = stripAnsi(exec.stdout).trim();
+    const text = stripHermesOperationalOutput(stripAnsi(exec.stdout)).trim();
     const endReason = mapEndReason(exec);
     const hermesSessionId = parseHermesSessionId(exec.stdout, exec.stderr);
 
@@ -318,6 +318,15 @@ function mapEndReason(exec: OneShotResult): HostDispatchResult['endReason'] {
 function stripAnsi(text: string): string {
   // eslint-disable-next-line no-control-regex
   return text.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
+}
+
+function stripHermesOperationalOutput(text: string): string {
+  // `hermes --resume ... chat --query ... --quiet` still emits a resume status line on stdout.
+  // SEMO outbox should contain only the worker's user-facing reply; audit already captures session metadata.
+  return text
+    .split(/\r?\n/)
+    .filter((line) => !line.trim().match(/^↻\s+Resumed session\s+\d{8}_\d{6}_[A-Za-z0-9]+\b/i))
+    .join('\n');
 }
 
 function parseHermesSessionId(stdout: string, stderr: string): string | undefined {

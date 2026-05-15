@@ -286,7 +286,45 @@ hermes --profile semo-hermes-canary chat --query "Return exactly: HERMES_CANARY_
 
 ---
 
-## Phase 7: Explicitly Deferred Items
+## Phase 7: Live Canary Resume Smoke
+
+### Task 7.1: Verify live readiness and run isolated mailbox smoke
+
+**Status:** Completed on 2026-05-15 against OpenAI Codex `gpt-5.5` with `HERMES_HOME=/Users/reus/.hermes-semo-canary` and profile `semo-hermes-canary`.
+
+**Preconditions verified:**
+- `hermes auth list openai-codex` shows one OAuth credential in the canary home.
+- `hermes doctor` reports OpenAI Codex auth logged in for the canary home.
+- SEMO KB/DB still declare `hermes-canary` as `host_kind=hermes-cli`, `transport=semo-mailbox-only`, `gateway_enabled=false`, provider `openai-codex`, model `gpt-5.5`, role `research/code-inspection/plan-review`.
+
+**Live smoke setup:**
+- Used temporary local mailbox roots under `/tmp/semo-hermes-phase7-mailbox*` via `SEMO_MAILBOX_DIR` to avoid mutating operational `~/.semo/mailbox`.
+- Ran `node packages/cli/dist/bundle.js runtime serve --bot hermes-canary --once --enable-session-resume --timeout-ms 300000`.
+- No Slack/Discord posting or Hermes gateway was used.
+
+**Observed pass criteria:**
+- First same-thread turn stored a valid Hermes session id such as `20260515_175224_a91d45` in `sessions.json`.
+- Second same-thread turn set `runtime_session_reused=true`, `session_resume_requested=true`, reused the same `hermes_session_id`, and returned the remembered nonce.
+- Cross-thread and cross-channel messages used distinct runtime session keys, set `session_resume_requested=false`, and returned no-memory sentinels.
+- Audit rows captured provider/model/profile/role, session resume metadata, exit code, and sanitized stderr tail.
+
+### Task 7.2: Fix live-discovered resume banner artifact
+
+**Issue found:** Hermes CLI prints a resume status line on stdout even with `--quiet`, e.g. `↻ Resumed session ...`. Without filtering, SEMO outbox would include this operational line before the user-facing reply.
+
+**Fix implemented:** `HermesCliAdapter` now strips Hermes resume status lines from user-facing `text` while retaining raw stderr/stdout session metadata for audit and `hermes_session_id` parsing.
+
+**Verification:**
+- `npm run test --workspace=@team-semicolon/semo-common -- hermes-cli-adapter.test.ts`
+- `npx vitest run packages/cli/src/commands/runtime.test.ts`
+- `npm run build --workspace=@team-semicolon/semo-cli`
+- Post-fix live same-thread smoke returned exactly `RESUME_OK:<nonce>` without the resume banner in outbox text.
+
+**Operational boundary after Phase 7:** Actual resume is proven for a narrow local canary, but remains opt-in via `--enable-session-resume`. Do not enable broadly until a separate routing/operations decision chooses where the canary worker should run continuously.
+
+---
+
+## Phase 8: Explicitly Deferred Items
 
 These are intentionally out of scope until a separate decision:
 
@@ -296,6 +334,7 @@ These are intentionally out of scope until a separate decision:
 4. Hermes delegation as replacement for SEMO bot delegation.
 5. Interactive cmux/TUI Hermes bot controlled by `cmux send`.
 6. Replacing the 7 OpenClaw Slack Apps.
+7. Broadly enabling Hermes session resume outside the narrow canary flag.
 
 ---
 
