@@ -41,6 +41,7 @@ import { getCronJobStats } from './context';
 import { resolveBotWorkspace, SEMO_WORKSPACES } from '../paths';
 import { registerBotsFactoryCommands } from './bots-factory';
 import { registerInboxPumpCommand } from './inbox-pump';
+import { registerBotsServiceCommand } from './bots-service';
 
 // ============================================================
 // Types (matches actual DB schema)
@@ -451,6 +452,7 @@ export function registerBotsCommands(program: Command): void {
   // Agent Factory (create / delete / show) — SemoBot 진입점
   registerBotsFactoryCommands(botsCmd);
   registerInboxPumpCommand(botsCmd);
+  registerBotsServiceCommand(botsCmd);
 
   // ── semo bots routing-audit ────────────────────────────────
   // S1 (Codex 권고): hint suggested_bot vs 최종 escalation target 불일치 추출.
