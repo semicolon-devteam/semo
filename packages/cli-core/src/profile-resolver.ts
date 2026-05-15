@@ -57,10 +57,12 @@ export function resolveProfile(cwd: string = process.cwd()): ProfileResolution {
     if (profile) return { profile, source: 'config:semo-home', configPath };
   }
 
-  const userHomeConfig = path.join(os.homedir(), '.semo', 'config.toml');
-  const userProfile = readProfileFromConfig(userHomeConfig);
-  if (userProfile) {
-    return { profile: userProfile, source: 'config:user-home', configPath: userHomeConfig };
+  if (process.env.SEMO_IGNORE_USER_HOME_CONFIG !== '1') {
+    const userHomeConfig = path.join(os.homedir(), '.semo', 'config.toml');
+    const userProfile = readProfileFromConfig(userHomeConfig);
+    if (userProfile) {
+      return { profile: userProfile, source: 'config:user-home', configPath: userHomeConfig };
+    }
   }
 
   const cwdCandidates = [

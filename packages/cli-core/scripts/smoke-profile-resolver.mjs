@@ -37,6 +37,15 @@ function resetEnv() {
   process.env = { ...originalEnv };
   delete process.env.SEMO_PROFILE;
   delete process.env.SEMO_HOME;
+
+  process.env.SEMO_IGNORE_USER_HOME_CONFIG = '1';
+
+  // Keep the smoke test hermetic: resolveProfile intentionally reads
+  // ~/.semo/config.toml before cwd config, so the developer's real SEMO_HOME
+  // must not influence assertions for cwd/default precedence.
+  const home = mkTmp('semo-core-home-');
+  process.env.HOME = home;
+  process.env.USERPROFILE = home;
 }
 
 console.log('profile-resolver smoke test');
