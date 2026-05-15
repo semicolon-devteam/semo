@@ -237,15 +237,19 @@ hermes --profile semo-hermes-canary chat --query "Return exactly: HERMES_CANARY_
 
 ### Task 5.1: Add thread-to-Hermes-session mapping design
 
-**Objective:** Introduce resume only after one-shot path is stable.
+**Objective:** Introduce SEMO-owned thread/session mapping now, while keeping actual Hermes resume behavior deferred until the one-shot canary remains stable.
 
-**Rules:**
-- Key by SEMO platform/channel/thread/bot_id.
-- Store Hermes session id or `--continue` reference only in SEMO-owned state.
-- Add TTL and cleanup.
-- Provide manual reset.
+**Implemented mapping rules:**
+- Key by SEMO `platform/channel/thread/bot_id`.
+- If no thread id exists, fall back to message id to avoid channel-wide context leakage.
+- Store host session refs in SEMO-owned mailbox state: `<mailbox>/<bot>/sessions.json`.
+- Apply TTL pruning on load. Default TTL: 24h via `--session-ttl-ms`.
+- Provide manual reset through `--reset-session-map`.
+- Record `runtime_session_key`, `runtime_session_reused`, and `session_resume_capable` in runtime audit.
 
-**Verification:** Two messages in same test thread can share context; different threads do not leak context.
+**Important boundary:** Phase 5 creates the mapping layer only. Hermes CLI dispatch is still one-shot; the adapter does not yet pass `--resume`/`--continue` to Hermes. Enabling actual context resume requires a separate decision and a dedicated leak/isolation smoke.
+
+**Verification:** Runtime unit tests cover same-thread key stability, no-thread fallback isolation, and TTL pruning. Runtime build passes.
 
 ---
 

@@ -38,14 +38,15 @@ interface HostAdapterLike {
   readonly kind: string;
   readonly capability: HostCapabilityLike;
   probe(): Promise<{ ok: boolean; detail?: string }>;
-  startSession(input: { botId: string }): Promise<{ hostSessionId: string }>;
+  startSession(input: { botId: string }): Promise<{ hostSessionId: string; rolloutPath?: string }>;
   dispatch(input: {
     botId: string;
-    session: { hostSessionId: string };
+    session: { hostSessionId: string; rolloutPath?: string };
     prompt: string;
     timeoutMs?: number;
   }): Promise<{
     text: string;
+    session?: { hostSessionId: string; rolloutPath?: string };
     endReason: string;
     hostMeta?: Record<string, unknown>;
   }>;
@@ -73,6 +74,14 @@ interface NormalizedDispatchOutput {
     suggested_delegation?: unknown;
   };
 }
+
+export interface RuntimeSessionEntry {
+  session: { hostSessionId: string; rolloutPath?: string };
+  updated_at: string;
+  expires_at: string;
+}
+
+export type RuntimeSessionMap = Record<string, RuntimeSessionEntry>;
 
 async function loadCommon(): Promise<CommonRuntime> {
   try {
@@ -398,6 +407,8 @@ export function registerRuntimeCommands(program: Command): void {
     .option('--hermes-skills <csv>', 'Hermes skills override')
     .option('--hermes-max-turns <n>', 'Hermes max turns override')
     .option('--hermes-role <role>', 'Hermes SEMO role-bounded worker role')
+    .option('--session-ttl-ms <n>', 'Thread session mapping TTL ms', '86400000')
+    .option('--reset-session-map', 'Clear this bot runtime session map before serving')
     .option('--timeout-ms <n>', 'dispatch 1회 timeout ms', '120000')
     .action(
       async (opts: {
@@ -413,6 +424,8 @@ export function registerRuntimeCommands(program: Command): void {
         hermesSkills?: string;
         hermesMaxTurns?: string;
         hermesRole?: string;
+        sessionTtlMs: string;
+        resetSessionMap?: boolean;
         timeoutMs: string;
       }) => {
         const connected = await isDbConnected();
@@ -463,10 +476,13 @@ export function registerRuntimeCommands(program: Command): void {
         const consumedPath = path.join(mboxDir, 'inbox.consumed');
         const outboxPath = path.join(mboxDir, 'outbox.jsonl');
         const auditPath = path.join(mboxDir, 'audit.jsonl');
+        const sessionMapPath = path.join(mboxDir, 'sessions.json');
         const heartbeatPath = path.join(mboxDir, 'heartbeat');
 
         const intervalMs = Math.max(1000, Number(opts.intervalMs));
         const timeoutMs = Math.max(5000, Number(opts.timeoutMs));
+        const sessionTtlMs = Math.max(0, Number(opts.sessionTtlMs));
+        if (opts.resetSessionMap && fs.existsSync(sessionMapPath)) fs.unlinkSync(sessionMapPath);
 
         console.log(chalk.cyan.bold(`\n🚀 semo runtime serve\n`));
         console.log(`  bot:        ${chalk.green(opts.bot)}`);
@@ -507,7 +523,11 @@ export function registerRuntimeCommands(program: Command): void {
                 ),
               );
               try {
-                const session = await adapter.startSession({ botId: opts.bot });
+                const sessionMap = loadRuntimeSessionMap(sessionMapPath, sessionTtlMs);
+                const sessionKey = buildRuntimeSessionKey(opts.bot, msg);
+                const existingSession = sessionMap[sessionKey]?.session;
+                const sessionReused = Boolean(existingSession);
+                const session = existingSession ?? (await adapter.startSession({ botId: opts.bot }));
                 const r = await adapter.dispatch({
                   botId: opts.bot,
                   session,
@@ -522,6 +542,12 @@ export function registerRuntimeCommands(program: Command): void {
                   timeoutMs,
                   result: r,
                 });
+                audit.runtime_session_key = sessionKey;
+                audit.runtime_session_reused = sessionReused;
+                audit.session_resume_capable = adapter.capability.sessionResume;
+                const nextSession = r.session ?? session;
+                sessionMap[sessionKey] = buildRuntimeSessionEntry(nextSession, sessionTtlMs);
+                saveRuntimeSessionMap(sessionMapPath, sessionMap);
                 appendAudit(auditPath, {
                   id: randomUUID(),
                   in_reply_to: msg.id,
@@ -647,6 +673,61 @@ export function buildRuntimeAudit(input: {
   return out;
 }
 
+export function buildRuntimeSessionKey(botId: string, msg: InboxMessage): string {
+  const platform = sanitizeSessionKeyPart(msg.platform ?? 'unknown-platform');
+  const channel = sanitizeSessionKeyPart(msg.channel_id ?? 'unknown-channel');
+  const thread = sanitizeSessionKeyPart(msg.thread_id ?? msg.id);
+  const bot = sanitizeSessionKeyPart(botId);
+  return [platform, channel, thread, bot].join(':');
+}
+
+export function loadRuntimeSessionMap(sessionMapPath: string, ttlMs: number): RuntimeSessionMap {
+  if (!fs.existsSync(sessionMapPath)) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(fs.readFileSync(sessionMapPath, 'utf8'));
+  } catch {
+    return {};
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+  const now = Date.now();
+  const out: RuntimeSessionMap = {};
+  for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+    const entry = value as Partial<RuntimeSessionEntry>;
+    if (!entry.session || typeof entry.session.hostSessionId !== 'string') continue;
+    const expiresAt = typeof entry.expires_at === 'string' ? Date.parse(entry.expires_at) : NaN;
+    if (ttlMs > 0 && Number.isFinite(expiresAt) && expiresAt <= now) continue;
+    out[key] = {
+      session: {
+        hostSessionId: entry.session.hostSessionId,
+        rolloutPath: typeof entry.session.rolloutPath === 'string' ? entry.session.rolloutPath : undefined,
+      },
+      updated_at: typeof entry.updated_at === 'string' ? entry.updated_at : new Date(now).toISOString(),
+      expires_at: typeof entry.expires_at === 'string'
+        ? entry.expires_at
+        : new Date(now + Math.max(0, ttlMs)).toISOString(),
+    };
+  }
+  return out;
+}
+
+export function buildRuntimeSessionEntry(
+  session: { hostSessionId: string; rolloutPath?: string },
+  ttlMs: number,
+): RuntimeSessionEntry {
+  const now = Date.now();
+  return {
+    session,
+    updated_at: new Date(now).toISOString(),
+    expires_at: new Date(now + Math.max(0, ttlMs)).toISOString(),
+  };
+}
+
+export function saveRuntimeSessionMap(sessionMapPath: string, map: RuntimeSessionMap): void {
+  fs.writeFileSync(sessionMapPath, JSON.stringify(map, null, 2) + '\n');
+}
+
 export function formatDispatchFailureForLog(
   result: { text?: string; endReason: string; hostMeta?: Record<string, unknown> },
   elapsedMs: number,
@@ -669,6 +750,10 @@ export function formatDispatchFailureForLog(
 
 function oneLine(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
+}
+
+function sanitizeSessionKeyPart(value: string): string {
+  return value.replace(/[^A-Za-z0-9._-]+/g, '_').slice(0, 160) || 'unknown';
 }
 
 function extractJsonCandidate(text: string): string | null {

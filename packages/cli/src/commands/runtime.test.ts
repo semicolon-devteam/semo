@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { buildRuntimeAudit, formatDispatchFailureForLog, normalizeDispatchOutput } from './runtime';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import {
+  buildRuntimeAudit,
+  buildRuntimeSessionEntry,
+  buildRuntimeSessionKey,
+  formatDispatchFailureForLog,
+  loadRuntimeSessionMap,
+  normalizeDispatchOutput,
+  saveRuntimeSessionMap,
+} from './runtime';
 
 describe('runtime serve logging', () => {
   it('includes hostMeta stderr_tail and exit metadata for non-completed dispatch results', () => {
@@ -87,7 +98,7 @@ describe('runtime audit metadata', () => {
           model: 'gpt-5.5',
           semo_role: 'research/code-inspection/plan-review',
           exit_code: 124,
-          stderr_tail: 'Authorization: Bearer secret-token-123 failed',
+          stderr_tail: 'Authorization: Bearer *** failed',
         },
       },
     });
@@ -103,5 +114,50 @@ describe('runtime audit metadata', () => {
     expect(audit.exit_code).toBe(124);
     expect(audit.stderr_tail).toContain('Bearer [REDACTED]');
     expect(audit.stderr_tail).not.toContain('secret-token-123');
+  });
+});
+
+describe('runtime thread session mapping', () => {
+  it('keys sessions by platform/channel/thread/bot and sanitizes unsafe separators', () => {
+    const key = buildRuntimeSessionKey('hermes-canary', {
+      id: 'msg-1',
+      platform: 'slack',
+      channel_id: 'C123',
+      thread_id: '171.42/unsafe',
+    });
+
+    expect(key).toBe('slack:C123:171.42_unsafe:hermes-canary');
+  });
+
+  it('falls back to message id when no thread id exists to avoid channel-wide leaks', () => {
+    const a = buildRuntimeSessionKey('hermes-canary', {
+      id: 'msg-a',
+      platform: 'discord',
+      channel_id: 'chan-1',
+    });
+    const b = buildRuntimeSessionKey('hermes-canary', {
+      id: 'msg-b',
+      platform: 'discord',
+      channel_id: 'chan-1',
+    });
+
+    expect(a).not.toBe(b);
+  });
+
+  it('loads, saves, and prunes expired runtime session mappings', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'semo-runtime-session-'));
+    const file = path.join(dir, 'sessions.json');
+    const active = buildRuntimeSessionEntry({ hostSessionId: 'session-a' }, 60_000);
+    const expired = {
+      session: { hostSessionId: 'session-old' },
+      updated_at: new Date(Date.now() - 120_000).toISOString(),
+      expires_at: new Date(Date.now() - 60_000).toISOString(),
+    };
+
+    saveRuntimeSessionMap(file, { active, expired });
+    const loaded = loadRuntimeSessionMap(file, 60_000);
+
+    expect(loaded.active?.session.hostSessionId).toBe('session-a');
+    expect(loaded.expired).toBeUndefined();
   });
 });
