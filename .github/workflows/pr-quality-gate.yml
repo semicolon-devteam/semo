@@ -50,3 +50,5 @@ jobs:
           node packages/cli/dist/bundle.js --version
           SEMO_HOME=$(mktemp -d) SEMO_CONFIG_PATH=$(mktemp)/config.toml \
             node packages/cli/dist/bundle.js init --profile personal-discord --dry-run
+      - name: CLI solo bundle purity
+        run: scripts/check-solo-purity.sh

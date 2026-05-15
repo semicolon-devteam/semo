@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
+    "kb:writeback-check": "scripts/check-kb-writeback.sh",
     "dev:server": "npm run dev --workspace=@team-semicolon/semo-office-server",
     "dev:web": "npm run dev --workspace=@team-semicolon/semo-office-web",
     "dev": "npm run dev:server & npm run dev:web",
