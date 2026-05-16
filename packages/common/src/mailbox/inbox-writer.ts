@@ -8,6 +8,7 @@ import * as crypto from 'crypto';
 import { exec } from 'child_process';
 import type { InboxMessage } from './types.js';
 import { loadSurfaceMap, type SurfaceMap } from './surface-map.js';
+import { isCodexFallbackEnabled, runCodexFallback } from './codex-fallback.js';
 
 const LOCK_TIMEOUT_MS = 5_000;
 const SURFACE_MAP_RELOAD_DEBOUNCE_MS = 200;
@@ -132,6 +133,16 @@ export class InboxWriter {
 
     // Nudge the bot's Claude Code session to call check_inbox
     this.nudgeBot(botId);
+
+    // (b) Codex fallback — Claude org quota 소진 봇은 env 로 활성. 새 메시지에만 응답 (누적 X).
+    // KB: semo decision/bot-codex-fallback-architecture-2026-05-16
+    if (isCodexFallbackEnabled(botId)) {
+      runCodexFallback(botId, fullMsg, this.mailboxDir).catch((err) => {
+        console.warn(
+          `[codex-fallback] ${botId}: unhandled exception: ${(err as Error).message}`,
+        );
+      });
+    }
 
     return fullMsg.id;
   }
