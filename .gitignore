@@ -60,6 +60,7 @@ supabase/.branches/
 supabase/.temp/
 __pycache__/
 *.pyc
+packages/semo-meeting/.job-store/
 
 # === 개인 메모 ===
 packages/cli/PERSONAL_TESTING.md

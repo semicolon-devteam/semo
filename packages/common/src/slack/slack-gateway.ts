@@ -18,11 +18,19 @@ const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN || '';
  *
  * 형식: 콤마 구분 channel ID. 예: SEMO_FULL_INGEST_CHANNELS=C0AFBQ209E0,C09KNL91QBZ
  */
-const FULL_INGEST_CHANNELS = new Set(
-  (process.env.SEMO_FULL_INGEST_CHANNELS || '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean),
+export function parseFullIngestChannels(raw: string | undefined, enabled: boolean): Set<string> {
+  if (!enabled) return new Set();
+  return new Set(
+    (raw || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
+}
+
+const FULL_INGEST_CHANNELS = parseFullIngestChannels(
+  process.env.SEMO_FULL_INGEST_CHANNELS,
+  process.env.SEMO_ENABLE_FULL_INGEST === '1' || process.env.SEMO_ENABLE_FULL_INGEST === 'true',
 );
 
 /** magic bytes로 실제 이미지 파일인지 검증 */

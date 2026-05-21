@@ -33,9 +33,12 @@ export const fetchActionItemAdapter: ActionItemAdapter = {
     if (!res.ok) throw new Error('Update failed');
   },
   async delete(actionItemId: string) {
-    const res = await fetch(`/api/action-items?action_item_id=${actionItemId}`, {
-      method: 'DELETE',
-    });
+    const res = await fetch(
+      `/api/action-items?action_item_id=${encodeURIComponent(actionItemId)}`,
+      {
+        method: 'DELETE',
+      },
+    );
     if (!res.ok) throw new Error('Delete failed');
   },
 };

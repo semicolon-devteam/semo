@@ -7,7 +7,18 @@ export const dynamic = 'force-dynamic';
 // Allow up to 5 minutes for large audio uploads
 export const maxDuration = 300;
 
-const ALLOWED_EXTENSIONS = new Set(['mp3', 'm4a', 'mp4', 'wav', 'flac', 'ogg', 'webm', 'amr']);
+const ALLOWED_EXTENSIONS = new Set([
+  'mp3',
+  'm4a',
+  'mp4',
+  'wav',
+  'flac',
+  'ogg',
+  'webm',
+  'amr',
+  'mkv',
+  'mov',
+]);
 
 /** POST /api/meetings/upload — upload audio and start STT transcription */
 export async function POST(request: NextRequest) {

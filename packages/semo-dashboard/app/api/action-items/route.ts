@@ -6,7 +6,6 @@ import {
   updateActionItem,
   deleteActionItem,
 } from '@/lib/service';
-import type { ActionItem } from '@/types';
 
 export const dynamic = 'force-dynamic';
 
@@ -65,8 +64,8 @@ export async function POST(request: NextRequest) {
       category,
       source,
       related_url,
-      iteration_id,
       metadata,
+      runtime_source,
     } = body;
 
     if (!owner_domain || !description) {
@@ -86,8 +85,8 @@ export async function POST(request: NextRequest) {
       category,
       source: source || 'dashboard',
       related_url,
-      iteration_id,
       metadata,
+      runtime_source,
     });
 
     return NextResponse.json(item, { status: 201 });

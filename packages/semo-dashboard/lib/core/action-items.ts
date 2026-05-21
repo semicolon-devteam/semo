@@ -66,18 +66,17 @@ export async function createActionItem(data: {
   source?: string;
   related_url?: string;
   sort_order?: number;
-  iteration_id?: string;
   metadata?: Record<string, unknown>;
+  runtime_source?: string | null;
 }): Promise<ActionItem> {
   const res = await query<ActionItem>(
     `INSERT INTO semo.action_items
-       (owner_domain, target_domain, iteration_id, description, assignee, deadline, status, priority, category, source, related_url, sort_order, metadata)
-     VALUES ($1, $2, $3, $4, $5, $6::date, $7, $8, $9, $10, $11, $12, $13)
+       (owner_domain, target_domain, description, assignee, deadline, status, priority, category, source, related_url, sort_order, metadata, runtime_source)
+     VALUES ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12, $13)
      RETURNING *`,
     [
       data.owner_domain,
       data.target_domain ?? null,
-      data.iteration_id ?? null,
       data.description,
       data.assignee ?? null,
       data.deadline ?? null,
@@ -88,6 +87,7 @@ export async function createActionItem(data: {
       data.related_url ?? null,
       data.sort_order ?? 0,
       JSON.stringify(data.metadata ?? {}),
+      data.runtime_source ?? null,
     ],
   );
   return res.rows[0];
@@ -98,6 +98,8 @@ export async function updateActionItem(
   data: Partial<
     Pick<
       ActionItem,
+      | 'owner_domain'
+      | 'target_domain'
       | 'description'
       | 'assignee'
       | 'deadline'
@@ -107,6 +109,7 @@ export async function updateActionItem(
       | 'related_url'
       | 'sort_order'
       | 'metadata'
+      | 'runtime_source'
     >
   >,
 ): Promise<ActionItem | null> {
@@ -115,6 +118,8 @@ export async function updateActionItem(
   let idx = 1;
 
   const ALLOWED_COLS = new Set([
+    'owner_domain',
+    'target_domain',
     'description',
     'assignee',
     'deadline',
@@ -124,6 +129,7 @@ export async function updateActionItem(
     'related_url',
     'sort_order',
     'metadata',
+    'runtime_source',
   ]);
   for (const [key, val] of Object.entries(data)) {
     if (val === undefined || !ALLOWED_COLS.has(key)) continue;

@@ -16,7 +16,8 @@
   "scripts": {
     "start": "npx tsx src/index.ts",
     "start:bun": "bun src/index.ts",
-    "dev": "npx tsx --watch src/index.ts"
+    "dev": "npx tsx --watch src/index.ts",
+    "test": "vitest --run"
   },
   "dependencies": {
     "@slack/socket-mode": "^2.0.0",

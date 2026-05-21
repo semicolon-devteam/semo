@@ -39,6 +39,7 @@ import {
   type InboxMessage,
   type OutboxMessage,
 } from '@team-semicolon/semo-common';
+import { applySlackRouterPolicy, shouldHandleSemoBotNlp } from './router-policy.js';
 
 // Cmux ancestry guard — daemon(launchd/nohup) 화 감지 시 즉시 종료.
 // 배경: cmux nudge 는 cmux pane 자손 프로세스만 허용하므로 daemon 화되면 침묵 실패.
@@ -64,6 +65,9 @@ const MAX_ESCALATION_DEPTH = 3;
 // Phase 3 시 .env 에 SYSTEM_BOT_ID=semobot 설정하면 SemoBot 페르소나로 전환됨.
 // SLACK_PROFILES 에 'semobot' fallback 등록됨 (packages/common/src/slack/bot-config.ts).
 const SYSTEM_BOT_ID = process.env.SYSTEM_BOT_ID || 'semiclaw';
+const SEMOBOT_NLP_INBOX_ENABLED =
+  process.env.SEMO_ENABLE_SEMOBOT_NLP_INBOX === '1' ||
+  process.env.SEMO_ENABLE_SEMOBOT_NLP_INBOX === 'true';
 
 // ── Components ──
 
@@ -776,10 +780,7 @@ const PING_ALIASES = new Set([
   'ㅎㅇ',
 ]);
 
-async function maybeHandleSemoBotCommand(
-  msg: SlackMessage,
-  senderName: string,
-): Promise<boolean> {
+async function maybeHandleSemoBotCommand(msg: SlackMessage, senderName: string): Promise<boolean> {
   const text = msg.text.trim();
   const lowerText = text.toLowerCase();
   const tokens = lowerText.split(/\s+/);
@@ -841,6 +842,24 @@ async function maybeHandleSemoBotCommand(
   //
   // 2026-05-10: thread_history 도 동봉. "스레드 안에서 본문 가리키며 멘션" 케이스
   // (예: "이거 내 action item 으로 기록") 에서 SemoBot 이 본문 못 보던 버그 fix.
+  if (!shouldHandleSemoBotNlp({ allowNlpInbox: SEMOBOT_NLP_INBOX_ENABLED })) {
+    try {
+      await postSystemMessage(
+        msg.channel,
+        [
+          ':robot_face: SemoBot은 system/persona endpoint로 제한되어 있습니다.',
+          '작업 위임은 해당 OpenClaw 봇을 직접 멘션하거나 action item/GitHub issue로 남겨주세요.',
+          'deterministic 명령: `@SemoBot ping`, `@SemoBot status`, `@SemoBot incident [<slug>]`',
+        ].join('\n'),
+        replyThreadTs,
+      );
+      console.log(`[semobot-cmd] nlp blocked by system-only policy in ${msg.channel}`);
+    } catch (err) {
+      console.error('[semobot-cmd] system-only guidance post failed:', err);
+    }
+    return true;
+  }
+
   let semobotThreadHistory: InboxMessage['thread_history'];
   if (msg.thread_ts) {
     try {
@@ -938,6 +957,28 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
       threadPins.set(threadKey, { target: botId, expiresAt: Date.now() + THREAD_PIN_TTL });
     }
   }
+
+  // 2b. Split-runtime guard: slack-router must not mailbox-route OpenClaw-owned botIds.
+  const policy = applySlackRouterPolicy({
+    candidateBotId: botId,
+    routeReason,
+    openclawBotIds: OPENCLAW_BOTS,
+  });
+  if (policy.allowed === false) {
+    const replyThreadTs = msg.thread_ts || msg.ts;
+    await postSystemMessage(
+      msg.channel,
+      [
+        `:no_entry: slack-router mailbox route blocked (${policy.reason}): \`${policy.botId}\``,
+        policy.guidance,
+      ].join('\n'),
+      replyThreadTs,
+    );
+    console.log(`[router-policy] blocked ${routeReason} → ${policy.botId}: ${policy.reason}`);
+    return;
+  }
+  botId = policy.botId;
+  routeReason = policy.routeReason;
 
   // 3. Resolve channel → service domain context + KB intent hint.
   //    Phase 3b-2 옵션 C (2026-04-29): slack-router 는 default semiclaw 로 inbox 쓰지만,

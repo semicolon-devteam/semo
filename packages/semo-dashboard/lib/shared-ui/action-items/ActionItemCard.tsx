@@ -1,6 +1,6 @@
 'use client';
 
-import type { ActionItem } from '../types';
+import type { ActionItem, ActionItemPriority } from '../types';
 import type { Tab } from './useActionItems';
 import { isOverdue, formatRelativeDate } from './useActionItems';
 
@@ -12,6 +12,20 @@ interface Props {
   onEdit?: (item: ActionItem) => void;
   onDelete?: (item: ActionItem) => void;
 }
+
+const PRIORITY_STYLE: Record<ActionItemPriority, string> = {
+  low: 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300',
+  normal: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
+  high: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
+  urgent: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+};
+
+const PRIORITY_LABEL: Record<ActionItemPriority, string> = {
+  low: '낮음',
+  normal: '보통',
+  high: '높음',
+  urgent: '긴급',
+};
 
 export default function ActionItemCard({
   item,
@@ -64,6 +78,28 @@ export default function ActionItemCard({
             >
               ~ {item.deadline}
             </span>
+          )}
+          {item.priority && item.priority !== 'normal' && (
+            <span
+              className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${PRIORITY_STYLE[item.priority]}`}
+            >
+              {PRIORITY_LABEL[item.priority]}
+            </span>
+          )}
+          {item.category && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+              {item.category}
+            </span>
+          )}
+          {item.related_url && (
+            <a
+              href={item.related_url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400"
+            >
+              관련 링크
+            </a>
           )}
           <span className="text-xs text-gray-400 dark:text-gray-500">
             {formatRelativeDate(item.created_at)}

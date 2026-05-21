@@ -20,6 +20,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import type { Pool, PoolClient } from 'pg';
 import { getPool, closeConnection, isDbConnected } from '../database';
+import { buildHermesProvisionPlan, ensureHermesProvisioned } from './hermes-provision.js';
 
 interface Delegation {
   to_bot_id: string;
@@ -34,13 +35,65 @@ interface Delegation {
 interface CreateBotInput {
   botId: string;
   role: string;
+  hostKind: string;
   templateBotId: string | null;
   delegations: Delegation[];
   kbDomains: string[];
   budgetPerMessage: number | null;
   slackUsername: string | null;
   slackIconEmoji: string | null;
+  hermesHome: string | null;
+  hermesProfile: string | null;
+  hermesBaseProfile: string | null;
+  hermesProvider: string | null;
+  hermesModel: string | null;
+  hermesMaxTurns: number | null;
+  hermesRole: string | null;
+  hermesToolsets: string | null;
+  hermesSkills: string | null;
+  noHermesProvision: boolean;
   dryRun: boolean;
+}
+
+export interface BotRuntimeConfigOptions {
+  hostKind?: string | null;
+  hermesHome?: string | null;
+  hermesProfile?: string | null;
+  hermesBaseProfile?: string | null;
+  hermesProvider?: string | null;
+  hermesModel?: string | null;
+  hermesMaxTurns?: number | null;
+  hermesRole?: string | null;
+  hermesToolsets?: string | null;
+  hermesSkills?: string | null;
+}
+
+export function requiresClaudeSeatForHostKind(hostKind?: string | null): boolean {
+  const normalized = (hostKind ?? 'claude-code').trim().toLowerCase();
+  return normalized === '' || normalized === 'claude-code' || normalized === 'claude';
+}
+
+export function buildBotRuntimeConfig(options: BotRuntimeConfigOptions): Record<string, unknown> {
+  const hostKind = (options.hostKind ?? 'claude-code').trim() || 'claude-code';
+  const config: Record<string, unknown> = {
+    host_kind: hostKind,
+  };
+
+  if (hostKind === 'hermes-cli') {
+    config.transport = 'semo-mailbox-only';
+    config.gateway_enabled = false;
+    if (options.hermesHome) config.hermes_home = options.hermesHome;
+    if (options.hermesProfile) config.hermes_profile = options.hermesProfile;
+    if (options.hermesBaseProfile) config.hermes_base_profile = options.hermesBaseProfile;
+    if (options.hermesProvider) config.hermes_provider = options.hermesProvider;
+    if (options.hermesModel) config.hermes_model = options.hermesModel;
+    if (options.hermesMaxTurns != null) config.hermes_max_turns = options.hermesMaxTurns;
+    if (options.hermesRole) config.hermes_role = options.hermesRole;
+    if (options.hermesToolsets) config.hermes_toolsets = options.hermesToolsets;
+    if (options.hermesSkills) config.hermes_skills = options.hermesSkills;
+  }
+
+  return config;
 }
 
 async function withTransaction<T>(pool: Pool, fn: (c: PoolClient) => Promise<T>): Promise<T> {
@@ -120,15 +173,17 @@ async function copyKbFromTemplate(
  * 이유: createBot 는 단일 트랜잭션. kbUpsert 는 자체 connect 로 별 트랜잭션이라 이 트랜잭션과 분리됨.
  */
 /**
- * 봇 KB 시드 entry 4종의 (key, content) 계산 — seedBotKbEntries / rebuildBotKbEmbeddings 가 공유.
+ * 봇 KB 시드 entry 5종의 (key, content) 계산 — seedBotKbEntries / rebuildBotKbEmbeddings 가 공유.
  * 한 곳에서 계산해야 raw SQL seed 와 kbUpsert (임베딩 생성) 가 동일 content 사용 보장.
  */
 function computeBotKbSeedEntries(input: CreateBotInput): Array<{ key: string; content: string }> {
+  const runtimeConfig = buildBotRuntimeConfig(input);
   const identityContent = [
     `name: ${input.slackUsername ?? input.botId}`,
     `emoji: ${input.slackIconEmoji ?? ':robot_face:'}`,
     `role: ${input.role}`,
     `agent_type: specialist`,
+    `host_kind: ${input.hostKind}`,
   ].join('\n');
 
   // delegation 키워드 풀 (input.delegations 의 domains 합집합 — 1차 시드, 사후 보강 권장)
@@ -152,6 +207,7 @@ function computeBotKbSeedEntries(input: CreateBotInput): Array<{ key: string; co
   return [
     { key: 'identity', content: identityContent },
     { key: 'delegation', content: delegationContent },
+    { key: 'model-config', content: JSON.stringify(runtimeConfig, null, 2) },
     { key: 'status', content: 'online' },
     { key: 'slack-profile', content: slackProfileContent },
   ];
@@ -207,10 +263,32 @@ async function rebuildBotKbEmbeddings(pool: Pool, input: CreateBotInput): Promis
 }
 
 async function createBot(pool: Pool, input: CreateBotInput): Promise<void> {
+  const hermesPlan = buildHermesProvisionPlan({
+    botId: input.botId,
+    hostKind: input.hostKind,
+    hermesHome: input.hermesHome,
+    hermesProfile: input.hermesProfile,
+    hermesBaseProfile: input.hermesBaseProfile,
+    hermesSkills: input.hermesSkills,
+    noHermesProvision: input.noHermesProvision,
+  });
+
   if (input.dryRun) {
     console.log(chalk.yellow('🧪 DRY-RUN — 다음 작업을 수행 예정:'));
-    console.log(JSON.stringify(input, null, 2));
+    console.log(JSON.stringify({ ...input, hermesProvision: hermesPlan }, null, 2));
     return;
+  }
+
+  if (hermesPlan.required) {
+    const provisioned = await ensureHermesProvisioned(hermesPlan);
+    console.log(
+      chalk.gray(
+        `  → Hermes profile 준비 완료 profile=${provisioned.profile}, created=${provisioned.profileCreated ? 'yes' : 'no'}, skills_synced=${provisioned.skillsSynced.join(',') || 'none'}`,
+      ),
+    );
+    input.hermesHome = hermesPlan.home;
+    input.hermesProfile = hermesPlan.profile;
+    input.hermesBaseProfile = hermesPlan.baseProfile;
   }
 
   await withTransaction(pool, async (client) => {
@@ -225,22 +303,26 @@ async function createBot(pool: Pool, input: CreateBotInput): Promise<void> {
       );
     }
 
-    // 2. seat 획득 — 실패 시 전체 롤백
-    const seat = await allocateSeat(client, input.botId);
-    if (!seat) {
+    // 2. seat 획득 — Claude Code 계열만 물리 Claude Max seat 필요.
+    // Hermes/OpenClaw/Codex/Ollama 등 HostAdapter 계열은 SEMO mailbox/outbox 로 실행되며
+    // Claude seat 를 소비하지 않는다.
+    const needsSeat = requiresClaudeSeatForHostKind(input.hostKind);
+    const seat = needsSeat ? await allocateSeat(client, input.botId) : null;
+    if (needsSeat && !seat) {
       throw new Error(
-        '사용 가능한 Claude Max seat 없음. `semo seats add` 로 seat를 추가하거나 기존 봇을 retire 해주세요.',
+        '사용 가능한 Claude Max seat 없음. `semo seats add` 로 seat를 추가하거나 기존 봇을 retire 하거나, --host-kind hermes-cli 같은 seatless runtime을 지정해주세요.',
       );
     }
 
     // 3. bot_status insert
     const workspacePath = `~/.semo/workspaces/${input.botId}`;
+    const runtimeConfig = buildBotRuntimeConfig(input);
     await client.query(
       `INSERT INTO semo.bot_status (
          bot_id, name, emoji, role, workspace_path, status,
          kb_domains, budget_per_message, slack_username, slack_icon_emoji,
-         created_by_bot_id, template_bot_id
-       ) VALUES ($1,$2,$3,$4,$5,'online',$6,$7,$8,$9,$10,$11)`,
+         created_by_bot_id, template_bot_id, runtime_hint, projection_targets
+       ) VALUES ($1,$2,$3,$4,$5,'online',$6,$7,$8,$9,$10,$11,$12,$13::jsonb)`,
       [
         input.botId,
         input.slackUsername ?? input.botId,
@@ -253,6 +335,8 @@ async function createBot(pool: Pool, input: CreateBotInput): Promise<void> {
         input.slackIconEmoji ?? ':robot_face:',
         'semobot',
         input.templateBotId,
+        [input.hostKind],
+        JSON.stringify({ runtime: runtimeConfig }),
       ],
     );
 
@@ -296,7 +380,11 @@ async function createBot(pool: Pool, input: CreateBotInput): Promise<void> {
     }
 
     console.log(
-      chalk.green(`✔ 봇 "${input.botId}" 생성 완료 — seat=${seat.seatId} (${seat.configDir})`),
+      chalk.green(
+        `✔ 봇 "${input.botId}" 생성 완료 — host=${input.hostKind}${
+          seat ? `, seat=${seat.seatId} (${seat.configDir})` : ', seat=not-required'
+        }`,
+      ),
     );
   });
 
@@ -306,7 +394,9 @@ async function createBot(pool: Pool, input: CreateBotInput): Promise<void> {
   try {
     await rebuildBotKbEmbeddings(pool, input);
     console.log(
-      chalk.gray('  → KB 임베딩 갱신 완료 (identity/delegation/status/slack-profile 4종)'),
+      chalk.gray(
+        '  → KB 임베딩 갱신 완료 (identity/delegation/model-config/status/slack-profile 5종)',
+      ),
     );
   } catch (kbErr) {
     console.warn(
@@ -411,12 +501,30 @@ export function registerBotsFactoryCommands(botsCmd: Command): void {
     .description('신규 서브 봇 생성 (SemoBot Agent Factory)')
     .requiredOption('--id <botId>', '봇 ID (불변)')
     .requiredOption('--role <role>', '역할 (specialist|analyst|reviewer 등)')
+    .option(
+      '--host-kind <kind>',
+      '실행 host kind (claude-code|hermes-cli|openclaw|codex-cli|ollama-cli|local-worker)',
+      'claude-code',
+    )
     .option('--template <botId>', '복사할 베이스 봇 (KB 키 시드)')
     .option('--delegations <json>', 'JSON 배열 [{"to_bot_id":"...","domains":["..."]}]', '[]')
     .option('--kb-domains <csv>', 'KB 검색 허용 도메인 (쉼표구분)', 'semicolon')
     .option('--budget <num>', '메시지당 예산 (USD)', '1.0')
     .option('--slack-username <name>', 'Slack 표시명')
     .option('--slack-icon <emoji>', 'Slack 아이콘 (:robot_face: 등)')
+    .option('--hermes-home <path>', 'hermes-cli 전용 HERMES_HOME')
+    .option('--hermes-profile <profile>', 'hermes-cli 전용 profile')
+    .option(
+      '--hermes-base-profile <profile>',
+      'hermes-cli profile provision 시 clone할 base profile',
+    )
+    .option('--hermes-provider <provider>', 'hermes-cli 전용 provider')
+    .option('--hermes-model <model>', 'hermes-cli 전용 model')
+    .option('--hermes-max-turns <num>', 'hermes-cli 전용 max turns')
+    .option('--hermes-role <role>', 'hermes-cli 전용 role/persona label')
+    .option('--hermes-toolsets <csv>', 'hermes-cli 전용 enabled toolsets CSV')
+    .option('--hermes-skills <csv>', 'hermes-cli 전용 skills CSV')
+    .option('--no-hermes-provision', 'hermes-cli profile/skill 자동 provision 비활성화')
     .option('--dry-run', '실제 실행 없이 계획만 출력')
     .action(async (options) => {
       const connected = await isDbConnected();
@@ -430,6 +538,7 @@ export function registerBotsFactoryCommands(botsCmd: Command): void {
         const input: CreateBotInput = {
           botId: options.id,
           role: options.role,
+          hostKind: options.hostKind,
           templateBotId: options.template ?? null,
           delegations,
           kbDomains: options.kbDomains
@@ -439,6 +548,16 @@ export function registerBotsFactoryCommands(botsCmd: Command): void {
           budgetPerMessage: options.budget ? parseFloat(options.budget) : null,
           slackUsername: options.slackUsername ?? null,
           slackIconEmoji: options.slackIcon ?? null,
+          hermesHome: options.hermesHome ?? null,
+          hermesProfile: options.hermesProfile ?? null,
+          hermesBaseProfile: options.hermesBaseProfile ?? null,
+          hermesProvider: options.hermesProvider ?? null,
+          hermesModel: options.hermesModel ?? null,
+          hermesMaxTurns: options.hermesMaxTurns ? parseInt(options.hermesMaxTurns, 10) : null,
+          hermesRole: options.hermesRole ?? null,
+          hermesToolsets: options.hermesToolsets ?? null,
+          hermesSkills: options.hermesSkills ?? null,
+          noHermesProvision: options.hermesProvision === false,
           dryRun: !!options.dryRun,
         };
         await createBot(pool, input);

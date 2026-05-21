@@ -74,7 +74,7 @@ def _get_diarization() -> DiarizationPipeline:
         logger.info("Loading pyannote speaker-diarization-3.1 (device=%s)...", DEVICE)
         _diarization_pipeline = DiarizationPipeline.from_pretrained(
             "pyannote/speaker-diarization-3.1",
-            token=hf_token,
+            use_auth_token=hf_token,
         )
         # Move to device (MPS or CUDA)
         if DEVICE != "cpu":
@@ -94,8 +94,13 @@ def convert_to_wav(input_path: str, output_path: str) -> None:
     )
 
 
-def transcribe_audio(wav_path: str) -> list[dict]:
-    """Run faster-whisper on WAV, return segments with word timestamps."""
+def transcribe_audio(wav_path: str, initial_prompt: str | None = None) -> list[dict]:
+    """Run faster-whisper on WAV, return segments with word timestamps.
+
+    `initial_prompt` biases Whisper toward provided vocabulary — pass a
+    comma-separated list of expected proper nouns (service names, members,
+    brands) to reduce mistranscription of domain-specific terms.
+    """
     model = _get_whisper()
     segments, _info = model.transcribe(
         wav_path,
@@ -103,6 +108,7 @@ def transcribe_audio(wav_path: str) -> list[dict]:
         beam_size=5,
         word_timestamps=True,
         vad_filter=True,
+        initial_prompt=initial_prompt or None,
     )
     result = []
     for seg in segments:
@@ -179,10 +185,17 @@ def merge_transcription_and_diarization(
     return utterances
 
 
-def process_audio(audio_bytes: bytes, filename: str) -> list[dict]:
+def process_audio(
+    audio_bytes: bytes,
+    filename: str,
+    initial_prompt: str | None = None,
+) -> list[dict]:
     """
     Full pipeline: audio bytes → WAV → Whisper + pyannote → utterances.
     Returns list of VitoUtterance-compatible dicts.
+
+    `initial_prompt` is forwarded to Whisper to bias transcription toward
+    domain-specific proper nouns (see transcribe_audio).
     """
     suffix = Path(filename).suffix or ".m4a"
 
@@ -199,8 +212,11 @@ def process_audio(audio_bytes: bytes, filename: str) -> list[dict]:
         convert_to_wav(input_path, wav_path)
 
         # Run transcription and diarization
-        logger.info("Running Whisper transcription...")
-        segments = transcribe_audio(wav_path)
+        if initial_prompt:
+            logger.info("Running Whisper transcription (initial_prompt=%d chars)...", len(initial_prompt))
+        else:
+            logger.info("Running Whisper transcription...")
+        segments = transcribe_audio(wav_path, initial_prompt=initial_prompt)
         logger.info("Got %d segments from Whisper", len(segments))
 
         logger.info("Running speaker diarization...")

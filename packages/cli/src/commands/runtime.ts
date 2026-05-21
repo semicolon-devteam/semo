@@ -16,6 +16,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { randomUUID } from 'crypto';
 import { getPool, closeConnection, isDbConnected } from '../database';
+import { buildHermesProvisionPlan, ensureHermesProvisioned } from './hermes-provision.js';
 
 interface CommonRuntime {
   ClaudeCodeAdapter: new (opts?: Record<string, unknown>) => HostAdapterLike;
@@ -123,6 +124,7 @@ interface BotRecord {
     openclaw_profile?: string;
     hermes_home?: string;
     hermes_profile?: string;
+    hermes_base_profile?: string;
     hermes_provider?: string;
     hermes_model?: string;
     hermes_toolsets?: string;
@@ -155,6 +157,7 @@ function buildAdapterFromHostKind(
     openclawBinary?: string;
     hermesBinary?: string;
     hermesHome?: string;
+    hermesProfile?: string;
     hermesProvider?: string;
     hermesModel?: string;
     hermesToolsets?: string;
@@ -179,7 +182,7 @@ function buildAdapterFromHostKind(
     case 'hermes-cli':
       if (opts.hermesBinary) ctorOpts.binaryPath = opts.hermesBinary;
       ctorOpts.hermesHome = opts.hermesHome ?? bot.config?.hermes_home;
-      ctorOpts.profile = bot.config?.hermes_profile ?? `semo-${bot.bot_id}`;
+      ctorOpts.profile = opts.hermesProfile ?? bot.config?.hermes_profile ?? `semo-${bot.bot_id}`;
       ctorOpts.provider = opts.hermesProvider ?? bot.config?.hermes_provider;
       ctorOpts.model = opts.hermesModel ?? bot.config?.hermes_model;
       ctorOpts.toolsets = opts.hermesToolsets ?? bot.config?.hermes_toolsets;
@@ -191,7 +194,7 @@ function buildAdapterFromHostKind(
     case 'hermes-desktop':
       if (opts.hermesBinary) ctorOpts.binaryPath = opts.hermesBinary;
       ctorOpts.hermesHome = opts.hermesHome ?? bot.config?.hermes_home;
-      ctorOpts.profile = bot.config?.hermes_profile ?? `semo-${bot.bot_id}`;
+      ctorOpts.profile = opts.hermesProfile ?? bot.config?.hermes_profile ?? `semo-${bot.bot_id}`;
       ctorOpts.provider = opts.hermesProvider ?? bot.config?.hermes_provider;
       ctorOpts.model = opts.hermesModel ?? bot.config?.hermes_model;
       ctorOpts.toolsets = opts.hermesToolsets ?? bot.config?.hermes_toolsets;
@@ -229,74 +232,87 @@ export function registerRuntimeCommands(program: Command): void {
     .option('--hermes-binary <path>', 'hermes 바이너리 절대경로 (PATH 미등록 환경용)')
     .option('--hermes-home <path>', 'Hermes HERMES_HOME 격리 디렉토리')
     .option('--json', 'JSON 출력')
-    .action(async (opts: { openclawBinary?: string; hermesBinary?: string; hermesHome?: string; json?: boolean }) => {
-      const m = await loadCommon();
+    .action(
+      async (opts: {
+        openclawBinary?: string;
+        hermesBinary?: string;
+        hermesHome?: string;
+        json?: boolean;
+      }) => {
+        const m = await loadCommon();
 
-      const adapters = listAdapters();
-      const results: Array<{
-        name: string;
-        capability: HostCapabilityLike;
-        ok: boolean;
-        detail?: string;
-      }> = [];
+        const adapters = listAdapters();
+        const results: Array<{
+          name: string;
+          capability: HostCapabilityLike;
+          ok: boolean;
+          detail?: string;
+        }> = [];
 
-      for (const def of adapters) {
-        const ctorOpts: Record<string, unknown> = {};
-        if (def.name === 'openclaw' && opts.openclawBinary) {
-          ctorOpts.binaryPath = opts.openclawBinary;
+        for (const def of adapters) {
+          const ctorOpts: Record<string, unknown> = {};
+          if (def.name === 'openclaw' && opts.openclawBinary) {
+            ctorOpts.binaryPath = opts.openclawBinary;
+          }
+          if (def.name.startsWith('hermes') && opts.hermesBinary) {
+            ctorOpts.binaryPath = opts.hermesBinary;
+          }
+          if (def.name.startsWith('hermes') && opts.hermesHome) {
+            ctorOpts.hermesHome = opts.hermesHome;
+          }
+          const adapter = def.factory(m, ctorOpts);
+          const r = await adapter.probe();
+          results.push({
+            name: def.name,
+            capability: adapter.capability,
+            ok: r.ok,
+            detail: r.detail,
+          });
         }
-        if (def.name.startsWith('hermes') && opts.hermesBinary) {
-          ctorOpts.binaryPath = opts.hermesBinary;
-        }
-        if (def.name.startsWith('hermes') && opts.hermesHome) {
-          ctorOpts.hermesHome = opts.hermesHome;
-        }
-        const adapter = def.factory(m, ctorOpts);
-        const r = await adapter.probe();
-        results.push({
-          name: def.name,
-          capability: adapter.capability,
-          ok: r.ok,
-          detail: r.detail,
-        });
-      }
 
-      if (opts.json) {
-        console.log(JSON.stringify(results, null, 2));
-        return;
-      }
+        if (opts.json) {
+          console.log(JSON.stringify(results, null, 2));
+          return;
+        }
 
-      console.log(chalk.cyan.bold('\n🧪 HostAdapter probe\n'));
-      console.log(
-        chalk.gray('  어댑터              상태  capability                              detail'),
-      );
-      console.log(chalk.gray('  ' + '─'.repeat(95)));
-      for (const r of results) {
-        const icon = r.ok ? chalk.green('✓ ok ') : chalk.red('✗ no ');
-        const cap = `sandbox=${r.capability.sandboxModes.length},approval=${r.capability.approvalPolicy},resume=${r.capability.sessionResume ? '✓' : '✗'},1shot=${r.capability.oneShotIO ? '✓' : '✗'}`;
-        const detail = (r.detail ?? '').slice(0, 50);
-        console.log(`  ${r.name.padEnd(20)}${icon} ${cap.padEnd(40)} ${chalk.gray(detail)}`);
-      }
-      console.log();
-      const okCount = results.filter((r) => r.ok).length;
-      console.log(chalk.gray(`  총 ${results.length}개 어댑터 (가용: ${okCount})\n`));
-    });
+        console.log(chalk.cyan.bold('\n🧪 HostAdapter probe\n'));
+        console.log(
+          chalk.gray('  어댑터              상태  capability                              detail'),
+        );
+        console.log(chalk.gray('  ' + '─'.repeat(95)));
+        for (const r of results) {
+          const icon = r.ok ? chalk.green('✓ ok ') : chalk.red('✗ no ');
+          const cap = `sandbox=${r.capability.sandboxModes.length},approval=${r.capability.approvalPolicy},resume=${r.capability.sessionResume ? '✓' : '✗'},1shot=${r.capability.oneShotIO ? '✓' : '✗'}`;
+          const detail = (r.detail ?? '').slice(0, 50);
+          console.log(`  ${r.name.padEnd(20)}${icon} ${cap.padEnd(40)} ${chalk.gray(detail)}`);
+        }
+        console.log();
+        const okCount = results.filter((r) => r.ok).length;
+        console.log(chalk.gray(`  총 ${results.length}개 어댑터 (가용: ${okCount})\n`));
+      },
+    );
 
   runtime
     .command('dispatch <prompt>')
     .description('지정 어댑터로 1-shot dispatch — smoke 검증 (운영 흐름 미침투)')
-    .requiredOption('--adapter <name>', 'claude-code | codex-cli | openclaw | ollama-cli | hermes-cli')
+    .requiredOption(
+      '--adapter <name>',
+      'claude-code | codex-cli | openclaw | ollama-cli | hermes-cli',
+    )
     .option('--bot-id <id>', '봇 식별자 (호스트별 의미 다름)', 'probe-bot')
     .option('--timeout <ms>', 'timeout (ms)', '60000')
     .option('--openclaw-binary <path>', 'openclaw 바이너리 절대경로')
     .option('--hermes-binary <path>', 'hermes 바이너리 절대경로')
     .option('--hermes-home <path>', 'Hermes HERMES_HOME 격리 디렉토리')
+    .option('--hermes-profile <profile>', 'Hermes profile override')
+    .option('--hermes-base-profile <profile>', 'Hermes profile provision 시 clone할 base profile')
     .option('--hermes-provider <provider>', 'Hermes provider override')
     .option('--hermes-model <model>', 'Hermes model override')
     .option('--hermes-toolsets <csv>', 'Hermes toolsets override')
     .option('--hermes-skills <csv>', 'Hermes skills override')
     .option('--hermes-max-turns <n>', 'Hermes max turns override')
     .option('--hermes-role <role>', 'Hermes SEMO role-bounded worker role')
+    .option('--no-hermes-provision', 'Hermes profile/skill readiness guard 비활성화')
     .option('--cwd <dir>', '호출 cwd')
     .action(
       async (
@@ -308,12 +324,15 @@ export function registerRuntimeCommands(program: Command): void {
           openclawBinary?: string;
           hermesBinary?: string;
           hermesHome?: string;
+          hermesProfile?: string;
+          hermesBaseProfile?: string;
           hermesProvider?: string;
           hermesModel?: string;
           hermesToolsets?: string;
           hermesSkills?: string;
           hermesMaxTurns?: string;
           hermesRole?: string;
+          hermesProvision?: boolean;
           cwd?: string;
         },
       ) => {
@@ -337,6 +356,20 @@ export function registerRuntimeCommands(program: Command): void {
         }
         if (def.name.startsWith('hermes') && opts.hermesHome) {
           ctorOpts.hermesHome = opts.hermesHome;
+        }
+        if (def.name.startsWith('hermes')) {
+          const plan = buildHermesProvisionPlan({
+            botId: opts.botId,
+            hostKind: def.name,
+            hermesHome: opts.hermesHome,
+            hermesProfile: opts.hermesProfile,
+            hermesBaseProfile: opts.hermesBaseProfile,
+            hermesSkills: opts.hermesSkills,
+            noHermesProvision: opts.hermesProvision === false,
+          });
+          const ready = await ensureHermesProvisioned(plan);
+          ctorOpts.profile = ready.profile;
+          if (ready.home) ctorOpts.hermesHome = ready.home;
         }
         if (def.name.startsWith('hermes') && opts.hermesProvider) {
           ctorOpts.provider = opts.hermesProvider;
@@ -405,13 +438,19 @@ export function registerRuntimeCommands(program: Command): void {
     .option('--openclaw-binary <path>', 'openclaw 바이너리 절대경로 (PATH 미등록 환경)')
     .option('--hermes-binary <path>', 'hermes 바이너리 절대경로 (PATH 미등록 환경)')
     .option('--hermes-home <path>', 'Hermes HERMES_HOME 격리 디렉토리')
+    .option('--hermes-profile <profile>', 'Hermes profile override')
+    .option('--hermes-base-profile <profile>', 'Hermes profile provision 시 clone할 base profile')
     .option('--hermes-provider <provider>', 'Hermes provider override')
     .option('--hermes-model <model>', 'Hermes model override')
     .option('--hermes-toolsets <csv>', 'Hermes toolsets override')
     .option('--hermes-skills <csv>', 'Hermes skills override')
     .option('--hermes-max-turns <n>', 'Hermes max turns override')
     .option('--hermes-role <role>', 'Hermes SEMO role-bounded worker role')
-    .option('--enable-session-resume', 'Enable host session resume for reused thread session mappings')
+    .option('--no-hermes-provision', 'Hermes profile/skill readiness guard 비활성화')
+    .option(
+      '--enable-session-resume',
+      'Enable host session resume for reused thread session mappings',
+    )
     .option('--session-ttl-ms <n>', 'Thread session mapping TTL ms', '86400000')
     .option('--reset-session-map', 'Clear this bot runtime session map before serving')
     .option('--timeout-ms <n>', 'dispatch 1회 timeout ms', '120000')
@@ -423,12 +462,15 @@ export function registerRuntimeCommands(program: Command): void {
         openclawBinary?: string;
         hermesBinary?: string;
         hermesHome?: string;
+        hermesProfile?: string;
+        hermesBaseProfile?: string;
         hermesProvider?: string;
         hermesModel?: string;
         hermesToolsets?: string;
         hermesSkills?: string;
         hermesMaxTurns?: string;
         hermesRole?: string;
+        hermesProvision?: boolean;
         enableSessionResume?: boolean;
         sessionTtlMs: string;
         resetSessionMap?: boolean;
@@ -451,11 +493,26 @@ export function registerRuntimeCommands(program: Command): void {
           process.exit(1);
         }
         const hostKind = bot.config?.host_kind ?? 'claude-code';
+        if (hostKind === 'hermes-cli' || hostKind === 'hermes-desktop') {
+          const plan = buildHermesProvisionPlan({
+            botId: opts.bot,
+            hostKind,
+            hermesHome: opts.hermesHome ?? bot.config?.hermes_home,
+            hermesProfile: opts.hermesProfile ?? bot.config?.hermes_profile,
+            hermesBaseProfile: opts.hermesBaseProfile ?? bot.config?.hermes_base_profile,
+            hermesSkills: opts.hermesSkills ?? bot.config?.hermes_skills,
+            noHermesProvision: opts.hermesProvision === false,
+          });
+          await ensureHermesProvisioned(plan);
+          opts.hermesHome = plan.home ?? undefined;
+          opts.hermesProfile = plan.profile;
+        }
         const m = await loadCommon();
         const adapter = buildAdapterFromHostKind(m, hostKind, bot, {
           openclawBinary: opts.openclawBinary,
           hermesBinary: opts.hermesBinary,
           hermesHome: opts.hermesHome,
+          hermesProfile: opts.hermesProfile,
           hermesProvider: opts.hermesProvider,
           hermesModel: opts.hermesModel,
           hermesToolsets: opts.hermesToolsets,
@@ -534,7 +591,8 @@ export function registerRuntimeCommands(program: Command): void {
                 const sessionKey = buildRuntimeSessionKey(opts.bot, msg);
                 const existingSession = sessionMap[sessionKey]?.session;
                 const sessionReused = Boolean(existingSession);
-                const session = existingSession ?? (await adapter.startSession({ botId: opts.bot }));
+                const session =
+                  existingSession ?? (await adapter.startSession({ botId: opts.bot }));
                 const r = await adapter.dispatch({
                   botId: opts.bot,
                   session,
@@ -712,12 +770,15 @@ export function loadRuntimeSessionMap(sessionMapPath: string, ttlMs: number): Ru
     out[key] = {
       session: {
         hostSessionId: entry.session.hostSessionId,
-        rolloutPath: typeof entry.session.rolloutPath === 'string' ? entry.session.rolloutPath : undefined,
+        rolloutPath:
+          typeof entry.session.rolloutPath === 'string' ? entry.session.rolloutPath : undefined,
       },
-      updated_at: typeof entry.updated_at === 'string' ? entry.updated_at : new Date(now).toISOString(),
-      expires_at: typeof entry.expires_at === 'string'
-        ? entry.expires_at
-        : new Date(now + Math.max(0, ttlMs)).toISOString(),
+      updated_at:
+        typeof entry.updated_at === 'string' ? entry.updated_at : new Date(now).toISOString(),
+      expires_at:
+        typeof entry.expires_at === 'string'
+          ? entry.expires_at
+          : new Date(now + Math.max(0, ttlMs)).toISOString(),
     };
   }
   return out;
@@ -775,7 +836,9 @@ function extractJsonCandidate(text: string): string | null {
 }
 
 function normalizeKbStatus(value: unknown): 'written' | 'not-needed' | 'pending' {
-  return value === 'written' || value === 'pending' || value === 'not-needed' ? value : 'not-needed';
+  return value === 'written' || value === 'pending' || value === 'not-needed'
+    ? value
+    : 'not-needed';
 }
 
 function redactSensitive(text: string): string {

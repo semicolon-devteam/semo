@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query } from '@/lib/db';
 import {
   listActionItems,
   createActionItem,
@@ -61,7 +60,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       source: body.source || 'dashboard',
       related_url: body.related_url,
       sort_order: body.sort_order,
-      iteration_id: body.iteration_id,
+      runtime_source: body.runtime_source,
       metadata: body.metadata,
     });
     return NextResponse.json(item, { status: 201 });

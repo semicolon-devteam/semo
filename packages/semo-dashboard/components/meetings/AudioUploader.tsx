@@ -9,7 +9,7 @@ interface AudioUploaderProps {
   onError: (error: string) => void;
 }
 
-const ACCEPTED_EXTENSIONS = '.mp3,.m4a,.mp4,.wav,.flac,.ogg,.webm,.amr';
+const ACCEPTED_EXTENSIONS = '.mp3,.m4a,.mp4,.mov,.wav,.flac,.ogg,.webm,.amr,.mkv';
 
 type Tab = 'upload' | 'record';
 
@@ -157,7 +157,7 @@ export default function AudioUploader({
                 오디오 파일을 드롭하거나 클릭하여 선택
               </p>
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                MP3, M4A, MP4, WAV, FLAC, OGG, WebM, AMR
+                MP3, M4A, MP4, MOV, WAV, FLAC, OGG, WebM, AMR, MKV
               </p>
             </div>
           )}

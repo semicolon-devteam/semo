@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import type { ActionItem } from '../types';
+import type { ActionItem, ActionItemPriority } from '../types';
 
 export type Tab = 'person' | 'service';
 export type StatusFilter = 'all' | 'open' | 'completed';
@@ -25,13 +25,23 @@ export interface ActionItemCreateInput {
   description: string;
   assignee?: string;
   deadline?: string;
+  priority?: ActionItemPriority;
+  category?: string;
+  related_url?: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ActionItemUpdateInput {
+  owner_domain?: string;
+  target_domain?: string | null;
   description?: string;
   assignee?: string;
   deadline?: string;
   status?: 'open' | 'completed';
+  priority?: ActionItemPriority;
+  category?: string | null;
+  related_url?: string | null;
+  metadata?: Record<string, unknown>;
 }
 
 export interface ActionItemAdapter {

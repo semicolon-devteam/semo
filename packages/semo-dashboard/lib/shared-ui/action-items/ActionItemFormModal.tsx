@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import type { ActionItem } from '../types';
+import type { ActionItem, ActionItemPriority } from '../types';
 import type { TeamMember } from './useActionItems';
 import LayerModal from '../common/LayerModal';
 
@@ -20,6 +20,9 @@ export interface FormData {
   description: string;
   assignee?: string;
   deadline?: string;
+  priority?: ActionItemPriority;
+  category?: string;
+  related_url?: string;
 }
 
 export default function ActionItemFormModal({
@@ -35,6 +38,9 @@ export default function ActionItemFormModal({
   const [description, setDescription] = useState('');
   const [assignee, setAssignee] = useState('');
   const [deadline, setDeadline] = useState('');
+  const [priority, setPriority] = useState<ActionItemPriority>('normal');
+  const [category, setCategory] = useState('');
+  const [relatedUrl, setRelatedUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -44,12 +50,18 @@ export default function ActionItemFormModal({
       setDescription(editItem.description);
       setAssignee(editItem.assignee || '');
       setDeadline(editItem.deadline || '');
+      setPriority(editItem.priority || 'normal');
+      setCategory(editItem.category || '');
+      setRelatedUrl(editItem.related_url || '');
     } else {
       setOwnerDomain('');
       setTargetDomain('');
       setDescription('');
       setAssignee('');
       setDeadline('');
+      setPriority('normal');
+      setCategory('');
+      setRelatedUrl('');
     }
   }, [editItem, open]);
 
@@ -64,6 +76,9 @@ export default function ActionItemFormModal({
         description,
         assignee: assignee || undefined,
         deadline: deadline || undefined,
+        priority,
+        category: category || undefined,
+        related_url: relatedUrl || undefined,
       });
       onClose();
     } finally {
@@ -157,6 +172,49 @@ export default function ActionItemFormModal({
             type="date"
             value={deadline}
             onChange={(e) => setDeadline(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              우선순위
+            </label>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value as ActionItemPriority)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="low">낮음</option>
+              <option value="normal">보통</option>
+              <option value="high">높음</option>
+              <option value="urgent">긴급</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              카테고리
+            </label>
+            <input
+              type="text"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              placeholder="예: review, follow-up"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            관련 링크 / Task / Run URL
+          </label>
+          <input
+            type="text"
+            value={relatedUrl}
+            onChange={(e) => setRelatedUrl(e.target.value)}
+            placeholder="https://... 또는 dashboard task/run 링크"
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 dark:text-white focus:ring-2 focus:ring-blue-500"
           />
         </div>
