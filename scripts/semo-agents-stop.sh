@@ -6,7 +6,7 @@ MAILBOX_DIR="$HOME/.semo/mailbox"
 PID_FILE="$HOME/.semo/agents.pid"
 WORKSPACE_TITLE="semo-agents"
 
-BOTS=(semiclaw planclaw designclaw workclaw reviewclaw infraclaw growthclaw incubator)
+BOTS=(semiclaw planclaw designclaw workclaw reviewclaw infraclaw growthclaw incubator semi colony)
 OVERFLOW_BOTS=(semiclaw-overflow)
 POLLER_BOTS=(cron-poller)
 

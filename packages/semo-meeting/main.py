@@ -67,7 +67,18 @@ _JOB_LOCK = Lock()
 # Stats
 stats = {"total_jobs": 0, "total_duration_ms": 0, "started_at": None}
 
-MAX_JOB_AGE = timedelta(minutes=30)
+# In-flight jobs are short-lived and cannot survive a server restart.
+# Completed jobs are operational recovery artifacts: long meetings can run for
+# hours, and users often need to recover transcripts after cmux/terminal crashes.
+INFLIGHT_JOB_TTL = timedelta(
+    minutes=int(os.environ.get("SEMO_MEETING_INFLIGHT_JOB_TTL_MINUTES", "30"))
+)
+COMPLETED_JOB_TTL = timedelta(
+    hours=int(os.environ.get("SEMO_MEETING_COMPLETED_JOB_TTL_HOURS", str(24 * 7)))
+)
+FAILED_JOB_TTL = timedelta(
+    hours=int(os.environ.get("SEMO_MEETING_FAILED_JOB_TTL_HOURS", "24"))
+)
 _JOB_DIR = Path(__file__).resolve().parent / ".job-store"
 
 
@@ -84,9 +95,37 @@ def _safe_iso_to_dt(value: str | None) -> datetime:
         return datetime.now(timezone.utc)
 
 
-def _is_job_expired(created_at: str | None) -> bool:
-    created = _safe_iso_to_dt(created_at)
-    return datetime.now(timezone.utc) - created > MAX_JOB_AGE
+def _job_ttl(job: dict[str, Any]) -> timedelta:
+    status = job.get("status")
+    if isinstance(status, JobStatus):
+        status = status.value
+    if status == JobStatus.completed.value:
+        return COMPLETED_JOB_TTL
+    if status == JobStatus.failed.value:
+        return FAILED_JOB_TTL
+    return INFLIGHT_JOB_TTL
+
+
+def _job_age_anchor(job: dict[str, Any]) -> str | None:
+    status = job.get("status")
+    if isinstance(status, JobStatus):
+        status = status.value
+    if status == JobStatus.completed.value:
+        return job.get("completed_at") or job.get("created_at")
+    return job.get("created_at")
+
+
+def _is_job_expired(job: dict[str, Any]) -> bool:
+    status = job.get("status")
+    if isinstance(status, JobStatus):
+        status = status.value
+    if status == JobStatus.transcribing.value:
+        # Active long-running transcriptions can legitimately exceed the short
+        # restart-recovery TTL. They are only marked failed when restored from
+        # disk in _load_job_store, because that proves the worker thread is gone.
+        return False
+    created = _safe_iso_to_dt(_job_age_anchor(job))
+    return datetime.now(timezone.utc) - created > _job_ttl(job)
 
 
 def _serialize_job(job: dict[str, Any]) -> dict[str, Any]:
@@ -109,8 +148,7 @@ def _load_job_store() -> None:
             if not isinstance(payload, dict):
                 raise ValueError("invalid payload")
 
-            created_at = payload.get("created_at")
-            if _is_job_expired(created_at):
+            if _is_job_expired(payload):
                 path.unlink(missing_ok=True)
                 continue
 
@@ -135,12 +173,8 @@ def _save_job(job_id: str) -> None:
 
 
 def _cleanup_jobs() -> None:
-    now = datetime.now(timezone.utc)
     with _JOB_LOCK:
-        expired = [
-            k for k, v in jobs.items()
-            if now - _safe_iso_to_dt(v.get("created_at")) > MAX_JOB_AGE
-        ]
+        expired = [k for k, v in jobs.items() if _is_job_expired(v)]
         for k in expired:
             del jobs[k]
             _job_path(k).unlink(missing_ok=True)

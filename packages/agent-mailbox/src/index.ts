@@ -14,22 +14,23 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
 import * as crypto from 'crypto';
 import { Mailbox } from './mailbox.js';
+import { AgentMailboxShardLock, resolveAgentMailboxConfig } from './config.js';
 import type { InboxMessage, OutboxMessage } from './types.js';
 
 // ── Configuration ──
 
-const BOT_ID = process.env.SEMO_BOT_ID || 'semiclaw';
+const CONFIG = resolveAgentMailboxConfig();
+const BOT_ID = CONFIG.botId;
 /** Persona override — overflow sessions post as the primary bot's identity */
-const REPLY_AS = process.env.SEMO_REPLY_AS || BOT_ID;
-const MAILBOX_DIR = process.env.SEMO_MAILBOX_DIR || path.join(os.homedir(), '.semo', 'mailbox');
+const REPLY_AS = CONFIG.replyAs;
+const MAILBOX_DIR = CONFIG.mailboxDir;
 const HEARTBEAT_INTERVAL_MS = 30_000;
 const POLL_INTERVAL_MS = 3_000;
 
 const mailbox = new Mailbox(BOT_ID, MAILBOX_DIR);
+const shardLock = new AgentMailboxShardLock(BOT_ID, MAILBOX_DIR);
 
 // Track the current message being processed (for reply correlation)
 let currentInboxMessage: InboxMessage | null = null;
@@ -563,6 +564,19 @@ function startHeartbeat(): void {
 async function start(): Promise<void> {
   console.error(`[agent-mailbox] Starting for bot: ${BOT_ID}`);
   console.error(`[agent-mailbox] Mailbox dir: ${MAILBOX_DIR}/${BOT_ID}`);
+
+  // 0. Enforce one live worker per botId shard.
+  shardLock.acquire();
+  const releaseShardLock = () => shardLock.release();
+  process.once('exit', releaseShardLock);
+  process.once('SIGINT', () => {
+    releaseShardLock();
+    process.exit(130);
+  });
+  process.once('SIGTERM', () => {
+    releaseShardLock();
+    process.exit(143);
+  });
 
   // 1. Connect MCP (stdio transport)
   await mcp.connect(new StdioServerTransport());

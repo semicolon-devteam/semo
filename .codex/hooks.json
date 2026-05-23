@@ -1,0 +1,90 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash /Users/reus/.semo/shared/hooks/skill-mirror-guard.sh",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ". /Users/reus/.claude/semo/.env 2>/dev/null; semo agent-claim 2>/dev/null || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": ". /Users/reus/.claude/semo/.env 2>/dev/null; semo context sync 2>/dev/null || true",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": ". /Users/reus/.claude/semo/.env 2>/dev/null; semo session-register 2>/dev/null || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/usr/local/bin/semo guard run context-router",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": ". /Users/reus/.claude/semo/.env 2>/dev/null; semo metrics log-turn 2>/dev/null || true",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": ". /Users/reus/.claude/semo/.env 2>/dev/null; semo context push 2>/dev/null || true",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "command": "/usr/local/bin/semo guard run kb-first",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "/usr/local/bin/semo guard run url-validator",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "/usr/local/bin/semo guard run response-length",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "/usr/local/bin/semo guard run decision-reminder",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

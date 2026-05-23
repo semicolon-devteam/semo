@@ -381,6 +381,10 @@ function generateMcpJson(botId) {
     },
   };
 
+  if (botId === 'semobot') {
+    config.mcpServers['semo-agent-mailbox'].env.SEMO_ALLOW_SEMOBOT_MAILBOX = '1';
+  }
+
   // DesignClaw gets Stitch MCP too
   if (botId === 'designclaw') {
     config.mcpServers.stitch = {

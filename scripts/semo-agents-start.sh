@@ -9,7 +9,7 @@ PID_FILE="$HOME/.semo/agents.pid"
 WORKSPACE="semo-agents"
 BOT_CONFIG_DIR="$HOME/.claude/snamanager0"  # 봇 전용 계정 (reus7042와 분리)
 
-BOTS=(semiclaw planclaw designclaw workclaw reviewclaw infraclaw growthclaw incubator)
+BOTS=(semiclaw planclaw designclaw workclaw reviewclaw infraclaw growthclaw incubator semi colony)
 OVERFLOW_BOTS=(semiclaw-overflow)
 POLLER_BOTS=(cron-poller)
 # NLP_BOTS: deterministic-name-direct (router) + cmux Claude session for natural-language.
@@ -256,6 +256,16 @@ else
   echo "[start] All $TOTAL_BOTS bots ready!"
 fi
 
+# ── Inbox pump ──
+#
+# Keep inbox-pump in the cmux workspace. The launchd variant can miss cmux socket
+# permissions on macOS, which makes every pane look busy and blocks delivery.
+echo "[start] Starting inbox-pump..."
+create_split "inbox-pump"
+cmux send --workspace "$WORKSPACE_REF" --surface "${SURFACES[inbox-pump]}" \
+  $'cd '"$SEMO_ROOT"' && set -a && source '"$HOME"'/.claude/semo/.env && set +a && SEMO_MAILBOX_DIR='"$MAILBOX_DIR"' SEMO_SURFACE_MAP=/tmp/semo-surface-map.json SEMO_WORKSPACE='"$WORKSPACE"' node packages/cli/dist/bundle.js bots inbox-pump --interval-ms 3000\n'
+sleep 2
+
 echo $$ > "$PID_FILE"
 
 # Optional smoke test — synthetic inbox→outbox round trip (no Slack needed)
@@ -270,6 +280,7 @@ echo " SEMO Agents (Architecture B)"
 echo " Workspace: $WORKSPACE_REF"
 echo " Bots: ${BOTS[*]}"
 echo " Overflow: ${OVERFLOW_BOTS[*]}"
+echo " Inbox pump: ${SURFACES[inbox-pump]:-not-started}"
 echo " Mailbox: $MAILBOX_DIR"
 echo " Sessions: $SESSION_DIR"
 echo "==================================="

@@ -7,7 +7,10 @@ SEMO_ROOT="$HOME/Desktop/Sources/semicolon/projects/semo"
 MAILBOX_DIR="$HOME/.semo/mailbox"
 DATE=$(date +%Y-%m-%d)
 
-BOTS=(semiclaw planclaw designclaw workclaw reviewclaw infraclaw growthclaw)
+CMUX_MAILBOX_BOTS=(semiclaw planclaw designclaw workclaw reviewclaw infraclaw growthclaw incubator semiclaw-overflow semobot)
+HEARTBEAT_BOTS=(semiclaw planclaw designclaw workclaw reviewclaw infraclaw growthclaw incubator semiclaw-overflow)
+OPENCLAW_BOTS=(semiclaw planclaw reviewclaw infraclaw workclaw designclaw growthclaw)
+OPENCLAW_PORTS=(18789 18809 18829 18849 18869 18889 18909)
 
 echo ""
 echo "=== Daily Reset: $DATE $(date +%H:%M:%S) ==="
@@ -20,7 +23,7 @@ bash "$SEMO_ROOT/scripts/semo-agents-stop.sh" 2>&1 || true
 echo "[reset] Waiting for full shutdown..."
 for attempt in {1..6}; do
   ALL_STALE=true
-  for bot in "${BOTS[@]}"; do
+  for bot in "${HEARTBEAT_BOTS[@]}"; do
     HB_FILE="$MAILBOX_DIR/$bot/heartbeat"
     if [ -f "$HB_FILE" ]; then
       HB_AGE=$(( $(date +%s) - $(date -r "$HB_FILE" +%s 2>/dev/null || echo 0) ))
@@ -37,8 +40,9 @@ done
 
 # 3. Archive mailbox files
 echo "[reset] Archiving mailbox data..."
-for bot in "${BOTS[@]}"; do
+for bot in "${CMUX_MAILBOX_BOTS[@]}"; do
   BOT_DIR="$MAILBOX_DIR/$bot"
+  mkdir -p "$BOT_DIR/archive"
 
   # Archive inbox
   if [ -s "$BOT_DIR/inbox.jsonl" ]; then
@@ -64,8 +68,33 @@ for bot in "${BOTS[@]}"; do
 done
 echo "  Done."
 
-# 4. Restart agents with smoke test
-echo "[reset] Restarting agents..."
-bash "$SEMO_ROOT/scripts/semo-agents-start.sh" --smoke 2>&1 || true
+# 4. Restart OpenClaw gateway agents
+echo "[reset] Restarting OpenClaw gateway agents..."
+for bot in "${OPENCLAW_BOTS[@]}"; do
+  launchctl kickstart -k "gui/$(id -u)/ai.openclaw.$bot" 2>&1 || true
+done
+
+echo "[reset] Verifying OpenClaw gateway health..."
+for i in "${!OPENCLAW_PORTS[@]}"; do
+  bot="${OPENCLAW_BOTS[$i]}"
+  port="${OPENCLAW_PORTS[$i]}"
+  ok=false
+  for attempt in {1..12}; do
+    if curl -fsS --max-time 2 "http://127.0.0.1:$port/health" >/dev/null 2>&1; then
+      ok=true
+      break
+    fi
+    sleep 5
+  done
+  if $ok; then
+    echo "  $bot:$port healthy"
+  else
+    echo "  [WARN] $bot:$port health check failed"
+  fi
+done
+
+# 5. Restart cmux SemoBot/slack-router runtime
+echo "[reset] Restarting cmux SemoBot/slack-router runtime..."
+bash "$SEMO_ROOT/scripts/semo-agents-start.sh" 2>&1 || echo "  [WARN] semo-agents-start failed"
 
 echo "=== Daily Reset Complete: $(date +%H:%M:%S) ==="

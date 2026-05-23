@@ -55,6 +55,22 @@ interface CreateBotInput {
   dryRun: boolean;
 }
 
+function sanitizeAlias(alias: string): string {
+  const trimmed = alias.trim();
+  if (!trimmed) {
+    throw new Error('alias는 빈 문자열일 수 없습니다.');
+  }
+  return trimmed;
+}
+
+function sanitizeCanonicalBotId(botId: string): string {
+  const trimmed = botId.trim();
+  if (!trimmed) {
+    throw new Error('canonical_bot_id는 빈 문자열일 수 없습니다.');
+  }
+  return trimmed;
+}
+
 export interface BotRuntimeConfigOptions {
   hostKind?: string | null;
   hermesHome?: string | null;
@@ -495,6 +511,89 @@ async function showBot(pool: Pool, botId: string): Promise<void> {
   }
 }
 
+async function upsertBotAlias(pool: Pool, alias: string, canonicalBotId: string): Promise<void> {
+  const normalizedAlias = sanitizeAlias(alias);
+  const normalizedCanonical = sanitizeCanonicalBotId(canonicalBotId);
+
+  const client = await pool.connect();
+  try {
+    const canonical = await client.query(`SELECT bot_id FROM semo.bot_status WHERE bot_id = $1`, [
+      normalizedCanonical,
+    ]);
+    if (canonical.rows.length === 0) {
+      throw new Error(`canonical bot_id="${normalizedCanonical}" 없음`);
+    }
+
+    const result = await client.query(
+      `INSERT INTO semo.bot_id_aliases (alias, canonical_bot_id, retired_at)
+       VALUES ($1, $2, NULL)
+       ON CONFLICT (alias) DO UPDATE SET
+         canonical_bot_id = EXCLUDED.canonical_bot_id,
+         retired_at = NULL`,
+      [normalizedAlias, normalizedCanonical],
+    );
+
+    if (result.rowCount === 1) {
+      console.log(
+        chalk.green(`✔ alias "${normalizedAlias}" 생성/갱신: canonical="${normalizedCanonical}"`),
+      );
+    } else {
+      console.log(chalk.yellow(`alias "${normalizedAlias}" 처리: 행 없음(중복/락) 가능성`));
+    }
+  } finally {
+    client.release();
+  }
+}
+
+async function retireBotAlias(pool: Pool, alias: string): Promise<void> {
+  const normalizedAlias = sanitizeAlias(alias);
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `UPDATE semo.bot_id_aliases SET retired_at = NOW() WHERE alias = $1 AND retired_at IS NULL`,
+      [normalizedAlias],
+    );
+    if (result.rowCount === 0) {
+      throw new Error(`alias="${normalizedAlias}" 찾지 못했거나 이미 retired 상태입니다.`);
+    }
+    console.log(chalk.yellow(`✔ alias "${normalizedAlias}" retired`));
+  } finally {
+    client.release();
+  }
+}
+
+async function restoreBotAlias(pool: Pool, alias: string): Promise<void> {
+  const normalizedAlias = sanitizeAlias(alias);
+  const client = await pool.connect();
+  try {
+    const result = await client.query(
+      `UPDATE semo.bot_id_aliases SET retired_at = NULL WHERE alias = $1`,
+      [normalizedAlias],
+    );
+    if (result.rowCount === 0) {
+      throw new Error(`alias="${normalizedAlias}" 없음`);
+    }
+    console.log(chalk.green(`✔ alias "${normalizedAlias}" restored`));
+  } finally {
+    client.release();
+  }
+}
+
+async function listBotAliases(pool: Pool, showRetired = false): Promise<void> {
+  const client = await pool.connect();
+  try {
+    const rows = await client.query(
+      `SELECT alias, canonical_bot_id, retired_at, created_at
+       FROM semo.bot_id_aliases
+       WHERE retired_at ${showRetired ? 'IS NOT NULL' : 'IS NULL'}
+       ORDER BY created_at DESC, alias`,
+    );
+    console.log(JSON.stringify(rows.rows, null, 2));
+  } finally {
+    client.release();
+  }
+}
+
 export function registerBotsFactoryCommands(botsCmd: Command): void {
   botsCmd
     .command('create')
@@ -606,6 +705,88 @@ export function registerBotsFactoryCommands(botsCmd: Command): void {
         await showBot(pool, options.id);
       } catch (err) {
         console.error(chalk.red(`조회 실패: ${err instanceof Error ? err.message : err}`));
+        process.exit(1);
+      } finally {
+        await closeConnection();
+      }
+    });
+
+  const aliasCmd = botsCmd.command('alias').description('봇 alias 관리');
+  aliasCmd
+    .command('set')
+    .requiredOption('--alias <alias>', '별칭 (예: @Semi)')
+    .requiredOption('--canonical-bot-id <botId>', '실제 bot_id')
+    .action(async (options) => {
+      const connected = await isDbConnected();
+      if (!connected) {
+        console.error(chalk.red('DB 연결 실패'));
+        process.exit(1);
+      }
+      try {
+        const pool = getPool();
+        await upsertBotAlias(pool, options.alias, options.canonicalBotId);
+      } catch (err) {
+        console.error(chalk.red(`alias set 실패: ${err instanceof Error ? err.message : err}`));
+        process.exit(1);
+      } finally {
+        await closeConnection();
+      }
+    });
+
+  aliasCmd
+    .command('retire')
+    .requiredOption('--alias <alias>', 'retire할 별칭')
+    .action(async (options) => {
+      const connected = await isDbConnected();
+      if (!connected) {
+        console.error(chalk.red('DB 연결 실패'));
+        process.exit(1);
+      }
+      try {
+        const pool = getPool();
+        await retireBotAlias(pool, options.alias);
+      } catch (err) {
+        console.error(chalk.red(`alias retire 실패: ${err instanceof Error ? err.message : err}`));
+        process.exit(1);
+      } finally {
+        await closeConnection();
+      }
+    });
+
+  aliasCmd
+    .command('restore')
+    .requiredOption('--alias <alias>', 'restore할 별칭')
+    .action(async (options) => {
+      const connected = await isDbConnected();
+      if (!connected) {
+        console.error(chalk.red('DB 연결 실패'));
+        process.exit(1);
+      }
+      try {
+        const pool = getPool();
+        await restoreBotAlias(pool, options.alias);
+      } catch (err) {
+        console.error(chalk.red(`alias restore 실패: ${err instanceof Error ? err.message : err}`));
+        process.exit(1);
+      } finally {
+        await closeConnection();
+      }
+    });
+
+  aliasCmd
+    .command('list')
+    .option('--retired', 'retired alias만 조회')
+    .action(async (options) => {
+      const connected = await isDbConnected();
+      if (!connected) {
+        console.error(chalk.red('DB 연결 실패'));
+        process.exit(1);
+      }
+      try {
+        const pool = getPool();
+        await listBotAliases(pool, !!options.retired);
+      } catch (err) {
+        console.error(chalk.red(`alias list 실패: ${err instanceof Error ? err.message : err}`));
         process.exit(1);
       } finally {
         await closeConnection();

@@ -131,7 +131,7 @@ describe('Source code path consistency', () => {
   });
 
   it('agent-mailbox defaults to .semo/mailbox', () => {
-    const content = readFile('packages/agent-mailbox/src/index.ts');
+    const content = readFile('packages/agent-mailbox/src/config.ts');
     expect(content).toContain("'.semo', 'mailbox'");
     expect(content).not.toContain("'.semo-mailbox'");
   });

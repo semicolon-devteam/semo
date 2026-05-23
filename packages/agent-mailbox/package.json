@@ -16,7 +16,8 @@
   "scripts": {
     "start": "npx tsx src/index.ts",
     "start:bun": "bun src/index.ts",
-    "dev": "npx tsx --watch src/index.ts"
+    "dev": "npx tsx --watch src/index.ts",
+    "test": "vitest --run"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.4.0",
@@ -24,6 +25,7 @@
     "pg": "^8.17.2"
   },
   "devDependencies": {
-    "tsx": "^4.21.0"
+    "tsx": "^4.21.0",
+    "vitest": "^4.1.7"
   }
 }
