@@ -1,0 +1,236 @@
+/*
+ * SEMO Dashboard v5 — Tokens
+ * Light-first. Keeps Semicolon DS #068FFF as the only chromatic UI accent,
+ * but ships warm off-white surfaces so the dashboard reads as friendly-SaaS
+ * (Notion / 카카오뱅크 / Linear) on paper-like backgrounds.
+ *
+ * One extra accent — `--ai-accent` (warm violet) — only marks actions a bot
+ * performed, so a 사장님 can scan the page and see human vs bot at a glance.
+ */
+
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
+@import url("https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&family=JetBrains+Mono:wght@400;500&display=swap");
+
+:root, .semo-light {
+  /* ── Surfaces ─────────────────────────────────────────────────── */
+  --semo-bg:            #FAF9F4;   /* page — slight cream to avoid clinical white */
+  --semo-bg-soft:       #F4F2EA;   /* alt section, sidebar */
+  --semo-surface:       #FFFFFF;   /* card */
+  --semo-surface-2:     #F8F6F0;   /* nested card / hover */
+  --semo-surface-3:     #EFECE2;   /* press / table head */
+  --semo-cream:         #FBF6EC;   /* warm callout (Notion sidebar feel) */
+
+  /* ── Lines ────────────────────────────────────────────────────── */
+  --semo-line:          #ECE9DF;   /* default border */
+  --semo-line-soft:     #F1EEE4;   /* hairline divider */
+  --semo-line-strong:   #D9D5C8;   /* emphasized border */
+
+  /* ── Foreground ───────────────────────────────────────────────── */
+  --semo-fg-1:          #1D242B;   /* h1 / strong */
+  --semo-fg-2:          #3B424B;   /* body */
+  --semo-fg-3:          #6B7280;   /* secondary */
+  --semo-fg-muted:      #98A1AD;   /* caption / hint */
+  --semo-fg-faint:      #C2C7CF;   /* disabled / placeholder */
+  --semo-fg-on-accent:  #FFFFFF;
+
+  /* ── Brand (Semicolon DS, kept verbatim) ──────────────────────── */
+  --semo-primary:       #068FFF;
+  --semo-primary-hover: #0078DC;
+  --semo-primary-press: #005FB0;
+  --semo-primary-08:    rgba(6,143,255,0.08);
+  --semo-primary-12:    rgba(6,143,255,0.12);
+  --semo-primary-16:    rgba(6,143,255,0.16);
+  --semo-primary-24:    rgba(6,143,255,0.24);
+
+  /* ── "AI 가 한 일" accent — only color outside #068FFF ─────────── */
+  --semo-ai:            #7C5CFF;   /* warm violet */
+  --semo-ai-hover:      #6543F0;
+  --semo-ai-08:         rgba(124,92,255,0.08);
+  --semo-ai-16:         rgba(124,92,255,0.16);
+
+  /* ── Semantic ─────────────────────────────────────────────────── */
+  --semo-success:       #10A668;
+  --semo-success-bg:    #E7F6EE;
+  --semo-warning:       #C97F1A;   /* darkened for AA on cream */
+  --semo-warning-bg:    #FCF1DC;
+  --semo-danger:        #D0322C;
+  --semo-danger-bg:     #FCE7E6;
+  --semo-info:          #068FFF;
+  --semo-info-bg:       var(--semo-primary-08);
+
+  /* ── Agent avatar palette (7) — each owns one role ────────────── */
+  --agent-peach:        #FFB780;   /* 주문이 · 응대 */
+  --agent-mint:         #6FCFA3;   /* 회계도리 · 회계 */
+  --agent-lavender:     #B5A7FF;   /* 알리미 · 마케팅 */
+  --agent-coral:        #FF9685;   /* 채워 · 재고 */
+  --agent-sky:          #8FC8FF;   /* 셈이 · 분석 */
+  --agent-butter:       #FFCB5E;   /* 단골이 · CS */
+  --agent-rose:         #F49AC2;   /* 비서 · 스케줄 */
+
+  /* avatar background tones (peach but lighter — for face plate) */
+  --agent-skin-1:       #FFE8D4;
+  --agent-skin-2:       #FFDCC0;
+  --agent-skin-3:       #FFCFA8;
+  --agent-cheek:        #FF9985;
+
+  /* ── Shadows (very soft; we use lines + tonal contrast more) ──── */
+  --semo-shadow-1:      0 1px 2px rgba(29,36,43,0.04), 0 1px 1px rgba(29,36,43,0.02);
+  --semo-shadow-2:      0 2px 8px rgba(29,36,43,0.06), 0 1px 2px rgba(29,36,43,0.04);
+  --semo-shadow-3:      0 8px 24px rgba(29,36,43,0.08), 0 2px 6px rgba(29,36,43,0.05);
+  --semo-shadow-pop:    0 24px 60px rgba(29,36,43,0.14), 0 6px 16px rgba(29,36,43,0.08);
+  --semo-glow-primary:  0 0 0 4px var(--semo-primary-16);
+  --semo-glow-ai:       0 0 0 4px var(--semo-ai-16);
+
+  /* ── Radii (extend DS scale) ──────────────────────────────────── */
+  --r-2:  2px;
+  --r-4:  4px;
+  --r-6:  6px;
+  --r-8:  8px;
+  --r-10: 10px;
+  --r-12: 12px;
+  --r-14: 14px;
+  --r-16: 16px;
+  --r-20: 20px;
+  --r-24: 24px;
+  --r-full: 9999px;
+
+  /* ── Spacing (DS 4/8/12/16/24/32/48/64/96) ────────────────────── */
+  --s-1: 4px;   --s-2: 8px;   --s-3: 12px;  --s-4: 16px;
+  --s-5: 20px;  --s-6: 24px;  --s-8: 32px;  --s-10: 40px;
+  --s-12: 48px; --s-16: 64px; --s-20: 80px; --s-24: 96px;
+
+  /* ── Type families ────────────────────────────────────────────── */
+  --semo-sans:  "Pretendard", -apple-system, BlinkMacSystemFont,
+                "Apple SD Gothic Neo", "Segoe UI", Roboto, sans-serif;
+  --semo-serif: "Newsreader", "Noto Serif KR", ui-serif, Georgia, serif;
+  --semo-mono:  "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --semo-numeric: "Pretendard", "SF Pro Display", ui-rounded, sans-serif;
+
+  /* ── Type scale (Figma-aligned, slightly tightened lh on body) ── */
+  --t-display:    44px;  --t-display-lh:    1.12;
+  --t-h1:         32px;  --t-h1-lh:         1.18;
+  --t-h2:         24px;  --t-h2-lh:         1.25;
+  --t-h3:         20px;  --t-h3-lh:         1.3;
+  --t-h4:         17px;  --t-h4-lh:         1.35;
+  --t-body:       15px;  --t-body-lh:       1.55;
+  --t-body-sm:    14px;  --t-body-sm-lh:    1.5;
+  --t-caption:    13px;  --t-caption-lh:    1.45;
+  --t-micro:      11px;  --t-micro-lh:      1.4;
+  --t-eyebrow-tracking: 0.18em;
+
+  --w-regular: 400;  --w-medium: 500;  --w-semibold: 600;  --w-bold: 700;
+
+  /* ── Motion ───────────────────────────────────────────────────── */
+  --ease-out:    cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.6, 1);
+  --dur-1: 120ms;  --dur-2: 200ms;  --dur-3: 320ms;  --dur-4: 500ms;
+}
+
+/* ── Dark theme (toggled via class on a wrapper) ──────────────────── */
+.semo-dark {
+  --semo-bg:            #0F1117;
+  --semo-bg-soft:       #161924;
+  --semo-surface:       #1A1D29;
+  --semo-surface-2:     #22263A;   /* warmer than pure slate, hint of violet */
+  --semo-surface-3:     #2B3148;
+  --semo-cream:         #1F1E1A;
+
+  --semo-line:          rgba(255,255,255,0.08);
+  --semo-line-soft:     rgba(255,255,255,0.05);
+  --semo-line-strong:   rgba(255,255,255,0.16);
+
+  --semo-fg-1:          #F4F4F1;
+  --semo-fg-2:          #C8CCD4;
+  --semo-fg-3:          #8E939E;
+  --semo-fg-muted:      #6B7280;
+  --semo-fg-faint:      #4A5058;
+
+  --semo-primary:       #2EA0FF;   /* slightly lifted for dark contrast */
+  --semo-primary-hover: #5AB4FF;
+  --semo-primary-08:    rgba(46,160,255,0.10);
+  --semo-primary-12:    rgba(46,160,255,0.16);
+  --semo-primary-16:    rgba(46,160,255,0.22);
+
+  --semo-ai:            #A696FF;
+  --semo-ai-08:         rgba(166,150,255,0.10);
+  --semo-ai-16:         rgba(166,150,255,0.20);
+
+  --semo-success-bg:    rgba(16,166,104,0.16);
+  --semo-warning-bg:    rgba(232,148,26,0.16);
+  --semo-danger-bg:     rgba(208,50,44,0.18);
+
+  --semo-shadow-1:      0 1px 2px rgba(0,0,0,0.40);
+  --semo-shadow-2:      0 4px 12px rgba(0,0,0,0.45);
+  --semo-shadow-3:      0 12px 32px rgba(0,0,0,0.55);
+  --semo-shadow-pop:    0 24px 60px rgba(0,0,0,0.65);
+}
+
+/* ── Base reset for screens inside artboards ──────────────────────── */
+.semo-root {
+  font-family: var(--semo-sans);
+  color: var(--semo-fg-1);
+  background: var(--semo-bg);
+  font-feature-settings: "ss01", "cv11";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+.semo-root *,
+.semo-root *::before,
+.semo-root *::after {
+  box-sizing: border-box;
+}
+.semo-root button {
+  font-family: inherit;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+.semo-root input,
+.semo-root textarea {
+  font-family: inherit;
+  color: inherit;
+}
+
+/* tabular figures everywhere numbers matter */
+.semo-num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+}
+
+/* eyebrow label (DS pattern: title-case EN, tracked, brand) */
+.semo-eyebrow {
+  font-size: 11px;
+  font-weight: var(--w-semibold);
+  letter-spacing: var(--t-eyebrow-tracking);
+  text-transform: uppercase;
+  color: var(--semo-primary);
+}
+
+/* AI-action chip — the one extra color signal */
+.semo-ai-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+  background: var(--semo-ai-08);
+  color: var(--semo-ai);
+  font-size: 11px;
+  font-weight: var(--w-semibold);
+}
+
+/* friendly micro-pulse for "working" status */
+@keyframes semo-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.94); }
+}
+@keyframes semo-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(124,92,255,0); }
+  50%      { box-shadow: 0 0 0 6px rgba(124,92,255,0.10); }
+}
+@keyframes semo-marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
