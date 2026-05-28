@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SEMO kb-mirror launchctl plist (P3-D, 2026-05-28)
+
+  Obsidian ↔ PostgreSQL hybrid sync daemon 을 macOS 백그라운드로 등록.
+
+  Install:
+    cp scripts/com.semicolon.semo-kb-mirror.plist ~/Library/LaunchAgents/
+    # 환경변수 + 경로를 본인 환경에 맞게 수정 후:
+    launchctl load -w ~/Library/LaunchAgents/com.semicolon.semo-kb-mirror.plist
+
+  Uninstall:
+    launchctl unload -w ~/Library/LaunchAgents/com.semicolon.semo-kb-mirror.plist
+    rm ~/Library/LaunchAgents/com.semicolon.semo-kb-mirror.plist
+
+  KB: semo decision/semo-p2-complete-2026-05-28 의 P2-B + P3-D
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.semicolon.semo-kb-mirror</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/reus/.local/bin/semo</string>
+    <string>kb-mirror</string>
+    <string>start</string>
+    <string>--source</string>
+    <string>obsidian</string>
+    <string>--source-vault</string>
+    <!-- ⚠ 본인 환경에 맞게 수정 -->
+    <string>/Users/reus/Documents/SEMO-Vault</string>
+    <string>--target</string>
+    <string>postgres</string>
+    <string>--bidirectional</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/reus/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <!-- DATABASE_URL 은 .env 에서 source 되도록 별도 wrapper 사용 권장.
+         또는 여기에 직접 명시 (단, plist 는 평문 저장 — secrets 노출 주의). -->
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+    <key>Crashed</key>
+    <true/>
+  </dict>
+
+  <!-- 5분 안에 재시작 시도 3번 초과하면 KeepAlive 해제 (loop 방지) -->
+  <key>ThrottleInterval</key>
+  <integer>30</integer>
+
+  <key>StandardOutPath</key>
+  <string>/Users/reus/.semo/logs/kb-mirror.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>/Users/reus/.semo/logs/kb-mirror.err.log</string>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/reus/.semo</string>
+</dict>
+</plist>
