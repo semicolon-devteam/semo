@@ -1,7 +1,11 @@
 'use client';
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { AGENT_BY_ID, BotAvatar } from './agents';
 import { Icon, Badge, SegTab, AppShell } from './components';
+
+// react-force-graph-2d 는 canvas/window 에 의존 → 클라이언트에서만 로드(ssr:false).
+const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
 
 /*
  * screen-knowledge.jsx — Customer Knowledge (KB graph, §4.1).
@@ -93,7 +97,7 @@ function buildKBEdges(nodes) {
   return edges;
 }
 
-function ScreenKnowledge({ mode: initialMode = '2d' }) {
+function ScreenKnowledge({ mode: initialMode = '2d', graph }) {
   const [mode, setMode] = React.useState(initialMode);
   return (
     <AppShell mode="customer" active="knowledge" title="가게 지식"
@@ -104,7 +108,7 @@ function ScreenKnowledge({ mode: initialMode = '2d' }) {
         overflow: 'hidden',
       }}>
         <KBFilterRail/>
-        <KBCanvas mode={mode} onMode={setMode}/>
+        <KBCanvas mode={mode} onMode={setMode} graph={graph}/>
         <KBDetailPanel/>
       </div>
     </AppShell>
@@ -217,12 +221,17 @@ function KBFilterRail() {
 }
 
 /* ── Center: graph canvas ─────────────────────────────────────────── */
-function KBCanvas({ mode, onMode }) {
+function KBCanvas({ mode, onMode, graph }) {
   const W = 720, H = 560;
   const nodes = buildKBNodes(W, H);
   const edges = buildKBEdges(nodes);
   const selectedId = 'guest-0';
   const selected = nodes.find(n => n.id === selectedId);
+
+  // 실데이터 그래프(있으면) → react-force-graph 로 렌더. 없으면 SVG mock.
+  const hasReal = graph && Array.isArray(graph.nodes) && graph.nodes.length > 0;
+  const nodeCount = hasReal ? graph.nodes.length : nodes.length;
+  const edgeCount = hasReal ? graph.links.length : edges.length;
 
   return (
     <div style={{
@@ -249,7 +258,7 @@ function KBCanvas({ mode, onMode }) {
             지식 네트워크
           </div>
           <div className="semo-num" style={{ fontSize: 13, color: 'var(--semo-fg-1)', fontWeight: 600, marginTop: 2 }}>
-            {nodes.length}개 노드 · {edges.length}개 연결
+            {nodeCount}개 노드 · {edgeCount}개 연결
           </div>
         </div>
 
@@ -271,12 +280,24 @@ function KBCanvas({ mode, onMode }) {
         </div>
       </div>
 
-      {/* The graph */}
+      {/* The graph — 실데이터(2D)면 force-graph, 그 외엔 SVG mock */}
       <div style={{
         position: 'absolute', inset: 0,
         display: 'grid', placeItems: 'center',
       }}>
-        {mode === '3d'
+        {hasReal && mode !== '3d'
+          ? <ForceGraph2D
+              graphData={graph}
+              width={W} height={H}
+              backgroundColor="transparent"
+              nodeRelSize={4}
+              nodeVal={(n) => n.val || 3}
+              nodeColor={(n) => n.color}
+              nodeLabel={(n) => n.name}
+              linkColor={() => 'rgba(120,130,140,0.35)'}
+              linkWidth={1}
+              cooldownTicks={80}/>
+          : mode === '3d'
           ? <KBGraph3D nodes={nodes} edges={edges} width={W} height={H} selected={selected}/>
           : <KBGraph2D nodes={nodes} edges={edges} width={W} height={H} selected={selected}/>}
       </div>

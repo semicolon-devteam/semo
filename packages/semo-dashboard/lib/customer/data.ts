@@ -307,3 +307,91 @@ export interface NudgeItem {
 export async function getNudges(): Promise<NudgeItem[]> {
   return [];
 }
+
+// ─── KB 그래프(/my/knowledge) 실데이터 ────────────────────────────────
+// "가게 지식" 그래프는 테넌트의 agent_activity 에서 만든다(직원=허브, 활동 target=지식 노드,
+// 엣지=직원→지식). 고객 지식은 SEMO 내부 semo.knowledge_base 와 별개이므로 그쪽 스키마는
+// 건드리지 않는다(공유 production KB 보호). react-force-graph-2d 가 이 shape 를 그대로 소비.
+
+export interface GraphNode {
+  id: string;
+  name: string;
+  kind: 'agent' | 'knowledge';
+  color: string;
+  val: number;
+}
+export interface GraphLink {
+  source: string;
+  target: string;
+}
+export interface KnowledgeGraph {
+  nodes: GraphNode[];
+  links: GraphLink[];
+}
+
+interface GraphRow {
+  agent_slug: string | null;
+  display_name: string | null;
+  accent: string | null;
+  target: string | null;
+}
+
+/**
+ * 테넌트 활동에서 지식 그래프 구성. 비면 빈 그래프(화면이 mock SVG 폴백).
+ * 색은 canvas(react-force-graph)에서 CSS 변수가 안 먹으므로 listing.accent(hex)를 쓴다.
+ */
+export async function getKnowledgeGraph(
+  tenantSlug: string = DEMO_TENANT,
+  limit = 200,
+): Promise<KnowledgeGraph> {
+  try {
+    const { rows } = await query<GraphRow>(
+      `select l.agent_slug, l.display_name, l.accent, a.target
+         from public.agent_activity a
+         join public.tenants t on t.id = a.tenant_id
+         left join public.agent_listings l on l.id = a.listing_id
+        where t.slug = $1
+        order by a.occurred_at desc
+        limit $2`,
+      [tenantSlug, limit],
+    );
+    const nodes = new Map<string, GraphNode>();
+    const links: GraphLink[] = [];
+    const seenLink = new Set<string>();
+    for (const r of rows) {
+      const agentColor = r.accent ?? '#6E5BD1';
+      const agentId = r.agent_slug ? `agent:${r.agent_slug}` : null;
+      if (agentId && !nodes.has(agentId)) {
+        nodes.set(agentId, {
+          id: agentId,
+          name: r.display_name ?? r.agent_slug ?? '직원',
+          kind: 'agent',
+          color: agentColor,
+          val: 6,
+        });
+      }
+      if (r.target) {
+        const kbId = `kb:${r.target}`;
+        if (!nodes.has(kbId)) {
+          nodes.set(kbId, {
+            id: kbId,
+            name: r.target,
+            kind: 'knowledge',
+            color: agentColor,
+            val: 3,
+          });
+        }
+        if (agentId) {
+          const lk = `${agentId}->${kbId}`;
+          if (!seenLink.has(lk)) {
+            seenLink.add(lk);
+            links.push({ source: agentId, target: kbId });
+          }
+        }
+      }
+    }
+    return { nodes: Array.from(nodes.values()), links };
+  } catch {
+    return { nodes: [], links: [] };
+  }
+}
