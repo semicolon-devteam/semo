@@ -6,6 +6,7 @@ import {
   getHomeStats,
   getNudges,
 } from '@/lib/customer/data';
+import { getPersonaViewModel } from '@/lib/customer/persona/viewmodel';
 
 // 공개 데모 — 시드된 데모 테넌트(정민 카페) 데이터를 매 요청 렌더.
 export const dynamic = 'force-dynamic';
@@ -18,5 +19,14 @@ export default async function DemoHomePage() {
     getHomeStats(DEMO_TENANT),
     getNudges(),
   ]);
-  return <ScreenHome agents={agents} activity={activity} stats={stats} nudges={nudges} demo />;
+  return (
+    <ScreenHome
+      agents={agents}
+      activity={activity}
+      stats={stats}
+      nudges={nudges}
+      demo
+      personaVM={getPersonaViewModel('shop')}
+    />
+  );
 }

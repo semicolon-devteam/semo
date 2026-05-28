@@ -14,7 +14,18 @@ import {
  * linked together in one scrollable canvas.
  */
 
-function ScreenHome({ agents, activity, stats, nudges, demo = false }) {
+function ScreenHome({ agents, activity, stats, nudges, demo = false, personaVM }) {
+  // persona 표현(카피)만 viewmodel 에서 — 실데이터(agents/activity/stats)는 그대로.
+  const vmHome = personaVM?.home ?? {};
+  const cp = {
+    eyebrow: vmHome.eyebrow ?? 'Today · 오전 9:47',
+    greetingTitle: vmHome.greetingTitle ?? '안녕하세요 정민 사장님.',
+    greetingSubtitle: vmHome.greetingSubtitle ?? '오늘 직원들이 이런 일을 했어요.',
+    feedTitle: vmHome.feedTitle ?? '활동 피드',
+    nudgeTitle: vmHome.nudgeTitle ?? '오늘 사장님이 해주셔야 할 일',
+    workingTitle: vmHome.workingTitle ?? '지금 일하고 있어요',
+    weekKB: vmHome.weekKB ?? '이번 주 가게 지식',
+  };
   const jumuni = AGENT_BY_ID['jumuni'];
   const dangol = AGENT_BY_ID['dangol-i'];
   const hwegye = AGENT_BY_ID['hwegyedo-ri'];
@@ -74,7 +85,7 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false }) {
           {/* Greeting + 3 stats */}
           <div style={{ display: 'grid', gap: 20 }}>
             <div>
-              <Eyebrow>Today · 오전 9:47</Eyebrow>
+              <Eyebrow>{cp.eyebrow}</Eyebrow>
               <h1 style={{
                 margin: '8px 0 0',
                 fontSize: 'var(--t-display)',
@@ -83,9 +94,9 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false }) {
                 letterSpacing: '-0.025em',
                 color: 'var(--semo-fg-1)',
               }}>
-                안녕하세요 정민 사장님.<br/>
+                {cp.greetingTitle}<br/>
                 <span style={{ color: 'var(--semo-fg-3)', fontWeight: 600 }}>
-                  오늘 직원들이 이런 일을 했어요.
+                  {cp.greetingSubtitle}
                 </span>
               </h1>
             </div>
@@ -128,7 +139,7 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <Icon name="inbox" size={18} color="var(--semo-fg-2)"/>
                 <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600, color: 'var(--semo-fg-1)' }}>
-                  활동 피드
+                  {cp.feedTitle}
                 </h3>
                 <Badge tone="primary">{hasActivity ? activity.length : 36}</Badge>
               </div>
@@ -236,7 +247,7 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
               <Icon name="flag" size={16} color="var(--semo-warning)"/>
               <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--semo-fg-1)' }}>
-                오늘 사장님이 해주셔야 할 일
+                {cp.nudgeTitle}
               </h3>
               <Badge tone="warning">{hasNudges ? nudges.length : 3}</Badge>
             </div>
@@ -290,7 +301,7 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false }) {
                 animation: 'semo-pulse 1.8s ease-in-out infinite',
               }}/>
               <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--semo-fg-1)' }}>
-                지금 일하고 있어요
+                {cp.workingTitle}
               </h3>
             </div>
             <Card padding={0} style={{ overflow: 'hidden' }}>
@@ -320,7 +331,7 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--semo-fg-1)' }}>
-                  이번 주 가게 지식
+                  {cp.weekKB}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--semo-fg-3)', marginTop: 2 }}>
                   새 노드 8개 · 새 연결 23개
