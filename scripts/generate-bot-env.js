@@ -237,7 +237,7 @@ ${
 
 - 서비스/프로젝트 정보는 반드시 \`semo kb search\` 또는 \`semo kb get\`으로 먼저 조회
 - KB에 없으면 "KB에 해당 정보가 없습니다"로 응답. 추측 금지.
-- 서비스 구조화 메타: \`semo service get {domain}\`
+- 서비스 구조화 메타: \`semo kb get {domain} pipeline config\`
 
 ## Response Rules
 

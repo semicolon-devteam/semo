@@ -24,7 +24,7 @@ describe('slack-router split-runtime policy', () => {
       openclawBotIds: openclaw,
     });
 
-    expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error('expected policy to block OpenClaw botId');
     expect(result.reason).toBe('openclaw-owned-bot');
   });
 
@@ -35,7 +35,7 @@ describe('slack-router split-runtime policy', () => {
       openclawBotIds: openclaw,
     });
 
-    expect(result.allowed).toBe(false);
+    if (result.allowed) throw new Error('expected policy to block OpenClaw botId');
     expect(result.reason).toBe('openclaw-owned-bot');
   });
 

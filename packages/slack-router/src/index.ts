@@ -16,7 +16,11 @@
 
 import * as path from 'path';
 import * as os from 'os';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Pool } from 'pg';
+
+const execFileP = promisify(execFile);
 
 import {
   SlackGateway,
@@ -28,6 +32,7 @@ import {
   BusyDetector,
   resolveSpeaker,
   SlackProjectionEmitter,
+  listBotsWithDedicatedToken,
   acquireSingletonLock,
   assertCmuxAncestry,
   recordCommitmentFailure,
@@ -35,6 +40,7 @@ import {
   appendCommitmentEvent,
   claimNotifiedAlert,
   claimPagedAlert,
+  HermesCliAdapter,
   type SlackMessage,
   type InboxMessage,
   type OutboxMessage,
@@ -59,6 +65,20 @@ const MAILBOX_DIR = process.env.SEMO_MAILBOX_DIR || path.join(os.homedir(), '.se
 const SESSION_DIR = process.env.SEMO_SESSION_DIR || path.join(os.homedir(), '.semo', 'sessions');
 const MAX_ESCALATION_DEPTH = 3;
 
+// Semi 가 SEMO 의 primary Slack App 일 때 main gateway 의 route_bot_id 를 명시한다.
+// 미설정 시 기존 동작 유지 (route_bot_id=undefined → fallback semiclaw default).
+// KB: semo decision/semi-slack-primary-bot-2026-05-24
+const SEMO_PRIMARY_BOT_ID = process.env.SEMO_PRIMARY_BOT_ID || undefined;
+const SEMI_HERMES_HOME =
+  process.env.SEMI_HERMES_HOME || path.join(os.homedir(), '.hermes-semo-canary');
+const SEMI_HERMES_PROFILE = process.env.SEMI_HERMES_PROFILE || 'semo-semi';
+const SEMI_HERMES_TIMEOUT_MS = Number(process.env.SEMI_HERMES_TIMEOUT_MS || 120_000);
+const SEMI_BOT_ID = process.env.SEMI_BOT_ID || 'semi';
+
+// Colony 도 hermes-cli orchestrator. agent factory builder 역할.
+const COLONY_HERMES_PROFILE = process.env.COLONY_HERMES_PROFILE || 'semo-colony';
+const COLONY_BOT_ID = process.env.COLONY_BOT_ID || 'colony';
+
 // SemoBot 분리 Phase 2 (semo decision/semobot-independent-agent-2026-05-06):
 // system-level 메시지 (usage rejection, watchdog, escalation 등) 의 발송 페르소나를 env 로 추상화.
 // 기본값은 'semiclaw' 로 두어 행동 변경 0 (Phase 2 = pure refactor).
@@ -73,9 +93,25 @@ const SEMOBOT_NLP_INBOX_ENABLED =
 
 const pool = new Pool({ connectionString: DATABASE_URL });
 const router = new Router(pool);
-const slack = new SlackGateway(SLACK_BOT_TOKEN, SLACK_APP_TOKEN);
+const slack = new SlackGateway(SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SEMO_PRIMARY_BOT_ID);
+const inboundSlacks: SlackGateway[] = [slack];
 const inboxWriter = new InboxWriter(MAILBOX_DIR);
 const busyDetector = new BusyDetector(MAILBOX_DIR);
+
+function appTokenEnvKeyFor(botId: string): string {
+  return `${botId.replace(/-/g, '_').toUpperCase()}_SLACK_APP_TOKEN`;
+}
+
+function buildDedicatedInboundSlackGateways(): SlackGateway[] {
+  return listBotsWithDedicatedToken()
+    .filter((botId) => botId !== 'slack' && botId !== 'semobot' && !OPENCLAW_BOTS.has(botId))
+    .flatMap((botId) => {
+      const botToken = process.env[`${botId.replace(/-/g, '_').toUpperCase()}_SLACK_BOT_TOKEN`];
+      const appToken = process.env[appTokenEnvKeyFor(botId)];
+      if (!botToken || !appToken) return [];
+      return [new SlackGateway(botToken, appToken, botId)];
+    });
+}
 
 /**
  * System-level Slack 알림 발송 단일 진입점.
@@ -192,11 +228,19 @@ async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
   // source_ref = channel:thread_id 매칭, 같은 thread 여러 open commitment가 있으면
   // 가장 오래된 active 하나를 마감한다 (FIFO).
   const sourceRef = `${msg.channel_id}:${msg.thread_id}`;
+  // 개선1 (2026-05-28): execution 실패 분리. runtime-fallback placeholder 는
+  // metadata.failed=true 로 표시됨 → commitment 를 'failed' 로 닫는다.
+  const isFailed = Boolean(msg.metadata?.failed);
+  const targetStatus = isFailed ? 'failed' : 'done';
   try {
     const result = await pool.query<{ id: string; bot_id: string; title: string }>(
       `UPDATE semo.bot_commitments
-       SET status = 'done',
-           metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('completed_at', NOW())
+       SET status = $3,
+           metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
+             'completed_at', NOW()::text,
+             ${isFailed ? `'fail_reason', 'execution_failed',` : ''}
+             'closed_by', 'slack-router-outbox-reply'
+           )
        WHERE id = (
          SELECT id FROM semo.bot_commitments
          WHERE bot_id = $1
@@ -207,13 +251,22 @@ async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
          LIMIT 1
        )
        RETURNING id, bot_id, title`,
-      [msg.bot_id, sourceRef],
+      [msg.bot_id, sourceRef, targetStatus],
     );
     if (result.rowCount && result.rowCount > 0) {
       const row = result.rows[0];
-      console.log(`[commitment] done: ${row.id} (${msg.bot_id}) ← ${sourceRef}`);
-      // C3 PR2: pattern escalation 카운터 reset. 실패해도 원래 흐름 막지 않음.
-      await recordCommitmentSuccess(pool, row.bot_id, row.title);
+      console.log(`[commitment] ${targetStatus}: ${row.id} (${msg.bot_id}) ← ${sourceRef}`);
+      if (!isFailed) {
+        // C3 PR2: pattern escalation 카운터 reset (성공 시만). 실패해도 원래 흐름 막지 않음.
+        await recordCommitmentSuccess(pool, row.bot_id, row.title);
+      } else {
+        // 실패 → pattern 카운터 증가 (escalation 추적).
+        try {
+          await recordCommitmentFailure(pool, row.bot_id, row.title);
+        } catch (err) {
+          console.warn('[commitment] recordCommitmentFailure failed', err);
+        }
+      }
       // C5 dual-write: status_changed event for replay/audit.
       try {
         await appendCommitmentEvent(pool, {
@@ -222,14 +275,14 @@ async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
           occurred_at: new Date(),
           bot_id: row.bot_id,
           source_type: 'slack-inbox',
-          payload: { to_status: 'done', trigger_source: 'slack-router-outbox-reply' },
+          payload: { to_status: targetStatus, trigger_source: 'slack-router-outbox-reply' },
         });
       } catch (err) {
-        console.warn('[commitment-events] outbox-done append failed', err);
+        console.warn('[commitment-events] outbox-close append failed', err);
       }
     }
   } catch (err) {
-    console.error(`[commitment] UPDATE done failed for ${msg.bot_id}:`, err);
+    console.error(`[commitment] UPDATE ${targetStatus} failed for ${msg.bot_id}:`, err);
   }
 }
 
@@ -259,6 +312,45 @@ async function handleUsageRejection(botId: string, text: string): Promise<void> 
   }
 }
 
+// Reply persona wrapping: 봇 응답이 Semi orchestrator dispatch 결과면 Semi 명의로 게시.
+// One Agent Experience: 사용자에게는 Semi 만 보이고, 실제 실행 봇은 footer 로만 명시.
+// SEMO_REPLY_WRAP_PERSONA env 로 옵트인. 기본 off (기존 동작 유지).
+const REPLY_WRAP_PERSONA = process.env.SEMO_REPLY_WRAP_PERSONA === '1';
+
+async function maybeWrapReplyPersona(
+  msg: OutboxMessage,
+): Promise<{ botId: string; text: string } | null> {
+  if (!REPLY_WRAP_PERSONA) return null;
+  // commitment_id 가 outbox payload 에 없을 수 있으므로 channel/thread+bot_id 기반 lookup.
+  try {
+    const result = await pool.query<{ pipeline_context: string | null }>(
+      `SELECT pipeline_context::text AS pipeline_context
+         FROM semo.bot_commitments
+        WHERE bot_id = $1
+          AND source_type = 'slack-inbox'
+          AND runtime_source = 'hermes-orchestrator'
+          AND source_ref = $2
+        ORDER BY created_at DESC
+        LIMIT 1`,
+      [msg.bot_id, `${msg.channel_id}:${msg.thread_id || ''}`],
+    );
+    const row = result.rows[0];
+    if (!row?.pipeline_context) return null;
+    let ctx: { routed_from?: string };
+    try {
+      ctx = JSON.parse(row.pipeline_context);
+    } catch {
+      return null;
+    }
+    if (!ctx.routed_from) return null;
+    const wrapped = `${msg.text}\n\n— ${ctx.routed_from} (executed by \`@${msg.bot_id}\`)`;
+    return { botId: ctx.routed_from, text: wrapped };
+  } catch (err) {
+    console.warn(`[outbox-wrap] commitment lookup failed: ${(err as Error).message}`);
+    return null;
+  }
+}
+
 const outboxReader = new OutboxReader({
   mailboxDir: MAILBOX_DIR,
   // 'semobot' 은 자연어 응답을 처리하는 hybrid Claude 세션 — outbox 도 watch 한다.
@@ -272,6 +364,7 @@ const outboxReader = new OutboxReader({
   onAskUser: handleAskUser,
   onReplyPosted: handleReplyPosted,
   onUsageRejection: handleUsageRejection,
+  replyTransform: maybeWrapReplyPersona,
 });
 
 // ── OpenClaw Native Bots (KB-driven) ──
@@ -835,7 +928,20 @@ async function maybeHandleSemoBotCommand(msg: SlackMessage, senderName: string):
     return false;
   }
 
-  // 자연어 fallback — SemoBot 의 cmux pane Claude 세션 (Claude Max subscription) 으로 위임.
+  // 자연어 fallback 은 "명시적으로 semobot 타깃"일 때만 수행한다.
+  // 배경: cleanText 에서는 멘션 토큰이 제거될 수 있어, semobot 전용 앱 라우팅이 아닌
+  // 일반 멘션(@Semi 등)까지 semobot 가로채기로 오인될 수 있었다.
+  //
+  // 허용 조건:
+  // 1) dedicated app 라우팅(route_bot_id=semobot)
+  // 2) 본문에 semobot 명시 키워드 포함(멘션 제거 실패/직접 타이핑 보정)
+  const explicitSemoBotTarget =
+    msg.route_bot_id === 'semobot' || /(?:^|\s)@?semobot(?:\s|$)/i.test(text);
+
+  if (!explicitSemoBotTarget) {
+    return false;
+  }
+
   // semo decision/semobot-natural-language-cmux-session-2026-05-08:
   // SemoBot 은 hybrid 운영 — deterministic 명령은 router 직접 처리, 자연어는
   // ~/.semo/sessions/semobot/ Claude 세션이 처리. role separation 유지.
@@ -915,10 +1021,897 @@ async function maybeHandleSemoBotCommand(msg: SlackMessage, senderName: string):
   return true;
 }
 
+// ── Hermes-backed orchestrators (Semi / Colony) ──
+//
+// host_kind=hermes-cli orchestrator 봇들 (Semi/Colony) 의 통합 핸들러.
+// Slack 멘션 → Hermes inline dispatch → 응답 파싱 → 후속 처리:
+//   - Semi: ROUTE: <bot> → 해당 OpenClaw 봇 inbox 로 작업 위임 (commitment INSERT)
+//   - Colony: ACTION: FOUND/CREATE/CLARIFY → 사용자에게 직접 응답 (Slack reply only)
+//
+// KB: semo decision/semi-orchestrator-hermes-poc-2026-05-27
+//      semo decision/semi-slack-router-integration-complete-2026-05-27
+
+interface OrchestratorConfig {
+  botId: string;
+  hermesHome: string;
+  profile: string;
+  role: string;
+  responseKind: 'route' | 'action'; // ROUTE: 또는 ACTION:
+  timeoutMs: number;
+}
+
+const ORCHESTRATORS: Record<string, OrchestratorConfig> = {};
+
+if (SEMO_PRIMARY_BOT_ID === SEMI_BOT_ID) {
+  ORCHESTRATORS[SEMI_BOT_ID] = {
+    botId: SEMI_BOT_ID,
+    hermesHome: SEMI_HERMES_HOME,
+    profile: SEMI_HERMES_PROFILE,
+    role: 'orchestrator',
+    responseKind: 'route',
+    timeoutMs: SEMI_HERMES_TIMEOUT_MS,
+  };
+  // Colony 도 같은 home 에 있다면 같이 활성화
+  ORCHESTRATORS[COLONY_BOT_ID] = {
+    botId: COLONY_BOT_ID,
+    hermesHome: SEMI_HERMES_HOME,
+    profile: COLONY_HERMES_PROFILE,
+    role: 'agent-factory-builder',
+    responseKind: 'action',
+    timeoutMs: SEMI_HERMES_TIMEOUT_MS,
+  };
+}
+
+const orchestratorAdapters: Record<string, HermesCliAdapter> = {};
+for (const [botId, cfg] of Object.entries(ORCHESTRATORS)) {
+  orchestratorAdapters[botId] = new HermesCliAdapter({
+    hermesHome: cfg.hermesHome,
+    profile: cfg.profile,
+    semoRole: cfg.role,
+    defaultTimeoutMs: cfg.timeoutMs,
+    enableSessionResume: false,
+  });
+}
+
+interface ParsedRoute {
+  kind: 'route';
+  bot: string | null;
+  reason: string | null;
+  handoff: string | null;
+}
+
+interface ParsedAction {
+  kind: 'action';
+  action: string | null; // FOUND / CREATE / CLARIFY
+  target: string | null;
+  reason: string | null;
+  handoff: string | null;
+}
+
+function parseRouteResponse(text: string): ParsedRoute {
+  const lines = text.split(/\r?\n/);
+  let bot: string | null = null;
+  let reason: string | null = null;
+  const handoffLines: string[] = [];
+  let handoffStarted = false;
+  for (const line of lines) {
+    const m = line.match(/^\s*(ROUTE|REASON|HANDOFF)\s*:\s*(.*)$/i);
+    if (!m) {
+      if (handoffStarted) handoffLines.push(line);
+      continue;
+    }
+    const tag = m[1].toUpperCase();
+    const value = m[2].trim();
+    if (tag === 'ROUTE') {
+      bot =
+        value
+          .replace(/[`@*<>]/g, '')
+          .split(/\s+/)[0]
+          ?.toLowerCase() || null;
+    } else if (tag === 'REASON') {
+      reason = value;
+    } else if (tag === 'HANDOFF') {
+      handoffStarted = true;
+      if (value) handoffLines.push(value);
+    }
+  }
+  return {
+    kind: 'route',
+    bot,
+    reason,
+    handoff: handoffLines.length > 0 ? handoffLines.join('\n').trim() : null,
+  };
+}
+
+function parseActionResponse(text: string): ParsedAction {
+  const lines = text.split(/\r?\n/);
+  let action: string | null = null;
+  let target: string | null = null;
+  let reason: string | null = null;
+  const handoffLines: string[] = [];
+  let handoffStarted = false;
+  for (const line of lines) {
+    const m = line.match(/^\s*(ACTION|TARGET|REASON|HANDOFF)\s*:\s*(.*)$/i);
+    if (!m) {
+      if (handoffStarted) handoffLines.push(line);
+      continue;
+    }
+    const tag = m[1].toUpperCase();
+    const value = m[2].trim();
+    if (tag === 'ACTION') {
+      action = value.toUpperCase();
+    } else if (tag === 'TARGET') {
+      target =
+        value
+          .replace(/[`@*<>]/g, '')
+          .split(/\s+/)[0]
+          ?.toLowerCase() || null;
+    } else if (tag === 'REASON') {
+      reason = value;
+    } else if (tag === 'HANDOFF') {
+      handoffStarted = true;
+      if (value) handoffLines.push(value);
+    }
+  }
+  return {
+    kind: 'action',
+    action,
+    target,
+    reason,
+    handoff: handoffLines.length > 0 ? handoffLines.join('\n').trim() : null,
+  };
+}
+
+// Semi 의 ROUTE 결정 후 → 해당 봇 inbox 에 dispatch + commitment INSERT.
+// 작업 [A] + [E] (KB: semi-slack-router-integration-complete-2026-05-27).
+async function dispatchToInbox(args: {
+  fromBot: string;
+  toBot: string;
+  msg: SlackMessage;
+  senderName: string;
+  handoff: string;
+  reason: string | null;
+}): Promise<{ commitmentId: string | null; error: string | null }> {
+  const { fromBot, toBot, msg, senderName, handoff, reason } = args;
+  const replyThreadTs = msg.thread_ts || msg.ts;
+  const commitmentId = `cmt-${toBot}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  const speakerId = msg.user;
+  try {
+    await pool.query(
+      `INSERT INTO semo.bot_commitments
+         (id, bot_id, status, title, source_type, source_ref,
+          session_owner, assigned_session, pipeline_context, runtime_source)
+       VALUES ($1, $2, 'active', $3, 'slack-inbox', $4, $5, $6, $7, 'hermes-orchestrator')
+       ON CONFLICT DO NOTHING`,
+      [
+        commitmentId,
+        toBot,
+        (msg.text || '').slice(0, 200) || '(empty)',
+        `${msg.channel}:${replyThreadTs}`,
+        `${fromBot}-orchestrator`,
+        null,
+        JSON.stringify({
+          routed_from: fromBot,
+          orchestrator_reason: reason,
+          channel: msg.channel,
+          thread: replyThreadTs,
+          sender_id: speakerId,
+          sender_name: senderName,
+          slack_event_id: msg.ts,
+        }),
+      ],
+    );
+  } catch (err) {
+    console.warn(`[${fromBot}] commitment INSERT failed:`, (err as Error).message);
+  }
+
+  try {
+    await inboxWriter.write(toBot, {
+      type: 'message',
+      priority: 'normal',
+      platform: 'slack' as const,
+      channel_id: msg.channel,
+      thread_id: replyThreadTs,
+      message_id: msg.ts,
+      sender_name: senderName,
+      sender_id: speakerId,
+      text: handoff,
+      route_reason: `${fromBot}-orchestrator-dispatch`,
+    });
+  } catch (err) {
+    const e = err as Error;
+    console.error(`[${fromBot}] inbox.write(${toBot}) failed:`, e.message);
+    return { commitmentId: null, error: e.message };
+  }
+
+  return { commitmentId, error: null };
+}
+
+// Colony 의 ACTION 후속 자동 실행 (P0-C 2026-05-28).
+// - SEARCH_LIBRARY: semo kb search 결과를 Slack thread 에 게시
+// - CREATE:        semo bots create 실행 후 stdout/stderr 를 thread 에 게시
+async function executeColonyAction(
+  parsed: ParsedAction,
+  msg: SlackMessage,
+  replyThreadTs: string,
+  fromBot: string,
+): Promise<void> {
+  if (!parsed.action) return;
+  const action = parsed.action.toUpperCase();
+  const target = parsed.target || '';
+
+  if (action === 'SEARCH_LIBRARY' && target) {
+    try {
+      const { stdout } = await execFileP('semo', ['kb', 'search', target, '--limit', '5'], {
+        timeout: 30_000,
+        env: process.env,
+      });
+      const summary = (stdout || '').trim().slice(0, 1800) || '(검색 결과 없음)';
+      await slack.postAsBot(
+        fromBot,
+        msg.channel,
+        `:mag: KB 라이브러리 검색 결과 — \`${target}\`\n\`\`\`\n${summary}\n\`\`\``,
+        replyThreadTs,
+      );
+      console.log(`[${fromBot}] SEARCH_LIBRARY '${target}' executed`);
+    } catch (err) {
+      const e = err as Error;
+      await slack.postAsBot(
+        fromBot,
+        msg.channel,
+        `:warning: KB 검색 실패 (\`${target}\`): \`${e.message.slice(0, 200)}\``,
+        replyThreadTs,
+      );
+    }
+    return;
+  }
+
+  if (action === 'CREATE' && target) {
+    // 새 봇 ID 검증 — 영문 lowercase + hyphen 만, 기존 봇과 중복 X.
+    const cleanId = target.toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (!cleanId || cleanId.length < 3) {
+      await slack.postAsBot(
+        fromBot,
+        msg.channel,
+        `:warning: 봇 ID \`${target}\` 가 유효하지 않습니다 (최소 3자 영문/숫자/hyphen).`,
+        replyThreadTs,
+      );
+      return;
+    }
+    try {
+      const { stdout, stderr } = await execFileP(
+        'semo',
+        [
+          'bots',
+          'create',
+          '--id',
+          cleanId,
+          '--role',
+          'specialist',
+          '--host-kind',
+          'hermes-cli',
+          '--hermes-home',
+          SEMI_HERMES_HOME,
+          '--hermes-base-profile',
+          'semo-hermes-canary',
+          '--hermes-provider',
+          'openai-codex',
+          '--hermes-model',
+          'gpt-5.5',
+          '--kb-domains',
+          'semicolon,semo',
+        ],
+        { timeout: 60_000, env: process.env },
+      );
+      const out = ((stdout || '') + (stderr || '')).trim().slice(0, 1800);
+      await slack.postAsBot(
+        fromBot,
+        msg.channel,
+        `:sparkles: \`${cleanId}\` 생성 시도 결과\n\`\`\`\n${out || '(빈 출력 — 성공/실패 audit 로그 확인 필요)'}\n\`\`\``,
+        replyThreadTs,
+      );
+      console.log(`[${fromBot}] CREATE '${cleanId}' executed`);
+    } catch (err) {
+      const e = err as Error & { stdout?: string; stderr?: string };
+      const detail = [e.message, e.stdout, e.stderr].filter(Boolean).join('\n').slice(0, 1800);
+      await slack.postAsBot(
+        fromBot,
+        msg.channel,
+        `:warning: \`${cleanId}\` 생성 실패\n\`\`\`\n${detail}\n\`\`\``,
+        replyThreadTs,
+      );
+    }
+    return;
+  }
+  // FOUND / CLARIFY / PROPOSE_NEW 등은 후속 action 없음.
+}
+
+// 사용자 식별 — Slack user_id 로 KB 팀원 도메인 + 프로필 컨텍스트 조회.
+// 등록된 사용자면 풍부한 컨텍스트, 미등록이면 익명 default 모드 + 온보딩 권유.
+async function resolveSenderProfile(slackUserId: string): Promise<{
+  registered: boolean;
+  domain?: string;
+  nickname?: string;
+  contextLines: string[];
+}> {
+  if (!slackUserId) return { registered: false, contextLines: [] };
+  try {
+    const r = await pool.query<{ domain: string }>(
+      `SELECT domain FROM semo.knowledge_base
+        WHERE key = 'slack-id' AND content = $1
+        LIMIT 1`,
+      [slackUserId],
+    );
+    if (r.rows.length === 0) {
+      return { registered: false, contextLines: [] };
+    }
+    const domain = r.rows[0].domain;
+    const profile = await pool.query<{ key: string; sub_key: string; content: string }>(
+      `SELECT key, sub_key, content FROM semo.knowledge_base
+        WHERE domain = $1 AND key IN ('nickname','role','memory','identity')
+        LIMIT 10`,
+      [domain],
+    );
+    const contextLines: string[] = [`# 발화자 정보 (KB)`, `domain: ${domain}`];
+    let nickname: string | undefined;
+    for (const row of profile.rows) {
+      const tag = row.sub_key ? `${row.key}/${row.sub_key}` : row.key;
+      const value = (row.content || '').trim().slice(0, 300);
+      if (row.key === 'nickname' && !nickname) nickname = value;
+      contextLines.push(`- ${tag}: ${value}`);
+    }
+    return { registered: true, domain, nickname, contextLines };
+  } catch (err) {
+    console.warn(`[sender-lookup] failed: ${(err as Error).message}`);
+    return { registered: false, contextLines: [] };
+  }
+}
+
+// P1-A (2026-05-28): Phase 2 대화 온보딩 — 미등록 사용자의 자기소개 텍스트에서
+// nickname/role/it-fluency 추출 후 KB upsert. 정규식 우선, 빈 결과면 LLM 보조는 향후.
+//
+// 매칭 예시:
+//   "재용이라고 불러요" → nickname=재용
+//   "백엔드 개발자입니다" → role=개발자
+//   "AI 잘 모르는 편이에요" → it_fluency=beginner
+//   "I'm Joe, frontend dev" → nickname=Joe, role=frontend dev
+interface ExtractedProfile {
+  nickname?: string;
+  role?: string;
+  itFluency?: 'beginner' | 'intermediate' | 'expert';
+}
+
+function extractProfileFromTextRegex(text: string): ExtractedProfile {
+  const out: ExtractedProfile = {};
+  const lower = text.toLowerCase();
+
+  // nickname — 한국어 "X라고 불러요/부르세요/불러줘" + 영어 "I'm X / call me X"
+  const koName = text.match(
+    /([가-힣A-Za-z][가-힣A-Za-z0-9_]{1,15})\s*(?:이?라고|로)\s*(?:불러|부르)/,
+  );
+  if (koName) out.nickname = koName[1];
+  if (!out.nickname) {
+    const enName = text.match(/(?:i'?m|call me|i am)\s+([A-Za-z][A-Za-z0-9_]{1,15})/i);
+    if (enName) out.nickname = enName[1];
+  }
+
+  // role — 흔한 직군 키워드
+  const roleMap: Array<[RegExp, string]> = [
+    [/(백엔드|backend|서버)/i, '백엔드 개발자'],
+    [/(프론트엔드|frontend|fe)/i, '프론트엔드 개발자'],
+    [/(풀스택|full[\s-]?stack)/i, '풀스택 개발자'],
+    [/(디자이너|designer|ui|ux)/i, '디자이너'],
+    [/(기획|pm|po|product\s*manager|product\s*owner)/i, '기획자'],
+    [/(마케터|marketer|growth)/i, '마케터'],
+    [/(대표|ceo|founder|cofounder)/i, '대표'],
+    [/(데이터|data\s*(scientist|analyst|engineer))/i, '데이터 엔지니어'],
+    [/(인프라|devops|sre|infra)/i, '인프라 엔지니어'],
+    [/(개발자|developer|engineer)/i, '개발자'],
+  ];
+  for (const [re, role] of roleMap) {
+    if (re.test(lower)) {
+      out.role = role;
+      break;
+    }
+  }
+
+  // it_fluency — 키워드 휴리스틱 (개선3: 패턴 확장)
+  if (
+    /(잘\s*모르|잘\s*못|처음|초보|입문|왕초보|문외한|어려워|beginner|newbie|new\s*to|first\s*time|not\s*(very\s*)?(good|familiar))/i.test(
+      lower,
+    )
+  ) {
+    out.itFluency = 'beginner';
+  } else if (
+    /(전문가|숙련|능숙|베테랑|expert|advanced|시니어|senior|principal|아키텍트|architect|lead|리드|10년|수년)/i.test(
+      lower,
+    )
+  ) {
+    out.itFluency = 'expert';
+  } else if (
+    /(개발자|엔지니어|engineer|developer|중급|intermediate|junior|주니어|midlevel|어느\s*정도|보통|쓸\s*줄)/i.test(
+      lower,
+    )
+  ) {
+    out.itFluency = 'intermediate';
+  }
+
+  return out;
+}
+
+// P2-E (2026-05-28): LLM 기반 자연어 추출. 정규식이 nickname 못 찾았을 때만 호출.
+// OpenAI API key 있을 때만 작동, 없거나 실패하면 정규식 결과 반환.
+// 짧은 prompt + gpt-4o-mini 같은 cheap 모델 + 5초 timeout.
+async function extractProfileWithLLM(text: string): Promise<ExtractedProfile> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return {};
+  const model = process.env.SEMO_ONBOARDING_LLM_MODEL || 'gpt-4o-mini';
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 7_000);
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        max_tokens: 200,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system',
+            content:
+              '사용자가 자기소개로 한 문장 보냈을 때 핵심 정보 추출. ' +
+              'JSON 출력: {"nickname": string|null, "role": string|null, "it_fluency": "beginner"|"intermediate"|"expert"|null}. ' +
+              '확실히 추론 가능할 때만 채우고, 없으면 null. 추측 금지.',
+          },
+          { role: 'user', content: text.slice(0, 500) },
+        ],
+      }),
+      signal: ctrl.signal,
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      console.warn(`[onboarding-llm] HTTP ${res.status}`);
+      return {};
+    }
+    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const raw = data.choices?.[0]?.message?.content;
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as {
+      nickname?: string | null;
+      role?: string | null;
+      it_fluency?: 'beginner' | 'intermediate' | 'expert' | null;
+    };
+    const out: ExtractedProfile = {};
+    if (parsed.nickname && parsed.nickname.length >= 1 && parsed.nickname.length <= 30) {
+      out.nickname = parsed.nickname;
+    }
+    if (parsed.role && parsed.role.length >= 1 && parsed.role.length <= 50) {
+      out.role = parsed.role;
+    }
+    if (parsed.it_fluency && ['beginner', 'intermediate', 'expert'].includes(parsed.it_fluency)) {
+      out.itFluency = parsed.it_fluency;
+    }
+    return out;
+  } catch (err) {
+    console.warn(`[onboarding-llm] failed: ${(err as Error).message}`);
+    return {};
+  }
+}
+
+async function extractProfileFromText(text: string): Promise<ExtractedProfile> {
+  const regex = extractProfileFromTextRegex(text);
+  // 개선3 (2026-05-28): LLM 라우팅 기준 재조정.
+  // 기존: nickname 잡히면 LLM skip → role/fluency 가 자주 누락됨 (fluency F1 40%).
+  // 변경: nickname + role + fluency 가 모두 채워지면 skip. 하나라도 비면 LLM 보조.
+  //       단, 정규식이 전혀 아무것도 못 잡았으면 (자기소개 아님) LLM 호출 안 함 (비용 절약).
+  const hasAny = Boolean(regex.nickname || regex.role || regex.itFluency);
+  const isComplete = Boolean(regex.nickname && regex.role && regex.itFluency);
+  if (!hasAny) return regex; // 자기소개 패턴 아님 → LLM 불필요
+  if (isComplete) return regex; // 이미 완전 → LLM 불필요
+
+  // 부분 추출됨 → LLM 으로 빈 필드 보완
+  const llm = await extractProfileWithLLM(text);
+  return {
+    nickname: regex.nickname || llm.nickname,
+    role: regex.role || llm.role,
+    itFluency: regex.itFluency || llm.itFluency,
+  };
+}
+
+function slugifyDomain(nickname: string): string {
+  // 한글 음절 -> latin transliteration 은 over-engineering 이므로 단순 처리:
+  // 영문/숫자만 추출, 부족하면 'user-' + 짧은 ts.
+  const ascii = nickname
+    .replace(/[^A-Za-z0-9]/g, '')
+    .toLowerCase()
+    .slice(0, 20);
+  if (ascii.length >= 2) return ascii;
+  // 한글이라 ascii 추출 불가 → unicode codepoint 일부로 hash-like slug
+  const fallback = Array.from(nickname)
+    .slice(0, 6)
+    .map((c) => c.charCodeAt(0).toString(36))
+    .join('')
+    .slice(0, 12);
+  return fallback || `user${Date.now().toString(36).slice(-6)}`;
+}
+
+async function maybeOnboardSender(args: {
+  slackUserId: string;
+  senderName: string;
+  text: string;
+}): Promise<{ extracted: ExtractedProfile; domain?: string; saved: boolean }> {
+  const extracted = await extractProfileFromText(args.text);
+  if (!extracted.nickname && !extracted.role && !extracted.itFluency) {
+    return { extracted, saved: false };
+  }
+  // nickname 없으면 senderName 사용 (Slack display name).
+  const nickname = extracted.nickname || args.senderName || `user-${args.slackUserId.slice(-4)}`;
+  const baseSlug = slugifyDomain(nickname);
+  // 기존 도메인 충돌 회피
+  let domain = `team-${baseSlug}`;
+  try {
+    const exists = await pool.query<{ domain: string }>(
+      `SELECT domain FROM semo.knowledge_base WHERE domain = $1 LIMIT 1`,
+      [domain],
+    );
+    if (exists.rows.length > 0) {
+      domain = `${domain}-${args.slackUserId.slice(-4).toLowerCase()}`;
+    }
+
+    const upserts: Array<[string, string]> = [
+      ['slack-id', args.slackUserId],
+      ['nickname', nickname],
+    ];
+    if (extracted.role) upserts.push(['role', extracted.role]);
+    if (extracted.itFluency) upserts.push(['it-fluency', extracted.itFluency]);
+
+    for (const [key, content] of upserts) {
+      await pool.query(
+        `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by, updated_at)
+         VALUES ($1, $2, '', $3, $4, NOW())
+         ON CONFLICT (domain, key, sub_key)
+         DO UPDATE SET content = EXCLUDED.content, updated_at = NOW()`,
+        [domain, key, content, 'slack-router:onboarding'],
+      );
+    }
+    console.log(
+      `[onboarding] domain=${domain} nickname=${nickname} role=${extracted.role || 'X'} fluency=${extracted.itFluency || 'X'}`,
+    );
+    return { extracted, domain, saved: true };
+  } catch (err) {
+    console.warn(`[onboarding] save failed: ${(err as Error).message}`);
+    return { extracted, saved: false };
+  }
+}
+
+// 개선6 (2026-05-28): orchestrator(Semi/Colony) 중복 이벤트 방어.
+//   Slack socket-mode 재연결 replay 등으로 같은 msg.ts 가 재전달되면
+//   LLM 재호출 + 중복 응답 게시 + (Colony) 중복 봇 생성이 발생한다.
+//   normal 라우팅 경로는 commitment 의 migration 089 unique index 로 막히지만,
+//   orchestrator 경로는 그 INSERT 전에 early-return 하므로 별도 가드가 필요하다.
+//   단일 router 인스턴스(표준 배포) 기준 in-process TTL 가드로 at-most-once 보장.
+const ORCHESTRATOR_DEDUP_TTL_MS = 10 * 60_000;
+const orchestratorSeenEvents = new Map<string, number>();
+
+function claimOrchestratorEvent(botId: string, eventTs: string): boolean {
+  const now = Date.now();
+  if (orchestratorSeenEvents.size > 500) {
+    for (const [k, t] of orchestratorSeenEvents) {
+      if (now - t > ORCHESTRATOR_DEDUP_TTL_MS) orchestratorSeenEvents.delete(k);
+    }
+  }
+  const key = `${botId}:${eventTs}`;
+  const prev = orchestratorSeenEvents.get(key);
+  if (prev !== undefined && now - prev < ORCHESTRATOR_DEDUP_TTL_MS) {
+    return false; // 이미 처리됨 — 중복 전달.
+  }
+  orchestratorSeenEvents.set(key, now);
+  return true;
+}
+
+async function handleOrchestrator(
+  msg: SlackMessage,
+  senderName: string,
+  cfg: OrchestratorConfig,
+): Promise<void> {
+  const replyThreadTs = msg.thread_ts || msg.ts;
+  const startedAt = Date.now();
+
+  // 중복 이벤트 차단 (at-most-once) — LLM 재호출/중복 응답/중복 봇 생성 방지.
+  if (!claimOrchestratorEvent(cfg.botId, msg.ts)) {
+    console.log(`[${cfg.botId}] duplicate slack event ${msg.ts} — skipping (dedup)`);
+    return;
+  }
+
+  console.log(
+    `[${cfg.botId}] received from ${senderName} in ${msg.channel}: ${msg.text.slice(0, 120)}`,
+  );
+
+  const adapter = orchestratorAdapters[cfg.botId];
+  if (!adapter) {
+    console.warn(`[${cfg.botId}] adapter not initialized`);
+    await postSystemMessage(
+      msg.channel,
+      `:warning: ${cfg.botId} 핸들러가 활성화되지 않았습니다.`,
+      replyThreadTs,
+    );
+    return;
+  }
+
+  // 멘션 토큰 제거
+  const cleanText = msg.text.replace(/<@[A-Z0-9]+>/g, '').trim();
+  if (!cleanText) {
+    await slack.postAsBot(
+      cfg.botId,
+      msg.channel,
+      `:robot_face: 무엇을 도와드릴까요? (요청을 한 줄로 적어주세요)`,
+      replyThreadTs,
+    );
+    return;
+  }
+
+  // 사용자 식별 — KB lookup
+  const senderProfile = await resolveSenderProfile(msg.user);
+  let promptWithContext = cleanText;
+  let onboardingResult: { extracted: ExtractedProfile; domain?: string; saved: boolean } | null =
+    null;
+
+  if (senderProfile.registered) {
+    promptWithContext =
+      senderProfile.contextLines.join('\n') +
+      `\n\n# 사용자 요청\n${cleanText}` +
+      `\n\n# 가이드\n- 응답은 친근하게, 이름을 알고 있으면 호명. (예: "${senderProfile.nickname || senderProfile.domain}님")`;
+  } else {
+    // P1-A (2026-05-28): 미등록자가 자기소개 패턴을 보내면 자동 KB 박제 시도.
+    // 매칭 성공 시 그 자리에서 등록됨 → 봇은 환영 인사를 첫 응답으로.
+    // 매칭 실패 시 default 모드 + 자기소개 권유.
+    onboardingResult = await maybeOnboardSender({
+      slackUserId: msg.user,
+      senderName,
+      text: cleanText,
+    });
+
+    if (onboardingResult.saved && onboardingResult.domain) {
+      promptWithContext =
+        `# 신규 사용자 온보딩 성공\n` +
+        `- domain: ${onboardingResult.domain}\n` +
+        `- nickname: ${onboardingResult.extracted.nickname || senderName}\n` +
+        (onboardingResult.extracted.role ? `- role: ${onboardingResult.extracted.role}\n` : '') +
+        (onboardingResult.extracted.itFluency
+          ? `- it-fluency: ${onboardingResult.extracted.itFluency}\n`
+          : '') +
+        `\n# 사용자 메시지\n${cleanText}\n\n` +
+        `# 가이드\n- 따뜻하게 환영 인사 + 등록 완료 알림 (한두 줄). 그 다음 사용자 메시지가 라우팅/액션이 필요한 요청이면 정상 라우팅 진행. ` +
+        `자기소개 자체로 끝나는 메시지이면 라우팅 대신 환영 응답만 (ROUTE/ACTION 라인은 그래도 출력 — semiclaw 로 기본).`;
+    } else {
+      promptWithContext =
+        `# 발화자 정보\n- 미등록 사용자 (slack_id=${msg.user}, display_name=${senderName})\n\n` +
+        `## ONBOARDING_GREETING\n` +
+        `# 사용자 요청\n${cleanText}\n\n` +
+        `# 가이드\n- 처음 뵙는 분이라 친근하게 인사부터. 본 요청을 default 모드로 처리하되, ` +
+        `응답 끝에 한 줄 자기소개 권유: "혹시 어떻게 부르면 좋을까요? '재용이라고 불러요, 백엔드 개발자' 처럼 한 문장이면 충분해요. KB 에 자동 등록해드릴게요." ` +
+        `시스템 라인(ROUTE/ACTION) 은 정상 출력.`;
+    }
+  }
+
+  try {
+    const session = await adapter.startSession({ botId: cfg.botId });
+    const result = await adapter.dispatch({
+      botId: cfg.botId,
+      session,
+      prompt: promptWithContext,
+      timeoutMs: cfg.timeoutMs,
+    });
+
+    const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+    const text = (result.text || '').trim();
+    if (!text) {
+      const tail = result.hostMeta?.stderr_tail
+        ? `\nstderr: ${String(result.hostMeta.stderr_tail).slice(-200)}`
+        : '';
+      await slack.postAsBot(
+        cfg.botId,
+        msg.channel,
+        `:warning: ${cfg.botId} 가 빈 응답을 받았습니다. endReason=${result.endReason}${tail}`,
+        replyThreadTs,
+      );
+      console.warn(
+        `[${cfg.botId}] empty response after ${elapsed}s (endReason=${result.endReason})`,
+      );
+      return;
+    }
+
+    if (cfg.responseKind === 'route') {
+      const parsed = parseRouteResponse(text);
+      let dispatchInfo = '';
+      if (parsed.bot && parsed.handoff && parsed.bot !== cfg.botId) {
+        // Semi 의 핵심: ROUTE 결정 후 실제 작업 dispatch.
+        const dispatch = await dispatchToInbox({
+          fromBot: cfg.botId,
+          toBot: parsed.bot,
+          msg,
+          senderName,
+          handoff: parsed.handoff,
+          reason: parsed.reason,
+        });
+        if (dispatch.error) {
+          dispatchInfo = `\n:warning: dispatch failed: \`${dispatch.error.slice(0, 100)}\``;
+        } else if (dispatch.commitmentId) {
+          dispatchInfo = `\n:white_check_mark: \`@${parsed.bot}\` 에 작업 위임됨 (commitment=\`${dispatch.commitmentId.slice(-8)}\`)`;
+        }
+      }
+      const footer = parsed.bot
+        ? `\n\n— ${cfg.botId} (${elapsed}s, → \`@${parsed.bot}\`)${dispatchInfo}`
+        : `\n\n— ${cfg.botId} (${elapsed}s)`;
+      await slack.postAsBot(cfg.botId, msg.channel, text + footer, replyThreadTs);
+      console.log(
+        `[${cfg.botId}] responded in ${elapsed}s; routed_to=${parsed.bot || 'none'} dispatch=${dispatchInfo ? 'ok' : 'skip'} (endReason=${result.endReason})`,
+      );
+    } else {
+      // Colony 의 action 응답 — ACTION 별 후속 자동 실행 (P0-C 2026-05-28).
+      const parsed = parseActionResponse(text);
+      const footer = parsed.action
+        ? `\n\n— ${cfg.botId} (${elapsed}s, action=\`${parsed.action}\`${parsed.target && parsed.target !== '-' ? `, target=\`${parsed.target}\`` : ''})`
+        : `\n\n— ${cfg.botId} (${elapsed}s)`;
+      await slack.postAsBot(cfg.botId, msg.channel, text + footer, replyThreadTs);
+      console.log(
+        `[${cfg.botId}] responded in ${elapsed}s; action=${parsed.action || 'none'} target=${parsed.target || 'none'} (endReason=${result.endReason})`,
+      );
+
+      // 후속 액션 자동 실행 (SEARCH_LIBRARY / CREATE).
+      // 실패해도 main 응답은 이미 게시됐으니 best-effort.
+      try {
+        await executeColonyAction(parsed, msg, replyThreadTs, cfg.botId);
+      } catch (followErr) {
+        console.warn(`[${cfg.botId}] follow-up action failed:`, (followErr as Error).message);
+      }
+    }
+  } catch (err) {
+    const e = err as Error;
+    const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+    console.error(`[${cfg.botId}] error after ${elapsed}s:`, e.message);
+    await postSystemMessage(
+      msg.channel,
+      `:warning: ${cfg.botId} orchestrator error (${elapsed}s): \`${e.message.slice(0, 200)}\``,
+      replyThreadTs,
+    );
+  }
+}
+
 // ── Message Handler ──
 
+async function routeDirectSlackAppMessage(
+  msg: SlackMessage,
+  senderName: string,
+  botId: string,
+): Promise<void> {
+  const routeReason = 'direct-slack-app-mention';
+  const replyThreadTs = msg.thread_ts || msg.ts;
+
+  const policy = applySlackRouterPolicy({
+    candidateBotId: botId,
+    routeReason,
+    openclawBotIds: OPENCLAW_BOTS,
+  });
+  if (policy.allowed === false) {
+    await postSystemMessage(
+      msg.channel,
+      [
+        `:no_entry: dedicated Slack app route blocked (${policy.reason}): \`${policy.botId}\``,
+        policy.guidance,
+      ].join('\n'),
+      replyThreadTs,
+    );
+    console.log(`[router-policy] blocked ${routeReason} → ${policy.botId}: ${policy.reason}`);
+    return;
+  }
+
+  let threadHistory: InboxMessage['thread_history'];
+  if (msg.thread_ts) {
+    const history = await slack.getThreadHistory(msg.channel, msg.thread_ts);
+    threadHistory = history.map((h) => ({
+      display_name: h.displayName,
+      text: h.text,
+      is_bot: h.isBotMessage,
+    }));
+  }
+
+  const speaker = await resolveSpeaker(pool, 'slack', msg.user);
+  const commitmentId = `cmt-${policy.botId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  try {
+    await pool.query(
+      `INSERT INTO semo.bot_commitments
+         (id, bot_id, status, title, source_type, source_ref,
+          session_owner, assigned_session, pipeline_context, runtime_source)
+       VALUES ($1, $2, 'active', $3, 'slack-inbox', $4, $5, $6, $7, 'slack-router')
+       ON CONFLICT DO NOTHING`,
+      [
+        commitmentId,
+        policy.botId,
+        msg.text.slice(0, 200) || '(empty)',
+        `${msg.channel}:${replyThreadTs}`,
+        `${policy.botId}-slack`,
+        `slack-${msg.channel}-${replyThreadTs}`,
+        JSON.stringify({
+          slack_event_id: msg.ts,
+          channel: msg.channel,
+          thread_ts: replyThreadTs,
+          sender_id: msg.user,
+          route_reason: policy.routeReason,
+          direct_slack_app_bot_id: botId,
+        }),
+      ],
+    );
+  } catch (err) {
+    console.error(`[commitment] INSERT failed for ${msg.ts}:`, err);
+  }
+
+  const msgId = await inboxWriter.write(policy.botId, {
+    type: 'message',
+    priority: 'normal',
+    platform: 'slack' as const,
+    channel_id: msg.channel,
+    thread_id: replyThreadTs,
+    message_id: msg.ts,
+    sender_name: senderName,
+    sender_id: msg.user,
+    text: msg.text,
+    images: msg.images?.map((img) => ({
+      name: img.name,
+      media_type: img.media_type,
+      local_path: img.localPath,
+    })),
+    speaker_domain: speaker?.domain,
+    speaker_profile: speaker
+      ? {
+          nickname: speaker.nickname,
+          organization: speaker.organization,
+          ...speaker.communicationProfile,
+        }
+      : undefined,
+    route_reason: policy.routeReason,
+    thread_history: threadHistory,
+  });
+
+  console.log(
+    `[router] ${senderName} → ${policy.botId} (${policy.routeReason}, direct_app=${botId}) [${msgId.slice(0, 8)}]`,
+  );
+}
+
 async function handleSlackMessage(msg: SlackMessage, senderName: string): Promise<void> {
-  // 0a. SemoBot 처리 (Phase 5 + 자연어 hybrid): deterministic 명령은 직접 응답, 자연어는
+  // 0. Hermes-backed orchestrators (Semi / Colony) — MUST be checked BEFORE SemoBot
+  // deterministic handler so that PING_ALIASES ("테스트" 등) 가 멘션을 가로채지 않는다.
+  // route_bot_id 는 main gateway 가 SEMO_PRIMARY_BOT_ID 일 때 자동 설정됨.
+  // Colony 의 경우 text 안에 @Colony 가 포함된 케이스도 지원 (별도 Slack App 없으면).
+  if (msg.route_bot_id && ORCHESTRATORS[msg.route_bot_id]) {
+    await handleOrchestrator(msg, senderName, ORCHESTRATORS[msg.route_bot_id]);
+    return;
+  }
+  // Colony 가 별도 Slack App 없이 Semi App 으로 들어왔는데 text 에 @Colony 가 명시된 경우.
+  if (
+    msg.route_bot_id === SEMI_BOT_ID &&
+    ORCHESTRATORS[COLONY_BOT_ID] &&
+    /(?:^|\s)@?colony(?:\s|$|<)/i.test(msg.text)
+  ) {
+    await handleOrchestrator(msg, senderName, ORCHESTRATORS[COLONY_BOT_ID]);
+    return;
+  }
+
+  // 0a. Dedicated per-bot Slack app mention → direct mailbox route.
+  // Example: @Semi arrives through SEMI_SLACK_APP_TOKEN Socket Mode, so it must
+  // not fall back to SemoBot/SemiClaw routing. The receiving app already proves
+  // the intended bot identity.
+  if (msg.route_bot_id) {
+    await routeDirectSlackAppMessage(msg, senderName, msg.route_bot_id);
+    return;
+  }
+
+  // 0b. SemoBot 처리 (Phase 5 + 자연어 hybrid): deterministic 명령은 직접 응답, 자연어는
   // semobot cmux pane Claude 세션으로 inbox-route. 둘 다 outer routing 막음.
   if (await maybeHandleSemoBotCommand(msg, senderName)) return;
 
@@ -1111,10 +2104,12 @@ async function start(): Promise<void> {
   console.log('[slack-router] Config loaded (routing + incubator)');
 
   // 3. Set message handler
-  slack.setMessageHandler(handleSlackMessage);
+  inboundSlacks.push(...buildDedicatedInboundSlackGateways());
+  for (const gateway of inboundSlacks) gateway.setMessageHandler(handleSlackMessage);
+  console.log(`[slack-router] Inbound Slack apps: ${inboundSlacks.length}`);
 
   // 4. Start Slack Socket Mode
-  await slack.start();
+  await Promise.all(inboundSlacks.map((gateway) => gateway.start()));
   console.log('[slack-router] Slack connected');
 
   // 5. Start outbox reader
@@ -1138,7 +2133,7 @@ async function shutdown(): Promise<void> {
   console.log('[slack-router] Shutting down...');
   healthMonitor?.stop();
   outboxReader.stop();
-  await slack.stop();
+  await Promise.all(inboundSlacks.map((gateway) => gateway.stop().catch(() => {})));
   await pool.end();
   console.log('[slack-router] Stopped');
   process.exit(0);
