@@ -1,0 +1,262 @@
+{
+  "id": "shop",
+  "label": "소상공인",
+  "longLabel": "소상공인 · 1인 사장님",
+  "icon": "store",
+  "accent": "--agent-peach",
+  "ownerLabel": "사장님",
+  "workspace": {
+    "name": "정민 카페",
+    "subtitle": "Customer · 소상공인"
+  },
+  "agents": [
+    {
+      "id": "jumuni",
+      "name": "주문이",
+      "role": "주문 응대 직원",
+      "dept": "응대",
+      "color": "var(--agent-peach)",
+      "accent": "#E07A3B",
+      "accessoryKind": "headset"
+    },
+    {
+      "id": "hwegyedo-ri",
+      "name": "회계도리",
+      "role": "회계·세무 직원",
+      "dept": "회계",
+      "color": "var(--agent-mint)",
+      "accent": "#2E9670",
+      "accessoryKind": "calc"
+    },
+    {
+      "id": "algorim-i",
+      "name": "알리미",
+      "role": "마케팅·SNS 직원",
+      "dept": "마케팅",
+      "color": "var(--agent-lavender)",
+      "accent": "#6E5BD1",
+      "accessoryKind": "megaphone"
+    },
+    {
+      "id": "chae-wo",
+      "name": "채워",
+      "role": "재고·발주 직원",
+      "dept": "재고",
+      "color": "var(--agent-coral)",
+      "accent": "#D9543F",
+      "accessoryKind": "box"
+    },
+    {
+      "id": "sem-i",
+      "name": "셈이",
+      "role": "매출 분석 직원",
+      "dept": "분석",
+      "color": "var(--agent-sky)",
+      "accent": "#1F7AC9",
+      "accessoryKind": "chart"
+    },
+    {
+      "id": "dangol-i",
+      "name": "단골이",
+      "role": "CS·단골 관리",
+      "dept": "CS",
+      "color": "var(--agent-butter)",
+      "accent": "#B27418",
+      "accessoryKind": "heart"
+    },
+    {
+      "id": "bi-seo",
+      "name": "비서",
+      "role": "스케줄 직원",
+      "dept": "스케줄",
+      "color": "var(--agent-rose)",
+      "accent": "#C66095",
+      "accessoryKind": "clock"
+    }
+  ],
+  "home": {
+    "eyebrow": "Today · 오전 9:47",
+    "greetingTitle": "안녕하세요 정민 사장님.",
+    "greetingSubtitle": "오늘 직원들이 이런 일을 했어요.",
+    "feedTitle": "활동 피드",
+    "nudgeTitle": "오늘 사장님이 해주셔야 할 일",
+    "workingTitle": "지금 일하고 있어요",
+    "weekKB": "이번 주 가게 지식",
+    "weekKBSub": "새 노드 8개 · 새 연결 23개",
+    "planLabel": "응대 사용량",
+    "stats": [
+      {
+        "label": "오늘 응대",
+        "value": "36건",
+        "delta": 12,
+        "hint": "주문이 · 단골이",
+        "chart": "bar",
+        "data": [14, 18, 12, 22, 19, 28, 36]
+      },
+      {
+        "label": "어제 매출",
+        "value": "₩412,000",
+        "delta": 8,
+        "hint": "셈이가 분석함",
+        "chart": "line",
+        "data": [320, 280, 360, 410, 340, 412]
+      },
+      {
+        "label": "새 가게 지식",
+        "value": "8건",
+        "delta": null,
+        "hint": "3명이 함께 채움",
+        "chart": "network"
+      }
+    ],
+    "feed": {
+      "now": [
+        {
+          "agent": "jumuni",
+          "verb": "카카오톡 문의에 답했어요",
+          "target": "단골 김미영 님",
+          "detail": "시그니처 메뉴 '더치 라떼' 추천 + 단골 할인 안내. 답변 만족도 ★★★★★",
+          "time": "2분 전",
+          "status": "working"
+        },
+        {
+          "agent": "dangol-i",
+          "verb": "단골 손님을 알아봤어요",
+          "target": "이번 달 5번째 방문",
+          "detail": "박지호 님이 오후 2시쯤 오실 예정. 평소 따뜻한 아메리카노 + 베이글.",
+          "time": "8분 전"
+        }
+      ],
+      "morning": [
+        {
+          "agent": "hwegyedo-ri",
+          "verb": "5월 4주차 매출 리포트를 만들었어요",
+          "target": "가게 지식에 저장",
+          "detail": "총 매출 ₩2,148,000 (+15%). 화요일 매출이 평균 대비 22% 높았어요.",
+          "time": "9:32"
+        },
+        {
+          "agent": "algorim-i",
+          "verb": "인스타 게시물 초안을 만들었어요",
+          "target": "'신메뉴 더치 라떼'",
+          "detail": "해시태그 7개 + 사진 3장 후보. 게시 전에 한 번 검토해주세요.",
+          "time": "9:14"
+        },
+        {
+          "agent": "chae-wo",
+          "verb": "우유 재고 부족을 알렸어요",
+          "target": "발주 초안 준비됨",
+          "detail": "저지방 우유 2팩 남음 · 내일 오전 소진 예상. 평소 거래처에 자동 발주서 작성 완료.",
+          "time": "8:47"
+        }
+      ],
+      "yesterday": [
+        {
+          "agent": "sem-i",
+          "verb": "어제의 인사이트를 만들었어요",
+          "target": "'오후 3-5시가 가장 한가해요'",
+          "detail": "이 시간대에 단골 할인 알림을 보내면 매출 +18% 효과 예상.",
+          "time": "어제 18:00"
+        }
+      ]
+    },
+    "nudges": [
+      {
+        "agentId": "jumuni",
+        "title": "단골 김미영 님 환불 요청",
+        "detail": "어제 케이크 상태가 이상하다고 하셨어요. 주문이가 답변 초안을 만들어뒀어요.",
+        "primary": "승인하고 응대",
+        "secondary": "내가 답하기"
+      },
+      {
+        "agentId": "algorim-i",
+        "title": "신메뉴 게시물 검토",
+        "detail": "알리미가 인스타용 초안 1개를 준비했어요.",
+        "primary": "미리보기",
+        "secondary": "수정 요청"
+      },
+      {
+        "agentId": "chae-wo",
+        "title": "우유 발주 (저지방 2팩)",
+        "detail": "평소 거래처로 자동 발주 가능.",
+        "primary": "발주하기",
+        "secondary": "나중에"
+      }
+    ],
+    "working": [
+      {
+        "agentId": "jumuni",
+        "task": "카카오톡 응대 중",
+        "detail": "3개 대화"
+      },
+      {
+        "agentId": "hwegyedo-ri",
+        "task": "오늘 매출 정산 중",
+        "detail": "62%",
+        "progress": 62
+      },
+      {
+        "agentId": "algorim-i",
+        "task": "SNS 모니터링 중",
+        "detail": "대기"
+      }
+    ]
+  },
+  "team": {
+    "title": "내 직원",
+    "subtitle": "7명 채용 중",
+    "ctaNew": "새 직원 채용",
+    "filters": ["전체", "일하는 중", "응대", "회계·분석", "마케팅", "재고·발주"],
+    "emptyHire": "120+ 직원이 라이브러리에 있어요"
+  },
+  "knowledge": {
+    "title": "가게 지식",
+    "subtitle": "KB",
+    "weekBlurb": "봇들이 일을 시작하면 여기에 가게 지식이 쌓여요.",
+    "categories": [
+      "메뉴",
+      "손님·단골",
+      "응대·CS",
+      "매출·재무",
+      "마케팅",
+      "재고·발주",
+      "운영",
+      "미팅·일정"
+    ],
+    "sampleNodeTitle": "김미영 (단골)",
+    "sampleNodeFields": [
+      ["첫 방문", "2023년 11월"],
+      ["누적 방문", "48회"],
+      ["평균 객단가", "₩9,500"],
+      ["좋아하는 메뉴", "더치 라떼, 베이글"]
+    ]
+  },
+  "library": {
+    "title": "채용",
+    "subtitle": "120+ 직원",
+    "heroEyebrow": "Hire",
+    "heroTitle": "새 직원을 만나보세요",
+    "searchPlaceholder": "원하는 일을 검색하세요 — 예: 매출 리포트, 카톡 응대",
+    "audienceChips": ["전체", "카페", "미용실", "쇼핑몰", "컨설턴트", "음식점"],
+    "audienceActive": "카페",
+    "rows": [
+      {
+        "eyebrow": "Picked for you",
+        "title": "카페 사장님께 추천하는 직원"
+      },
+      {
+        "eyebrow": "Customer Care",
+        "title": "응대·CS 직원"
+      },
+      {
+        "eyebrow": "Numbers",
+        "title": "회계·분석 직원"
+      }
+    ],
+    "cta": "채용하기"
+  },
+  "plan": {
+    "audience": "1인 사장님의 시작",
+    "tip": "연간 결제 시 한 달치 절약돼요."
+  }
+}

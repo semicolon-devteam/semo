@@ -1,0 +1,262 @@
+{
+  "id": "worker",
+  "label": "직장인",
+  "longLabel": "직장인 · 팀",
+  "icon": "building",
+  "accent": "--agent-sky",
+  "ownerLabel": "님",
+  "workspace": {
+    "name": "재훈의 데스크",
+    "subtitle": "Customer · 직장인"
+  },
+  "agents": [
+    {
+      "id": "report-i",
+      "name": "리포트",
+      "role": "보고서 작성 동료",
+      "dept": "문서",
+      "color": "var(--agent-peach)",
+      "accent": "#E07A3B",
+      "accessoryKind": "chart"
+    },
+    {
+      "id": "research-i",
+      "name": "리서치",
+      "role": "조사·요약 동료",
+      "dept": "리서치",
+      "color": "var(--agent-mint)",
+      "accent": "#2E9670",
+      "accessoryKind": "box"
+    },
+    {
+      "id": "data-yi",
+      "name": "데이터",
+      "role": "데이터 분석 동료",
+      "dept": "분석",
+      "color": "var(--agent-sky)",
+      "accent": "#1F7AC9",
+      "accessoryKind": "chart"
+    },
+    {
+      "id": "meeting-i",
+      "name": "미팅이",
+      "role": "회의록 동료",
+      "dept": "미팅",
+      "color": "var(--agent-rose)",
+      "accent": "#C66095",
+      "accessoryKind": "clock"
+    },
+    {
+      "id": "inbox-i",
+      "name": "인박스",
+      "role": "메일·업무 정리",
+      "dept": "인박스",
+      "color": "var(--agent-lavender)",
+      "accent": "#6E5BD1",
+      "accessoryKind": "megaphone"
+    },
+    {
+      "id": "issue-i",
+      "name": "이슈매니저",
+      "role": "작업 트래킹 동료",
+      "dept": "트래커",
+      "color": "var(--agent-butter)",
+      "accent": "#B27418",
+      "accessoryKind": "calc"
+    },
+    {
+      "id": "sokong-i",
+      "name": "소통이",
+      "role": "메시지 정리 동료",
+      "dept": "커뮤니케이션",
+      "color": "var(--agent-coral)",
+      "accent": "#D9543F",
+      "accessoryKind": "heart"
+    }
+  ],
+  "home": {
+    "eyebrow": "Today · 오전 9:47",
+    "greetingTitle": "안녕하세요 재훈 님.",
+    "greetingSubtitle": "오늘 동료 AI 들이 이런 일을 정리해뒀어요.",
+    "feedTitle": "오늘 정리된 일",
+    "nudgeTitle": "내 결정이 필요한 일",
+    "workingTitle": "지금 처리 중",
+    "weekKB": "이번 주 업무 노트",
+    "weekKBSub": "새 노드 27개 · 새 연결 64개",
+    "planLabel": "월 토큰 사용량",
+    "stats": [
+      {
+        "label": "정리된 메일·메시지",
+        "value": "142건",
+        "delta": 18,
+        "hint": "인박스 + 소통이",
+        "chart": "bar",
+        "data": [22, 28, 31, 26, 34, 38, 42]
+      },
+      {
+        "label": "문서 초안",
+        "value": "6편",
+        "delta": 2,
+        "hint": "리포트가 작성",
+        "chart": "line",
+        "data": [2, 3, 4, 3, 5, 6]
+      },
+      {
+        "label": "회의록·노트",
+        "value": "11편",
+        "delta": null,
+        "hint": "미팅이 + 노트",
+        "chart": "network"
+      }
+    ],
+    "feed": {
+      "now": [
+        {
+          "agent": "meeting-i",
+          "verb": "회의록 초안을 만들었어요",
+          "target": "제품 주간 · 09:00 회의",
+          "detail": "결정 4건 · 액션 7건 · 다음 회의 안건 3건. 본인 발언 인용 정확도 97%.",
+          "time": "5분 전",
+          "status": "working"
+        },
+        {
+          "agent": "inbox-i",
+          "verb": "인박스를 분류했어요",
+          "target": "오전 메일 47통",
+          "detail": "읽음 정리 32 · 답신 초안 9 · 회의 요청 3 · 행동 필요 3.",
+          "time": "15분 전"
+        }
+      ],
+      "morning": [
+        {
+          "agent": "research-i",
+          "verb": "경쟁사 자료를 정리했어요",
+          "target": "'B사 가격 정책 변경 정리'",
+          "detail": "주요 변경 3가지 + 우리 영향 추정 + 의사결정 카드 1장. 출처 6개 인용.",
+          "time": "8:54"
+        },
+        {
+          "agent": "data-yi",
+          "verb": "주간 KPI 대시보드를 새로 그렸어요",
+          "target": "'5월 4주차'",
+          "detail": "MAU +4.8% · 잔존율 D7 +2.1pp. 그래프 캡션은 한 번 봐주세요.",
+          "time": "8:36"
+        },
+        {
+          "agent": "issue-i",
+          "verb": "내 이슈 상태를 정리했어요",
+          "target": "진행 6 · 검토 2 · 블록 1",
+          "detail": "블록 1건 = 디자인 검토 대기 24시간 초과. 슬랙 멘션 초안 준비됨.",
+          "time": "8:14"
+        }
+      ],
+      "yesterday": [
+        {
+          "agent": "sokong-i",
+          "verb": "어제 슬랙을 요약했어요",
+          "target": "#product · 52건",
+          "detail": "결정 3건 · 멘션 받은 항목 4건. 새벽 대화는 모두 #design 채널.",
+          "time": "어제 23:12"
+        }
+      ]
+    },
+    "nudges": [
+      {
+        "agentId": "meeting-i",
+        "title": "회의록 검토 후 공유",
+        "detail": "결정 사항 4건 확인 후 #product 채널에 자동 공유 가능.",
+        "primary": "검토 후 공유",
+        "secondary": "내가 직접"
+      },
+      {
+        "agentId": "issue-i",
+        "title": "디자인 검토 24h 초과 1건",
+        "detail": "담당자에게 친절한 리마인드 초안 준비됨.",
+        "primary": "리마인드 보내기",
+        "secondary": "나중에"
+      },
+      {
+        "agentId": "research-i",
+        "title": "경쟁사 자료 결정 카드",
+        "detail": "우리 가격 정책 대응 옵션 3가지 정리됨.",
+        "primary": "의사결정 미팅 잡기",
+        "secondary": "나중에"
+      }
+    ],
+    "working": [
+      {
+        "agentId": "meeting-i",
+        "task": "회의록 정리 중",
+        "detail": "79%",
+        "progress": 79
+      },
+      {
+        "agentId": "data-yi",
+        "task": "KPI 쿼리 실행",
+        "detail": "대기"
+      },
+      {
+        "agentId": "inbox-i",
+        "task": "메일 분류 중",
+        "detail": "대기"
+      }
+    ]
+  },
+  "team": {
+    "title": "내 동료팀",
+    "subtitle": "7명이 함께 일해요",
+    "ctaNew": "새 동료 추가",
+    "filters": ["전체", "처리 중", "문서·노트", "데이터", "커뮤니케이션", "트래커"],
+    "emptyHire": "60+ 동료가 라이브러리에 있어요"
+  },
+  "knowledge": {
+    "title": "업무 노트",
+    "subtitle": "Work KB",
+    "weekBlurb": "동료들이 함께 정리한 회의·문서·결정이 그래프로 쌓여요.",
+    "categories": [
+      "프로젝트",
+      "결정 기록",
+      "회의록",
+      "KPI·데이터",
+      "경쟁사·시장",
+      "제품·기능",
+      "팀·사람",
+      "문서·계약"
+    ],
+    "sampleNodeTitle": "5월 4주차 제품 주간 회의",
+    "sampleNodeFields": [
+      ["일시", "5월 28일 09:00"],
+      ["참석", "6명"],
+      ["결정", "4건"],
+      ["관련 KPI", "MAU · D7 잔존"]
+    ]
+  },
+  "library": {
+    "title": "동료 만나기",
+    "subtitle": "60+ 동료",
+    "heroEyebrow": "Hire",
+    "heroTitle": "내 업무를 도와줄 동료를 만나보세요",
+    "searchPlaceholder": "도움받고 싶은 일을 검색하세요 — 예: 회의록 정리, 경쟁사 리서치",
+    "audienceChips": ["전체", "제품 매니저", "디자이너", "개발자", "마케터", "리서처"],
+    "audienceActive": "제품 매니저",
+    "rows": [
+      {
+        "eyebrow": "Picked for you",
+        "title": "제품 매니저에게 추천하는 동료"
+      },
+      {
+        "eyebrow": "Writing",
+        "title": "문서·보고서 동료"
+      },
+      {
+        "eyebrow": "Numbers",
+        "title": "데이터·KPI 동료"
+      }
+    ],
+    "cta": "데려오기"
+  },
+  "plan": {
+    "audience": "바쁜 1인의 업무 보조",
+    "tip": "연간 결제 시 한 달치 절약돼요."
+  }
+}

@@ -1,0 +1,262 @@
+{
+  "id": "personal",
+  "label": "개인",
+  "longLabel": "개인 · 일상을 돕는 비서팀",
+  "icon": "heart",
+  "accent": "--agent-rose",
+  "ownerLabel": "님",
+  "workspace": {
+    "name": "지원의 일상",
+    "subtitle": "Customer · 개인"
+  },
+  "agents": [
+    {
+      "id": "eui-ri",
+      "name": "의리",
+      "role": "보험·증권 비서",
+      "dept": "재무",
+      "color": "var(--agent-peach)",
+      "accent": "#E07A3B",
+      "accessoryKind": "heart"
+    },
+    {
+      "id": "hwal-do-ri",
+      "name": "활도리",
+      "role": "건강·운동 비서",
+      "dept": "건강",
+      "color": "var(--agent-mint)",
+      "accent": "#2E9670",
+      "accessoryKind": "chart"
+    },
+    {
+      "id": "mind-i",
+      "name": "마인드",
+      "role": "감정·일기 비서",
+      "dept": "마음",
+      "color": "var(--agent-lavender)",
+      "accent": "#6E5BD1",
+      "accessoryKind": "heart"
+    },
+    {
+      "id": "sallim-i",
+      "name": "살림이",
+      "role": "가계부 비서",
+      "dept": "재무",
+      "color": "var(--agent-butter)",
+      "accent": "#B27418",
+      "accessoryKind": "calc"
+    },
+    {
+      "id": "chingu-jigi",
+      "name": "친구지기",
+      "role": "관계·기념일 비서",
+      "dept": "관계",
+      "color": "var(--agent-rose)",
+      "accent": "#C66095",
+      "accessoryKind": "heart"
+    },
+    {
+      "id": "chwimi",
+      "name": "취미",
+      "role": "취미·콘텐츠 비서",
+      "dept": "취미",
+      "color": "var(--agent-coral)",
+      "accent": "#D9543F",
+      "accessoryKind": "megaphone"
+    },
+    {
+      "id": "iljeong-i",
+      "name": "일정이",
+      "role": "일정·할 일 비서",
+      "dept": "일정",
+      "color": "var(--agent-sky)",
+      "accent": "#1F7AC9",
+      "accessoryKind": "clock"
+    }
+  ],
+  "home": {
+    "eyebrow": "Today · 오전 9:47",
+    "greetingTitle": "안녕하세요 지원 님.",
+    "greetingSubtitle": "오늘 비서들이 이런 걸 챙겨두었어요.",
+    "feedTitle": "오늘의 정리",
+    "nudgeTitle": "오늘 결정해주실 것들",
+    "workingTitle": "지금 챙기고 있어요",
+    "weekKB": "이번 주 나의 기록",
+    "weekKBSub": "새 노드 12개 · 새 연결 31개",
+    "planLabel": "대화 사용량",
+    "stats": [
+      {
+        "label": "이번 달 가계",
+        "value": "-₩238,000",
+        "delta": -6,
+        "hint": "살림이 정리",
+        "chart": "line",
+        "data": [180, 220, 240, 260, 250, 238]
+      },
+      {
+        "label": "운동 기록",
+        "value": "4 / 5일",
+        "delta": null,
+        "hint": "활도리 응원 중",
+        "chart": "bar",
+        "data": [1, 0, 1, 1, 0, 1, 0]
+      },
+      {
+        "label": "새 기록·메모",
+        "value": "12건",
+        "delta": null,
+        "hint": "마인드·일정이",
+        "chart": "network"
+      }
+    ],
+    "feed": {
+      "now": [
+        {
+          "agent": "eui-ri",
+          "verb": "실손보험 청구를 도와드렸어요",
+          "target": "5월 16일 진료",
+          "detail": "병원 영수증 사진을 인식해서 청구서 초안을 만들었어요. 마지막 확인만 해주세요.",
+          "time": "3분 전",
+          "status": "working"
+        },
+        {
+          "agent": "iljeong-i",
+          "verb": "내일 일정을 정리했어요",
+          "target": "치과 14:30 + 부모님 통화 19:00",
+          "detail": "치과 출발 30분 전에 알려드릴게요.",
+          "time": "11분 전"
+        }
+      ],
+      "morning": [
+        {
+          "agent": "sallim-i",
+          "verb": "5월 가계부를 정리했어요",
+          "target": "이번 달 카테고리 TOP 3",
+          "detail": "식비 ₩412k · 교통 ₩98k · 구독 ₩47k. 구독은 지난달보다 ₩12k 늘었어요.",
+          "time": "8:48"
+        },
+        {
+          "agent": "hwal-do-ri",
+          "verb": "오늘 운동 루틴을 준비했어요",
+          "target": "저녁 7시 · 30분",
+          "detail": "어제 어깨가 무거우셨다 했으니 가벼운 스트레칭 위주로 짰어요.",
+          "time": "8:30"
+        },
+        {
+          "agent": "chingu-jigi",
+          "verb": "친구 기념일을 챙겼어요",
+          "target": "주연이 생일 D-3",
+          "detail": "작년에 좋아하셨던 카페 케이크 + 손글씨 카드 조합을 추천드려요.",
+          "time": "8:12"
+        }
+      ],
+      "yesterday": [
+        {
+          "agent": "mind-i",
+          "verb": "어제 감정 일기를 모았어요",
+          "target": "'오후엔 차분, 저녁엔 들뜸'",
+          "detail": "비슷한 패턴이 이번 주 4번. 오후 산책이 도움되었던 날과 겹쳐요.",
+          "time": "어제 23:10"
+        }
+      ]
+    },
+    "nudges": [
+      {
+        "agentId": "eui-ri",
+        "title": "실손보험 청구 서명",
+        "detail": "서류 마지막에 본인 확인만 하면 바로 접수돼요.",
+        "primary": "확인하고 보내기",
+        "secondary": "내가 직접"
+      },
+      {
+        "agentId": "sallim-i",
+        "title": "넷플릭스 구독 자동결제 ₩17,000",
+        "detail": "이번 달 사용 0시간. 한 달 쉬어볼까요?",
+        "primary": "한 달 쉬기",
+        "secondary": "유지"
+      },
+      {
+        "agentId": "chingu-jigi",
+        "title": "주연이 생일 선물",
+        "detail": "작년 후기 좋았던 옵션 3개 준비했어요.",
+        "primary": "미리보기",
+        "secondary": "나중에"
+      }
+    ],
+    "working": [
+      {
+        "agentId": "eui-ri",
+        "task": "병원 영수증 인식 중",
+        "detail": "서류 1건"
+      },
+      {
+        "agentId": "sallim-i",
+        "task": "카드내역 분류 중",
+        "detail": "74%",
+        "progress": 74
+      },
+      {
+        "agentId": "hwal-do-ri",
+        "task": "루틴 준비 중",
+        "detail": "대기"
+      }
+    ]
+  },
+  "team": {
+    "title": "내 비서팀",
+    "subtitle": "7명이 함께해요",
+    "ctaNew": "새 비서 데려오기",
+    "filters": ["전체", "챙기는 중", "재무", "건강", "관계", "취미·일정"],
+    "emptyHire": "80+ 비서가 라이브러리에 있어요"
+  },
+  "knowledge": {
+    "title": "나의 기록",
+    "subtitle": "My KB",
+    "weekBlurb": "비서들이 함께 정리하면 여기에 내 일상이 그래프로 쌓여요.",
+    "categories": [
+      "가계·소비",
+      "건강·운동",
+      "감정·일기",
+      "관계·기념일",
+      "취미·콘텐츠",
+      "여행",
+      "일정·할 일",
+      "문서·계약"
+    ],
+    "sampleNodeTitle": "주연 (친한 친구)",
+    "sampleNodeFields": [
+      ["알게 된 날", "2018년 3월"],
+      ["지난 만남", "4월 27일"],
+      ["좋아하는 카페", "연남동 노티드"],
+      ["알레르기", "갑각류"]
+    ]
+  },
+  "library": {
+    "title": "비서 만나기",
+    "subtitle": "80+ 비서",
+    "heroEyebrow": "Hire",
+    "heroTitle": "내 일상을 도와줄 비서를 만나보세요",
+    "searchPlaceholder": "도움받고 싶은 일을 검색하세요 — 예: 가계부 정리, 운동 루틴",
+    "audienceChips": ["전체", "재무·소비", "건강·운동", "마음·일기", "관계", "취미·여행"],
+    "audienceActive": "재무·소비",
+    "rows": [
+      {
+        "eyebrow": "Picked for you",
+        "title": "바쁜 분께 추천하는 비서"
+      },
+      {
+        "eyebrow": "Money",
+        "title": "돈·구독 정리 비서"
+      },
+      {
+        "eyebrow": "Wellbeing",
+        "title": "건강·마음 비서"
+      }
+    ],
+    "cta": "데려오기"
+  },
+  "plan": {
+    "audience": "나의 일상을 도와주는 첫 비서",
+    "tip": "연간 결제 시 한 달치 절약돼요."
+  }
+}
