@@ -31,10 +31,10 @@ export default function SignupPage() {
         setBusy(false);
         return;
       }
-      // 세션이 바로 생기면(이메일 확인 off) 테넌트 생성 후 진입.
+      // 세션이 바로 생기면(이메일 확인 off) 테넌트 생성 후 모드 선택(/my/start)으로.
       const res = await fetch('/api/my/tenant/ensure', { method: 'POST' });
       if (res.ok) {
-        window.location.href = '/my';
+        window.location.href = '/my/start';
         return;
       }
       // 이메일 확인이 필요한 경우 등 — 세션 아직 없음.

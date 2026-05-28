@@ -373,6 +373,20 @@ const c = new Client({ connectionString: url });
       }
     }
 
+    // ── Persona settings (012) ─────────────────────────────────────
+    await c.query(
+      fs.readFileSync(
+        path.join(process.cwd(), 'migrations/012_customer_persona_settings.sql'),
+        'utf8',
+      ),
+    );
+    // 데모 테넌트(정민 카페)는 가게(shop) 페르소나로 기본값 시드.
+    await c.query(
+      `insert into public.customer_tenant_settings (tenant_id, default_persona_id)
+       select id, 'shop' from public.tenants where slug='jeongmin-cafe'
+       on conflict (tenant_id) do nothing`,
+    );
+
     const counts = await c.query(
       `select (select count(*) from public.agent_listings where audience='customer') listings,
               (select count(*) from public.tenants) tenants,
@@ -380,7 +394,8 @@ const c = new Client({ connectionString: url });
               (select count(*) from public.agent_activity) activity,
               (select count(*) from public.plans) plans,
               (select count(*) from public.subscriptions) subs,
-              (select count(*) from public.payment_events) invoices`,
+              (select count(*) from public.payment_events) invoices,
+              (select count(*) from public.customer_tenant_settings) tenant_personas`,
     );
     console.log('OK', counts.rows[0]);
   } finally {
