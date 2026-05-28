@@ -1,4 +1,5 @@
 'use client';
+import { usePathname } from 'next/navigation';
 import { BotAvatar } from './agents';
 
 /*
@@ -313,6 +314,9 @@ const NAV_PROVIDER = [
 
 function Sidebar({ mode, active, workspace }) {
   const isProvider = mode === 'provider';
+  // 데모(/demo)와 실제(/my)가 같은 nav 를 공유 → 현재 컨텍스트에 맞춰 href base 전환.
+  const pathname = usePathname();
+  const navBase = pathname && pathname.startsWith('/demo') ? '/demo' : '/my';
   return (
     <aside style={{
       width: 232,
@@ -380,7 +384,7 @@ function Sidebar({ mode, active, workspace }) {
       {(isProvider ? NAV_PROVIDER : NAV_CUSTOMER).map(n => {
         const sel = n.id === active;
         return (
-          <a key={n.id} href={n.href}
+          <a key={n.id} href={n.external ? n.href : navBase + n.href.slice('/my'.length)}
              target={n.external ? '_blank' : undefined}
              rel={n.external ? 'noreferrer' : undefined}
              style={{

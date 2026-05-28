@@ -1,5 +1,6 @@
 'use client';
 import React from 'react';
+import { usePathname } from 'next/navigation';
 import { AGENT_BY_ID, BotAvatar } from './agents';
 import { Icon, Eyebrow, Badge, Button, AppShell } from './components';
 
@@ -186,8 +187,10 @@ function LibraryRow({ eyebrow, title, items, isCommunity, resolve = getLibAgent 
 function LibraryCard({ agent, primary, community }) {
   const a = agent.bio ? agent : libraryCard(agent);
   const bigBio = (agent.bio || `${agent.role}으로 일해요.`).slice(0, 56);
+  const pathname = usePathname();
+  const base = pathname && pathname.startsWith('/demo') ? '/demo' : '/my';
   return (
-    <div onClick={() => { window.location.href = `/my/library/${a.id || agent.id || ''}`; }} style={{
+    <div onClick={() => { window.location.href = `${base}/library/${a.id || agent.id || ''}`; }} style={{
       flex: '0 0 auto',
       width: primary ? 280 : 220,
       background: 'var(--semo-surface)',

@@ -68,8 +68,12 @@ export async function updateSession(request: NextRequest) {
     // Voice push notification 탭 시 진입하는 fallback 중계 페이지 — 미로그인 상태에서도
     // discord deep link 로 redirect 해야 하므로 인증 우회
     pathname.startsWith('/voice/join') ||
-    // Customer 대시보드 v5 쇼케이스 (/my*) — 현재 mock 데이터 퍼블리싱 단계라 인증 우회.
-    // ⚠️ 실데이터(테넌시/KB/봇) 연동 시 반드시 재-게이팅할 것.
+    // Customer 데모 쇼케이스 (/demo*) — 영구 공개. 시드된 데모 테넌트(정민 카페)를
+    // 보여주는 영업/소개용 라우트. /my 가 인증 제품으로 게이팅된 뒤에도 공개 유지.
+    pathname === '/demo' ||
+    pathname.startsWith('/demo/') ||
+    // Customer 대시보드 v5 (/my*) — 현재 mock 데이터 퍼블리싱 단계라 인증 우회.
+    // ⚠️ 실 가입/테넌시 플로우 도입 시 이 블록을 제거해 재-게이팅할 것(데모는 /demo* 가 담당).
     // 참조: docs/plans/2026-05-28-customer-dashboard-agents-integration.md
     pathname === '/my' ||
     pathname.startsWith('/my/') ||
