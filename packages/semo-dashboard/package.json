@@ -18,6 +18,8 @@
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.99.1",
     "@tailwindcss/typography": "^0.5.19",
+    "@team-semicolon/semo-kb-core": "*",
+    "@team-semicolon/semo-kb-pg": "*",
     "@types/pg": "^8.18.0",
     "highlight.js": "^11.11.1",
     "isomorphic-dompurify": "^3.1.0",
