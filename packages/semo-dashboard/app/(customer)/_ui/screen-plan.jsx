@@ -56,10 +56,52 @@ const PLANS = [
   },
 ];
 
-function ScreenPlan() {
+function planColor(p) {
+  if (p.recommended) return 'var(--semo-primary-08)';
+  if (p.current) return 'var(--semo-cream)';
+  return 'var(--semo-surface)';
+}
+
+// 실 billing → mock PLANS 호환 shape 로 매핑(PlanTier 가 기대하는 형태).
+function toTier(p) {
+  return {
+    id: p.slug,
+    name: p.name,
+    price: p.priceKrw,
+    period: p.period === 'month' ? '월' : p.period === 'year' ? '년' : '',
+    blurb: p.blurb,
+    color: planColor(p),
+    items: p.features,
+    current: p.current,
+    recommended: p.recommended,
+  };
+}
+
+function fmtUsageSub(m) {
+  if (m.metric === 'kb_storage_mb') return `${m.used} / ${m.limit ?? '∞'}MB`;
+  if (m.metric === 'employees') return `${m.used} / ${m.limit ?? '∞'}명`;
+  return `${m.used.toLocaleString()} / ${m.limit != null ? m.limit.toLocaleString() : '∞'}`;
+}
+
+function fmtDate(iso) {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`;
+}
+
+function ScreenPlan({ billing }) {
+  const hasReal = billing && Array.isArray(billing.plans) && billing.plans.length > 0;
+  const plans = hasReal ? billing.plans.map(toTier) : PLANS;
+  const current = plans.find((p) => p.current) || plans.find((p) => p.id === 'starter') || plans[1];
+  const usage = hasReal && billing.usage.length ? billing.usage : null;
+  const invoices = hasReal && billing.invoices.length ? billing.invoices : null;
+  const pm = hasReal ? billing.paymentMethod : null;
+  const nextBilling = hasReal ? fmtDate(billing.nextBillingAt) : '6월 28일';
+  const priceLabel = current && current.price ? `₩${current.price.toLocaleString()}` : '₩29,000';
+
   return (
     <AppShell mode="customer" active="plan" title="요금제"
-              subtitle="Starter · 다음 결제일 6월 28일">
+              subtitle={`${current?.name || 'Starter'} · 다음 결제일 ${nextBilling || '6월 28일'}`}>
       <div style={{
         height: '100%', overflow: 'hidden',
         padding: '28px 32px',
@@ -78,9 +120,10 @@ function ScreenPlan() {
                   margin: '6px 0 4px',
                   fontSize: 30, fontWeight: 700,
                   color: 'var(--semo-fg-1)', letterSpacing: '-0.02em',
-                }}>Starter <span style={{ color: 'var(--semo-fg-3)', fontWeight: 500, fontSize: 18 }}>· 월 ₩29,000</span></h2>
+                }}>{current?.name || 'Starter'} <span style={{ color: 'var(--semo-fg-3)', fontWeight: 500, fontSize: 18 }}>· 월 {priceLabel}</span></h2>
                 <div style={{ fontSize: 13, color: 'var(--semo-fg-3)' }}>
-                  다음 결제: 6월 28일 · 카드 신한 4242로 끝나는 카드
+                  다음 결제: {nextBilling || '6월 28일'}
+                  {pm?.brand ? ` · ${pm.brand} ${pm.last4 || ''}로 끝나는 카드` : ' · 카드 신한 4242로 끝나는 카드'}
                 </div>
               </div>
               <Button variant="primary" iconRight="arrow-right">Pro 로 업그레이드</Button>
@@ -88,9 +131,24 @@ function ScreenPlan() {
             <div style={{
               display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18, marginTop: 22,
             }}>
-              <Progress label="AI 응대" sub="1,240 / 5,000" value={1240} max={5000}/>
-              <Progress label="가게 지식 용량" sub="124 / 500MB" value={124} max={500}/>
-              <Progress label="채용 중인 직원" sub="3 / 3명" value={3} max={3} warning/>
+              {usage ? (
+                usage.slice(0, 3).map((m) => (
+                  <Progress
+                    key={m.metric}
+                    label={m.label}
+                    sub={fmtUsageSub(m)}
+                    value={m.used}
+                    max={m.limit ?? m.used}
+                    warning={m.limit != null && m.used >= m.limit}
+                  />
+                ))
+              ) : (
+                <>
+                  <Progress label="AI 응대" sub="1,240 / 5,000" value={1240} max={5000}/>
+                  <Progress label="가게 지식 용량" sub="124 / 500MB" value={124} max={500}/>
+                  <Progress label="채용 중인 직원" sub="3 / 3명" value={3} max={3} warning/>
+                </>
+              )}
             </div>
             <div style={{
               marginTop: 16,
@@ -114,18 +172,27 @@ function ScreenPlan() {
                      { value: 'yearly',  label: '연간 -20%' },
                    ]}/>}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12 }}>
-              {PLANS.map(p => <PlanTier key={p.id} plan={p}/>)}
+              {plans.map(p => <PlanTier key={p.id} plan={p}/>)}
             </div>
           </Section>
 
           {/* Bottom: invoices + receipts */}
           <Section eyebrow="Invoices" title="청구서·영수증">
             <Card padding={0}>
-              {[
-                ['2026-05', '5월 청구서', '₩29,000', '결제 완료', 'success'],
-                ['2026-04', '4월 청구서', '₩29,000', '결제 완료', 'success'],
-                ['2026-03', '3월 청구서', '₩0',       'Free 사용 중', 'neutral'],
-              ].map((row, i, a) => (
+              {(invoices
+                ? invoices.map((inv) => {
+                    const d = new Date(inv.occurredAt);
+                    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                    const statusLabel = inv.status === 'paid' ? '결제 완료' : inv.status === 'free' ? 'Free 사용 중' : inv.status === 'pending' ? '대기' : '실패';
+                    const tone = inv.status === 'paid' ? 'success' : inv.status === 'failed' ? 'danger' : 'neutral';
+                    return [ym, inv.label, `₩${inv.amountKrw.toLocaleString()}`, statusLabel, tone];
+                  })
+                : [
+                    ['2026-05', '5월 청구서', '₩29,000', '결제 완료', 'success'],
+                    ['2026-04', '4월 청구서', '₩29,000', '결제 완료', 'success'],
+                    ['2026-03', '3월 청구서', '₩0', 'Free 사용 중', 'neutral'],
+                  ]
+              ).map((row, i, a) => (
                 <div key={i} style={{
                   display: 'grid',
                   gridTemplateColumns: '90px 1fr 100px 140px 40px',
@@ -174,18 +241,18 @@ function ScreenPlan() {
                 background: 'rgba(6,143,255,0.45)', filter: 'blur(20px)',
               }}/>
               <div style={{ fontSize: 11, opacity: 0.65, fontWeight: 600,
-                            letterSpacing: '0.1em', textTransform: 'uppercase' }}>신한카드</div>
+                            letterSpacing: '0.1em', textTransform: 'uppercase' }}>{pm?.brand || '신한카드'}</div>
               <div className="semo-num" style={{
                 marginTop: 18, fontSize: 18, fontWeight: 600, letterSpacing: '0.04em',
                 fontFamily: 'var(--semo-mono)',
-              }}>•••• •••• •••• 4242</div>
+              }}>•••• •••• •••• {pm?.last4 || '4242'}</div>
               <div style={{
                 marginTop: 12, display: 'flex',
                 justifyContent: 'space-between', alignItems: 'center',
                 fontSize: 11, opacity: 0.85,
               }}>
-                <span>강정민</span>
-                <span className="semo-num">04 / 28</span>
+                <span>{pm?.holder || '강정민'}</span>
+                <span className="semo-num">{pm?.exp || '04 / 28'}</span>
               </div>
             </div>
             <div style={{

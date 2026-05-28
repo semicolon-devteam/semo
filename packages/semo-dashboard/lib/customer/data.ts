@@ -395,3 +395,132 @@ export async function getKnowledgeGraph(
     return { nodes: [], links: [] };
   }
 }
+
+// ─── 결제/구독(/my/plan) 실데이터 ─────────────────────────────────────
+// 데이터 모델만 실데이터로 구동(플랜 카탈로그/구독/사용량/청구이력). 실제 결제 실행
+// (포트원 V2 결제창·빌링키, 팝빌 세금계산서)은 merchant 크리덴셜 필요 → 별도 통합 레이어에서
+// 처리하고 payment_events 에 적재한다(여기서는 그 적재 결과를 읽기만).
+
+export interface PlanTier {
+  slug: string;
+  name: string;
+  priceKrw: number;
+  period: string;
+  blurb: string | null;
+  features: Array<[string, string | boolean]>;
+  recommended: boolean;
+  current: boolean;
+}
+export interface UsageMeter {
+  metric: string;
+  label: string;
+  used: number;
+  limit: number | null;
+}
+export interface Invoice {
+  label: string;
+  amountKrw: number;
+  status: string;
+  occurredAt: string;
+}
+export interface BillingData {
+  currentPlan: PlanTier | null;
+  nextBillingAt: string | null;
+  paymentMethod: { brand?: string; last4?: string; holder?: string; exp?: string } | null;
+  plans: PlanTier[];
+  usage: UsageMeter[];
+  invoices: Invoice[];
+}
+
+const USAGE_LABELS: Record<string, string> = {
+  ai_responses: 'AI 응대',
+  kb_storage_mb: '가게 지식 용량',
+  employees: '채용 중인 직원',
+};
+
+/** 테넌트 결제 현황. 비거나 오류면 null(화면이 mock 폴백). */
+export async function getBilling(tenantSlug: string = DEMO_TENANT): Promise<BillingData | null> {
+  try {
+    const [planRes, subRes, usageRes, invRes] = await Promise.all([
+      query<{
+        slug: string;
+        name: string;
+        price_krw: number;
+        period: string;
+        blurb: string | null;
+        features: Array<[string, string | boolean]>;
+        recommended: boolean;
+      }>(
+        `select slug, name, price_krw, period, blurb, features, recommended from public.plans order by sort`,
+      ),
+      query<{
+        plan_slug: string;
+        next_billing_at: string | Date | null;
+        payment_method: BillingData['paymentMethod'];
+      }>(
+        `select s.plan_slug, s.next_billing_at, s.payment_method
+           from public.subscriptions s join public.tenants t on t.id = s.tenant_id
+          where t.slug = $1 limit 1`,
+        [tenantSlug],
+      ),
+      query<{ metric: string; used: number; limit_val: number | null }>(
+        `select u.metric, u.used, u.limit_val
+           from public.usage_meters u join public.tenants t on t.id = u.tenant_id
+          where t.slug = $1 order by u.period_start desc, u.metric`,
+        [tenantSlug],
+      ),
+      query<{
+        invoice_label: string | null;
+        amount_krw: number;
+        status: string;
+        occurred_at: string | Date;
+      }>(
+        `select pe.invoice_label, pe.amount_krw, pe.status, pe.occurred_at
+           from public.payment_events pe join public.tenants t on t.id = pe.tenant_id
+          where t.slug = $1 order by pe.occurred_at desc limit 12`,
+        [tenantSlug],
+      ),
+    ]);
+
+    if (planRes.rows.length === 0) return null;
+    const currentSlug = subRes.rows[0]?.plan_slug ?? null;
+    const plans: PlanTier[] = planRes.rows.map((p) => ({
+      slug: p.slug,
+      name: p.name,
+      priceKrw: p.price_krw,
+      period: p.period,
+      blurb: p.blurb,
+      features: Array.isArray(p.features) ? p.features : [],
+      recommended: p.recommended,
+      current: p.slug === currentSlug,
+    }));
+    const seen = new Set<string>();
+    const usage: UsageMeter[] = [];
+    for (const u of usageRes.rows) {
+      if (seen.has(u.metric)) continue;
+      seen.add(u.metric);
+      usage.push({
+        metric: u.metric,
+        label: USAGE_LABELS[u.metric] ?? u.metric,
+        used: u.used,
+        limit: u.limit_val,
+      });
+    }
+    const nb = subRes.rows[0]?.next_billing_at;
+    return {
+      currentPlan: plans.find((p) => p.current) ?? null,
+      nextBillingAt: nb ? (nb instanceof Date ? nb.toISOString() : nb) : null,
+      paymentMethod: subRes.rows[0]?.payment_method ?? null,
+      plans,
+      usage,
+      invoices: invRes.rows.map((r) => ({
+        label: r.invoice_label ?? '청구서',
+        amountKrw: r.amount_krw,
+        status: r.status,
+        occurredAt: r.occurred_at instanceof Date ? r.occurred_at.toISOString() : r.occurred_at,
+      })),
+    };
+  } catch {
+    return null;
+  }
+}

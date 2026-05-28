@@ -257,11 +257,130 @@ const c = new Client({ connectionString: url });
         );
       }
     }
+    // ── Billing (011) ──────────────────────────────────────────────
+    await c.query(
+      fs.readFileSync(path.join(process.cwd(), 'migrations/011_billing_tables.sql'), 'utf8'),
+    );
+    const PLANS = [
+      [
+        'free',
+        'Free',
+        0,
+        '',
+        '처음 둘러보기',
+        [
+          ['동시 채용 가능', '1명'],
+          ['월간 AI 사용량', '300건'],
+          ['가게 지식 용량', '50MB'],
+          ['우선 지원', false],
+          ['내 봇 라이브러리 공유', false],
+        ],
+        false,
+        0,
+      ],
+      [
+        'starter',
+        'Starter',
+        29000,
+        'month',
+        '1인 사장님의 시작',
+        [
+          ['동시 채용 가능', '3명'],
+          ['월간 AI 사용량', '5,000건'],
+          ['가게 지식 용량', '500MB'],
+          ['우선 지원', '이메일'],
+          ['내 봇 라이브러리 공유', false],
+        ],
+        false,
+        1,
+      ],
+      [
+        'pro',
+        'Pro',
+        79000,
+        'month',
+        '직원이 더 필요한 가게',
+        [
+          ['동시 채용 가능', '7명'],
+          ['월간 AI 사용량', '25,000건'],
+          ['가게 지식 용량', '5GB'],
+          ['우선 지원', '카톡 채널'],
+          ['내 봇 라이브러리 공유', true],
+        ],
+        true,
+        2,
+      ],
+      [
+        'business',
+        'Business',
+        199000,
+        'month',
+        '여러 매장·팀 운영',
+        [
+          ['동시 채용 가능', '제한 없음'],
+          ['월간 AI 사용량', '제한 없음'],
+          ['가게 지식 용량', '50GB'],
+          ['우선 지원', '전담 매니저'],
+          ['내 봇 라이브러리 공유', true],
+        ],
+        false,
+        3,
+      ],
+    ];
+    for (const p of PLANS) {
+      await c.query(
+        `insert into public.plans (slug,name,price_krw,period,blurb,features,recommended,sort)
+         values ($1,$2,$3,$4,$5,$6::jsonb,$7,$8) on conflict (slug) do nothing`,
+        [p[0], p[1], p[2], p[3], p[4], JSON.stringify(p[5]), p[6], p[7]],
+      );
+    }
+    await c.query(
+      `insert into public.subscriptions (tenant_id,plan_slug,status,next_billing_at,payment_method)
+       select t.id,'starter','active', timestamptz '2026-06-28',
+              '{"brand":"신한카드","last4":"4242","holder":"강정민","exp":"04/28"}'::jsonb
+       from public.tenants t where t.slug='jeongmin-cafe'
+       on conflict (tenant_id) do nothing`,
+    );
+    for (const [metric, used, lim] of [
+      ['ai_responses', 1240, 5000],
+      ['kb_storage_mb', 124, 500],
+      ['employees', 3, 3],
+    ]) {
+      await c.query(
+        `insert into public.usage_meters (tenant_id,metric,used,limit_val)
+         select t.id,$1,$2,$3 from public.tenants t where t.slug='jeongmin-cafe'
+         on conflict (tenant_id,metric,period_start) do nothing`,
+        [metric, used, lim],
+      );
+    }
+    const {
+      rows: [{ pn }],
+    } = await c.query(
+      `select count(*)::int pn from public.payment_events pe
+       join public.tenants t on pe.tenant_id=t.id where t.slug='jeongmin-cafe'`,
+    );
+    if (pn === 0) {
+      for (const [label, amt, st, daysAgo] of [
+        ['5월 청구서', 29000, 'paid', 27],
+        ['4월 청구서', 29000, 'paid', 58],
+      ]) {
+        await c.query(
+          `insert into public.payment_events (tenant_id,event_type,amount_krw,status,invoice_label,occurred_at)
+           select t.id,'charge',$2,$3,$1, now() - ($4 || ' days')::interval
+           from public.tenants t where t.slug='jeongmin-cafe'`,
+          [label, amt, st, String(daysAgo)],
+        );
+      }
+    }
+
     const counts = await c.query(
       `select (select count(*) from public.agent_listings where audience='customer') listings,
               (select count(*) from public.tenants) tenants,
               (select count(*) from public.agent_installs) installs,
-              (select count(*) from public.agent_activity) activity`,
+              (select count(*) from public.agent_activity) activity,
+              (select count(*) from public.plans) plans,
+              (select count(*) from public.subscriptions) subs,
+              (select count(*) from public.payment_events) invoices`,
     );
     console.log('OK', counts.rows[0]);
   } finally {
