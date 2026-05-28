@@ -47,6 +47,9 @@ export async function updateSession(request: NextRequest) {
 
   // 인증이 필요 없는 경로 (봇 callback/webhook 포함)
   const pathname = request.nextUrl.pathname;
+  // T67: 고객 게이팅 플래그. OFF(기본) → /my* 공개(현행 쇼케이스). ON → /my* 로그인 필수
+  //      (가입은 /my/signup, 데모는 /demo* 로 항상 공개). prod 전환 전 dev 에서 검증 후 ON.
+  const CUSTOMER_GATING = process.env.SEMO_CUSTOMER_GATING === '1';
   // 인증 불필요 경로: 공개 페이지 + 봇/외부 webhook + 서버 컴포넌트 내부 호출용 read-only API
   const publicPaths = ['/login', '/auth/callback', '/api/health'];
   const isPublicPath =
@@ -72,12 +75,12 @@ export async function updateSession(request: NextRequest) {
     // 보여주는 영업/소개용 라우트. /my 가 인증 제품으로 게이팅된 뒤에도 공개 유지.
     pathname === '/demo' ||
     pathname.startsWith('/demo/') ||
-    // Customer 대시보드 v5 (/my*) — 현재 mock 데이터 퍼블리싱 단계라 인증 우회.
-    // ⚠️ 실 가입/테넌시 플로우 도입 시 이 블록을 제거해 재-게이팅할 것(데모는 /demo* 가 담당).
-    // 참조: docs/plans/2026-05-28-customer-dashboard-agents-integration.md
-    pathname === '/my' ||
-    pathname.startsWith('/my/') ||
-    pathname.startsWith('/api/my/') ||
+    // 가입/로그인 페이지 — 게이팅 여부와 무관하게 항상 공개.
+    pathname === '/my/signup' ||
+    // Customer 대시보드 (/my*) — 게이팅 OFF 일 때만 공개(현 mock 쇼케이스). ON 이면
+    // 로그인 필수 → 아래 redirect 가 /my/signup 으로 보냄. 데모는 /demo* 가 담당.
+    (!CUSTOMER_GATING &&
+      (pathname === '/my' || pathname.startsWith('/my/') || pathname.startsWith('/api/my/'))) ||
     // 소개사이트(introduction) 자료실: 공개 글 목록/상세/첨부 다운로드
     pathname.startsWith('/api/board/public') ||
     (pathname.startsWith('/api/board/attachments/') &&
@@ -88,7 +91,8 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
-    url.pathname = '/login';
+    // 고객 영역(/my*)은 고객 가입 페이지로, 그 외(내부 툴)는 내부 로그인으로.
+    url.pathname = pathname.startsWith('/my') ? '/my/signup' : '/login';
     return NextResponse.redirect(url);
   }
 

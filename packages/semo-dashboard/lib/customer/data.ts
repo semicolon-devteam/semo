@@ -35,6 +35,35 @@ export async function resolveTenantSlug(): Promise<string> {
   }
 }
 
+/**
+ * 가입 사용자 → 테넌트 보장 (T67). 소유 테넌트가 있으면 그 slug, 없으면 생성(+무료 구독).
+ * 가입 직후 /api/my/tenant/ensure 에서 호출. resolveTenantSlug 는 순수 읽기로 유지하고
+ * 생성은 여기서만 (내부 팀원이 /my 를 들러도 테넌트가 생기지 않도록 분리).
+ */
+export async function ensureTenantForUser(userId: string, email?: string | null): Promise<string> {
+  const existing = await query<{ slug: string }>(
+    `select slug from public.tenants where owner_user_id = $1 order by created_at limit 1`,
+    [userId],
+  );
+  if (existing.rows[0]) return existing.rows[0].slug;
+
+  const slug = `t-${userId.replace(/-/g, '').slice(0, 12)}`;
+  const name = email ? `${email.split('@')[0]}의 가게` : '내 가게';
+  await query(
+    `insert into public.tenants (slug, display_name, tenant_type, owner_user_id, plan_slug)
+     values ($1, $2, 'personal', $3, 'free')
+     on conflict (slug) do nothing`,
+    [slug, name, userId],
+  );
+  await query(
+    `insert into public.subscriptions (tenant_id, plan_slug, status)
+     select id, 'free', 'active' from public.tenants where slug = $1
+     on conflict (tenant_id) do nothing`,
+    [slug],
+  );
+  return slug;
+}
+
 /** agents.jsx 의 AGENT 객체와 동일 shape + install 정보(todaySummary/state). */
 export interface CustomerAgent {
   id: string;
