@@ -262,6 +262,34 @@ function ScreenLibraryDetail({ recruitOpen = false, step = 1, slug, agent }) {
   const a = agent || (slug && AGENT_BY_ID[slug]) || AGENT_BY_ID['jumuni'];
   const [open, setOpen] = React.useState(recruitOpen);
   const [curStep, setCurStep] = React.useState(step);
+  const [hiring, setHiring] = React.useState(false);
+  const pathname = usePathname();
+  const base = pathname && pathname.startsWith('/demo') ? '/demo' : '/my';
+
+  // 채용 마법사 마지막 단계 → 실제 install. 데모 테넌트는 API 가 저장 거부(가입 유도).
+  async function hire() {
+    if (hiring) return;
+    setHiring(true);
+    try {
+      const res = await fetch('/api/my/agents/install', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ slug: a.id }),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        window.location.href = `${base}/team`;
+        return;
+      }
+      window.alert(j.message || '채용에 실패했어요. 잠시 후 다시 시도해주세요.');
+      setOpen(false);
+    } catch {
+      window.alert('채용 요청 중 문제가 발생했어요.');
+    } finally {
+      setHiring(false);
+    }
+  }
+
   return (
     <AppShell mode="customer" active="library" title="채용" subtitle={a.name}>
       <div style={{ height: '100%', overflow: 'hidden', position: 'relative' }}>
@@ -424,7 +452,7 @@ function ScreenLibraryDetail({ recruitOpen = false, step = 1, slug, agent }) {
           step={curStep} agent={a}
           onClose={() => setOpen(false)}
           onPrev={() => setCurStep((s) => Math.max(1, s - 1))}
-          onNext={() => (curStep === 3 ? setOpen(false) : setCurStep((s) => Math.min(3, s + 1)))}
+          onNext={() => (curStep === 3 ? hire() : setCurStep((s) => Math.min(3, s + 1)))}
         />}
       </div>
     </AppShell>
