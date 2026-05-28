@@ -649,6 +649,23 @@ export function registerRuntimeCommands(program: Command): void {
                 } else {
                   totalErrors++;
                   console.log(chalk.red(formatDispatchFailureForLog(r, elapsedMs)));
+                  // P0-A (2026-05-28): timeout/error/empty 응답 시에도 placeholder outbox 작성.
+                  // 이유: slack-router 의 outbox-matcher 가 reply 를 감지해야 bot_commitments 를
+                  // 'failed' 로 마감. 안 그러면 commitment 가 영원히 active 상태로 stuck.
+                  // KB: semo decision/one-agent-experience-implementation-2026-05-27
+                  appendOutbox(outboxPath, {
+                    id: randomUUID(),
+                    in_reply_to: msg.id,
+                    timestamp: new Date().toISOString(),
+                    type: 'reply',
+                    bot_id: opts.bot,
+                    text: `[runtime-fallback] dispatch 처리 실패 (endReason=${r.endReason}${r.text ? ', empty text' : ''}). audit 로그 확인 필요.`,
+                    runtime_audit: audit,
+                    platform: msg.platform ?? 'slack',
+                    channel_id: msg.channel_id ?? '',
+                    thread_id: msg.thread_id ?? '',
+                    metadata: { failed: true, endReason: r.endReason },
+                  });
                 }
               } catch (err) {
                 totalErrors++;

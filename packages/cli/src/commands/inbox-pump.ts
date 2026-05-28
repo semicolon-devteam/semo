@@ -112,7 +112,15 @@ export class CmuxDeliveryAdapter implements DeliveryAdapter {
     try {
       const { stdout } = await execFileP(
         'cmux',
-        ['read-screen', '--workspace', target.workspace, '--surface', target.surface, '--lines', '30'],
+        [
+          'read-screen',
+          '--workspace',
+          target.workspace,
+          '--surface',
+          target.surface,
+          '--lines',
+          '30',
+        ],
         { timeout: 5_000 },
       );
       // Claude Code alive 신호 — bypass permissions footer 또는 ⏵⏵ marker
@@ -133,14 +141,22 @@ export class CmuxDeliveryAdapter implements DeliveryAdapter {
   }
 
   async sendPrompt(target: DeliveryTarget, text: string): Promise<void> {
-    await execFileP('cmux', ['send', '--workspace', target.workspace, '--surface', target.surface, text], {
-      timeout: 5_000,
-    });
+    await execFileP(
+      'cmux',
+      ['send', '--workspace', target.workspace, '--surface', target.surface, text],
+      {
+        timeout: 5_000,
+      },
+    );
     // newline 별도 전송 — 한글/특수문자 시 1 send에 포함하면 newline 누락 케이스 회피
     // (KB feedback_cmux-send-newline 참조).
-    await execFileP('cmux', ['send', '--workspace', target.workspace, '--surface', target.surface, '\n'], {
-      timeout: 5_000,
-    });
+    await execFileP(
+      'cmux',
+      ['send', '--workspace', target.workspace, '--surface', target.surface, '\n'],
+      {
+        timeout: 5_000,
+      },
+    );
   }
 }
 
@@ -168,8 +184,10 @@ function writePumpStats(mboxDir: string, botId: string, state: BotState, pending
 }
 
 function buildPrompt(botId: string, pendingCount: number): string {
+  // P0-A (2026-05-28): marker 를 [hermes-orchestrator-dispatch] 로 변경.
+  // 향후 delegation-check 또는 routing guard 가 마커별 분기할 수 있게 reserved.
   return [
-    `[inbox-pump] ${pendingCount}건의 새 inbox 메시지가 있어.`,
+    `[hermes-orchestrator-dispatch] ${pendingCount}건의 새 inbox 메시지가 있어.`,
     `agent-mailbox MCP \`check_inbox\` / \`read_message\` 로 가져와서 처리해줘.`,
     `메시지에 \`routing_hint.suggested_bot_id\` 가 있고 \`score>=2\` 면 즉시 그 봇에 \`escalate\` (또는 Task) 위임.`,
     `score=1 이면 의도 판단 후 위임 또는 직접 처리. hint 없으면 ${botId} 본인 처리.`,

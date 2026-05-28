@@ -67,6 +67,8 @@ import { registerHooksCommand } from './commands/hooks-verify.js';
 import { registerInitCommand } from './commands/init.js';
 import { registerChatCommand } from './commands/chat';
 import { registerKbPortableCommands } from './commands/kb';
+import { registerObsidianCommands } from './commands/obsidian.js';
+import { registerKbMirrorCommands } from './commands/kb-mirror.js';
 import { registerAgentFactoryCommands } from './commands/agent-factory';
 import { registerFactoryCommand } from './commands/factory';
 import { registerOnboardCommand } from './commands/onboard';
@@ -1489,6 +1491,12 @@ registerChatCommand(program);
 
 // === kb-portable — 프로파일 기반 어댑터(KbStore) 경유 CLI ===
 registerKbPortableCommands(program);
+
+// === obsidian — vault 양방향 sync (KB.driver=obsidian 시 사용) ===
+registerObsidianCommands(program);
+
+// === kb-mirror — 두 KbStore 간 단/양방향 sync (Obsidian ↔ PG hybrid) ===
+registerKbMirrorCommands(program);
 
 // === agent-factory — 포터블 봇 CRUD (KbStore + OperationalStore) ===
 registerAgentFactoryCommands(program);

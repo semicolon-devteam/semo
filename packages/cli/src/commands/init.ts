@@ -196,6 +196,88 @@ async function promptProfile(): Promise<InitProfile> {
   return profile;
 }
 
+// P1-B (2026-05-28): driver-별 추가 입력. 신규 설치 환경(외부 팀이 SEMO 도입) 에서
+// coreDB / Obsidian / SQLite / hybrid 선택을 wizard 한 번에 끝낼 수 있게.
+async function promptKbDriverDetails(cfg: InitConfigShape): Promise<InitConfigShape> {
+  const driver = cfg.kb.driver;
+  if (driver === 'obsidian') {
+    const { vault } = await inquirer.prompt<{ vault: string }>([
+      {
+        type: 'input',
+        name: 'vault',
+        message: 'Obsidian vault 경로 (절대경로 권장):',
+        default: cfg.kb.obsidian_vault ?? path.join(os.homedir(), 'Documents', 'SEMO-Vault'),
+        validate: (v: string) => v.trim().length > 0 || 'vault 경로가 비어있습니다',
+      },
+    ]);
+    cfg.kb = { ...cfg.kb, obsidian_vault: vault.trim() };
+  }
+  if (driver === 'notion') {
+    const { token, dbId } = await inquirer.prompt<{ token: string; dbId: string }>([
+      {
+        type: 'input',
+        name: 'token',
+        message: 'Notion integration token:',
+        default: cfg.kb.notion_token ?? '',
+      },
+      {
+        type: 'input',
+        name: 'dbId',
+        message: 'Notion database ID:',
+        default: cfg.kb.notion_database_id ?? '',
+      },
+    ]);
+    cfg.kb = { ...cfg.kb, notion_token: token.trim(), notion_database_id: dbId.trim() };
+  }
+  if (driver === 'postgres') {
+    const env = process.env.DATABASE_URL ? `(현재 env: 설정됨)` : `(현재 env: 미설정)`;
+    const { url } = await inquirer.prompt<{ url: string }>([
+      {
+        type: 'input',
+        name: 'url',
+        message: `Postgres connection URL ${env} (Enter 로 env 사용):`,
+        default: '',
+      },
+    ]);
+    if (url.trim()) {
+      cfg.kb = { ...cfg.kb, postgres_url: url.trim() };
+    }
+  }
+  return cfg;
+}
+
+// P1-B: 1st-user 프로필 (선택). 신규 설치 시 KB 가 즉시 사용 가능하면 박제.
+// hybrid wizard 안에서 호출되며, postgres 의 경우 DATABASE_URL 검증 실패 시 skip.
+async function promptFirstUser(cfg: InitConfigShape): Promise<{
+  nickname?: string;
+  slackId?: string;
+}> {
+  const { wantOnboard } = await inquirer.prompt<{ wantOnboard: boolean }>([
+    {
+      type: 'confirm',
+      name: 'wantOnboard',
+      message: '본인 프로필을 KB 에 첫 사용자로 등록하시겠어요?',
+      default: true,
+    },
+  ]);
+  if (!wantOnboard) return {};
+  const { nickname, slackId } = await inquirer.prompt<{ nickname: string; slackId: string }>([
+    {
+      type: 'input',
+      name: 'nickname',
+      message: '본인을 어떻게 부르면 좋을까요? (예: 재용)',
+      validate: (v: string) => v.trim().length >= 1 || '닉네임이 비어있습니다',
+    },
+    {
+      type: 'input',
+      name: 'slackId',
+      message: 'Slack user ID (선택, 모르면 Enter):',
+      default: '',
+    },
+  ]);
+  return { nickname: nickname.trim(), slackId: slackId.trim() || undefined };
+}
+
 function printNextSteps(cfg: InitConfigShape): void {
   console.log();
   console.log(chalk.bold('다음 단계'));
@@ -219,6 +301,18 @@ function printNextSteps(cfg: InitConfigShape): void {
   if (cfg.kb.driver === 'sqlite') {
     console.log(`  • KB 스키마 적용: ${chalk.cyan('semo migrate-sqlite')}`);
   }
+  if (cfg.kb.driver === 'postgres' && cfg.kb.obsidian_vault) {
+    // Hybrid mode 활성 (P3-F)
+    console.log(chalk.bold('  • Hybrid 모드 (Core PG + Obsidian sync) 활성:'));
+    console.log(
+      `    ${chalk.cyan(`./scripts/install-kb-mirror-launchd.sh install --vault "${cfg.kb.obsidian_vault}" --bidirectional`)}`,
+    );
+    console.log(
+      `    또는 foreground: ${chalk.cyan(`semo kb-mirror start --source obsidian --source-vault "${cfg.kb.obsidian_vault}" --target postgres --bidirectional`)}`,
+    );
+  } else if (cfg.kb.driver === 'obsidian' && cfg.kb.obsidian_vault) {
+    console.log(`  • Obsidian watch: ${chalk.cyan('semo obsidian watch')}`);
+  }
   console.log(`  • 레이아웃 확인: ${chalk.cyan('semo update --status')}`);
   console.log(`  • 설정 확인: ${chalk.cyan('semo config show')}`);
   console.log();
@@ -235,51 +329,137 @@ export function registerInitCommand(program: Command): void {
     .option('--path <file>', 'config.toml 출력 경로', defaultConfigPath())
     .option('--force', '기존 config 덮어쓰기')
     .option('--dry-run', '실제 쓰기 없이 생성될 내용만 출력')
-    .action(async (opts: { profile?: string; path: string; force?: boolean; dryRun?: boolean }) => {
-      const valid: InitProfile[] = [
-        'team',
-        'personal-discord',
-        'personal-offline',
-        'solo-connected',
-        'custom',
-      ];
-      let profile: InitProfile;
-      if (opts.profile) {
-        if (!valid.includes(opts.profile as InitProfile)) {
-          console.error(chalk.red(`✗ 알 수 없는 프로파일: ${opts.profile}`));
-          console.error(chalk.gray(`  지원: ${valid.join(', ')}`));
-          process.exit(2);
+    .option(
+      '--hybrid',
+      'kb.driver=postgres + obsidian_vault 동시 활성 (kb-mirror 가 sync). --profile 비대화형과 결합 가능',
+    )
+    .option(
+      '--obsidian-vault <path>',
+      '비대화형 obsidian_vault 경로 (--hybrid 또는 obsidian profile)',
+    )
+    .action(
+      async (opts: {
+        profile?: string;
+        path: string;
+        force?: boolean;
+        dryRun?: boolean;
+        hybrid?: boolean;
+        obsidianVault?: string;
+      }) => {
+        const valid: InitProfile[] = [
+          'team',
+          'personal-discord',
+          'personal-offline',
+          'solo-connected',
+          'custom',
+        ];
+        let profile: InitProfile;
+        if (opts.profile) {
+          if (!valid.includes(opts.profile as InitProfile)) {
+            console.error(chalk.red(`✗ 알 수 없는 프로파일: ${opts.profile}`));
+            console.error(chalk.gray(`  지원: ${valid.join(', ')}`));
+            process.exit(2);
+          }
+          profile = opts.profile as InitProfile;
+        } else {
+          profile = await promptProfile();
         }
-        profile = opts.profile as InitProfile;
-      } else {
-        profile = await promptProfile();
-      }
 
-      const cfg = buildConfigForProfile(profile);
+        let cfg = buildConfigForProfile(profile);
 
-      if (opts.dryRun) {
-        console.log(chalk.gray(`# ${opts.path}`));
-        console.log(renderConfigToml(cfg));
-        return;
-      }
+        // P3-F (2026-05-28): --hybrid 본구현. kb.driver 는 postgres 로 유지하되
+        // obsidian_vault 도 함께 박제 → kb-mirror 가 양방향 sync.
+        if (opts.hybrid) {
+          if (cfg.kb.driver !== 'postgres') {
+            console.log(
+              chalk.yellow(
+                `⚠ --hybrid 는 postgres driver 기반. 현재 ${cfg.kb.driver} → postgres 로 강제 변경.`,
+              ),
+            );
+            cfg.kb = { ...cfg.kb, driver: 'postgres' };
+          }
+          const vault =
+            opts.obsidianVault ||
+            (opts.profile
+              ? path.join(os.homedir(), 'Documents', 'SEMO-Vault')
+              : (
+                  await inquirer.prompt<{ vault: string }>([
+                    {
+                      type: 'input',
+                      name: 'vault',
+                      message: 'Obsidian vault 경로 (hybrid sync 대상):',
+                      default: path.join(os.homedir(), 'Documents', 'SEMO-Vault'),
+                      validate: (v: string) => v.trim().length > 0 || 'vault 경로 비어 있음',
+                    },
+                  ])
+                ).vault);
+          cfg.kb = { ...cfg.kb, obsidian_vault: vault.trim() };
+        }
 
-      const res = writeConfig(opts.path, cfg, { force: opts.force });
-      if (!res.written) {
-        console.error(chalk.yellow(`⚠ ${res.path} — ${res.skipped}`));
-        process.exit(1);
-      }
-      console.log(chalk.green(`✓ config 생성: ${res.path}`));
+        // P1-B (2026-05-28): driver-별 detail prompt (비대화형 옵션 없는 경우만)
+        if (!opts.profile && !opts.dryRun && !opts.hybrid) {
+          cfg = await promptKbDriverDetails(cfg);
+        }
 
-      const { created } = ensureSemoLayout();
-      if (created.length > 0) {
-        console.log(chalk.cyan(`레이아웃 생성: ${created.length}개 디렉터리`));
-        for (const d of created) console.log(`  + ${d}`);
-      } else {
-        console.log(chalk.gray('레이아웃 이미 존재'));
-      }
+        if (opts.dryRun) {
+          console.log(chalk.gray(`# ${opts.path}`));
+          console.log(renderConfigToml(cfg));
+          return;
+        }
 
-      printNextSteps(cfg);
-    });
+        const res = writeConfig(opts.path, cfg, { force: opts.force });
+        if (!res.written) {
+          console.error(chalk.yellow(`⚠ ${res.path} — ${res.skipped}`));
+          process.exit(1);
+        }
+        console.log(chalk.green(`✓ config 생성: ${res.path}`));
+
+        const { created } = ensureSemoLayout();
+        if (created.length > 0) {
+          console.log(chalk.cyan(`레이아웃 생성: ${created.length}개 디렉터리`));
+          for (const d of created) console.log(`  + ${d}`);
+        } else {
+          console.log(chalk.gray('레이아웃 이미 존재'));
+        }
+
+        // P1-B: 1st-user 프로필 안내 (대화형만, 실제 KB upsert 는 별도 명령 권장)
+        if (!opts.profile && !opts.dryRun) {
+          try {
+            const firstUser = await promptFirstUser(cfg);
+            if (firstUser.nickname) {
+              console.log(
+                chalk.cyan(
+                  `\n✓ 첫 사용자 정보 수집: nickname=${firstUser.nickname}${firstUser.slackId ? `, slack-id=${firstUser.slackId}` : ''}`,
+                ),
+              );
+              console.log(chalk.gray(`  → 실제 KB 박제는 backend 준비 후 다음 명령으로:`));
+              const slug =
+                firstUser.nickname
+                  .replace(/[^A-Za-z0-9]/g, '')
+                  .toLowerCase()
+                  .slice(0, 20) || 'user';
+              const domain = `team-${slug}`;
+              console.log(
+                chalk.gray(
+                  `    semo kb-portable upsert ${domain} nickname --content ${firstUser.nickname}`,
+                ),
+              );
+              if (firstUser.slackId) {
+                console.log(
+                  chalk.gray(
+                    `    semo kb-portable upsert ${domain} slack-id --content ${firstUser.slackId}`,
+                  ),
+                );
+              }
+            }
+          } catch (err) {
+            console.warn(chalk.yellow(`⚠ first-user prompt skipped: ${(err as Error).message}`));
+          }
+        }
+
+        printNextSteps(cfg);
+      },
+    );
 }
 
 export const __testables = { buildConfigForProfile, renderConfigToml, writeConfig };
