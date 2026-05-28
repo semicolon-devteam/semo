@@ -2,32 +2,15 @@
  * Knowledge Base 라이브러리
  * PostgreSQL + pgvector를 사용한 시맨틱 검색 및 KB 조회
  *
- * P2-D (2026-05-28): 점진적 KbStore 마이그레이션 진행 중.
- * - getItem, search 는 KbStore singleton 사용 (backend-agnostic).
- *   `SEMO_DASHBOARD_USE_KBSTORE=0` env 로 강제 폴백 (롤백 안전망).
- * - 나머지는 PG 직접 query 유지 — KbStore 인터페이스에 없는 메서드 (listByKey, count, listByKeyPrefix 등)
- * - 향후 KbStore 확장 후 점진 교체.
+ * NOTE (2026-05-28): 한때 KbStore(@team-semicolon/semo-kb-core) delegate 로
+ * backend-agnostic 화를 시도했으나, dashboard Docker 빌드가 subdir 컨텍스트에서
+ * standalone `npm install` 을 돌려 미발행 워크스페이스 패키지를 resolve 하지 못한다
+ * (E404). coreDB-agnostic dashboard 는 kb-core/kb-pg 를 npm 발행하거나 Docker
+ * 빌드 컨텍스트를 repo 루트로 옮긴 뒤 재도입해야 한다. 그때까지 PG 직접 query 유지.
  */
 
 import { Pool } from 'pg';
 import { genEmbedding } from '../voyage';
-import type { KbEntry, ListOpts } from '@team-semicolon/semo-kb-core';
-import { getKbStore } from './kb-store-singleton';
-
-const USE_KBSTORE = process.env.SEMO_DASHBOARD_USE_KBSTORE !== '0';
-
-function kbEntryToKBItem(entry: KbEntry): KBItem {
-  return {
-    kb_id: entry.kbId ?? 0,
-    domain: entry.domain,
-    key: entry.subKey ? `${entry.key}/${entry.subKey}` : entry.key,
-    content: entry.content,
-    metadata: (entry.metadata as Record<string, unknown> | undefined) ?? undefined,
-    created_by: entry.createdBy,
-    updated_at: entry.updatedAt,
-    similarity_pct: entry.similarityPct,
-  };
-}
 
 function splitKey(combinedKey: string): { key: string; subKey: string } {
   const idx = combinedKey.indexOf('/');
@@ -142,31 +125,12 @@ async function textSearch(query: string, limit: number, createdBy?: string): Pro
 
 /**
  * 시맨틱 검색 (OpenAI 임베딩 + pgvector), 키 없으면 텍스트 검색 fallback.
- * P2-D: KbStore singleton 경유 (현재 PgKbStore — 향후 SQLite/Obsidian 도 동일 entry).
- *       임베딩 없는 케이스는 PgKbStore 내부에서 ILIKE 폴백 처리.
  */
 export async function search(
   query: string,
   limit: number = 10,
   createdBy?: string,
 ): Promise<KBItem[]> {
-  if (USE_KBSTORE) {
-    try {
-      const store = await getKbStore();
-      const entries = await store.search(query, {
-        topK: limit,
-        ...(createdBy ? { createdBy } : {}),
-      });
-      return entries.map(kbEntryToKBItem);
-    } catch (err) {
-      console.warn(
-        '[kb] search KbStore failed, falling back to legacy PG:',
-        (err as Error).message,
-      );
-    }
-  }
-
-  // Legacy 폴백 — 환경변수 명시 disable 또는 KbStore 실패 시.
   if (!process.env.OPENAI_API_KEY) {
     return textSearch(query, limit, createdBy);
   }
@@ -269,24 +233,12 @@ export async function list(
 
 /**
  * KB 항목 수 조회 (domain + key + metadata 필터)
- * 개선4 (2026-05-28): metadata where 없는 단순 카운트는 KbStore.count 경유 (backend-agnostic).
- *   metadata 필터가 있으면 KbStore 계약에 없으므로 PG 직접 query 폴백.
  */
 export async function count(
   domain: string,
   key?: string,
   where?: Record<string, unknown>,
 ): Promise<number> {
-  if (USE_KBSTORE && !where) {
-    try {
-      const store = await getKbStore();
-      if (typeof store.count === 'function') {
-        return await store.count({ domain, ...(key ? { key } : {}) });
-      }
-    } catch (err) {
-      console.warn('[kb] count KbStore failed, falling back to PG:', (err as Error).message);
-    }
-  }
   const conditions: string[] = [`domain = $1`];
   const params: (string | number)[] = [domain];
   let idx = 2;
@@ -321,14 +273,8 @@ export async function count(
 
 /**
  * 도메인 목록 조회 (통계 포함)
- *
- * 개선4 (2026-05-28) — 의도적 PG-direct 유지 (compromise):
- *   이 함수는 `semo.ontology` LEFT JOIN 으로 description/service/entity_type 를 가져오고,
- *   KB 엔트리가 0건인 ontology 도메인까지 포함한다. ontology 는 포터블 KbStore 계약에 없는
- *   PG/대시보드 고유 개념이므로 `KbStore.listDomains()`(knowledge_base GROUP BY, count 만)로는
- *   description/빈 도메인을 표현할 수 없다. 따라서 KbStore delegate 하지 않고 PG 직접 query 유지.
- *   비-PG backend(SQLite/Obsidian) 대시보드 배포 시 이 view 는 backend 별로 override 가 필요하다
- *   (docs/dashboard-multi-driver-deployment.md 참조).
+ * `semo.ontology` LEFT JOIN 으로 description/service/entity_type 를 가져오고
+ * KB 엔트리가 0건인 ontology 도메인까지 포함한다 (ontology 는 PG/대시보드 고유 개념).
  */
 export async function listDomains(): Promise<KBDomain[]> {
   const sql = `
@@ -345,25 +291,8 @@ export async function listDomains(): Promise<KBDomain[]> {
 
 /**
  * 전 도메인에서 특정 key를 가진 항목 조회 (예: key=milestone)
- * P3-A: KbStore.list({ key, orderBy }) 경유. 폴백 SEMO_DASHBOARD_USE_KBSTORE=0.
  */
 export async function listByKey(key: string): Promise<KBItem[]> {
-  if (USE_KBSTORE) {
-    try {
-      const store = await getKbStore();
-      if (typeof store.list === 'function') {
-        const entries = await store.list({
-          key,
-          limit: 500,
-          orderBy: 'domain',
-          orderDir: 'asc',
-        });
-        return entries.map(kbEntryToKBItem);
-      }
-    } catch (err) {
-      console.warn('[kb] listByKey KbStore failed, falling back to PG:', (err as Error).message);
-    }
-  }
   const sql = `
     SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at
     FROM semo.knowledge_base
@@ -379,19 +308,9 @@ export async function listByKey(key: string): Promise<KBItem[]> {
 
 /**
  * 특정 KB 항목 조회
- * P2-D: KbStore singleton 경유 (backend-agnostic). 폴백 SEMO_DASHBOARD_USE_KBSTORE=0.
  */
 export async function getItem(domain: string, rawKey: string): Promise<KBItem | null> {
   const { key, subKey } = splitKey(rawKey);
-  if (USE_KBSTORE) {
-    try {
-      const store = await getKbStore();
-      const entry = await store.get(domain, key, subKey);
-      return entry ? kbEntryToKBItem(entry) : null;
-    } catch (err) {
-      console.warn('[kb] getItem KbStore failed, falling back to PG:', (err as Error).message);
-    }
-  }
   const sql = `
     SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at
     FROM semo.knowledge_base
@@ -530,32 +449,6 @@ export async function listByKeyPrefix(
   subKeyPrefix: string,
   options?: { where?: Record<string, unknown>; orderBy?: string },
 ): Promise<KBItem[]> {
-  // 개선4 (2026-05-28): metadata 필터/정렬이 없는 단순 prefix 조회는 KbStore.list 경유.
-  //   metadata where 또는 metadata.* orderBy 가 있으면 KbStore 계약 밖이므로 PG 폴백.
-  const usesMetadata =
-    Boolean(options?.where) || Boolean(options?.orderBy?.startsWith('metadata.'));
-  if (USE_KBSTORE && !usesMetadata) {
-    try {
-      const store = await getKbStore();
-      if (typeof store.list === 'function') {
-        const orderBy = (options?.orderBy as ListOpts['orderBy']) ?? 'sub_key';
-        const entries = await store.list({
-          domain,
-          key,
-          subKeyPrefix,
-          limit: 500,
-          orderBy,
-          orderDir: orderBy === 'sub_key' ? 'asc' : 'desc',
-        });
-        return entries.map(kbEntryToKBItem);
-      }
-    } catch (err) {
-      console.warn(
-        '[kb] listByKeyPrefix KbStore failed, falling back to PG:',
-        (err as Error).message,
-      );
-    }
-  }
   const conditions: string[] = [`domain = $1`, `key = $2`, `sub_key LIKE $3`];
   const params: (string | number)[] = [domain, key, subKeyPrefix + '%'];
   let idx = 4;
