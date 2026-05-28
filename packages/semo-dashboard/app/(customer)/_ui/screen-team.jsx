@@ -1,6 +1,6 @@
 'use client';
 import { AGENT_BY_ID, BotAvatar } from './agents';
-import { Icon, Badge, Button, SegTab, AppShell } from './components';
+import { Icon, Badge, Button, SegTab, AppShell, EmptyState } from './components';
 
 /*
  * screen-team.jsx — Customer Team (내 AI 직원, §4.2).
@@ -9,8 +9,22 @@ import { Icon, Badge, Button, SegTab, AppShell } from './components';
  * timeline, recent KB additions, and tool access.
  */
 
-function ScreenTeam({ agents }) {
-  // agents: 실데이터(설치된 직원) 배열. 없으면 디자인 mock 7명으로 폴백.
+function ScreenTeam({ agents, demo = false }) {
+  // 신규 가입자(실 테넌트, 직원 0) → 빈 상태. 데모는 시드 직원이 있어 해당 없음.
+  if (!demo && (!agents || agents.length === 0)) {
+    return (
+      <AppShell mode="customer" active="team" title="내 직원" subtitle="0명">
+        <EmptyState
+          icon="users"
+          title="첫 직원을 채용해보세요"
+          sub="라이브러리에서 응대·회계·마케팅 등 필요한 AI 직원을 데려올 수 있어요."
+          ctaLabel="직원 채용하기"
+          ctaTo="/library"
+        />
+      </AppShell>
+    );
+  }
+  // agents: 실데이터(설치된 직원) 배열. 없으면 디자인 mock 7명으로 폴백(데모 경로).
   const roster = (agents && agents.length) ? agents : Object.values(AGENT_BY_ID);
   const selected = roster[0];
   const teamMood = (s) =>

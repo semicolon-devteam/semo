@@ -713,10 +713,38 @@ function PhoneFrame({ children, label, width = 320, height = 660 }) {
 }
 
 /* ────────────────────────────────────────────────────────────────── */
+/* Empty state — 실 테넌트에 데이터가 아직 없을 때(신규 가입자). AppShell 안에 배치. */
+function EmptyState({ icon = 'users', title, sub, ctaLabel, ctaTo = '/library' }) {
+  const pathname = usePathname();
+  const base = pathname && pathname.startsWith('/demo') ? '/demo' : '/my';
+  return (
+    <div style={{ height: '100%', display: 'grid', placeItems: 'center', padding: 32 }}>
+      <div style={{ textAlign: 'center', maxWidth: 440, display: 'grid', gap: 14, justifyItems: 'center' }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: '50%',
+          background: 'var(--semo-cream)', display: 'grid', placeItems: 'center',
+        }}>
+          <Icon name={icon} size={28} color="var(--semo-primary)" stroke={1.8} />
+        </div>
+        <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--semo-fg-1)' }}>{title}</div>
+        {sub && <div style={{ fontSize: 13.5, color: 'var(--semo-fg-3)', lineHeight: 1.6 }}>{sub}</div>}
+        {ctaLabel && (
+          <div style={{ marginTop: 6 }}>
+            <Button variant="primary" icon="plus"
+                    onClick={() => { window.location.href = `${base}${ctaTo}`; }}>
+              {ctaLabel}
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export {
   Icon, Eyebrow, Card, Section, Badge, Button, Stat, Progress, SegTab,
   Sidebar, Topbar, AppShell,
   ActivityFeedItem, NudgeItem,
   MiniBarChart, MiniLineChart,
-  PhoneFrame,
+  PhoneFrame, EmptyState,
 };

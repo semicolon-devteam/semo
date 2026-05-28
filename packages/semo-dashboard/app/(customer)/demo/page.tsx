@@ -18,5 +18,5 @@ export default async function DemoHomePage() {
     getHomeStats(DEMO_TENANT),
     getNudges(),
   ]);
-  return <ScreenHome agents={agents} activity={activity} stats={stats} nudges={nudges} />;
+  return <ScreenHome agents={agents} activity={activity} stats={stats} nudges={nudges} demo />;
 }

@@ -2,7 +2,7 @@
 import React from 'react';
 import dynamic from 'next/dynamic';
 import { AGENT_BY_ID, BotAvatar } from './agents';
-import { Icon, Badge, SegTab, AppShell } from './components';
+import { Icon, Badge, SegTab, AppShell, EmptyState } from './components';
 
 // react-force-graph-2d 는 canvas/window 에 의존 → 클라이언트에서만 로드(ssr:false).
 const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false });
@@ -97,8 +97,22 @@ function buildKBEdges(nodes) {
   return edges;
 }
 
-function ScreenKnowledge({ mode: initialMode = '2d', graph }) {
+function ScreenKnowledge({ mode: initialMode = '2d', graph, demo = false }) {
   const [mode, setMode] = React.useState(initialMode);
+  // 신규 가입자(실 테넌트, 지식 0) → 빈 상태. 데모는 시드 활동에서 그래프가 생성됨.
+  if (!demo && (!graph || !Array.isArray(graph.nodes) || graph.nodes.length === 0)) {
+    return (
+      <AppShell mode="customer" active="knowledge" title="가게 지식" subtitle="그래프">
+        <EmptyState
+          icon="network"
+          title="아직 쌓인 지식이 없어요"
+          sub="직원들이 일하면서 단골·메뉴·응대 같은 가게 지식을 채우면 여기 그래프로 이어져요."
+          ctaLabel="직원 채용하기"
+          ctaTo="/library"
+        />
+      </AppShell>
+    );
+  }
   return (
     <AppShell mode="customer" active="knowledge" title="가게 지식"
               subtitle={`그래프 · ${mode === '3d' ? '3D 뷰' : '2D 뷰'}`}>

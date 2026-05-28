@@ -2,7 +2,7 @@
 import { AGENT_BY_ID, BotAvatar } from './agents';
 import {
   AppShell, Eyebrow, Card, Badge, SegTab, Icon,
-  MiniBarChart, MiniLineChart, Progress, ActivityFeedItem, NudgeItem,
+  MiniBarChart, MiniLineChart, Progress, ActivityFeedItem, NudgeItem, EmptyState,
 } from './components';
 
 /*
@@ -14,7 +14,7 @@ import {
  * linked together in one scrollable canvas.
  */
 
-function ScreenHome({ agents, activity, stats, nudges }) {
+function ScreenHome({ agents, activity, stats, nudges, demo = false }) {
   const jumuni = AGENT_BY_ID['jumuni'];
   const dangol = AGENT_BY_ID['dangol-i'];
   const hwegye = AGENT_BY_ID['hwegyedo-ri'];
@@ -22,6 +22,21 @@ function ScreenHome({ agents, activity, stats, nudges }) {
   const chaewo = AGENT_BY_ID['chae-wo'];
   const semi   = AGENT_BY_ID['sem-i'];
   const biseo  = AGENT_BY_ID['bi-seo'];
+
+  // 신규 가입자(실 테넌트, 직원 0) → 남의 가게 mock 대신 빈 상태. 데모는 시드가 있어 해당 없음.
+  if (!demo && (!agents || agents.length === 0)) {
+    return (
+      <AppShell mode="customer" active="home" title="홈" subtitle="환영합니다" onModeToggle={null}>
+        <EmptyState
+          icon="users"
+          title="아직 직원이 없어요"
+          sub="첫 AI 직원을 채용하면 오늘 한 일·가게 지식·매출 인사이트가 여기 모여요."
+          ctaLabel="첫 직원 채용하기"
+          ctaTo="/library"
+        />
+      </AppShell>
+    );
+  }
 
   // 실데이터(있으면) → 화면 구동, 없으면 디자인 mock 폴백.
   const hasActivity = activity && activity.length > 0;
