@@ -23,6 +23,10 @@ export interface AuthContextType {
   menuAccess: string[];
   projectAccess: string[];
   isAdmin: boolean;
+  /** 사용자가 소유한 고객 테넌트 slug (없으면 null). */
+  tenantSlug: string | null;
+  /** 팀 프로필 없이 테넌트만 소유 = 외부 고객. */
+  isCustomer: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
 }

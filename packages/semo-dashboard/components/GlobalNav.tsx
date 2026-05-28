@@ -135,6 +135,14 @@ export default function GlobalNav() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* 고객 대시보드(/my) 진입 — 운영팀↔고객 모드 전환 */}
+            <Link
+              href="/my"
+              className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              고객 대시보드
+            </Link>
+
             {/* User avatar dropdown */}
             <div className="relative" ref={userMenuRef}>
               <button
@@ -243,6 +251,13 @@ export default function GlobalNav() {
 
             {/* Menu items */}
             <div className="px-3 py-4 space-y-1">
+              {/* 고객 대시보드(/my) 진입 */}
+              <Link
+                href="/my"
+                className="block px-4 py-3 mb-1 rounded-lg text-base font-medium text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+              >
+                고객 대시보드
+              </Link>
               {visibleItems.map((item) => (
                 <Link key={item.href} href={item.href} className={mobileLinkClass(item.href)}>
                   {item.label}

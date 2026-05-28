@@ -1,6 +1,7 @@
 'use client';
 import { usePathname } from 'next/navigation';
 import { BotAvatar } from './agents';
+import TeamModeToggle from './TeamModeToggle';
 
 /*
  * components.jsx — SEMO shared UI atoms + chrome.
@@ -431,7 +432,7 @@ function Sidebar({ mode, active, workspace }) {
   );
 }
 
-function Topbar({ mode, onModeToggle, title, subtitle, action, search = true }) {
+function Topbar({ title, subtitle, action, search = true }) {
   return (
     <header style={{
       height: 56,
@@ -469,34 +470,8 @@ function Topbar({ mode, onModeToggle, title, subtitle, action, search = true }) 
 
       {action}
 
-      {/* mode toggle (looks like 2-pill segmented in the topbar — admins only) */}
-      {onModeToggle && (
-        <div style={{
-          display: 'inline-flex', padding: 3,
-          background: 'var(--semo-surface-2)',
-          borderRadius: 'var(--r-10)',
-          border: '1px solid var(--semo-line)',
-          gap: 2,
-        }}>
-          {['customer', 'provider'].map(m => {
-            const sel = m === mode;
-            return (
-              <button key={m} onClick={() => onModeToggle && onModeToggle(m)}
-                style={{
-                  padding: '4px 10px',
-                  borderRadius: 'var(--r-8)',
-                  fontSize: 12, fontWeight: 600,
-                  background: sel ? (m === 'provider' ? 'var(--semo-ai-08)' : 'var(--semo-surface)') : 'transparent',
-                  color: sel ? (m === 'provider' ? 'var(--semo-ai)' : 'var(--semo-fg-1)') : 'var(--semo-fg-3)',
-                  boxShadow: sel ? 'var(--semo-shadow-1)' : 'none',
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                }}>
-                {m === 'customer' ? '내 가게' : '운영팀'}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {/* 모드 토글 — 팀원에게만 보임(useAuth). '운영팀' → 기존 내부 툴(/). */}
+      <TeamModeToggle />
 
       <button style={{ width: 34, height: 34, borderRadius: 'var(--r-10)',
                         display: 'grid', placeItems: 'center',
@@ -523,7 +498,7 @@ function Topbar({ mode, onModeToggle, title, subtitle, action, search = true }) 
   );
 }
 
-function AppShell({ mode = 'customer', active, workspace, title, subtitle, topAction, onModeToggle, children }) {
+function AppShell({ mode = 'customer', active, workspace, title, subtitle, topAction, children }) {
   return (
     <div className={mode === 'provider' ? 'semo-provider' : ''}
          style={{
@@ -535,8 +510,7 @@ function AppShell({ mode = 'customer', active, workspace, title, subtitle, topAc
          }}>
       <Sidebar mode={mode} active={active} workspace={workspace}/>
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-        <Topbar mode={mode} onModeToggle={onModeToggle}
-                title={title} subtitle={subtitle} action={topAction}/>
+        <Topbar title={title} subtitle={subtitle} action={topAction}/>
         <main style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
           {children}
         </main>

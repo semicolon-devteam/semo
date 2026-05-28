@@ -10,6 +10,8 @@ const AuthContext = createContext<AuthContextType>({
   menuAccess: [],
   projectAccess: [],
   isAdmin: false,
+  tenantSlug: null,
+  isCustomer: false,
   loading: true,
   signOut: async () => {},
 });
@@ -19,6 +21,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [menuAccess, setMenuAccess] = useState<string[]>([]);
   const [projectAccess, setProjectAccess] = useState<string[]>([]);
+  const [tenantSlug, setTenantSlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const supabase = createClient();
@@ -38,6 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(data.profile);
         setMenuAccess(data.menuAccess || []);
         setProjectAccess(data.projectAccess || []);
+        setTenantSlug(data.tenantSlug ?? null);
       }
     } catch (e) {
       console.error('[AuthProvider] session fetch error:', e);
@@ -56,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [supabase]);
 
   const isAdmin = profile?.role === 'admin';
+  const isCustomer = !!tenantSlug && !profile;
 
   return (
     <AuthContext.Provider
@@ -65,6 +70,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         menuAccess,
         projectAccess,
         isAdmin,
+        tenantSlug,
+        isCustomer,
         loading,
         signOut,
       }}
