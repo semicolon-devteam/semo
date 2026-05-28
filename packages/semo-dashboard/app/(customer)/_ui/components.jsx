@@ -1,4 +1,5 @@
 'use client';
+import { Suspense } from 'react';
 import { usePathname } from 'next/navigation';
 import { BotAvatar } from './agents';
 import TeamModeToggle from './TeamModeToggle';
@@ -470,8 +471,11 @@ function Topbar({ title, subtitle, action, search = true }) {
 
       {action}
 
-      {/* 모드 토글 — 팀원에게만 보임(useAuth). '운영팀' → 기존 내부 툴(/). */}
-      <TeamModeToggle />
+      {/* 모드 토글 — 팀원에게만 보임(useAuth). '운영팀' → 기존 내부 툴(/).
+          useSearchParams 사용 → 정적 페이지 빌드 위해 Suspense 경계로 감싼다. */}
+      <Suspense fallback={null}>
+        <TeamModeToggle />
+      </Suspense>
 
       <button style={{ width: 34, height: 34, borderRadius: 'var(--r-10)',
                         display: 'grid', placeItems: 'center',

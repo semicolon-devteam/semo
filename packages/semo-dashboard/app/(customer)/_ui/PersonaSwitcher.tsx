@@ -1,13 +1,16 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { PersonaHome, PersonaLibrary, PersonaPlan } from './screen-persona';
 import { listPersonaMeta } from '@/lib/customer/persona/registry';
-import type { PersonaId } from '@/lib/customer/persona/schema';
+import { isPersonaId, type PersonaId } from '@/lib/customer/persona/schema';
 
 /**
- * Persona 미리보기 스위처 (클라이언트). 초기 persona 는 서버에서 resolve 되어 주입된다
- * (URL ?p= → 설정 → fallback). 라벨은 registry(JSON 정본) 에서 가져온다.
+ * Persona 미리보기 스위처 (클라이언트). persona 는 URL ?p= 에서 reactive 하게 읽는다
+ * (useState 초기화 staleness 회피) — 어드민 셸 토글·여기 하단 pill 모두 ?p= 를 바꾸므로
+ * 둘 다 즉시 콘텐츠에 반영된다. initial 은 서버 resolve 결과(저장값/fallback).
+ * 라벨은 registry(JSON 정본).
  */
 const PERSONA_META = listPersonaMeta();
 const VIEWS = [
@@ -18,10 +21,19 @@ const VIEWS = [
 type ViewId = (typeof VIEWS)[number]['id'];
 
 export default function PersonaSwitcher({ initial }: { initial: PersonaId }) {
-  const [persona, setPersona] = useState<PersonaId>(initial);
+  const router = useRouter();
+  const sp = useSearchParams();
+  const pParam = sp.get('p');
+  const persona: PersonaId = isPersonaId(pParam) ? pParam : initial;
   const [view, setView] = useState<ViewId>('home');
 
   const Screen = view === 'library' ? PersonaLibrary : view === 'plan' ? PersonaPlan : PersonaHome;
+
+  function selectPersona(id: PersonaId) {
+    const params = new URLSearchParams(sp.toString());
+    params.set('p', id);
+    router.replace(`/my/personas?${params.toString()}`, { scroll: false });
+  }
 
   const pill = (active: boolean) => ({
     padding: '5px 12px',
@@ -59,7 +71,7 @@ export default function PersonaSwitcher({ initial }: { initial: PersonaId }) {
             <button
               key={p.id}
               type="button"
-              onClick={() => setPersona(p.id)}
+              onClick={() => selectPersona(p.id)}
               style={pill(persona === p.id)}
             >
               {p.label}

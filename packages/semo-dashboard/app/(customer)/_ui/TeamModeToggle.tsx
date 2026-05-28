@@ -1,6 +1,6 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth/provider';
 import { listPersonaMeta } from '@/lib/customer/persona/registry';
 
@@ -43,12 +43,17 @@ function pillStyle(selected: boolean): React.CSSProperties {
 export default function TeamModeToggle() {
   const { profile, isAdmin, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
+  const sp = useSearchParams();
 
   // 팀원만(프로필 보유). 로딩/외부 고객/비로그인은 숨김.
   if (loading || !profile) return null;
 
   if (isAdmin) {
     // 어드민 — 모든 모드. 페르소나 미리보기 + 운영팀.
+    // /my/personas 에 있을 때 현재 ?p= 페르소나를 active 로 표시.
+    const onPersonas = pathname === '/my/personas';
+    const activeP = onPersonas ? sp.get('p') : null;
     return (
       <div style={containerStyle} aria-label="모드 전환 (어드민)">
         {PERSONAS.map((p) => (
@@ -56,7 +61,7 @@ export default function TeamModeToggle() {
             key={p.id}
             type="button"
             onClick={() => router.push(`/my/personas?p=${p.id}`)}
-            style={pillStyle(false)}
+            style={pillStyle(activeP === p.id)}
           >
             {p.label}
           </button>
