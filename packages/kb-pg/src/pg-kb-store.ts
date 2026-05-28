@@ -2,8 +2,10 @@ import type { Pool, PoolClient } from 'pg';
 import {
   type DeleteInput,
   type KbChangeEvent,
+  type KbDomainSummary,
   type KbEntry,
   type KbStore,
+  type ListOpts,
   type SearchOpts,
   type Unsubscribe,
   type UpsertInput,
@@ -264,5 +266,109 @@ export class PgKbStore implements KbStore {
     } finally {
       client.release();
     }
+  }
+
+  // ─── Phase 1d (P3-A 2026-05-28): list / count / listDomains ───
+
+  async list(opts: ListOpts): Promise<KbEntry[]> {
+    const ORDER_ALLOWLIST: Record<NonNullable<ListOpts['orderBy']>, string> = {
+      updated_at: 'updated_at',
+      created_at: 'created_at',
+      key: 'key',
+      sub_key: 'sub_key',
+      domain: 'domain',
+    };
+    const orderCol = opts.orderBy ? ORDER_ALLOWLIST[opts.orderBy] : 'updated_at';
+    const orderDir = (opts.orderDir || 'desc').toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+
+    const params: (string | number)[] = [];
+    const conds: string[] = [];
+    let idx = 1;
+    if (opts.domain) {
+      conds.push(`domain = $${idx++}`);
+      params.push(opts.domain);
+    }
+    if (opts.key) {
+      conds.push(`key = $${idx++}`);
+      params.push(opts.key);
+    }
+    if (opts.keyPrefix) {
+      conds.push(`key LIKE $${idx++}`);
+      params.push(opts.keyPrefix.replace(/[%_]/g, (m) => '\\' + m) + '%');
+    }
+    if (opts.subKeyPrefix) {
+      conds.push(`sub_key LIKE $${idx++}`);
+      params.push(opts.subKeyPrefix.replace(/[%_]/g, (m) => '\\' + m) + '%');
+    }
+    if (opts.createdBy) {
+      conds.push(`created_by = $${idx++}`);
+      params.push(opts.createdBy);
+    }
+    const whereSql = conds.length > 0 ? `WHERE ${conds.join(' AND ')}` : '';
+    const limit = Math.max(1, Math.min(opts.limit ?? 50, 500));
+    const offset = Math.max(0, opts.offset ?? 0);
+    const sql = `
+      SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at
+        FROM semo.knowledge_base
+       ${whereSql}
+       ORDER BY ${orderCol} ${orderDir} NULLS LAST
+       LIMIT ${limit} OFFSET ${offset}
+    `;
+    const res = await this.pool.query<Row>(sql, params);
+    return res.rows.map(rowToEntry);
+  }
+
+  async count(
+    opts: Pick<ListOpts, 'domain' | 'key' | 'keyPrefix' | 'subKeyPrefix' | 'createdBy'>,
+  ): Promise<number> {
+    const params: (string | number)[] = [];
+    const conds: string[] = [];
+    let idx = 1;
+    if (opts.domain) {
+      conds.push(`domain = $${idx++}`);
+      params.push(opts.domain);
+    }
+    if (opts.key) {
+      conds.push(`key = $${idx++}`);
+      params.push(opts.key);
+    }
+    if (opts.keyPrefix) {
+      conds.push(`key LIKE $${idx++}`);
+      params.push(opts.keyPrefix.replace(/[%_]/g, (m) => '\\' + m) + '%');
+    }
+    if (opts.subKeyPrefix) {
+      conds.push(`sub_key LIKE $${idx++}`);
+      params.push(opts.subKeyPrefix.replace(/[%_]/g, (m) => '\\' + m) + '%');
+    }
+    if (opts.createdBy) {
+      conds.push(`created_by = $${idx++}`);
+      params.push(opts.createdBy);
+    }
+    const whereSql = conds.length > 0 ? `WHERE ${conds.join(' AND ')}` : '';
+    const sql = `SELECT COUNT(*)::int AS cnt FROM semo.knowledge_base ${whereSql}`;
+    const res = await this.pool.query<{ cnt: number }>(sql, params);
+    return res.rows[0]?.cnt ?? 0;
+  }
+
+  async listDomains(): Promise<KbDomainSummary[]> {
+    const sql = `
+      SELECT domain, COUNT(*)::int AS cnt, MAX(updated_at) AS last_updated_at
+        FROM semo.knowledge_base
+       GROUP BY domain
+       ORDER BY domain
+    `;
+    const res = await this.pool.query<{
+      domain: string;
+      cnt: number;
+      last_updated_at: string | Date | null;
+    }>(sql);
+    return res.rows.map((r) => ({
+      domain: r.domain,
+      count: r.cnt,
+      lastUpdatedAt:
+        r.last_updated_at instanceof Date
+          ? r.last_updated_at.toISOString()
+          : r.last_updated_at || undefined,
+    }));
   }
 }

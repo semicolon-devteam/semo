@@ -6,7 +6,12 @@ export type {
   KbChangeEvent,
   Unsubscribe,
 } from './types.js';
-export { type KbStore, NotImplementedError } from './kb-store.js';
+export {
+  type KbStore,
+  type ListOpts,
+  type KbDomainSummary,
+  NotImplementedError,
+} from './kb-store.js';
 export { SqliteKbStore } from './adapters/sqlite/sqlite-kb-store.js';
 export type {
   SqliteEmbeddingProvider,
