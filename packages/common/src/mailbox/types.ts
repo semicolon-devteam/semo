@@ -92,6 +92,11 @@ export interface OutboxMessage {
 
   // status_update
   status_text?: string;
+
+  // 개선1 (2026-05-28): execution 결과 메타. runtime serve 가 timeout/error 시
+  // metadata.failed=true 로 마킹 → slack-router 의 handleReplyPosted 가 commitment 를
+  // 'done' 대신 'failed' 로 닫음 (dispatch success ≠ execution complete 분리).
+  metadata?: Record<string, unknown>;
 }
 
 /** Priority ordering for inbox processing */

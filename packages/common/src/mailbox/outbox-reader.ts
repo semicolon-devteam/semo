@@ -39,6 +39,16 @@ export class OutboxReader {
    * pattern. Router decides how to surface it (Slack #bot-ops, console, etc.).
    */
   private readonly onUsageRejection?: (botId: string, text: string) => Promise<void>;
+  /**
+   * Optional reply transform — called BEFORE posting a reply. Used by router to
+   * implement persona wrapping (e.g., post as Semi orchestrator with footer
+   * "executed by reviewclaw" instead of as reviewclaw directly).
+   * Returns null to keep the original (botId, text); returns object to override.
+   * KB: semo decision/semi-slack-router-integration-complete-2026-05-27
+   */
+  private readonly replyTransform?: (
+    msg: OutboxMessage,
+  ) => Promise<{ botId: string; text: string } | null>;
   /** Track byte offset per bot to only read new content */
   private fileOffsets = new Map<string, number>();
   /** Prevent concurrent processOutbox for same bot */
@@ -65,6 +75,8 @@ export class OutboxReader {
      * Throttled per-bot to avoid #bot-ops spam.
      */
     onUsageRejection?: (botId: string, text: string) => Promise<void>;
+    /** Optional persona wrapping — see field doc above. */
+    replyTransform?: (msg: OutboxMessage) => Promise<{ botId: string; text: string } | null>;
   }) {
     this.mailboxDir = opts.mailboxDir;
     this.botIds = opts.botIds;
@@ -76,6 +88,7 @@ export class OutboxReader {
     this.onAskUser = opts.onAskUser;
     this.onReplyPosted = opts.onReplyPosted;
     this.onUsageRejection = opts.onUsageRejection;
+    this.replyTransform = opts.replyTransform;
   }
 
   start(): void {
@@ -243,7 +256,7 @@ export class OutboxReader {
             // P5-2d: projection emitter 주입 시 우선 사용, 실패/throw/미주입 시 gateway fallback.
             // (Codex 리뷰: projection.emit throw 가 outer catch 로 빠지면 fallback 미실행 → 별도 try)
             let posted = false;
-            let postedVia: 'projection' | 'gateway' = 'gateway';
+            let postedVia: 'projection' | 'gateway' | `gateway(as ${string})` = 'gateway';
             if (this.projection) {
               const channel: ProjectionChannel =
                 this.platform === 'slack' ? 'slack-block' : 'discord-embed';
@@ -271,8 +284,23 @@ export class OutboxReader {
               }
             }
             if (!posted) {
-              await this.gateway.postAsBot(msg.bot_id, msg.channel_id, msg.text, msg.thread_id);
-              postedVia = 'gateway';
+              let postBotId = msg.bot_id;
+              let postText = msg.text;
+              if (this.replyTransform) {
+                try {
+                  const override = await this.replyTransform(msg);
+                  if (override) {
+                    postBotId = override.botId;
+                    postText = override.text;
+                  }
+                } catch (err) {
+                  console.warn(
+                    `[outbox] replyTransform failed for ${msg.bot_id}: ${(err as Error).message} — falling back to original persona`,
+                  );
+                }
+              }
+              await this.gateway.postAsBot(postBotId, msg.channel_id, postText, msg.thread_id);
+              postedVia = postBotId === msg.bot_id ? 'gateway' : `gateway(as ${postBotId})`;
             }
             console.log(
               `[outbox] Posted reply from ${msg.bot_id} to ${this.platform} via ${postedVia}`,

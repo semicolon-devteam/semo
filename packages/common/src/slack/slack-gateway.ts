@@ -80,6 +80,7 @@ export class SlackGateway {
   private botUserId = '';
   private botBotId = ''; // bot_id (user_id와 별도 — 봇 메시지 식별용)
   private onMessage: MessageHandler | null = null;
+  private readonly routeBotId?: string;
 
   // Busy state + queue (serial processing per thread)
   private busyThreads = new Set<string>();
@@ -91,9 +92,10 @@ export class SlackGateway {
   private processedEvents = new Set<string>();
   private readonly PROCESSED_EVENTS_MAX = 200;
 
-  constructor(botToken: string, appToken: string) {
+  constructor(botToken: string, appToken: string, routeBotId?: string) {
     this.web = new WebClient(botToken);
     this.socket = new SocketModeClient({ appToken });
+    this.routeBotId = routeBotId;
   }
 
   /** P5-2e: SlackProjectionEmitter 등 외부에서 WebClient 가 필요할 때 사용. */
@@ -110,7 +112,10 @@ export class SlackGateway {
     const auth = await this.web.auth.test();
     this.botUserId = auth.user_id || '';
     this.botBotId = auth.bot_id || '';
-    console.log(`[slack] Bot user: ${this.botUserId}, bot_id: ${this.botBotId}`);
+    console.log(
+      `[slack] Bot user: ${this.botUserId}, bot_id: ${this.botBotId}` +
+        `${this.routeBotId ? `, route_bot_id: ${this.routeBotId}` : ''}`,
+    );
 
     // app_mention events — 봇 멘션 시 처리
     this.socket.on('app_mention', async ({ event, ack }) => {
@@ -120,7 +125,10 @@ export class SlackGateway {
         console.error('[slack] ack failed (app_mention), skipping:', (e as Error).message);
         return;
       }
-      if (event.bot_id) return; // 봇이 자기 자신을 멘션한 경우 무시
+      // 봇이 자기 자신을 멘션한 경우 무시 (봇 루프 방지).
+      // SEMO_DEV_ALLOW_BOT_MENTIONS=1 환경변수로 개발/테스트 시 우회 가능.
+      // KB: semo decision/semi-orchestrator-hermes-poc-2026-05-27 의 end-to-end 검증용.
+      if (event.bot_id && process.env.SEMO_DEV_ALLOW_BOT_MENTIONS !== '1') return;
       await this.handleEvent(event);
     });
 
@@ -258,6 +266,7 @@ export class SlackGateway {
       ts: event.ts,
       thread_ts: event.thread_ts,
       bot_id: event.bot_id,
+      route_bot_id: this.routeBotId,
       ...(images.length > 0 && { images }),
     };
 

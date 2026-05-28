@@ -11,6 +11,12 @@ export interface SlackMessage {
   ts: string;
   thread_ts?: string;
   bot_id?: string;
+  /**
+   * If the message arrived through a dedicated per-bot Slack app Socket Mode
+   * connection, route directly to that SEMO bot mailbox instead of the
+   * orchestrator/default channel router.
+   */
+  route_bot_id?: string;
   images?: SlackImage[];
 }
 
