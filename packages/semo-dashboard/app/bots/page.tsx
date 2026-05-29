@@ -1,10 +1,121 @@
-import { BotCard } from '@/lib/shared-ui';
+import Link from 'next/link';
 import type { Bot } from '@/types';
 import { query } from '@/lib/db';
 import { getItem } from '@/lib/kb';
 import RuntimeSourceChart from '@/components/RuntimeSourceChart';
 import SystemHealthBanner from '@/components/SystemHealthBanner';
-import { PageBody, PageHeader, Card } from '@/components/ui/semo';
+import { PageBody, PageHeader, Card, Badge } from '@/components/ui/semo';
+
+const AVATAR_COLORS = [
+  'var(--agent-peach)',
+  'var(--agent-mint)',
+  'var(--agent-lavender)',
+  'var(--agent-coral)',
+  'var(--agent-sky)',
+  'var(--agent-butter)',
+  'var(--agent-rose)',
+];
+
+function relTime(iso: string): string {
+  const d = new Date(iso).getTime();
+  if (isNaN(d)) return '-';
+  const diff = Date.now() - d;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return '방금';
+  if (m < 60) return `${m}분 전`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}시간 전`;
+  return `${Math.floor(h / 24)}일 전`;
+}
+
+/** 봇 상태 카드 — 고객 screen-team AgentCard 미감 이식. */
+function BotStatusCard({ bot, idx }: { bot: Bot; idx: number }) {
+  const online = bot.status === 'online';
+  const color = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+  return (
+    <Link
+      href={`/bots/${bot.id}`}
+      style={{
+        display: 'grid',
+        gap: 12,
+        background: 'var(--semo-surface)',
+        border: '1px solid var(--semo-line)',
+        borderRadius: 'var(--r-14)',
+        padding: 16,
+        boxShadow: 'var(--semo-shadow-1)',
+        textDecoration: 'none',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+        <div
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 'var(--r-12)',
+            background: color,
+            display: 'grid',
+            placeItems: 'center',
+            fontSize: 24,
+            flexShrink: 0,
+          }}
+        >
+          {bot.emoji || '\u{1F916}'}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--semo-fg-1)' }}>
+              {bot.name}
+            </span>
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: online ? 'var(--semo-success)' : 'var(--semo-fg-faint)',
+              }}
+            />
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--semo-fg-3)', marginTop: 2 }}>{bot.role}</div>
+        </div>
+        <Badge tone={online ? 'success' : 'neutral'}>{online ? '온라인' : '오프라인'}</Badge>
+      </div>
+      <div
+        style={{
+          padding: '10px 12px',
+          background: 'var(--semo-cream)',
+          borderRadius: 'var(--r-10)',
+          border: '1px solid var(--semo-line-soft)',
+        }}
+      >
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 600,
+            color: 'var(--semo-fg-1)',
+            fontVariantNumeric: 'tabular-nums',
+          }}
+        >
+          세션 {bot.sessionCount}개
+        </div>
+        <div style={{ fontSize: 11.5, color: 'var(--semo-fg-3)', marginTop: 2 }}>
+          마지막 활동 {relTime(bot.lastActive)}
+        </div>
+      </div>
+      <div
+        style={{
+          fontSize: 11,
+          color: 'var(--semo-fg-muted)',
+          fontFamily: 'monospace',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {bot.workspacePath}
+      </div>
+    </Link>
+  );
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -117,8 +228,8 @@ export default async function BotsPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {bots.map((bot) => (
-              <BotCard key={bot.id} bot={bot} />
+            {bots.map((bot, i) => (
+              <BotStatusCard key={bot.id} bot={bot} idx={i} />
             ))}
           </div>
         )}
