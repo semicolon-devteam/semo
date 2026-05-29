@@ -75,9 +75,17 @@ const SEMI_HERMES_PROFILE = process.env.SEMI_HERMES_PROFILE || 'semo-semi';
 const SEMI_HERMES_TIMEOUT_MS = Number(process.env.SEMI_HERMES_TIMEOUT_MS || 120_000);
 const SEMI_BOT_ID = process.env.SEMI_BOT_ID || 'semi';
 
-// Colony 도 hermes-cli orchestrator. agent factory builder 역할.
+// Colony 역할 전환 (2026-05-29): 메신저 컨텍스트 수집 + KB 메모리 업데이트 담당.
+// Semi 와 동일한 orchestrator 실행 기반은 유지하되, Colony 는 주기 수집 워커를 병행한다.
 const COLONY_HERMES_PROFILE = process.env.COLONY_HERMES_PROFILE || 'semo-colony';
 const COLONY_BOT_ID = process.env.COLONY_BOT_ID || 'colony';
+const COLONY_CONTEXT_MEMORY_ENABLED =
+  process.env.COLONY_CONTEXT_MEMORY_ENABLED !== '0' &&
+  process.env.COLONY_CONTEXT_MEMORY_ENABLED !== 'false';
+const COLONY_CONTEXT_FLUSH_INTERVAL_MS = Number(
+  process.env.COLONY_CONTEXT_FLUSH_INTERVAL_MS || 10 * 60_000,
+);
+const COLONY_CONTEXT_BATCH_LIMIT = Number(process.env.COLONY_CONTEXT_BATCH_LIMIT || 120);
 
 // SemoBot 분리 Phase 2 (semo decision/semobot-independent-agent-2026-05-06):
 // system-level 메시지 (usage rejection, watchdog, escalation 등) 의 발송 페르소나를 env 로 추상화.
@@ -120,6 +128,87 @@ function buildDedicatedInboundSlackGateways(): SlackGateway[] {
  */
 async function postSystemMessage(channel: string, text: string, threadTs?: string): Promise<void> {
   await slack.postAsBot(SYSTEM_BOT_ID, channel, text, threadTs);
+}
+
+interface ColonyContextSample {
+  ts: string;
+  channel: string;
+  threadTs: string;
+  senderId: string;
+  senderName: string;
+  routeBotId?: string;
+  text: string;
+}
+
+const colonyContextBuffer: ColonyContextSample[] = [];
+
+function recordColonyContextSample(msg: SlackMessage, senderName: string): void {
+  const text = (msg.text || '').replace(/\s+/g, ' ').trim();
+  if (!text || text.length < 2) return;
+  colonyContextBuffer.push({
+    ts: msg.ts,
+    channel: msg.channel,
+    threadTs: msg.thread_ts || msg.ts,
+    senderId: msg.user,
+    senderName,
+    routeBotId: msg.route_bot_id,
+    text: text.slice(0, 400),
+  });
+  if (colonyContextBuffer.length > COLONY_CONTEXT_BATCH_LIMIT * 5) {
+    colonyContextBuffer.splice(0, colonyContextBuffer.length - COLONY_CONTEXT_BATCH_LIMIT * 5);
+  }
+}
+
+async function flushColonyContextMemory(): Promise<void> {
+  if (!COLONY_CONTEXT_MEMORY_ENABLED || colonyContextBuffer.length === 0) return;
+  const batch = colonyContextBuffer.splice(0, COLONY_CONTEXT_BATCH_LIMIT);
+  if (batch.length === 0) return;
+
+  const lines = batch.map(
+    (item) =>
+      `- [${item.ts}] #${item.channel} (${item.senderName}/${item.senderId}) route=${item.routeBotId || 'none'} :: ${item.text}`,
+  );
+  const markdown = [
+    '# Colony Context Memory (rolling batch)',
+    `generated_at: ${new Date().toISOString()}`,
+    `samples: ${batch.length}`,
+    '',
+    ...lines,
+  ].join('\n');
+
+  try {
+    await execFileP(
+      'semo',
+      [
+        'kb',
+        'upsert',
+        'semo',
+        'iteration',
+        'colony-context-memory-latest',
+        '--content',
+        markdown,
+        '--metadata',
+        JSON.stringify({
+          source: 'slack-router:colony-context-collector',
+          sample_count: batch.length,
+          updated_at: new Date().toISOString(),
+        }),
+      ],
+      { timeout: 30_000, env: process.env },
+    );
+    console.log(`[colony-context] flushed ${batch.length} samples to KB (semo/iteration)`);
+  } catch (err) {
+    const e = err as Error;
+    console.warn(`[colony-context] kb upsert failed: ${e.message}`);
+    colonyContextBuffer.unshift(...batch);
+    if (colonyContextBuffer.length > COLONY_CONTEXT_BATCH_LIMIT * 5) {
+      colonyContextBuffer.splice(0, colonyContextBuffer.length - COLONY_CONTEXT_BATCH_LIMIT * 5);
+    }
+  }
+}
+
+if (COLONY_CONTEXT_MEMORY_ENABLED) {
+  setInterval(() => flushColonyContextMemory().catch(() => {}), COLONY_CONTEXT_FLUSH_INTERVAL_MS);
 }
 
 // ── Overflow Configuration ──
@@ -1023,10 +1112,9 @@ async function maybeHandleSemoBotCommand(msg: SlackMessage, senderName: string):
 
 // ── Hermes-backed orchestrators (Semi / Colony) ──
 //
-// host_kind=hermes-cli orchestrator 봇들 (Semi/Colony) 의 통합 핸들러.
-// Slack 멘션 → Hermes inline dispatch → 응답 파싱 → 후속 처리:
-//   - Semi: ROUTE: <bot> → 해당 OpenClaw 봇 inbox 로 작업 위임 (commitment INSERT)
-//   - Colony: ACTION: FOUND/CREATE/CLARIFY → 사용자에게 직접 응답 (Slack reply only)
+// host_kind=hermes-cli orchestrator 봇들 통합 핸들러.
+// Slack 멘션 → Hermes inline dispatch → ROUTE 파싱 → OpenClaw 봇 inbox 위임.
+// Colony 는 멘션 응답 외에 주기 수집 워커(record/flush)로 팀 컨텍스트 메모리(KB)를 갱신한다.
 //
 // KB: semo decision/semi-orchestrator-hermes-poc-2026-05-27
 //      semo decision/semi-slack-router-integration-complete-2026-05-27
@@ -1037,6 +1125,9 @@ interface OrchestratorConfig {
   profile: string;
   role: string;
   responseKind: 'route' | 'action'; // ROUTE: 또는 ACTION:
+  // 2026-05-29 역할 재편: 에이전트 찾기/생성(SEARCH_LIBRARY/CREATE)은 Semi 의 책임.
+  // ROUTE 가 없을 때 ACTION 라인을 파싱·실행할지 여부. Semi=true, Colony=false(순수 관찰자).
+  canManageAgents?: boolean;
   timeoutMs: number;
 }
 
@@ -1049,15 +1140,17 @@ if (SEMO_PRIMARY_BOT_ID === SEMI_BOT_ID) {
     profile: SEMI_HERMES_PROFILE,
     role: 'orchestrator',
     responseKind: 'route',
+    canManageAgents: true, // Semi = 오케스트레이터 + 에이전트 관리자
     timeoutMs: SEMI_HERMES_TIMEOUT_MS,
   };
-  // Colony 도 같은 home 에 있다면 같이 활성화
+  // Colony 도 같은 home 에 있다면 같이 활성화 (순수 관찰자 — 라우팅/에이전트 관리 안 함)
   ORCHESTRATORS[COLONY_BOT_ID] = {
     botId: COLONY_BOT_ID,
     hermesHome: SEMI_HERMES_HOME,
     profile: COLONY_HERMES_PROFILE,
-    role: 'agent-factory-builder',
-    responseKind: 'action',
+    role: 'observer',
+    responseKind: 'route',
+    canManageAgents: false,
     timeoutMs: SEMI_HERMES_TIMEOUT_MS,
   };
 }
@@ -1227,10 +1320,10 @@ async function dispatchToInbox(args: {
   return { commitmentId, error: null };
 }
 
-// Colony 의 ACTION 후속 자동 실행 (P0-C 2026-05-28).
+// 에이전트 관리 ACTION 후속 자동 실행 (2026-05-29 역할 재편 — Semi 가 수행).
 // - SEARCH_LIBRARY: semo kb search 결과를 Slack thread 에 게시
 // - CREATE:        semo bots create 실행 후 stdout/stderr 를 thread 에 게시
-async function executeColonyAction(
+async function executeAgentAction(
   parsed: ParsedAction,
   msg: SlackMessage,
   replyThreadTs: string,
@@ -1728,9 +1821,9 @@ async function handleOrchestrator(
 
     if (cfg.responseKind === 'route') {
       const parsed = parseRouteResponse(text);
-      let dispatchInfo = '';
+
+      // 1) ROUTE — 전문 작업을 해당 봇 inbox 에 dispatch (commitment INSERT → 완료 시 outbox reply 가 마감).
       if (parsed.bot && parsed.handoff && parsed.bot !== cfg.botId) {
-        // Semi 의 핵심: ROUTE 결정 후 실제 작업 dispatch.
         const dispatch = await dispatchToInbox({
           fromBot: cfg.botId,
           toBot: parsed.bot,
@@ -1739,21 +1832,50 @@ async function handleOrchestrator(
           handoff: parsed.handoff,
           reason: parsed.reason,
         });
+        let dispatchInfo = '';
         if (dispatch.error) {
           dispatchInfo = `\n:warning: dispatch failed: \`${dispatch.error.slice(0, 100)}\``;
         } else if (dispatch.commitmentId) {
-          dispatchInfo = `\n:white_check_mark: \`@${parsed.bot}\` 에 작업 위임됨 (commitment=\`${dispatch.commitmentId.slice(-8)}\`)`;
+          dispatchInfo = `\n:white_check_mark: \`@${parsed.bot}\` 에 작업 위임됨 — 끝나면 결과를 정리해 알려드릴게요. (commitment=\`${dispatch.commitmentId.slice(-8)}\`)`;
+        }
+        const footer = `\n\n— ${cfg.botId} (${elapsed}s, → \`@${parsed.bot}\`)${dispatchInfo}`;
+        await slack.postAsBot(cfg.botId, msg.channel, text + footer, replyThreadTs);
+        console.log(
+          `[${cfg.botId}] responded in ${elapsed}s; routed_to=${parsed.bot} dispatch=${dispatchInfo.includes('위임됨') ? 'ok' : 'fail'} (endReason=${result.endReason})`,
+        );
+        return;
+      }
+
+      // 2) ROUTE 없음 + 에이전트 관리자(Semi) — 에이전트 찾기/생성 ACTION 시도.
+      if (cfg.canManageAgents) {
+        const action = parseActionResponse(text);
+        if (action.action) {
+          const footer = `\n\n— ${cfg.botId} (${elapsed}s, action=\`${action.action}\`${action.target && action.target !== '-' ? `, target=\`${action.target}\`` : ''})`;
+          await slack.postAsBot(cfg.botId, msg.channel, text + footer, replyThreadTs);
+          console.log(
+            `[${cfg.botId}] responded in ${elapsed}s; action=${action.action} target=${action.target || 'none'} (endReason=${result.endReason})`,
+          );
+          try {
+            await executeAgentAction(action, msg, replyThreadTs, cfg.botId);
+          } catch (followErr) {
+            console.warn(`[${cfg.botId}] follow-up action failed:`, (followErr as Error).message);
+          }
+          return;
         }
       }
-      const footer = parsed.bot
-        ? `\n\n— ${cfg.botId} (${elapsed}s, → \`@${parsed.bot}\`)${dispatchInfo}`
-        : `\n\n— ${cfg.botId} (${elapsed}s)`;
-      await slack.postAsBot(cfg.botId, msg.channel, text + footer, replyThreadTs);
+
+      // 3) 직접 답변 — ROUTE/ACTION 없음. 그대로 게시 (단순 질문·회상·확인).
+      await slack.postAsBot(
+        cfg.botId,
+        msg.channel,
+        text + `\n\n— ${cfg.botId} (${elapsed}s)`,
+        replyThreadTs,
+      );
       console.log(
-        `[${cfg.botId}] responded in ${elapsed}s; routed_to=${parsed.bot || 'none'} dispatch=${dispatchInfo ? 'ok' : 'skip'} (endReason=${result.endReason})`,
+        `[${cfg.botId}] responded in ${elapsed}s; direct-answer (endReason=${result.endReason})`,
       );
     } else {
-      // Colony 의 action 응답 — ACTION 별 후속 자동 실행 (P0-C 2026-05-28).
+      // legacy responseKind === 'action' (현재 ORCHESTRATORS 에 미사용 — 호환 보존).
       const parsed = parseActionResponse(text);
       const footer = parsed.action
         ? `\n\n— ${cfg.botId} (${elapsed}s, action=\`${parsed.action}\`${parsed.target && parsed.target !== '-' ? `, target=\`${parsed.target}\`` : ''})`
@@ -1763,10 +1885,8 @@ async function handleOrchestrator(
         `[${cfg.botId}] responded in ${elapsed}s; action=${parsed.action || 'none'} target=${parsed.target || 'none'} (endReason=${result.endReason})`,
       );
 
-      // 후속 액션 자동 실행 (SEARCH_LIBRARY / CREATE).
-      // 실패해도 main 응답은 이미 게시됐으니 best-effort.
       try {
-        await executeColonyAction(parsed, msg, replyThreadTs, cfg.botId);
+        await executeAgentAction(parsed, msg, replyThreadTs, cfg.botId);
       } catch (followErr) {
         console.warn(`[${cfg.botId}] follow-up action failed:`, (followErr as Error).message);
       }
@@ -1884,6 +2004,9 @@ async function routeDirectSlackAppMessage(
 }
 
 async function handleSlackMessage(msg: SlackMessage, senderName: string): Promise<void> {
+  // Colony 컨텍스트 메모리 수집: 모든 유저 메시지를 버퍼링 후 주기 flush.
+  recordColonyContextSample(msg, senderName);
+
   // 0. Hermes-backed orchestrators (Semi / Colony) — MUST be checked BEFORE SemoBot
   // deterministic handler so that PING_ALIASES ("테스트" 등) 가 멘션을 가로채지 않는다.
   // route_bot_id 는 main gateway 가 SEMO_PRIMARY_BOT_ID 일 때 자동 설정됨.

@@ -134,14 +134,15 @@ export default async function OrchestratorFlowPage() {
       <header className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">Orchestrator Flow</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Semi / Colony 에서 라우팅된 작업의 진행 상태 + 최근 새 사용자 온보딩 현황
+          Semi 가 전문 에이전트에게 위임한 작업의 진행 상태 (위임 → 처리 → 완료) + 최근 새 사용자
+          온보딩 현황
         </p>
       </header>
 
       <LiveCommitmentBanner />
 
       <section className="mb-10">
-        <h2 className="mb-3 text-lg font-semibold">최근 라우팅 작업 (최근 50건)</h2>
+        <h2 className="mb-3 text-lg font-semibold">최근 위임 작업 (최근 50건)</h2>
         {commitments.length === 0 ? (
           <p className="rounded-lg border border-dashed border-zinc-300 p-6 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
             아직 hermes-orchestrator 가 만든 commitment 가 없습니다.

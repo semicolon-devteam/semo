@@ -22,6 +22,7 @@ const PLUGIN_NAV = [{ href: '/projects', label: '서비스', key: 'incubator' }]
 const ADMIN_NAV = [
   { href: '/agents', label: '에이전트', key: 'agents' },
   { href: '/tasks', label: '런', key: 'tasks' },
+  { href: '/orchestrator-flow', label: '오케스트레이션', key: 'orchestrator-flow' },
   { href: '/system', label: '시스템', key: 'system' },
   { href: '/cost', label: '비용', key: 'cost' },
   { href: '/tests', label: '테스트', key: 'tests' },
