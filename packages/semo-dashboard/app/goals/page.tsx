@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { PageHeader } from '@/components/ui/semo';
+import { PageBody, PageHeader, Card } from '@/components/ui/semo';
 
 interface KBRow {
   key: string;
@@ -20,29 +20,44 @@ interface ServiceGoals {
   projects: KBRow[];
 }
 
+type SectionKey = 'milestones' | 'decisions' | 'actionItems' | 'projects';
+const SECTIONS: { key: SectionKey; label: string; tint: string }[] = [
+  { key: 'milestones', label: '마일스톤', tint: 'var(--semo-primary)' },
+  { key: 'decisions', label: '결정', tint: 'var(--semo-ai)' },
+  { key: 'actionItems', label: '액션', tint: 'var(--semo-success)' },
+  { key: 'projects', label: '프로젝트', tint: 'var(--semo-warning)' },
+];
+
+function fmtDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export default function GoalsPage() {
   const [goals, setGoals] = useState<ServiceGoals[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [open, setOpen] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch('/api/goals')
-      .then((r) => {
-        if (!r.ok) return [];
-        return r.json();
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        const list: ServiceGoals[] = Array.isArray(data) ? data : [];
+        setGoals(list);
+        if (list[0]) setOpen(new Set([list[0].domain]));
       })
-      .then((data) => setGoals(Array.isArray(data) ? data : []))
       .catch(() => setGoals([]))
       .finally(() => setLoading(false));
   }, []);
 
-  const toggle = (key: string) => {
-    setExpanded((prev) => {
+  const toggle = (key: string) =>
+    setOpen((prev) => {
       const next = new Set(prev);
-      next.has(key) ? next.delete(key) : next.add(key);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
-  };
 
   const totalItems = goals.reduce(
     (sum, g) =>
@@ -51,133 +66,175 @@ export default function GoalsPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[1200px] px-6 pt-7 pb-16">
-      <PageHeader
-        title="목표 정렬"
-        sub={`서비스 목표, 마일스톤, 의사결정, 액션 아이템 — ${goals.length}개 서비스, ${totalItems}개 항목`}
-      />
+    <PageBody>
+      <PageHeader title="목표 정렬" sub={`${goals.length}개 서비스 · 총 ${totalItems}개 항목`} />
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        <div
+          style={{ display: 'grid', placeItems: 'center', padding: 64, color: 'var(--semo-fg-3)' }}
+        >
+          불러오는 중…
         </div>
       ) : goals.length === 0 ? (
-        <div className="text-center py-16 text-gray-500 dark:text-gray-400">
-          KB에 목표 데이터가 없습니다
-        </div>
+        <Card style={{ textAlign: 'center', padding: 48, color: 'var(--semo-fg-3)' }}>
+          KB에 목표 데이터가 없습니다.
+        </Card>
       ) : (
-        <div className="space-y-4">
-          {goals.map((svc) => {
-            const svcKey = svc.domain;
-            const isExpanded = expanded.has(svcKey);
-
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))',
+            gap: 14,
+            alignItems: 'start',
+          }}
+        >
+          {goals.map((g) => {
+            const isOpen = open.has(g.domain);
             return (
-              <div
-                key={svcKey}
-                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
-              >
-                {/* Service Header */}
+              <Card key={g.domain} padding={0} style={{ overflow: 'hidden' }}>
                 <button
-                  onClick={() => toggle(svcKey)}
-                  className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors text-left"
+                  onClick={() => toggle(g.domain)}
+                  style={{
+                    width: '100%',
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: 18,
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
                 >
-                  <div>
-                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {svc.domain}
-                    </h2>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xl">
-                      {svc.description?.slice(0, 100)}
-                    </p>
+                  <span
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 'var(--r-10)',
+                      background: 'var(--semo-primary-08)',
+                      color: 'var(--semo-primary)',
+                      display: 'grid',
+                      placeItems: 'center',
+                      fontWeight: 800,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {g.domain[0]?.toUpperCase()}
+                  </span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 15.5, fontWeight: 700, color: 'var(--semo-fg-1)' }}>
+                      {g.domain}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12.5,
+                        color: 'var(--semo-fg-3)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                      }}
+                    >
+                      {g.description}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 shrink-0 ml-4">
-                    {svc.projects.length > 0 && (
-                      <Badge label="프로젝트" count={svc.projects.length} color="purple" />
-                    )}
-                    {svc.milestones.length > 0 && (
-                      <Badge label="마일스톤" count={svc.milestones.length} color="blue" />
-                    )}
-                    {svc.decisions.length > 0 && (
-                      <Badge label="의사결정" count={svc.decisions.length} color="green" />
-                    )}
-                    {svc.actionItems.length > 0 && (
-                      <Badge label="액션" count={svc.actionItems.length} color="orange" />
-                    )}
-                    <span className="text-lg">{isExpanded ? '▾' : '▸'}</span>
-                  </div>
+                  <span style={{ color: 'var(--semo-fg-3)', fontSize: 16 }}>
+                    {isOpen ? '▾' : '▸'}
+                  </span>
                 </button>
 
-                {/* Expanded Content */}
-                {isExpanded && (
-                  <div className="px-6 pb-5 border-t border-gray-100 dark:border-gray-700 pt-4 space-y-4">
-                    {svc.projects.length > 0 && (
-                      <Section title="프로젝트" color="purple" items={svc.projects} />
-                    )}
-                    {svc.milestones.length > 0 && (
-                      <Section title="마일스톤" color="blue" items={svc.milestones} />
-                    )}
-                    {svc.decisions.length > 0 && (
-                      <Section title="의사결정" color="green" items={svc.decisions} />
-                    )}
-                    {svc.actionItems.length > 0 && (
-                      <Section title="액션 아이템" color="orange" items={svc.actionItems} />
-                    )}
+                <div style={{ display: 'flex', gap: 8, padding: '0 18px 16px', flexWrap: 'wrap' }}>
+                  {SECTIONS.map((s) => (
+                    <span
+                      key={s.key}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '4px 10px',
+                        borderRadius: 'var(--r-full)',
+                        fontSize: 12,
+                        fontWeight: 600,
+                        background: 'var(--semo-surface-2)',
+                        border: '1px solid var(--semo-line)',
+                        color: 'var(--semo-fg-2)',
+                      }}
+                    >
+                      <span
+                        style={{ width: 7, height: 7, borderRadius: '50%', background: s.tint }}
+                      />
+                      {s.label}{' '}
+                      <span
+                        style={{ color: 'var(--semo-fg-3)', fontVariantNumeric: 'tabular-nums' }}
+                      >
+                        {g[s.key].length}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+
+                {isOpen && (
+                  <div
+                    style={{
+                      borderTop: '1px solid var(--semo-line-soft)',
+                      padding: 18,
+                      display: 'grid',
+                      gap: 16,
+                    }}
+                  >
+                    {SECTIONS.filter((s) => g[s.key].length > 0).map((s) => (
+                      <div key={s.key}>
+                        <div
+                          style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 8 }}
+                        >
+                          <span
+                            style={{ width: 8, height: 8, borderRadius: '50%', background: s.tint }}
+                          />
+                          <span
+                            style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--semo-fg-2)' }}
+                          >
+                            {s.label}
+                          </span>
+                        </div>
+                        <div style={{ display: 'grid', gap: 4 }}>
+                          {g[s.key].map((it, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '7px 10px',
+                                background: 'var(--semo-surface-2)',
+                                borderRadius: 'var(--r-8)',
+                              }}
+                            >
+                              <span style={{ flex: 1, fontSize: 13.5, color: 'var(--semo-fg-1)' }}>
+                                {it.sub_key || it.key}
+                              </span>
+                              {it.updated_at && (
+                                <span
+                                  style={{
+                                    fontSize: 11.5,
+                                    fontWeight: 600,
+                                    color: 'var(--semo-fg-muted)',
+                                    fontVariantNumeric: 'tabular-nums',
+                                  }}
+                                >
+                                  {fmtDate(it.updated_at)}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
-              </div>
+              </Card>
             );
           })}
         </div>
       )}
-    </div>
-  );
-}
-
-function Badge({ label, count, color }: { label: string; count: number; color: string }) {
-  const colors: Record<string, string> = {
-    blue: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-    green: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-    orange: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-    purple: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  };
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${colors[color]}`}>
-      {label} {count}
-    </span>
-  );
-}
-
-function Section({ title, color, items }: { title: string; color: string; items: KBRow[] }) {
-  const dotColors: Record<string, string> = {
-    blue: 'bg-blue-500',
-    green: 'bg-green-500',
-    orange: 'bg-orange-500',
-    purple: 'bg-purple-500',
-  };
-
-  return (
-    <div>
-      <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">{title}</h3>
-      <div className="space-y-2">
-        {items.map((item, i) => (
-          <div
-            key={i}
-            className="flex items-start gap-3 p-3 rounded-md bg-gray-50 dark:bg-gray-700/30"
-          >
-            <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${dotColors[color]}`} />
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium text-gray-900 dark:text-white">
-                {item.sub_key || item.key}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">
-                {item.content?.slice(0, 200)}
-              </div>
-              <div className="text-xs text-gray-400 mt-1">
-                {new Date(item.updated_at).toLocaleDateString('ko-KR')}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    </PageBody>
   );
 }
