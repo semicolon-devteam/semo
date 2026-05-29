@@ -2,29 +2,41 @@
 @plugin "@tailwindcss/typography";
 @source "../../dashboard-ui/src/**/*.{ts,tsx}";
 
+/* SEMO v5 브랜드 파운데이션 (2026-05-29) — 내부 툴을 신규 랜딩 디자인 언어로.
+   라이트=크림 표면 + Pretendard + #068FFF. 다크 모드는 기존대로 유지. */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #faf9f4; /* 크림 (semo-bg) */
+  --foreground: #1d242b; /* ink (semo-fg-1) */
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: "Pretendard", var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: var(--font-geist-mono);
+  /* 브랜드 블루(#068FFF)로 blue-* 유틸리티 리맵 → 기존 페이지 액센트가 자동 온브랜드 */
+  --color-blue-50: #e7f3ff;
+  --color-blue-100: #cfe8ff;
+  --color-blue-200: #a6d4ff;
+  --color-blue-300: #6fbcff;
+  --color-blue-400: #3aa6ff;
+  --color-blue-500: #068fff;
+  --color-blue-600: #068fff;
+  --color-blue-700: #0078dc;
+  --color-blue-800: #005fb0;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #0f1117;
+    --foreground: #f4f4f1;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
 /* GFP Section card prose 조정 */

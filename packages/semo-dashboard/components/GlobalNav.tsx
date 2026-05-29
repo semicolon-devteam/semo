@@ -114,7 +114,7 @@ export default function GlobalNav() {
   if (profile && !isAdmin && profile.onboarding_status !== 'approved') return null;
 
   return (
-    <nav className="fixed top-0 left-0 right-0 z-40 bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+    <nav className="fixed top-0 left-0 right-0 z-40 bg-[#faf9f4]/85 dark:bg-gray-800/90 backdrop-blur-md border-b border-[#ece9df] dark:border-gray-700">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-8">

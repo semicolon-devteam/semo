@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import './(customer)/_ui/tokens.css';
 import './globals.css';
 import AppChrome from '@/components/AppChrome';
 import { AuthProvider } from '@/lib/auth/provider';
@@ -30,9 +31,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="ko">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gray-50 dark:bg-gray-900`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased dark:bg-gray-900`}>
         <AuthProvider>
           <AppChrome>{children}</AppChrome>
         </AuthProvider>
