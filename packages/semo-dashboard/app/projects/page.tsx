@@ -410,14 +410,12 @@ export default function ServiceListPage() {
   const isIncubatorPO = profile?.onboarding_role === 'incubator-participant';
   const showBothTabs = isAdmin || isTeamMember;
 
-  const [activeView, setActiveView] = useState<PrimaryView>('general');
-
-  // profile 비동기 로드 후 인큐베이터 유저는 incubator 뷰로 전환
-  useEffect(() => {
-    if (isIncubatorPO && !showBothTabs) {
-      setActiveView('incubator');
-    }
-  }, [isIncubatorPO, showBothTabs]);
+  // activeView 는 effect 동기화 대신 렌더 중 파생 — 인큐베이터 전용 유저는 기본 incubator,
+  // 사용자가 탭을 누르면 override 가 우선한다. (setState-in-effect 회피)
+  const [viewOverride, setViewOverride] = useState<PrimaryView | null>(null);
+  const activeView: PrimaryView =
+    viewOverride ?? (isIncubatorPO && !showBothTabs ? 'incubator' : 'general');
+  const setActiveView = setViewOverride;
 
   useEffect(() => {
     fetch('/api/projects')
