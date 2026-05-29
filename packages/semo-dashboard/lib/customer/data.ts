@@ -6,8 +6,10 @@
  * 현재는 데모 단일 테넌트(정민 카페). 실제 멀티테넌시 전환 시 tenantSlug 를 세션에서 주입.
  */
 import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
+import { DEV_AUTH_COOKIE, devAuthCookieValid } from '@/lib/dev-auth';
 
 export const DEMO_TENANT = 'jeongmin-cafe';
 
@@ -58,13 +60,41 @@ export async function resolveOwnedTenantSlug(): Promise<string | null> {
 }
 
 /**
- * 실 제품 /dashboard 게이트. 소유 테넌트가 없으면 온보딩(/dashboard/start)으로 보낸다.
- * 더미는 절대 노출하지 않는다(둘러보기는 /demo). 서버 컴포넌트에서만 호출.
+ * 우리 팀(운영팀 admin) 또는 dev 매직키 뷰어인지 — 고객 대시보드 "미리보기" 허용 대상.
+ * 팀 모드 토글(운영팀 ↔ 고객)로 admin 이 고객 화면을 데모 테넌트로 들여다볼 수 있게 한다.
+ */
+async function isTeamOrDevViewer(): Promise<boolean> {
+  try {
+    const c = await cookies();
+    if (devAuthCookieValid(c.get(DEV_AUTH_COOKIE)?.value)) return true;
+  } catch {
+    /* cookies unavailable */
+  }
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return false;
+    const { data } = await supabase.from('user_profiles').select('role').eq('id', user.id).single();
+    return data?.role === 'admin';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 실 제품 /dashboard 게이트.
+ * - 소유 테넌트 있음 → 그 테넌트(실데이터).
+ * - 없지만 팀 admin/dev → 데모 테넌트로 미리보기(팀 모드 토글로 고객 화면 확인).
+ * - 그 외(테넌트 없는 일반 사용자) → 온보딩(/dashboard/start).
+ * 서버 컴포넌트에서만 호출.
  */
 export async function requireOwnedTenantSlug(): Promise<string> {
   const slug = await resolveOwnedTenantSlug();
-  if (!slug) redirect('/dashboard/start');
-  return slug;
+  if (slug) return slug;
+  if (await isTeamOrDevViewer()) return DEMO_TENANT;
+  redirect('/dashboard/start');
 }
 
 /**

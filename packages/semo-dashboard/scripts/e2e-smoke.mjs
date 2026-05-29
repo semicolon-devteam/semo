@@ -24,6 +24,7 @@ const dir = path.dirname(fileURLToPath(import.meta.url));
 
 const ROUTES = [
   { path: `/api/dev-auth?key=${KEY}&next=/team`, file: 'team', wait: '로드맵' },
+  { path: '/dashboard', file: 'dashboard', wait: null },
   { path: '/bots', file: 'bots', wait: '봇 팀' },
   { path: '/kb', file: 'kb', wait: '지식' },
   { path: '/action-items', file: 'actions', wait: '액션' },
