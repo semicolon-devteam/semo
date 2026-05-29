@@ -12,6 +12,7 @@ import {
 } from '@/lib/shared-ui';
 import { fetchActionItemAdapter } from '@/lib/action-items-adapter';
 import NextPersonLink from '@/components/action-items/NextPersonLink';
+import { PageHeader } from '@/components/ui/semo';
 
 export default function ActionItemsPage() {
   const {
@@ -66,25 +67,27 @@ export default function ActionItemsPage() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">액션 아이템</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            {stats.open}개 진행 중 · {stats.completed}개 완료
-          </p>
-        </div>
-        <button
-          onClick={openCreate}
-          className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          추가
-        </button>
-      </div>
+    <div className="mx-auto max-w-[1200px] px-6 pt-7 pb-16">
+      <PageHeader
+        title="액션 아이템"
+        sub={`${stats.open}개 진행 중 · ${stats.completed}개 완료`}
+        action={
+          <button
+            onClick={openCreate}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
+            </svg>
+            추가
+          </button>
+        }
+      />
 
       {/* Controls: Tab + View switcher + Status filter */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">

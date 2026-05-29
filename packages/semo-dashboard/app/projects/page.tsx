@@ -6,6 +6,7 @@ import { useAuth } from '@/lib/auth/provider';
 import { LeaderboardTrack } from '@/components/service/LeaderboardTrack';
 import type { SubPhaseProgress } from '@/components/service/LeaderboardTrack';
 import type { ServiceProject, ServiceLifecycle, ServiceType } from '@/types';
+import { PageHeader } from '@/components/ui/semo';
 
 const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
   active: { bg: 'bg-green-100 dark:bg-green-900/30', text: 'text-green-700 dark:text-green-400' },
@@ -149,23 +150,21 @@ export default function ServiceListPage() {
   const displayedProjects = activeView === 'general' ? filteredGeneral : incubatorProjects;
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">서비스</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            서비스 라이프사이클 관리 — {projects.length}개 프로젝트
-          </p>
-        </div>
-        {(isAdmin || isTeamMember) && (
-          <Link
-            href="/projects/new"
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          >
-            + 새 프로젝트
-          </Link>
-        )}
-      </div>
+    <div className="mx-auto max-w-[1200px] px-6 pt-7 pb-16">
+      <PageHeader
+        title="서비스"
+        sub={`서비스 라이프사이클 관리 — ${projects.length}개 프로젝트`}
+        action={
+          (isAdmin || isTeamMember) && (
+            <Link
+              href="/projects/new"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            >
+              + 새 프로젝트
+            </Link>
+          )
+        }
+      />
 
       {/* 1차 탭: 일반 / 인큐베이터 / 플랫폼 (세미콜론 멤버만 표시) */}
       {showBothTabs && (

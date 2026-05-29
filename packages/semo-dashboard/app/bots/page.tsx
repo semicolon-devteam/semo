@@ -4,6 +4,7 @@ import { query } from '@/lib/db';
 import { getItem } from '@/lib/kb';
 import RuntimeSourceChart from '@/components/RuntimeSourceChart';
 import SystemHealthBanner from '@/components/SystemHealthBanner';
+import { PageBody, PageHeader, Card } from '@/components/ui/semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -99,31 +100,29 @@ export default async function BotsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">봇 팀 현황</h1>
-        <p className="text-gray-600 dark:text-gray-400">모든 봇의 활동과 상태를 모니터링합니다</p>
-      </div>
+    <PageBody>
+      <PageHeader title="봇 팀 현황" sub="모든 봇의 활동과 상태를 모니터링합니다" />
 
-      <div className="mb-6">
+      <div style={{ display: 'grid', gap: 20 }}>
         <SystemHealthBanner />
-      </div>
-
-      <div className="mb-8">
         <RuntimeSourceChart days={7} />
-      </div>
 
-      {error ? (
-        <div className="text-center py-12 text-red-500">DB 연결에 실패했습니다.</div>
-      ) : bots.length === 0 ? (
-        <div className="text-center py-12 text-gray-500">등록된 봇이 없습니다.</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {bots.map((bot) => (
-            <BotCard key={bot.id} bot={bot} />
-          ))}
-        </div>
-      )}
-    </div>
+        {error ? (
+          <Card style={{ textAlign: 'center', padding: 48, color: 'var(--semo-danger)' }}>
+            DB 연결에 실패했습니다.
+          </Card>
+        ) : bots.length === 0 ? (
+          <Card style={{ textAlign: 'center', padding: 48, color: 'var(--semo-fg-3)' }}>
+            등록된 봇이 없습니다.
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {bots.map((bot) => (
+              <BotCard key={bot.id} bot={bot} />
+            ))}
+          </div>
+        )}
+      </div>
+    </PageBody>
   );
 }

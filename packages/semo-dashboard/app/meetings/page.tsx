@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Meeting } from '@/lib/meeting';
+import { PageHeader } from '@/components/ui/semo';
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -102,21 +103,19 @@ export default function MeetingsListPage() {
     m.transcription_status === 'pending' && m.generation_status === 'pending';
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">회의</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            회의 녹취 및 메모 — {meetings.length}건
-          </p>
-        </div>
-        <Link
-          href="/meetings/new"
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          + 새 회의
-        </Link>
-      </div>
+    <div className="mx-auto max-w-[1200px] px-6 pt-7 pb-16">
+      <PageHeader
+        title="회의"
+        sub={`회의 녹취 및 메모 — ${meetings.length}건`}
+        action={
+          <Link
+            href="/meetings/new"
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            + 새 회의
+          </Link>
+        }
+      />
 
       {loading ? (
         <div className="flex items-center justify-center py-16">

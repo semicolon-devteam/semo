@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { PageHeader } from '@/components/ui/semo';
 
 interface KBRow {
   key: string;
@@ -36,7 +37,7 @@ export default function GoalsPage() {
   }, []);
 
   const toggle = (key: string) => {
-    setExpanded(prev => {
+    setExpanded((prev) => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
       return next;
@@ -44,19 +45,17 @@ export default function GoalsPage() {
   };
 
   const totalItems = goals.reduce(
-    (sum, g) => sum + g.milestones.length + g.decisions.length + g.actionItems.length + g.projects.length, 0
+    (sum, g) =>
+      sum + g.milestones.length + g.decisions.length + g.actionItems.length + g.projects.length,
+    0,
   );
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-          목표 정렬
-        </h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          서비스 목표, 마일스톤, 의사결정, 액션 아이템 — {goals.length}개 서비스, {totalItems}개 항목
-        </p>
-      </div>
+    <div className="mx-auto max-w-[1200px] px-6 pt-7 pb-16">
+      <PageHeader
+        title="목표 정렬"
+        sub={`서비스 목표, 마일스톤, 의사결정, 액션 아이템 — ${goals.length}개 서비스, ${totalItems}개 항목`}
+      />
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
@@ -73,7 +72,10 @@ export default function GoalsPage() {
             const isExpanded = expanded.has(svcKey);
 
             return (
-              <div key={svcKey} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div
+                key={svcKey}
+                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+              >
                 {/* Service Header */}
                 <button
                   onClick={() => toggle(svcKey)}
@@ -88,10 +90,18 @@ export default function GoalsPage() {
                     </p>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-gray-400 shrink-0 ml-4">
-                    {svc.projects.length > 0 && <Badge label="프로젝트" count={svc.projects.length} color="purple" />}
-                    {svc.milestones.length > 0 && <Badge label="마일스톤" count={svc.milestones.length} color="blue" />}
-                    {svc.decisions.length > 0 && <Badge label="의사결정" count={svc.decisions.length} color="green" />}
-                    {svc.actionItems.length > 0 && <Badge label="액션" count={svc.actionItems.length} color="orange" />}
+                    {svc.projects.length > 0 && (
+                      <Badge label="프로젝트" count={svc.projects.length} color="purple" />
+                    )}
+                    {svc.milestones.length > 0 && (
+                      <Badge label="마일스톤" count={svc.milestones.length} color="blue" />
+                    )}
+                    {svc.decisions.length > 0 && (
+                      <Badge label="의사결정" count={svc.decisions.length} color="green" />
+                    )}
+                    {svc.actionItems.length > 0 && (
+                      <Badge label="액션" count={svc.actionItems.length} color="orange" />
+                    )}
                     <span className="text-lg">{isExpanded ? '▾' : '▸'}</span>
                   </div>
                 </button>
@@ -149,7 +159,10 @@ function Section({ title, color, items }: { title: string; color: string; items:
       <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">{title}</h3>
       <div className="space-y-2">
         {items.map((item, i) => (
-          <div key={i} className="flex items-start gap-3 p-3 rounded-md bg-gray-50 dark:bg-gray-700/30">
+          <div
+            key={i}
+            className="flex items-start gap-3 p-3 rounded-md bg-gray-50 dark:bg-gray-700/30"
+          >
             <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${dotColors[color]}`} />
             <div className="min-w-0 flex-1">
               <div className="text-sm font-medium text-gray-900 dark:text-white">

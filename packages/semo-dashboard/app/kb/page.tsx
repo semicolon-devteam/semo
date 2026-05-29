@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { DomainCard, LayerModal } from '@/lib/shared-ui';
 import type { KBEntry, KBDomain, OntologyEntry } from '@/types';
+import { PageHeader } from '@/components/ui/semo';
 
 const EMPTY_FORM = { title: '', content: '', bot_id: '', category: '' };
 
@@ -341,20 +342,19 @@ function KBPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">지식</h1>
-          <p className="text-gray-600 dark:text-gray-400">KB 항목 관리 — {entries.length}개 항목</p>
-        </div>
-        <button
-          onClick={openNew}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-        >
-          + 새 항목
-        </button>
-      </div>
+    <div className="mx-auto max-w-[1200px] px-6 pt-7 pb-16">
+      <PageHeader
+        title="지식"
+        sub={`KB 항목 관리 — ${entries.length}개 항목`}
+        action={
+          <button
+            onClick={openNew}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            + 새 항목
+          </button>
+        }
+      />
 
       {/* Filters */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 mb-6">

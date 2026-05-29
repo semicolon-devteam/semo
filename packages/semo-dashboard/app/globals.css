@@ -14,10 +14,12 @@
   --color-foreground: var(--foreground);
   --font-sans: "Pretendard", var(--font-geist-sans), -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: var(--font-geist-mono);
-  /* 표면 그레이를 따뜻한 크림 톤으로 리맵 → 페이지 컨테이너가 일괄 온브랜드.
-     (border/text 로 쓰이는 gray-200+ 는 대비 보존 위해 건드리지 않음) */
+  /* 표면 그레이 → 따뜻한 크림 톤, 경계선 그레이 → semo line 톤. 전 페이지 카드/구분선 일괄 온브랜드.
+     (text 로 주로 쓰이는 gray-400+ 는 대비 보존 위해 유지) */
   --color-gray-50: #f4f2ea;
   --color-gray-100: #efece2;
+  --color-gray-200: #ece9df;
+  --color-gray-300: #d9d5c8;
   /* 브랜드 블루(#068FFF)로 blue-* 유틸리티 리맵 → 기존 페이지 액센트가 자동 온브랜드 */
   --color-blue-50: #e7f3ff;
   --color-blue-100: #cfe8ff;
