@@ -12,7 +12,7 @@ import {
 } from '@/lib/shared-ui';
 import { fetchActionItemAdapter } from '@/lib/action-items-adapter';
 import NextPersonLink from '@/components/action-items/NextPersonLink';
-import { PageHeader } from '@/components/ui/semo';
+import { PageHeader, Stat } from '@/components/ui/semo';
 
 export default function ActionItemsPage() {
   const {
@@ -88,6 +88,19 @@ export default function ActionItemsPage() {
           </button>
         }
       />
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 12,
+          marginBottom: 18,
+        }}
+      >
+        <Stat label="전체" value={`${filtered.length}건`} />
+        <Stat label="진행 중" value={`${stats.open}건`} />
+        <Stat label="완료" value={`${stats.completed}건`} tone="success" />
+      </div>
 
       {/* Controls: Tab + View switcher + Status filter */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
