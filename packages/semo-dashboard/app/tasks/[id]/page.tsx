@@ -11,7 +11,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
   if (!task) notFound();
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-950 px-6 py-8">
+    <main className="min-h-[calc(100vh-56px)] bg-gray-50 dark:bg-gray-950 px-6 py-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <div className="flex items-center justify-between">
           <Link

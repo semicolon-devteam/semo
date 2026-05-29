@@ -11,7 +11,7 @@ export default async function TasksPage() {
   const openActions = tasks.reduce((sum, t) => sum + t.pending_action_items, 0);
 
   return (
-    <main className="min-h-screen bg-gray-50 dark:bg-gray-950 px-6 py-8">
+    <main className="min-h-[calc(100vh-56px)] bg-gray-50 dark:bg-gray-950 px-6 py-8">
       <div className="mx-auto max-w-7xl space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
