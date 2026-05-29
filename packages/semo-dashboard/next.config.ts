@@ -10,6 +10,8 @@ const nextConfig: NextConfig = {
     return [
       { source: '/my', destination: '/dashboard', permanent: true },
       { source: '/my/:path*', destination: '/dashboard/:path*', permanent: true },
+      // 2026-05-29 디자인 이식: 온톨로지는 지식(KB) 화면의 탭으로 병합.
+      { source: '/ontology', destination: '/kb?tab=ontology', permanent: true },
     ];
   },
 };

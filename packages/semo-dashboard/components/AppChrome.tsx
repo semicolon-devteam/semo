@@ -2,16 +2,15 @@
 
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
-import GlobalNav from './GlobalNav';
+import InternalShell from './InternalShell';
 import OnboardingGate from './OnboardingGate';
 
 /**
  * Decides which chrome wraps the page.
  *
- * - Internal team tool (everything except /, /dashboard* and /demo*): GlobalNav +
- *   onboarding gate + padded main, exactly as before.
- * - Landing (/), customer dashboard (/dashboard*) and public demo (/demo*): no
- *   chrome here — the landing + (customer) route group provide their own layout.
+ * - 내부 운영툴(아래 bare 제외 전부): SEMO v5 사이드바 셸(InternalShell) + 온보딩 게이트.
+ * - bare(자체 레이아웃): 랜딩(/), 고객 대시보드(/dashboard*), 데모(/demo*),
+ *   로그인·인증·온보딩(/login·/auth*·/onboarding*).
  */
 export default function AppChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -20,14 +19,17 @@ export default function AppChrome({ children }: { children: ReactNode }) {
     pathname === '/dashboard' ||
     pathname?.startsWith('/dashboard/') ||
     pathname === '/demo' ||
-    pathname?.startsWith('/demo/');
+    pathname?.startsWith('/demo/') ||
+    pathname === '/login' ||
+    pathname?.startsWith('/auth/') ||
+    pathname === '/onboarding' ||
+    pathname?.startsWith('/onboarding/');
 
   if (isBare) return <>{children}</>;
 
   return (
     <OnboardingGate>
-      <GlobalNav />
-      <main className="min-h-screen pt-16">{children}</main>
+      <InternalShell>{children}</InternalShell>
     </OnboardingGate>
   );
 }

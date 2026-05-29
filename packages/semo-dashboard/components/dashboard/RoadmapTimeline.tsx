@@ -9,11 +9,15 @@ import MilestoneDetailModal from './MilestoneDetailModal';
 
 export default function RoadmapTimeline() {
   const [statusFilter, setStatusFilter] = useState('all');
-  const [selectedMilestone, setSelectedMilestone] = useState<{ milestone: Milestone; color: string } | null>(null);
-  const { projects, timelineStart, timelineEnd, months, loading, error } = useRoadmapData(statusFilter);
+  const [selectedMilestone, setSelectedMilestone] = useState<{
+    milestone: Milestone;
+    color: string;
+  } | null>(null);
+  const { projects, timelineStart, timelineEnd, months, loading, error } =
+    useRoadmapData(statusFilter);
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
+    <div className="h-[calc(100vh-56px)] flex flex-col bg-gray-50">
       <TimelineHeader
         projects={projects}
         statusFilter={statusFilter}
