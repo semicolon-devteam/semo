@@ -8,20 +8,21 @@ import OnboardingGate from './OnboardingGate';
 /**
  * Decides which chrome wraps the page.
  *
- * - Internal team tool (everything except /my* and /demo*): GlobalNav +
+ * - Internal team tool (everything except /, /dashboard* and /demo*): GlobalNav +
  *   onboarding gate + padded main, exactly as before.
- * - Customer dashboard (/my*) and public demo (/demo*): no chrome here — the
- *   (customer) route group provides its own full-screen AppShell.
+ * - Landing (/), customer dashboard (/dashboard*) and public demo (/demo*): no
+ *   chrome here — the landing + (customer) route group provide their own layout.
  */
 export default function AppChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const isCustomer =
-    pathname === '/my' ||
-    pathname?.startsWith('/my/') ||
+  const isBare =
+    pathname === '/' ||
+    pathname === '/dashboard' ||
+    pathname?.startsWith('/dashboard/') ||
     pathname === '/demo' ||
     pathname?.startsWith('/demo/');
 
-  if (isCustomer) return <>{children}</>;
+  if (isBare) return <>{children}</>;
 
   return (
     <OnboardingGate>

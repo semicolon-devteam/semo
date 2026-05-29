@@ -8,7 +8,7 @@ import { listPersonaMeta } from '@/lib/customer/persona/registry';
  * 모드 토글 — 고객 셸 Topbar용. 팀원에게만 보인다(외부 고객/비로그인은 숨김).
  *
  * - 어드민: 모든 모드 — 페르소나(가게/개인/직장인) 미리보기 + 운영팀(내부 툴).
- *   페르소나는 /my/personas?p= 로 미리보고, 운영팀은 기존 내부 대시보드(/)로.
+ *   페르소나는 /dashboard/personas?p= 로 미리보고, 운영팀은 내부 로드맵(/team)으로.
  * - 비어드민 팀원: 내 가게 ↔ 운영팀.
  * - 외부 고객: 스위처 없음(자기 페르소나 고정 — 처음 선택값).
  */
@@ -51,8 +51,8 @@ export default function TeamModeToggle() {
 
   if (isAdmin) {
     // 어드민 — 모든 모드. 페르소나 미리보기 + 운영팀.
-    // /my/personas 에 있을 때 현재 ?p= 페르소나를 active 로 표시.
-    const onPersonas = pathname === '/my/personas';
+    // /dashboard/personas 에 있을 때 현재 ?p= 페르소나를 active 로 표시.
+    const onPersonas = pathname === '/dashboard/personas';
     const activeP = onPersonas ? sp.get('p') : null;
     return (
       <div style={containerStyle} aria-label="모드 전환 (어드민)">
@@ -60,7 +60,7 @@ export default function TeamModeToggle() {
           <button
             key={p.id}
             type="button"
-            onClick={() => router.push(`/my/personas?p=${p.id}`)}
+            onClick={() => router.push(`/dashboard/personas?p=${p.id}`)}
             style={pillStyle(activeP === p.id)}
           >
             {p.label}
@@ -68,7 +68,7 @@ export default function TeamModeToggle() {
         ))}
         <button
           type="button"
-          onClick={() => router.push('/')}
+          onClick={() => router.push('/team')}
           style={{ ...pillStyle(false), color: 'var(--semo-ai)' }}
         >
           운영팀

@@ -301,24 +301,24 @@ function SegTab({ value, onChange, options }) {
  * App Shell — Sidebar + Topbar
  * ────────────────────────────────────────────────────────────────── */
 const NAV_CUSTOMER = [
-  { id: 'home',      label: '홈',         hint: '오늘',         icon: 'home',    href: '/my' },
-  { id: 'team',      label: '내 직원',     hint: '7명',          icon: 'users',   href: '/my/team' },
-  { id: 'knowledge', label: '가게 지식',   hint: 'KB',           icon: 'network', href: '/my/knowledge' },
-  { id: 'library',   label: '채용',       hint: '120+ 직원',    icon: 'store',   href: '/my/library' },
-  { id: 'plan',      label: '요금제',     hint: 'Starter',     icon: 'card',    href: '/my/plan' },
+  { id: 'home',      label: '홈',         hint: '오늘',         icon: 'home',    href: '/dashboard' },
+  { id: 'team',      label: '내 직원',     hint: '7명',          icon: 'users',   href: '/dashboard/team' },
+  { id: 'knowledge', label: '가게 지식',   hint: 'KB',           icon: 'network', href: '/dashboard/knowledge' },
+  { id: 'library',   label: '채용',       hint: '120+ 직원',    icon: 'store',   href: '/dashboard/library' },
+  { id: 'plan',      label: '요금제',     hint: 'Starter',     icon: 'card',    href: '/dashboard/plan' },
 ];
 const NAV_PROVIDER = [
-  { id: 'tenants',   label: '구독자',           icon: 'building',  href: '/my/provider' },
-  { id: 'factory',   label: '라이브러리 운영',   icon: 'wrench',    href: '/my/provider/factory' },
-  { id: 'health',    label: '시스템',           icon: 'activity',  href: '/my/provider/health' },
+  { id: 'tenants',   label: '구독자',           icon: 'building',  href: '/dashboard/provider' },
+  { id: 'factory',   label: '라이브러리 운영',   icon: 'wrench',    href: '/dashboard/provider/factory' },
+  { id: 'health',    label: '시스템',           icon: 'activity',  href: '/dashboard/provider/health' },
   { id: 'incubator', label: '인큐베이터',       icon: 'beaker', external: true, href: 'https://incubator.semo.team' },
 ];
 
 function Sidebar({ mode, active, workspace }) {
   const isProvider = mode === 'provider';
-  // 데모(/demo)와 실제(/my)가 같은 nav 를 공유 → 현재 컨텍스트에 맞춰 href base 전환.
+  // 데모(/demo)와 실제(/dashboard)가 같은 nav 를 공유 → 현재 컨텍스트에 맞춰 href base 전환.
   const pathname = usePathname();
-  const navBase = pathname && pathname.startsWith('/demo') ? '/demo' : '/my';
+  const navBase = pathname && pathname.startsWith('/demo') ? '/demo' : '/dashboard';
   return (
     <aside style={{
       width: 232,
@@ -386,7 +386,7 @@ function Sidebar({ mode, active, workspace }) {
       {(isProvider ? NAV_PROVIDER : NAV_CUSTOMER).map(n => {
         const sel = n.id === active;
         return (
-          <a key={n.id} href={n.external ? n.href : navBase + n.href.slice('/my'.length)}
+          <a key={n.id} href={n.external ? n.href : navBase + n.href.slice('/dashboard'.length)}
              target={n.external ? '_blank' : undefined}
              rel={n.external ? 'noreferrer' : undefined}
              style={{
@@ -694,7 +694,7 @@ function PhoneFrame({ children, label, width = 320, height = 660 }) {
 /* Empty state — 실 테넌트에 데이터가 아직 없을 때(신규 가입자). AppShell 안에 배치. */
 function EmptyState({ icon = 'users', title, sub, ctaLabel, ctaTo = '/library' }) {
   const pathname = usePathname();
-  const base = pathname && pathname.startsWith('/demo') ? '/demo' : '/my';
+  const base = pathname && pathname.startsWith('/demo') ? '/demo' : '/dashboard';
   return (
     <div style={{ height: '100%', display: 'grid', placeItems: 'center', padding: 32 }}>
       <div style={{ textAlign: 'center', maxWidth: 440, display: 'grid', gap: 14, justifyItems: 'center' }}>

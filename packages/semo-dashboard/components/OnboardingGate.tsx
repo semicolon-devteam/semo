@@ -14,9 +14,9 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
   useEffect(() => {
     if (loading || !user) return;
     // 외부 고객(팀 프로필 없이 테넌트 소유)이 내부 라우트에 들어오면 고객 대시보드로 보낸다.
-    // (AppChrome 가 /my*·/demo* 에는 이 게이트를 안 걸므로 여기 pathname 은 항상 내부 라우트.)
+    // (AppChrome 가 /·/dashboard*·/demo* 에는 이 게이트를 안 걸므로 여기 pathname 은 항상 내부 라우트.)
     if (isCustomer) {
-      if (!EXEMPT_PREFIXES.some((p) => pathname.startsWith(p))) router.replace('/my');
+      if (!EXEMPT_PREFIXES.some((p) => pathname.startsWith(p))) router.replace('/dashboard');
       return;
     }
     if (!profile) return;
@@ -28,11 +28,8 @@ export default function OnboardingGate({ children }: { children: React.ReactNode
     } else if (profile.onboarding_status === 'pending') {
       router.replace('/onboarding/pending');
     } else if (profile.onboarding_status === 'approved') {
-      // 인큐베이터 유저가 대시보드(로드맵)에 진입하면 서비스 페이지로 리다이렉트
-      if (
-        profile.onboarding_role === 'incubator-participant' &&
-        (pathname === '/' || pathname === '/dashboard')
-      ) {
+      // 인큐베이터 유저가 내부 로드맵(/team)에 진입하면 서비스 페이지로 리다이렉트
+      if (profile.onboarding_role === 'incubator-participant' && pathname === '/team') {
         router.replace('/projects');
       }
     }

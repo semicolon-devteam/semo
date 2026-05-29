@@ -53,6 +53,8 @@ export async function updateSession(request: NextRequest) {
   // 인증 불필요 경로: 공개 페이지 + 봇/외부 webhook + 서버 컴포넌트 내부 호출용 read-only API
   const publicPaths = ['/login', '/auth/callback', '/api/health'];
   const isPublicPath =
+    // 홍보 랜딩 — 항상 공개(로그인 무관). 로그인 사용자는 랜딩에서 '내 대시보드' 버튼으로 진입.
+    pathname === '/' ||
     publicPaths.some((p) => pathname.startsWith(p)) ||
     pathname.startsWith('/api/projects/callback') ||
     pathname.startsWith('/api/slack/') ||
@@ -76,11 +78,13 @@ export async function updateSession(request: NextRequest) {
     pathname === '/demo' ||
     pathname.startsWith('/demo/') ||
     // 가입/로그인 페이지 — 게이팅 여부와 무관하게 항상 공개.
-    pathname === '/my/signup' ||
-    // Customer 대시보드 (/my*) — 게이팅 OFF 일 때만 공개(현 mock 쇼케이스). ON 이면
-    // 로그인 필수 → 아래 redirect 가 /my/signup 으로 보냄. 데모는 /demo* 가 담당.
+    pathname === '/dashboard/signup' ||
+    // Customer 대시보드 (/dashboard*) — 게이팅 OFF 일 때만 공개(현 mock 쇼케이스). ON 이면
+    // 로그인 필수 → 아래 redirect 가 /dashboard/signup 으로 보냄. 데모는 /demo* 가 담당.
     (!CUSTOMER_GATING &&
-      (pathname === '/my' || pathname.startsWith('/my/') || pathname.startsWith('/api/my/'))) ||
+      (pathname === '/dashboard' ||
+        pathname.startsWith('/dashboard/') ||
+        pathname.startsWith('/api/my/'))) ||
     // 소개사이트(introduction) 자료실: 공개 글 목록/상세/첨부 다운로드
     pathname.startsWith('/api/board/public') ||
     (pathname.startsWith('/api/board/attachments/') &&
@@ -91,8 +95,8 @@ export async function updateSession(request: NextRequest) {
 
   if (!user && !isPublicPath) {
     const url = request.nextUrl.clone();
-    // 고객 영역(/my*)은 고객 가입 페이지로, 그 외(내부 툴)는 내부 로그인으로.
-    url.pathname = pathname.startsWith('/my') ? '/my/signup' : '/login';
+    // 고객 영역(/dashboard*)은 고객 가입 페이지로, 그 외(내부 툴)는 내부 로그인으로.
+    url.pathname = pathname.startsWith('/dashboard') ? '/dashboard/signup' : '/login';
     return NextResponse.redirect(url);
   }
 

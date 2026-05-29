@@ -5,6 +5,7 @@
  * 여기 쿼리 레이어의 WHERE tenant_slug 로 처리(appdb 는 RLS 없음, 서버 trusted).
  * 현재는 데모 단일 테넌트(정민 카페). 실제 멀티테넌시 전환 시 tenantSlug 를 세션에서 주입.
  */
+import { redirect } from 'next/navigation';
 import { query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 
@@ -33,6 +34,37 @@ export async function resolveTenantSlug(): Promise<string> {
   } catch {
     return DEMO_TENANT;
   }
+}
+
+/**
+ * 실 소유 테넌트만 해석 (데모 폴백 없음). 세션 없거나 소유 테넌트 없으면 null.
+ * /dashboard(실 제품)와 /demo(더미) 를 가르는 기준 — /demo 는 DEMO_TENANT 를 직접 넘긴다.
+ */
+export async function resolveOwnedTenantSlug(): Promise<string | null> {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return null;
+    const { rows } = await query<{ slug: string }>(
+      `select slug from public.tenants where owner_user_id = $1 order by created_at limit 1`,
+      [user.id],
+    );
+    return rows[0]?.slug ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 실 제품 /dashboard 게이트. 소유 테넌트가 없으면 온보딩(/dashboard/start)으로 보낸다.
+ * 더미는 절대 노출하지 않는다(둘러보기는 /demo). 서버 컴포넌트에서만 호출.
+ */
+export async function requireOwnedTenantSlug(): Promise<string> {
+  const slug = await resolveOwnedTenantSlug();
+  if (!slug) redirect('/dashboard/start');
+  return slug;
 }
 
 /**

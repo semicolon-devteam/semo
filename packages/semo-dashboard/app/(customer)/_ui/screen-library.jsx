@@ -188,7 +188,7 @@ function LibraryCard({ agent, primary, community }) {
   const a = agent.bio ? agent : libraryCard(agent);
   const bigBio = (agent.bio || `${agent.role}으로 일해요.`).slice(0, 56);
   const pathname = usePathname();
-  const base = pathname && pathname.startsWith('/demo') ? '/demo' : '/my';
+  const base = pathname && pathname.startsWith('/demo') ? '/demo' : '/dashboard';
   return (
     <div onClick={() => { window.location.href = `${base}/library/${a.id || agent.id || ''}`; }} style={{
       flex: '0 0 auto',
@@ -264,7 +264,7 @@ function ScreenLibraryDetail({ recruitOpen = false, step = 1, slug, agent }) {
   const [curStep, setCurStep] = React.useState(step);
   const [hiring, setHiring] = React.useState(false);
   const pathname = usePathname();
-  const base = pathname && pathname.startsWith('/demo') ? '/demo' : '/my';
+  const base = pathname && pathname.startsWith('/demo') ? '/demo' : '/dashboard';
 
   // 채용 마법사 마지막 단계 → 실제 install. 데모 테넌트는 API 가 저장 거부(가입 유도).
   async function hire() {

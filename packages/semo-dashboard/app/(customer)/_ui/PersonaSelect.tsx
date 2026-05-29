@@ -7,7 +7,7 @@ import type { PersonaId } from '@/lib/customer/persona/schema';
 
 /**
  * 처음 모드(페르소나) 선택 — 가입/첫 진입 시 1회. 선택을 customer_user_settings 에
- * 저장한 뒤 /my 로 들어간다. (어드민은 셸 스위처로 모든 모드를 자유 전환.)
+ * 저장한 뒤 /dashboard 로 들어간다. (어드민은 셸 스위처로 모든 모드를 자유 전환.)
  */
 const META = listPersonaMeta();
 
@@ -25,7 +25,10 @@ export default function PersonaSelect() {
         body: JSON.stringify({ persona: id }),
       });
       if (res.ok) {
-        router.push('/my');
+        // 모드 선택 = 내 가게 만들기. 소유 테넌트를 보장한 뒤 대시보드로
+        // (없으면 /dashboard 게이트가 다시 여기로 보내 무한루프가 됨).
+        await fetch('/api/my/tenant/ensure', { method: 'POST' });
+        router.push('/dashboard');
         return;
       }
       setBusy(null);

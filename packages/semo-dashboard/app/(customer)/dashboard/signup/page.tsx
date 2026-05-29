@@ -4,9 +4,9 @@ import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 /**
- * 고객 가입/로그인 (T67). 같은 Supabase auth 풀을 쓰고, 가입 직후
- * /api/my/tenant/ensure 로 내 가게(테넌트)를 생성한 뒤 /my 로 이동.
- * 게이팅(SEMO_CUSTOMER_GATING) 여부와 무관하게 이 페이지는 항상 공개.
+ * 고객 가입/로그인 (T67). 같은 Supabase auth 풀을 쓰고, 세션이 생기면 /dashboard/start 로.
+ * 가게(테넌트) 생성은 거기서 — 신규는 모드 선택(PersonaSelect)이 가게를 만들고, 기존
+ * 사용자는 곧장 /dashboard 로 통과한다. 게이팅 여부와 무관하게 이 페이지는 항상 공개.
  */
 export default function SignupPage() {
   const [mode, setMode] = useState<'signup' | 'login'>('signup');
@@ -31,10 +31,12 @@ export default function SignupPage() {
         setBusy(false);
         return;
       }
-      // 세션이 바로 생기면(이메일 확인 off) 테넌트 생성 후 모드 선택(/my/start)으로.
-      const res = await fetch('/api/my/tenant/ensure', { method: 'POST' });
-      if (res.ok) {
-        window.location.href = '/my/start';
+      // 세션이 바로 생기면(이메일 확인 off) 온보딩 게이트로. 가게 생성/모드 선택은 거기서.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session) {
+        window.location.href = '/dashboard/start';
         return;
       }
       // 이메일 확인이 필요한 경우 등 — 세션 아직 없음.

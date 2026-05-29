@@ -32,7 +32,7 @@ export default function PersonaSwitcher({ initial }: { initial: PersonaId }) {
   function selectPersona(id: PersonaId) {
     const params = new URLSearchParams(sp.toString());
     params.set('p', id);
-    router.replace(`/my/personas?${params.toString()}`, { scroll: false });
+    router.replace(`/dashboard/personas?${params.toString()}`, { scroll: false });
   }
 
   const pill = (active: boolean) => ({

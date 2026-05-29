@@ -1,6 +1,6 @@
 import { ScreenHome } from '../_ui/screen-home';
 import {
-  resolveTenantSlug,
+  requireOwnedTenantSlug,
   getInstalledAgents,
   getActivity,
   getHomeStats,
@@ -24,7 +24,7 @@ export default async function MyHomePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const tenant = await resolveTenantSlug();
+  const tenant = await requireOwnedTenantSlug();
   const supabase = await createClient();
   const {
     data: { user },
