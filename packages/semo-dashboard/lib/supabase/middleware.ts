@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config';
 import { getSupabaseCookieOptions } from './cookie-options';
+import { DEV_AUTH_COOKIE, devAuthCookieValid } from '../dev-auth';
 
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -55,6 +56,8 @@ export async function updateSession(request: NextRequest) {
   const isPublicPath =
     // 홍보 랜딩 — 항상 공개(로그인 무관). 로그인 사용자는 랜딩에서 '내 대시보드' 버튼으로 진입.
     pathname === '/' ||
+    // 개발 전용 매직키 로그인 엔드포인트 (prod 비활성)
+    pathname.startsWith('/api/dev-auth') ||
     publicPaths.some((p) => pathname.startsWith(p)) ||
     pathname.startsWith('/api/projects/callback') ||
     pathname.startsWith('/api/slack/') ||
@@ -93,7 +96,10 @@ export async function updateSession(request: NextRequest) {
     // 서버 컴포넌트가 자기 API를 호출할 때 쿠키 미전달 이슈 방지 (read-only GET만)
     (request.method === 'GET' && ['/api/bots', '/api/tests', '/api/org'].includes(pathname));
 
-  if (!user && !isPublicPath) {
+  // 개발 전용 매직키 — 유효하면 로그인 없이 통과 (prod 에선 devAuthCookieValid 가 항상 false).
+  const devAuthed = devAuthCookieValid(request.cookies.get(DEV_AUTH_COOKIE)?.value);
+
+  if (!user && !devAuthed && !isPublicPath) {
     const url = request.nextUrl.clone();
     // 고객 영역(/dashboard*)은 고객 가입 페이지로, 그 외(내부 툴)는 내부 로그인으로.
     url.pathname = pathname.startsWith('/dashboard') ? '/dashboard/signup' : '/login';
