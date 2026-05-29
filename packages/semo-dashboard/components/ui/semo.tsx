@@ -115,7 +115,7 @@ export function Card({
   );
 }
 
-export type SemoTone = 'neutral' | 'primary' | 'ai' | 'success' | 'warning' | 'danger';
+export type SemoTone = 'neutral' | 'primary' | 'ai' | 'success' | 'warning' | 'danger' | 'cream';
 const TONES: Record<SemoTone, { bg: string; fg: string; bd: string }> = {
   neutral: { bg: 'var(--semo-surface-3)', fg: 'var(--semo-fg-2)', bd: 'var(--semo-line)' },
   primary: {
@@ -127,6 +127,7 @@ const TONES: Record<SemoTone, { bg: string; fg: string; bd: string }> = {
   success: { bg: 'var(--semo-success-bg)', fg: 'var(--semo-success)', bd: 'transparent' },
   warning: { bg: 'var(--semo-warning-bg)', fg: 'var(--semo-warning)', bd: 'transparent' },
   danger: { bg: 'var(--semo-danger-bg)', fg: 'var(--semo-danger)', bd: 'transparent' },
+  cream: { bg: 'var(--semo-cream)', fg: 'var(--semo-fg-2)', bd: 'var(--semo-line)' },
 };
 
 /** 알약형 배지. */
@@ -217,4 +218,142 @@ export function btnStyle(variant: 'primary' | 'ghost' = 'primary'): CSSPropertie
     color: variant === 'ghost' ? 'var(--semo-fg-1)' : '#fff',
     boxShadow: variant === 'ghost' ? 'none' : '0 4px 12px var(--semo-primary-24)',
   };
+}
+
+/* ── Icon (운영툴 화면 공용 lucide 서브셋) ───────────────────────── */
+const ICONS: Record<string, ReactNode> = {
+  'arrow-right': (
+    <>
+      <path d="M5 12h14" />
+      <path d="m13 6 6 6-6 6" />
+    </>
+  ),
+  sparkles: (
+    <path d="M12 4v3M12 17v3M4 12h3M17 12h3M6.3 6.3l2 2M15.7 15.7l2 2M6.3 17.7l2-2M15.7 8.3l2-2" />
+  ),
+  check: <path d="m4.5 12.5 5 5L20 7" />,
+  'chevron-right': <path d="m9 6 6 6-6 6" />,
+  'chevron-down': <path d="m6 9 6 6 6-6" />,
+  flag: (
+    <>
+      <path d="M4 22V4h12l-2 4 2 4H4" />
+    </>
+  ),
+  rocket: (
+    <>
+      <path d="M14 4c4 0 6 2 6 6-2 0-4 1-6 3l-3-3c2-2 3-4 3-6Z" />
+      <path d="m11 13-4 4 1 4 4-1 4-4" />
+    </>
+  ),
+};
+export function Icon({
+  name,
+  size = 16,
+  color = 'currentColor',
+  stroke = 1.8,
+}: {
+  name: string;
+  size?: number;
+  color?: string;
+  stroke?: number;
+}) {
+  const body = ICONS[name];
+  if (!body) return null;
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth={stroke}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{ display: 'inline-block', flexShrink: 0 }}
+    >
+      {body}
+    </svg>
+  );
+}
+
+/* ── Section (eyebrow/title + hint) ──────────────────────────────── */
+export function Section({
+  title,
+  hint,
+  children,
+  style,
+}: {
+  title: ReactNode;
+  hint?: ReactNode;
+  children: ReactNode;
+  style?: CSSProperties;
+}) {
+  return (
+    <section style={{ ...style }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 12 }}>
+        <h2
+          style={{
+            margin: 0,
+            fontSize: 17,
+            fontWeight: 700,
+            color: 'var(--semo-fg-1)',
+            letterSpacing: '-0.01em',
+          }}
+        >
+          {title}
+        </h2>
+        {hint && <span style={{ fontSize: 13, color: 'var(--semo-fg-3)' }}>{hint}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/* ── Avatar — 결정적 색상 이니셜 동그라미 (봇/팀원/사용자 공용) ──── */
+const AVATAR_TINTS = [
+  'var(--agent-peach)',
+  'var(--agent-mint)',
+  'var(--agent-lavender)',
+  'var(--agent-coral)',
+  'var(--agent-sky)',
+  'var(--agent-butter)',
+  'var(--agent-rose)',
+];
+export function avatarTint(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return AVATAR_TINTS[Math.abs(h) % AVATAR_TINTS.length];
+}
+export function Avatar({
+  seed,
+  label,
+  size = 26,
+  square = false,
+}: {
+  seed: string;
+  label?: string;
+  size?: number;
+  square?: boolean;
+}) {
+  const ch = (label || seed || '?')[0]?.toUpperCase() || '?';
+  return (
+    <span
+      title={seed}
+      style={{
+        width: size,
+        height: size,
+        borderRadius: square ? '30%' : '50%',
+        background: avatarTint(seed),
+        display: 'grid',
+        placeItems: 'center',
+        color: 'var(--semo-fg-1)',
+        fontWeight: 700,
+        fontSize: size * 0.4,
+        flexShrink: 0,
+        boxShadow: 'inset 0 -2px 0 rgba(29,36,43,0.08)',
+      }}
+    >
+      {ch}
+    </span>
+  );
 }
