@@ -32,6 +32,8 @@ function relTime(iso: string): string {
 function BotStatusCard({ bot, idx }: { bot: Bot; idx: number }) {
   const online = bot.status === 'online';
   const color = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+  // 봇 이모지는 KB 에 :shortcode: (슬랙형)로 저장될 수 있음 → 유니코드면 그대로, 아니면 이름 이니셜.
+  const emoji = bot.emoji && !bot.emoji.includes(':') ? bot.emoji : bot.name?.[0] || '\u{1F916}';
   return (
     <Link
       href={`/bots/${bot.id}`}
@@ -55,11 +57,13 @@ function BotStatusCard({ bot, idx }: { bot: Bot; idx: number }) {
             background: color,
             display: 'grid',
             placeItems: 'center',
-            fontSize: 24,
+            fontSize: 22,
+            fontWeight: 800,
+            color: 'var(--semo-fg-1)',
             flexShrink: 0,
           }}
         >
-          {bot.emoji || '\u{1F916}'}
+          {emoji}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
