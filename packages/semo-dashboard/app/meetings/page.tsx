@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Meeting } from '@/lib/meeting';
-import { PageHeader } from '@/components/ui/semo';
+import { PageHeader, Stat } from '@/components/ui/semo';
 
 function formatDate(iso: string): string {
   const d = new Date(iso);
@@ -116,6 +116,69 @@ export default function MeetingsListPage() {
           </Link>
         }
       />
+
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: 12,
+          marginBottom: 18,
+        }}
+      >
+        <Stat label="전체 회의" value={`${meetings.length}건`} />
+        <Stat
+          label="회의록 생성 완료"
+          value={`${meetings.filter((m) => m.generation_status === 'completed').length}건`}
+          tone="ai"
+          hint="AI 생성"
+        />
+      </div>
+
+      {/* 업로드 안내 카드 */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          padding: 18,
+          marginBottom: 18,
+          background: 'var(--semo-ai-08)',
+          border: '1.5px dashed var(--semo-ai-16)',
+          borderRadius: 'var(--r-16)',
+        }}
+      >
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 'var(--r-12)',
+            background: 'var(--semo-surface)',
+            border: '1px solid var(--semo-ai-16)',
+            display: 'grid',
+            placeItems: 'center',
+            flexShrink: 0,
+            color: 'var(--semo-ai)',
+            fontSize: 20,
+          }}
+        >
+          🎙️
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--semo-fg-1)' }}>
+            녹음 파일을 올리면 회의록이 자동 생성돼요
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--semo-fg-3)', marginTop: 2 }}>
+            업로드 → 녹취 → 화자분리 회의록 → KB 저장. (m4a · mp3 · wav)
+          </div>
+        </div>
+        <Link
+          href="/meetings/new"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
+          style={{ background: 'var(--semo-ai)', color: '#fff' }}
+        >
+          파일 올리기
+        </Link>
+      </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-16">
