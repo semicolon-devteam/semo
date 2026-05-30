@@ -387,6 +387,12 @@ const c = new Client({ connectionString: url });
        on conflict (tenant_id) do nothing`,
     );
 
+    // ── Tenant channel integration (014) ───────────────────────────
+    // Schema only. No data seeded — channel connections are user-driven via OAuth.
+    await c.query(
+      fs.readFileSync(path.join(process.cwd(), 'migrations/014_tenant_channels.sql'), 'utf8'),
+    );
+
     const counts = await c.query(
       `select (select count(*) from public.agent_listings where audience='customer') listings,
               (select count(*) from public.tenants) tenants,
