@@ -11,7 +11,12 @@ import { query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { DEV_AUTH_COOKIE, devAuthCookieValid } from '@/lib/dev-auth';
 
-export const DEMO_TENANT = 'jeongmin-cafe';
+/**
+ * 팀/dev 뷰어가 자체 테넌트 없을 때 보는 기본 데모 테넌트.
+ * 'team-semicolon' (마이그 013 시드) 로 변경 — 세미콜론 팀 자체 데모 데이터.
+ * 'jeongmin-cafe' 는 별도 시드로 남아 있어 어드민 테넌트 스위처에서 선택 가능.
+ */
+export const DEMO_TENANT = 'team-semicolon';
 
 /**
  * 현재 세션 사용자 → 테넌트 slug 해석 (멀티테넌시, B).
@@ -62,8 +67,9 @@ export async function resolveOwnedTenantSlug(): Promise<string | null> {
 /**
  * 우리 팀(운영팀 admin) 또는 dev 매직키 뷰어인지 — 고객 대시보드 "미리보기" 허용 대상.
  * 팀 모드 토글(운영팀 ↔ 고객)로 admin 이 고객 화면을 데모 테넌트로 들여다볼 수 있게 한다.
+ * 어드민 테넌트 스위처 API 도 이 가드를 재사용.
  */
-async function isTeamOrDevViewer(): Promise<boolean> {
+export async function isTeamOrDevViewer(): Promise<boolean> {
   try {
     const c = await cookies();
     if (devAuthCookieValid(c.get(DEV_AUTH_COOKIE)?.value)) return true;
@@ -83,18 +89,80 @@ async function isTeamOrDevViewer(): Promise<boolean> {
   }
 }
 
+const ADMIN_TENANT_COOKIE = 'semo-admin-tenant';
+
+/** 어드민/dev 뷰어가 스위처로 골라둔 테넌트 slug 쿠키. 형식 검증 후 반환. */
+async function readAdminTenantOverride(): Promise<string | null> {
+  try {
+    const c = await cookies();
+    const v = c.get(ADMIN_TENANT_COOKIE)?.value;
+    return v && /^[a-z0-9-]{2,64}$/i.test(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+async function tenantExists(slug: string): Promise<boolean> {
+  try {
+    const { rows } = await query<{ ok: boolean }>(
+      `select true as ok from public.tenants where slug = $1 limit 1`,
+      [slug],
+    );
+    return rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 실 제품 /dashboard 게이트.
+ * - 어드민/dev 가 스위처 쿠키로 임의 테넌트 골라뒀고 그게 존재 → 그 테넌트(어드민 inspect).
  * - 소유 테넌트 있음 → 그 테넌트(실데이터).
- * - 없지만 팀 admin/dev → 데모 테넌트로 미리보기(팀 모드 토글로 고객 화면 확인).
+ * - 없지만 팀 admin/dev → 데모 테넌트(team-semicolon)로 미리보기.
  * - 그 외(테넌트 없는 일반 사용자) → 온보딩(/dashboard/start).
- * 서버 컴포넌트에서만 호출.
+ * 서버 컴포넌트에서만 호출. RLS 없으므로 어드민 가드는 isTeamOrDevViewer 가 책임.
  */
 export async function requireOwnedTenantSlug(): Promise<string> {
+  const override = await readAdminTenantOverride();
+  if (override && (await isTeamOrDevViewer()) && (await tenantExists(override))) {
+    return override;
+  }
   const slug = await resolveOwnedTenantSlug();
   if (slug) return slug;
   if (await isTeamOrDevViewer()) return DEMO_TENANT;
   redirect('/dashboard/start');
+}
+
+/** 어드민 테넌트 스위처용 최소 뷰. 호출자(/api/admin/tenants)가 권한 가드 책임. */
+export interface TenantSummary {
+  slug: string;
+  displayName: string;
+  tenantType: string;
+  planSlug: string;
+  owned: boolean;
+}
+export async function listTenants(): Promise<TenantSummary[]> {
+  try {
+    const { rows } = await query<{
+      slug: string;
+      display_name: string;
+      tenant_type: string;
+      plan_slug: string;
+      owned: boolean;
+    }>(
+      `select slug, display_name, tenant_type, plan_slug, owner_user_id is not null as owned
+         from public.tenants order by created_at`,
+    );
+    return rows.map((r) => ({
+      slug: r.slug,
+      displayName: r.display_name,
+      tenantType: r.tenant_type,
+      planSlug: r.plan_slug,
+      owned: r.owned,
+    }));
+  } catch {
+    return [];
+  }
 }
 
 /**

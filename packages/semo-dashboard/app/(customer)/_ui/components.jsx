@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { usePathname } from 'next/navigation';
 import { BotAvatar } from './agents';
 import TeamModeToggle from './TeamModeToggle';
+import TenantSwitcher from './TenantSwitcher';
 
 /*
  * components.jsx — SEMO shared UI atoms + chrome.
@@ -476,6 +477,9 @@ function Topbar({ title, subtitle, action, search = true }) {
       <Suspense fallback={null}>
         <TeamModeToggle />
       </Suspense>
+
+      {/* 어드민/dev 매직키 뷰어 전용 테넌트 스위처 — 임의 테넌트 inspect. */}
+      <TenantSwitcher />
 
       <button style={{ width: 34, height: 34, borderRadius: 'var(--r-10)',
                         display: 'grid', placeItems: 'center',

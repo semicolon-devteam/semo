@@ -48,9 +48,10 @@ export async function updateSession(request: NextRequest) {
 
   // 인증이 필요 없는 경로 (봇 callback/webhook 포함)
   const pathname = request.nextUrl.pathname;
-  // T67: 고객 게이팅 플래그. OFF(기본) → /my* 공개(현행 쇼케이스). ON → /my* 로그인 필수
-  //      (가입은 /my/signup, 데모는 /demo* 로 항상 공개). prod 전환 전 dev 에서 검증 후 ON.
-  const CUSTOMER_GATING = process.env.SEMO_CUSTOMER_GATING === '1';
+  // T67: 고객 게이팅 플래그. 기본 ON — /dashboard*, /api/my/* 로그인 필수.
+  // 명시적으로 OFF 하려면 SEMO_CUSTOMER_GATING=0 (개발 임시 공개용). 가입 페이지
+  // (/dashboard/signup), 데모(/demo*), dev 매직키(line 100 devAuthed) 는 게이팅 무관 통과.
+  const CUSTOMER_GATING = process.env.SEMO_CUSTOMER_GATING !== '0';
   // 인증 불필요 경로: 공개 페이지 + 봇/외부 webhook + 서버 컴포넌트 내부 호출용 read-only API
   const publicPaths = ['/login', '/auth/callback', '/api/health'];
   const isPublicPath =
