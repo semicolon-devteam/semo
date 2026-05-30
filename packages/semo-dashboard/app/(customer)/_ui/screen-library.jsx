@@ -634,7 +634,7 @@ function RecruitStep2({ agent }) {
             </div>
           </div>
           {i < 2 ?
-            <Button variant="secondary" size="sm">연결하기</Button> :
+            <Button variant="secondary" size="sm" onClick={() => { window.location.href = '/dashboard/settings/integrations?focus=' + encodeURIComponent(t); }}>연결하기</Button> :
             <Badge tone="success" icon="check">건너뛸 수 있음</Badge>
           }
         </div>
