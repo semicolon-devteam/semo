@@ -371,10 +371,10 @@ function Sidebar({ mode, active, workspace }) {
           display: 'grid', placeItems: 'center',
           color: isProvider ? 'var(--semo-ai)' : 'var(--semo-fg-1)',
           fontSize: 12, fontWeight: 700,
-        }}>{isProvider ? 'S' : '카'}</div>
+        }}>{isProvider ? 'S' : (workspace?.[0] ?? '나')}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--semo-fg-1)' }}>
-            {workspace || (isProvider ? '세미콜론 팀' : '정민 카페')}
+            {workspace || (isProvider ? '세미콜론 팀' : '내 가게')}
           </div>
           <div style={{ fontSize: 11, color: 'var(--semo-fg-3)' }}>
             {isProvider ? 'Provider · admin' : 'Customer'}
@@ -501,7 +501,7 @@ function Topbar({ title, subtitle, action, search = true }) {
         color: '#fff', fontSize: 13, fontWeight: 700,
         border: '2px solid var(--semo-surface)',
         boxShadow: 'var(--semo-shadow-1)',
-      }}>정</div>
+      }}>나</div>
     </header>
   );
 }

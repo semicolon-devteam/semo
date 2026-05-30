@@ -171,27 +171,31 @@ export async function listTenants(): Promise<TenantSummary[]> {
  * 생성은 여기서만 (내부 팀원이 /my 를 들러도 테넌트가 생기지 않도록 분리).
  */
 export async function ensureTenantForUser(userId: string, email?: string | null): Promise<string> {
-  const existing = await query<{ slug: string }>(
-    `select slug from public.tenants where owner_user_id = $1 order by created_at limit 1`,
-    [userId],
-  );
-  if (existing.rows[0]) return existing.rows[0].slug;
-
   const slug = `t-${userId.replace(/-/g, '').slice(0, 12)}`;
   const name = email ? `${email.split('@')[0]}의 가게` : '내 가게';
-  await query(
-    `insert into public.tenants (slug, display_name, tenant_type, owner_user_id, plan_slug)
-     values ($1, $2, 'personal', $3, 'free')
-     on conflict (slug) do nothing`,
+  // Race-safe ensure (Codex 리뷰): partial UNIQUE on owner_user_id (마이그 014) + ON CONFLICT
+  // DO NOTHING + UNION ALL fallback select. /auth/callback 과 PersonaSelect 가 동시에 호출돼도
+  // 단 하나의 행만 만들어지고 두 호출 모두 동일 slug 반환.
+  const { rows } = await query<{ slug: string }>(
+    `with attempt as (
+       insert into public.tenants (slug, display_name, tenant_type, owner_user_id, plan_slug)
+       values ($1, $2, 'personal', $3, 'free')
+       on conflict do nothing
+       returning slug
+     )
+     select slug from attempt
+     union all
+     select slug from public.tenants where owner_user_id = $3 order by created_at limit 1`,
     [slug, name, userId],
   );
+  const resolved = rows[0]?.slug ?? slug;
   await query(
     `insert into public.subscriptions (tenant_id, plan_slug, status)
      select id, 'free', 'active' from public.tenants where slug = $1
      on conflict (tenant_id) do nothing`,
-    [slug],
+    [resolved],
   );
-  return slug;
+  return resolved;
 }
 
 /** agents.jsx 의 AGENT 객체와 동일 shape + install 정보(todaySummary/state). */
