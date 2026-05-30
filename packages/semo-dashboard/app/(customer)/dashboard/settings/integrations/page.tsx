@@ -32,7 +32,7 @@ import {
 export const dynamic = 'force-dynamic';
 
 interface PageProps {
-  searchParams: Promise<{ focus?: string }>;
+  searchParams: Promise<{ focus?: string; ok?: string; err?: string }>;
 }
 
 const STATUS_TONE: Record<TenantChannel['status'], SemoTone> = {
@@ -69,6 +69,14 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
   const focusChannel: ChannelType | null = focusLabel
     ? (LABEL_TO_CHANNEL[focusLabel] ?? null)
     : null;
+  const okFlag = sp.ok ?? null;
+  const errFlag = sp.err ?? null;
+  const okMessage =
+    okFlag === 'google'
+      ? '✓ Google 연동 완료'
+      : okFlag === 'disconnect'
+        ? '✓ 채널 해제 완료'
+        : null;
 
   const channels = await listTenantChannels(tenantSlug);
   const connectedTypes = new Set<ChannelType>(channels.map((c) => c.channelType));
@@ -83,6 +91,34 @@ export default async function IntegrationsPage({ searchParams }: PageProps) {
         sub={`${tenantSlug} · 연결된 채널 ${channels.length}개`}
         eyebrow="Settings"
       />
+
+      {okMessage && (
+        <Card
+          style={{
+            marginBottom: 20,
+            background: 'var(--semo-success-bg)',
+            borderColor: 'transparent',
+          }}
+        >
+          <div style={{ fontSize: 13, color: 'var(--semo-success)', fontWeight: 600 }}>
+            {okMessage}
+          </div>
+        </Card>
+      )}
+
+      {errFlag && (
+        <Card
+          style={{
+            marginBottom: 20,
+            background: 'var(--semo-danger-bg)',
+            borderColor: 'transparent',
+          }}
+        >
+          <div style={{ fontSize: 13, color: 'var(--semo-danger)', fontWeight: 600 }}>
+            오류: {errFlag}
+          </div>
+        </Card>
+      )}
 
       {focusLabel && (
         <Card
@@ -226,22 +262,19 @@ function ConnectedCard({ channel }: { channel: TenantChannel }) {
           </div>
         )}
 
-        <div>
+        <form method="POST" action="/api/channels/disconnect">
+          <input type="hidden" name="channel_id" value={channel.id} />
           <button
-            type="button"
-            disabled
+            type="submit"
             style={{
               ...btnStyle('ghost'),
-              opacity: 0.6,
-              cursor: 'not-allowed',
               fontSize: 13,
               padding: '6px 12px',
             }}
-            title="해제 핸들러는 후속 PR"
           >
-            해제 (준비 중)
+            해제
           </button>
-        </div>
+        </form>
       </div>
     </Card>
   );
@@ -256,6 +289,7 @@ function AvailableCard({
 }) {
   const label = CHANNEL_LABEL[channelType];
   const color = CHANNEL_BRAND_COLOR[channelType];
+  const isGoogle = channelType === 'google';
   return (
     <Card
       padding={18}
@@ -283,24 +317,36 @@ function AvailableCard({
           />
           <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--semo-fg-1)' }}>{label}</div>
           <span style={{ marginLeft: 'auto' }}>
-            <Badge tone="warning">준비 중</Badge>
+            {isGoogle ? (
+              <Badge tone="primary">사용 가능</Badge>
+            ) : (
+              <Badge tone="warning">준비 중</Badge>
+            )}
           </span>
         </div>
         <div style={{ fontSize: 12.5, color: 'var(--semo-fg-3)', lineHeight: 1.5 }}>
-          OAuth 핸들러 미구현 — 후속 PR
+          {isGoogle
+            ? 'Google 계정으로 캘린더·메일 채널을 연결합니다.'
+            : 'OAuth 핸들러 미구현 — 후속 PR'}
         </div>
-        <button
-          type="button"
-          disabled
-          style={{
-            ...btnStyle('primary'),
-            opacity: 0.55,
-            cursor: 'not-allowed',
-          }}
-          title="OAuth 핸들러는 후속 PR"
-        >
-          연결하기 (준비 중)
-        </button>
+        {isGoogle ? (
+          <a href="/api/channels/google/start" style={btnStyle('primary')}>
+            연결하기
+          </a>
+        ) : (
+          <button
+            type="button"
+            disabled
+            style={{
+              ...btnStyle('primary'),
+              opacity: 0.55,
+              cursor: 'not-allowed',
+            }}
+            title="OAuth 핸들러는 후속 PR"
+          >
+            연결하기 (준비 중)
+          </button>
+        )}
       </div>
     </Card>
   );

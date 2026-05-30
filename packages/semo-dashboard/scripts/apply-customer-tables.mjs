@@ -393,6 +393,12 @@ const c = new Client({ connectionString: url });
       fs.readFileSync(path.join(process.cwd(), 'migrations/014_tenant_channels.sql'), 'utf8'),
     );
 
+    // ── Google channel type (015) ──────────────────────────────────
+    // Extends tenant_channels.channel_type CHECK to allow 'google'.
+    await c.query(
+      fs.readFileSync(path.join(process.cwd(), 'migrations/015_channel_google.sql'), 'utf8'),
+    );
+
     const counts = await c.query(
       `select (select count(*) from public.agent_listings where audience='customer') listings,
               (select count(*) from public.tenants) tenants,

@@ -17,7 +17,8 @@ export type ChannelType =
   | 'discord'
   | 'email'
   | 'line'
-  | 'instagram';
+  | 'instagram'
+  | 'google';
 
 /** 채널 연결 상태. tenant_channels.status ENUM 과 1:1 대응. */
 export type ChannelStatus = 'connected' | 'expired' | 'error' | 'revoked' | 'pending';
@@ -72,6 +73,7 @@ export const CHANNEL_LABEL: Record<ChannelType, string> = {
   email: '이메일',
   line: '라인',
   instagram: '인스타그램',
+  google: 'Google',
 };
 
 /** 브랜드 컬러(hex 근사치). 카드 dot, 배경 강조에 사용. */
@@ -83,6 +85,7 @@ export const CHANNEL_BRAND_COLOR: Record<ChannelType, string> = {
   email: '#6E5BD1',
   line: '#06C755',
   instagram: '#E4405F',
+  google: '#4285F4',
 };
 
 /**
@@ -102,4 +105,5 @@ export const LABEL_TO_CHANNEL: Record<string, ChannelType | undefined> = {
   인스타그램: 'instagram',
   이메일: 'email',
   라인: 'line',
+  'Google Calendar': 'google',
 };

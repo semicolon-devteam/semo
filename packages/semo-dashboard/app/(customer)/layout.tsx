@@ -1,66 +1,46 @@
-'use client';
-
-import { useEffect, useState } from 'react';
+import 'server-only';
 import type { ReactNode } from 'react';
 import './_ui/tokens.css';
+import { resolveTenantSlug, listTenants, getInstalledAgents } from '@/lib/customer/data';
+import CustomerChrome from './_ui/CustomerChrome';
 
 /**
- * Customer-facing shell (SEMO v5 design).
+ * Customer-facing shell (SEMO v5 design) — Codex 리뷰 반영 RSC 래퍼.
  *
- * 자체 route group 이라 내부 운영툴 GlobalNav 를 상속하지 않는다(/my* 는 <AppChrome/> 가
- * GlobalNav 를 숨김). 각 화면이 자체 <AppShell/>(사이드바+탑바)을 가져온다.
+ * RSC 단에서 1회 fetch:
+ *   - resolveTenantSlug() → 현재 뷰어가 볼 테넌트(어드민 override / 본인 소유 / 데모 폴백).
+ *   - listTenants() + getInstalledAgents() → 표시명·직원수.
+ * 그 정보를 클라 `<CustomerChrome/>` 에 props 로 주입 → 사이드바 useTenantInfo() 가 소비.
+ * 페이지별 callsite 가 workspace prop 을 일일이 전달하지 않아도 chrome 이 자동 정합.
  *
- * tokens.css 가 모든 것을 --semo-* / --agent-* 로 스코프. 테마는 이 wrapper 의
- * semo-light / semo-dark 클래스로 제어 (localStorage 영속, 우하단 플로팅 토글).
+ * tokens.css 는 모든 것을 --semo-* / --agent-* 로 스코프. 테마 토글은 CustomerChrome 가 담당.
+ * /demo, /dashboard/signup 등 비로그인 라우트도 layout 을 거치지만 resolveTenantSlug 가
+ * DEMO_TENANT 폴백이므로 안전(redirect 하지 않음).
  */
-export default function CustomerLayout({ children }: { children: ReactNode }) {
-  // Lazy init reads localStorage on the client only (SSR returns 'light').
-  // Avoids the react-hooks/set-state-in-effect lint error from syncing in an effect.
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-    if (typeof window === 'undefined') return 'light';
-    return localStorage.getItem('semo-theme') === 'dark' ? 'dark' : 'light';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('semo-theme', theme);
-  }, [theme]);
+export default async function CustomerLayout({ children }: { children: ReactNode }) {
+  let tenantSlug = '';
+  let tenantDisplayName: string | null = null;
+  let agentCount = 0;
+  let planSlug: string | null = null;
+  try {
+    tenantSlug = await resolveTenantSlug();
+    const [tenants, agents] = await Promise.all([listTenants(), getInstalledAgents(tenantSlug)]);
+    const t = tenants.find((x) => x.slug === tenantSlug);
+    tenantDisplayName = t?.displayName ?? null;
+    planSlug = t?.planSlug ?? null;
+    agentCount = agents.length;
+  } catch {
+    // 비치명적 — chrome 폴백.
+  }
 
   return (
-    <div
-      suppressHydrationWarning
-      className={`semo-root semo-${theme}`}
-      style={{
-        height: '100vh',
-        overflow: 'hidden',
-        background: 'var(--semo-bg)',
-        position: 'relative',
-      }}
+    <CustomerChrome
+      tenantSlug={tenantSlug}
+      tenantDisplayName={tenantDisplayName}
+      agentCount={agentCount}
+      planSlug={planSlug}
     >
       {children}
-
-      <button
-        type="button"
-        onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
-        aria-label="라이트/다크 테마 전환"
-        style={{
-          position: 'fixed',
-          right: 18,
-          bottom: 18,
-          zIndex: 60,
-          height: 36,
-          padding: '0 14px',
-          borderRadius: 9999,
-          background: 'var(--semo-surface)',
-          border: '1px solid var(--semo-line)',
-          boxShadow: 'var(--semo-shadow-2)',
-          color: 'var(--semo-fg-2)',
-          fontSize: 13,
-          fontWeight: 600,
-          cursor: 'pointer',
-        }}
-      >
-        {theme === 'dark' ? '라이트 모드' : '다크 모드'}
-      </button>
-    </div>
+    </CustomerChrome>
   );
 }

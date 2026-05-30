@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { BotAvatar } from './agents';
 import TeamModeToggle from './TeamModeToggle';
 import TenantSwitcher from './TenantSwitcher';
+import { useTenantInfo } from './CustomerChrome';
 
 /*
  * components.jsx — SEMO shared UI atoms + chrome.
@@ -320,6 +321,18 @@ function Sidebar({ mode, active, workspace }) {
   // 데모(/demo)와 실제(/dashboard)가 같은 nav 를 공유 → 현재 컨텍스트에 맞춰 href base 전환.
   const pathname = usePathname();
   const navBase = pathname && pathname.startsWith('/demo') ? '/demo' : '/dashboard';
+  // 테넌트 컨텍스트(layout RSC 가 주입) — 페이지별 workspace prop 이 없으면 폴백.
+  const tenant = useTenantInfo();
+  const effectiveWorkspace = workspace || tenant.tenantDisplayName || (isProvider ? '세미콜론 팀' : '내 가게');
+  const effectiveInitial = effectiveWorkspace?.[0] ?? '나';
+  // 내 직원·요금제 hint 를 실 테넌트 데이터로 덮어쓰기 (NAV_CUSTOMER 는 static, 여기서 가공).
+  const customerNav = NAV_CUSTOMER.map((n) => {
+    if (n.id === 'team') return { ...n, hint: `${tenant.agentCount || 0}명` };
+    if (n.id === 'plan' && tenant.planSlug) {
+      return { ...n, hint: tenant.planSlug[0].toUpperCase() + tenant.planSlug.slice(1) };
+    }
+    return n;
+  });
   return (
     <aside style={{
       width: 232,
@@ -371,10 +384,10 @@ function Sidebar({ mode, active, workspace }) {
           display: 'grid', placeItems: 'center',
           color: isProvider ? 'var(--semo-ai)' : 'var(--semo-fg-1)',
           fontSize: 12, fontWeight: 700,
-        }}>{isProvider ? 'S' : (workspace?.[0] ?? '나')}</div>
+        }}>{isProvider ? 'S' : effectiveInitial}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--semo-fg-1)' }}>
-            {workspace || (isProvider ? '세미콜론 팀' : '내 가게')}
+            {effectiveWorkspace}
           </div>
           <div style={{ fontSize: 11, color: 'var(--semo-fg-3)' }}>
             {isProvider ? 'Provider · admin' : 'Customer'}
@@ -384,7 +397,7 @@ function Sidebar({ mode, active, workspace }) {
       </button>
 
       {/* Nav (customer always shown; provider section appears below when mode=provider) */}
-      {(isProvider ? NAV_PROVIDER : NAV_CUSTOMER).map(n => {
+      {(isProvider ? NAV_PROVIDER : customerNav).map(n => {
         const sel = n.id === active;
         return (
           <a key={n.id} href={n.external ? n.href : navBase + n.href.slice('/dashboard'.length)}
