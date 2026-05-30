@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useSyncExternalStore } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/provider';
 
@@ -28,6 +28,15 @@ function readCookie(name: string): string | null {
   const m = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]+)`));
   return m ? decodeURIComponent(m[1]) : null;
 }
+
+/**
+ * 쿠키를 외부 상태로 읽는다(useSyncExternalStore). useEffect+setState 동기화는
+ * react-hooks/set-state-in-effect 위반이고 SSR-hydration 도 깨끗하지 않다.
+ * 쿠키는 자체 알림 메커니즘이 없으므로 subscribe 는 no-op — onSelect 가 쿠키 쓰고
+ * router.refresh() 호출하면 자연스럽게 재렌더되며 새 값 읽힌다.
+ */
+const noopSub = () => () => {};
+const getServerCookie = (): string | null => null;
 function writeCookie(name: string, value: string | null) {
   if (typeof document === 'undefined') return;
   if (value === null) {
@@ -41,7 +50,6 @@ export default function TenantSwitcher() {
   const { isAdmin, loading } = useAuth();
   const router = useRouter();
   const [tenants, setTenants] = useState<TenantSummary[]>([]);
-  const [current, setCurrent] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
@@ -49,10 +57,8 @@ export default function TenantSwitcher() {
   // 어드민만(또는 dev 매직키 — DEV_PROFILE role=admin). 로딩 중에는 숨김.
   const visible = !loading && isAdmin;
 
-  // 초기 쿠키 읽기
-  useEffect(() => {
-    setCurrent(readCookie(COOKIE_NAME));
-  }, []);
+  // 현재 선택된 테넌트 쿠키 — 외부 상태(쿠키)는 useSyncExternalStore 로 읽는다.
+  const current = useSyncExternalStore(noopSub, () => readCookie(COOKIE_NAME), getServerCookie);
 
   // 테넌트 목록 (admin 시에만 fetch)
   useEffect(() => {
@@ -80,9 +86,8 @@ export default function TenantSwitcher() {
 
   const onSelect = (slug: string | null) => {
     writeCookie(COOKIE_NAME, slug);
-    setCurrent(slug);
     setOpen(false);
-    // 서버 컴포넌트 재실행으로 새 쿠키 반영.
+    // 서버 컴포넌트 재실행으로 새 쿠키 반영(useSyncExternalStore 가 재읽어 current 갱신).
     router.refresh();
   };
 
