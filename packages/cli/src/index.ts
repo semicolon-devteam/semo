@@ -78,6 +78,7 @@ import { registerDoctorCommand } from './commands/doctor';
 import { registerRouterCommand } from './commands/router';
 import { registerDeployCommand } from './commands/deploy';
 import { registerDashboardCommand } from './commands/dashboard';
+import { registerDevTenantCommand } from './commands/dev-tenant.js';
 import { syncGlobalCache } from './global-cache';
 import {
   ensureSemoDir,
@@ -1524,6 +1525,7 @@ registerDeployCommand(program);
 
 // === dashboard — Personal 대시보드 로컬 기동 ===
 registerDashboardCommand(program);
+registerDevTenantCommand(program);
 
 configCmd
   .command('env')
