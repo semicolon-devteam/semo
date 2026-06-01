@@ -343,6 +343,36 @@ export class SlackGateway {
     }
   }
 
+  /**
+   * 채널 최근 메시지 (top-level). thread 가 아닌 "오늘/최근 채널에서 무슨 얘기 했지?"
+   * 류의 회상·요약 요청을 위해 conversations.history 를 사용.
+   * Slack API 는 최신순으로 반환하므로 시간순(오래된→최신)으로 뒤집어 돌려준다.
+   */
+  async getChannelHistory(
+    channel: string,
+    opts: { limit?: number; oldestTs?: string; excludeTs?: string } = {},
+  ): Promise<import('./channel-types').ThreadMessage[]> {
+    const limit = opts.limit ?? 30;
+    try {
+      const result = await this.web.conversations.history({
+        channel,
+        limit,
+        ...(opts.oldestTs ? { oldest: opts.oldestTs } : {}),
+      });
+      const messages = (result.messages || [])
+        .filter((m) => !opts.excludeTs || m.ts !== opts.excludeTs)
+        .reverse(); // newest-first → chronological
+      return messages.map((m) => ({
+        displayName: ((m as Record<string, unknown>).username as string) || m.user || 'unknown',
+        text:
+          (m.text || '').length > 500 ? (m.text || '').slice(0, 500) + '...(잘림)' : m.text || '',
+        isBotMessage: !!m.bot_id,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
   async postAsBot(botId: string, channel: string, text: string, threadTs?: string): Promise<void> {
     // 2026-05-07: username/icon_emoji 위장 제거. 봇별 Slack App 토큰의 WebClient 로 직접 발신.
     // 봇별 토큰이 없으면 SemoBot fallback (bot-web-client-pool 내부에서 처리).
