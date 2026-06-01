@@ -17,7 +17,8 @@
     "start": "npx tsx src/index.ts",
     "start:bun": "bun src/index.ts",
     "dev": "npx tsx --watch src/index.ts",
-    "test": "vitest --run"
+    "test": "vitest --run",
+    "sync-personas": "node scripts/sync-personas.mjs"
   },
   "dependencies": {
     "@slack/socket-mode": "^2.0.0",
