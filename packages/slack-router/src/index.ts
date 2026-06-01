@@ -46,6 +46,7 @@ import {
   type OutboxMessage,
 } from '@team-semicolon/semo-common';
 import { applySlackRouterPolicy, shouldHandleSemoBotNlp } from './router-policy.js';
+import { buildConversationContextBlock } from './conversation-context.js';
 
 // Cmux ancestry guard — daemon(launchd/nohup) 화 감지 시 즉시 종료.
 // 배경: cmux nudge 는 cmux pane 자손 프로세스만 허용하므로 daemon 화되면 침묵 실패.
@@ -1314,6 +1315,20 @@ async function dispatchToInbox(args: {
   } catch (err) {
     const e = err as Error;
     console.error(`[${fromBot}] inbox.write(${toBot}) failed:`, e.message);
+    // G6: inbox write 실패 시 위에서 만든 active commitment 를 failed 로 마감한다.
+    // 안 하면 active 인 채 남아 24h 후 stale_auto 로만 reap → 그동안 다음 dispatch 가 막힘.
+    try {
+      await pool.query(
+        `UPDATE semo.bot_commitments
+           SET status = 'failed',
+               metadata = COALESCE(metadata, '{}'::jsonb)
+                 || jsonb_build_object('fail_reason', 'inbox_write_failed', 'failed_at', NOW())
+         WHERE id = $1 AND status = 'active'`,
+        [commitmentId],
+      );
+    } catch (markErr) {
+      console.warn(`[${fromBot}] commitment fail-mark failed:`, (markErr as Error).message);
+    }
     return { commitmentId: null, error: e.message };
   }
 
@@ -1790,6 +1805,35 @@ async function handleOrchestrator(
         `응답 끝에 한 줄 자기소개 권유: "혹시 어떻게 부르면 좋을까요? '재용이라고 불러요, 백엔드 개발자' 처럼 한 문장이면 충분해요. KB 에 자동 등록해드릴게요." ` +
         `시스템 라인(ROUTE/ACTION) 은 정상 출력.`;
     }
+  }
+
+  // ① 대화 맥락 주입 — hermes 는 one-shot(세션 무기억)이라 매 메시지 직접 동봉해야 한다.
+  // thread 답글 + 채널 최근(당일) 메시지를 모아 프롬프트 앞에 붙인다.
+  try {
+    const threadHist = msg.thread_ts
+      ? (await slack.getThreadHistory(msg.channel, msg.thread_ts)).map((h) => ({
+          display_name: h.displayName,
+          text: h.text,
+          is_bot: h.isBotMessage,
+        }))
+      : [];
+    // 당일 00:00(로컬) 이후 채널 메시지. 현재 메시지는 제외.
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const oldestTs = (startOfDay.getTime() / 1000).toFixed(6);
+    const channelHist = (
+      await slack.getChannelHistory(msg.channel, { limit: 40, oldestTs, excludeTs: msg.ts })
+    ).map((h) => ({ display_name: h.displayName, text: h.text, is_bot: h.isBotMessage }));
+
+    const convoBlock = buildConversationContextBlock(threadHist, channelHist);
+    if (convoBlock) {
+      promptWithContext = `${convoBlock}\n\n${promptWithContext}`;
+    }
+    console.log(
+      `[${cfg.botId}] context injected (thread=${threadHist.length}, channel=${channelHist.length})`,
+    );
+  } catch (err) {
+    console.warn(`[${cfg.botId}] context fetch failed (non-fatal):`, (err as Error).message);
   }
 
   try {
