@@ -1769,6 +1769,19 @@ async function handleOrchestrator(
     `[${cfg.botId}] received from ${senderName} in ${msg.channel}: ${msg.text.slice(0, 120)}`,
   );
 
+  // operator(personaAdmin)는 지정 관리 채널 밖에서는 동작하지 않는다 — 전용 앱이 다른 채널에
+  // 초대돼 route_bot_id=operator 로 들어와도 방어(채널 게이트는 모든 전달 경로에서 강제).
+  if (cfg.personaAdmin && OPERATOR_ADMIN_CHANNEL && msg.channel !== OPERATOR_ADMIN_CHANNEL) {
+    await slack.postAsBot(
+      cfg.botId,
+      msg.channel,
+      ':lock: Operator 는 지정된 관리 채널에서만 사용할 수 있어요.',
+      replyThreadTs,
+    );
+    console.warn(`[${cfg.botId}] blocked outside admin channel (${msg.channel})`);
+    return;
+  }
+
   const adapter = orchestratorAdapters[cfg.botId];
   if (!adapter) {
     console.warn(`[${cfg.botId}] adapter not initialized`);

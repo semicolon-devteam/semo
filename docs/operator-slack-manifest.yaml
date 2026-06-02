@@ -1,0 +1,182 @@
+_metadata:
+  major_version: 2
+  minor_version: 1
+
+display_information:
+  name: SEMO Operator
+  description: SEMO base-agent persona(SOUL) 편집 전용 오퍼레이터. 관리 채널에서 @오퍼레이터 멘션으로 에이전트 행동 규칙을 컨펌 기반으로 수정한다.
+  background_color: '#3a2a6b'
+  long_description: >-
+    SEMO Operator 는 Semicolon Orchestrate 의 base persona(SOUL) Single-Source-of-Truth 를
+    슬랙에서 직접 수정하기 위한 운영자 전용 봇이다. 도구를 직접 실행하지 않는 대화형 봇이며,
+    응답에 포함된 APPLY_PERSONA 블록을 slack-router 가 파싱해 agent_personas DB 와 hermes
+    프로토타입 SOUL.md 에 반영한다. 보안상 지정된 관리 채널에만 초대해 사용한다.
+
+features:
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
+  bot_user:
+    display_name: Operator
+    always_online: true
+
+oauth_config:
+  scopes:
+    bot:
+      # 메시지 / 멘션 / 명령
+      - app_mentions:read
+      - chat:write
+      - chat:write.public
+      - chat:write.customize
+      - commands
+      # 어시스턴트 (Agents & AI Apps)
+      - assistant:write
+      # 공개 채널 (channels) — granular write (broad channels:write 는 deprecated 라 미사용)
+      - channels:history
+      - channels:read
+      - channels:write.invites
+      - channels:write.topic
+      - channels:manage
+      - channels:join
+      # 비공개 채널 (groups)
+      - groups:history
+      - groups:read
+      - groups:write
+      - groups:write.invites
+      - groups:write.topic
+      # 1:1 DM (im)
+      - im:history
+      - im:read
+      - im:write
+      # 그룹 DM (mpim)
+      - mpim:history
+      - mpim:read
+      - mpim:write
+      # Slack Connect
+      - conversations.connect:manage
+      - conversations.connect:read
+      - conversations.connect:write
+      # 사용자
+      - users:read
+      - users:read.email
+      - users:write
+      - users.profile:read
+      - users.profile:write
+      # 리액션 / 핀 / 북마크
+      - reactions:read
+      - reactions:write
+      - pins:read
+      - pins:write
+      - bookmarks:read
+      - bookmarks:write
+      # 파일 / 원격 파일
+      - files:read
+      - files:write
+      - remote_files:read
+      - remote_files:write
+      - remote_files:share
+      # 리마인더 / DND / 이모지 / 팀
+      - reminders:read
+      - reminders:write
+      - dnd:read
+      - dnd:write
+      - emoji:read
+      - team:read
+      - team.billing:read
+      - team.preferences:read
+      # 유저그룹
+      - usergroups:read
+      - usergroups:write
+      # 통화 (Calls)
+      - calls:read
+      - calls:write
+      # 캔버스 / 리스트
+      - canvases:read
+      - canvases:write
+      - lists:read
+      - lists:write
+      # 링크 / 메타데이터 / 멤버십
+      - links:read
+      - links:write
+      - links.embed:write
+      - metadata.message:read
+      # 자동화 플랫폼 (Triggers / Datastore)
+      # NOTE: 'workflows.steps:execute' 제거 — 오타(실명 workflow.steps:execute)이자 deprecated(2024-09 폐기) 스코프라 import 차단됨
+      - triggers:read
+      - triggers:write
+      - datastore:read
+      - datastore:write
+      # 인커밍 웹훅
+      - incoming-webhook
+    user:
+      # 공개/비공개/DM 대화 (유저 관점) — granular write 추가로 '전 권한' 보강
+      - channels:history
+      - channels:read
+      - channels:write.invites
+      - channels:write.topic
+      - channels:manage
+      - groups:history
+      - groups:read
+      - groups:write
+      - groups:write.invites
+      - groups:write.topic
+      - im:history
+      - im:read
+      - im:write
+      - mpim:history
+      - mpim:read
+      - mpim:write
+      # 메시지 / 리액션 / 파일 / 핀 / 북마크 (유저 관점)
+      - chat:write
+      - reactions:read
+      - reactions:write
+      - files:read
+      - files:write
+      - pins:read
+      - pins:write
+      - bookmarks:read
+      - bookmarks:write
+      # 검색 (유저 토큰 전용 — 봇 토큰 불가)
+      - search:read
+      # 사용자 / 프로필
+      - users:read
+      - users:read.email
+      - users.profile:read
+      - users.profile:write
+      # 리마인더 / DND / 이모지 / 팀
+      - reminders:read
+      - reminders:write
+      - dnd:read
+      - dnd:write
+      - emoji:read
+      - team:read
+      # 유저그룹 / 링크 / 별표
+      - usergroups:read
+      - usergroups:write
+      - links:read
+      - stars:read
+      - stars:write
+      # OpenID Connect (Sign in with Slack)
+      - openid
+      - profile
+      - email
+      # 기타 유저
+      - identify
+  token_management_enabled: false
+
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false
+  event_subscriptions:
+    bot_events:
+      - app_mention
+      - message.channels
+      - message.groups
+      - message.im
+      - message.mpim
+      - reaction_added
+      - reaction_removed
+  interactivity:
+    is_enabled: true
