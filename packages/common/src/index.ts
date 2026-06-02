@@ -17,6 +17,11 @@ export {
   resetBotWebClientPool,
   listBotsWithDedicatedToken,
 } from './slack/bot-web-client-pool.js';
+export {
+  listMemberChannels,
+  type MemberChannel,
+  type ConversationsClient,
+} from './slack/list-member-channels.js';
 export { SEMO_PATHS, resolveBotWorkspace } from './paths.js';
 export { acquireSingletonLock, type SingletonLockOptions } from './lock/singleton.js';
 export {
