@@ -1,3 +1,10 @@
+> **2026-06-03 정정 (NON-NEGOTIABLE): Colony 는 독립적이어야 한다.**
+> 최초 설계는 SEMO cron 폴러 제약(폴러가 subagent_type=bot_id 로만 fan-out)때문에 잡 소유를 semiclaw 로 뒀으나,
+> 이는 "Colony=독립 제품 에이전트" 컨셉에 어긋난다. **확정 설계**: 일일 digest 는 slack-router 안의
+> **Colony 자신의 in-process 머신러리**(10분 컨텍스트 수집기 옆)가 매일 KST 06:00 1회 실행하고,
+> 추출 추론은 **Colony 자신의 hermes(semo-colony)** 가 수행한다. semiclaw cron 서브에이전트 의존 없음.
+> 구현: `packages/slack-router/src/colony-digest.ts` + index.ts 스케줄러. (아래 cron/semiclaw 기반 섹션은 폐기된 초안.)
+
 # Colony 일일 채널 Digest + DB 채널-도메인 매핑 설계
 
 > 작성: 2026-06-03 · 결정: 신규로 대체(기존 slack-channel-digest 비활성) · 추출=decision/blocker/action-items · 격리 worktree.

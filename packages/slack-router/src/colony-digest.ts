@@ -62,10 +62,11 @@ export function buildDigestExtractionPrompt(
     '## 메시지:',
     lines || '(없음)',
     '',
-    '## 출력: 아래 형식의 JSON 펜스 블록 하나만. 추출 없으면 빈 배열.',
+    '## 출력: 아래 키 이름을 그대로 쓴 JSON 펜스 블록 하나만. 추출 없으면 빈 배열([]).',
+    '필드명 변경 금지(text/due 등 금지). decision=slug,title,decided_by,body / blocker=slug,title,body / action=description,owner,deadline.',
     'DIGEST_JSON',
     '```json',
-    '{"decisions":[],"blockers":[],"actions":[]}',
+    '{"decisions":[{"slug":"api-v2-migration","title":"API v2 마이그레이션 4월 1주차 시작","decided_by":"가든","body":"4월 1주차 시작 확정"}],"blockers":[],"actions":[{"description":"프론트 리팩토링","owner":"가든","deadline":"2026-03-28"}]}',
     '```',
   ].join('\n');
 }
