@@ -65,3 +65,9 @@ packages/semo-meeting/.job-store/
 # === 개인 메모 ===
 packages/cli/PERSONAL_TESTING.md
 증빙-*.md
+
+# === 사고 방지 가드 ===
+# 미확장 '~' (literal tilde) 로 잘못 생성되는 stray 디렉토리 — hermes 홈 사본 등 시크릿 유출 방지
+/~/
+# 클라우드 동기화 충돌 사본 (iCloud/Dropbox "filename 2.ext")
+* 2.*
