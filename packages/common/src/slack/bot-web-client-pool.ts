@@ -31,27 +31,56 @@ function envKeyFor(botId: string): string {
   return `${botId.replace(/-/g, '_').toUpperCase()}_SLACK_BOT_TOKEN`;
 }
 
+type SlackSenderEnv = {
+  SEMO_UNIFIED_SLACK_SENDER_BOT_ID?: string;
+  SEMO_REPLY_WRAP_PERSONA?: string;
+  SEMO_PRIMARY_BOT_ID?: string;
+  [key: string]: string | undefined;
+};
+
+function isLegacyClawBotId(botId: string): boolean {
+  return /^[-a-z0-9]*claw(?:-overflow)?$/i.test(botId);
+}
+
+export function resolveSlackSenderBotId(
+  botId: string | undefined,
+  env: SlackSenderEnv = process.env,
+): string | undefined {
+  if (!botId || !isLegacyClawBotId(botId)) return botId;
+
+  const explicit = env.SEMO_UNIFIED_SLACK_SENDER_BOT_ID?.trim();
+  if (explicit) return explicit;
+
+  const replyWrapEnabled =
+    env.SEMO_REPLY_WRAP_PERSONA === '1' || env.SEMO_REPLY_WRAP_PERSONA === 'true';
+  const primaryBotId = env.SEMO_PRIMARY_BOT_ID?.trim();
+  if (replyWrapEnabled && primaryBotId) return primaryBotId;
+
+  return botId;
+}
+
 /**
  * 봇별 WebClient 반환. botId 누락 시 SemoBot fallback.
  * Lazy 초기화 + 캐시.
  */
 export function getWebClientForBot(botId: string | undefined): WebClient {
   const semobotToken = process.env.SLACK_BOT_TOKEN || '';
+  const senderBotId = resolveSlackSenderBotId(botId);
 
-  if (!botId || SEMOBOT_FALLBACK_BOTS.has(botId)) {
+  if (!senderBotId || SEMOBOT_FALLBACK_BOTS.has(senderBotId)) {
     return getOrCreate('__semobot__', semobotToken);
   }
 
-  const key = envKeyFor(botId);
+  const key = envKeyFor(senderBotId);
   const token = process.env[key];
   if (token) {
-    return getOrCreate(botId, token);
+    return getOrCreate(senderBotId, token);
   }
 
-  if (!warned.has(botId)) {
-    warned.add(botId);
+  if (!warned.has(senderBotId)) {
+    warned.add(senderBotId);
     console.warn(
-      `[slack-pool] No per-bot token for '${botId}' (env ${key} missing) — falling back to SemoBot token`,
+      `[slack-pool] No per-bot token for '${senderBotId}' (env ${key} missing) — falling back to SemoBot token`,
     );
   }
   return getOrCreate('__semobot__', semobotToken);

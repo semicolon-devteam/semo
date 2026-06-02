@@ -1,7 +1,8 @@
 /**
  * Bot Slack Profiles — KB 기반 동적 봇 정체성 조회
  *
- * KB의 slack-config 엔트리에서 봇별 Slack 표시 정보를 로드.
+ * KB의 slack-profile 엔트리에서 봇별 Slack 표시 정보를 로드.
+ * legacy slack-config 는 migration 잔재라 fallback 으로만 사용한다.
  * chat:write.customize로 SemoBot이 각 봇 페르소나로 메시지를 발송할 때 사용.
  */
 
@@ -34,10 +35,11 @@ export async function getBotSlackProfiles(): Promise<Record<string, BotSlackProf
 
   try {
     const result = await query<{ domain: string; content: string }>(
-      `SELECT kb.domain, kb.content
+      `SELECT DISTINCT ON (kb.domain) kb.domain, kb.content
        FROM semo.knowledge_base kb
-       JOIN semo.ontology o ON o.domain = kb.domain AND o.entity_type = 'bot'
-       WHERE kb.key = 'slack-config' AND kb.sub_key = ''`,
+       JOIN semo.ontology o ON o.domain = kb.domain AND o.entity_type IN ('bot', 'agents')
+       WHERE kb.key IN ('slack-profile', 'slack-config') AND kb.sub_key = ''
+       ORDER BY kb.domain, CASE kb.key WHEN 'slack-profile' THEN 0 ELSE 1 END`,
     );
 
     const profiles: Record<string, BotSlackProfile> = {};

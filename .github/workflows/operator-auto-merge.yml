@@ -1,0 +1,62 @@
+name: Operator Auto-Merge
+
+# Operator(슬랙 관리채널)가 코딩 에이전트에 위임해 만든 PR 을, 안전 게이트를 모두 통과할 때만
+# 자동 머지한다. 게이트: (1) operator 라벨 + operator/* 브랜치, (2) needs-human-review 라벨 없음,
+# (3) allowlist 재검사 통과(2차 방어), (4) reviewclaw 승인. CI(필수 체크)는 GitHub 네이티브
+# auto-merge 가 대기시킨다(브랜치 보호 규칙 기준).
+#
+# 설계: docs/superpowers/specs/2026-06-03-operator-code-change-capability-design.md
+
+on:
+  pull_request_target:
+    types: [labeled, unlabeled, synchronize, reopened, opened]
+  pull_request_review:
+    types: [submitted]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    # operator/* 브랜치 + operator 라벨 + needs-human-review 없음
+    if: >-
+      startsWith(github.event.pull_request.head.ref, 'operator/') &&
+      contains(github.event.pull_request.labels.*.name, 'operator') &&
+      !contains(github.event.pull_request.labels.*.name, 'needs-human-review')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Allowlist re-check (2차 방어)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr diff "$PR" --name-only \
+            | npx --yes tsx packages/slack-router/scripts/operator-allowlist-check.ts
+
+      - name: Require reviewclaw approval
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          APPROVED=$(gh pr view "$PR" --json reviews \
+            --jq '[.reviews[] | select(.state=="APPROVED") | (.author.login // "")] | map(ascii_downcase) | any(test("reviewclaw"))')
+          if [ "$APPROVED" != "true" ]; then
+            echo "reviewclaw 승인 대기 — auto-merge 보류"
+            exit 1
+          fi
+
+      - name: Enable auto-merge (CI 통과 시 squash)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ github.event.pull_request.number }}
+        run: gh pr merge "$PR" --auto --squash

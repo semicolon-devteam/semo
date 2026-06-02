@@ -38,6 +38,8 @@ function writeOutbox(mailboxDir: string) {
 
 interface RecordedCall {
   via: string;
+  botId?: string;
+  text?: string;
 }
 
 function makeGateway(calls: RecordedCall[]): GatewayAdapter {
@@ -54,9 +56,13 @@ function makeEmitter(kind: 'ok' | 'fail' | 'throw', calls: RecordedCall[]): Proj
   return {
     emit: async (
       target: ProjectionTarget,
-      _payload: ProjectionPayload,
+      payload: ProjectionPayload,
     ): Promise<ProjectionResult> => {
-      calls.push({ via: `emitter-${kind}` });
+      calls.push({
+        via: `emitter-${kind}`,
+        botId: String(target.options?.botId ?? ''),
+        text: payload.text,
+      });
       if (kind === 'throw') throw new Error('simulated throw');
       return {
         channel: target.channel,
@@ -72,20 +78,23 @@ async function runReader(
   mailboxDir: string,
   projection: ProjectionEmitter | undefined,
   calls: RecordedCall[],
+  replyTransform?: () => Promise<{ botId: string; text: string } | null>,
 ): Promise<void> {
   // 빈 outbox 로 시작 → start() 가 offset=0 으로 잡음 → 그 다음 append 가 처리됨.
   fs.mkdirSync(path.join(mailboxDir, BOT_ID), { recursive: true });
   fs.writeFileSync(path.join(mailboxDir, BOT_ID, 'outbox.jsonl'), '');
 
+  const inboxWriter = new InboxWriter(mailboxDir);
   const reader = new OutboxReader({
     mailboxDir,
     botIds: [BOT_ID],
     platform: 'slack',
     gateway: makeGateway(calls),
     projection,
-    inboxWriter: new InboxWriter(mailboxDir),
+    inboxWriter,
     onEscalation: async () => {},
     onAskUser: async () => {},
+    replyTransform,
   });
   reader.start();
   await new Promise((r) => setTimeout(r, 100)); // start() settle
@@ -94,6 +103,7 @@ async function runReader(
 
   await new Promise((r) => setTimeout(r, 1200)); // poll cycle
   reader.stop();
+  inboxWriter.stop();
 }
 
 describe('P5-2e: OutboxReader projection 주입 합류', () => {
@@ -130,5 +140,14 @@ describe('P5-2e: OutboxReader projection 주입 합류', () => {
     const calls: RecordedCall[] = [];
     await runReader(mailboxDir, makeEmitter('throw', calls), calls);
     expect(calls.map((c) => c.via)).toEqual(['emitter-throw', 'gateway']);
+  });
+
+  it('5. projection ok=true 에서도 replyTransform 을 먼저 적용한다', async () => {
+    const calls: RecordedCall[] = [];
+    await runReader(mailboxDir, makeEmitter('ok', calls), calls, async () => ({
+      botId: 'semi',
+      text: 'wrapped as semi',
+    }));
+    expect(calls).toEqual([{ via: 'emitter-ok', botId: 'semi', text: 'wrapped as semi' }]);
   });
 });

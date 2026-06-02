@@ -54,6 +54,7 @@ export class OutboxReader {
   /** Prevent concurrent processOutbox for same bot */
   private processing = new Set<string>();
   private watchers: fs.FSWatcher[] = [];
+  private pollTimer: ReturnType<typeof setInterval> | null = null;
   /** Per-bot last usage-rejection alert epoch ms (throttle). */
   private usageRejectionNotifiedAt = new Map<string, number>();
 
@@ -112,6 +113,9 @@ export class OutboxReader {
             console.error(`[outbox] Error processing ${botId}:`, err),
           );
         });
+        watcher.on('error', (err) => {
+          console.warn(`[outbox] fs.watch error for ${botId}: ${(err as Error).message}`);
+        });
         this.watchers.push(watcher);
       } catch {
         console.error(`[outbox] fs.watch failed for ${botId}`);
@@ -119,7 +123,7 @@ export class OutboxReader {
     }
 
     // Fallback poll
-    setInterval(() => {
+    this.pollTimer = setInterval(() => {
       for (const botId of this.botIds) {
         this.processOutbox(botId).catch(() => {});
       }
@@ -253,6 +257,22 @@ export class OutboxReader {
             console.log(
               `[outbox] Posting reply from ${msg.bot_id}: "${msg.text.slice(0, 30)}" (id: ${msg.id?.slice(0, 8)})`,
             );
+            let postBotId = msg.bot_id;
+            let postText = msg.text;
+            if (this.replyTransform) {
+              try {
+                const override = await this.replyTransform(msg);
+                if (override) {
+                  postBotId = override.botId;
+                  postText = override.text;
+                }
+              } catch (err) {
+                console.warn(
+                  `[outbox] replyTransform failed for ${msg.bot_id}: ${(err as Error).message} — falling back to original persona`,
+                );
+              }
+            }
+
             // P5-2d: projection emitter 주입 시 우선 사용, 실패/throw/미주입 시 gateway fallback.
             // (Codex 리뷰: projection.emit throw 가 outer catch 로 빠지면 fallback 미실행 → 별도 try)
             let posted = false;
@@ -265,9 +285,9 @@ export class OutboxReader {
                   {
                     channel,
                     destination: msg.channel_id,
-                    options: { threadTs: msg.thread_id, botId: msg.bot_id },
+                    options: { threadTs: msg.thread_id, botId: postBotId },
                   },
-                  { text: msg.text },
+                  { text: postText },
                 );
                 if (result.ok) {
                   posted = true;
@@ -284,21 +304,6 @@ export class OutboxReader {
               }
             }
             if (!posted) {
-              let postBotId = msg.bot_id;
-              let postText = msg.text;
-              if (this.replyTransform) {
-                try {
-                  const override = await this.replyTransform(msg);
-                  if (override) {
-                    postBotId = override.botId;
-                    postText = override.text;
-                  }
-                } catch (err) {
-                  console.warn(
-                    `[outbox] replyTransform failed for ${msg.bot_id}: ${(err as Error).message} — falling back to original persona`,
-                  );
-                }
-              }
               await this.gateway.postAsBot(postBotId, msg.channel_id, postText, msg.thread_id);
               postedVia = postBotId === msg.bot_id ? 'gateway' : `gateway(as ${postBotId})`;
             }
@@ -368,5 +373,9 @@ export class OutboxReader {
   stop(): void {
     for (const w of this.watchers) w.close();
     this.watchers = [];
+    if (this.pollTimer) {
+      clearInterval(this.pollTimer);
+      this.pollTimer = null;
+    }
   }
 }

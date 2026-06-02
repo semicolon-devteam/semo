@@ -23,6 +23,7 @@ import cronParser from 'cron-parser';
 import { getPool, closeConnection } from '../database';
 import { resolveBotWorkspace } from '../paths';
 import {
+  resolveSlackSenderBotId,
   recordCommitmentFailure,
   recordCommitmentSuccess,
   appendCommitmentEvent,
@@ -97,6 +98,11 @@ function buildTriggerPrompt(botId: string, job: CronJobRow, opts?: { scheduledAt
   const scheduleExpr = translateSchedule(job.schedule) ?? JSON.stringify(job.schedule);
   const scheduledAt = opts?.scheduledAt ?? new Date();
   const today = scheduledAt.toISOString().slice(0, 10);
+  const reportAsBotId = resolveSlackSenderBotId(botId) ?? botId;
+  const sourceLine =
+    reportAsBotId === botId
+      ? ''
+      : `\nBecause SEMO uses one visible Slack persona, include the source bot in the message body, e.g. \`[${job.name}] 결과: success — ... (source: ${botId})\`.`;
 
   const sections: string[] = [];
 
@@ -142,11 +148,11 @@ ${message}`);
     `## Report Destination
 On completion (success or failure), post a short result summary to Slack channel \`${reportChannel}\`.
 Format: \`[${job.name}] 결과: ...\` (3 lines max).
-**Sender:** Always pass \`--as ${botId}\` to \`semo slack send\` so the message is posted under the real ${botId} Slack App author. Without it, the message will appear as SemoBot.
+**Sender:** Always pass \`--as ${reportAsBotId}\` to \`semo slack send\` so the message is posted under the SEMO visible Slack persona. Without it, the message may appear as the wrong bot profile or SemoBot.${sourceLine}
 
 Example:
 \`\`\`
-semo slack send --as ${botId} -c ${reportChannel} -t '[${job.name}] 결과: success — ...'
+semo slack send --as ${reportAsBotId} -c ${reportChannel} -t '[${job.name}] 결과: success — ...'
 \`\`\``,
   );
 

@@ -1,7 +1,7 @@
 {
   "display_information": {
     "name": "Colony",
-    "description": "SEMO Agent Factory builder — finds existing agents or proposes new ones.",
+    "description": "SEMO channel observer — collects channel context into the team KB. Routing/agent creation is handled by Semi (role-redesign 2026-05-29).",
     "background_color": "#5b3aa6"
   },
   "features": {

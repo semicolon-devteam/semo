@@ -76,17 +76,19 @@ export function resolveModelForMessage(botId: BotId, baseModel: string, message:
 }
 
 // Bot Slack profiles — KB 기반 동적 로드, 하드코딩 fallback
+const UNIFIED_SEMI_SLACK_PROFILE = { username: 'Semi', icon_emoji: ':robot_face:' };
+
 const FALLBACK_SLACK_PROFILES: Record<string, { username: string; icon_emoji: string }> = {
-  semiclaw: { username: 'SemiClaw', icon_emoji: ':clipboard:' },
+  semiclaw: UNIFIED_SEMI_SLACK_PROFILE,
   // SemoBot — SEMO 시스템 관리/가이드 에이전트 (semo decision/semobot-independent-agent-2026-05-06).
   // SemiClaw (orchestrator) 와 분리. system-level 알림 (usage, watchdog, escalation 등) 의 Slack 페르소나.
   semobot: { username: 'SemoBot', icon_emoji: ':robot_face:' },
-  planclaw: { username: 'PlanClaw', icon_emoji: ':bar_chart:' },
-  designclaw: { username: 'DesignClaw', icon_emoji: ':art:' },
-  workclaw: { username: 'WorkClaw', icon_emoji: ':hammer_and_wrench:' },
-  reviewclaw: { username: 'ReviewClaw', icon_emoji: ':mag:' },
-  infraclaw: { username: 'InfraClaw', icon_emoji: ':gear:' },
-  growthclaw: { username: 'GrowthClaw', icon_emoji: ':chart_with_upwards_trend:' },
+  planclaw: UNIFIED_SEMI_SLACK_PROFILE,
+  designclaw: UNIFIED_SEMI_SLACK_PROFILE,
+  workclaw: UNIFIED_SEMI_SLACK_PROFILE,
+  reviewclaw: UNIFIED_SEMI_SLACK_PROFILE,
+  infraclaw: UNIFIED_SEMI_SLACK_PROFILE,
+  growthclaw: UNIFIED_SEMI_SLACK_PROFILE,
   incubator: { username: 'Incubator', icon_emoji: ':hatching_chick:' },
 };
 export let SLACK_PROFILES: Record<string, { username: string; icon_emoji: string }> = {

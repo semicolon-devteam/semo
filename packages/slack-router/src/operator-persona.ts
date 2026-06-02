@@ -42,6 +42,45 @@ export function buildPersonaContextBlock(personas: PersonaRow[]): string {
   return lines.join('\n');
 }
 
+export interface OperatorMentionTarget {
+  botId: string;
+  displayName: string;
+  mention: string;
+}
+
+export function buildOperatorMentionGuide(targets: OperatorMentionTarget[]): string {
+  const targetByBotId = new Map<string, OperatorMentionTarget>();
+  for (const target of targets) {
+    if (!targetByBotId.has(target.botId)) targetByBotId.set(target.botId, target);
+  }
+  const uniqueTargets = Array.from(targetByBotId.values());
+  if (uniqueTargets.length === 0) return '';
+  const lines = [
+    '# Slack bot 호출 권한',
+    '사용자가 Semi/Colony에게 질문해달라, 테스트해달라, 호출해달라, 답하게 해달라고 요청하면 다른 base 에이전트를 직접 호출할 수 있습니다.',
+    '',
+    '정확한 Slack 멘션 토큰:',
+  ];
+  for (const target of uniqueTargets) {
+    lines.push(`- ${target.displayName} (\`${target.botId}\`): ${target.mention}`);
+  }
+  lines.push(
+    '',
+    '규칙:',
+    '- 이 호출은 행동 수정이 아니므로 APPLY_PERSONA 블록이 필요 없습니다.',
+    '- 실제로 호출할 때는 위 토큰을 그대로 쓰고, 그 뒤에 질문/요청을 한 문장으로 붙입니다.',
+    '- 호출한 에이전트의 답을 대신 지어내지 말고, 답변은 해당 에이전트가 이어서 하게 둡니다.',
+  );
+  return lines.join('\n');
+}
+
+export function shouldTriggerOperatorAdminRoute(text: string, operatorMentionToken = ''): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  if (operatorMentionToken && trimmed.includes(operatorMentionToken)) return true;
+  return /^(?:@?(?:operator|오퍼레이터))(?:\s|$|<)/i.test(trimmed);
+}
+
 export interface ParsedApply {
   slug: string;
   note?: string;

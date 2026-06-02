@@ -72,6 +72,30 @@ export function isSystemMessage(text: string | undefined): boolean {
   return SYSTEM_MESSAGE_PATTERNS.some((p) => p.test(text));
 }
 
+export interface SlackEventProcessingInput {
+  event: {
+    user?: string;
+    bot_id?: string;
+    text?: string;
+  };
+  botUserId: string;
+  botBotId: string;
+  allowBotMessage?: boolean;
+}
+
+export function shouldProcessSlackEvent({
+  event,
+  botUserId,
+  botBotId,
+  allowBotMessage = false,
+}: SlackEventProcessingInput): boolean {
+  if (event.user && event.user === botUserId) return false;
+  if (!event.bot_id) return true;
+  if (event.bot_id === botBotId) return false;
+  if (allowBotMessage) return true;
+  return isSystemMessage(event.text);
+}
+
 export type MessageHandler = (msg: SlackMessage, senderName: string) => Promise<void>;
 
 export class SlackGateway {
@@ -103,6 +127,14 @@ export class SlackGateway {
     return this.web;
   }
 
+  getBotUserId(): string {
+    return this.botUserId;
+  }
+
+  getRouteBotId(): string | undefined {
+    return this.routeBotId;
+  }
+
   setMessageHandler(handler: MessageHandler) {
     this.onMessage = handler;
   }
@@ -125,11 +157,7 @@ export class SlackGateway {
         console.error('[slack] ack failed (app_mention), skipping:', (e as Error).message);
         return;
       }
-      // 봇이 자기 자신을 멘션한 경우 무시 (봇 루프 방지).
-      // SEMO_DEV_ALLOW_BOT_MENTIONS=1 환경변수로 개발/테스트 시 우회 가능.
-      // KB: semo decision/semi-orchestrator-hermes-poc-2026-05-27 의 end-to-end 검증용.
-      if (event.bot_id && process.env.SEMO_DEV_ALLOW_BOT_MENTIONS !== '1') return;
-      await this.handleEvent(event);
+      await this.handleEvent(event, { allowBotMessage: true });
     });
 
     // message events — DM, 시스템 메시지만 처리 (채널 메시지는 app_mention으로 수신)
@@ -186,9 +214,16 @@ export class SlackGateway {
     console.log('[slack] Socket Mode connected');
   }
 
-  private async handleEvent(event: any) {
-    if (event.user === this.botUserId) return;
-    if (event.bot_id && !isSystemMessage(event.text)) return;
+  private async handleEvent(event: any, opts: { allowBotMessage?: boolean } = {}) {
+    if (
+      !shouldProcessSlackEvent({
+        event,
+        botUserId: this.botUserId,
+        botBotId: this.botBotId,
+        allowBotMessage: opts.allowBotMessage,
+      })
+    )
+      return;
 
     // Dedup: skip if same event.ts already processed (app_mention + message race)
     if (this.processedEvents.has(event.ts)) return;
@@ -211,10 +246,14 @@ export class SlackGateway {
     }
 
     // 유저 정보 조회
-    let senderName = event.user;
+    let senderName = event.user || event.bot_id || 'bot';
     try {
-      const info = await this.web.users.info({ user: event.user });
-      senderName = info.user?.profile?.display_name || info.user?.real_name || event.user;
+      if (event.user) {
+        const info = await this.web.users.info({ user: event.user });
+        senderName = info.user?.profile?.display_name || info.user?.real_name || event.user;
+      } else if (event.username || event.bot_profile?.name) {
+        senderName = event.username || event.bot_profile.name;
+      }
     } catch {
       /* fallback to user ID */
     }
@@ -261,7 +300,7 @@ export class SlackGateway {
 
     const msg: SlackMessage = {
       text: cleanText,
-      user: event.user,
+      user: event.user || event.bot_id || 'bot',
       channel: event.channel,
       ts: event.ts,
       thread_ts: event.thread_ts,
