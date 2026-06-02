@@ -41,11 +41,19 @@ import {
   claimNotifiedAlert,
   claimPagedAlert,
   HermesCliAdapter,
+  getWebClientForBot,
   type SlackMessage,
   type InboxMessage,
   type OutboxMessage,
 } from '@team-semicolon/semo-common';
+import * as fs from 'node:fs';
 import { applySlackRouterPolicy, shouldHandleSemoBotNlp } from './router-policy.js';
+import {
+  runColonyDailyDigest,
+  type DigestState,
+  type DigestMessage,
+  type DigestDeps,
+} from './colony-digest.js';
 
 // Cmux ancestry guard — daemon(launchd/nohup) 화 감지 시 즉시 종료.
 // 배경: cmux nudge 는 cmux pane 자손 프로세스만 허용하므로 daemon 화되면 침묵 실패.
@@ -1164,6 +1172,177 @@ for (const [botId, cfg] of Object.entries(ORCHESTRATORS)) {
     defaultTimeoutMs: cfg.timeoutMs,
     enableSessionResume: false,
   });
+}
+
+// ── Colony 일일 digest — Colony 자신의 런타임(이 프로세스)에서 독립 실행 ──
+// semiclaw cron 서브에이전트에 의존하지 않는다. 채널 열거·수집·KB write 는 라우터가,
+// 추출 추론은 Colony 자신의 hermes(semo-colony)가 수행. Colony 의 10분 컨텍스트 수집기와 동급의
+// in-process 머신러리. 매일 KST 06:00 이후 1회(채널별 멱등) 실행.
+const COLONY_DIGEST_ENABLED =
+  process.env.COLONY_DIGEST_ENABLED !== '0' && process.env.COLONY_DIGEST_ENABLED !== 'false';
+const COLONY_DIGEST_REPORT_CHANNEL = process.env.COLONY_DIGEST_REPORT_CHANNEL || '';
+const COLONY_DIGEST_HOUR_KST = Number(process.env.COLONY_DIGEST_HOUR_KST || 6);
+const COLONY_DIGEST_STATE_PATH = path.join(os.homedir(), '.semo', 'colony-digest-state.json');
+let colonyDigestLastRunDate = '';
+
+function kstTodayStr(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }); // YYYY-MM-DD
+}
+function kstHour(): number {
+  return Number(
+    new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul', hour: '2-digit', hour12: false }),
+  );
+}
+
+async function colonyEnumerateChannels(): Promise<Array<{ id: string; name: string }>> {
+  const web = getWebClientForBot(COLONY_BOT_ID);
+  const out: Array<{ id: string; name: string }> = [];
+  let cursor: string | undefined;
+  do {
+    const res = await web.users.conversations({
+      types: 'public_channel,private_channel',
+      exclude_archived: true,
+      limit: 200,
+      ...(cursor ? { cursor } : {}),
+    });
+    for (const c of (res.channels ?? []) as Array<{ id?: string; name?: string }>) {
+      if (c.id) out.push({ id: c.id, name: c.name ?? '' });
+    }
+    cursor =
+      (res.response_metadata as { next_cursor?: string } | undefined)?.next_cursor || undefined;
+  } while (cursor);
+  return out;
+}
+
+async function colonyFetchMessages(channelId: string, sinceTs: string): Promise<DigestMessage[]> {
+  const web = getWebClientForBot(COLONY_BOT_ID);
+  const out: DigestMessage[] = [];
+  let cursor: string | undefined;
+  do {
+    const res = await web.conversations.history({
+      channel: channelId,
+      oldest: sinceTs,
+      limit: 200,
+      ...(cursor ? { cursor } : {}),
+    });
+    for (const m of (res.messages ?? []) as Array<Record<string, unknown>>) {
+      if (m.bot_id || m.subtype) continue;
+      const text = String(m.text || '').trim();
+      if (text) out.push({ ts: String(m.ts), user: String(m.user || 'unknown'), text });
+      if (out.length >= 500) break;
+    }
+    cursor =
+      (res.response_metadata as { next_cursor?: string } | undefined)?.next_cursor || undefined;
+  } while (cursor && out.length < 500);
+  out.reverse(); // 오래된→최신
+  return out;
+}
+
+async function runColonyDigestNow(): Promise<void> {
+  const adapter = orchestratorAdapters[COLONY_BOT_ID];
+  if (!adapter) return;
+  const today = kstTodayStr();
+  const defaultSince = ((Date.now() - 30 * 3600 * 1000) / 1000).toFixed(6); // 최초 실행 시 최근 ~30h
+
+  const deps: DigestDeps = {
+    listChannels: colonyEnumerateChannels,
+    getMappings: async () => {
+      const { rows } = await pool.query<{ channel_id: string; domain: string }>(
+        `SELECT channel_id, domain FROM semo.channel_domain_map WHERE platform = 'slack' AND ingest_enabled`,
+      );
+      return new Map(rows.map((r) => [r.channel_id, r.domain]));
+    },
+    fetchMessages: colonyFetchMessages,
+    extract: async (prompt) => {
+      const session = await adapter.startSession({ botId: COLONY_BOT_ID });
+      const r = await adapter.dispatch({
+        botId: COLONY_BOT_ID,
+        session,
+        prompt,
+        timeoutMs: 120_000,
+      });
+      return r.text || '';
+    },
+    writeDecision: async ({ domain, ex, date, channelName }) => {
+      const body = `## ${ex.title}\n\n${ex.body}\n\n- 출처: Slack #${channelName}\n- created_by: colony-daily-digest`;
+      await execFileP(
+        'semo',
+        ['kb', 'upsert', domain, 'decision', ex.slug, '--content', body, '--decided-by', ex.decided_by || 'colony', '--decided-at', date],
+        { timeout: 30_000, env: process.env },
+      );
+    },
+    writeBlocker: async ({ domain, ex, date, channelName }) => {
+      const body = `**상태:** active\n**시작일:** ${date}\n**서비스:** ${domain}\n**출처:** slack:#${channelName}\n\n### 설명\n${ex.body}`;
+      await execFileP(
+        'semo',
+        ['kb', 'upsert', domain, 'blocker', `${date}/${ex.slug}`, '--content', body, '--severity', 'medium', '--status', 'open'],
+        { timeout: 30_000, env: process.env },
+      );
+    },
+    createAction: async ({ domain, ex }) => {
+      const args = ['action-items', 'create', '--owner', ex.owner || domain, '--target', domain, '--description', ex.description];
+      if (ex.deadline) args.push('--deadline', ex.deadline);
+      await execFileP('semo', args, { timeout: 30_000, env: process.env });
+    },
+    loadState: () => {
+      try {
+        return JSON.parse(fs.readFileSync(COLONY_DIGEST_STATE_PATH, 'utf8')) as DigestState;
+      } catch {
+        return { channels: {} };
+      }
+    },
+    saveState: (s) => {
+      try {
+        fs.mkdirSync(path.dirname(COLONY_DIGEST_STATE_PATH), { recursive: true });
+        fs.writeFileSync(COLONY_DIGEST_STATE_PATH, JSON.stringify(s, null, 2));
+      } catch (e) {
+        console.warn('[colony-digest] state save failed:', (e as Error).message);
+      }
+    },
+    log: (m) => console.log(m),
+    today,
+    defaultSinceTs: defaultSince,
+  };
+
+  const summary = await runColonyDailyDigest(deps);
+  if (COLONY_DIGEST_REPORT_CHANNEL) {
+    const rows = summary.ran.filter(
+      (r) => r.messages > 0 || r.decisions || r.blockers || r.actions,
+    );
+    const table = rows.length
+      ? rows
+          .map(
+            (r) =>
+              `• #${r.name}→${r.domain}: 메시지 ${r.messages}, 결정 ${r.decisions}, 블로커 ${r.blockers}, 액션 ${r.actions}`,
+          )
+          .join('\n')
+      : '특이사항 없음';
+    const unmapped = summary.unmapped.length
+      ? `\n\n미매핑 채널(등록 필요): ${summary.unmapped.map((u) => `#${u.name}(${u.id})`).join(', ')}`
+      : '';
+    await slack
+      .postAsBot(COLONY_BOT_ID, COLONY_DIGEST_REPORT_CHANNEL, `📒 Colony 일일 다이제스트 (${today})\n${table}${unmapped}`)
+      .catch(() => {});
+  }
+  console.log(
+    `[colony-digest] done: ${summary.ran.length} channels, ${summary.unmapped.length} unmapped, ${summary.skippedToday} skipped`,
+  );
+}
+
+if (COLONY_DIGEST_ENABLED) {
+  setInterval(
+    () => {
+      if (!orchestratorAdapters[COLONY_BOT_ID]) return;
+      const today = kstTodayStr();
+      if (kstHour() >= COLONY_DIGEST_HOUR_KST && colonyDigestLastRunDate !== today) {
+        colonyDigestLastRunDate = today;
+        runColonyDigestNow().catch((e) =>
+          console.warn('[colony-digest] failed:', (e as Error).message),
+        );
+      }
+    },
+    30 * 60_000,
+  );
 }
 
 interface ParsedRoute {
