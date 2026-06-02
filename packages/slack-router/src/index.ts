@@ -2133,23 +2133,24 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
   // Colony 컨텍스트 메모리 수집: 모든 유저 메시지를 버퍼링 후 주기 flush.
   recordColonyContextSample(msg, senderName);
 
+  // Operator — base persona(SOUL) 편집 모드. 지정 관리 채널 + @오퍼레이터/@operator 키워드로만.
+  // 채널 게이트로 접근 제한하므로 route_bot_id 무관. Semi orchestrator 가 가로채기 전에 최우선 체크.
+  if (
+    ORCHESTRATORS[OPERATOR_BOT_ID] &&
+    OPERATOR_ADMIN_CHANNEL &&
+    msg.channel === OPERATOR_ADMIN_CHANNEL &&
+    /(?:^|\s)@?(?:operator|오퍼레이터)(?:\s|$|<)/i.test(msg.text)
+  ) {
+    await handleOrchestrator(msg, senderName, ORCHESTRATORS[OPERATOR_BOT_ID]);
+    return;
+  }
+
   // 0. Hermes-backed orchestrators (Semi / Colony) — MUST be checked BEFORE SemoBot
   // deterministic handler so that PING_ALIASES ("테스트" 등) 가 멘션을 가로채지 않는다.
   // route_bot_id 는 main gateway 가 SEMO_PRIMARY_BOT_ID 일 때 자동 설정됨.
   // Colony 의 경우 text 안에 @Colony 가 포함된 케이스도 지원 (별도 Slack App 없으면).
   if (msg.route_bot_id && ORCHESTRATORS[msg.route_bot_id]) {
     await handleOrchestrator(msg, senderName, ORCHESTRATORS[msg.route_bot_id]);
-    return;
-  }
-  // Operator — 지정 관리 채널에서 @오퍼레이터/@operator 트리거 시 base persona 편집 모드.
-  // Semi App 으로 들어오며, 채널 게이트(OPERATOR_ADMIN_CHANNEL)로 접근 제한.
-  if (
-    msg.route_bot_id === SEMI_BOT_ID &&
-    ORCHESTRATORS[OPERATOR_BOT_ID] &&
-    msg.channel === OPERATOR_ADMIN_CHANNEL &&
-    /(?:^|\s)@?(?:operator|오퍼레이터)(?:\s|$|<)/i.test(msg.text)
-  ) {
-    await handleOrchestrator(msg, senderName, ORCHESTRATORS[OPERATOR_BOT_ID]);
     return;
   }
   // Colony 가 별도 Slack App 없이 Semi App 으로 들어왔는데 text 에 @Colony 가 명시된 경우.
