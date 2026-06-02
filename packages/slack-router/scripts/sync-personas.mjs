@@ -1,34 +1,19 @@
 #!/usr/bin/env node
-// repo personas → active hermes home 의 SOUL.md 동기화.
-// SoT = packages/slack-router/personas/{semi,colony,operator}.SOUL.md
-// 대상 home = $SEMI_HERMES_HOME (기본 ~/.hermes-semo-canary)
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const here = dirname(fileURLToPath(import.meta.url));
-const personasDir = join(here, '..', 'personas');
-const home = process.env.SEMI_HERMES_HOME || join(homedir(), '.hermes-semo-canary');
-
-const MAP = [
-  ['semi.SOUL.md', 'semo-semi'],
-  ['colony.SOUL.md', 'semo-colony'],
-  ['operator.SOUL.md', 'semo-operator'],
-];
-
-let synced = 0;
-for (const [file, profile] of MAP) {
-  const src = join(personasDir, file);
-  if (!existsSync(src)) {
-    console.warn(`[sync-personas] skip (no src): ${file}`);
-    continue;
-  }
-  const destDir = join(home, 'profiles', profile);
-  mkdirSync(destDir, { recursive: true });
-  const dest = join(destDir, 'SOUL.md');
-  writeFileSync(dest, readFileSync(src, 'utf8'));
-  console.log(`[sync-personas] ${file} → ${dest}`);
-  synced++;
-}
-console.log(`[sync-personas] done (${synced} profiles, home=${home})`);
+// DEPRECATED 경로 안내 — SoT 가 repo 파일 → DB(semo.agent_personas)로 승격됨 (2026-06-02).
+//
+// 행동 정의 SoT 는 이제 DB 다. 프로토타입 hermes SOUL.md 반영은:
+//     semo persona sync            (전역 CLI, 배포 후)
+//   또는 npx tsx packages/cli/src/index.ts persona sync   (로컬 소스)
+//
+// repo personas/*.SOUL.md 는 seed/bootstrap 용도로만 남는다:
+//     semo persona set <slug> --file packages/slack-router/personas/<slug>.SOUL.md --by <who>
+//
+// 설계: docs/superpowers/specs/2026-06-02-agent-behavior-sot-and-propagation-design.md
+console.error(
+  [
+    '[sync-personas] DEPRECATED — SoT 가 DB(semo.agent_personas)로 이동했습니다.',
+    '  프로토타입 반영:  semo persona sync   (또는 npx tsx packages/cli/src/index.ts persona sync)',
+    '  seed:            semo persona set <slug> --file packages/slack-router/personas/<slug>.SOUL.md --by <who>',
+  ].join('\n'),
+);
+process.exit(1);
