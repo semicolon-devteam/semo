@@ -18,6 +18,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import inquirer from 'inquirer';
+import { execSync } from 'node:child_process';
 import { stringify as tomlStringify } from 'smol-toml';
 import { ensureSemoLayout } from '../paths.js';
 import {
@@ -25,6 +26,7 @@ import {
   type KbConfig,
   type OpsConfig,
   type MessagingConfig,
+  type MessagingSource,
   type ExecutionConfig,
   type NetworkConfig,
   type EmbeddingConfig,
@@ -278,6 +280,175 @@ async function promptFirstUser(cfg: InitConfigShape): Promise<{
   return { nickname: nickname.trim(), slackId: slackId.trim() || undefined };
 }
 
+type InitDbChoice = 'postgres' | 'obsidian' | 'notion' | 'sqlite';
+type InitAgentHostChoice = 'hermes' | 'openclaw' | 'claude-code' | 'ollama';
+
+interface InitReadinessCheck {
+  name: string;
+  status: 'PASS' | 'WARN' | 'BLOCKER';
+  detail: string;
+}
+
+function parseCsvList(value?: string): string[] {
+  if (!value) return [];
+  return value
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+function commandExists(cmd: string): boolean {
+  try {
+    execSync(`command -v ${cmd}`, { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function applySetupOverrides(
+  cfg: InitConfigShape,
+  opts: {
+    db?: string;
+    messaging?: string;
+    agentHost?: string;
+    obsidianVault?: string;
+  },
+): InitConfigShape {
+  const out: InitConfigShape = {
+    ...cfg,
+    kb: { ...cfg.kb },
+    ops: { ...cfg.ops },
+    messaging: { ...cfg.messaging, sources: [...cfg.messaging.sources] },
+    execution: { ...cfg.execution },
+    network: { ...cfg.network },
+  };
+
+  const db = (opts.db || '').trim() as InitDbChoice;
+  if (db) {
+    if (db === 'postgres') {
+      out.kb = { ...out.kb, driver: 'postgres' };
+      out.ops = { ...out.ops, driver: 'postgres' };
+    } else if (db === 'sqlite') {
+      out.kb = { ...out.kb, driver: 'sqlite', sqlite_path: out.kb.sqlite_path ?? '~/.semo/kb.db' };
+      out.ops = {
+        ...out.ops,
+        driver: 'sqlite',
+        sqlite_path: out.ops.sqlite_path ?? '~/.semo/ops.db',
+      };
+    } else if (db === 'obsidian') {
+      out.kb = { ...out.kb, driver: 'obsidian' };
+      if (opts.obsidianVault?.trim()) {
+        out.kb.obsidian_vault = opts.obsidianVault.trim();
+      }
+    } else if (db === 'notion') {
+      out.kb = { ...out.kb, driver: 'notion' };
+    }
+  }
+
+  const messagingList = parseCsvList(opts.messaging) as MessagingSource[];
+  if (messagingList.length > 0) {
+    out.messaging.sources = messagingList;
+  }
+
+  const host = (opts.agentHost || '').trim() as InitAgentHostChoice;
+  if (host === 'hermes') {
+    out.execution = { ...out.execution, target: 'claude-code', model: 'gpt-5.5' };
+  } else if (host === 'openclaw') {
+    out.execution = { ...out.execution, target: 'claude-code' };
+  } else if (host === 'claude-code') {
+    out.execution = { ...out.execution, target: 'claude-code' };
+  } else if (host === 'ollama') {
+    out.execution = {
+      ...out.execution,
+      target: 'ollama',
+      model: out.execution.model || 'qwen2.5-coder:14b',
+      ollama_host: out.execution.ollama_host || 'http://127.0.0.1:11434',
+    };
+  }
+
+  return out;
+}
+
+function runReadinessChecks(
+  cfg: InitConfigShape,
+  opts: { agentHost?: string; messaging?: string },
+): InitReadinessCheck[] {
+  const checks: InitReadinessCheck[] = [];
+
+  checks.push({
+    name: 'semo CLI',
+    status: commandExists('semo') ? 'PASS' : 'BLOCKER',
+    detail: commandExists('semo') ? 'semo command detected' : 'semo command not found in PATH',
+  });
+
+  const host = (opts.agentHost || '').trim() as InitAgentHostChoice;
+  if (host === 'hermes') {
+    const ok = commandExists('hermes');
+    checks.push({
+      name: 'Hermes runtime',
+      status: ok ? 'PASS' : 'BLOCKER',
+      detail: ok ? 'hermes command detected' : 'hermes command not found',
+    });
+  }
+  if (host === 'openclaw') {
+    const ok = commandExists('openclaw');
+    checks.push({
+      name: 'OpenClaw runtime',
+      status: ok ? 'PASS' : 'BLOCKER',
+      detail: ok ? 'openclaw command detected' : 'openclaw command not found',
+    });
+  }
+
+  const sources = (parseCsvList(opts.messaging) as MessagingSource[]).length
+    ? (parseCsvList(opts.messaging) as MessagingSource[])
+    : cfg.messaging.sources;
+
+  if (sources.includes('slack')) {
+    const ok = Boolean(process.env.SLACK_BOT_TOKEN || process.env.SEMI_SLACK_BOT_TOKEN);
+    checks.push({
+      name: 'Slack credential',
+      status: ok ? 'PASS' : 'WARN',
+      detail: ok
+        ? 'SLACK_BOT_TOKEN or SEMI_SLACK_BOT_TOKEN present'
+        : 'Slack token env not found (set before router run)',
+    });
+  }
+  if (sources.includes('discord')) {
+    const ok = Boolean(process.env.DISCORD_TOKEN);
+    checks.push({
+      name: 'Discord credential',
+      status: ok ? 'PASS' : 'WARN',
+      detail: ok ? 'DISCORD_TOKEN present' : 'DISCORD_TOKEN not found (set before router run)',
+    });
+  }
+
+  if (cfg.kb.driver === 'notion') {
+    checks.push({
+      name: 'Notion KB driver',
+      status: 'WARN',
+      detail: 'Notion driver is marked as 준비중 in current SEMO rollout plan',
+    });
+  }
+
+  return checks;
+}
+
+function printReadinessChecks(checks: InitReadinessCheck[]): void {
+  if (checks.length === 0) return;
+  console.log();
+  console.log(chalk.bold('설치/연동 점검 결과'));
+  for (const c of checks) {
+    const icon =
+      c.status === 'PASS'
+        ? chalk.green('PASS')
+        : c.status === 'WARN'
+          ? chalk.yellow('WARN')
+          : chalk.red('BLOCKER');
+    console.log(`  • ${icon} ${c.name} — ${c.detail}`);
+  }
+}
+
 function printNextSteps(cfg: InitConfigShape): void {
   console.log();
   console.log(chalk.bold('다음 단계'));
@@ -337,6 +508,10 @@ export function registerInitCommand(program: Command): void {
       '--obsidian-vault <path>',
       '비대화형 obsidian_vault 경로 (--hybrid 또는 obsidian profile)',
     )
+    .option('--db <driver>', 'DB 드라이버 선택 (postgres|obsidian|notion|sqlite)')
+    .option('--messaging <sources>', '메신저 선택 CSV (slack,discord,stdin,http,obsidian-file)')
+    .option('--agent-host <host>', '에이전트 런타임 선택 (hermes|openclaw|claude-code|ollama)')
+    .option('--with-checks', '명령/토큰/런타임 설치 점검까지 수행')
     .action(
       async (opts: {
         profile?: string;
@@ -345,6 +520,10 @@ export function registerInitCommand(program: Command): void {
         dryRun?: boolean;
         hybrid?: boolean;
         obsidianVault?: string;
+        db?: string;
+        messaging?: string;
+        agentHost?: string;
+        withChecks?: boolean;
       }) => {
         const valid: InitProfile[] = [
           'team',
@@ -401,9 +580,22 @@ export function registerInitCommand(program: Command): void {
           cfg = await promptKbDriverDetails(cfg);
         }
 
+        // 2026-05-29: 설치 보장형 통합 옵션(DB/메신저/에이전트 런타임) override
+        cfg = applySetupOverrides(cfg, {
+          db: opts.db,
+          messaging: opts.messaging,
+          agentHost: opts.agentHost,
+          obsidianVault: opts.obsidianVault,
+        });
+
+        const readinessChecks = opts.withChecks
+          ? runReadinessChecks(cfg, { agentHost: opts.agentHost, messaging: opts.messaging })
+          : [];
+
         if (opts.dryRun) {
           console.log(chalk.gray(`# ${opts.path}`));
           console.log(renderConfigToml(cfg));
+          printReadinessChecks(readinessChecks);
           return;
         }
 
@@ -457,6 +649,7 @@ export function registerInitCommand(program: Command): void {
           }
         }
 
+        printReadinessChecks(readinessChecks);
         printNextSteps(cfg);
       },
     );

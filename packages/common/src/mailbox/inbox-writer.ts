@@ -80,6 +80,9 @@ export class InboxWriter {
             scheduleReload(`file ${eventType}`);
           },
         );
+        this.surfaceMapWatcher.on('error', (err) => {
+          console.warn(`[inbox-writer] surface map watch error: ${(err as Error).message}`);
+        });
         console.log(`[inbox-writer] watching surface map: ${this.surfaceMapPath}`);
       } catch {
         // File may not exist yet — fall back to dir-watch.
@@ -94,13 +97,14 @@ export class InboxWriter {
             scheduleReload('file appeared');
             tryWatchFile();
           });
+          this.surfaceMapDirWatcher.on('error', (err) => {
+            console.warn(`[inbox-writer] surface map dir watch error: ${(err as Error).message}`);
+          });
           console.log(
             `[inbox-writer] surface map ${this.surfaceMapPath} not found — watching dir for creation`,
           );
         } catch (err) {
-          console.warn(
-            `[inbox-writer] failed to watch surface map dir: ${(err as Error).message}`,
-          );
+          console.warn(`[inbox-writer] failed to watch surface map dir: ${(err as Error).message}`);
         }
       }
     };
@@ -138,9 +142,7 @@ export class InboxWriter {
     // KB: semo decision/bot-codex-fallback-architecture-2026-05-16
     if (isCodexFallbackEnabled(botId)) {
       runCodexFallback(botId, fullMsg, this.mailboxDir).catch((err) => {
-        console.warn(
-          `[codex-fallback] ${botId}: unhandled exception: ${(err as Error).message}`,
-        );
+        console.warn(`[codex-fallback] ${botId}: unhandled exception: ${(err as Error).message}`);
       });
     }
 

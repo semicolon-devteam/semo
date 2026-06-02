@@ -46,6 +46,17 @@ import {
   type OutboxMessage,
 } from '@team-semicolon/semo-common';
 import { applySlackRouterPolicy, shouldHandleSemoBotNlp } from './router-policy.js';
+import { buildConversationContextBlock } from './conversation-context.js';
+import {
+  listActivePersonas,
+  buildPersonaContextBlock,
+  buildOperatorMentionGuide,
+  shouldTriggerOperatorAdminRoute,
+  parseApplyPersona,
+  applyPersona,
+} from './operator-persona.js';
+import { parseApplyCodeTask, buildOperatorCodeGuide } from './operator-code-task.js';
+import { dispatchCodeTask, createDefaultDeps } from './operator-code-dispatch.js';
 
 // Cmux ancestry guard — daemon(launchd/nohup) 화 감지 시 즉시 종료.
 // 배경: cmux nudge 는 cmux pane 자손 프로세스만 허용하므로 daemon 화되면 침묵 실패.
@@ -79,6 +90,18 @@ const SEMI_BOT_ID = process.env.SEMI_BOT_ID || 'semi';
 // Semi 와 동일한 orchestrator 실행 기반은 유지하되, Colony 는 주기 수집 워커를 병행한다.
 const COLONY_HERMES_PROFILE = process.env.COLONY_HERMES_PROFILE || 'semo-colony';
 const COLONY_BOT_ID = process.env.COLONY_BOT_ID || 'colony';
+
+// Operator (2026-06-02): Mark 가 base 에이전트 행동(SOUL SoT)을 슬랙에서 컨펌 기반으로 수정.
+// 전용 Slack App 없음 → Semi 앱 수신 메시지 중 OPERATOR_ADMIN_CHANNEL 에서 온 것만 라우팅.
+// 비어 있으면 operator 비활성(보안 기본값). 도구 없는 대화형 — APPLY_PERSONA 블록을 라우터가 적용.
+const OPERATOR_BOT_ID = process.env.OPERATOR_BOT_ID || 'operator';
+const OPERATOR_HERMES_PROFILE = process.env.OPERATOR_HERMES_PROFILE || 'semo-operator';
+const OPERATOR_ADMIN_CHANNEL = process.env.OPERATOR_ADMIN_CHANNEL || '';
+// operator 코드-변경 위임 — auto-merge 가능한 PR 을 만드므로 명시적 opt-in(기본 off).
+// 설계: docs/superpowers/specs/2026-06-03-operator-code-change-capability-design.md
+const OPERATOR_CODE_ENABLED = process.env.OPERATOR_CODE_ENABLED === '1';
+const OPERATOR_CODE_BASE_BRANCH = process.env.OPERATOR_CODE_BASE_BRANCH || 'dev';
+const OPERATOR_CODE_REPO_ROOT = process.env.OPERATOR_CODE_REPO_ROOT || process.cwd();
 const COLONY_CONTEXT_MEMORY_ENABLED =
   process.env.COLONY_CONTEXT_MEMORY_ENABLED !== '0' &&
   process.env.COLONY_CONTEXT_MEMORY_ENABLED !== 'false';
@@ -1128,6 +1151,9 @@ interface OrchestratorConfig {
   // 2026-05-29 역할 재편: 에이전트 찾기/생성(SEARCH_LIBRARY/CREATE)은 Semi 의 책임.
   // ROUTE 가 없을 때 ACTION 라인을 파싱·실행할지 여부. Semi=true, Colony=false(순수 관찰자).
   canManageAgents?: boolean;
+  // 2026-06-02 operator: base persona(SOUL) SoT 편집자. 현재 persona 를 프롬프트에 주입하고,
+  // 응답의 APPLY_PERSONA 블록을 라우터가 DB(semo.agent_personas)에 적용한다. 도구 없음.
+  personaAdmin?: boolean;
   timeoutMs: number;
 }
 
@@ -1153,6 +1179,19 @@ if (SEMO_PRIMARY_BOT_ID === SEMI_BOT_ID) {
     canManageAgents: false,
     timeoutMs: SEMI_HERMES_TIMEOUT_MS,
   };
+  // Operator — 관리 채널이 설정된 경우에만 활성. base persona(SOUL) SoT 편집 전용.
+  if (OPERATOR_ADMIN_CHANNEL) {
+    ORCHESTRATORS[OPERATOR_BOT_ID] = {
+      botId: OPERATOR_BOT_ID,
+      hermesHome: SEMI_HERMES_HOME,
+      profile: OPERATOR_HERMES_PROFILE,
+      role: 'operator',
+      responseKind: 'route',
+      canManageAgents: false,
+      personaAdmin: true,
+      timeoutMs: SEMI_HERMES_TIMEOUT_MS,
+    };
+  }
 }
 
 const orchestratorAdapters: Record<string, HermesCliAdapter> = {};
@@ -1164,6 +1203,42 @@ for (const [botId, cfg] of Object.entries(ORCHESTRATORS)) {
     defaultTimeoutMs: cfg.timeoutMs,
     enableSessionResume: false,
   });
+}
+
+const ORCHESTRATOR_DISPLAY_NAMES: Record<string, string> = {
+  [SEMI_BOT_ID]: 'Semi',
+  [COLONY_BOT_ID]: 'Colony',
+};
+
+let operatorMentionGuide = '';
+let operatorMentionToken = '';
+
+function refreshOperatorMentionGuide(): void {
+  const targetByBotId = new Map<string, { botId: string; displayName: string; mention: string }>();
+  operatorMentionToken = '';
+  for (const gateway of inboundSlacks) {
+    const routeBotId = gateway.getRouteBotId();
+    const botUserId = gateway.getBotUserId();
+    if (!routeBotId || !botUserId) continue;
+    if (routeBotId === OPERATOR_BOT_ID) {
+      operatorMentionToken = `<@${botUserId}>`;
+      continue;
+    }
+    if (routeBotId !== SEMI_BOT_ID && routeBotId !== COLONY_BOT_ID) continue;
+    if (targetByBotId.has(routeBotId)) continue;
+    targetByBotId.set(routeBotId, {
+      botId: routeBotId,
+      displayName: ORCHESTRATOR_DISPLAY_NAMES[routeBotId] || routeBotId,
+      mention: `<@${botUserId}>`,
+    });
+  }
+  const targets = Array.from(targetByBotId.values());
+  operatorMentionGuide = buildOperatorMentionGuide(targets);
+  if (operatorMentionGuide) {
+    console.log(
+      `[operator] mention guide ready: ${targets.map((target) => `${target.botId}:${target.mention}`).join(', ')}`,
+    );
+  }
 }
 
 interface ParsedRoute {
@@ -1314,6 +1389,20 @@ async function dispatchToInbox(args: {
   } catch (err) {
     const e = err as Error;
     console.error(`[${fromBot}] inbox.write(${toBot}) failed:`, e.message);
+    // G6: inbox write 실패 시 위에서 만든 active commitment 를 failed 로 마감한다.
+    // 안 하면 active 인 채 남아 24h 후 stale_auto 로만 reap → 그동안 다음 dispatch 가 막힘.
+    try {
+      await pool.query(
+        `UPDATE semo.bot_commitments
+           SET status = 'failed',
+               metadata = COALESCE(metadata, '{}'::jsonb)
+                 || jsonb_build_object('fail_reason', 'inbox_write_failed', 'failed_at', NOW())
+         WHERE id = $1 AND status = 'active'`,
+        [commitmentId],
+      );
+    } catch (markErr) {
+      console.warn(`[${fromBot}] commitment fail-mark failed:`, (markErr as Error).message);
+    }
     return { commitmentId: null, error: e.message };
   }
 
@@ -1725,6 +1814,19 @@ async function handleOrchestrator(
     `[${cfg.botId}] received from ${senderName} in ${msg.channel}: ${msg.text.slice(0, 120)}`,
   );
 
+  // operator(personaAdmin)는 지정 관리 채널 밖에서는 동작하지 않는다 — 전용 앱이 다른 채널에
+  // 초대돼 route_bot_id=operator 로 들어와도 방어(채널 게이트는 모든 전달 경로에서 강제).
+  if (cfg.personaAdmin && OPERATOR_ADMIN_CHANNEL && msg.channel !== OPERATOR_ADMIN_CHANNEL) {
+    await slack.postAsBot(
+      cfg.botId,
+      msg.channel,
+      ':lock: Operator 는 지정된 관리 채널에서만 사용할 수 있어요.',
+      replyThreadTs,
+    );
+    console.warn(`[${cfg.botId}] blocked outside admin channel (${msg.channel})`);
+    return;
+  }
+
   const adapter = orchestratorAdapters[cfg.botId];
   if (!adapter) {
     console.warn(`[${cfg.botId}] adapter not initialized`);
@@ -1748,47 +1850,100 @@ async function handleOrchestrator(
     return;
   }
 
-  // 사용자 식별 — KB lookup
-  const senderProfile = await resolveSenderProfile(msg.user);
   let promptWithContext = cleanText;
   let onboardingResult: { extracted: ExtractedProfile; domain?: string; saved: boolean } | null =
     null;
 
-  if (senderProfile.registered) {
+  if (msg.bot_id) {
     promptWithContext =
-      senderProfile.contextLines.join('\n') +
-      `\n\n# 사용자 요청\n${cleanText}` +
-      `\n\n# 가이드\n- 응답은 친근하게, 이름을 알고 있으면 호명. (예: "${senderProfile.nickname || senderProfile.domain}님")`;
+      `# 발화자 정보\n` +
+      `- Slack bot message (bot_id=${msg.bot_id}, slack_user_id=${msg.user}, display_name=${senderName})\n\n` +
+      `# 사용자 요청\n${cleanText}\n\n` +
+      `# 가이드\n- 발화자가 봇이면 자기소개/온보딩을 요청하지 말고 요청 자체만 처리하세요.`;
   } else {
-    // P1-A (2026-05-28): 미등록자가 자기소개 패턴을 보내면 자동 KB 박제 시도.
-    // 매칭 성공 시 그 자리에서 등록됨 → 봇은 환영 인사를 첫 응답으로.
-    // 매칭 실패 시 default 모드 + 자기소개 권유.
-    onboardingResult = await maybeOnboardSender({
-      slackUserId: msg.user,
-      senderName,
-      text: cleanText,
-    });
-
-    if (onboardingResult.saved && onboardingResult.domain) {
+    // 사용자 식별 — KB lookup. 봇 발화는 온보딩 대상이 아니므로 위에서 분리한다.
+    const senderProfile = await resolveSenderProfile(msg.user);
+    if (senderProfile.registered) {
       promptWithContext =
-        `# 신규 사용자 온보딩 성공\n` +
-        `- domain: ${onboardingResult.domain}\n` +
-        `- nickname: ${onboardingResult.extracted.nickname || senderName}\n` +
-        (onboardingResult.extracted.role ? `- role: ${onboardingResult.extracted.role}\n` : '') +
-        (onboardingResult.extracted.itFluency
-          ? `- it-fluency: ${onboardingResult.extracted.itFluency}\n`
-          : '') +
-        `\n# 사용자 메시지\n${cleanText}\n\n` +
-        `# 가이드\n- 따뜻하게 환영 인사 + 등록 완료 알림 (한두 줄). 그 다음 사용자 메시지가 라우팅/액션이 필요한 요청이면 정상 라우팅 진행. ` +
-        `자기소개 자체로 끝나는 메시지이면 라우팅 대신 환영 응답만 (ROUTE/ACTION 라인은 그래도 출력 — semiclaw 로 기본).`;
+        senderProfile.contextLines.join('\n') +
+        `\n\n# 사용자 요청\n${cleanText}` +
+        `\n\n# 가이드\n- 응답은 친근하게, 이름을 알고 있으면 호명. (예: "${senderProfile.nickname || senderProfile.domain}님")`;
     } else {
-      promptWithContext =
-        `# 발화자 정보\n- 미등록 사용자 (slack_id=${msg.user}, display_name=${senderName})\n\n` +
-        `## ONBOARDING_GREETING\n` +
-        `# 사용자 요청\n${cleanText}\n\n` +
-        `# 가이드\n- 처음 뵙는 분이라 친근하게 인사부터. 본 요청을 default 모드로 처리하되, ` +
-        `응답 끝에 한 줄 자기소개 권유: "혹시 어떻게 부르면 좋을까요? '재용이라고 불러요, 백엔드 개발자' 처럼 한 문장이면 충분해요. KB 에 자동 등록해드릴게요." ` +
-        `시스템 라인(ROUTE/ACTION) 은 정상 출력.`;
+      // P1-A (2026-05-28): 미등록자가 자기소개 패턴을 보내면 자동 KB 박제 시도.
+      // 매칭 성공 시 그 자리에서 등록됨 → 봇은 환영 인사를 첫 응답으로.
+      // 매칭 실패 시 default 모드 + 자기소개 권유.
+      onboardingResult = await maybeOnboardSender({
+        slackUserId: msg.user,
+        senderName,
+        text: cleanText,
+      });
+
+      if (onboardingResult.saved && onboardingResult.domain) {
+        promptWithContext =
+          `# 신규 사용자 온보딩 성공\n` +
+          `- domain: ${onboardingResult.domain}\n` +
+          `- nickname: ${onboardingResult.extracted.nickname || senderName}\n` +
+          (onboardingResult.extracted.role ? `- role: ${onboardingResult.extracted.role}\n` : '') +
+          (onboardingResult.extracted.itFluency
+            ? `- it-fluency: ${onboardingResult.extracted.itFluency}\n`
+            : '') +
+          `\n# 사용자 메시지\n${cleanText}\n\n` +
+          `# 가이드\n- 따뜻하게 환영 인사 + 등록 완료 알림 (한두 줄). 그 다음 사용자 메시지가 라우팅/액션이 필요한 요청이면 정상 라우팅 진행. ` +
+          `자기소개 자체로 끝나는 메시지이면 라우팅 대신 환영 응답만 (ROUTE/ACTION 라인은 그래도 출력 — semiclaw 로 기본).`;
+      } else {
+        promptWithContext =
+          `# 발화자 정보\n- 미등록 사용자 (slack_id=${msg.user}, display_name=${senderName})\n\n` +
+          `## ONBOARDING_GREETING\n` +
+          `# 사용자 요청\n${cleanText}\n\n` +
+          `# 가이드\n- 처음 뵙는 분이라 친근하게 인사부터. 본 요청을 default 모드로 처리하되, ` +
+          `응답 끝에 한 줄 자기소개 권유: "혹시 어떻게 부르면 좋을까요? '재용이라고 불러요, 백엔드 개발자' 처럼 한 문장이면 충분해요. KB 에 자동 등록해드릴게요." ` +
+          `시스템 라인(ROUTE/ACTION) 은 정상 출력.`;
+      }
+    }
+  }
+
+  // ① 대화 맥락 주입 — hermes 는 one-shot(세션 무기억)이라 매 메시지 직접 동봉해야 한다.
+  // thread 답글 + 채널 최근(당일) 메시지를 모아 프롬프트 앞에 붙인다.
+  try {
+    const threadHist = msg.thread_ts
+      ? (await slack.getThreadHistory(msg.channel, msg.thread_ts)).map((h) => ({
+          display_name: h.displayName,
+          text: h.text,
+          is_bot: h.isBotMessage,
+        }))
+      : [];
+    // 당일 00:00(로컬) 이후 채널 메시지. 현재 메시지는 제외.
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const oldestTs = (startOfDay.getTime() / 1000).toFixed(6);
+    const channelHist = (
+      await slack.getChannelHistory(msg.channel, { limit: 40, oldestTs, excludeTs: msg.ts })
+    ).map((h) => ({ display_name: h.displayName, text: h.text, is_bot: h.isBotMessage }));
+
+    const convoBlock = buildConversationContextBlock(threadHist, channelHist);
+    if (convoBlock) {
+      promptWithContext = `${convoBlock}\n\n${promptWithContext}`;
+    }
+    console.log(
+      `[${cfg.botId}] context injected (thread=${threadHist.length}, channel=${channelHist.length})`,
+    );
+  } catch (err) {
+    console.warn(`[${cfg.botId}] context fetch failed (non-fatal):`, (err as Error).message);
+  }
+
+  // operator: 현재 base persona(SOUL) 들을 프롬프트에 주입 (operator 는 도구가 없으므로 이걸 보고 제안).
+  if (cfg.personaAdmin) {
+    try {
+      const personas = await listActivePersonas(pool);
+      const block = buildPersonaContextBlock(personas);
+      const codeGuide = OPERATOR_CODE_ENABLED ? buildOperatorCodeGuide() : '';
+      const operatorBlocks = [operatorMentionGuide, codeGuide, block].filter(Boolean);
+      if (operatorBlocks.length > 0) {
+        promptWithContext = `${operatorBlocks.join('\n\n')}\n\n${promptWithContext}`;
+      }
+      console.log(`[${cfg.botId}] persona context injected (${personas.length} personas)`);
+    } catch (err) {
+      console.warn(`[${cfg.botId}] persona context fetch failed:`, (err as Error).message);
     }
   }
 
@@ -1815,6 +1970,95 @@ async function handleOrchestrator(
       );
       console.warn(
         `[${cfg.botId}] empty response after ${elapsed}s (endReason=${result.endReason})`,
+      );
+      return;
+    }
+
+    // operator: 응답에 APPLY_PERSONA 블록이 있으면 base persona SoT 에 적용(컨펌 후 단계).
+    // 블록이 없으면(제안·대화) 아래 일반 경로로 그대로 게시.
+    if (cfg.personaAdmin) {
+      // 코드 변경 위임 — APPLY_CODE_TASK 블록이 있으면 headless 코딩 에이전트에 위임해 PR 생성.
+      const codeTask = parseApplyCodeTask(text);
+      if (codeTask) {
+        const proposal = text.split(/APPLY_CODE_TASK:/i)[0].trim();
+        if (!OPERATOR_CODE_ENABLED) {
+          await slack.postAsBot(
+            cfg.botId,
+            msg.channel,
+            `${proposal}\n\n:lock: 코드 변경 위임이 비활성화되어 있어요(\`OPERATOR_CODE_ENABLED=1\` 필요). 제안만 남깁니다.\n— ${cfg.botId} (${elapsed}s)`,
+            replyThreadTs,
+          );
+          return;
+        }
+        try {
+          const deps = createDefaultDeps({
+            repoRoot: OPERATOR_CODE_REPO_ROOT,
+            baseBranch: OPERATOR_CODE_BASE_BRANCH,
+          });
+          const r = await dispatchCodeTask(codeTask, deps);
+          let statusLine: string;
+          if (r.status === 'pr_open') {
+            statusLine = `:rocket: PR 생성됨 → ${r.prUrl}\nCI + reviewclaw 통과 시 자동 머지됩니다. (머지 후 slack-router 재기동해야 라이브)`;
+          } else if (r.status === 'needs_human_review') {
+            statusLine = `:warning: PR 생성됨이나 **allowlist 밖 변경 포함 → 자동 머지 차단**, 사람 리뷰 필요 → ${r.prUrl}\noffending: ${r.offending.join(', ')}`;
+          } else {
+            statusLine = `:information_source: 코딩 에이전트가 변경을 만들지 않았습니다(no-op). 브랜치 \`${r.branch}\`.`;
+          }
+          await slack.postAsBot(
+            cfg.botId,
+            msg.channel,
+            `${proposal}\n\n${statusLine}\n— ${cfg.botId} (${elapsed}s, code-task=\`${codeTask.slug}\`)`,
+            replyThreadTs,
+          );
+          console.log(
+            `[${cfg.botId}] code task dispatched slug=${codeTask.slug} status=${r.status} branch=${r.branch} by ${msg.user}`,
+          );
+        } catch (codeErr) {
+          await slack.postAsBot(
+            cfg.botId,
+            msg.channel,
+            `:warning: 코드 변경 위임 실패: \`${(codeErr as Error).message.slice(0, 200)}\``,
+            replyThreadTs,
+          );
+          console.warn(`[${cfg.botId}] code task dispatch failed:`, (codeErr as Error).message);
+        }
+        return;
+      }
+
+      const apply = parseApplyPersona(text);
+      if (apply) {
+        try {
+          const version = await applyPersona(pool, apply, msg.user || cfg.botId, SEMI_HERMES_HOME);
+          const proposal = text.split(/APPLY_PERSONA:/i)[0].trim();
+          await slack.postAsBot(
+            cfg.botId,
+            msg.channel,
+            `${proposal}\n\n:white_check_mark: \`${apply.slug}\` 행동을 **v${version}** 로 반영했어요. 프로토타입엔 즉시 적용됩니다.${apply.note ? `\n메모: ${apply.note}` : ''}\n\n— ${cfg.botId} (${elapsed}s, persona=\`${apply.slug}\`@v${version})`,
+            replyThreadTs,
+          );
+          console.log(
+            `[${cfg.botId}] persona applied ${apply.slug}→v${version} by ${msg.user} (endReason=${result.endReason})`,
+          );
+        } catch (applyErr) {
+          await slack.postAsBot(
+            cfg.botId,
+            msg.channel,
+            `:warning: 적용 실패: \`${(applyErr as Error).message.slice(0, 150)}\``,
+            replyThreadTs,
+          );
+          console.warn(`[${cfg.botId}] persona apply failed:`, (applyErr as Error).message);
+        }
+        return;
+      }
+      // APPLY 없음 → 제안/대화. 그대로 게시.
+      await slack.postAsBot(
+        cfg.botId,
+        msg.channel,
+        `${text}\n\n— ${cfg.botId} (${elapsed}s)`,
+        replyThreadTs,
+      );
+      console.log(
+        `[${cfg.botId}] persona-admin proposal (${elapsed}s, endReason=${result.endReason})`,
       );
       return;
     }
@@ -2006,6 +2250,18 @@ async function routeDirectSlackAppMessage(
 async function handleSlackMessage(msg: SlackMessage, senderName: string): Promise<void> {
   // Colony 컨텍스트 메모리 수집: 모든 유저 메시지를 버퍼링 후 주기 flush.
   recordColonyContextSample(msg, senderName);
+
+  // Operator — base persona(SOUL) 편집 모드. 지정 관리 채널 + @오퍼레이터/@operator 키워드로만.
+  // 채널 게이트로 접근 제한하므로 route_bot_id 무관. Semi orchestrator 가 가로채기 전에 최우선 체크.
+  if (
+    ORCHESTRATORS[OPERATOR_BOT_ID] &&
+    OPERATOR_ADMIN_CHANNEL &&
+    msg.channel === OPERATOR_ADMIN_CHANNEL &&
+    shouldTriggerOperatorAdminRoute(msg.text, operatorMentionToken)
+  ) {
+    await handleOrchestrator(msg, senderName, ORCHESTRATORS[OPERATOR_BOT_ID]);
+    return;
+  }
 
   // 0. Hermes-backed orchestrators (Semi / Colony) — MUST be checked BEFORE SemoBot
   // deterministic handler so that PING_ALIASES ("테스트" 등) 가 멘션을 가로채지 않는다.
@@ -2233,6 +2489,7 @@ async function start(): Promise<void> {
 
   // 4. Start Slack Socket Mode
   await Promise.all(inboundSlacks.map((gateway) => gateway.start()));
+  refreshOperatorMentionGuide();
   console.log('[slack-router] Slack connected');
 
   // 5. Start outbox reader

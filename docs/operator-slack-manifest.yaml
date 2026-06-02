@@ -1,0 +1,93 @@
+# SEMO Operator — Slack app manifest (설치 가능 최대 권한 세트, bot-only)
+# 차세대 자동화(triggers/datastore)·canvases·lists·conversations.connect·assistant:write 등
+# 기능/플랜 게이팅 스코프는 install 거부되므로 제외. user 스코프는 런타임 불요라 제거.
+_metadata:
+  major_version: 2
+  minor_version: 1
+display_information:
+  name: SEMO Operator
+  description:
+    SEMO base-agent persona(SOUL) 편집 전용 오퍼레이터. 관리 채널에서 @오퍼레이터 멘션으로 행동 규칙을
+    컨펌 기반 수정.
+  background_color: '#3a2a6b'
+  long_description:
+    SEMO Operator 는 base persona(SOUL) SoT 를 슬랙에서 컨펌 기반으로 수정하는 운영자
+    전용 봇이다. 도구를 직접 실행하지 않는 대화형 봇이며, 응답의 APPLY_PERSONA 블록을 slack-router 가 파싱해 agent_personas
+    DB 와 hermes 프로토타입 SOUL.md 에 반영한다. 보안상 지정된 관리 채널에만 초대해 사용한다.
+features:
+  app_home:
+    home_tab_enabled: false
+    messages_tab_enabled: true
+    messages_tab_read_only_enabled: false
+  bot_user:
+    display_name: Operator
+    always_online: true
+oauth_config:
+  scopes:
+    bot:
+      - app_mentions:read
+      - chat:write
+      - chat:write.public
+      - chat:write.customize
+      - commands
+      - channels:history
+      - channels:read
+      - channels:join
+      - channels:manage
+      - channels:write.invites
+      - channels:write.topic
+      - groups:history
+      - groups:read
+      - groups:write
+      - groups:write.invites
+      - groups:write.topic
+      - im:history
+      - im:read
+      - im:write
+      - mpim:history
+      - mpim:read
+      - mpim:write
+      - users:read
+      - users:read.email
+      - users:write
+      - users.profile:read
+      - users.profile:write
+      - reactions:read
+      - reactions:write
+      - pins:read
+      - pins:write
+      - bookmarks:read
+      - bookmarks:write
+      - files:read
+      - files:write
+      - remote_files:read
+      - remote_files:write
+      - remote_files:share
+      - reminders:read
+      - reminders:write
+      - dnd:read
+      - dnd:write
+      - emoji:read
+      - team:read
+      - usergroups:read
+      - usergroups:write
+      - links:read
+      - links:write
+      - metadata.message:read
+      - calls:read
+      - calls:write
+settings:
+  org_deploy_enabled: false
+  socket_mode_enabled: true
+  token_rotation_enabled: false
+  event_subscriptions:
+    bot_events:
+      - app_mention
+      - message.channels
+      - message.groups
+      - message.im
+      - message.mpim
+      - reaction_added
+      - reaction_removed
+  interactivity:
+    is_enabled: true

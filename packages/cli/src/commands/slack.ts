@@ -4,11 +4,14 @@
  * 2026-05-07: --as <botId> 가 주어지면 그 봇의 Slack App 토큰
  * ({BOTID}_SLACK_BOT_TOKEN) 으로 발송한다 (진짜 봇 명의). 토큰 누락 시
  * SemoBot 본진(SLACK_BOT_TOKEN) 으로 fallback. username/icon_emoji 위장 폐기.
+ *
+ * 2026-06-02: SEMO_REPLY_WRAP_PERSONA=1 또는 SEMO_UNIFIED_SLACK_SENDER_BOT_ID 설정 시
+ * legacy *claw 발신은 Semi 같은 통합 Slack App 토큰으로 전환한다.
  */
 
 import { Command } from 'commander';
 import chalk from 'chalk';
-import { isUsageRejection } from '@team-semicolon/semo-common';
+import { isUsageRejection, resolveSlackSenderBotId } from '@team-semicolon/semo-common';
 
 /**
  * 봇 ID 추론 우선순위 (--as 미지정 시):
@@ -24,16 +27,17 @@ function inferBotId(): string | undefined {
 }
 
 function getToken(botId?: string): string {
-  if (botId) {
-    const key = `${botId.replace(/-/g, '_').toUpperCase()}_SLACK_BOT_TOKEN`;
+  const senderBotId = resolveSlackSenderBotId(botId);
+  if (senderBotId) {
+    const key = `${senderBotId.replace(/-/g, '_').toUpperCase()}_SLACK_BOT_TOKEN`;
     const dedicated = process.env[key];
     if (dedicated) return dedicated;
     // SemoBot 흡수 봇 (incubator/kb-sidekick) 또는 토큰 미발급 봇은 조용히 fallback.
     const SEMOBOT_FALLBACK = new Set(['semobot', 'incubator', 'kb-sidekick']);
-    if (!SEMOBOT_FALLBACK.has(botId)) {
+    if (!SEMOBOT_FALLBACK.has(senderBotId)) {
       console.error(
         chalk.yellow(
-          `[slack] No dedicated token for '${botId}' (env ${key} missing) — falling back to SemoBot token`,
+          `[slack] No dedicated token for '${senderBotId}' (env ${key} missing) — falling back to SemoBot token`,
         ),
       );
     }
@@ -181,6 +185,7 @@ export function registerSlackCommands(program: Command): void {
         }
 
         const effectiveAs = opts.as ?? inferBotId();
+        const effectiveSender = resolveSlackSenderBotId(effectiveAs);
         const token = getToken(effectiveAs);
 
         const body: Record<string, unknown> = {
@@ -208,7 +213,7 @@ export function registerSlackCommands(program: Command): void {
           };
 
           if (!data.ok) {
-            const senderLabel = effectiveAs ? `'${effectiveAs}'` : 'SemoBot';
+            const senderLabel = effectiveSender ? `'${effectiveSender}'` : 'SemoBot';
             const hint =
               data.error === 'not_in_channel' ? ` (${senderLabel} 봇을 채널에 초대하세요)` : '';
             console.error(chalk.red(`Slack API 오류: ${data.error}${hint}`));

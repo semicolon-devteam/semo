@@ -14,6 +14,7 @@ export { StaticRouter, type StaticRouterOptions } from './router/static-router.j
 export { FALLBACK_BOT_IDS, SLACK_PROFILES, type BotId } from './slack/bot-config.js';
 export {
   getWebClientForBot,
+  resolveSlackSenderBotId,
   resetBotWebClientPool,
   listBotsWithDedicatedToken,
 } from './slack/bot-web-client-pool.js';
