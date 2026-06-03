@@ -57,6 +57,28 @@ import {
 } from './operator-persona.js';
 import { parseApplyCodeTask, buildOperatorCodeGuide } from './operator-code-task.js';
 import { dispatchCodeTask, createDefaultDeps } from './operator-code-dispatch.js';
+import {
+  buildInternalRoster,
+  buildRosterContextBlock,
+  parseBotIdsDisplayMeta,
+  isRoutable,
+  stripRouteSystemLines,
+  FALLBACK_ROSTER,
+  type ResolvedRoster,
+  type BotDisplayMeta,
+} from './semi-roster.js';
+
+// Semi roster 데이터화 (계획: ~/.claude/plans/a-fluffy-grove.md). 단계적 롤아웃 flag.
+// SEMI_ROSTER_INJECTION: Semi 프롬프트에 internal roster 주입 on/off (기본 on, canary).
+// SEMI_ROUTE_VALIDATION: 'off' | 'log-only'(기본) | 'enforce'. enforce 시 roster 밖 ROUTE 차단.
+const SEMI_ROSTER_INJECTION =
+  process.env.SEMI_ROSTER_INJECTION !== '0' && process.env.SEMI_ROSTER_INJECTION !== 'false';
+const SEMI_ROUTE_VALIDATION = (process.env.SEMI_ROUTE_VALIDATION || 'log-only').toLowerCase(); // off|log-only|enforce
+let SEMI_INTERNAL_ROSTER: ResolvedRoster = {
+  entries: FALLBACK_ROSTER,
+  audience: 'internal',
+  source: 'internal-openclaw',
+};
 
 // Cmux ancestry guard — daemon(launchd/nohup) 화 감지 시 즉시 종료.
 // 배경: cmux nudge 는 cmux pane 자손 프로세스만 허용하므로 daemon 화되면 침묵 실패.
@@ -1947,6 +1969,18 @@ async function handleOrchestrator(
     }
   }
 
+  // Semi: 라우팅 가능한 internal roster 를 프롬프트에 주입(SOUL.md 하드코딩 대체).
+  // routing 블록엔 internal 만 노출(One Agent Experience). 현재 컨텍스트 = 내부(프로토타입).
+  if (cfg.canManageAgents && SEMI_ROSTER_INJECTION) {
+    const block = buildRosterContextBlock(SEMI_INTERNAL_ROSTER);
+    if (block) {
+      promptWithContext = `${block}\n\n${promptWithContext}`;
+      console.log(
+        `[${cfg.botId}] roster injected(internal, ${SEMI_INTERNAL_ROSTER.entries.length})`,
+      );
+    }
+  }
+
   try {
     const session = await adapter.startSession({ botId: cfg.botId });
     const result = await adapter.dispatch({
@@ -2065,6 +2099,36 @@ async function handleOrchestrator(
 
     if (cfg.responseKind === 'route') {
       const parsed = parseRouteResponse(text);
+
+      // roster 검증 (Semi 한정) — roster 밖/non-dispatchable 봇 ROUTE 차단. log-only 면 로깅만.
+      if (
+        cfg.canManageAgents &&
+        SEMI_ROUTE_VALIDATION !== 'off' &&
+        parsed.bot &&
+        parsed.handoff &&
+        parsed.bot !== cfg.botId
+      ) {
+        const route = isRoutable(SEMI_INTERNAL_ROSTER, parsed.bot);
+        if (!route.ok) {
+          if (SEMI_ROUTE_VALIDATION === 'enforce') {
+            // inbox/commitment 미생성 + 시스템 라인 제거 + 별도 안내 (원문 post 금지).
+            const cleaned = stripRouteSystemLines(text);
+            await slack.postAsBot(
+              cfg.botId,
+              msg.channel,
+              `${cleaned ? cleaned + '\n\n' : ''}:information_source: \`${parsed.bot}\` 는 지금 라우팅 가능한 대상이 아니에요. 제가 직접 도와드리거나 한 가지만 더 여쭤볼게요.\n\n— ${cfg.botId} (${elapsed}s)`,
+              replyThreadTs,
+            );
+            console.warn(
+              `[${cfg.botId}] route BLOCKED (${route.reason}): ${parsed.bot} (endReason=${result.endReason})`,
+            );
+            return;
+          }
+          console.warn(
+            `[${cfg.botId}] route would-block (${route.reason}): ${parsed.bot} [log-only]`,
+          );
+        }
+      }
 
       // 1) ROUTE — 전문 작업을 해당 봇 inbox 에 dispatch (commitment INSERT → 완료 시 outbox reply 가 마감).
       if (parsed.bot && parsed.handoff && parsed.bot !== cfg.botId) {
@@ -2474,6 +2538,30 @@ async function start(): Promise<void> {
   console.log(
     `[openclaw-bots] source=${openclawSource} bots=[${[...openclawBots].sort().join(',')}]`,
   );
+
+  // Semi internal roster 빌드 (OPENCLAW_BOTS = dispatch SoT, KB bot-ids content = 표시명/역할 보조).
+  try {
+    let displayMeta: Map<string, BotDisplayMeta> | undefined;
+    try {
+      const kb = await pool.query<{ content: string }>(
+        `SELECT content FROM semo.knowledge_base
+          WHERE domain = 'semo' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '') LIMIT 1`,
+      );
+      if (kb.rows[0]?.content) displayMeta = parseBotIdsDisplayMeta(kb.rows[0].content);
+    } catch {
+      /* 보조 메타 실패 — botId fallback */
+    }
+    const entries = buildInternalRoster(OPENCLAW_BOTS, displayMeta);
+    if (entries.length > 0) {
+      SEMI_INTERNAL_ROSTER = { entries, audience: 'internal', source: 'internal-openclaw' };
+    }
+    console.log(
+      `[semi-roster] internal bots=[${entries.map((e) => e.botId).join(',')}] injection=${SEMI_ROSTER_INJECTION ? 'on' : 'off'} validation=${SEMI_ROUTE_VALIDATION}`,
+    );
+  } catch (err) {
+    console.warn('[semi-roster] build failed, using fallback:', (err as Error).message);
+  }
+
   buildHealthMonitor();
 
   // 2. Load routing config + incubator channel filter + initial stale reap
