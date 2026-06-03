@@ -139,6 +139,28 @@ function semoMailboxDir(): string {
   return process.env.SEMO_MAILBOX_DIR ?? path.join(os.homedir(), '.semo', 'mailbox');
 }
 
+/**
+ * 동적 에이전트 personaEnvelope 로드 — agent_personas.soul_md 우선, 없으면 agent_definitions.persona_prompt.
+ * 둘 다 없으면 undefined(envelope 없이 base profile 행동으로 fallback).
+ */
+async function loadPersonaEnvelope(botId: string): Promise<string | undefined> {
+  const pool = getPool();
+  try {
+    const p = await pool.query<{ soul_md: string }>(
+      `SELECT soul_md FROM semo.agent_personas WHERE slug = $1 AND status = 'active' LIMIT 1`,
+      [botId],
+    );
+    if (p.rows[0]?.soul_md) return p.rows[0].soul_md;
+    const d = await pool.query<{ persona_prompt: string }>(
+      `SELECT persona_prompt FROM semo.agent_definitions WHERE name = $1 LIMIT 1`,
+      [botId],
+    );
+    return d.rows[0]?.persona_prompt || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function loadBotRecord(botId: string): Promise<BotRecord | null> {
   const pool = getPool();
   const r = await pool.query(
@@ -536,6 +558,20 @@ export function registerRuntimeCommands(program: Command): void {
           opts.hermesHome = plan.home ?? undefined;
           opts.hermesProfile = plan.profile;
         }
+
+        // 동적 에이전트: DB 정의(agent_personas.soul_md / agent_definitions.persona_prompt)를
+        // personaEnvelope 로 로드해 dispatch 시 in-band 주입(per-agent profile 불필요).
+        // config.use_persona_envelope 인 봇만 — 기존 profile-기반 봇(Semi/Colony)은 자기 SOUL.md 사용(무변).
+        let dynamicPersonaEnvelope: string | undefined;
+        if ((bot.config as Record<string, unknown> | undefined)?.use_persona_envelope) {
+          dynamicPersonaEnvelope = await loadPersonaEnvelope(opts.bot);
+          console.log(
+            chalk.dim(
+              `[serve] persona envelope ${dynamicPersonaEnvelope ? `loaded (${dynamicPersonaEnvelope.length} chars)` : 'not found in DB'}`,
+            ),
+          );
+        }
+
         const m = await loadCommon();
         const adapter = buildAdapterFromHostKind(m, hostKind, bot, {
           openclawBinary: opts.openclawBinary,
@@ -626,6 +662,7 @@ export function registerRuntimeCommands(program: Command): void {
                   botId: opts.bot,
                   session,
                   prompt: composePrompt(msg),
+                  personaEnvelope: dynamicPersonaEnvelope,
                   timeoutMs,
                   context: { runtimeSessionReused: sessionReused, runtimeSessionKey: sessionKey },
                 });
