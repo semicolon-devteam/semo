@@ -492,6 +492,35 @@ export function registerRuntimeCommands(program: Command): void {
           await closeConnection();
           process.exit(1);
         }
+
+        // 봇당 워커 1 보장 (Codex #4: migration 089 는 동시성 보장 아님 → 별도 claim lock).
+        // 전용 connection 에 session-level advisory lock 을 잡고 워커 생애 동안 유지(에이전트별 순차 큐).
+        // 다른 워커가 이미 점유 중이면 즉시 종료(중복 워커·경쟁 방지). 프로세스 종료 시 자동 해제.
+        const lockClient = await getPool().connect();
+        const lockKey = `semo-serve:${opts.bot}`;
+        const lockRes = await lockClient.query<{ locked: boolean }>(
+          `SELECT pg_try_advisory_lock(hashtext($1)) AS locked`,
+          [lockKey],
+        );
+        if (!lockRes.rows[0]?.locked) {
+          console.error(chalk.yellow(`⏭  '${opts.bot}' 워커가 이미 실행 중 — 종료(중복 방지).`));
+          lockClient.release();
+          await closeConnection();
+          process.exit(0);
+        }
+        const releaseLock = () => {
+          try {
+            lockClient.release();
+          } catch {
+            /* 종료 경로 — 무시 */
+          }
+        };
+        process.once('exit', releaseLock);
+        process.once('SIGTERM', () => {
+          releaseLock();
+          process.exit(0);
+        });
+
         const hostKind = bot.config?.host_kind ?? 'claude-code';
         if (hostKind === 'hermes-cli' || hostKind === 'hermes-desktop') {
           const plan = buildHermesProvisionPlan({
