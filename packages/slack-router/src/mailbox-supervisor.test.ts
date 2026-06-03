@@ -20,6 +20,7 @@ function makeSup(over = {}) {
     spawnFn: fn as any,
     log: () => {},
     respawnBackoffMs: 1000,
+    idleExitMs: 0, // 기존 args 단언 보존 — idle-exit 는 전용 테스트에서 검증
     ...over,
   });
   return { sup, fn, children };
@@ -34,6 +35,19 @@ describe('MailboxSupervisor', () => {
     expect(fn.mock.calls[0][0]).toBe('semo');
     expect(fn.mock.calls[0][1]).toEqual(['runtime', 'serve', '--bot', 'jumuni']);
     expect(sup.activeBots()).toEqual(['jumuni']);
+  });
+
+  it('idleExitMs>0 이면 spawn args 에 --idle-exit-ms 주입', () => {
+    const { sup, fn } = makeSup({ serveCommand: ['semo'], idleExitMs: 60_000 });
+    expect(sup.ensureWorker('jumuni')).toBe('spawned');
+    expect(fn.mock.calls[0][1]).toEqual([
+      'runtime',
+      'serve',
+      '--bot',
+      'jumuni',
+      '--idle-exit-ms',
+      '60000',
+    ]);
   });
 
   it('워커 종료 후 백오프 내 재spawn 금지, 백오프 후 재spawn', () => {

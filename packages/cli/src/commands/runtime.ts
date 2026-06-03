@@ -459,6 +459,11 @@ export function registerRuntimeCommands(program: Command): void {
     .requiredOption('--bot <id>', '봇 식별자 (bot_status.bot_id)')
     .option('--interval-ms <n>', '폴링 주기 ms', '5000')
     .option('--once', '한 번만 처리하고 종료 (테스트용)')
+    .option(
+      '--idle-exit-ms <n>',
+      'forever 모드에서 이 시간(ms) 동안 새 메시지가 없으면 종료 (ephemeral 워커; 0=비활성)',
+      '0',
+    )
     .option('--openclaw-binary <path>', 'openclaw 바이너리 절대경로 (PATH 미등록 환경)')
     .option('--hermes-binary <path>', 'hermes 바이너리 절대경로 (PATH 미등록 환경)')
     .option('--hermes-home <path>', 'Hermes HERMES_HOME 격리 디렉토리')
@@ -483,6 +488,7 @@ export function registerRuntimeCommands(program: Command): void {
         bot: string;
         intervalMs: string;
         once?: boolean;
+        idleExitMs?: string;
         openclawBinary?: string;
         hermesBinary?: string;
         hermesHome?: string;
@@ -612,6 +618,7 @@ export function registerRuntimeCommands(program: Command): void {
 
         const intervalMs = Math.max(1000, Number(opts.intervalMs));
         const timeoutMs = Math.max(5000, Number(opts.timeoutMs));
+        const idleExitMs = Math.max(0, Number(opts.idleExitMs ?? 0));
         const sessionTtlMs = Math.max(0, Number(opts.sessionTtlMs));
         if (opts.resetSessionMap && fs.existsSync(sessionMapPath)) fs.unlinkSync(sessionMapPath);
 
@@ -620,7 +627,9 @@ export function registerRuntimeCommands(program: Command): void {
         console.log(`  host_kind:  ${chalk.green(hostKind)} (${probe.detail ?? 'ok'})`);
         console.log(`  mailbox:    ${chalk.gray(mboxDir)}`);
         console.log(`  interval:   ${intervalMs}ms`);
-        console.log(`  mode:       ${opts.once ? 'once' : 'forever'}\n`);
+        console.log(
+          `  mode:       ${opts.once ? 'once' : idleExitMs > 0 ? `ephemeral(idle-exit ${idleExitMs}ms)` : 'forever'}\n`,
+        );
 
         let stopRequested = false;
         const onShutdown = (signal: string) => {
@@ -636,11 +645,13 @@ export function registerRuntimeCommands(program: Command): void {
 
         let totalProcessed = 0;
         let totalErrors = 0;
+        let lastActivityAt = Date.now();
 
         while (!stopRequested) {
           fs.writeFileSync(heartbeatPath, new Date().toISOString());
           try {
             const newMessages = readNewInboxMessages(inboxPath, consumedPath);
+            if (newMessages.length > 0) lastActivityAt = Date.now();
             for (const msg of newMessages) {
               if (stopRequested) break;
               if (msg.type !== 'message') {
@@ -748,6 +759,14 @@ export function registerRuntimeCommands(program: Command): void {
             console.error(chalk.red(`[serve] poll error: ${(err as Error).message}`));
           }
           if (opts.once) break;
+          // ephemeral 워커: idle 이 idleExitMs 를 넘으면 큐가 빈 것으로 보고 종료
+          // (supervisor 가 새 inbox 도착 시 재spawn). 처리 직후엔 lastActivityAt 갱신되어 즉시 종료 안 함.
+          if (idleExitMs > 0 && Date.now() - lastActivityAt >= idleExitMs) {
+            console.log(
+              chalk.gray(`\n[serve] idle ${idleExitMs}ms 초과 — 큐 비어 종료(ephemeral).`),
+            );
+            break;
+          }
           await sleep(intervalMs);
         }
 

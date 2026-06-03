@@ -21,6 +21,8 @@ export interface SupervisorOptions {
   maxWorkers?: number;
   /** 같은 봇 재spawn 최소 간격(ms) — crash loop 방지. */
   respawnBackoffMs?: number;
+  /** 워커 ephemeral idle-exit (ms). serve 가 이 시간 동안 새 메시지 없으면 종료 → 다음 도착 시 재spawn. 0=forever. */
+  idleExitMs?: number;
   /** 워커 로그 파일 디렉토리(없으면 부모 stdio inherit). */
   logDir?: string;
   /** spawn 함수 주입(테스트용). */
@@ -42,6 +44,7 @@ export class MailboxSupervisor {
   private readonly cwd: string;
   private readonly maxWorkers: number;
   private readonly respawnBackoffMs: number;
+  private readonly idleExitMs: number;
   private readonly spawnFn: typeof spawn;
   private readonly env: NodeJS.ProcessEnv;
   private readonly log: (msg: string) => void;
@@ -52,6 +55,7 @@ export class MailboxSupervisor {
     this.cwd = opts.cwd ?? process.cwd();
     this.maxWorkers = opts.maxWorkers ?? 12;
     this.respawnBackoffMs = opts.respawnBackoffMs ?? 15_000;
+    this.idleExitMs = opts.idleExitMs ?? 60_000;
     this.spawnFn = opts.spawnFn ?? spawn;
     this.env = opts.env ?? process.env;
     this.log = opts.log ?? ((m) => console.log(m));
@@ -86,6 +90,8 @@ export class MailboxSupervisor {
   private spawnWorker(botId: string): void {
     const [cmd, ...preArgs] = this.serveCommand;
     const args = [...preArgs, 'runtime', 'serve', '--bot', botId];
+    // ephemeral: idle 초과 시 워커 자가 종료 → 새 inbox 도착 시 supervisor 가 재spawn (좀비/유휴 방지).
+    if (this.idleExitMs > 0) args.push('--idle-exit-ms', String(this.idleExitMs));
     const child = this.spawnFn(cmd, args, {
       cwd: this.cwd,
       env: this.env,
