@@ -67,6 +67,7 @@ import {
   type ResolvedRoster,
   type BotDisplayMeta,
 } from './semi-roster.js';
+import { MailboxSupervisor } from './mailbox-supervisor.js';
 
 // Semi roster 데이터화 (계획: ~/.claude/plans/a-fluffy-grove.md). 단계적 롤아웃 flag.
 // SEMI_ROSTER_INJECTION: Semi 프롬프트에 internal roster 주입 on/off (기본 on, canary).
@@ -150,6 +151,29 @@ const slack = new SlackGateway(SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SEMO_PRIMARY_BO
 const inboundSlacks: SlackGateway[] = [slack];
 const inboxWriter = new InboxWriter(MAILBOX_DIR);
 const busyDetector = new BusyDetector(MAILBOX_DIR);
+
+// mailbox-supervisor — opt-in 봇(config.serve_worker_enabled) inbox 도착 시 serve 워커 spawn(콜드스타트).
+// 라이브 OpenClaw 7봇은 플래그 없음 → 미관리(socket-mode 유지). 부팅 시 SERVE_WORKER_BOTS 로드.
+const mailboxSupervisor = new MailboxSupervisor({ cwd: process.cwd(), env: process.env });
+let SERVE_WORKER_BOTS: Set<string> = new Set();
+async function loadServeWorkerBots(): Promise<void> {
+  try {
+    const r = await pool.query<{ bot_id: string }>(
+      `SELECT bot_id FROM semo.bot_status WHERE (config->>'serve_worker_enabled') = 'true'`,
+    );
+    SERVE_WORKER_BOTS = new Set(r.rows.map((x) => x.bot_id));
+    console.log(`[supervisor] serve-worker bots=[${[...SERVE_WORKER_BOTS].join(',')}]`);
+  } catch (err) {
+    console.warn('[supervisor] serve-worker bots load failed:', (err as Error).message);
+  }
+}
+/** opt-in 봇이면 워커 보장(콜드스타트). 그 외(라이브 socket 봇)는 no-op. */
+function maybeSuperviseWorker(botId: string): void {
+  if (SERVE_WORKER_BOTS.has(botId)) {
+    const r = mailboxSupervisor.ensureWorker(botId);
+    if (r === 'spawned') console.log(`[supervisor] ensureWorker(${botId}) → spawned`);
+  }
+}
 
 function appTokenEnvKeyFor(botId: string): string {
   return `${botId.replace(/-/g, '_').toUpperCase()}_SLACK_APP_TOKEN`;
@@ -1408,6 +1432,7 @@ async function dispatchToInbox(args: {
       text: handoff,
       route_reason: `${fromBot}-orchestrator-dispatch`,
     });
+    maybeSuperviseWorker(toBot); // 콜드스타트: opt-in 봇이면 serve 워커 spawn
   } catch (err) {
     const e = err as Error;
     console.error(`[${fromBot}] inbox.write(${toBot}) failed:`, e.message);
@@ -2306,6 +2331,7 @@ async function routeDirectSlackAppMessage(
     thread_history: threadHistory,
   });
 
+  maybeSuperviseWorker(policy.botId); // 콜드스타트
   console.log(
     `[router] ${senderName} → ${policy.botId} (${policy.routeReason}, direct_app=${botId}) [${msgId.slice(0, 8)}]`,
   );
@@ -2515,6 +2541,7 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
     routing_hint: routingHint,
     thread_history: threadHistory,
   });
+  maybeSuperviseWorker(botId); // 콜드스타트
 
   console.log(
     `[router] ${senderName} → ${botId} (${routeReason}` +
@@ -2562,6 +2589,8 @@ async function start(): Promise<void> {
     console.warn('[semi-roster] build failed, using fallback:', (err as Error).message);
   }
 
+  await loadServeWorkerBots(); // mailbox-supervisor 대상(opt-in) 봇 로드
+
   buildHealthMonitor();
 
   // 2. Load routing config + incubator channel filter + initial stale reap
@@ -2599,6 +2628,7 @@ async function start(): Promise<void> {
 
 async function shutdown(): Promise<void> {
   console.log('[slack-router] Shutting down...');
+  mailboxSupervisor.shutdown(); // 자식 serve 워커에 SIGTERM 전파(좀비 방지)
   healthMonitor?.stop();
   outboxReader.stop();
   await Promise.all(inboundSlacks.map((gateway) => gateway.stop().catch(() => {})));
