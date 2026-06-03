@@ -44,6 +44,7 @@ interface HostAdapterLike {
     botId: string;
     session: { hostSessionId: string; rolloutPath?: string };
     prompt: string;
+    personaEnvelope?: string;
     timeoutMs?: number;
     context?: Record<string, unknown>;
   }): Promise<{
