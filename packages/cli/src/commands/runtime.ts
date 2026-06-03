@@ -201,6 +201,7 @@ function buildAdapterFromHostKind(
       // bot.config.openclaw_workspace 의 부모 디렉토리를 workspaceParent 로 (~/.openclaw-{bot} 패턴 유지).
       return new m.OpenClawAdapter(ctorOpts);
     case 'ollama-cli':
+      ctorOpts.model = (bot.config as Record<string, unknown> | undefined)?.ollama_model;
       return new m.OllamaCliAdapter(ctorOpts);
     case 'hermes-cli':
       if (opts.hermesBinary) ctorOpts.binaryPath = opts.hermesBinary;
@@ -662,8 +663,10 @@ export function registerRuntimeCommands(program: Command): void {
                 const r = await adapter.dispatch({
                   botId: opts.bot,
                   session,
-                  prompt: composePrompt(msg),
-                  personaEnvelope: dynamicPersonaEnvelope,
+                  // 동적 에이전트 행동 envelope 를 프롬프트에 prepend (adapter-agnostic — ollama/codex 등 모두 적용).
+                  prompt: dynamicPersonaEnvelope
+                    ? `# 당신의 정체성·행동 정의 (아래 에이전트로서 응답한다)\n${dynamicPersonaEnvelope}\n\n---\n\n${composePrompt(msg)}`
+                    : composePrompt(msg),
                   timeoutMs,
                   context: { runtimeSessionReused: sessionReused, runtimeSessionKey: sessionKey },
                 });
