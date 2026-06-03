@@ -189,20 +189,31 @@ export class HermesCliAdapter implements HostAdapter {
   }
 
   private wrapPrompt(input: HostDispatchInput): string {
-    if (!this.semoRole) return input.prompt;
-    return [
-      'SEMO Runtime Context:',
-      `- bot_id: ${input.botId}`,
-      `- SEMO role: ${this.semoRole}`,
-      '- SEMO KB is the source of truth for durable Semicolon/SEMO team, service, process, and decision facts.',
-      '- Hermes memory is not SEMO source of truth.',
-      '- SEMO mailbox/outbox is the only Slack/Discord transport owner; do not use Hermes gateway or direct platform messaging.',
-      '- External mutation, publishing, messaging, deployment, or spending requires explicit user intent.',
-      '- If durable SEMO state changes, final response must include KB status: written, not-needed, or pending.',
-      '',
-      'User prompt:',
-      input.prompt,
-    ].join('\n');
+    const parts: string[] = [];
+    // 동적 에이전트 행동 envelope (DB 정의). per-agent profile/SOUL.md 없이도 정체성대로 실행.
+    if (input.personaEnvelope && input.personaEnvelope.trim()) {
+      parts.push(
+        '# 당신의 정체성·행동 정의 (아래 에이전트로서 응답한다)',
+        input.personaEnvelope.trim(),
+        '',
+      );
+    }
+    if (this.semoRole) {
+      parts.push(
+        'SEMO Runtime Context:',
+        `- bot_id: ${input.botId}`,
+        `- SEMO role: ${this.semoRole}`,
+        '- SEMO KB is the source of truth for durable Semicolon/SEMO team, service, process, and decision facts.',
+        '- Hermes memory is not SEMO source of truth.',
+        '- SEMO mailbox/outbox is the only Slack/Discord transport owner; do not use Hermes gateway or direct platform messaging.',
+        '- External mutation, publishing, messaging, deployment, or spending requires explicit user intent.',
+        '- If durable SEMO state changes, final response must include KB status: written, not-needed, or pending.',
+        '',
+      );
+    }
+    if (parts.length === 0) return input.prompt;
+    parts.push('User prompt:', input.prompt);
+    return parts.join('\n');
   }
 
   private shouldResume(input: HostDispatchInput): boolean {

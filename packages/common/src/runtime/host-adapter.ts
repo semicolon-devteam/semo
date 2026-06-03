@@ -85,6 +85,13 @@ export interface HostDispatchInput {
   channel?: HostDispatchChannel;
   /** 추가 컨텍스트 (KB lookup 결과, mailbox 메타 등 — channel 외 자유 필드). */
   context?: Record<string, unknown>;
+  /**
+   * 동적 에이전트 행동(persona) envelope — DB(agent_personas.soul_md / agent_definitions.persona_prompt)
+   * 에서 조립한 에이전트 정의를 프롬프트에 in-band 동봉한다. 이게 있으면 per-agent profile/SOUL.md 가
+   * 디스크에 없어도(동적 생성 직후) 에이전트가 자기 행동대로 실행된다(profile clone 불필요).
+   * 설계: docs/superpowers/specs/2026-06-03-dynamic-agent-runtime-redesign.md (Phase 2 envelope).
+   */
+  personaEnvelope?: string;
   /** 호출 cwd (Adapter 별 특화 — Claude Code 는 봇 세션 디렉토리). */
   cwd?: string;
   /** 호출 timeout (ms). 0 또는 undefined 면 호스트 기본값. */
