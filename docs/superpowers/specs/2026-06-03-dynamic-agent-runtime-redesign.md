@@ -1,0 +1,97 @@
+# 동적 에이전트 실행 런타임 재설계 (옵션 A — serve-worker on-demand)
+
+> 작성: 2026-06-03 · 트리거: "추후 동적으로 에이전트가 생성·위임·실행되도록 구조 자체를 재설계."
+> 워크플로우 매핑(5 에이전트) 근거. 사용자 결정 반영. **Codex 검토 후 Phase 1부터 구축.**
+
+## Context / 문제
+
+현 위임→실행이 **cmux-pane + mailbox nudge + 정적 봇목록 + OpenClaw socket**에 결합돼 동적이 불가:
+
+- **transport 불일치 (핵심)**: OpenClaw 7봇은 자체 socket-mode로 수신. Semi 오케스트레이터는 `dispatchToInbox`(index.ts:1357)로 mailbox에 씀 → OpenClaw 봇은 mailbox를 안 읽음 → **orphan, 영원히 미처리**(reviewclaw 멈춘 진짜 원인).
+- **콜드스타트 계층 부재**: 봇 깨우는 모든 경로(nudge inbox-writer.ts:153, pump, fs.watch)가 `surface-map`(botId→cmux surface, surface-map.ts:13) 또는 살아있는 세션 전제. surface-map 생성 스크립트(semo-agents-start.sh:204)는 2026-05-07 이후 미실행 → `/tmp/semo-surface-map.json` 부재 → **모든 nudge "no surface mapping" skip**.
+- **정적 6곳 하드코딩** + roster hot-reload 부재(loadOpenClawBots 부팅 1회, index.ts:523) → 동적 봇이 코드+재기동 요구.
+- **정의→Hermes 렌더러 부재** → 임의 DB 정의를 on-demand 실행 불가(정적 프로비저닝 선행).
+
+## 핵심 자산 (재사용)
+
+- **`runtime.ts serve`(L430-690)** — 이미 완성된 **cmux-free 범용 워커**. `bot_status.config.host_kind` DB 동적 조회(L495) → `buildAdapterFromHostKind`(L152-209, claude-code/codex/openclaw/ollama/hermes-cli/hermes-desktop) → inbox.jsonl 폴링(순차) → adapter.dispatch → outbox.jsonl + 실패 시 placeholder. **surface-map 의존 0, 봇이름 하드코딩 0.** → 동적 실행 엔진은 이미 존재.
+- **hermes-cli-adapter** — Semi/Colony/Operator 프로덕션 구동 중 + **seatless**(Claude seat 풀 무관 → 동적 다수 에이전트 유일 경로).
+- agent_personas(행동 SoT), semi-roster(데이터 roster), HostAdapter 추상화, bot_commitments(작업 추적), handleReplyPosted(완료 마감, index.ts:360).
+
+## 목표 아키텍처
+
+**모든 에이전트 실행을 serve-worker(mailbox→spawn→adapter→outbox) 단일 경로로 통합**하고 cmux/surface-map/socket-orchestrator-mismatch 제거.
+
+```
+Semi ROUTE / 직접 라우팅 → inbox.jsonl(에이전트별 큐) + bot_commitment(active)
+   → [mailbox-supervisor: 미처리 큐 있고 워커 없으면 spawn]
+   → serve-worker(child_process): 큐를 순차 drain (작업1→outbox→commitment done→작업2 …)
+      → host_kind=hermes-cli 면 wrapPrompt에 DB persona 동봉(clone 불필요)
+   → 큐 비면 워커 종료(ephemeral 경계). 대시보드는 에이전트별 active commitment 큐 표시.
+```
+
+### 사용자 결정 반영
+
+- **실행 모델 = 에이전트별 순차 큐**: 워커는 그 봇의 큐(inbox/active commitments)를 **한 번에 하나씩** 처리, 완료 후 다음. 큐 비면 종료. 동시성=봇당 1(migration 089 unique와 정합). **대시보드에서 에이전트별 큐 가시화**(active commitments ordered by created_at).
+- **정의 전달 = wrapPrompt에 persona 동봉**(hermes-cli-adapter.ts:191-206, `--ignore-rules`). profile clone 불필요 → 임의 DB 정의 즉시 실행.
+- **supervisor = slack-router child_process spawn**(cmux ancestry 불필요, daemon 금지 제약서 자유).
+- **범위 = Phase 1~4(내부)**. 고객 실행 브릿지(Phase 5)는 별도.
+
+## 마이그레이션 (Codex 검토 반영 — 재정렬. 라이브 무중단, 각 단계 독립 PR·롤백)
+
+### Phase 0 — 기반 정합 (Codex 추가, 빌드 전 필수)
+
+- **config SoT 정합 (Codex #5)**: `runtime.ts serve`의 `loadBotRecord`는 `bot_status.config`를 읽는데(runtime.ts:142), repo 마이그레이션에 `config` 컬럼이 없고 `createBot`은 runtime config를 `projection_targets.runtime`에 넣음(bots-factory.ts:335). → serve가 빈 값을 읽는 버그. **먼저 SoT 컬럼/쿼리 일원화**(config 컬럼 추가 마이그레이션 또는 serve가 projection_targets.runtime 읽도록).
+- **worker claim lock 설계 (Codex #4)**: migration 089는 `(bot_id, slack_event_id)` 중복방지일 뿐 **봇당 active 1 보장 아님**. 사용자 요구(에이전트별 순차 큐)엔 별도 claim lock 필요 → PG advisory lock(`pg_try_advisory_lock(hashtext(bot_id))`) 또는 `bot_runtime_workers`(bot_id, pid, heartbeat) registry. 봇당 워커 1 보장.
+- **outbox dynamic watch 설계**: OutboxReader 봇목록(index.ts:492 정적) → DB bot_status 동적.
+
+### Phase 1 — reviewclaw 단일 canary (Codex #2: 단일봇 증명 우선)
+
+- **Semi→mailbox→serve-worker→outbox 경로만** reviewclaw 하나로 복구. OpenClaw socket 직접멘션은 유지(병존).
+- `bot_status.config`(또는 SoT)에 reviewclaw `host_kind` 지정 + serve 1회 수동 기동으로 inbox drain → outbox → `handleReplyPosted`(index.ts:360) commitment done 확인.
+- **중복수신 방지 (Codex #3)**: reviewclaw transport_owner='serve' 플래그 + source_ref/slack_event_id dedupe. (이 단계선 socket도 살아있으므로 dedupe 필수.)
+- 검증: @Semi→ROUTE reviewclaw → serve-worker 처리 → Slack 응답 + commitment done. (현재 orphan이던 케이스 복구.)
+
+### Phase 2 — mailbox-supervisor on-demand spawn (콜드스타트, **핵심**)
+
+- 신규 supervisor(slack-router child_process): inbox 미처리 + 워커 부재 시 `semo runtime serve --bot {id}` spawn → 큐 순차 drain → idle 종료.
+- **하드닝 (Codex #6)**: `detached:false` + parent exit 시 SIGTERM 전파, pid liveness/heartbeat timeout kill, spawn backoff, max workers, orphan cleanup. **"실패=consumed" 정책 재검토**(runtime.ts:640 placeholder) → 실패 작업이 큐에서 조용히 사라지지 않게 retry/DLQ.
+- `inbox-writer.nudgeBot`(inbox-writer.ts:153): surface-map → supervisor 통지로 교체. surface-map/semo-agents-start.sh 폐기.
+- 검증: surface-map 삭제 상태에서 휴면/동적 봇 dispatch → 자동 spawn → outbox → done.
+
+### Phase 3 — 7봇 봇별 mailbox-worker 전환 (위험 구간, 봇별 점진)
+
+- 봇별로 reviewclaw→나머지: `runtime_source=serve-worker` 플래그 켜고 안정화 → **그 봇의 OpenClaw Slack app event를 마지막에 disable**(중복수신 종료). transport_owner 플래그로 소유권 명시.
+- `dispatchToInbox` policy 가드는 이 시점(serve-worker가 그 봇을 소비) 활성.
+- 검증: 봇별 전환 후 직접멘션·ROUTE 둘 다 단일 처리(중복 없음), 롤백(env 토글) 동작.
+
+### Phase 4 — 정적 잔재 제거 + 동적 roster/대시보드 큐
+
+- 정적 봇목록(OutboxReader index.ts:492, FALLBACK_BOT_IDS bot-config.ts:143, agent-mailbox escalate, codex-fallback PERSONA_PROMPTS) → DB bot_status 동적. `createBot`→KB `bot-ids` runtime_source upsert + `loadOpenClawBots` hot-reload(재기동 없이 roster 인지). semo-agents-start.sh deprecate.
+- **대시보드(app/bots)**: 에이전트별 active commitment **큐**(ordered) + 진행 상태(사용자 요구).
+
+### Phase 2 정의 전달 — "runtime prompt envelope" (Codex #7)
+
+- wrapPrompt 단순 동봉이 아니라 **agent_personas + agent_definitions + capability/allowed-tools + KB rules**를 하나의 envelope로 조립해 dispatch. persona version/hash를 audit에 기록. (--ignore-rules·one-shot의 layered-behavior 약화 보완.) — Phase 2 supervisor와 함께/직후.
+
+### (범위 밖) Phase 5 — 고객 실행 브릿지
+
+migration 008 승격, SEMO_RUNTIME_URL→serve 워커풀, agent_installs dispatchable 해제.
+
+## 핵심 리스크 (Codex 반영)
+
+- **봇당 1 워커 보장**: 089로 불충분 → advisory lock/registry 필수(아니면 동일 봇 동시 워커 → 중복/경쟁). Phase 0에서 선해결.
+- **config SoT 불일치**: 선해결 안 하면 serve가 빈 config 읽어 Phase 1부터 깨짐.
+- **중복수신**: socket+mailbox 병존 구간 dedupe + transport_owner + 직접멘션 disable 순서.
+- **supervisor SPOF/좀비**: 하드닝 명세 필수. 실패-consumed 정책 재검토.
+- hermes one-shot 무기억: prompt envelope 재동봉 또는 sessionResume.
+
+## Codex 검토 결과
+
+- **판정**: 방향(serve-worker 통합 + supervisor + wrapPrompt + 봇별 점진) 승인. 진단(transport 불일치=reviewclaw orphan) 정확.
+- 반영: Phase 0 신설(config SoT·worker lock·outbox dynamic), Phase 1=reviewclaw 단일 canary, 089 오해 정정→claim lock, 중복수신 dedupe+transport_owner, supervisor 하드닝+실패정책, prompt envelope. 단계 재정렬.
+- Codex KB: not-needed(리뷰만).
+
+## 결정 기록
+
+KB `semo decision/dynamic-agent-runtime-redesign-2026-06-03` (예정).
