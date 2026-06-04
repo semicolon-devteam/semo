@@ -125,6 +125,18 @@ const OPERATOR_ADMIN_CHANNEL = process.env.OPERATOR_ADMIN_CHANNEL || '';
 const OPERATOR_CODE_ENABLED = process.env.OPERATOR_CODE_ENABLED === '1';
 const OPERATOR_CODE_BASE_BRANCH = process.env.OPERATOR_CODE_BASE_BRANCH || 'dev';
 const OPERATOR_CODE_REPO_ROOT = process.env.OPERATOR_CODE_REPO_ROOT || process.cwd();
+
+// 고객 동적 위임 (P3) — feature-flagged additive. off 면 기존 internal ROUTE 동작 불변.
+// 채널이 테넌트에 매핑되면 internal 봇 대신 customer 에이전트(agent_installs→bot_status 프로젝션)로 위임.
+const SEMI_CUSTOMER_DELEGATION = process.env.SEMI_CUSTOMER_DELEGATION === '1';
+// 채널→테넌트 매핑: JSON {"<channelId>":"<tenantSlug>"}. tenant_channels 적재 전 임시 override.
+const SEMI_CUSTOMER_CHANNELS: Record<string, string> = (() => {
+  try {
+    return JSON.parse(process.env.SEMI_CUSTOMER_CHANNELS || '{}');
+  } catch {
+    return {};
+  }
+})();
 const COLONY_CONTEXT_MEMORY_ENABLED =
   process.env.COLONY_CONTEXT_MEMORY_ENABLED !== '0' &&
   process.env.COLONY_CONTEXT_MEMORY_ENABLED !== 'false';
@@ -1459,6 +1471,121 @@ async function dispatchToInbox(args: {
 // 에이전트 관리 ACTION 후속 자동 실행 (2026-05-29 역할 재편 — Semi 가 수행).
 // - SEARCH_LIBRARY: semo kb search 결과를 Slack thread 에 게시
 // - CREATE:        semo bots create 실행 후 stdout/stderr 를 thread 에 게시
+/** 채널 → 테넌트 slug 해소. env override(SEMI_CUSTOMER_CHANNELS) 우선, 다음 public.tenant_channels. */
+async function resolveTenantForChannel(channelId: string): Promise<string | null> {
+  if (SEMI_CUSTOMER_CHANNELS[channelId]) return SEMI_CUSTOMER_CHANNELS[channelId];
+  try {
+    const r = await pool.query<{ slug: string }>(
+      `SELECT t.slug FROM public.tenant_channels tc JOIN public.tenants t ON t.id = tc.tenant_id
+       WHERE tc.external_workspace_id = $1 AND tc.status = 'active' LIMIT 1`,
+      [channelId],
+    );
+    return r.rows[0]?.slug ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** 요청 텍스트에서 매칭용 키워드 추출 (한/영 단어, 2자+, 상위 N). */
+function extractKeywords(text: string, max = 8): string[] {
+  const words = (text || '')
+    .toLowerCase()
+    .split(/[^a-z0-9가-힣]+/i)
+    .map((w) => w.trim())
+    .filter((w) => w.length >= 2);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const w of words) {
+    if (!seen.has(w)) {
+      seen.add(w);
+      out.push(w);
+    }
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+interface CustomerDelegationCtx {
+  tenantSlug: string;
+  msg: SlackMessage;
+  senderName: string;
+  handoff: string;
+  reason: string | null;
+  semiText: string;
+  elapsed: string;
+  botId: string;
+  replyThreadTs: string;
+}
+
+/** 고객 위임: `semo customer delegate` 호출 → 결과에 따라 Slack 응답. 처리하면 true(internal ROUTE 스킵). */
+async function delegateCustomerRequest(ctx: CustomerDelegationCtx): Promise<boolean> {
+  const requestText = ctx.handoff || ctx.msg.text || '';
+  const keywords = extractKeywords(`${ctx.msg.text || ''} ${ctx.reason || ''}`);
+  if (!keywords.length) return false;
+  try {
+    const { stdout } = await execFileP(
+      'semo',
+      [
+        'customer',
+        'delegate',
+        '--tenant',
+        ctx.tenantSlug,
+        '--keywords',
+        keywords.join(','),
+        '--text',
+        requestText.slice(0, 2000),
+        '--channel',
+        ctx.msg.channel,
+        '--thread',
+        ctx.replyThreadTs,
+        '--sender',
+        ctx.senderName,
+      ],
+      { timeout: 60_000, env: process.env, maxBuffer: 8 * 1024 * 1024 },
+    );
+    const jsonStart = stdout.indexOf('{');
+    const result = jsonStart >= 0 ? JSON.parse(stdout.slice(jsonStart)) : null;
+    if (!result || result.status === 'no-agent') {
+      await slack.postAsBot(
+        ctx.botId,
+        ctx.msg.channel,
+        `${ctx.semiText}\n\n:information_source: 이 요청에 맞는 직원을 아직 못 찾았어요. 새 직원을 만들어 처리하도록 준비할게요.\n\n— ${ctx.botId} (${ctx.elapsed}s)`,
+        ctx.replyThreadTs,
+      );
+      return true;
+    }
+    const agentName = result.agent?.displayName || result.agent?.botId || '직원';
+    // 콜드스타트: 위임된 customer 에이전트 워커 spawn (없으면) → 실행 → outbox → 스레드 전달.
+    if (result.agent?.botId) {
+      const sp = mailboxSupervisor.ensureWorker(result.agent.botId);
+      if (sp === 'spawned')
+        console.log(`[supervisor] customer worker ${result.agent.botId} → spawned`);
+    }
+    if (result.status === 'busy') {
+      await slack.postAsBot(
+        ctx.botId,
+        ctx.msg.channel,
+        `${ctx.semiText}\n\n:hourglass_flowing_sand: \`${agentName}\` 가 이미 "${(result.busyTitle || '').slice(0, 40)}" 처리 중이라, 끝나면 바로 이 요청을 이어서 처리하고 결과를 알려드릴게요.\n\n— ${ctx.botId} (${ctx.elapsed}s, → \`${agentName}\`)`,
+        ctx.replyThreadTs,
+      );
+    } else {
+      await slack.postAsBot(
+        ctx.botId,
+        ctx.msg.channel,
+        `${ctx.semiText}\n\n:white_check_mark: \`${agentName}\` 에게 작업을 맡겼어요 — 끝나면 결과를 이 스레드에 알려드릴게요.\n\n— ${ctx.botId} (${ctx.elapsed}s, → \`${agentName}\`)`,
+        ctx.replyThreadTs,
+      );
+    }
+    console.log(
+      `[${ctx.botId}] customer-delegated tenant=${ctx.tenantSlug} status=${result.status} agent=${result.agent?.botId}`,
+    );
+    return true;
+  } catch (err) {
+    console.warn(`[${ctx.botId}] customer delegation failed:`, (err as Error).message);
+    return false; // 실패 시 internal ROUTE 로 fallthrough
+  }
+}
+
 async function executeAgentAction(
   parsed: ParsedAction,
   msg: SlackMessage,
@@ -2125,6 +2252,31 @@ async function handleOrchestrator(
     if (cfg.responseKind === 'route') {
       const parsed = parseRouteResponse(text);
 
+      // 고객 위임 경로 (P3, feature-flagged) — 채널이 테넌트에 매핑되면 internal ROUTE 대신
+      // customer 에이전트로 위임(해소→생성→큐→실행→결과 스레드 전달). flag off 면 동작 불변.
+      if (
+        SEMI_CUSTOMER_DELEGATION &&
+        cfg.canManageAgents &&
+        parsed.handoff &&
+        parsed.bot !== cfg.botId
+      ) {
+        const tenantSlug = await resolveTenantForChannel(msg.channel);
+        if (tenantSlug) {
+          const handled = await delegateCustomerRequest({
+            tenantSlug,
+            msg,
+            senderName,
+            handoff: parsed.handoff,
+            reason: parsed.reason,
+            semiText: stripRouteSystemLines(text) || text,
+            elapsed,
+            botId: cfg.botId,
+            replyThreadTs,
+          });
+          if (handled) return;
+        }
+      }
+
       // roster 검증 (Semi 한정) — roster 밖/non-dispatchable 봇 ROUTE 차단. log-only 면 로깅만.
       if (
         cfg.canManageAgents &&
@@ -2612,6 +2764,21 @@ async function start(): Promise<void> {
   // 5. Start outbox reader
   outboxReader.start();
   console.log('[slack-router] Outbox reader started');
+
+  // 고객 프로젝션 에이전트(ag-*) outbox watch — 결과를 원 스레드로 전달. 동적 생성(2-B) 반영 위해 주기 새로고침.
+  const refreshCustomerOutboxBots = async (): Promise<void> => {
+    try {
+      const r = await pool.query<{ bot_id: string }>(
+        `SELECT bot_id FROM semo.bot_status WHERE config->>'audience' = 'customer'`,
+      );
+      const added = outboxReader.addBots(r.rows.map((x) => x.bot_id));
+      if (added.length) console.log(`[outbox] customer bots watched: ${added.join(', ')}`);
+    } catch (err) {
+      console.warn('[outbox] customer bot refresh failed:', (err as Error).message);
+    }
+  };
+  await refreshCustomerOutboxBots();
+  setInterval(() => void refreshCustomerOutboxBots(), 60_000).unref();
 
   // 6. Start health monitor (대상이 있을 때만)
   if (healthMonitor) {

@@ -25,7 +25,7 @@ export interface GatewayAdapter {
 
 export class OutboxReader {
   private readonly mailboxDir: string;
-  private readonly botIds: string[];
+  private botIds: string[];
   private readonly platform: 'slack' | 'discord';
   private readonly gateway: GatewayAdapter;
   /** P5-2d: optional projection emitter — 주입 시 reply 흐름이 emitter 로 분기. */
@@ -95,31 +95,7 @@ export class OutboxReader {
   start(): void {
     // fs.watch on each bot's outbox
     for (const botId of this.botIds) {
-      const outboxPath = path.join(this.mailboxDir, botId, 'outbox.jsonl');
-      this.ensureFile(outboxPath);
-      // Skip existing content on startup — only process new messages
-      try {
-        const skipBytes = fs.statSync(outboxPath).size;
-        if (skipBytes > 0) {
-          console.log(`[outbox] ${botId}: skipping ${skipBytes} existing bytes on startup`);
-        }
-        this.fileOffsets.set(botId, skipBytes);
-      } catch {
-        /* ignore */
-      }
-      try {
-        const watcher = fs.watch(outboxPath, { persistent: false }, () => {
-          this.processOutbox(botId).catch((err) =>
-            console.error(`[outbox] Error processing ${botId}:`, err),
-          );
-        });
-        watcher.on('error', (err) => {
-          console.warn(`[outbox] fs.watch error for ${botId}: ${(err as Error).message}`);
-        });
-        this.watchers.push(watcher);
-      } catch {
-        console.error(`[outbox] fs.watch failed for ${botId}`);
-      }
+      this.watchBot(botId);
     }
 
     // Fallback poll
@@ -128,6 +104,49 @@ export class OutboxReader {
         this.processOutbox(botId).catch(() => {});
       }
     }, POLL_INTERVAL_MS);
+  }
+
+  /** Set up fs.watch + offset for one bot's outbox (skip existing content). */
+  private watchBot(botId: string): void {
+    const outboxPath = path.join(this.mailboxDir, botId, 'outbox.jsonl');
+    this.ensureFile(outboxPath);
+    try {
+      const skipBytes = fs.statSync(outboxPath).size;
+      if (skipBytes > 0) {
+        console.log(`[outbox] ${botId}: skipping ${skipBytes} existing bytes on startup`);
+      }
+      this.fileOffsets.set(botId, skipBytes);
+    } catch {
+      /* ignore */
+    }
+    try {
+      const watcher = fs.watch(outboxPath, { persistent: false }, () => {
+        this.processOutbox(botId).catch((err) =>
+          console.error(`[outbox] Error processing ${botId}:`, err),
+        );
+      });
+      watcher.on('error', (err) => {
+        console.warn(`[outbox] fs.watch error for ${botId}: ${(err as Error).message}`);
+      });
+      this.watchers.push(watcher);
+    } catch {
+      console.error(`[outbox] fs.watch failed for ${botId}`);
+    }
+  }
+
+  /**
+   * 런타임에 watch 대상 봇 추가 (동적 customer 에이전트용). 이미 있는 봇은 무시.
+   * @returns 실제로 추가된 botId 들.
+   */
+  addBots(newIds: string[]): string[] {
+    const added: string[] = [];
+    for (const botId of newIds) {
+      if (this.botIds.includes(botId)) continue;
+      this.botIds.push(botId);
+      if (this.pollTimer) this.watchBot(botId); // start() 이후면 즉시 watch
+      added.push(botId);
+    }
+    return added;
   }
 
   private ensureFile(filePath: string): void {
