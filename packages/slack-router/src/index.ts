@@ -46,6 +46,7 @@ import {
   type OutboxMessage,
 } from '@team-semicolon/semo-common';
 import { applySlackRouterPolicy, shouldHandleSemoBotNlp } from './router-policy.js';
+import { resolveReplyRelay } from './reply-relay.js';
 import { buildConversationContextBlock } from './conversation-context.js';
 import {
   listActivePersonas,
@@ -493,11 +494,14 @@ const REPLY_WRAP_PERSONA = process.env.SEMO_REPLY_WRAP_PERSONA === '1';
 async function maybeWrapReplyPersona(
   msg: OutboxMessage,
 ): Promise<{ botId: string; text: string } | null> {
-  // 고객(customer) 에이전트(ag-*)는 자체 Slack 앱이 없으므로 **항상** 오케스트레이터(Semi)가 relay.
-  // REPLY_WRAP_PERSONA 플래그와 무관. internal 봇은 기존대로 플래그 게이트.
   const isCustomer = msg.bot_id.startsWith('ag-');
   if (!isCustomer && !REPLY_WRAP_PERSONA) return null;
   // commitment_id 가 outbox payload 에 없을 수 있으므로 channel/thread+bot_id 기반 lookup.
+  let pipelineContext: {
+    relay_as?: string;
+    routed_from?: string;
+    agent_display_name?: string;
+  } | null = null;
   try {
     const result = await pool.query<{ pipeline_context: string | null }>(
       `SELECT pipeline_context::text AS pipeline_context
@@ -509,35 +513,21 @@ async function maybeWrapReplyPersona(
         LIMIT 1`,
       [msg.bot_id, `${msg.channel_id}:${msg.thread_id || ''}`],
     );
-    const row = result.rows[0];
-    if (isCustomer) {
-      // 고객 에이전트 결과 → 오케스트레이터(Semi)가 원 스레드에 전달.
-      let relayAs = CUSTOMER_RELAY_BOT_ID;
-      if (row?.pipeline_context) {
-        try {
-          const c = JSON.parse(row.pipeline_context) as { relay_as?: string };
-          if (c.relay_as) relayAs = c.relay_as;
-        } catch {
-          /* keep default */
-        }
+    if (result.rows[0]?.pipeline_context) {
+      try {
+        pipelineContext = JSON.parse(result.rows[0].pipeline_context);
+      } catch {
+        /* keep null */
       }
-      const displayName = msg.bot_id.replace(/^ag-[^-]+-/, '');
-      return { botId: relayAs, text: `${msg.text}\n\n— ${relayAs} (담당: \`${displayName}\`)` };
     }
-    if (!row?.pipeline_context) return null;
-    let ctx: { routed_from?: string };
-    try {
-      ctx = JSON.parse(row.pipeline_context);
-    } catch {
-      return null;
-    }
-    if (!ctx.routed_from) return null;
-    const wrapped = `${msg.text}\n\n— ${ctx.routed_from} (executed by \`@${msg.bot_id}\`)`;
-    return { botId: ctx.routed_from, text: wrapped };
   } catch (err) {
     console.warn(`[outbox-wrap] commitment lookup failed: ${(err as Error).message}`);
-    return null;
+    // 고객 에이전트는 commitment 없어도 relay 되어야 하므로 계속 진행(pipelineContext=null).
   }
+  return resolveReplyRelay(msg, pipelineContext, {
+    customerRelayBotId: CUSTOMER_RELAY_BOT_ID,
+    replyWrapPersona: REPLY_WRAP_PERSONA,
+  });
 }
 
 const outboxReader = new OutboxReader({

@@ -447,6 +447,7 @@ export async function isAgentBusy(botId: string): Promise<{ busy: boolean; title
 export async function dispatchToCustomerAgent(
   botId: string,
   req: DelegationRequest,
+  agentDisplayName?: string,
 ): Promise<string> {
   const dir = mailboxDir(botId);
   fs.mkdirSync(dir, { recursive: true });
@@ -482,6 +483,8 @@ export async function dispatchToCustomerAgent(
         // relay_as: 결과 reply 의 Slack relay 정체성. maybeWrapReplyPersona 가 이 값을 읽어
         // override(없으면 CUSTOMER_RELAY_BOT_ID 기본). 테넌트별 orchestrator relay 지원.
         ...(req.relayAs ? { relay_as: req.relayAs } : {}),
+        // agent_display_name: relay footer "담당: X" 의 정확한 표시명(bot_id 추출은 하이픈 슬러그에 모호).
+        ...(agentDisplayName ? { agent_display_name: agentDisplayName } : {}),
       }),
     ],
   );
@@ -526,7 +529,7 @@ export async function delegateToCustomerAgent(
   if (!agent) return { status: 'no-agent' };
 
   const busy = await isAgentBusy(agent.botId);
-  const commitmentId = await dispatchToCustomerAgent(agent.botId, req);
+  const commitmentId = await dispatchToCustomerAgent(agent.botId, req, agent.displayName);
   return {
     status: busy.busy ? 'busy' : 'dispatched',
     agent,
