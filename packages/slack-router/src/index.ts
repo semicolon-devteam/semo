@@ -2732,7 +2732,11 @@ async function start(): Promise<void> {
     `[openclaw-bots] source=${openclawSource} bots=[${[...openclawBots].sort().join(',')}]`,
   );
 
-  // Semi internal roster 빌드 (OPENCLAW_BOTS = dispatch SoT, KB bot-ids content = 표시명/역할 보조).
+  await loadServeWorkerBots(); // serve-worker(opt-in) 봇 먼저 로드 — roster 가 내부 serve-worker 봇 포함.
+
+  // Semi internal roster = OPENCLAW socket-mode 봇 ∪ serve-worker 전환 내부봇(~claw).
+  // cutover 후 OPENCLAW_BOTS 가 비어도 serve-worker 내부봇이 roster 유지 → Semi 가 ROUTE 가능.
+  // (ag-* 고객 에이전트는 internal roster 비포함 — delegateCustomerRequest 경로가 별도 처리)
   try {
     let displayMeta: Map<string, BotDisplayMeta> | undefined;
     try {
@@ -2744,7 +2748,11 @@ async function start(): Promise<void> {
     } catch {
       /* 보조 메타 실패 — botId fallback */
     }
-    const entries = buildInternalRoster(OPENCLAW_BOTS, displayMeta);
+    const internalRosterIds = new Set<string>([
+      ...OPENCLAW_BOTS,
+      ...[...SERVE_WORKER_BOTS].filter((b) => !b.startsWith('ag-')),
+    ]);
+    const entries = buildInternalRoster(internalRosterIds, displayMeta);
     if (entries.length > 0) {
       SEMI_INTERNAL_ROSTER = { entries, audience: 'internal', source: 'internal-openclaw' };
     }
@@ -2754,8 +2762,6 @@ async function start(): Promise<void> {
   } catch (err) {
     console.warn('[semi-roster] build failed, using fallback:', (err as Error).message);
   }
-
-  await loadServeWorkerBots(); // mailbox-supervisor 대상(opt-in) 봇 로드
 
   buildHealthMonitor();
 
