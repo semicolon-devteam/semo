@@ -10,7 +10,16 @@
  * 해소(resolve): 요청 → 테넌트 풀 → 라이브러리 → none(2-B 생성).
  */
 import type { Command } from 'commander';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { getPool } from '../database';
+
+function mailboxDir(botId: string): string {
+  const base = process.env.SEMO_MAILBOX_DIR ?? path.join(os.homedir(), '.semo', 'mailbox');
+  return path.join(base, botId);
+}
 
 export interface ProjectedAgent {
   botId: string;
@@ -375,6 +384,124 @@ export async function createPlainAgent(
   return { ...projected, listingId, installId, notifiedAdmin };
 }
 
+// ── 위임 오케스트레이션 (Semi 가 호출할 핵심 로직) ───────────────────────────
+
+export interface DelegationRequest {
+  text: string;
+  channelId: string;
+  threadId: string;
+  senderName?: string;
+  platform?: string;
+}
+
+export interface DelegationResult {
+  status: 'dispatched' | 'busy' | 'no-agent';
+  agent?: ProjectedAgent;
+  source?: AgentMatch['source'] | 'created';
+  commitmentId?: string;
+  busyTitle?: string;
+}
+
+/** 해당 customer 에이전트가 현재 작업 중(active commitment 존재)인가. */
+export async function isAgentBusy(botId: string): Promise<{ busy: boolean; title?: string }> {
+  const pool = getPool();
+  const r = await pool.query<{ title: string }>(
+    `SELECT title FROM semo.bot_commitments WHERE bot_id = $1 AND status = 'active' ORDER BY created_at ASC LIMIT 1`,
+    [botId],
+  );
+  return { busy: r.rows.length > 0, title: r.rows[0]?.title };
+}
+
+/** customer 에이전트 mailbox 에 작업 dispatch + bot_commitments(active) 생성. 원 스레드 보존. */
+export async function dispatchToCustomerAgent(
+  botId: string,
+  req: DelegationRequest,
+): Promise<string> {
+  const dir = mailboxDir(botId);
+  fs.mkdirSync(dir, { recursive: true });
+  const now = new Date().toISOString();
+  const msg = {
+    id: randomUUID(),
+    type: 'message',
+    sender_name: req.senderName ?? 'customer',
+    text: req.text,
+    channel_id: req.channelId,
+    thread_id: req.threadId,
+    platform: req.platform ?? 'slack',
+    timestamp: now,
+  };
+  fs.appendFileSync(path.join(dir, 'inbox.jsonl'), JSON.stringify(msg) + '\n');
+
+  const pool = getPool();
+  const commitmentId = `cmt-${botId}-${Date.now().toString(36)}-${randomUUID().slice(0, 4)}`;
+  await pool.query(
+    `INSERT INTO semo.bot_commitments
+       (id, bot_id, status, title, source_type, source_ref, pipeline_context, created_at, updated_at)
+     VALUES ($1, $2, 'active', $3, 'customer-delegation', $4, $5::jsonb, now(), now())`,
+    [
+      commitmentId,
+      botId,
+      req.text.slice(0, 120),
+      `${req.channelId}:${req.threadId}`,
+      JSON.stringify({
+        channel: req.channelId,
+        thread: req.threadId,
+        sender_name: req.senderName,
+        message_id: msg.id,
+      }),
+    ],
+  );
+  return commitmentId;
+}
+
+/**
+ * Semi 가 호출할 핵심 위임 로직: 해소 → (없으면 2-B 생성) → 프로젝션 → busy 체크 → dispatch.
+ * busy 면 dispatch 하되 status='busy' 반환(Semi 가 "처리 중, 이어서" 안내).
+ */
+export async function delegateToCustomerAgent(
+  tenantSlug: string,
+  intent: RequestIntent,
+  req: DelegationRequest,
+  opts: { create?: CreateAgentSpec; projectOpts?: ProjectOptions } = {},
+): Promise<DelegationResult> {
+  const match = await resolveAgentForRequest(tenantSlug, intent);
+
+  let agent: ProjectedAgent | null = null;
+  let source: DelegationResult['source'] = match.source;
+
+  if (match.source === 'tenant-pool' && match.installId) {
+    agent = await projectInstallToBotStatus(match.installId, opts.projectOpts);
+  } else if (match.source === 'library' && match.agentSlug) {
+    // 2-A: 라이브러리 히트 → 테넌트에 설치 후 프로젝션 (createPlainAgent 가 listing 재사용)
+    const created = await createPlainAgent(tenantSlug, {
+      agentSlug: match.agentSlug,
+      displayName: match.displayName ?? match.agentSlug,
+      roleLabel: match.roleLabel ?? '직원',
+      hostKind: opts.projectOpts?.hostKind,
+      ollamaModel: opts.projectOpts?.ollamaModel,
+    });
+    agent = created;
+    source = 'library';
+  } else if (opts.create) {
+    // 2-B: 신규 생성
+    const created = await createPlainAgent(tenantSlug, opts.create);
+    agent = created;
+    source = 'created';
+  }
+
+  if (!agent) return { status: 'no-agent' };
+
+  const busy = await isAgentBusy(agent.botId);
+  const commitmentId = await dispatchToCustomerAgent(agent.botId, req);
+  return {
+    status: busy.busy ? 'busy' : 'dispatched',
+    agent,
+    source,
+    commitmentId,
+    busyTitle: busy.title,
+  };
+}
+
 // ── CLI ────────────────────────────────────────────────────────────────────
 
 export function registerCustomerCommands(program: Command): void {
@@ -425,6 +552,66 @@ export function registerCustomerCommands(program: Command): void {
       console.log(JSON.stringify(m, null, 2));
       process.exit(0);
     });
+
+  cmd
+    .command('delegate')
+    .description('Semi 위임 시뮬레이션: 해소→(생성)→프로젝션→busy체크→dispatch')
+    .requiredOption('--tenant <slug>', '테넌트 slug')
+    .requiredOption('--keywords <csv>', '의도 키워드')
+    .requiredOption('--text <t>', '요청 본문')
+    .requiredOption('--channel <c>', 'Slack channel id')
+    .requiredOption('--thread <t>', 'Slack thread id')
+    .option('--sender <s>', '요청자명', 'customer')
+    .option('--create-slug <s>', '2-B 생성 시 agent_slug')
+    .option('--create-name <n>', '2-B 생성 시 display_name')
+    .option('--create-role <r>', '2-B 생성 시 role_label')
+    .option('--create-skills <csv>', '2-B 생성 시 스킬')
+    .action(
+      async (opts: {
+        tenant: string;
+        keywords: string;
+        text: string;
+        channel: string;
+        thread: string;
+        sender: string;
+        createSlug?: string;
+        createName?: string;
+        createRole?: string;
+        createSkills?: string;
+      }) => {
+        const keywords = opts.keywords
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        const create =
+          opts.createSlug && opts.createName && opts.createRole
+            ? {
+                agentSlug: opts.createSlug,
+                displayName: opts.createName,
+                roleLabel: opts.createRole,
+                skills: opts.createSkills
+                  ? opts.createSkills
+                      .split(',')
+                      .map((s) => s.trim())
+                      .filter(Boolean)
+                  : undefined,
+              }
+            : undefined;
+        const r = await delegateToCustomerAgent(
+          opts.tenant,
+          { keywords },
+          {
+            text: opts.text,
+            channelId: opts.channel,
+            threadId: opts.thread,
+            senderName: opts.sender,
+          },
+          { create },
+        );
+        console.log(JSON.stringify(r, null, 2));
+        process.exit(0);
+      },
+    );
 
   cmd
     .command('create')
