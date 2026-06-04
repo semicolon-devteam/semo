@@ -1558,6 +1558,8 @@ async function delegateCustomerRequest(ctx: CustomerDelegationCtx): Promise<bool
         ctx.replyThreadTs,
         '--sender',
         ctx.senderName,
+        '--relay-as',
+        CUSTOMER_RELAY_BOT_ID,
       ],
       { timeout: 60_000, env: process.env, maxBuffer: 8 * 1024 * 1024 },
     );

@@ -419,6 +419,9 @@ export interface DelegationRequest {
   threadId: string;
   senderName?: string;
   platform?: string;
+  /** 결과 reply 를 Slack 에 relay 할 정체성(orchestrator bot_id). 미지정 시 OutboxReader 가
+   *  CUSTOMER_RELAY_BOT_ID 기본값으로 relay. 테넌트별 orchestrator 대비 명시 경로. */
+  relayAs?: string;
 }
 
 export interface DelegationResult {
@@ -475,6 +478,9 @@ export async function dispatchToCustomerAgent(
         thread: req.threadId,
         sender_name: req.senderName,
         message_id: msg.id,
+        // relay_as: 결과 reply 의 Slack relay 정체성. maybeWrapReplyPersona 가 이 값을 읽어
+        // override(없으면 CUSTOMER_RELAY_BOT_ID 기본). 테넌트별 orchestrator relay 지원.
+        ...(req.relayAs ? { relay_as: req.relayAs } : {}),
       }),
     ],
   );
@@ -589,6 +595,7 @@ export function registerCustomerCommands(program: Command): void {
     .requiredOption('--channel <c>', 'Slack channel id')
     .requiredOption('--thread <t>', 'Slack thread id')
     .option('--sender <s>', '요청자명', 'customer')
+    .option('--relay-as <botId>', '결과 reply relay 정체성(orchestrator). 미지정 시 기본 relay')
     .option('--create-slug <s>', '2-B 생성 시 agent_slug')
     .option('--create-name <n>', '2-B 생성 시 display_name')
     .option('--create-role <r>', '2-B 생성 시 role_label')
@@ -601,6 +608,7 @@ export function registerCustomerCommands(program: Command): void {
         channel: string;
         thread: string;
         sender: string;
+        relayAs?: string;
         createSlug?: string;
         createName?: string;
         createRole?: string;
@@ -632,6 +640,7 @@ export function registerCustomerCommands(program: Command): void {
             channelId: opts.channel,
             threadId: opts.thread,
             senderName: opts.sender,
+            relayAs: opts.relayAs,
           },
           { create },
         );
