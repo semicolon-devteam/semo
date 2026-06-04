@@ -19,10 +19,15 @@ const DEFAULT_CONFIG_PATH = path.join(os.homedir(), '.semo', 'config.toml');
 
 function expand(p: string | undefined): string | undefined {
   if (!p) return p;
-  if (p.startsWith('~/.semo/') || p === '~/.semo') {
-    const semoRoot = process.env.SEMO_HOME || path.join(os.homedir(), '.semo');
-    const rest = p === '~/.semo' ? '' : p.slice('~/.semo/'.length);
-    return rest ? path.join(semoRoot, rest) : semoRoot;
+  // SEMO→semicolony 호환: ~/.semo/ 와 ~/.semicolony/ 둘 다 플랫폼 홈으로 인식.
+  // SEMICOLONY_HOME > SEMO_HOME > ~/.semo (Phase 0 default 불변).
+  const semoRoot =
+    process.env.SEMICOLONY_HOME || process.env.SEMO_HOME || path.join(os.homedir(), '.semo');
+  for (const prefix of ['~/.semicolony', '~/.semo']) {
+    if (p === prefix) return semoRoot;
+    if (p.startsWith(`${prefix}/`)) {
+      return path.join(semoRoot, p.slice(`${prefix}/`.length));
+    }
   }
   return p.startsWith('~') ? path.join(os.homedir(), p.slice(1)) : p;
 }

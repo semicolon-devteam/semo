@@ -18,7 +18,8 @@ export {
   resetBotWebClientPool,
   listBotsWithDedicatedToken,
 } from './slack/bot-web-client-pool.js';
-export { SEMO_PATHS, resolveBotWorkspace } from './paths.js';
+export { SEMO_PATHS, SEMICOLONY_PATHS, resolveBotWorkspace } from './paths.js';
+export { envDual, resolveSemoHome, DB_SCHEMA, PLATFORM_KB_DOMAIN } from './env.js';
 export { acquireSingletonLock, type SingletonLockOptions } from './lock/singleton.js';
 export {
   assertCmuxAncestry,

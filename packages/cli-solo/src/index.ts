@@ -28,7 +28,9 @@ import { SqliteKbStore, type SqliteEmbeddingProvider } from '@team-semicolon/sem
 import { SqliteOperationalStore } from '@team-semicolon/semo-ops-store/sqlite';
 import { renderConfigToml, runWizard } from './wizard.js';
 
-const DEFAULT_CONFIG_DIR = process.env.SEMO_HOME ?? path.join(os.homedir(), '.semo');
+// SEMO→semicolony 호환: SEMICOLONY_HOME > SEMO_HOME > ~/.semo (Phase 0 default 불변).
+const DEFAULT_CONFIG_DIR =
+  process.env.SEMICOLONY_HOME ?? process.env.SEMO_HOME ?? path.join(os.homedir(), '.semo');
 const DEFAULT_DB_PATH = path.join(DEFAULT_CONFIG_DIR, 'kb.db');
 const DEFAULT_AGENT_ID = 'default-agent';
 
@@ -245,7 +247,11 @@ agentsCmd
   .command('render')
   .description('Personal default-agent artifact 렌더링')
   .option('--targets <csv>', 'claude-code,codex-skill', 'claude-code')
-  .option('--session-dir <path>', 'ClaudeCode session dir', path.join(DEFAULT_CONFIG_DIR, 'sessions'))
+  .option(
+    '--session-dir <path>',
+    'ClaudeCode session dir',
+    path.join(DEFAULT_CONFIG_DIR, 'sessions'),
+  )
   .option('--codex-skills-dir <path>', 'Codex skills dir', path.join(DEFAULT_CONFIG_DIR, 'skills'))
   .option('--write', '파일 쓰기')
   .option('--json', 'JSON 출력')
