@@ -573,6 +573,7 @@ const EMOJI_SHORTCODE_MAP: Record<string, string> = {
   ':robot_face:': '🤖',
   ':gear:': '⚙️',
   ':bust_in_silhouette:': '👤',
+  ':building_construction:': '🏗️',
 };
 function resolveEmoji(raw: string | null | undefined): string | undefined {
   if (!raw) return undefined;
@@ -885,9 +886,14 @@ export function registerBotsCommands(program: Command): void {
       try {
         const pool = getPool();
         const client = await pool.connect();
-        // 기존 값 조회 — slack_username 동기 판단(의도적 분리는 보존).
-        const prev = await client.query<{ name: string | null; slack_username: string | null }>(
-          `SELECT name, slack_username FROM semo.bot_status WHERE bot_id = $1`,
+        // 기존 값 조회 — slack_username/slack_icon_emoji 동기 판단(의도적 분리는 보존).
+        const prev = await client.query<{
+          name: string | null;
+          slack_username: string | null;
+          emoji: string | null;
+          slack_icon_emoji: string | null;
+        }>(
+          `SELECT name, slack_username, emoji, slack_icon_emoji FROM semo.bot_status WHERE bot_id = $1`,
           [botId],
         );
         if (prev.rowCount === 0) {
@@ -897,6 +903,8 @@ export function registerBotsCommands(program: Command): void {
         }
         const prevName = prev.rows[0].name;
         const prevSlackU = prev.rows[0].slack_username;
+        const prevEmoji = prev.rows[0].emoji;
+        const prevSlackIcon = prev.rows[0].slack_icon_emoji;
         const sets: string[] = [];
         const vals: unknown[] = [botId];
         if (opts.name) {
@@ -911,6 +919,11 @@ export function registerBotsCommands(program: Command): void {
         if (opts.emoji) {
           vals.push(opts.emoji);
           sets.push(`emoji = $${vals.length}`);
+          // slack_icon_emoji 가 기존 emoji 와 동기였거나 비어있으면 함께 갱신(분리된 경우 보존).
+          if (prevSlackIcon == null || prevSlackIcon === prevEmoji) {
+            vals.push(opts.emoji);
+            sets.push(`slack_icon_emoji = $${vals.length}`);
+          }
         }
         const up = await client.query(
           `UPDATE semo.bot_status SET ${sets.join(', ')}, synced_at = NOW() WHERE bot_id = $1
