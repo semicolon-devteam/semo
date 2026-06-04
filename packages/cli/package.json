@@ -4,6 +4,7 @@
   "description": "SEMO CLI - AI Agent Orchestration Framework Installer",
   "main": "dist/bundle.js",
   "bin": {
+    "semicolony": "dist/bundle.js",
     "semo": "dist/bundle.js",
     "semo-cli": "dist/bundle.js"
   },

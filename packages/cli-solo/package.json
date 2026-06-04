@@ -4,6 +4,7 @@
   "description": "SEMO Solo — zero-setup personal AI agent (SQLite + Ollama/MLX/API). No Postgres, no Slack.",
   "main": "dist/bundle.js",
   "bin": {
+    "semicolony-solo": "dist/bundle.js",
     "semo-solo": "dist/bundle.js"
   },
   "scripts": {

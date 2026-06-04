@@ -14,6 +14,7 @@
   },
   "main": "src/index.ts",
   "bin": {
+    "semicolony-discord-router": "src/bin.ts",
     "semo-discord-router": "src/bin.ts"
   },
   "scripts": {

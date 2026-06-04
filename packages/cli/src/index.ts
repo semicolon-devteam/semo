@@ -213,8 +213,9 @@ const isWindows =
 const program = new Command();
 
 program
-  .name('semo')
-  .description('SEMO CLI - AI Agent Orchestration Framework')
+  // SEMO→semicolony 리브랜딩: 표준 이름은 semicolony. `semo`/`semo-cli` 는 무기한 호환 bin alias.
+  .name('semicolony')
+  .description('semicolony CLI - AI Agent Orchestration Framework')
   .version(VERSION, '-V, --version', '버전 번호만 출력');
 
 // === version 명령어 (상세 버전 정보) ===
