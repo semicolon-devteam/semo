@@ -47,6 +47,7 @@ import {
 } from '@team-semicolon/semo-common';
 import { applySlackRouterPolicy, shouldHandleSemoBotNlp } from './router-policy.js';
 import { resolveReplyRelay } from './reply-relay.js';
+import { parseRouteResponse, type ParsedRoute } from './route-parse.js';
 import { buildConversationContextBlock } from './conversation-context.js';
 import {
   listActivePersonas,
@@ -1311,12 +1312,7 @@ function refreshOperatorMentionGuide(): void {
   }
 }
 
-interface ParsedRoute {
-  kind: 'route';
-  bot: string | null;
-  reason: string | null;
-  handoff: string | null;
-}
+// ParsedRoute/RouteTarget/parseRouteResponse 는 ./route-parse.js (순수·테스트 가능)
 
 interface ParsedAction {
   kind: 'action';
@@ -1324,41 +1320,6 @@ interface ParsedAction {
   target: string | null;
   reason: string | null;
   handoff: string | null;
-}
-
-function parseRouteResponse(text: string): ParsedRoute {
-  const lines = text.split(/\r?\n/);
-  let bot: string | null = null;
-  let reason: string | null = null;
-  const handoffLines: string[] = [];
-  let handoffStarted = false;
-  for (const line of lines) {
-    const m = line.match(/^\s*(ROUTE|REASON|HANDOFF)\s*:\s*(.*)$/i);
-    if (!m) {
-      if (handoffStarted) handoffLines.push(line);
-      continue;
-    }
-    const tag = m[1].toUpperCase();
-    const value = m[2].trim();
-    if (tag === 'ROUTE') {
-      bot =
-        value
-          .replace(/[`@*<>]/g, '')
-          .split(/\s+/)[0]
-          ?.toLowerCase() || null;
-    } else if (tag === 'REASON') {
-      reason = value;
-    } else if (tag === 'HANDOFF') {
-      handoffStarted = true;
-      if (value) handoffLines.push(value);
-    }
-  }
-  return {
-    kind: 'route',
-    bot,
-    reason,
-    handoff: handoffLines.length > 0 ? handoffLines.join('\n').trim() : null,
-  };
 }
 
 function parseActionResponse(text: string): ParsedAction {
@@ -2291,58 +2252,61 @@ async function handleOrchestrator(
         }
       }
 
-      // roster 검증 (Semi 한정) — roster 밖/non-dispatchable 봇 ROUTE 차단. log-only 면 로깅만.
-      if (
-        cfg.canManageAgents &&
-        SEMI_ROUTE_VALIDATION !== 'off' &&
-        parsed.bot &&
-        parsed.handoff &&
-        parsed.bot !== cfg.botId
-      ) {
-        const route = isRoutable(SEMI_INTERNAL_ROSTER, parsed.bot);
-        if (!route.ok) {
-          if (SEMI_ROUTE_VALIDATION === 'enforce') {
-            // inbox/commitment 미생성 + 시스템 라인 제거 + 별도 안내 (원문 post 금지).
-            const cleaned = stripRouteSystemLines(text);
-            await slack.postAsBot(
-              cfg.botId,
-              msg.channel,
-              `${cleaned ? cleaned + '\n\n' : ''}:information_source: \`${parsed.bot}\` 는 지금 라우팅 가능한 대상이 아니에요. 제가 직접 도와드리거나 한 가지만 더 여쭤볼게요.\n\n— ${cfg.botId} (${elapsed}s)`,
-              replyThreadTs,
-            );
-            console.warn(
-              `[${cfg.botId}] route BLOCKED (${route.reason}): ${parsed.bot} (endReason=${result.endReason})`,
-            );
-            return;
+      // ROUTE fan-out — 한 응답의 모든 ROUTE 를 각각 dispatch (다중 위임 지원).
+      // roster 검증(Semi enforce)은 라우트별로 — 비대상 봇은 skip + 안내, 나머지는 dispatch.
+      const fanoutTargets = parsed.routes.filter((r) => r.bot && r.handoff && r.bot !== cfg.botId);
+      if (fanoutTargets.length > 0) {
+        const lines: string[] = [];
+        let dispatched = 0;
+        for (const r of fanoutTargets) {
+          if (cfg.canManageAgents && SEMI_ROUTE_VALIDATION !== 'off') {
+            const route = isRoutable(SEMI_INTERNAL_ROSTER, r.bot);
+            if (!route.ok) {
+              if (SEMI_ROUTE_VALIDATION === 'enforce') {
+                lines.push(`:information_source: \`@${r.bot}\` 는 라우팅 가능한 대상이 아니에요`);
+                console.warn(`[${cfg.botId}] route BLOCKED (${route.reason}): ${r.bot}`);
+                continue;
+              }
+              console.warn(
+                `[${cfg.botId}] route would-block (${route.reason}): ${r.bot} [log-only]`,
+              );
+            }
           }
-          console.warn(
-            `[${cfg.botId}] route would-block (${route.reason}): ${parsed.bot} [log-only]`,
+          const dispatch = await dispatchToInbox({
+            fromBot: cfg.botId,
+            toBot: r.bot,
+            msg,
+            senderName,
+            handoff: r.handoff as string,
+            reason: r.reason,
+          });
+          if (dispatch.error) {
+            lines.push(`:warning: \`@${r.bot}\` dispatch 실패: \`${dispatch.error.slice(0, 80)}\``);
+          } else if (dispatch.commitmentId) {
+            dispatched++;
+            lines.push(
+              `:white_check_mark: \`@${r.bot}\` 위임됨 (commitment=\`${dispatch.commitmentId.slice(-8)}\`)`,
+            );
+          }
+        }
+        if (lines.length > 0) {
+          const cleaned = stripRouteSystemLines(text);
+          const head = cleaned ? cleaned + '\n\n' : '';
+          const tag =
+            fanoutTargets.length > 1
+              ? `→ ${dispatched}/${fanoutTargets.length}봇`
+              : `→ \`@${fanoutTargets[0].bot}\``;
+          await slack.postAsBot(
+            cfg.botId,
+            msg.channel,
+            `${head}${lines.join('\n')}\n\n— ${cfg.botId} (${elapsed}s, ${tag})`,
+            replyThreadTs,
           );
+          console.log(
+            `[${cfg.botId}] fan-out ${dispatched}/${fanoutTargets.length} dispatched (endReason=${result.endReason})`,
+          );
+          return;
         }
-      }
-
-      // 1) ROUTE — 전문 작업을 해당 봇 inbox 에 dispatch (commitment INSERT → 완료 시 outbox reply 가 마감).
-      if (parsed.bot && parsed.handoff && parsed.bot !== cfg.botId) {
-        const dispatch = await dispatchToInbox({
-          fromBot: cfg.botId,
-          toBot: parsed.bot,
-          msg,
-          senderName,
-          handoff: parsed.handoff,
-          reason: parsed.reason,
-        });
-        let dispatchInfo = '';
-        if (dispatch.error) {
-          dispatchInfo = `\n:warning: dispatch failed: \`${dispatch.error.slice(0, 100)}\``;
-        } else if (dispatch.commitmentId) {
-          dispatchInfo = `\n:white_check_mark: \`@${parsed.bot}\` 에 작업 위임됨 — 끝나면 결과를 정리해 알려드릴게요. (commitment=\`${dispatch.commitmentId.slice(-8)}\`)`;
-        }
-        const footer = `\n\n— ${cfg.botId} (${elapsed}s, → \`@${parsed.bot}\`)${dispatchInfo}`;
-        await slack.postAsBot(cfg.botId, msg.channel, text + footer, replyThreadTs);
-        console.log(
-          `[${cfg.botId}] responded in ${elapsed}s; routed_to=${parsed.bot} dispatch=${dispatchInfo.includes('위임됨') ? 'ok' : 'fail'} (endReason=${result.endReason})`,
-        );
-        return;
       }
 
       // 2) ROUTE 없음 + 에이전트 관리자(Semi) — 에이전트 찾기/생성 ACTION 시도.
