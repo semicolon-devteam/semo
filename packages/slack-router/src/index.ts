@@ -137,6 +137,8 @@ const SEMI_CUSTOMER_CHANNELS: Record<string, string> = (() => {
     return {};
   }
 })();
+// 고객 에이전트 결과를 원 스레드에 전달할 오케스트레이터(Slack 앱 보유). 기본 Semi.
+const CUSTOMER_RELAY_BOT_ID = process.env.SEMI_CUSTOMER_RELAY_BOT_ID || SEMI_BOT_ID;
 const COLONY_CONTEXT_MEMORY_ENABLED =
   process.env.COLONY_CONTEXT_MEMORY_ENABLED !== '0' &&
   process.env.COLONY_CONTEXT_MEMORY_ENABLED !== 'false';
@@ -490,21 +492,37 @@ const REPLY_WRAP_PERSONA = process.env.SEMO_REPLY_WRAP_PERSONA === '1';
 async function maybeWrapReplyPersona(
   msg: OutboxMessage,
 ): Promise<{ botId: string; text: string } | null> {
-  if (!REPLY_WRAP_PERSONA) return null;
+  // 고객(customer) 에이전트(ag-*)는 자체 Slack 앱이 없으므로 **항상** 오케스트레이터(Semi)가 relay.
+  // REPLY_WRAP_PERSONA 플래그와 무관. internal 봇은 기존대로 플래그 게이트.
+  const isCustomer = msg.bot_id.startsWith('ag-');
+  if (!isCustomer && !REPLY_WRAP_PERSONA) return null;
   // commitment_id 가 outbox payload 에 없을 수 있으므로 channel/thread+bot_id 기반 lookup.
   try {
     const result = await pool.query<{ pipeline_context: string | null }>(
       `SELECT pipeline_context::text AS pipeline_context
          FROM semo.bot_commitments
         WHERE bot_id = $1
-          AND source_type = 'slack-inbox'
-          AND runtime_source = 'hermes-orchestrator'
           AND source_ref = $2
+          AND source_type IN ('slack-inbox', 'customer-delegation')
         ORDER BY created_at DESC
         LIMIT 1`,
       [msg.bot_id, `${msg.channel_id}:${msg.thread_id || ''}`],
     );
     const row = result.rows[0];
+    if (isCustomer) {
+      // 고객 에이전트 결과 → 오케스트레이터(Semi)가 원 스레드에 전달.
+      let relayAs = CUSTOMER_RELAY_BOT_ID;
+      if (row?.pipeline_context) {
+        try {
+          const c = JSON.parse(row.pipeline_context) as { relay_as?: string };
+          if (c.relay_as) relayAs = c.relay_as;
+        } catch {
+          /* keep default */
+        }
+      }
+      const displayName = msg.bot_id.replace(/^ag-[^-]+-/, '');
+      return { botId: relayAs, text: `${msg.text}\n\n— ${relayAs} (담당: \`${displayName}\`)` };
+    }
     if (!row?.pipeline_context) return null;
     let ctx: { routed_from?: string };
     try {
