@@ -33,7 +33,7 @@ function makeReader(
   };
   return new OutboxReader({
     mailboxDir,
-    botIds: ['reviewclaw'],
+    botIds: ['test-bot'],
     platform,
     gateway,
     inboxWriter: {} as unknown as InboxWriter, // reply(채널 지정) 경로에선 미사용
@@ -47,7 +47,7 @@ function replyLine(id: string, text: string): string {
     JSON.stringify({
       id,
       type: 'reply',
-      bot_id: 'reviewclaw',
+      bot_id: 'test-bot',
       text,
       channel_id: 'C_TEST',
       platform: 'slack',
@@ -61,8 +61,8 @@ describe('OutboxReader persisted offset (재기동 내구성)', () => {
 
   beforeEach(() => {
     dir = fs.mkdtempSync(path.join(os.tmpdir(), 'outbox-test-'));
-    fs.mkdirSync(path.join(dir, 'reviewclaw'), { recursive: true });
-    outbox = path.join(dir, 'reviewclaw', 'outbox.jsonl');
+    fs.mkdirSync(path.join(dir, 'test-bot'), { recursive: true });
+    outbox = path.join(dir, 'test-bot', 'outbox.jsonl');
     fs.writeFileSync(outbox, '');
   });
   afterEach(() => {
@@ -74,11 +74,9 @@ describe('OutboxReader persisted offset (재기동 내구성)', () => {
     const posted1: PostedRec[] = [];
     const r1 = makeReader(dir, posted1);
     fs.appendFileSync(outbox, replyLine('a', 'first')); // 기동 전 존재 → skip 대상
-    (r1 as unknown as { watchBot(b: string): void }).watchBot('reviewclaw');
+    (r1 as unknown as { watchBot(b: string): void }).watchBot('test-bot');
     fs.appendFileSync(outbox, replyLine('b', 'second')); // 가동 중 도착
-    await (r1 as unknown as { processOutbox(b: string): Promise<void> }).processOutbox(
-      'reviewclaw',
-    );
+    await (r1 as unknown as { processOutbox(b: string): Promise<void> }).processOutbox('test-bot');
     r1.stop();
     expect(posted1.map((p) => p.text)).toEqual(['second']); // 'a' skip, 'b' 포스팅
 
@@ -88,10 +86,8 @@ describe('OutboxReader persisted offset (재기동 내구성)', () => {
     // ── reader2: 재기동 → 영속 offset('b' 직후)부터 재개 → 'c' 포스팅(유실 X), 'a'/'b' 재포스팅 X ──
     const posted2: PostedRec[] = [];
     const r2 = makeReader(dir, posted2);
-    (r2 as unknown as { watchBot(b: string): void }).watchBot('reviewclaw');
-    await (r2 as unknown as { processOutbox(b: string): Promise<void> }).processOutbox(
-      'reviewclaw',
-    );
+    (r2 as unknown as { watchBot(b: string): void }).watchBot('test-bot');
+    await (r2 as unknown as { processOutbox(b: string): Promise<void> }).processOutbox('test-bot');
     r2.stop();
     expect(posted2.map((p) => p.text)).toEqual(['third']); // 'c' 유실 없이 포스팅, 중복 없음
   });
@@ -100,8 +96,8 @@ describe('OutboxReader persisted offset (재기동 내구성)', () => {
     const posted: PostedRec[] = [];
     fs.appendFileSync(outbox, replyLine('x', 'old')); // 기동 전 존재
     const r = makeReader(dir, posted);
-    (r as unknown as { watchBot(b: string): void }).watchBot('reviewclaw');
-    await (r as unknown as { processOutbox(b: string): Promise<void> }).processOutbox('reviewclaw');
+    (r as unknown as { watchBot(b: string): void }).watchBot('test-bot');
+    await (r as unknown as { processOutbox(b: string): Promise<void> }).processOutbox('test-bot');
     r.stop();
     expect(posted).toEqual([]); // 최초 기동 시 기존 내용 미포스팅(double-post 방지 보존)
   });
@@ -109,11 +105,11 @@ describe('OutboxReader persisted offset (재기동 내구성)', () => {
   it('.outbox-offset 사이드카가 처리 후 디스크에 기록된다', async () => {
     const posted: PostedRec[] = [];
     const r = makeReader(dir, posted);
-    (r as unknown as { watchBot(b: string): void }).watchBot('reviewclaw');
+    (r as unknown as { watchBot(b: string): void }).watchBot('test-bot');
     fs.appendFileSync(outbox, replyLine('y', 'persisted'));
-    await (r as unknown as { processOutbox(b: string): Promise<void> }).processOutbox('reviewclaw');
+    await (r as unknown as { processOutbox(b: string): Promise<void> }).processOutbox('test-bot');
     r.stop();
-    const offPath = path.join(dir, 'reviewclaw', '.outbox-offset-slack');
+    const offPath = path.join(dir, 'test-bot', '.outbox-offset-slack');
     expect(fs.existsSync(offPath)).toBe(true);
     expect(Number(fs.readFileSync(offPath, 'utf8'))).toBe(fs.statSync(outbox).size);
   });
@@ -126,21 +122,17 @@ describe('OutboxReader persisted offset (재기동 내구성)', () => {
     const postedD: PostedRec[] = [];
     const rS = makeReader(dir, postedS, 'slack');
     const rD = makeReader(dir, postedD, 'discord');
-    (rS as unknown as { watchBot(b: string): void }).watchBot('reviewclaw');
-    (rD as unknown as { watchBot(b: string): void }).watchBot('reviewclaw');
+    (rS as unknown as { watchBot(b: string): void }).watchBot('test-bot');
+    (rD as unknown as { watchBot(b: string): void }).watchBot('test-bot');
     fs.appendFileSync(outbox, replyLine('s1', 'slack-only')); // platform: 'slack'
-    await (rD as unknown as { processOutbox(b: string): Promise<void> }).processOutbox(
-      'reviewclaw',
-    );
-    await (rS as unknown as { processOutbox(b: string): Promise<void> }).processOutbox(
-      'reviewclaw',
-    );
+    await (rD as unknown as { processOutbox(b: string): Promise<void> }).processOutbox('test-bot');
+    await (rS as unknown as { processOutbox(b: string): Promise<void> }).processOutbox('test-bot');
     rS.stop();
     rD.stop();
 
     expect(postedD).toEqual([]); // discord 는 slack 메시지 skip
     expect(postedS.map((p) => p.text)).toEqual(['slack-only']); // slack 은 포스팅
-    expect(fs.existsSync(path.join(dir, 'reviewclaw', '.outbox-offset-slack'))).toBe(true);
-    expect(fs.existsSync(path.join(dir, 'reviewclaw', '.outbox-offset-discord'))).toBe(true);
+    expect(fs.existsSync(path.join(dir, 'test-bot', '.outbox-offset-slack'))).toBe(true);
+    expect(fs.existsSync(path.join(dir, 'test-bot', '.outbox-offset-discord'))).toBe(true);
   });
 });
