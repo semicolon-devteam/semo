@@ -503,7 +503,8 @@ function classifyBotCacheTargets(botId: string): CacheTarget[] {
     return [];
   }
   const push = (p: string, kind: string) => {
-    if (!isCacheProtected(p) && fs.existsSync(p)) out.push({ path: p, bytes: pathSizeBytes(p), kind });
+    if (!isCacheProtected(p) && fs.existsSync(p))
+      out.push({ path: p, bytes: pathSizeBytes(p), kind });
   };
 
   // 1) config 백업 *.bak* — .last-good 과 가장 최근 1개는 안전망으로 보존
@@ -553,6 +554,125 @@ function classifyBotCacheTargets(botId: string): CacheTarget[] {
     }
   }
   return out.filter((t) => !isCacheProtected(t.path));
+}
+
+// ── DB-driven 식별자 렌더 (P1/P2) ──────────────────────────────────
+// bot_status(name/emoji) = SoT. OpenClaw 프로필 base openclaw.json 의 ui.assistant 를
+// DB 에서 머지 렌더(secrets/그 외 전부 보존). 단일 편집점은 `semo bots set`.
+//
+// emoji 포맷: DB 는 Slack 숏코드(:art:) 저장(slack_icon_emoji 와 동일 표현),
+// OpenClaw ui.assistant.avatar 는 유니코드. 매핑 없으면 기존 로컬 avatar 보존.
+const EMOJI_SHORTCODE_MAP: Record<string, string> = {
+  ':art:': '🎨',
+  ':chart_with_upwards_trend:': '📈',
+  ':shield:': '🛡️',
+  ':mag:': '🔍',
+  ':clipboard:': '📋',
+  ':brain:': '🧠',
+  ':hammer_and_wrench:': '🛠️',
+  ':robot_face:': '🤖',
+  ':gear:': '⚙️',
+  ':bust_in_silhouette:': '👤',
+};
+function resolveEmoji(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  const t = raw.trim();
+  if (!t) return undefined;
+  if (t.startsWith(':') && t.endsWith(':')) return EMOJI_SHORTCODE_MAP[t]; // 매핑 없으면 undefined → 보존
+  return t; // 이미 유니코드
+}
+
+interface OpenclawAssistant {
+  name?: string;
+  avatar?: string;
+  [k: string]: unknown;
+}
+interface OpenclawConfigShape {
+  ui?: { assistant?: OpenclawAssistant; [k: string]: unknown };
+  [k: string]: unknown;
+}
+interface IdentityRenderResult {
+  botId: string;
+  profileExists: boolean;
+  nameChange?: { from: string | null; to: string };
+  avatarFill?: { to: string };
+  avatarDrift?: { local: string; db: string }; // 불일치 — render 는 변경 안 함(리포트만)
+  changed: boolean;
+}
+
+// base openclaw.json 에 식별자 머지. name=DB SoT(있으면). avatar 는 누락분만 채움(fill);
+// forceAvatar=true(=`set --emoji`)면 불일치도 덮어씀. secrets/그 외 키 전부 보존.
+function renderBotIdentity(
+  botId: string,
+  dbName: string | null,
+  dbEmoji: string | null,
+  opts: { apply: boolean; forceAvatar?: boolean },
+): IdentityRenderResult {
+  const ocPath = path.join(os.homedir(), `.openclaw-${botId}`, 'openclaw.json');
+  const res: IdentityRenderResult = {
+    botId,
+    profileExists: fs.existsSync(ocPath),
+    changed: false,
+  };
+  if (!res.profileExists) return res;
+  let oc: OpenclawConfigShape;
+  try {
+    oc = JSON.parse(fs.readFileSync(ocPath, 'utf8')) as OpenclawConfigShape;
+  } catch {
+    res.profileExists = false;
+    return res;
+  }
+  oc.ui = oc.ui ?? {};
+  oc.ui.assistant = oc.ui.assistant ?? {};
+  const cur = oc.ui.assistant;
+
+  if (dbName && cur.name !== dbName) {
+    res.nameChange = { from: cur.name ?? null, to: dbName };
+    cur.name = dbName;
+    res.changed = true;
+  }
+
+  const dbAvatar = resolveEmoji(dbEmoji);
+  if (dbAvatar) {
+    if (cur.avatar == null || cur.avatar === '') {
+      res.avatarFill = { to: dbAvatar };
+      cur.avatar = dbAvatar;
+      res.changed = true;
+    } else if (cur.avatar !== dbAvatar) {
+      if (opts.forceAvatar) {
+        res.avatarFill = { to: dbAvatar };
+        cur.avatar = dbAvatar;
+        res.changed = true;
+      } else {
+        res.avatarDrift = { local: cur.avatar, db: dbAvatar }; // 무단 변경 방지
+      }
+    }
+  }
+
+  if (res.changed && opts.apply) {
+    let mode = 0o600;
+    try {
+      mode = fs.statSync(ocPath).mode & 0o777;
+    } catch {
+      /* keep default */
+    }
+    const tmp = ocPath + '.tmp-render';
+    fs.writeFileSync(tmp, JSON.stringify(oc, null, 2) + '\n', { mode });
+    fs.renameSync(tmp, ocPath); // atomic
+  }
+  return res;
+}
+
+// render/set 대상 봇 목록: 로컬 ~/.openclaw-* 프로필 ∩ DB bot_status (내부 봇).
+function listRenderableBotIds(): string[] {
+  try {
+    return fs
+      .readdirSync(os.homedir())
+      .filter((d) => d.startsWith('.openclaw-') && !d.includes('shared'))
+      .map((d) => d.replace(/^\.openclaw-/, ''));
+  } catch {
+    return [];
+  }
 }
 
 export function registerBotsCommands(program: Command): void {
@@ -628,6 +748,158 @@ export function registerBotsCommands(program: Command): void {
           `\n총 ${grandCount}건 ${humanBytes(grandTotal)} ${opts.apply ? '삭제 완료' : 'dry-run (--apply 로 실제 삭제)'}`,
         ),
       );
+      process.exit(0);
+    });
+
+  // ── semo bots render (DB 식별자 → OpenClaw 프로필, P1/P2) ───────────
+  botsCmd
+    .command('render')
+    .description(
+      'DB(bot_status) 식별자를 OpenClaw 프로필 openclaw.json 에 머지 렌더 (dry-run 기본; --apply). name=DB SoT, avatar 누락분 채움(불일치는 리포트만). secrets/그 외 config 전부 보존.',
+    )
+    .option('--bot <id>', '특정 봇')
+    .option('--all', '로컬 프로필 ∩ DB 내부 봇 전체')
+    .option('--apply', '실제 파일 수정 (기본은 dry-run)')
+    .action(async (opts: { bot?: string; all?: boolean; apply?: boolean }) => {
+      let botIds: string[] = [];
+      if (opts.bot) botIds = [opts.bot];
+      else if (opts.all) botIds = listRenderableBotIds();
+      else {
+        console.error(chalk.red('✗ --bot <id> 또는 --all 필요'));
+        process.exit(1);
+      }
+      const connected = await isDbConnected();
+      if (!connected) {
+        console.log(chalk.red('❌ DB 연결 실패'));
+        await closeConnection();
+        process.exit(1);
+      }
+      try {
+        const pool = getPool();
+        const r = await pool.query<{ bot_id: string; name: string | null; emoji: string | null }>(
+          `SELECT bot_id, name, emoji FROM semo.bot_status WHERE bot_id = ANY($1)`,
+          [botIds],
+        );
+        const dbMap = new Map(r.rows.map((row) => [row.bot_id, row]));
+        let changes = 0;
+        let drifts = 0;
+        for (const botId of botIds) {
+          const row = dbMap.get(botId);
+          if (!row) {
+            console.log(chalk.gray(`  ${botId}: DB bot_status 없음 — skip`));
+            continue;
+          }
+          const res = renderBotIdentity(botId, row.name, row.emoji, {
+            apply: !!opts.apply,
+          });
+          if (!res.profileExists) {
+            console.log(chalk.gray(`  ${botId}: 로컬 프로필 없음/파싱 실패 — skip`));
+            continue;
+          }
+          const parts: string[] = [];
+          if (res.nameChange)
+            parts.push(
+              `name ${JSON.stringify(res.nameChange.from)} → ${JSON.stringify(res.nameChange.to)}`,
+            );
+          if (res.avatarFill) parts.push(`avatar 채움 → ${res.avatarFill.to}`);
+          if (res.changed) changes++;
+          if (parts.length) {
+            console.log(
+              `  ${chalk.cyan(botId)}: ${parts.join(', ')} ${opts.apply ? chalk.green('[적용]') : chalk.yellow('(dry-run)')}`,
+            );
+          } else {
+            console.log(chalk.gray(`  ${botId}: 변경 없음 (이미 동기)`));
+          }
+          if (res.avatarDrift) {
+            drifts++;
+            console.log(
+              chalk.yellow(
+                `     ⚠ avatar 드리프트: 로컬 ${res.avatarDrift.local} ≠ DB ${res.avatarDrift.db} (render 는 변경 안 함; \`semo bots set ${botId} --emoji ...\` 로 확정)`,
+              ),
+            );
+          }
+        }
+        console.log(
+          chalk[opts.apply ? 'green' : 'yellow'](
+            `\n${changes}건 ${opts.apply ? '적용 완료' : 'dry-run (--apply 로 실제 수정)'}${drifts ? ` · 드리프트 ${drifts}건 미해결` : ''}`,
+          ),
+        );
+      } catch (err) {
+        console.log(chalk.red(`❌ 실패: ${err}`));
+        process.exit(1);
+      } finally {
+        await closeConnection();
+      }
+      process.exit(0);
+    });
+
+  // ── semo bots set (DB 식별자 수정 + 자동 재렌더, 단일 편집점) ────────
+  botsCmd
+    .command('set <bot_id>')
+    .description('DB(bot_status) 식별자 수정 후 자동 재렌더. 닉네임/이모지 변경은 이 명령 하나.')
+    .option('--name <name>', '표시 이름(닉네임)')
+    .option('--emoji <emoji>', 'emoji (Slack 숏코드 :x: 또는 유니코드)')
+    .action(async (botId: string, opts: { name?: string; emoji?: string }) => {
+      if (!opts.name && !opts.emoji) {
+        console.error(chalk.red('✗ --name 또는 --emoji 중 하나 이상 필요'));
+        process.exit(1);
+      }
+      const connected = await isDbConnected();
+      if (!connected) {
+        console.log(chalk.red('❌ DB 연결 실패'));
+        await closeConnection();
+        process.exit(1);
+      }
+      try {
+        const pool = getPool();
+        const client = await pool.connect();
+        const sets: string[] = [];
+        const vals: unknown[] = [botId];
+        if (opts.name) {
+          vals.push(opts.name);
+          sets.push(`name = $${vals.length}`);
+        }
+        if (opts.emoji) {
+          vals.push(opts.emoji);
+          sets.push(`emoji = $${vals.length}`);
+        }
+        const up = await client.query(
+          `UPDATE semo.bot_status SET ${sets.join(', ')}, synced_at = NOW() WHERE bot_id = $1
+           RETURNING name, emoji`,
+          vals,
+        );
+        client.release();
+        if (up.rowCount === 0) {
+          console.log(chalk.red(`❌ bot_status 에 ${botId} 없음`));
+          process.exit(1);
+        }
+        const { name, emoji } = up.rows[0] as { name: string | null; emoji: string | null };
+        console.log(
+          chalk.green(
+            `✔ DB 업데이트: ${botId} name=${JSON.stringify(name)} emoji=${JSON.stringify(emoji)}`,
+          ),
+        );
+        // 자동 재렌더 (emoji 명시 시 드리프트도 덮어씀)
+        const res = renderBotIdentity(botId, name, emoji, {
+          apply: true,
+          forceAvatar: !!opts.emoji,
+        });
+        if (!res.profileExists) {
+          console.log(chalk.yellow(`  로컬 프로필 없음 — DB 만 갱신됨 (런타임이 DB 읽으면 충분)`));
+        } else if (res.changed) {
+          const parts: string[] = [];
+          if (res.nameChange) parts.push(`name → ${res.nameChange.to}`);
+          if (res.avatarFill) parts.push(`avatar → ${res.avatarFill.to}`);
+          console.log(chalk.green(`  재렌더 적용: ${parts.join(', ')}`));
+        } else {
+          console.log(chalk.gray(`  로컬 이미 동기 — 재렌더 변경 없음`));
+        }
+      } catch (err) {
+        console.log(chalk.red(`❌ 실패: ${err}`));
+        process.exit(1);
+      } finally {
+        await closeConnection();
+      }
       process.exit(0);
     });
 
