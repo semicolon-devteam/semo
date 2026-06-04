@@ -597,7 +597,13 @@ interface IdentityRenderResult {
   nameChange?: { from: string | null; to: string };
   avatarFill?: { to: string };
   avatarDrift?: { local: string; db: string }; // 불일치 — render 는 변경 안 함(리포트만)
+  metaChange?: { from: string | null; to: string }; // agent-spec.meta.json displayName
   changed: boolean;
+}
+
+interface AgentSpecMetaShape {
+  semo?: { displayName?: string; [k: string]: unknown };
+  [k: string]: unknown;
 }
 
 // base openclaw.json 에 식별자 머지. name=DB SoT(있으면). avatar 는 누락분만 채움(fill);
@@ -649,6 +655,7 @@ function renderBotIdentity(
     }
   }
 
+  // openclaw.json 쓰기 (name/avatar 변경 시). meta 변경은 아래에서 별도 게이트.
   if (res.changed && opts.apply) {
     let mode = 0o600;
     try {
@@ -659,6 +666,30 @@ function renderBotIdentity(
     const tmp = ocPath + '.tmp-render';
     fs.writeFileSync(tmp, JSON.stringify(oc, null, 2) + '\n', { mode });
     fs.renameSync(tmp, ocPath); // atomic
+  }
+
+  // agent-spec.meta.json 의 displayName 도 DB name 으로 동기 (DB-rendered 메타 — 드리프트 방지).
+  // 이 블록이 openclaw.json 쓰기 뒤에 와야 meta-only 변경이 openclaw 쓰기를 잘못 트리거하지 않음.
+  if (dbName) {
+    const metaPath = path.join(os.homedir(), `.openclaw-${botId}`, 'agent-spec.meta.json');
+    if (fs.existsSync(metaPath)) {
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as AgentSpecMetaShape;
+        meta.semo = meta.semo ?? {};
+        if (meta.semo.displayName !== dbName) {
+          res.metaChange = { from: meta.semo.displayName ?? null, to: dbName };
+          res.changed = true;
+          if (opts.apply) {
+            meta.semo.displayName = dbName;
+            const mtmp = metaPath + '.tmp-render';
+            fs.writeFileSync(mtmp, JSON.stringify(meta, null, 2) + '\n');
+            fs.renameSync(mtmp, metaPath);
+          }
+        }
+      } catch {
+        /* meta 파싱 실패 — skip */
+      }
+    }
   }
   return res;
 }
@@ -802,6 +833,7 @@ export function registerBotsCommands(program: Command): void {
               `name ${JSON.stringify(res.nameChange.from)} → ${JSON.stringify(res.nameChange.to)}`,
             );
           if (res.avatarFill) parts.push(`avatar 채움 → ${res.avatarFill.to}`);
+          if (res.metaChange) parts.push(`meta.displayName → ${res.metaChange.to}`);
           if (res.changed) changes++;
           if (parts.length) {
             console.log(
@@ -853,11 +885,28 @@ export function registerBotsCommands(program: Command): void {
       try {
         const pool = getPool();
         const client = await pool.connect();
+        // 기존 값 조회 — slack_username 동기 판단(의도적 분리는 보존).
+        const prev = await client.query<{ name: string | null; slack_username: string | null }>(
+          `SELECT name, slack_username FROM semo.bot_status WHERE bot_id = $1`,
+          [botId],
+        );
+        if (prev.rowCount === 0) {
+          client.release();
+          console.log(chalk.red(`❌ bot_status 에 ${botId} 없음`));
+          process.exit(1);
+        }
+        const prevName = prev.rows[0].name;
+        const prevSlackU = prev.rows[0].slack_username;
         const sets: string[] = [];
         const vals: unknown[] = [botId];
         if (opts.name) {
           vals.push(opts.name);
           sets.push(`name = $${vals.length}`);
+          // slack_username 이 기존 name 과 동기였거나 비어있으면 함께 갱신(Slack 표시명 = 식별자).
+          if (prevSlackU == null || prevSlackU === prevName) {
+            vals.push(opts.name);
+            sets.push(`slack_username = $${vals.length}`);
+          }
         }
         if (opts.emoji) {
           vals.push(opts.emoji);
@@ -865,7 +914,7 @@ export function registerBotsCommands(program: Command): void {
         }
         const up = await client.query(
           `UPDATE semo.bot_status SET ${sets.join(', ')}, synced_at = NOW() WHERE bot_id = $1
-           RETURNING name, emoji`,
+           RETURNING name, emoji, slack_username`,
           vals,
         );
         client.release();
@@ -873,13 +922,17 @@ export function registerBotsCommands(program: Command): void {
           console.log(chalk.red(`❌ bot_status 에 ${botId} 없음`));
           process.exit(1);
         }
-        const { name, emoji } = up.rows[0] as { name: string | null; emoji: string | null };
+        const { name, emoji, slack_username } = up.rows[0] as {
+          name: string | null;
+          emoji: string | null;
+          slack_username: string | null;
+        };
         console.log(
           chalk.green(
-            `✔ DB 업데이트: ${botId} name=${JSON.stringify(name)} emoji=${JSON.stringify(emoji)}`,
+            `✔ DB 업데이트: ${botId} name=${JSON.stringify(name)} emoji=${JSON.stringify(emoji)} slack_username=${JSON.stringify(slack_username)}`,
           ),
         );
-        // 자동 재렌더 (emoji 명시 시 드리프트도 덮어씀)
+        // 자동 재렌더 (emoji 명시 시 드리프트도 덮어씀). meta.displayName 도 함께 동기.
         const res = renderBotIdentity(botId, name, emoji, {
           apply: true,
           forceAvatar: !!opts.emoji,
@@ -890,6 +943,7 @@ export function registerBotsCommands(program: Command): void {
           const parts: string[] = [];
           if (res.nameChange) parts.push(`name → ${res.nameChange.to}`);
           if (res.avatarFill) parts.push(`avatar → ${res.avatarFill.to}`);
+          if (res.metaChange) parts.push(`meta.displayName → ${res.metaChange.to}`);
           console.log(chalk.green(`  재렌더 적용: ${parts.join(', ')}`));
         } else {
           console.log(chalk.gray(`  로컬 이미 동기 — 재렌더 변경 없음`));
