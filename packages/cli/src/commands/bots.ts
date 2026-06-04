@@ -14,6 +14,7 @@ import ora from 'ora';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { spawn, execSync } from 'child_process';
 import {
   getPool,
   closeConnection,
@@ -967,6 +968,140 @@ export function registerBotsCommands(program: Command): void {
       } finally {
         await closeConnection();
       }
+      process.exit(0);
+    });
+
+  // ── semo bots worker (serve-worker durable 관리, P3 수렴 도구) ─────────
+  // reviewclaw 하드코딩 forever-loop 스크립트를 봇 무관하게 일반화. serve-worker 엔진
+  // (runtime serve)은 advisory lock 으로 봇당 1워커 보장 — 이 명령은 durable 래퍼만 관리.
+  botsCmd
+    .command('worker <bot_id>')
+    .description(
+      'serve-worker(mailbox→dispatch) durable 관리 — start/stop/status. config.serve_worker_enabled 봇의 워커를 봇 무관하게 기동(휘발성 /tmp 스크립트 대체).',
+    )
+    .option('--start', 'durable forever-loop 워커 기동 (detached)')
+    .option('--stop', '워커 정지 (래퍼 + serve 프로세스)')
+    .action(async (botId: string, opts: { start?: boolean; stop?: boolean }) => {
+      const repoRoot = process.cwd();
+      const entry = path.join(repoRoot, 'packages/cli/src/index.ts');
+      const scriptPath = path.join(os.homedir(), '.semo', 'scripts', `${botId}-worker.sh`);
+      const logPath = path.join(os.homedir(), '.semo', 'logs', `${botId}-worker.log`);
+      const matchPat = `runtime serve --bot ${botId}`;
+      const findServe = (): string[] => {
+        try {
+          return execSync(`pgrep -f ${JSON.stringify(matchPat)}`, { encoding: 'utf8' })
+            .trim()
+            .split('\n')
+            .filter(Boolean);
+        } catch {
+          return []; // pgrep no-match → exit 1
+        }
+      };
+
+      // config 조회 (serve_worker_enabled / host_kind)
+      let cfg: Record<string, unknown> = {};
+      if (await isDbConnected()) {
+        try {
+          const r = await getPool().query<{ config: Record<string, unknown> | null }>(
+            `SELECT config FROM semo.bot_status WHERE bot_id = $1`,
+            [botId],
+          );
+          cfg = r.rows[0]?.config ?? {};
+        } catch {
+          /* ignore */
+        }
+      }
+      const enabled = String(cfg.serve_worker_enabled ?? '') === 'true';
+      const hostKind = (cfg.host_kind as string) ?? 'claude-code';
+
+      if (opts.stop) {
+        const running = findServe();
+        try {
+          execSync(`pkill -f ${JSON.stringify(scriptPath)}`, { stdio: 'ignore' }); // 래퍼 먼저
+        } catch {
+          /* 래퍼 없을 수 있음 */
+        }
+        for (const pid of running) {
+          try {
+            process.kill(Number(pid), 'SIGTERM');
+          } catch {
+            /* ignore */
+          }
+        }
+        console.log(
+          running.length
+            ? chalk.green(`✔ ${botId} 워커 정지 (${running.length} serve proc + 래퍼)`)
+            : chalk.gray(`  ${botId}: 실행 중인 serve 없음 (래퍼만 정리 시도)`),
+        );
+        await closeConnection();
+        process.exit(0);
+      }
+
+      if (opts.start) {
+        if (!enabled) {
+          console.log(
+            chalk.yellow(
+              `⚠ ${botId}: config.serve_worker_enabled != 'true' — DB config 에서 먼저 활성화 필요.`,
+            ),
+          );
+          await closeConnection();
+          process.exit(1);
+        }
+        if (findServe().length) {
+          console.log(
+            chalk.gray(`  ${botId}: 이미 실행 중 (advisory lock 보유) — skip(중복 방지).`),
+          );
+          await closeConnection();
+          process.exit(0);
+        }
+        if (!fs.existsSync(entry)) {
+          console.log(
+            chalk.red(`✗ ${entry} 없음 — repo 루트에서 실행 필요 (현재 cwd=${repoRoot}).`),
+          );
+          await closeConnection();
+          process.exit(1);
+        }
+        const script =
+          [
+            '#!/bin/bash',
+            `cd ${JSON.stringify(repoRoot)}`,
+            'set -a && source ~/.claude/semo/.env && set +a',
+            'while true; do',
+            `  npx tsx packages/cli/src/index.ts runtime serve --bot ${botId} \\`,
+            '    --max-message-age-ms 600000 --timeout-ms 120000 --interval-ms 3000',
+            `  echo "[${botId}-worker $(date +%H:%M:%S)] serve exited, restart in 3s"`,
+            '  sleep 3',
+            'done',
+          ].join('\n') + '\n';
+        fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
+        fs.mkdirSync(path.dirname(logPath), { recursive: true });
+        fs.writeFileSync(scriptPath, script, { mode: 0o755 });
+        const out = fs.openSync(logPath, 'a');
+        const child = spawn('bash', [scriptPath], { detached: true, stdio: ['ignore', out, out] });
+        child.unref();
+        console.log(
+          chalk.green(
+            `✔ ${botId} serve-worker 기동 (host=${hostKind}, pid ${child.pid})\n  script: ${scriptPath}\n  log: ${logPath}`,
+          ),
+        );
+        await closeConnection();
+        process.exit(0);
+      }
+
+      // default: status
+      const running = findServe();
+      console.log(chalk.cyan(`${botId} serve-worker 상태`));
+      console.log(
+        `  config.serve_worker_enabled: ${enabled ? chalk.green('true') : chalk.gray(String(cfg.serve_worker_enabled ?? '(미설정)'))}`,
+      );
+      console.log(`  host_kind: ${hostKind}`);
+      console.log(
+        `  실행 중 serve proc: ${running.length ? chalk.green(running.join(', ')) : chalk.gray('없음')}`,
+      );
+      console.log(
+        `  durable script: ${fs.existsSync(scriptPath) ? scriptPath : chalk.gray('(미생성)')}`,
+      );
+      await closeConnection();
       process.exit(0);
     });
 
