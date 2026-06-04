@@ -94,6 +94,30 @@ migration 008 승격, SEMO_RUNTIME_URL→serve 워커풀, agent_installs dispatc
 - 반영: Phase 0 신설(config SoT·worker lock·outbox dynamic), Phase 1=runtime prompt envelope, Phase 2=reviewclaw 단일 canary, 089 오해 정정→claim lock, 중복수신 dedupe+transport_owner, supervisor 하드닝+실패정책. 단계 재정렬.
 - Codex KB: not-needed(리뷰만).
 
+## 구현 현황 (2026-06-04 업데이트)
+
+**완료·커밋 (branch `feat/rebrand-semicolony-phase0`, 그 전엔 `feat/semi-colony-improvements`):**
+
+- **Phase 0 엔진**:
+  - worker advisory lock (`pg_try_advisory_lock(hashtext('semo-serve:'+bot))`) — 봇당 1 워커 보장.
+  - `bot_status.config` 직접 조회 SoT (testbot-dyn 으로 검증 — config 만으로 동적 에이전트 구동).
+  - **동적 persona envelope**(`loadPersonaEnvelope`: agent_personas.soul_md → agent_definitions.persona_prompt) → serve 가 프롬프트에 prepend (adapter-agnostic). `f704c07b`.
+  - **`--idle-exit-ms`** ephemeral 워커(큐 비면 종료). `96a757f1`.
+  - **`--max-message-age-ms`** stale 가드(오래된 orphan 메시지는 dispatch 없이 consume). `34ee71e9`.
+- **Phase 2 supervisor**: mailbox-supervisor (on-demand spawn + backoff + maxWorkers + SIGTERM 전파 + idle-exit/stale-guard args 주입). 테스트 6/6. `38ecc621` + 후속.
+- **ollama-cli 호스트 어댑터**(무인증 테스트 호스트, spawn+stdin). `f704c07b`.
+
+**E2E 증명**:
+
+- 동적 생성→실행: DB-only 에이전트(testbot-dyn) → serve → persona envelope → ollama → outbox(서명 일치). `processed=1`.
+- **Phase 1 reviewclaw 카나리**(2026-06-04): `inbox → serve-worker → OpenClawAdapter → gpt-5.5 → outbox → (기존 OutboxReader) → Slack` 전체 루프 동작. 라이브 OpenClaw 게이트웨이 무손상, auth 무영향. 카나리 메시지 정확 응답.
+- **발견**: serve-worker 가 묵은 orphan 백로그를 드레인하면 stale 응답이 실채널로 게시됨 → `--max-message-age-ms` 가드 신설(검증: 2일전 메시지 consume=1/dispatch=0). reviewclaw 백로그(11건) 전체 freeze.
+
+**남은 활성화 (의도적·관측 하 수행 필요)**:
+
+- 라이브 slack-router 가 supervisor 커밋(22:49) **이전(17:47) 기동** → 현재 `serve_worker_enabled` **inert**. Phase 1 auto-spawn 활성화 = **라이브 router 재기동(신코드)** 필요 — 전체 Slack 환경(Semi/Colony/operator) 영향 + Codex rebrand 세션과 동일 코드 경합 → 조율 후 단일 관측 단계로.
+- 활성화 절차: `serve_worker_enabled=true`(reviewclaw) + cmux pane 안에서 router 재기동(router-operations.md 준수) + 실 `@Semi→ROUTE:reviewclaw` 1건으로 auto-spawn→outbox→Slack 확인.
+
 ## 결정 기록
 
 KB `semo decision/dynamic-agent-runtime-redesign-2026-06-03` (예정).
