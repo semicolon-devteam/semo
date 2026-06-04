@@ -196,10 +196,14 @@ function buildAdapterFromHostKind(
       return new m.ClaudeCodeAdapter(ctorOpts);
     case 'codex-cli':
       return new m.CodexCliAdapter(ctorOpts);
-    case 'openclaw':
+    case 'openclaw': {
       if (opts.openclawBinary) ctorOpts.binaryPath = opts.openclawBinary;
+      // 자체 openclaw 프로필이 없는 동적/고객 에이전트는 config.openclaw_profile 로 기존 프로필 차용.
+      const ocProfile = (bot.config as Record<string, unknown> | undefined)?.openclaw_profile;
+      if (typeof ocProfile === 'string' && ocProfile) ctorOpts.profileOverride = ocProfile;
       // bot.config.openclaw_workspace 의 부모 디렉토리를 workspaceParent 로 (~/.openclaw-{bot} 패턴 유지).
       return new m.OpenClawAdapter(ctorOpts);
+    }
     case 'ollama-cli':
       ctorOpts.model = (bot.config as Record<string, unknown> | undefined)?.ollama_model;
       return new m.OllamaCliAdapter(ctorOpts);
