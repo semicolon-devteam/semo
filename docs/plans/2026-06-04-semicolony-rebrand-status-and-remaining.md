@@ -51,6 +51,28 @@
 - psql 미설치 → DB introspection은 `pg` read-only 스크립트(레포 내 실행).
 - 회사 자산(변경 금지): npm scope `@team-semicolon`, GitHub org `semicolon-devteam`, 도메인 `semi-colon.space`(서브도메인만), 봇 `Semi`/`Colony`, 불변 key `semobot`.
 
+## 4b. DB 스키마 copy + 코드 cutover-prep (2026-06-05 추가)
+
+사용자 결정으로 DB 스키마도 전면 교체 착수 — **copy(expand-contract) 후 이식** 방식.
+
+| 단계                   | 내용                                                                                                                                   | 커밋       | 검증                                                            |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ---------- | --------------------------------------------------------------- |
+| copy                   | `semo`→`semicolony` 스키마 **충실 복제**(테이블/데이터/시퀀스/FK/뷰/함수/트리거). `semo` 무손상. 스크립트 `scripts/clone-schema-*.mjs` | `a2ebb253` | 39테이블/8뷰/15시퀀스/32함수/20FK 일치, 전 테이블 행수 일치     |
+| cutover-prep(백엔드)   | 라이브 백엔드 45파일 `semo.<obj>`→`${DB_SCHEMA}` (allowlist 79객체, 단일따옴표 58건 백틱화). 기본 `'semo'`=동작 불변                   | `cb570e0e` | tsc 5패키지 exit0, smoke 정상, baseline 대비 테스트 실패 0 추가 |
+| cutover-prep(대시보드) | Next.js 50파일 동일 변환(단일따옴표 13건). `'use client'` 디렉티브 뒤 상수 주입                                                        | `79b414e7` | `next build` ✓ Compiled, 정적 56/56                             |
+
+### 남은 것 = **flip(활성화)만** — 1-env-change지만 조율 필요 (자율 실행 부적절)
+
+1. **delta 재동기**: copy 이후 `semo.*` 라이브 쓰기는 `semicolony`에 미반영 → flip 직전 재동기. 가장 단순 = `node scripts/clone-schema-semo-to-semicolony.mjs --reset`(현재 `semo`에서 전량 재복제).
+2. **env flip**: `SEMICOLONY_DB_SCHEMA=semicolony` 를 `~/.claude/semo/.env`(로컬·router·cron·cli) + 대시보드 배포 env + 봇 env(generate-bot-env)에 설정.
+3. **서비스 재기동**: slack-router/discord-router/cron-poller/kb-gateway + 대시보드 재배포.
+4. **검증**: smoke를 semicolony 스키마 대상으로.
+
+### ⚠️ flip 전 반드시 해결할 갭 (신규 발견)
+
+- **마이그레이션 러너 갭**: `migrations/*.sql` 은 `semo.` **하드코딩**(편집 금지 원칙). flip 후 신규 마이그레이션은 stale `semo` 스키마에 적용돼 **두 스키마 divergence** 발생. → flip 하려면 (a) 마이그레이션 템플릿/러너를 schema-aware로, 또는 (b) 마이그레이션은 양 스키마 동시 적용하도록 손봐야 함. **이 갭 해결 전 flip 금지.**
+- 권고: cutover-prep(코드 schema-parameterized)은 **안전·완료**. flip 자체는 invisible(내부 비노출)·고조율이고 위 갭이 남아, **기본 `'semo'` 유지(= flip-ready standby)** 가 현 시점 합리적. `semicolony` 스키마는 검증된 standby로 보존.
+
 ## 5. 참조
 
 - 결정: KB `semo/decision/rebrand-semo-to-semicolony-2026-06-04`
