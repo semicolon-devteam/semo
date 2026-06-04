@@ -494,8 +494,10 @@ const REPLY_WRAP_PERSONA = process.env.SEMO_REPLY_WRAP_PERSONA === '1';
 async function maybeWrapReplyPersona(
   msg: OutboxMessage,
 ): Promise<{ botId: string; text: string } | null> {
-  const isCustomer = msg.bot_id.startsWith('ag-');
-  if (!isCustomer && !REPLY_WRAP_PERSONA) return null;
+  // 봇 유형 특별처리 없이 "자체 Slack 토큰 보유" 단일 기준. 토큰 없는 봇(고객/serve-worker
+  // 전환 봇)은 항상 relay 필요. 토큰 있고 persona-wrap 옵트인도 아니면 relay/wrap 불필요.
+  const hasOwnToken = listBotsWithDedicatedToken().includes(msg.bot_id);
+  if (hasOwnToken && !REPLY_WRAP_PERSONA) return null;
   // commitment_id 가 outbox payload 에 없을 수 있으므로 channel/thread+bot_id 기반 lookup.
   let pipelineContext: {
     relay_as?: string;
@@ -525,7 +527,8 @@ async function maybeWrapReplyPersona(
     // 고객 에이전트는 commitment 없어도 relay 되어야 하므로 계속 진행(pipelineContext=null).
   }
   return resolveReplyRelay(msg, pipelineContext, {
-    customerRelayBotId: CUSTOMER_RELAY_BOT_ID,
+    relayBotId: CUSTOMER_RELAY_BOT_ID,
+    hasOwnSlackToken: hasOwnToken,
     replyWrapPersona: REPLY_WRAP_PERSONA,
   });
 }
