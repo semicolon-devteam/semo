@@ -17,7 +17,7 @@ export function registerModelsCommands(parent: Command): void {
     .action(async (opts: { json?: boolean }) => {
       const pool = getPool();
       const res = await pool.query(
-        `SELECT content FROM semo.knowledge_base WHERE domain = 'semo' AND key = 'models' AND sub_key = 'catalog'`,
+        `SELECT content FROM semo.knowledge_base WHERE domain = 'semicolony' AND key = 'models' AND sub_key = 'catalog'`,
       );
       const content = res.rows[0]?.content as string | undefined;
       if (!content) {
@@ -44,7 +44,7 @@ export function registerModelsCommands(parent: Command): void {
     .action(async (logical: string, modelId: string) => {
       const pool = getPool();
       const res = await pool.query(
-        `SELECT content FROM semo.knowledge_base WHERE domain = 'semo' AND key = 'models' AND sub_key = 'catalog'`,
+        `SELECT content FROM semo.knowledge_base WHERE domain = 'semicolony' AND key = 'models' AND sub_key = 'catalog'`,
       );
       const current = res.rows[0]?.content ? parseCatalog(res.rows[0].content) : {};
       current[logical] = modelId;
@@ -68,7 +68,7 @@ export function registerModelsCommands(parent: Command): void {
     .action(async (logical: string) => {
       const pool = getPool();
       const res = await pool.query(
-        `SELECT content FROM semo.knowledge_base WHERE domain = 'semo' AND key = 'models' AND sub_key = 'catalog'`,
+        `SELECT content FROM semo.knowledge_base WHERE domain = 'semicolony' AND key = 'models' AND sub_key = 'catalog'`,
       );
       if (!res.rows[0]?.content) {
         console.log(chalk.yellow('catalog 없음 — 제거할 것 없음'));

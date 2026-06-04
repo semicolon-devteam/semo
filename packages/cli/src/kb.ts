@@ -22,6 +22,16 @@ function combineKey(key: string, subKey: string): string {
   return subKey ? `${key}/${subKey}` : key;
 }
 
+// SEMO→semicolony 리브랜딩: legacy 플랫폼 도메인 'semo' 를 canonical 'semicolony' 로 정규화(alias).
+// `semo kb get/upsert/search/list semo …` (훅·스킬·봇이 쓰는 주 경로)와 PgKbStore 가 동일 canonical
+// 도메인으로 수렴 → dual-domain 정합성 유지. 구 'semo' 행은 frozen legacy.
+// rollback(코드 변경 없이): SEMO_PLATFORM_KB_DOMAIN=semo.
+const CANONICAL_KB_DOMAIN =
+  process.env.SEMICOLONY_PLATFORM_KB_DOMAIN ?? process.env.SEMO_PLATFORM_KB_DOMAIN ?? 'semicolony';
+function canonicalKbDomain(domain: string): string {
+  return domain === 'semo' ? CANONICAL_KB_DOMAIN : domain;
+}
+
 const ORDER_ALLOWLIST = ['updated_at', 'created_at', 'key', 'sub_key', 'domain'];
 const METADATA_ORDER_ALLOWLIST = [
   'status',
@@ -412,6 +422,7 @@ export async function kbList(
     offset?: number;
   },
 ): Promise<KBEntry[]> {
+  if (options.domain) options = { ...options, domain: canonicalKbDomain(options.domain) };
   const client = await pool.connect();
   const limit = options.limit || 50;
   const offset = options.offset || 0;
@@ -528,10 +539,11 @@ export async function kbCount(
  */
 export async function kbUpdateMetadata(
   pool: Pool,
-  domain: string,
+  domainArg: string,
   rawKey: string,
   metadataPatch: Record<string, unknown>,
 ): Promise<KBEntry | null> {
+  const domain = canonicalKbDomain(domainArg);
   const { key, subKey } = splitKey(rawKey);
   const client = await pool.connect();
   try {
@@ -714,6 +726,7 @@ export async function kbSearch(
     minScore?: number;
   },
 ): Promise<KBEntry[]> {
+  if (options.domain) options = { ...options, domain: canonicalKbDomain(options.domain) };
   const client = await pool.connect();
   const limit = options.limit || 10;
   const mode = options.mode || 'hybrid';
@@ -1103,10 +1116,11 @@ export async function kbDigest(
  */
 export async function kbGet(
   pool: Pool,
-  domain: string,
+  domainArg: string,
   rawKey: string,
   rawSubKey?: string,
 ): Promise<KBEntry | null> {
+  const domain = canonicalKbDomain(domainArg);
   let key: string;
   let subKey: string;
   if (rawSubKey !== undefined) {
@@ -1187,6 +1201,8 @@ export async function kbUpsert(
     expect_version?: number;
   },
 ): Promise<{ success: boolean; error?: string; warnings?: string[] }> {
+  // SEMO→semicolony: 쓰기 도메인도 canonical 로 정규화 → 신규 KB 쓰기는 'semicolony' 로 수렴.
+  entry = { ...entry, domain: canonicalKbDomain(entry.domain) };
   let key: string;
   let subKey: string;
   if (entry.sub_key !== undefined) {

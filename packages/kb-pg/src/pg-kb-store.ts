@@ -55,13 +55,24 @@ function rowToEntry(row: Row): KbEntry {
  * Phase 1a 어댑터: `get` / `search` 만 구현.
  * 쓰기/watch/transaction 은 Phase 1b/1c 에서 추가된다.
  */
+// SEMO→semicolony 리브랜딩: legacy 플랫폼 도메인 'semo' 를 canonical 'semicolony' 로 정규화(alias).
+// 모든 store read/write 가 단일 canonical 도메인으로 수렴 → `semo kb get/upsert semo …` (런타임 인자)
+// 와 하드코딩 store 접근이 모두 'semicolony' 행을 본다. 구 'semo' 행(376)은 frozen legacy.
+// rollback(코드 변경 없이): SEMO_PLATFORM_KB_DOMAIN=semo (또는 SEMICOLONY_PLATFORM_KB_DOMAIN=semo).
+const CANONICAL_PLATFORM_KB_DOMAIN =
+  process.env.SEMICOLONY_PLATFORM_KB_DOMAIN ?? process.env.SEMO_PLATFORM_KB_DOMAIN ?? 'semicolony';
+function canonicalKbDomain(domain: string): string {
+  return domain === 'semo' ? CANONICAL_PLATFORM_KB_DOMAIN : domain;
+}
+
 export class PgKbStore implements KbStore {
   constructor(
     private readonly pool: QueryRunner,
     private readonly embedding: EmbeddingProvider,
   ) {}
 
-  async get(domain: string, key: string, subKey?: string): Promise<KbEntry | null> {
+  async get(domainArg: string, key: string, subKey?: string): Promise<KbEntry | null> {
+    const domain = canonicalKbDomain(domainArg);
     const sql = `
       SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at
       FROM semo.knowledge_base
@@ -83,7 +94,7 @@ export class PgKbStore implements KbStore {
 
     if (opts.domain) {
       conditions.push(`domain = $${idx++}`);
-      params.push(opts.domain);
+      params.push(canonicalKbDomain(opts.domain));
     }
     if (opts.createdBy) {
       conditions.push(`created_by = $${idx++}`);
@@ -108,7 +119,8 @@ export class PgKbStore implements KbStore {
   }
 
   async upsert(input: UpsertInput): Promise<KbEntry> {
-    const { domain, key, subKey, content, createdBy, metadata } = input;
+    const { key, subKey, content, createdBy, metadata } = input;
+    const domain = canonicalKbDomain(input.domain);
     const subKeyVal = subKey ?? '';
 
     await this.validateOntology(domain);
@@ -145,7 +157,8 @@ export class PgKbStore implements KbStore {
   }
 
   async delete(input: DeleteInput): Promise<void> {
-    const { domain, key, subKey } = input;
+    const { key, subKey } = input;
+    const domain = canonicalKbDomain(input.domain);
     await this.pool.query(
       'DELETE FROM semo.knowledge_base WHERE domain = $1 AND key = $2 AND sub_key = $3',
       [domain, key, subKey ?? ''],
@@ -286,7 +299,7 @@ export class PgKbStore implements KbStore {
     let idx = 1;
     if (opts.domain) {
       conds.push(`domain = $${idx++}`);
-      params.push(opts.domain);
+      params.push(canonicalKbDomain(opts.domain));
     }
     if (opts.key) {
       conds.push(`key = $${idx++}`);
@@ -326,7 +339,7 @@ export class PgKbStore implements KbStore {
     let idx = 1;
     if (opts.domain) {
       conds.push(`domain = $${idx++}`);
-      params.push(opts.domain);
+      params.push(canonicalKbDomain(opts.domain));
     }
     if (opts.key) {
       conds.push(`key = $${idx++}`);

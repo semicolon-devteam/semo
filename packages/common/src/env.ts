@@ -31,5 +31,9 @@ export function resolveSemoHome(): string {
  */
 export const DB_SCHEMA: string = envDual('DB_SCHEMA') ?? 'semo';
 
-/** KB 플랫폼 도메인. Phase 0~2: `'semo'`. Phase 3 에서 `'semicolony'`. override: `*_PLATFORM_KB_DOMAIN`. */
-export const PLATFORM_KB_DOMAIN: string = envDual('PLATFORM_KB_DOMAIN') ?? 'semo';
+/**
+ * KB 플랫폼 도메인. Phase 3 에서 `'semo'` → `'semicolony'` flip 완료.
+ * KB 스토어(pg-kb-store)가 legacy 'semo' 를 canonical 로 정규화하므로 dual-domain 정합성 유지.
+ * rollback(코드 변경 없이): `SEMO_PLATFORM_KB_DOMAIN=semo`.
+ */
+export const PLATFORM_KB_DOMAIN: string = envDual('PLATFORM_KB_DOMAIN') ?? 'semicolony';

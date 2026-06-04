@@ -557,7 +557,7 @@ async function loadOpenClawBots(): Promise<{
   try {
     const res = await pool.query(
       `SELECT metadata FROM semo.knowledge_base
-       WHERE domain = 'semo' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '')
+       WHERE domain = 'semicolony' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '')
        LIMIT 1`,
     );
     const meta = res.rows[0]?.metadata as
@@ -953,7 +953,7 @@ async function composeSemoBotIncident(slug: string | null): Promise<string> {
       }>(
         `SELECT sub_key, content, metadata, updated_at
          FROM semo.knowledge_base
-         WHERE domain = 'semo' AND key = 'incident' AND sub_key = $1`,
+         WHERE domain = 'semicolony' AND key = 'incident' AND sub_key = $1`,
         [slug],
       );
       if (rows.length === 0) {
@@ -991,7 +991,7 @@ async function composeSemoBotIncident(slug: string | null): Promise<string> {
          metadata->>'severity' AS severity,
          metadata->>'occurred_at' AS occurred_at
        FROM semo.knowledge_base
-       WHERE domain = 'semo' AND key = 'incident'
+       WHERE domain = 'semicolony' AND key = 'incident'
          AND COALESCE(metadata->>'status', 'open') NOT IN ('resolved', 'postmortem', 'closed')
        ORDER BY metadata->>'occurred_at' DESC NULLS LAST
        LIMIT 10`,
@@ -2572,7 +2572,7 @@ async function start(): Promise<void> {
     try {
       const kb = await pool.query<{ content: string }>(
         `SELECT content FROM semo.knowledge_base
-          WHERE domain = 'semo' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '') LIMIT 1`,
+          WHERE domain = 'semicolony' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '') LIMIT 1`,
       );
       if (kb.rows[0]?.content) displayMeta = parseBotIdsDisplayMeta(kb.rows[0].content);
     } catch {

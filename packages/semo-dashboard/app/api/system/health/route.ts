@@ -64,7 +64,7 @@ async function loadOpenClawBotIds(): Promise<Set<string>> {
   try {
     const res = await query<{ metadata: { runtime_source?: Record<string, string> } | null }>(
       `SELECT metadata FROM semo.knowledge_base
-       WHERE domain = 'semo' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '')
+       WHERE domain = 'semicolony' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '')
        LIMIT 1`,
     );
     const map = res.rows[0]?.metadata?.runtime_source ?? {};

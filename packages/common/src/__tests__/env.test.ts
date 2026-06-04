@@ -63,14 +63,14 @@ describe('envDual / resolveSemoHome (SEMO→semicolony 호환 레이어)', () =>
   });
 
   describe('DB_SCHEMA / PLATFORM_KB_DOMAIN', () => {
-    it("Phase 0 기본값은 'semo' (DB/KB 마이그레이션 전이라 동작 불변)", async () => {
+    it("DB_SCHEMA 기본값은 'semo'(스키마 move 보류), PLATFORM_KB_DOMAIN 은 'semicolony'(Phase 3 flip)", async () => {
       delete process.env.SEMO_DB_SCHEMA;
       delete process.env.SEMICOLONY_DB_SCHEMA;
       delete process.env.SEMO_PLATFORM_KB_DOMAIN;
       delete process.env.SEMICOLONY_PLATFORM_KB_DOMAIN;
       const { DB_SCHEMA, PLATFORM_KB_DOMAIN } = await load();
       expect(DB_SCHEMA).toBe('semo');
-      expect(PLATFORM_KB_DOMAIN).toBe('semo');
+      expect(PLATFORM_KB_DOMAIN).toBe('semicolony');
     });
     it('env 로 오버라이드 가능 (Phase 3 flip 또는 운영 override)', async () => {
       process.env.SEMICOLONY_DB_SCHEMA = 'semicolony';
