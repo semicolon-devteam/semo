@@ -446,6 +446,115 @@ export async function syncWorkspaceFiles(
 // Command registration
 // ============================================================
 
+// ── 봇 프로필 캐시 정리 (DB-driven 전환 P0) ──────────────────────────────
+// 설계: docs/superpowers/specs/2026-06-04-db-driven-bot-architecture-design.md
+// 재생성 가능 캐시(.bak/completions/*-last-rendered/update-check/오래된 로그)만 대상.
+// SoT(openclaw.json/agent-spec/identity/cron) · 시크릿(auth/credential/device) · 메모리 · mailbox
+// · .openclaw/ 미러(auth 포함)는 **절대 미삭제**(이중 가드). dry-run 기본.
+interface CacheTarget {
+  path: string;
+  bytes: number;
+  kind: string;
+}
+
+function pathSizeBytes(p: string): number {
+  try {
+    const st = fs.statSync(p);
+    if (!st.isDirectory()) return st.size;
+    let total = 0;
+    for (const e of fs.readdirSync(p)) total += pathSizeBytes(path.join(p, e));
+    return total;
+  } catch {
+    return 0;
+  }
+}
+
+const CACHE_PROTECTED_SUBSTR = [
+  'identity',
+  'auth',
+  'credential',
+  'secret',
+  'memory',
+  'device',
+  '.openclaw/',
+  '/mailbox',
+  'cron/jobs.json',
+];
+function isCacheProtected(p: string): boolean {
+  const low = p.toLowerCase();
+  return CACHE_PROTECTED_SUBSTR.some((s) => low.includes(s.toLowerCase()));
+}
+
+function humanBytes(n: number): string {
+  if (n < 1024) return n + 'B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + 'K';
+  if (n < 1073741824) return (n / 1048576).toFixed(1) + 'M';
+  return (n / 1073741824).toFixed(2) + 'G';
+}
+
+function classifyBotCacheTargets(botId: string): CacheTarget[] {
+  const profile = path.join(os.homedir(), `.openclaw-${botId}`);
+  if (!fs.existsSync(profile)) return [];
+  const out: CacheTarget[] = [];
+  let entries: string[] = [];
+  try {
+    entries = fs.readdirSync(profile);
+  } catch {
+    return [];
+  }
+  const push = (p: string, kind: string) => {
+    if (!isCacheProtected(p) && fs.existsSync(p)) out.push({ path: p, bytes: pathSizeBytes(p), kind });
+  };
+
+  // 1) config 백업 *.bak* — .last-good 과 가장 최근 1개는 안전망으로 보존
+  const baks = entries
+    .filter((e) => /\.bak($|[.\-])/.test(e) && !e.includes('last-good'))
+    .map((e) => {
+      let m = 0;
+      try {
+        m = fs.statSync(path.join(profile, e)).mtimeMs;
+      } catch {
+        /* ignore */
+      }
+      return { e, m };
+    })
+    .sort((a, b) => b.m - a.m);
+  baks.slice(1).forEach(({ e }) => push(path.join(profile, e), 'config-backup'));
+
+  // 2) *-last-rendered.json (렌더 아티팩트)
+  entries
+    .filter((e) => e.includes('last-rendered'))
+    .forEach((e) => push(path.join(profile, e), 'render-artifact'));
+
+  // 3) completions/ (쉘 자동완성 — 재생성)
+  push(path.join(profile, 'completions'), 'completions');
+
+  // 4) update-check.json (버전 체크 캐시)
+  push(path.join(profile, 'update-check.json'), 'version-cache');
+
+  // 5) logs/*.log 중 7일+ 오래된 것만
+  const logs = path.join(profile, 'logs');
+  if (fs.existsSync(logs)) {
+    const weekAgo = Date.now() - 7 * 86_400_000;
+    try {
+      for (const e of fs.readdirSync(logs)) {
+        const p = path.join(logs, e);
+        try {
+          const st = fs.statSync(p);
+          if (st.isFile() && /\.log(\.|$)/.test(e) && st.mtimeMs < weekAgo) {
+            push(p, 'old-log');
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return out.filter((t) => !isCacheProtected(t.path));
+}
+
 export function registerBotsCommands(program: Command): void {
   const botsCmd = program.command('bots').description('봇 상태 조회 및 관리 (semo.bot_status)');
 
@@ -453,6 +562,74 @@ export function registerBotsCommands(program: Command): void {
   registerBotsFactoryCommands(botsCmd);
   registerInboxPumpCommand(botsCmd);
   registerBotsServiceCommand(botsCmd);
+
+  // ── semo bots clean-cache (DB-driven 전환 P0) ──────────────────────
+  botsCmd
+    .command('clean-cache')
+    .description(
+      '봇 OpenClaw 프로필의 재생성 가능 캐시 정리 (dry-run 기본; --apply로 실삭제). SoT/시크릿/메모리/mailbox/.openclaw 미러는 절대 미삭제.',
+    )
+    .option('--bot <id>', '특정 봇')
+    .option('--all', '모든 ~/.openclaw-* 봇')
+    .option('--apply', '실제 삭제 (기본은 dry-run)')
+    .action(async (opts: { bot?: string; all?: boolean; apply?: boolean }) => {
+      let bots: string[] = [];
+      if (opts.bot) bots = [opts.bot];
+      else if (opts.all) {
+        try {
+          bots = fs
+            .readdirSync(os.homedir())
+            .filter((d) => d.startsWith('.openclaw-') && !d.includes('shared'))
+            .map((d) => d.replace(/^\.openclaw-/, ''));
+        } catch {
+          /* ignore */
+        }
+      } else {
+        console.error(chalk.red('✗ --bot <id> 또는 --all 필요'));
+        process.exit(1);
+      }
+      let grandTotal = 0;
+      let grandCount = 0;
+      for (const botId of bots) {
+        const targets = classifyBotCacheTargets(botId);
+        if (!targets.length) {
+          console.log(chalk.gray(`  ${botId}: 정리 대상 없음`));
+          continue;
+        }
+        const sum = targets.reduce((a, t) => a + t.bytes, 0);
+        grandTotal += sum;
+        grandCount += targets.length;
+        console.log(
+          chalk.cyan(
+            `\n${botId} — ${targets.length}건, ${humanBytes(sum)} ${opts.apply ? '삭제' : '(dry-run)'}`,
+          ),
+        );
+        const byKind: Record<string, { n: number; b: number }> = {};
+        for (const t of targets) {
+          (byKind[t.kind] ??= { n: 0, b: 0 }).n++;
+          byKind[t.kind].b += t.bytes;
+        }
+        for (const [k, v] of Object.entries(byKind)) {
+          console.log(`  ${k}: ${v.n}건 ${humanBytes(v.b)}`);
+        }
+        if (opts.apply) {
+          for (const t of targets) {
+            if (isCacheProtected(t.path)) continue; // 이중 가드
+            try {
+              fs.rmSync(t.path, { recursive: true, force: true });
+            } catch (e) {
+              console.warn(chalk.yellow(`  skip ${t.path}: ${(e as Error).message}`));
+            }
+          }
+        }
+      }
+      console.log(
+        chalk[opts.apply ? 'green' : 'yellow'](
+          `\n총 ${grandCount}건 ${humanBytes(grandTotal)} ${opts.apply ? '삭제 완료' : 'dry-run (--apply 로 실제 삭제)'}`,
+        ),
+      );
+      process.exit(0);
+    });
 
   // ── semo bots routing-audit ────────────────────────────────
   // S1 (Codex 권고): hint suggested_bot vs 최종 escalation target 불일치 추출.

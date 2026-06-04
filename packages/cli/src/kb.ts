@@ -28,8 +28,20 @@ function combineKey(key: string, subKey: string): string {
 // rollback(코드 변경 없이): SEMO_PLATFORM_KB_DOMAIN=semo.
 const CANONICAL_KB_DOMAIN =
   process.env.SEMICOLONY_PLATFORM_KB_DOMAIN ?? process.env.SEMO_PLATFORM_KB_DOMAIN ?? 'semicolony';
+let legacyKbDomainWarned = false;
 function canonicalKbDomain(domain: string): string {
-  return domain === 'semo' ? CANONICAL_KB_DOMAIN : domain;
+  if (domain === 'semo' && CANONICAL_KB_DOMAIN !== 'semo') {
+    if (!legacyKbDomainWarned && process.env.SEMICOLONY_SUPPRESS_DEPRECATION !== '1') {
+      legacyKbDomainWarned = true;
+      process.stderr.write(
+        "[semicolony] KB 도메인 'semo'는 'semicolony'로 리브랜딩됨(alias 자동변환). " +
+          "'semicolony' 사용 권장 · 미마이그레이션 DB면 'semo'로 자동 fallback. " +
+          'guide: packages/cli/MIGRATION-semo-to-semicolony.md\n',
+      );
+    }
+    return CANONICAL_KB_DOMAIN;
+  }
+  return domain;
 }
 
 const ORDER_ALLOWLIST = ['updated_at', 'created_at', 'key', 'sub_key', 'domain'];
@@ -1140,13 +1152,16 @@ export async function kbGet(
 
   const client = await pool.connect();
   try {
-    const result = await client.query(
-      `SELECT domain, key, sub_key, content, metadata, created_by, version,
+    const sql = `SELECT domain, key, sub_key, content, metadata, created_by, version,
               created_at::text, updated_at::text
        FROM semo.knowledge_base
-       WHERE domain = $1 AND key = $2 AND sub_key = $3`,
-      [domain, key, subKey],
-    );
+       WHERE domain = $1 AND key = $2 AND sub_key = $3`;
+    let result = await client.query(sql, [domain, key, subKey]);
+    // backward-safe: canonical 도메인이 비고 legacy 로 alias 된 경우 원본으로 fallback
+    // → migration 127 미적용 DB/구 환경에서도 데이터를 찾는다.
+    if (result.rows.length === 0 && domain !== domainArg) {
+      result = await client.query(sql, [domainArg, key, subKey]);
+    }
     return result.rows[0] || null;
   } finally {
     client.release();

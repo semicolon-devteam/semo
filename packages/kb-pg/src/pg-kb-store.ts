@@ -61,8 +61,20 @@ function rowToEntry(row: Row): KbEntry {
 // rollback(코드 변경 없이): SEMO_PLATFORM_KB_DOMAIN=semo (또는 SEMICOLONY_PLATFORM_KB_DOMAIN=semo).
 const CANONICAL_PLATFORM_KB_DOMAIN =
   process.env.SEMICOLONY_PLATFORM_KB_DOMAIN ?? process.env.SEMO_PLATFORM_KB_DOMAIN ?? 'semicolony';
+let legacyKbDomainWarned = false;
 function canonicalKbDomain(domain: string): string {
-  return domain === 'semo' ? CANONICAL_PLATFORM_KB_DOMAIN : domain;
+  if (domain === 'semo' && CANONICAL_PLATFORM_KB_DOMAIN !== 'semo') {
+    if (!legacyKbDomainWarned && process.env.SEMICOLONY_SUPPRESS_DEPRECATION !== '1') {
+      legacyKbDomainWarned = true;
+      process.stderr.write(
+        "[semicolony] KB 도메인 'semo'는 'semicolony'로 리브랜딩됨(alias 자동변환). " +
+          "'semicolony' 사용 권장 · 미마이그레이션 DB면 'semo'로 자동 fallback. " +
+          'guide: packages/cli/MIGRATION-semo-to-semicolony.md\n',
+      );
+    }
+    return CANONICAL_PLATFORM_KB_DOMAIN;
+  }
+  return domain;
 }
 
 export class PgKbStore implements KbStore {
@@ -79,7 +91,13 @@ export class PgKbStore implements KbStore {
       WHERE domain = $1 AND key = $2 AND sub_key = $3
     `;
     const res = await this.pool.query(sql, [domain, key, subKey ?? '']);
-    const row = res.rows[0];
+    let row = res.rows[0];
+    // backward-safe: canonical 도메인이 비고(=migration 127 미적용 등) legacy 로 alias 된 경우
+    // 원본(legacy) 도메인으로 fallback 조회 → 구 환경/미마이그레이션 DB 에서도 데이터를 찾는다.
+    if (!row && domain !== domainArg) {
+      const fb = await this.pool.query(sql, [domainArg, key, subKey ?? '']);
+      row = fb.rows[0];
+    }
     if (!row) return null;
     return rowToEntry(row);
   }
