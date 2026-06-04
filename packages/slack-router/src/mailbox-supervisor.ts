@@ -23,6 +23,8 @@ export interface SupervisorOptions {
   respawnBackoffMs?: number;
   /** 워커 ephemeral idle-exit (ms). serve 가 이 시간 동안 새 메시지 없으면 종료 → 다음 도착 시 재spawn. 0=forever. */
   idleExitMs?: number;
+  /** stale 가드 (ms). 이 나이보다 오래된 inbox 메시지는 dispatch 없이 소비 — orphan 백로그 드레인 방지. 0=비활성. */
+  maxMessageAgeMs?: number;
   /** 워커 로그 파일 디렉토리(없으면 부모 stdio inherit). */
   logDir?: string;
   /** spawn 함수 주입(테스트용). */
@@ -45,6 +47,7 @@ export class MailboxSupervisor {
   private readonly maxWorkers: number;
   private readonly respawnBackoffMs: number;
   private readonly idleExitMs: number;
+  private readonly maxMessageAgeMs: number;
   private readonly spawnFn: typeof spawn;
   private readonly env: NodeJS.ProcessEnv;
   private readonly log: (msg: string) => void;
@@ -56,6 +59,7 @@ export class MailboxSupervisor {
     this.maxWorkers = opts.maxWorkers ?? 12;
     this.respawnBackoffMs = opts.respawnBackoffMs ?? 15_000;
     this.idleExitMs = opts.idleExitMs ?? 60_000;
+    this.maxMessageAgeMs = opts.maxMessageAgeMs ?? 600_000; // 기본 10분 — orphan 백로그 드레인 차단
     this.spawnFn = opts.spawnFn ?? spawn;
     this.env = opts.env ?? process.env;
     this.log = opts.log ?? ((m) => console.log(m));
@@ -92,6 +96,8 @@ export class MailboxSupervisor {
     const args = [...preArgs, 'runtime', 'serve', '--bot', botId];
     // ephemeral: idle 초과 시 워커 자가 종료 → 새 inbox 도착 시 supervisor 가 재spawn (좀비/유휴 방지).
     if (this.idleExitMs > 0) args.push('--idle-exit-ms', String(this.idleExitMs));
+    // stale 가드: 묵은 orphan 백로그를 실채널로 흘리지 않도록 오래된 메시지는 skip.
+    if (this.maxMessageAgeMs > 0) args.push('--max-message-age-ms', String(this.maxMessageAgeMs));
     const child = this.spawnFn(cmd, args, {
       cwd: this.cwd,
       env: this.env,

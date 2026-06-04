@@ -20,7 +20,8 @@ function makeSup(over = {}) {
     spawnFn: fn as any,
     log: () => {},
     respawnBackoffMs: 1000,
-    idleExitMs: 0, // 기존 args 단언 보존 — idle-exit 는 전용 테스트에서 검증
+    idleExitMs: 0, // 기존 args 단언 보존 — idle-exit/stale-guard 는 전용 테스트에서 검증
+    maxMessageAgeMs: 0,
     ...over,
   });
   return { sup, fn, children };
@@ -37,8 +38,12 @@ describe('MailboxSupervisor', () => {
     expect(sup.activeBots()).toEqual(['jumuni']);
   });
 
-  it('idleExitMs>0 이면 spawn args 에 --idle-exit-ms 주입', () => {
-    const { sup, fn } = makeSup({ serveCommand: ['semo'], idleExitMs: 60_000 });
+  it('idleExitMs/maxMessageAgeMs>0 이면 spawn args 에 플래그 주입', () => {
+    const { sup, fn } = makeSup({
+      serveCommand: ['semo'],
+      idleExitMs: 60_000,
+      maxMessageAgeMs: 600_000,
+    });
     expect(sup.ensureWorker('jumuni')).toBe('spawned');
     expect(fn.mock.calls[0][1]).toEqual([
       'runtime',
@@ -47,6 +52,8 @@ describe('MailboxSupervisor', () => {
       'jumuni',
       '--idle-exit-ms',
       '60000',
+      '--max-message-age-ms',
+      '600000',
     ]);
   });
 

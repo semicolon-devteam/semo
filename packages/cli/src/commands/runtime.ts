@@ -464,6 +464,11 @@ export function registerRuntimeCommands(program: Command): void {
       'forever 모드에서 이 시간(ms) 동안 새 메시지가 없으면 종료 (ephemeral 워커; 0=비활성)',
       '0',
     )
+    .option(
+      '--max-message-age-ms <n>',
+      'inbox 메시지가 이 나이(ms)보다 오래됐으면 dispatch 없이 consumed 처리 (stale 백로그 드레인 방지; 0=비활성)',
+      '0',
+    )
     .option('--openclaw-binary <path>', 'openclaw 바이너리 절대경로 (PATH 미등록 환경)')
     .option('--hermes-binary <path>', 'hermes 바이너리 절대경로 (PATH 미등록 환경)')
     .option('--hermes-home <path>', 'Hermes HERMES_HOME 격리 디렉토리')
@@ -489,6 +494,7 @@ export function registerRuntimeCommands(program: Command): void {
         intervalMs: string;
         once?: boolean;
         idleExitMs?: string;
+        maxMessageAgeMs?: string;
         openclawBinary?: string;
         hermesBinary?: string;
         hermesHome?: string;
@@ -619,6 +625,7 @@ export function registerRuntimeCommands(program: Command): void {
         const intervalMs = Math.max(1000, Number(opts.intervalMs));
         const timeoutMs = Math.max(5000, Number(opts.timeoutMs));
         const idleExitMs = Math.max(0, Number(opts.idleExitMs ?? 0));
+        const maxMessageAgeMs = Math.max(0, Number(opts.maxMessageAgeMs ?? 0));
         const sessionTtlMs = Math.max(0, Number(opts.sessionTtlMs));
         if (opts.resetSessionMap && fs.existsSync(sessionMapPath)) fs.unlinkSync(sessionMapPath);
 
@@ -628,7 +635,10 @@ export function registerRuntimeCommands(program: Command): void {
         console.log(`  mailbox:    ${chalk.gray(mboxDir)}`);
         console.log(`  interval:   ${intervalMs}ms`);
         console.log(
-          `  mode:       ${opts.once ? 'once' : idleExitMs > 0 ? `ephemeral(idle-exit ${idleExitMs}ms)` : 'forever'}\n`,
+          `  mode:       ${opts.once ? 'once' : idleExitMs > 0 ? `ephemeral(idle-exit ${idleExitMs}ms)` : 'forever'}`,
+        );
+        console.log(
+          `  stale-guard: ${maxMessageAgeMs > 0 ? `${maxMessageAgeMs}ms 초과 메시지 skip` : 'off'}\n`,
         );
 
         let stopRequested = false;
@@ -645,6 +655,7 @@ export function registerRuntimeCommands(program: Command): void {
 
         let totalProcessed = 0;
         let totalErrors = 0;
+        let totalStaleSkipped = 0;
         let lastActivityAt = Date.now();
 
         while (!stopRequested) {
@@ -657,6 +668,20 @@ export function registerRuntimeCommands(program: Command): void {
               if (msg.type !== 'message') {
                 appendConsumed(consumedPath, msg.id);
                 continue;
+              }
+              // stale 가드: 너무 오래된 메시지는 dispatch 없이 소비 (orphan 백로그 드레인 → 실채널 노이즈 방지).
+              if (maxMessageAgeMs > 0 && typeof msg.timestamp === 'string') {
+                const msgTs = Date.parse(msg.timestamp);
+                if (Number.isFinite(msgTs) && Date.now() - msgTs > maxMessageAgeMs) {
+                  appendConsumed(consumedPath, msg.id);
+                  totalStaleSkipped++;
+                  console.log(
+                    chalk.yellow(
+                      `[serve] stale skip ${msg.id.slice(0, 8)} (age ${Math.round((Date.now() - msgTs) / 1000)}s > ${Math.round(maxMessageAgeMs / 1000)}s)`,
+                    ),
+                  );
+                  continue;
+                }
               }
               const t0 = Date.now();
               process.stdout.write(
@@ -771,7 +796,9 @@ export function registerRuntimeCommands(program: Command): void {
         }
 
         console.log(
-          chalk.gray(`\n[serve] 종료. processed=${totalProcessed}, errors=${totalErrors}`),
+          chalk.gray(
+            `\n[serve] 종료. processed=${totalProcessed}, errors=${totalErrors}, staleSkipped=${totalStaleSkipped}`,
+          ),
         );
         await closeConnection();
         process.exit(0);
