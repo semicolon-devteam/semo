@@ -162,3 +162,65 @@ export async function listAgents(): Promise<AgentListItem[]> {
     };
   });
 }
+
+export interface CommitmentQueueItem {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  source_type: string | null;
+  runtime_source: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  last_heartbeat_at: string | null;
+  age_seconds: number | null;
+}
+
+interface CommitmentQueueRow {
+  id: string;
+  title: string | null;
+  description: string | null;
+  status: string;
+  source_type: string | null;
+  runtime_source: string | null;
+  created_at: string | Date | null;
+  updated_at: string | Date | null;
+  last_heartbeat_at: string | Date | null;
+  age_seconds: string | number | null;
+}
+
+/**
+ * 한 에이전트의 진행 중 작업 큐 — active/stale 커밋먼트를 created_at 오름차순(오래된 것 먼저)으로.
+ * spec Phase 5(동적 위임 가시화): 에이전트가 지금 무엇을 순차 처리 중인지 대시보드에서 본다.
+ * 동시성=봇당 1 모델이라 보통 active 1 + 대기열이 보인다.
+ */
+export async function getAgentCommitmentQueue(
+  botId: string,
+  options: { limit?: number } = {},
+): Promise<CommitmentQueueItem[]> {
+  const limit = Math.min(Math.max(options.limit ?? 50, 1), 200);
+  const result = await query<CommitmentQueueRow>(
+    `
+      SELECT id, title, description, status, source_type, runtime_source,
+             created_at, updated_at, last_heartbeat_at,
+             EXTRACT(EPOCH FROM (NOW() - created_at))::int AS age_seconds
+      FROM semo.bot_commitments
+      WHERE bot_id = $1 AND status IN ('active', 'stale')
+      ORDER BY created_at ASC
+      LIMIT $2
+    `,
+    [botId, limit],
+  );
+  return result.rows.map((row) => ({
+    id: row.id,
+    title: row.title || '(제목 없음)',
+    description: row.description,
+    status: row.status,
+    source_type: row.source_type,
+    runtime_source: row.runtime_source,
+    created_at: toIsoString(row.created_at),
+    updated_at: toIsoString(row.updated_at),
+    last_heartbeat_at: toIsoString(row.last_heartbeat_at),
+    age_seconds: toNullableNumber(row.age_seconds),
+  }));
+}
