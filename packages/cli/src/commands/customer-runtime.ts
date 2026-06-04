@@ -46,6 +46,7 @@ interface InstallRow {
   instance_name: string | null;
   tenant_id: string;
   tenant_slug: string;
+  tenant_display_name: string | null;
   listing_id: string;
   agent_slug: string;
   display_name: string;
@@ -54,6 +55,31 @@ interface InstallRow {
   short_desc: string | null;
   dept: string | null;
   skills: unknown;
+  persona_template: string | null;
+  persona_override: string | null;
+}
+
+/** 라이브러리 템플릿/고객 override 의 플레이스홀더를 테넌트 정보로 치환. */
+function fillPlaceholders(text: string, row: InstallRow): string {
+  const company = row.tenant_display_name || row.tenant_slug;
+  return text
+    .replace(/\{회사명\}/g, company)
+    .replace(/\{회사\}/g, company)
+    .replace(/\{tenant\}/gi, company);
+}
+
+/**
+ * 설치된 customer 에이전트의 런타임 soul 해소:
+ * 고객 override > 라이브러리 persona_template > listing 메타 합성. (커스터마이즈 우선)
+ */
+export function resolveCustomerSoul(row: InstallRow): string {
+  if (row.persona_override && row.persona_override.trim()) {
+    return fillPlaceholders(row.persona_override, row);
+  }
+  if (row.persona_template && row.persona_template.trim()) {
+    return fillPlaceholders(row.persona_template, row);
+  }
+  return buildCustomerSoul(row);
 }
 
 function skillsText(skills: unknown): string {
@@ -88,10 +114,10 @@ export function buildCustomerSoul(row: {
 async function loadInstall(installId: string): Promise<InstallRow | null> {
   const pool = getPool();
   const r = await pool.query<InstallRow>(
-    `SELECT i.id AS install_id, i.instance_name,
-            t.id AS tenant_id, t.slug AS tenant_slug,
+    `SELECT i.id AS install_id, i.instance_name, i.persona_override,
+            t.id AS tenant_id, t.slug AS tenant_slug, t.display_name AS tenant_display_name,
             l.id AS listing_id, l.agent_slug, l.display_name, l.role_label,
-            l.bio, l.short_desc, l.dept, l.skills
+            l.bio, l.short_desc, l.dept, l.skills, l.persona_template
      FROM public.agent_installs i
      JOIN public.tenants t ON t.id = i.tenant_id
      JOIN public.agent_listings l ON l.id = i.listing_id
@@ -139,7 +165,8 @@ export async function projectInstallToBotStatus(
     [botId, row.instance_name || row.display_name, row.role_label, JSON.stringify(config)],
   );
 
-  const soul = buildCustomerSoul(row);
+  const soul = resolveCustomerSoul(row);
+  const nickname = row.instance_name || row.display_name; // 고객이 정한 닉네임 우선
   await pool.query(
     `INSERT INTO semo.agent_personas (slug, display_name, soul_md, version, status, updated_by, created_at, updated_at)
      VALUES ($1, $2, $3, 1, 'active', 'customer-projection', now(), now())
@@ -148,14 +175,14 @@ export async function projectInstallToBotStatus(
            soul_md = EXCLUDED.soul_md,
            version = semo.agent_personas.version + 1,
            updated_at = now()`,
-    [botId, row.display_name, soul],
+    [botId, nickname, soul],
   );
 
   return {
     botId,
     tenantSlug: row.tenant_slug,
     agentSlug: row.agent_slug,
-    displayName: row.display_name,
+    displayName: nickname,
     roleLabel: row.role_label,
     hostKind,
   };
