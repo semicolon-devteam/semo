@@ -89,3 +89,22 @@ customer agent를 별도 런타임으로 만들지 않는다. **각 활성 `agen
 1. 프로젝션: agent*install 1건 → bot_status 행 생성 → `runtime serve --bot ag*{id} --once`로 dispatch 확인.
 2. 해소: resolveAgentForRequest 단위테스트(풀히트/라이브러리히트/none→2-B).
 3. E2E(canary): fresh 메시지→해소→(생성)→프로젝션→serve→outbox→스레드(benign 채널) 확인. 기존 reviewclaw 패턴.
+
+## 구현 현황 (2026-06-04 — MVP 슬라이스 완료)
+
+**완료·커밋** (`packages/cli/src/commands/customer-runtime.ts`, branch `feat/rebrand-semicolony-phase0`):
+
+- **P1 프로젝션 브릿지** `projectInstallToBotStatus` — agent_install → bot_status + agent_personas(soul). bot_id 규약 `ag-{tenant}-{agent}`. 멱등. `semo customer project`. ✅
+- **P2 해소** `resolveAgentForRequest` — 풀→라이브러리→none, 규칙기반 스코어(키워드 적중률, threshold 0.34). `createPlainAgent`(2-B: listing draft/private + install + 프로젝션 + action_items 어드민 알림). `semo customer resolve|create`. ✅
+- **오케스트레이션** `delegateToCustomerAgent` — 해소→(2-A 설치/2-B 생성)→프로젝션→busy 체크→mailbox dispatch + bot_commitment(active, 원 스레드 보존). `isAgentBusy`. busy면 status='busy'+busyTitle. `semo customer delegate`. ✅
+- **실행** = 기존 serve-worker 엔진 재사용(프로젝션 bot_status.host_kind). 변경 0. ✅
+- 단위테스트 6/6(scoreAgent/buildCustomerSoul/customerBotId). tsc/lint clean.
+
+**검증된 시퀀스(Mark 케이스)**: `delegate(team-semicolon, "조사")` → 풀에 researcher 없음→2-B 생성→재해소 매칭(1.0)→dispatch+commitment(ch=C0B4V8667PT 보존)→재위임 busy 감지→serve-worker 실행(리서처 persona)→outbox(채널 보존). MVP는 host=ollama(무인증 toy) — 실 웹조사는 host swap.
+
+**남은 라이브 통합(미완, 고객-facing 라우터 영향)**:
+
+- **P3 Semi 라우팅**: `SlackMessage`/`handleOrchestrator` 에 tenant context 추가 → 고객 요청 시 `delegateToCustomerAgent` 호출(현재는 internal-bot ROUTE만). 채널→tenant resolver(`tenant_channels` 적재). **라이브 Semi(고객-facing) 수정 → 조율 필요.**
+- **결과 전달**: OutboxReader 가 customer 프로젝션 bot 의 outbox 를 watch → 원 스레드 포스팅 + commitment done. (현재 watch 목록에 customer bot 포함 필요.)
+- **실 호스트**: customer 에이전트용 web-capable host(openclaw/hermes+web) 프로비저닝(ollama 는 골격검증용 toy).
+- **대시보드**: customer 에이전트(config.audience='customer') 필터/뷰.
