@@ -3,6 +3,7 @@ import { getFileContent, getBotWorkspaces } from '@/lib/github';
 import { query } from '@/lib/db';
 import { getItem } from '@/lib/kb';
 import type { Bot } from '@/types';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // Force dynamic rendering to prevent build-time DB connection
 export const dynamic = 'force-dynamic';
@@ -51,7 +52,7 @@ async function parseBotMetadata(
     // 2. Fallback to bot_workspace_files DB
     const dbResult = await query<{ content: string }>(
       `
-      SELECT content FROM semo.bot_workspace_files
+      SELECT content FROM ${DB_SCHEMA}.bot_workspace_files
       WHERE bot_id = $1 AND file_path = 'IDENTITY.md'
     `,
       [botId],
@@ -98,7 +99,7 @@ export async function GET() {
     try {
       result = await query<BotStatusRow>(`
         SELECT bot_id, name, emoji, role, last_active, session_count, workspace_path, status, synced_at
-        FROM semo.bot_status
+        FROM ${DB_SCHEMA}.bot_status
         ORDER BY bot_id
       `);
     } catch (dbError) {
@@ -130,7 +131,7 @@ export async function GET() {
             // Update DB with fetched metadata (optional, async)
             query(
               `
-              UPDATE semo.bot_status
+              UPDATE ${DB_SCHEMA}.bot_status
               SET name = $1, emoji = $2, role = $3
               WHERE bot_id = $4
             `,

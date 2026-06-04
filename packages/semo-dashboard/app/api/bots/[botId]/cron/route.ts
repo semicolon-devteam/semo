@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,18 +15,18 @@ interface CronJobRow {
   payload: Record<string, unknown> | null;
 }
 
-export async function GET(
-  _req: Request,
-  { params }: { params: Promise<{ botId: string }> }
-) {
+export async function GET(_req: Request, { params }: { params: Promise<{ botId: string }> }) {
   try {
     const { botId } = await params;
-    const result = await query<CronJobRow>(`
+    const result = await query<CronJobRow>(
+      `
       SELECT job_id, name, schedule, enabled, last_run, next_run, session_target, payload
-      FROM semo.bot_cron_jobs
+      FROM ${DB_SCHEMA}.bot_cron_jobs
       WHERE bot_id = $1
       ORDER BY next_run NULLS LAST
-    `, [botId]);
+    `,
+      [botId],
+    );
 
     const cronJobs = result.rows.map((row) => ({
       jobId: row.job_id,

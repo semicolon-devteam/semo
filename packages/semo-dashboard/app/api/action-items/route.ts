@@ -6,6 +6,7 @@ import {
   updateActionItem,
   deleteActionItem,
 } from '@/lib/service';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,11 +25,11 @@ export async function GET(request: NextRequest) {
       `SELECT o.domain,
               COALESCE(nk.content, INITCAP(o.domain)) AS nickname,
               COALESCE(rl.content, '') AS role
-       FROM semo.ontology o
-       LEFT JOIN semo.knowledge_base nk ON nk.domain = o.domain AND nk.key = 'nickname'
-       LEFT JOIN semo.knowledge_base rl ON rl.domain = o.domain AND rl.key = 'role'
+       FROM ${DB_SCHEMA}.ontology o
+       LEFT JOIN ${DB_SCHEMA}.knowledge_base nk ON nk.domain = o.domain AND nk.key = 'nickname'
+       LEFT JOIN ${DB_SCHEMA}.knowledge_base rl ON rl.domain = o.domain AND rl.key = 'role'
        WHERE o.entity_type = 'person'
-         AND EXISTS (SELECT 1 FROM semo.knowledge_base org WHERE org.domain = o.domain AND org.key = 'organization' AND org.content = 'semicolon')
+         AND EXISTS (SELECT 1 FROM ${DB_SCHEMA}.knowledge_base org WHERE org.domain = o.domain AND org.key = 'organization' AND org.content = 'semicolon')
        ORDER BY o.domain`,
     );
 

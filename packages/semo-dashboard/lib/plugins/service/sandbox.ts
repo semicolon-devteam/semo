@@ -25,6 +25,7 @@ import type {
   SandboxVirtualPOMode,
   ServiceSectionSource,
 } from '@/types';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 const MAX_CONCURRENT_SANDBOXES = 3;
 
@@ -321,9 +322,9 @@ export async function teardownSandboxProject(serviceId: string): Promise<{ error
     }
 
     // Ontology domain 정리
-    await query('DELETE FROM semo.ontology WHERE domain = $1', [project.service_domain]).catch(
-      (err) => console.error('[SANDBOX] Ontology cleanup failed:', err),
-    );
+    await query(`DELETE FROM ${DB_SCHEMA}.ontology WHERE domain = $1`, [
+      project.service_domain,
+    ]).catch((err) => console.error('[SANDBOX] Ontology cleanup failed:', err));
   }
 
   console.log(`[SANDBOX] Torn down project "${project.project_name}" (${serviceId})`);

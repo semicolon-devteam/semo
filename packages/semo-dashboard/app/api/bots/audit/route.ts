@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,8 +17,8 @@ export async function GET() {
   try {
     // Get the latest run_id
     const latestRun = await query<{ run_id: string }>(
-      `SELECT run_id FROM semo.bot_workspace_audits
-       ORDER BY created_at DESC LIMIT 1`
+      `SELECT run_id FROM ${DB_SCHEMA}.bot_workspace_audits
+       ORDER BY created_at DESC LIMIT 1`,
     );
 
     if (latestRun.rows.length === 0) {
@@ -28,10 +29,10 @@ export async function GET() {
 
     const result = await query<AuditRow>(
       `SELECT bot_id, run_id, rating, score, checks, created_at::text
-       FROM semo.bot_workspace_audits
+       FROM ${DB_SCHEMA}.bot_workspace_audits
        WHERE run_id = $1
        ORDER BY bot_id`,
-      [runId]
+      [runId],
     );
 
     const audits = result.rows.map((row) => ({
@@ -45,9 +46,6 @@ export async function GET() {
     return NextResponse.json(audits);
   } catch (error) {
     console.error('Error fetching audit results:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch audit results' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch audit results' }, { status: 500 });
   }
 }

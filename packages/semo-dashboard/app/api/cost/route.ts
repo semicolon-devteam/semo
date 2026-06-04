@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,8 +25,8 @@ export async function GET(request: NextRequest) {
                STRING_AGG(DISTINCT c.bot_id, ', ') AS bots_used,
                MIN(c.created_at)::date AS first_activity,
                MAX(c.created_at)::date AS last_activity
-        FROM semo.bot_cost_log c
-        JOIN semo.knowledge_base kb ON kb.key = 'pipeline' AND kb.sub_key = 'config'
+        FROM ${DB_SCHEMA}.bot_cost_log c
+        JOIN ${DB_SCHEMA}.knowledge_base kb ON kb.key = 'pipeline' AND kb.sub_key = 'config'
           AND (kb.metadata->>'service_id' = c.service_id
                OR LEFT(kb.metadata->>'service_id', 8) = c.service_id)
         WHERE c.service_id IS NOT NULL
@@ -38,8 +39,8 @@ export async function GET(request: NextRequest) {
     if (period === 'daily') {
       // 일별 트렌드 (최근 30일)
       const sql = botId
-        ? `SELECT * FROM semo.bot_cost_daily WHERE bot_id = $1 AND day >= CURRENT_DATE - INTERVAL '30 days' ORDER BY day`
-        : `SELECT * FROM semo.bot_cost_daily WHERE day >= CURRENT_DATE - INTERVAL '30 days' ORDER BY day, bot_id`;
+        ? `SELECT * FROM ${DB_SCHEMA}.bot_cost_daily WHERE bot_id = $1 AND day >= CURRENT_DATE - INTERVAL '30 days' ORDER BY day`
+        : `SELECT * FROM ${DB_SCHEMA}.bot_cost_daily WHERE day >= CURRENT_DATE - INTERVAL '30 days' ORDER BY day, bot_id`;
       const params = botId ? [botId] : [];
       const result = await query(sql, params);
       return NextResponse.json(result.rows);
@@ -47,14 +48,14 @@ export async function GET(request: NextRequest) {
 
     // 월별 집계
     const sql = botId
-      ? `SELECT * FROM semo.bot_cost_summary WHERE bot_id = $1 ORDER BY month DESC LIMIT 12`
-      : `SELECT * FROM semo.bot_cost_summary ORDER BY month DESC, bot_id LIMIT 100`;
+      ? `SELECT * FROM ${DB_SCHEMA}.bot_cost_summary WHERE bot_id = $1 ORDER BY month DESC LIMIT 12`
+      : `SELECT * FROM ${DB_SCHEMA}.bot_cost_summary ORDER BY month DESC, bot_id LIMIT 100`;
     const params = botId ? [botId] : [];
     const result = await query(sql, params);
 
     // 예산 정보 조인
     const budgets = await query(
-      `SELECT bot_id, monthly_budget_usd, alert_threshold_pct, auto_pause FROM semo.bot_budgets`,
+      `SELECT bot_id, monthly_budget_usd, alert_threshold_pct, auto_pause FROM ${DB_SCHEMA}.bot_budgets`,
     );
     const budgetMap: Record<
       string,
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
 
     // 봇 이름/이모지 조인
     const botsResult = await query(
-      `SELECT bot_id, name, emoji, status FROM semo.bot_status WHERE status != 'retired' ORDER BY bot_id`,
+      `SELECT bot_id, name, emoji, status FROM ${DB_SCHEMA}.bot_status WHERE status != 'retired' ORDER BY bot_id`,
     );
     const botMap: Record<string, { name: string; emoji: string; status: string }> = {};
     for (const b of botsResult.rows) {

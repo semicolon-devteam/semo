@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,12 +36,12 @@ export async function GET() {
       session_count: number;
     }>(`
       SELECT bot_id, name, emoji, role, status, last_active, session_count
-      FROM semo.bot_status
+      FROM ${DB_SCHEMA}.bot_status
       WHERE status != 'retired'
       ORDER BY bot_id
     `);
 
-    const nodes: BotNode[] = botsResult.rows.map(row => ({
+    const nodes: BotNode[] = botsResult.rows.map((row) => ({
       id: row.bot_id,
       name: row.name || row.bot_id,
       emoji: row.emoji || '🤖',
@@ -60,12 +61,12 @@ export async function GET() {
       priority: string;
     }>(`
       SELECT from_bot_id, to_bot_id, delegation_type, domains, method, priority
-      FROM semo.bot_delegation
+      FROM ${DB_SCHEMA}.bot_delegation
       WHERE is_active = true
       ORDER BY from_bot_id, to_bot_id
     `);
 
-    const edges: DelegationEdge[] = delegationsResult.rows.map(row => ({
+    const edges: DelegationEdge[] = delegationsResult.rows.map((row) => ({
       from: row.from_bot_id,
       to: row.to_bot_id,
       type: row.delegation_type,

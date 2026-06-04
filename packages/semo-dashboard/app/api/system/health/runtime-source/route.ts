@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ export async function GET(req: Request) {
 
     const res = await query<{ runtime_source: string | null; count: string }>(
       `SELECT runtime_source, COUNT(*)::text AS count
-       FROM semo.bot_commitments
+       FROM ${DB_SCHEMA}.bot_commitments
        WHERE created_at > NOW() - ($1::int || ' days')::interval
        GROUP BY runtime_source
        ORDER BY 2 DESC`,

@@ -1,6 +1,7 @@
 import { query } from '../../db';
 import { list as kbList, getItem as kbGetItem, upsertItem as kbUpsert } from '../../core/kb';
 import type { ServiceKPIMetric } from '@/types';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ── KPI Markdown Parser (migrated from kb-sync.ts for backward compat) ──
 
@@ -215,7 +216,7 @@ export function extractMetricsFromKBEntry(
 export async function getServiceKPIData(serviceDomain: string, limit = 5) {
   const kpiRes = await query<{ key: string; sub_key: string; content: string; updated_at: string }>(
     `SELECT key, sub_key, content, updated_at::text
-     FROM semo.knowledge_base
+     FROM ${DB_SCHEMA}.knowledge_base
      WHERE domain = $1 AND key = 'kpi' AND sub_key != ''
      ORDER BY sub_key DESC LIMIT $2`,
     [serviceDomain, limit],
@@ -228,7 +229,7 @@ export async function getServiceKPIData(serviceDomain: string, limit = 5) {
     created_at: string;
   }>(
     `SELECT description, status, assignee, created_at::text
-     FROM semo.action_items
+     FROM ${DB_SCHEMA}.action_items
      WHERE target_domain = $1
      ORDER BY CASE status WHEN 'open' THEN 0 WHEN 'completed' THEN 1 ELSE 2 END,
               created_at DESC
@@ -243,7 +244,7 @@ export async function getServiceKPIData(serviceDomain: string, limit = 5) {
     metadata: Record<string, unknown>;
   }>(
     `SELECT key, sub_key, content, metadata
-     FROM semo.knowledge_base
+     FROM ${DB_SCHEMA}.knowledge_base
      WHERE domain = $1 AND key = 'milestone'
      ORDER BY sub_key`,
     [serviceDomain],

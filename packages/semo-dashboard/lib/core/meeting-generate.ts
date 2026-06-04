@@ -11,6 +11,7 @@ import { createMeetingDiscussion } from './meeting-github';
 import { upsertItem } from './kb';
 import { syncMeetingToNotion, updateNotionSync } from './meeting-notion';
 import type { Meeting } from './meeting';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ── Anthropic API ──
 
@@ -200,7 +201,7 @@ function buildDiscussionBody(meeting: Meeting, analysis: MeetingAnalysis): strin
 async function loadMemberDomainMap(): Promise<Record<string, string>> {
   const { query: dbQuery } = await import('../db');
   const result = await dbQuery<{ sub_key: string; content: string }>(
-    `SELECT sub_key, content FROM semo.knowledge_base
+    `SELECT sub_key, content FROM ${DB_SCHEMA}.knowledge_base
      WHERE domain = 'semicolon' AND key = 'team' AND sub_key != ''`,
   );
   const map: Record<string, string> = {};
@@ -275,12 +276,12 @@ async function loadServiceContext(
   const [baseInfoResult, parentResult] = await Promise.all([
     dbQuery<{ domain: string; content: string }>(
       `SELECT domain, LEFT(content, 500) as content
-       FROM semo.knowledge_base
+       FROM ${DB_SCHEMA}.knowledge_base
        WHERE domain = ANY($1) AND key = 'base-information' AND sub_key = ''`,
       [serviceDomains],
     ),
     dbQuery<{ domain: string; metadata: Record<string, unknown> }>(
-      `SELECT domain, metadata FROM semo.knowledge_base
+      `SELECT domain, metadata FROM ${DB_SCHEMA}.knowledge_base
        WHERE domain = ANY($1) AND key = 'pipeline' AND sub_key = 'config'`,
       [serviceDomains],
     ),
@@ -558,7 +559,7 @@ async function sendSlackNotification(
   try {
     const kb = await import('../db').then((db) =>
       db.query<{ content: string }>(
-        `SELECT content FROM semo.knowledge_base WHERE domain = 'semicolon' AND key = 'team' AND sub_key = 'slack-channels' LIMIT 1`,
+        `SELECT content FROM ${DB_SCHEMA}.knowledge_base WHERE domain = 'semicolon' AND key = 'team' AND sub_key = 'slack-channels' LIMIT 1`,
       ),
     );
     if (kb.rows.length > 0) {

@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await query(
-      `UPDATE semo.incubator_sessions
+      `UPDATE ${DB_SCHEMA}.incubator_sessions
        SET last_heartbeat = NOW(), updated_at = NOW()
        WHERE service_id = $1 AND status = 'active'`,
       [service_id.trim()],

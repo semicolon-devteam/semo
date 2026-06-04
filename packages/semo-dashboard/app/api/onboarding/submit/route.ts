@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { query } from '@/lib/db';
 import type { OnboardingRole } from '@/lib/auth/types';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
     } else {
       // 유효성: ontology에 존재하는지
       const check = await query(
-        `SELECT 1 FROM semo.ontology WHERE domain = $1 AND entity_type = 'person'`,
+        `SELECT 1 FROM ${DB_SCHEMA}.ontology WHERE domain = $1 AND entity_type = 'person'`,
         [body.domain],
       );
       if (check.rowCount === 0) {

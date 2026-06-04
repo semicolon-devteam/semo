@@ -5,6 +5,7 @@ import { getItem } from '@/lib/kb';
 import RuntimeSourceChart from '@/components/RuntimeSourceChart';
 import SystemHealthBanner from '@/components/SystemHealthBanner';
 import { PageBody, PageHeader, Card, Badge } from '@/components/ui/semo';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 const AVATAR_COLORS = [
   'var(--agent-peach)',
@@ -161,7 +162,7 @@ async function enrichBotMetadata(
   // 2. bot_workspace_files fallback
   try {
     const dbResult = await query<{ content: string }>(
-      `SELECT content FROM semo.bot_workspace_files WHERE bot_id = $1 AND file_path = 'IDENTITY.md'`,
+      `SELECT content FROM ${DB_SCHEMA}.bot_workspace_files WHERE bot_id = $1 AND file_path = 'IDENTITY.md'`,
       [botId],
     );
     if (dbResult.rows.length > 0) return parseIdentityContent(dbResult.rows[0].content, botId);
@@ -174,7 +175,7 @@ async function enrichBotMetadata(
 async function getBots(): Promise<Bot[]> {
   const result = await query<BotStatusRow>(`
     SELECT bot_id, name, emoji, role, last_active, session_count, workspace_path, status
-    FROM semo.bot_status
+    FROM ${DB_SCHEMA}.bot_status
     ORDER BY bot_id
   `);
 

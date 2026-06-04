@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,7 +30,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ filePat
     // Try DB first
     try {
       const result = await query<{ content: string }>(
-        `SELECT content FROM semo.bot_workspace_files WHERE bot_id = '_shared' AND file_path = $1`,
+        `SELECT content FROM ${DB_SCHEMA}.bot_workspace_files WHERE bot_id = '_shared' AND file_path = $1`,
         [requestedPath],
       );
       if (result.rows.length > 0) {
@@ -88,7 +89,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ filePath
     const fileSize = Buffer.byteLength(content, 'utf-8');
     try {
       await query(
-        `INSERT INTO semo.bot_workspace_files (bot_id, file_path, content, file_size, file_hash, synced_at)
+        `INSERT INTO ${DB_SCHEMA}.bot_workspace_files (bot_id, file_path, content, file_size, file_hash, synced_at)
          VALUES ('_shared', $1, $2, $3, $4, NOW())
          ON CONFLICT (bot_id, file_path) DO UPDATE SET
            content = EXCLUDED.content,

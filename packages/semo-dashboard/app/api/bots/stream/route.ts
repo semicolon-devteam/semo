@@ -13,6 +13,7 @@
 import type { NextRequest } from 'next/server';
 import type { PoolClient } from 'pg';
 import { Pool } from 'pg';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -113,7 +114,7 @@ export async function GET(req: NextRequest) {
             let sql = `
               SELECT id, bot_id, status, runtime_source, source_type,
                      GREATEST(created_at, updated_at) AS seen_at
-                FROM semo.bot_commitments
+                FROM ${DB_SCHEMA}.bot_commitments
             `;
             if (lastSeenAt) {
               // `>=` 로 경계 동일-timestamp row 누락 방지 (중복은 아래 sentAtBoundary 로 제거).

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 function validateIds(botId: string, skillName: string): string | null {
   if (!/^[a-zA-Z0-9_-]+$/.test(botId)) return 'Invalid bot ID';
@@ -9,7 +10,7 @@ function validateIds(botId: string, skillName: string): string | null {
 
 export async function GET(
   _req: Request,
-  { params }: { params: Promise<{ botId: string; skillName: string }> }
+  { params }: { params: Promise<{ botId: string; skillName: string }> },
 ) {
   try {
     const { botId, skillName } = await params;
@@ -23,9 +24,9 @@ export async function GET(
     if (content === null) {
       try {
         const wsResult = await query<{ content: string }>(
-          `SELECT content FROM semo.bot_workspace_files
+          `SELECT content FROM ${DB_SCHEMA}.bot_workspace_files
            WHERE bot_id = $1 AND file_path = $2`,
-          [botId, `skills/${skillName}/SKILL.md`]
+          [botId, `skills/${skillName}/SKILL.md`],
         );
         if (wsResult.rows.length > 0) {
           content = wsResult.rows[0].content;
@@ -41,9 +42,9 @@ export async function GET(
       const fullName = `${botId}/${skillName}`;
       const result = await query(
         `SELECT name, is_active, category, package, metadata, updated_at
-         FROM semo.skill_definitions
+         FROM ${DB_SCHEMA}.skill_definitions
          WHERE name = $1 AND office_id IS NULL`,
-        [fullName]
+        [fullName],
       );
       if (result.rows.length > 0) {
         dbMeta = result.rows[0];
@@ -70,7 +71,7 @@ export async function GET(
 
 export async function PUT(
   req: Request,
-  { params }: { params: Promise<{ botId: string; skillName: string }> }
+  { params }: { params: Promise<{ botId: string; skillName: string }> },
 ) {
   try {
     const { botId, skillName } = await params;
@@ -85,9 +86,9 @@ export async function PUT(
     // Update bot_workspace_files if it exists
     try {
       await query(
-        `UPDATE semo.bot_workspace_files SET content = $1, file_size = $2, synced_at = NOW()
+        `UPDATE ${DB_SCHEMA}.bot_workspace_files SET content = $1, file_size = $2, synced_at = NOW()
          WHERE bot_id = $3 AND file_path = $4`,
-        [content, Buffer.byteLength(content, 'utf-8'), botId, `skills/${skillName}/SKILL.md`]
+        [content, Buffer.byteLength(content, 'utf-8'), botId, `skills/${skillName}/SKILL.md`],
       );
     } catch {
       // workspace DB write failed
@@ -97,9 +98,9 @@ export async function PUT(
     const fullName = `${botId}/${skillName}`;
     try {
       await query(
-        `UPDATE semo.skill_definitions SET prompt = $1, updated_at = NOW()
+        `UPDATE ${DB_SCHEMA}.skill_definitions SET prompt = $1, updated_at = NOW()
          WHERE name = $2 AND office_id IS NULL`,
-        [content, fullName]
+        [content, fullName],
       );
     } catch {
       // DB unavailable — workspace updated only
@@ -114,7 +115,7 @@ export async function PUT(
 
 export async function PATCH(
   req: Request,
-  { params }: { params: Promise<{ botId: string; skillName: string }> }
+  { params }: { params: Promise<{ botId: string; skillName: string }> },
 ) {
   try {
     const { botId, skillName } = await params;
@@ -128,10 +129,10 @@ export async function PATCH(
 
     const fullName = `${botId}/${skillName}`;
     const result = await query(
-      `UPDATE semo.skill_definitions SET is_active = $1, updated_at = NOW()
+      `UPDATE ${DB_SCHEMA}.skill_definitions SET is_active = $1, updated_at = NOW()
        WHERE name = $2 AND office_id IS NULL
        RETURNING name, is_active`,
-      [isActive, fullName]
+      [isActive, fullName],
     );
 
     if (result.rowCount === 0) {

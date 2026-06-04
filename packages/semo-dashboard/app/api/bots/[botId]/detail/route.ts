@@ -3,6 +3,7 @@ import { query } from '@/lib/db';
 import { listSessions, listCronJobs } from '@/lib/openclaw';
 import { list as kbList, getItem as kbGetItem } from '@/lib/kb';
 import type { BotDetail, Session, CronJob, BotFile, DailyLog } from '@/types';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // Force dynamic rendering to prevent build-time DB connection
 export const dynamic = 'force-dynamic';
@@ -38,8 +39,8 @@ interface WorkspaceFileRow {
  */
 async function readFileFromDB(botId: string, filePath: string): Promise<string> {
   const result = await query<WorkspaceFileRow>(
-    `SELECT content FROM semo.bot_workspace_files WHERE bot_id = $1 AND file_path = $2`,
-    [botId, filePath]
+    `SELECT content FROM ${DB_SCHEMA}.bot_workspace_files WHERE bot_id = $1 AND file_path = $2`,
+    [botId, filePath],
   );
   if (result.rows.length === 0) return '';
   return result.rows[0].content;
@@ -67,27 +68,29 @@ async function readConfigFile(botId: string, fileName: string): Promise<string> 
     try {
       const entry = await kbGetItem('bot-config', `${botId}/${kbType}`);
       if (entry?.content) return entry.content;
-    } catch { /* KB unavailable, fallback */ }
+    } catch {
+      /* KB unavailable, fallback */
+    }
   }
   return readFileFromDB(botId, fileName);
 }
 
-export async function GET(
-  req: Request,
-  { params }: { params: Promise<{ botId: string }> }
-) {
+export async function GET(req: Request, { params }: { params: Promise<{ botId: string }> }) {
   try {
     const { botId } = await params;
 
     // 1. Fetch sessions from DB (primary source)
     let sessions: Session[] = [];
     try {
-      const sessionsResult = await query<SessionRow>(`
+      const sessionsResult = await query<SessionRow>(
+        `
         SELECT session_key, label, kind, chat_type, last_activity, message_count
-        FROM semo.bot_sessions
+        FROM ${DB_SCHEMA}.bot_sessions
         WHERE bot_id = $1
         ORDER BY last_activity DESC
-      `, [botId]);
+      `,
+        [botId],
+      );
 
       sessions = sessionsResult.rows.map((row: SessionRow) => ({
         sessionKey: row.session_key,
@@ -100,7 +103,7 @@ export async function GET(
     } catch (error) {
       console.warn('DB sessions query failed, trying OpenClaw CLI:', error);
       const openclawSessions = await listSessions(20);
-      sessions = openclawSessions.map(s => ({
+      sessions = openclawSessions.map((s) => ({
         sessionKey: s.key,
         label: s.label || s.key,
         kind: s.kind || 'main',
@@ -113,12 +116,15 @@ export async function GET(
     // 2. Fetch cron jobs from DB (primary source)
     let cronJobs: CronJob[] = [];
     try {
-      const cronResult = await query<CronJobRow>(`
+      const cronResult = await query<CronJobRow>(
+        `
         SELECT job_id, name, schedule, enabled, last_run, next_run, session_target, payload
-        FROM semo.bot_cron_jobs
+        FROM ${DB_SCHEMA}.bot_cron_jobs
         WHERE bot_id = $1
         ORDER BY next_run NULLS LAST
-      `, [botId]);
+      `,
+        [botId],
+      );
 
       cronJobs = cronResult.rows.map((row: CronJobRow) => ({
         jobId: row.job_id,
@@ -133,7 +139,7 @@ export async function GET(
     } catch (error) {
       console.warn('DB cron query failed, trying OpenClaw CLI:', error);
       const openclawCrons = await listCronJobs();
-      cronJobs = openclawCrons.map(c => ({
+      cronJobs = openclawCrons.map((c) => ({
         jobId: c.id,
         name: c.name || c.id,
         schedule: c.schedule,
@@ -156,44 +162,46 @@ export async function GET(
       const filesResult = await query<{ file_path: string; file_size: number }>(
         `SELECT DISTINCT split_part(file_path, '/', 1) AS file_path,
                 MAX(file_size) AS file_size
-         FROM semo.bot_workspace_files
+         FROM ${DB_SCHEMA}.bot_workspace_files
          WHERE bot_id = $1
          GROUP BY split_part(file_path, '/', 1)
          ORDER BY file_path`,
-        [botId]
+        [botId],
       );
 
       // Determine if top-level entry is a directory (has sub-paths) or file
       const allPaths = await query<{ file_path: string }>(
-        `SELECT file_path FROM semo.bot_workspace_files WHERE bot_id = $1`,
-        [botId]
+        `SELECT file_path FROM ${DB_SCHEMA}.bot_workspace_files WHERE bot_id = $1`,
+        [botId],
       );
-      const pathSet = new Set(allPaths.rows.map(r => r.file_path));
+      const pathSet = new Set(allPaths.rows.map((r) => r.file_path));
 
-      files = filesResult.rows.map(row => {
-        const isDir = allPaths.rows.some(r =>
-          r.file_path.startsWith(row.file_path + '/') && r.file_path !== row.file_path
+      files = filesResult.rows.map((row) => {
+        const isDir = allPaths.rows.some(
+          (r) => r.file_path.startsWith(row.file_path + '/') && r.file_path !== row.file_path,
         );
         return {
           path: row.file_path,
           type: (isDir ? 'directory' : 'file') as 'directory' | 'file',
         };
       });
-    } catch { /* DB may not have workspace files yet */ }
+    } catch {
+      /* DB may not have workspace files yet */
+    }
 
     // 5. Fetch KB entries (team SoT — replaces local memory files)
     let kbEntries: { domain: string; key: string; content: string }[] = [];
     try {
       const KB_DOMAINS = ['decision', 'team', 'process', 'bot-config', 'spec'];
-      const allEntries = await Promise.all(
-        KB_DOMAINS.map(d => kbList(d))
-      );
-      kbEntries = allEntries.flat().map(e => ({
+      const allEntries = await Promise.all(KB_DOMAINS.map((d) => kbList(d)));
+      kbEntries = allEntries.flat().map((e) => ({
         domain: e.domain,
         key: e.key,
         content: e.content,
       }));
-    } catch { /* KB may not be available */ }
+    } catch {
+      /* KB may not be available */
+    }
 
     // 6. Fetch recent daily logs (last 3 days) from DB
     const today = new Date();
@@ -230,9 +238,6 @@ export async function GET(
     return NextResponse.json(detail);
   } catch (error) {
     console.error('Error fetching bot detail:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch bot detail' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch bot detail' }, { status: 500 });
   }
 }

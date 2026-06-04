@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,14 +24,14 @@ export async function GET(_req: Request, ctx: { params: Promise<{ botId: string 
 
     const [statusRes, commitsRes, cronsRes] = await Promise.all([
       query<{ status: 'online' | 'offline'; last_active: string | null; synced_at: string }>(
-        `SELECT status, last_active, synced_at FROM semo.bot_status WHERE bot_id = $1`,
+        `SELECT status, last_active, synced_at FROM ${DB_SCHEMA}.bot_status WHERE bot_id = $1`,
         [botId],
       ),
       query<{ runtime_source: string | null; total: string; failed: string }>(
         `SELECT runtime_source,
                 COUNT(*)::text AS total,
                 COUNT(*) FILTER (WHERE status = 'failed')::text AS failed
-         FROM semo.bot_commitments
+         FROM ${DB_SCHEMA}.bot_commitments
          WHERE bot_id = $1 AND created_at > NOW() - INTERVAL '24 hours'
          GROUP BY runtime_source`,
         [botId],
@@ -44,7 +45,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ botId: string 
         last_run: string | null;
       }>(
         `SELECT job_id, runtime_source, last_status, consecutive_failures, enabled, last_run
-         FROM semo.bot_cron_jobs
+         FROM ${DB_SCHEMA}.bot_cron_jobs
          WHERE bot_id = $1
          ORDER BY consecutive_failures DESC, last_run DESC NULLS LAST
          LIMIT 20`,

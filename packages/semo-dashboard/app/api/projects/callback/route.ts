@@ -36,6 +36,7 @@ import {
   sendFeatureWorkCompleteSlack,
 } from '@/lib/slack';
 import { transitionFeatureStatus } from '@/lib/feature-lifecycle';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 const DASHBOARD_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space';
 
@@ -257,7 +258,7 @@ export async function POST(request: NextRequest) {
         let serviceId: string | undefined = body.service_id;
         if (!serviceId) {
           const kbLookup = await query(
-            `SELECT domain FROM semo.knowledge_base WHERE key = 'research' AND sub_key = $1 LIMIT 1`,
+            `SELECT domain FROM ${DB_SCHEMA}.knowledge_base WHERE key = 'research' AND sub_key = $1 LIMIT 1`,
             [body.task_id],
           );
           if (kbLookup.rows[0]) {

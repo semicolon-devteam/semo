@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { listActionItems } from '@/lib/service';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,11 +29,11 @@ export async function GET(
               rl.content   AS role,
               ts.content   AS tech_stack,
               org.content  AS organization
-       FROM semo.ontology o
-       LEFT JOIN semo.knowledge_base nk  ON nk.domain  = o.domain AND nk.key = 'nickname'
-       LEFT JOIN semo.knowledge_base rl  ON rl.domain  = o.domain AND rl.key = 'role' AND rl.sub_key IS NULL
-       LEFT JOIN semo.knowledge_base ts  ON ts.domain  = o.domain AND ts.key = 'tech-stack'
-       LEFT JOIN semo.knowledge_base org ON org.domain  = o.domain AND org.key = 'organization'
+       FROM ${DB_SCHEMA}.ontology o
+       LEFT JOIN ${DB_SCHEMA}.knowledge_base nk  ON nk.domain  = o.domain AND nk.key = 'nickname'
+       LEFT JOIN ${DB_SCHEMA}.knowledge_base rl  ON rl.domain  = o.domain AND rl.key = 'role' AND rl.sub_key IS NULL
+       LEFT JOIN ${DB_SCHEMA}.knowledge_base ts  ON ts.domain  = o.domain AND ts.key = 'tech-stack'
+       LEFT JOIN ${DB_SCHEMA}.knowledge_base org ON org.domain  = o.domain AND org.key = 'organization'
        WHERE o.domain = $1 AND o.entity_type = 'person'
        LIMIT 1`,
       [domain],
@@ -52,11 +53,11 @@ export async function GET(
       `SELECT o.domain,
               COALESCE(nk.content, INITCAP(o.domain)) AS nickname,
               COALESCE(rl.content, '') AS role
-       FROM semo.ontology o
-       LEFT JOIN semo.knowledge_base nk ON nk.domain = o.domain AND nk.key = 'nickname'
-       LEFT JOIN semo.knowledge_base rl ON rl.domain = o.domain AND rl.key = 'role'
+       FROM ${DB_SCHEMA}.ontology o
+       LEFT JOIN ${DB_SCHEMA}.knowledge_base nk ON nk.domain = o.domain AND nk.key = 'nickname'
+       LEFT JOIN ${DB_SCHEMA}.knowledge_base rl ON rl.domain = o.domain AND rl.key = 'role'
        WHERE o.entity_type = 'person'
-         AND EXISTS (SELECT 1 FROM semo.knowledge_base org WHERE org.domain = o.domain AND org.key = 'organization' AND org.content = 'semicolon')
+         AND EXISTS (SELECT 1 FROM ${DB_SCHEMA}.knowledge_base org WHERE org.domain = o.domain AND org.key = 'organization' AND org.content = 'semicolon')
        ORDER BY o.domain`,
     );
 

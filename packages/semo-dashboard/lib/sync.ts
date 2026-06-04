@@ -1,5 +1,6 @@
 import { query } from './db';
 import type { SyncFlow, SyncStatus, SyncBotStatus } from '@/types';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const SYNC_FLOWS: SyncFlow[] = [
   {
@@ -9,8 +10,14 @@ export const SYNC_FLOWS: SyncFlow[] = [
     direction: 'DB→Local',
     command: 'semo context sync',
     table: 'knowledge_base',
-    description: 'Core DB의 knowledge_base 테이블에서 team/project/infra/process 도메인 데이터를 .claude/memory/ 파일로 동기화',
-    filePaths: ['.claude/memory/team.md', '.claude/memory/projects.md', '.claude/memory/infra.md', '.claude/memory/process.md'],
+    description:
+      'Core DB의 knowledge_base 테이블에서 team/project/infra/process 도메인 데이터를 .claude/memory/ 파일로 동기화',
+    filePaths: [
+      '.claude/memory/team.md',
+      '.claude/memory/projects.md',
+      '.claude/memory/infra.md',
+      '.claude/memory/process.md',
+    ],
   },
   {
     id: 'ctx-sync-bots',
@@ -120,7 +127,7 @@ export const SYNC_FLOWS: SyncFlow[] = [
 
 export async function fetchRecentRecords(
   table: string,
-  limit = 10
+  limit = 10,
 ): Promise<{ columns: string[]; rows: Record<string, unknown>[] }> {
   // Only allow known sync tables
   const allowedTables: Record<string, { schema: string; table: string; orderBy: string }> = {
@@ -139,7 +146,7 @@ export async function fetchRecentRecords(
   try {
     const result = await query(
       `SELECT * FROM "${target.schema}"."${target.table}" ORDER BY "${target.orderBy}" DESC LIMIT $1`,
-      [limit]
+      [limit],
     );
     return {
       columns: result.fields.map((f) => f.name),
@@ -153,14 +160,14 @@ export async function fetchRecentRecords(
 export async function fetchSyncStatus(): Promise<SyncStatus> {
   const botsResult = await query<SyncBotStatus>(
     `SELECT bot_id, name, status, last_active, synced_at
-     FROM semo.bot_status
-     ORDER BY name`
+     FROM ${DB_SCHEMA}.bot_status
+     ORDER BY name`,
   );
 
   let lastMigration: string | null = null;
   try {
     const migResult = await query<{ executed_at: string }>(
-      `SELECT executed_at FROM semo.schema_migrations ORDER BY executed_at DESC LIMIT 1`
+      `SELECT executed_at FROM ${DB_SCHEMA}.schema_migrations ORDER BY executed_at DESC LIMIT 1`,
     );
     if (migResult.rows.length > 0) {
       lastMigration = migResult.rows[0].executed_at;

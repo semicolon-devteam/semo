@@ -11,6 +11,7 @@
 
 import { Pool } from 'pg';
 import { genEmbedding } from '../voyage';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 function splitKey(combinedKey: string): { key: string; subKey: string } {
   const idx = combinedKey.indexOf('/');
@@ -103,7 +104,7 @@ async function textSearch(query: string, limit: number, createdBy?: string): Pro
 
   let sql = `
     SELECT kb_id, domain, key, sub_key, content, created_by
-    FROM semo.knowledge_base
+    FROM ${DB_SCHEMA}.knowledge_base
     WHERE key ILIKE $1 OR sub_key ILIKE $1 OR content ILIKE $1
   `;
   const params: (string | number)[] = [pattern];
@@ -141,7 +142,7 @@ export async function search(
   let sql = `
     SELECT kb_id, domain, key, sub_key, content, created_by,
            ROUND((1 - (embedding <=> $1::vector))::numeric * 100, 1) as similarity_pct
-    FROM semo.knowledge_base
+    FROM ${DB_SCHEMA}.knowledge_base
   `;
   const params: (string | number)[] = [embeddingStr];
   let idx = 2;
@@ -173,7 +174,7 @@ export async function list(
     : 'kb_id, domain, key, sub_key, content, created_by';
   let sql = `
     SELECT ${cols}
-    FROM semo.knowledge_base
+    FROM ${DB_SCHEMA}.knowledge_base
   `;
   const params: (string | number)[] = [];
   const conditions: string[] = [];
@@ -265,7 +266,7 @@ export async function count(
   }
 
   const res = await pool.query(
-    `SELECT COUNT(*)::int AS count FROM semo.knowledge_base WHERE ${conditions.join(' AND ')}`,
+    `SELECT COUNT(*)::int AS count FROM ${DB_SCHEMA}.knowledge_base WHERE ${conditions.join(' AND ')}`,
     params,
   );
   return res.rows[0].count;
@@ -273,15 +274,15 @@ export async function count(
 
 /**
  * 도메인 목록 조회 (통계 포함)
- * `semo.ontology` LEFT JOIN 으로 description/service/entity_type 를 가져오고
+ * `${DB_SCHEMA}.ontology` LEFT JOIN 으로 description/service/entity_type 를 가져오고
  * KB 엔트리가 0건인 ontology 도메인까지 포함한다 (ontology 는 PG/대시보드 고유 개념).
  */
 export async function listDomains(): Promise<KBDomain[]> {
   const sql = `
     SELECT o.domain, o.description, o.service, o.entity_type,
            COUNT(k.kb_id) as entry_count
-    FROM semo.ontology o
-    LEFT JOIN semo.knowledge_base k ON o.domain = k.domain
+    FROM ${DB_SCHEMA}.ontology o
+    LEFT JOIN ${DB_SCHEMA}.knowledge_base k ON o.domain = k.domain
     GROUP BY o.domain, o.description, o.service, o.entity_type
     ORDER BY o.service NULLS FIRST, o.domain
   `;
@@ -295,7 +296,7 @@ export async function listDomains(): Promise<KBDomain[]> {
 export async function listByKey(key: string): Promise<KBItem[]> {
   const sql = `
     SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at
-    FROM semo.knowledge_base
+    FROM ${DB_SCHEMA}.knowledge_base
     WHERE key = $1
     ORDER BY domain, sub_key
   `;
@@ -313,7 +314,7 @@ export async function getItem(domain: string, rawKey: string): Promise<KBItem | 
   const { key, subKey } = splitKey(rawKey);
   const sql = `
     SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at
-    FROM semo.knowledge_base
+    FROM ${DB_SCHEMA}.knowledge_base
     WHERE domain = $1 AND key = $2 AND sub_key = $3
   `;
   const res = await pool.query(sql, [domain, key, subKey]);
@@ -335,9 +336,13 @@ export async function upsertItem(
   const { key, subKey } = splitKey(rawKey);
 
   // Domain validation: check ontology before write
-  const domainCheck = await pool.query('SELECT 1 FROM semo.ontology WHERE domain = $1', [domain]);
+  const domainCheck = await pool.query(`SELECT 1 FROM ${DB_SCHEMA}.ontology WHERE domain = $1`, [
+    domain,
+  ]);
   if (domainCheck.rows.length === 0) {
-    const knownDomains = await pool.query('SELECT domain FROM semo.ontology ORDER BY domain');
+    const knownDomains = await pool.query(
+      `SELECT domain FROM ${DB_SCHEMA}.ontology ORDER BY domain`,
+    );
     const known = knownDomains.rows.map((r: { domain: string }) => r.domain);
     throw new Error(
       `도메인 '${domain}'은(는) 온톨로지에 등록되지 않았습니다. 등록된 도메인: [${known.join(', ')}]`,
@@ -346,13 +351,13 @@ export async function upsertItem(
 
   // Type schema validation + projection key 차단 (CLI kbUpsert와 동일 enforcement)
   const typeResult = await pool.query(
-    'SELECT entity_type FROM semo.ontology WHERE domain = $1 AND entity_type IS NOT NULL',
+    `SELECT entity_type FROM ${DB_SCHEMA}.ontology WHERE domain = $1 AND entity_type IS NOT NULL`,
     [domain],
   );
   if (typeResult.rows.length > 0) {
     const entityType = typeResult.rows[0].entity_type;
     const schemaResult = await pool.query(
-      "SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source FROM semo.kb_type_schema WHERE type_key = $1",
+      `SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source FROM ${DB_SCHEMA}.kb_type_schema WHERE type_key = $1`,
       [entityType],
     );
     const schemas = schemaResult.rows as Array<{
@@ -382,15 +387,15 @@ export async function upsertItem(
   const metadataJson = metadata ? JSON.stringify(metadata) : null;
 
   const sql = metadataJson
-    ? `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by, embedding, metadata)
+    ? `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, created_by, embedding, metadata)
        VALUES ($1, $2, $3, $4, $5, $6::vector, $7::jsonb)
        ON CONFLICT (domain, key, sub_key) DO UPDATE SET
          content    = EXCLUDED.content,
          embedding  = EXCLUDED.embedding,
-         metadata   = COALESCE(semo.knowledge_base.metadata, '{}'::jsonb) || EXCLUDED.metadata,
+         metadata   = COALESCE(${DB_SCHEMA}.knowledge_base.metadata, '{}'::jsonb) || EXCLUDED.metadata,
          updated_at = NOW()
        RETURNING kb_id, domain, key, sub_key, content, metadata, created_by, updated_at`
-    : `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by, embedding)
+    : `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, created_by, embedding)
        VALUES ($1, $2, $3, $4, $5, $6::vector)
        ON CONFLICT (domain, key, sub_key) DO UPDATE SET
          content    = EXCLUDED.content,
@@ -420,13 +425,15 @@ export async function updateMetadata(
   const { key, subKey } = splitKey(rawKey);
 
   // Domain validation only (no type schema / projection check — metadata-only)
-  const domainCheck = await pool.query('SELECT 1 FROM semo.ontology WHERE domain = $1', [domain]);
+  const domainCheck = await pool.query(`SELECT 1 FROM ${DB_SCHEMA}.ontology WHERE domain = $1`, [
+    domain,
+  ]);
   if (domainCheck.rows.length === 0) {
     throw new Error(`도메인 '${domain}'은(는) 온톨로지에 등록되지 않았습니다.`);
   }
 
   const res = await pool.query(
-    `UPDATE semo.knowledge_base
+    `UPDATE ${DB_SCHEMA}.knowledge_base
      SET metadata = COALESCE(metadata, '{}'::jsonb) || $4::jsonb,
          updated_at = NOW()
      WHERE domain = $1 AND key = $2 AND sub_key = $3
@@ -477,7 +484,7 @@ export async function listByKeyPrefix(
 
   const sql = `
     SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at
-    FROM semo.knowledge_base
+    FROM ${DB_SCHEMA}.knowledge_base
     WHERE ${conditions.join(' AND ')}
     ${orderClause}
   `;
@@ -522,7 +529,7 @@ export async function countByKeyPrefix(
   }
 
   const res = await pool.query(
-    `SELECT COUNT(*)::int AS count FROM semo.knowledge_base WHERE ${conditions.join(' AND ')}`,
+    `SELECT COUNT(*)::int AS count FROM ${DB_SCHEMA}.knowledge_base WHERE ${conditions.join(' AND ')}`,
     params,
   );
   return res.rows[0].count;
@@ -561,8 +568,8 @@ export async function listByKeyAcrossDomains(
 
   const sql = `
     SELECT kb.kb_id, kb.domain, kb.key, kb.sub_key, kb.content, kb.metadata, kb.created_by, kb.updated_at
-    FROM semo.knowledge_base kb
-    JOIN semo.ontology o ON o.domain = kb.domain
+    FROM ${DB_SCHEMA}.knowledge_base kb
+    JOIN ${DB_SCHEMA}.ontology o ON o.domain = kb.domain
     WHERE ${conditions.join(' AND ')}
     ORDER BY kb.domain
   `;
@@ -580,14 +587,16 @@ export async function listByKeyAcrossDomains(
 export async function deleteItemByKey(domain: string, rawKey: string): Promise<boolean> {
   const { key, subKey } = splitKey(rawKey);
   const res = await pool.query(
-    'DELETE FROM semo.knowledge_base WHERE domain = $1 AND key = $2 AND sub_key = $3',
+    `DELETE FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1 AND key = $2 AND sub_key = $3`,
     [domain, key, subKey],
   );
   return (res.rowCount ?? 0) > 0;
 }
 
 export async function deleteItemsByDomain(domain: string): Promise<number> {
-  const res = await pool.query('DELETE FROM semo.knowledge_base WHERE domain = $1', [domain]);
+  const res = await pool.query(`DELETE FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1`, [
+    domain,
+  ]);
   return res.rowCount ?? 0;
 }
 
@@ -597,13 +606,13 @@ export async function deleteItemsByDomain(domain: string): Promise<number> {
 export async function stats(): Promise<KBStats> {
   const kbByDomain = await pool.query(
     `SELECT domain, count(*) as cnt, count(embedding) as emb_cnt
-     FROM semo.knowledge_base
+     FROM ${DB_SCHEMA}.knowledge_base
      GROUP BY domain
      ORDER BY domain`,
   );
 
   const totKb = await pool.query(
-    'SELECT count(*) as total, count(embedding) as emb FROM semo.knowledge_base',
+    `SELECT count(*) as total, count(embedding) as emb FROM ${DB_SCHEMA}.knowledge_base`,
   );
 
   return {

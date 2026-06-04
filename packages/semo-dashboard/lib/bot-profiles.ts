@@ -7,6 +7,7 @@
  */
 
 import { query } from './db';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export interface BotSlackProfile {
   username: string;
@@ -36,8 +37,8 @@ export async function getBotSlackProfiles(): Promise<Record<string, BotSlackProf
   try {
     const result = await query<{ domain: string; content: string }>(
       `SELECT DISTINCT ON (kb.domain) kb.domain, kb.content
-       FROM semo.knowledge_base kb
-       JOIN semo.ontology o ON o.domain = kb.domain AND o.entity_type IN ('bot', 'agents')
+       FROM ${DB_SCHEMA}.knowledge_base kb
+       JOIN ${DB_SCHEMA}.ontology o ON o.domain = kb.domain AND o.entity_type IN ('bot', 'agents')
        WHERE kb.key IN ('slack-profile', 'slack-config') AND kb.sub_key = ''
        ORDER BY kb.domain, CASE kb.key WHEN 'slack-profile' THEN 0 ELSE 1 END`,
     );

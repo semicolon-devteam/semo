@@ -1,11 +1,12 @@
 /**
  * Meeting DB Operations
  *
- * CRUD operations for semo.meetings table.
+ * CRUD operations for ${DB_SCHEMA}.meetings table.
  */
 
 import { query } from '../db';
 import type { VitoUtterance } from '../stt';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export interface Meeting {
   meeting_id: string;
@@ -58,7 +59,7 @@ export async function createMeeting(input: CreateMeetingInput): Promise<Meeting>
   const targetDomain = input.target_domain ?? null;
 
   const result = await query<Meeting>(
-    `INSERT INTO semo.meetings (title, meeting_type, adhoc_subtype, meeting_date, attendees, target_domain)
+    `INSERT INTO ${DB_SCHEMA}.meetings (title, meeting_type, adhoc_subtype, meeting_date, attendees, target_domain)
      VALUES ($1, $2, $3, $4, $5::jsonb, $6)
      RETURNING *`,
     [
@@ -83,7 +84,7 @@ const MEETING_COLS = `meeting_id, title, meeting_type, adhoc_subtype, meeting_da
 
 export async function getMeeting(meetingId: string): Promise<Meeting | null> {
   const result = await query<Meeting>(
-    `SELECT ${MEETING_COLS} FROM semo.meetings WHERE meeting_id = $1`,
+    `SELECT ${MEETING_COLS} FROM ${DB_SCHEMA}.meetings WHERE meeting_id = $1`,
     [meetingId],
   );
   return result.rows[0] ?? null;
@@ -96,14 +97,14 @@ export async function listMeetings(
 ): Promise<Meeting[]> {
   if (targetDomain) {
     const result = await query<Meeting>(
-      `SELECT ${MEETING_COLS} FROM semo.meetings WHERE target_domain = $1
+      `SELECT ${MEETING_COLS} FROM ${DB_SCHEMA}.meetings WHERE target_domain = $1
        ORDER BY meeting_date DESC, created_at DESC LIMIT $2 OFFSET $3`,
       [targetDomain, limit, offset],
     );
     return result.rows;
   }
   const result = await query<Meeting>(
-    `SELECT ${MEETING_COLS} FROM semo.meetings ORDER BY meeting_date DESC, created_at DESC LIMIT $1 OFFSET $2`,
+    `SELECT ${MEETING_COLS} FROM ${DB_SCHEMA}.meetings ORDER BY meeting_date DESC, created_at DESC LIMIT $1 OFFSET $2`,
     [limit, offset],
   );
   return result.rows;
@@ -118,7 +119,7 @@ export async function updateTranscriptionStarted(
 ): Promise<void> {
   if (audioData) {
     await query(
-      `UPDATE semo.meetings
+      `UPDATE ${DB_SCHEMA}.meetings
        SET vito_transcribe_id = $2, audio_filename = $3,
            audio_data = $4,
            transcription_status = 'transcribing', updated_at = NOW()
@@ -127,7 +128,7 @@ export async function updateTranscriptionStarted(
     );
   } else {
     await query(
-      `UPDATE semo.meetings
+      `UPDATE ${DB_SCHEMA}.meetings
        SET vito_transcribe_id = $2, audio_filename = $3,
            transcription_status = 'transcribing', updated_at = NOW()
        WHERE meeting_id = $1`,
@@ -140,7 +141,7 @@ export async function getAudioData(
   meetingId: string,
 ): Promise<{ data: Buffer; filename: string } | null> {
   const result = await query<{ audio_data: Buffer; audio_filename: string }>(
-    'SELECT audio_data, audio_filename FROM semo.meetings WHERE meeting_id = $1 AND audio_data IS NOT NULL',
+    `SELECT audio_data, audio_filename FROM ${DB_SCHEMA}.meetings WHERE meeting_id = $1 AND audio_data IS NOT NULL`,
     [meetingId],
   );
   const row = result.rows[0];
@@ -153,7 +154,7 @@ export async function updateTranscriptionCompleted(
   utterances: VitoUtterance[],
 ): Promise<void> {
   await query(
-    `UPDATE semo.meetings
+    `UPDATE ${DB_SCHEMA}.meetings
      SET raw_transcript = $2::jsonb, transcription_status = 'completed', updated_at = NOW()
      WHERE meeting_id = $1`,
     [meetingId, JSON.stringify(utterances)],
@@ -162,7 +163,7 @@ export async function updateTranscriptionCompleted(
 
 export async function updateTranscriptionFailed(meetingId: string, error: string): Promise<void> {
   await query(
-    `UPDATE semo.meetings
+    `UPDATE ${DB_SCHEMA}.meetings
      SET transcription_status = 'failed', transcription_error = $2, updated_at = NOW()
      WHERE meeting_id = $1`,
     [meetingId, error],
@@ -185,7 +186,7 @@ export async function updateSpeakerMap(
   });
 
   await query(
-    `UPDATE semo.meetings
+    `UPDATE ${DB_SCHEMA}.meetings
      SET speaker_map = $2::jsonb, mapped_transcript = $3, updated_at = NOW()
      WHERE meeting_id = $1`,
     [meetingId, JSON.stringify(speakerMap), mappedLines.join('\n')],
@@ -194,7 +195,7 @@ export async function updateSpeakerMap(
 
 export async function updateGenerationStarted(meetingId: string): Promise<void> {
   await query(
-    `UPDATE semo.meetings
+    `UPDATE ${DB_SCHEMA}.meetings
      SET generation_status = 'generating', updated_at = NOW()
      WHERE meeting_id = $1`,
     [meetingId],
@@ -208,7 +209,7 @@ export async function updateGenerationCompleted(
   result: { decisions: number; actions: number; kpi: number },
 ): Promise<void> {
   await query(
-    `UPDATE semo.meetings
+    `UPDATE ${DB_SCHEMA}.meetings
      SET discussion_url = $2, discussion_number = $3,
          generation_status = 'completed', generation_result = $4::jsonb, updated_at = NOW()
      WHERE meeting_id = $1`,
@@ -218,7 +219,7 @@ export async function updateGenerationCompleted(
 
 export async function updateGenerationFailed(meetingId: string, error: string): Promise<void> {
   await query(
-    `UPDATE semo.meetings
+    `UPDATE ${DB_SCHEMA}.meetings
      SET generation_status = 'failed', generation_error = $2, updated_at = NOW()
      WHERE meeting_id = $1`,
     [meetingId, error],
@@ -262,13 +263,15 @@ export async function updateMeeting(
 
   sets.push('updated_at = NOW()');
   const result = await query<Meeting>(
-    `UPDATE semo.meetings SET ${sets.join(', ')} WHERE meeting_id = $1 RETURNING ${MEETING_COLS}`,
+    `UPDATE ${DB_SCHEMA}.meetings SET ${sets.join(', ')} WHERE meeting_id = $1 RETURNING ${MEETING_COLS}`,
     vals,
   );
   return result.rows[0] ?? null;
 }
 
 export async function deleteMeeting(meetingId: string): Promise<boolean> {
-  const result = await query('DELETE FROM semo.meetings WHERE meeting_id = $1', [meetingId]);
+  const result = await query(`DELETE FROM ${DB_SCHEMA}.meetings WHERE meeting_id = $1`, [
+    meetingId,
+  ]);
   return (result.rowCount ?? 0) > 0;
 }

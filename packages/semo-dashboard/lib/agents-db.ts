@@ -1,4 +1,5 @@
 import { query } from '@/lib/db';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export type AgentRoleKey =
   | 'orchestration'
@@ -96,19 +97,19 @@ export async function listAgents(): Promise<AgentListItem[]> {
   const [botsResult, rollupResult] = await Promise.all([
     query<BotStatusProjectionRow>(`
       SELECT bot_id, name, emoji, role, status, last_active, session_count, workspace_path
-      FROM semo.bot_status
+      FROM ${DB_SCHEMA}.bot_status
       ORDER BY bot_id
     `),
     query<CommitmentRollupRow>(`
       WITH recent AS (
         SELECT *
-        FROM semo.bot_commitments
+        FROM ${DB_SCHEMA}.bot_commitments
         WHERE created_at > NOW() - INTERVAL '24 hours'
       ), latest_source AS (
         SELECT DISTINCT ON (bot_id)
           bot_id,
           runtime_source AS latest_runtime_source
-        FROM semo.bot_commitments
+        FROM ${DB_SCHEMA}.bot_commitments
         WHERE runtime_source IS NOT NULL
         ORDER BY bot_id, created_at DESC
       )
@@ -125,7 +126,7 @@ export async function listAgents(): Promise<AgentListItem[]> {
             ELSE NULL
           END
         )::text AS avg_latency_ms_24h
-      FROM semo.bot_status bs
+      FROM ${DB_SCHEMA}.bot_status bs
       LEFT JOIN recent r ON r.bot_id = bs.bot_id
       LEFT JOIN latest_source ls ON ls.bot_id = bs.bot_id
       GROUP BY bs.bot_id, ls.latest_runtime_source
@@ -204,7 +205,7 @@ export async function getAgentCommitmentQueue(
       SELECT id, title, description, status, source_type, runtime_source,
              created_at, updated_at, last_heartbeat_at,
              EXTRACT(EPOCH FROM (NOW() - created_at))::int AS age_seconds
-      FROM semo.bot_commitments
+      FROM ${DB_SCHEMA}.bot_commitments
       WHERE bot_id = $1 AND status IN ('active', 'stale')
       ORDER BY created_at ASC
       LIMIT $2

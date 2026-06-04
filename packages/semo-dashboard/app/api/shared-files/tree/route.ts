@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import type { FileTreeEntry } from '@/types';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,9 +16,9 @@ export async function GET(req: Request) {
 
     const prefix = subpath ? `${subpath}/` : '';
     const result = await query<{ file_path: string; file_size: number }>(
-      `SELECT file_path, file_size FROM semo.bot_workspace_files
+      `SELECT file_path, file_size FROM ${DB_SCHEMA}.bot_workspace_files
        WHERE bot_id = '_shared' AND file_path LIKE $1`,
-      [`${prefix}%`]
+      [`${prefix}%`],
     );
 
     if (result.rows.length === 0) {
