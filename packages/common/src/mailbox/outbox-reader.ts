@@ -164,7 +164,10 @@ export class OutboxReader {
   }
 
   private offsetFilePath(botId: string): string {
-    return path.join(this.mailboxDir, botId, '.outbox-offset');
+    // platform 별 네임스페이스 필수 — slack/discord 두 router 가 같은 mailboxDir 의
+    // 동일 outbox 를 각자 watch(타 플랫폼 메시지는 skip 하되 offset 은 전진)하므로,
+    // 공유 파일이면 서로 덮어써 cross-platform 유실/오프셋 오염이 발생한다.
+    return path.join(this.mailboxDir, botId, `.outbox-offset-${this.platform}`);
   }
 
   /**

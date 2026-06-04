@@ -19,7 +19,11 @@ interface PostedRec {
   text: string;
 }
 
-function makeReader(mailboxDir: string, posted: PostedRec[]): OutboxReader {
+function makeReader(
+  mailboxDir: string,
+  posted: PostedRec[],
+  platform: 'slack' | 'discord' = 'slack',
+): OutboxReader {
   const gateway: GatewayAdapter = {
     postAsBot: async (botId, channel, text) => {
       posted.push({ botId, channel, text });
@@ -30,7 +34,7 @@ function makeReader(mailboxDir: string, posted: PostedRec[]): OutboxReader {
   return new OutboxReader({
     mailboxDir,
     botIds: ['reviewclaw'],
-    platform: 'slack',
+    platform,
     gateway,
     inboxWriter: {} as unknown as InboxWriter, // reply(채널 지정) 경로에선 미사용
     onEscalation: async () => {},
@@ -109,8 +113,34 @@ describe('OutboxReader persisted offset (재기동 내구성)', () => {
     fs.appendFileSync(outbox, replyLine('y', 'persisted'));
     await (r as unknown as { processOutbox(b: string): Promise<void> }).processOutbox('reviewclaw');
     r.stop();
-    const offPath = path.join(dir, 'reviewclaw', '.outbox-offset');
+    const offPath = path.join(dir, 'reviewclaw', '.outbox-offset-slack');
     expect(fs.existsSync(offPath)).toBe(true);
     expect(Number(fs.readFileSync(offPath, 'utf8'))).toBe(fs.statSync(outbox).size);
+  });
+
+  it('slack/discord reader 가 platform 별 독립 offset 파일을 써 서로 오염시키지 않는다', async () => {
+    // 같은 mailboxDir 의 같은 outbox 를 slack/discord reader 가 동시 watch 하는 실제 배치.
+    // slack reply 1건: slack reader 는 포스팅+offset 전진, discord reader 는 skip 하되
+    // 자기 offset 만 전진 → 두 offset 파일이 독립이어야 cross-platform 유실이 없다.
+    const postedS: PostedRec[] = [];
+    const postedD: PostedRec[] = [];
+    const rS = makeReader(dir, postedS, 'slack');
+    const rD = makeReader(dir, postedD, 'discord');
+    (rS as unknown as { watchBot(b: string): void }).watchBot('reviewclaw');
+    (rD as unknown as { watchBot(b: string): void }).watchBot('reviewclaw');
+    fs.appendFileSync(outbox, replyLine('s1', 'slack-only')); // platform: 'slack'
+    await (rD as unknown as { processOutbox(b: string): Promise<void> }).processOutbox(
+      'reviewclaw',
+    );
+    await (rS as unknown as { processOutbox(b: string): Promise<void> }).processOutbox(
+      'reviewclaw',
+    );
+    rS.stop();
+    rD.stop();
+
+    expect(postedD).toEqual([]); // discord 는 slack 메시지 skip
+    expect(postedS.map((p) => p.text)).toEqual(['slack-only']); // slack 은 포스팅
+    expect(fs.existsSync(path.join(dir, 'reviewclaw', '.outbox-offset-slack'))).toBe(true);
+    expect(fs.existsSync(path.join(dir, 'reviewclaw', '.outbox-offset-discord'))).toBe(true);
   });
 });
