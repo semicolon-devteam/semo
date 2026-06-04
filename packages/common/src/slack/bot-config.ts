@@ -5,6 +5,7 @@ import type { Pool } from 'pg';
 import type { BotConfig } from './channel-types.js';
 import { resolveMcpForBot, loadMcpAccessFromDb } from '../mcp-config.js';
 import { resolveBotWorkspace } from '../paths.js';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 const AGENTS_DIR = path.join(os.homedir(), '.claude', 'agents');
 
@@ -159,7 +160,7 @@ let _activeBotIds: string[] = [...FALLBACK_BOT_IDS];
 export async function loadActiveBotIds(pool: Pool): Promise<string[]> {
   try {
     const result = await pool.query(
-      `SELECT bot_id FROM semo.bot_status WHERE status != 'retired' ORDER BY bot_id`,
+      `SELECT bot_id FROM ${DB_SCHEMA}.bot_status WHERE status != 'retired' ORDER BY bot_id`,
     );
     if (result.rows.length > 0) {
       _activeBotIds = result.rows.map((r) => r.bot_id);
@@ -218,7 +219,7 @@ const childDomainCache = new Map<string, string[]>();
 
 /**
  * Expand KB domains by including child domains (modules) of each parent.
- * Queries semo.ontology.parent at boot time, caches the result.
+ * Queries ${DB_SCHEMA}.ontology.parent at boot time, caches the result.
  */
 export async function expandKBDomainsWithChildren(
   pool: Pool,
@@ -230,7 +231,7 @@ export async function expandKBDomainsWithChildren(
   if (uncached.length > 0) {
     try {
       const res = await pool.query(
-        'SELECT domain, parent FROM semo.ontology WHERE parent = ANY($1)',
+        `SELECT domain, parent FROM ${DB_SCHEMA}.ontology WHERE parent = ANY($1)`,
         [uncached],
       );
       // Initialize cache for all queried domains

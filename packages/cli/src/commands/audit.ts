@@ -17,6 +17,7 @@ import * as os from 'os';
 import * as path from 'path';
 import type { Pool, PoolClient } from 'pg';
 import { randomUUID } from 'crypto';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ============================================================
 // Types
@@ -258,7 +259,7 @@ export async function loadCheckDefs(
       `SELECT path_pattern, entry_type, level, severity, category,
               bot_scope, bot_ids, symlink_target, content_rules,
               description, fix_action, fix_template
-       FROM semo.bot_workspace_standard
+       FROM ${DB_SCHEMA}.bot_workspace_standard
        WHERE spec_version = '2.0'
        ORDER BY level, path_pattern`,
     );
@@ -748,7 +749,7 @@ export async function auditBotKb(pool: Pool): Promise<AuditCheck[]> {
   try {
     const result = await pool.query(
       `SELECT domain, COUNT(*)::int as cnt
-       FROM semo.knowledge_base
+       FROM ${DB_SCHEMA}.knowledge_base
        WHERE domain = ANY($1)
        GROUP BY domain`,
       [KB_REQUIRED_DOMAINS],
@@ -790,9 +791,10 @@ export async function auditBotDb(botId: string, pool: Pool): Promise<AuditCheck[
   const checks: AuditCheck[] = [];
 
   try {
-    const result = await pool.query('SELECT synced_at FROM semo.bot_status WHERE bot_id = $1', [
-      botId,
-    ]);
+    const result = await pool.query(
+      `SELECT synced_at FROM ${DB_SCHEMA}.bot_status WHERE bot_id = $1`,
+      [botId],
+    );
     const registered = result.rows.length > 0;
 
     checks.push({
@@ -904,7 +906,7 @@ export async function storeAuditResults(
 
   for (const r of results) {
     await client.query(
-      `INSERT INTO semo.bot_workspace_audits (bot_id, run_id, rating, score, checks)
+      `INSERT INTO ${DB_SCHEMA}.bot_workspace_audits (bot_id, run_id, rating, score, checks)
        VALUES ($1, $2, $3, $4, $5)`,
       [r.botId, runId, r.rating, r.score, JSON.stringify(r.checks)],
     );

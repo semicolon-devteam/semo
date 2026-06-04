@@ -4,7 +4,7 @@
  * Architecture: KB semo decision/dashboard-host-signals-sidecar-2026-05-07.
  *
  * semo-dashboard 는 OKE pod 안이라 host(pgrep / PID 파일 / auth-profiles.json) 직접 접근 불가.
- * 이 sidecar 는 host(=Reus Mac mini) 에서 동작하며 결과를 semo.host_signals 에 push.
+ * 이 sidecar 는 host(=Reus Mac mini) 에서 동작하며 결과를 ${DB_SCHEMA}.host_signals 에 push.
  * dashboard /api/system/health 는 이 테이블을 read-only 로 조회.
  *
  * Subcommands:
@@ -21,6 +21,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { getPool, closeConnection } from '../database';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 interface CollectedSignal {
   signal_type: 'process' | 'pid_file' | 'auth_profile' | 'log_grep' | 'ancestry';
@@ -296,7 +297,7 @@ async function upsertSignals(
   let updated = 0;
   for (const s of signals) {
     const res = await pool.query<{ xmax: string }>(
-      `INSERT INTO semo.host_signals
+      `INSERT INTO ${DB_SCHEMA}.host_signals
          (source_host, signal_type, target_id, status, payload, observed_at, recorded_at, expires_at)
        VALUES ($1, $2, $3, $4, $5::jsonb, $6, NOW(), $7)
        ON CONFLICT (source_host, signal_type, target_id)
@@ -330,11 +331,11 @@ async function upsertSignals(
 export function registerHostSignalsCommands(program: Command): void {
   const cmd = program
     .command('host-signals')
-    .description('Host filesystem/process signal sidecar (push to semo.host_signals)');
+    .description(`Host filesystem/process signal sidecar (push to ${DB_SCHEMA}.host_signals)`);
 
   cmd
     .command('push')
-    .description('Collect host signals and UPSERT to semo.host_signals')
+    .description(`Collect host signals and UPSERT to ${DB_SCHEMA}.host_signals`)
     .option('--source-host <name>', 'source host identifier (default: hostname)')
     .option('--interval <sec>', 'daemon mode: repeat every N seconds (omit for one-shot)')
     .option('--quiet', 'suppress per-cycle stdout (errors still printed)')
@@ -409,7 +410,7 @@ export function registerHostSignalsCommands(program: Command): void {
       const sql = `SELECT source_host, signal_type, target_id, status,
                           EXTRACT(EPOCH FROM (NOW() - recorded_at))::int AS age_sec,
                           payload
-                   FROM semo.host_signals
+                   FROM ${DB_SCHEMA}.host_signals
                    ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
                    ORDER BY recorded_at DESC
                    LIMIT $${params.length}`;

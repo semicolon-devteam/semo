@@ -68,6 +68,7 @@ import {
   type BotDisplayMeta,
 } from './semi-roster.js';
 import { MailboxSupervisor } from './mailbox-supervisor.js';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // Semi roster 데이터화 (계획: ~/.claude/plans/a-fluffy-grove.md). 단계적 롤아웃 flag.
 // SEMI_ROSTER_INJECTION: Semi 프롬프트에 internal roster 주입 on/off (기본 on, canary).
@@ -173,7 +174,7 @@ let SERVE_WORKER_BOTS: Set<string> = new Set();
 async function loadServeWorkerBots(): Promise<void> {
   try {
     const r = await pool.query<{ bot_id: string }>(
-      `SELECT bot_id FROM semo.bot_status WHERE (config->>'serve_worker_enabled') = 'true'`,
+      `SELECT bot_id FROM ${DB_SCHEMA}.bot_status WHERE (config->>'serve_worker_enabled') = 'true'`,
     );
     SERVE_WORKER_BOTS = new Set(r.rows.map((x) => x.bot_id));
     console.log(`[supervisor] serve-worker bots=[${[...SERVE_WORKER_BOTS].join(',')}]`);
@@ -406,7 +407,7 @@ async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
   const targetStatus = isFailed ? 'failed' : 'done';
   try {
     const result = await pool.query<{ id: string; bot_id: string; title: string }>(
-      `UPDATE semo.bot_commitments
+      `UPDATE ${DB_SCHEMA}.bot_commitments
        SET status = $3,
            metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
              'completed_at', NOW()::text,
@@ -414,7 +415,7 @@ async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
              'closed_by', 'slack-router-outbox-reply'
            )
        WHERE id = (
-         SELECT id FROM semo.bot_commitments
+         SELECT id FROM ${DB_SCHEMA}.bot_commitments
          WHERE bot_id = $1
            AND source_type = 'slack-inbox'
            AND source_ref = $2
@@ -500,7 +501,7 @@ async function maybeWrapReplyPersona(
   try {
     const result = await pool.query<{ pipeline_context: string | null }>(
       `SELECT pipeline_context::text AS pipeline_context
-         FROM semo.bot_commitments
+         FROM ${DB_SCHEMA}.bot_commitments
         WHERE bot_id = $1
           AND source_ref = $2
           AND source_type IN ('slack-inbox', 'customer-delegation')
@@ -586,7 +587,7 @@ async function loadOpenClawBots(): Promise<{
   }
   try {
     const res = await pool.query(
-      `SELECT metadata FROM semo.knowledge_base
+      `SELECT metadata FROM ${DB_SCHEMA}.knowledge_base
        WHERE domain = 'semicolony' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '')
        LIMIT 1`,
     );
@@ -653,7 +654,7 @@ let incubatorChannels = new Set<string>();
 async function loadIncubatorChannels(): Promise<void> {
   try {
     const result = await pool.query(
-      `SELECT channel FROM semo.incubator_sessions WHERE status = 'active' AND channel IS NOT NULL AND channel != ''`,
+      `SELECT channel FROM ${DB_SCHEMA}.incubator_sessions WHERE status = 'active' AND channel IS NOT NULL AND channel != ''`,
     );
     incubatorChannels = new Set(result.rows.map((r: { channel: string }) => r.channel));
     console.log(`[router] Incubator channel filter: ${incubatorChannels.size} channels excluded`);
@@ -676,7 +677,7 @@ setInterval(() => loadIncubatorChannels().catch(() => {}), 5 * 60_000);
 async function reapStale(): Promise<void> {
   try {
     const commitRes = await pool.query<{ id: string; bot_id: string; title: string }>(
-      `UPDATE semo.bot_commitments
+      `UPDATE ${DB_SCHEMA}.bot_commitments
        SET status = 'failed',
            metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('fail_reason', 'stale_auto', 'reaped_at', NOW())
        WHERE status IN ('pending', 'active')
@@ -707,7 +708,7 @@ async function reapStale(): Promise<void> {
     }
 
     const sessRes = await pool.query(
-      `UPDATE semo.bot_sessions
+      `UPDATE ${DB_SCHEMA}.bot_sessions
        SET status = 'terminated', ended_at = NOW()
        WHERE status = 'active'
          AND COALESCE(ended_at, started_at) < NOW() - INTERVAL '24 hours'
@@ -755,7 +756,7 @@ async function scanAndPostEscalationAlerts(): Promise<void> {
       state: 'notified' | 'paged';
     }>(
       `SELECT pattern_id, state
-       FROM semo.commitment_pattern_health
+       FROM ${DB_SCHEMA}.commitment_pattern_health
        WHERE (state = 'notified' AND notified_at IS NULL)
           OR (state = 'paged' AND paged_at IS NULL)
        ORDER BY last_failure_at DESC
@@ -831,7 +832,7 @@ async function checkPollerHeartbeat(): Promise<void> {
     // 2026-05-06: cron-poller-tick 잡이 disabled 면 watchdog 자체를 skip.
     // OpenClaw 공존 운영 시 Architecture B cron-poller 는 deprecated 가능 — 이 분기로 noise 차단.
     const jobRes = await pool.query(
-      `SELECT enabled, last_run FROM semo.bot_cron_jobs
+      `SELECT enabled, last_run FROM ${DB_SCHEMA}.bot_cron_jobs
         WHERE bot_id = 'semiclaw' AND job_id = 'cron-poller-tick'`,
     );
     if (!jobRes.rows.length) return;
@@ -921,7 +922,7 @@ async function composeSemoBotStatus(): Promise<string> {
 
   try {
     const stateRes = await pool.query<{ state: string; n: string }>(
-      `SELECT state, COUNT(*)::text AS n FROM semo.commitment_pattern_health GROUP BY state`,
+      `SELECT state, COUNT(*)::text AS n FROM ${DB_SCHEMA}.commitment_pattern_health GROUP BY state`,
     );
     const counts = Object.fromEntries(stateRes.rows.map((r) => [r.state, r.n]));
     lines.push(
@@ -935,7 +936,7 @@ async function composeSemoBotStatus(): Promise<string> {
            WHERE enabled = true
              AND (last_run IS NULL OR last_run < NOW() - INTERVAL '1 day')
          )::text AS stale_count
-       FROM semo.bot_cron_jobs`,
+       FROM ${DB_SCHEMA}.bot_cron_jobs`,
     );
     const cron = cronRes.rows[0];
     lines.push(`• bot_cron_jobs: enabled=${cron.enabled_count}, stale_24h=${cron.stale_count}`);
@@ -945,7 +946,7 @@ async function composeSemoBotStatus(): Promise<string> {
          COUNT(*) FILTER (WHERE status IN ('pending', 'active'))::text AS active,
          COUNT(*) FILTER (WHERE status = 'done' AND completed_at >= NOW() - INTERVAL '24 hours')::text AS done24h,
          COUNT(*) FILTER (WHERE status = 'failed' AND completed_at >= NOW() - INTERVAL '24 hours')::text AS failed24h
-       FROM semo.bot_commitments`,
+       FROM ${DB_SCHEMA}.bot_commitments`,
     );
     const cmt = commitRes.rows[0];
     lines.push(
@@ -982,7 +983,7 @@ async function composeSemoBotIncident(slug: string | null): Promise<string> {
         updated_at: Date;
       }>(
         `SELECT sub_key, content, metadata, updated_at
-         FROM semo.knowledge_base
+         FROM ${DB_SCHEMA}.knowledge_base
          WHERE domain = 'semicolony' AND key = 'incident' AND sub_key = $1`,
         [slug],
       );
@@ -1020,7 +1021,7 @@ async function composeSemoBotIncident(slug: string | null): Promise<string> {
          metadata->>'status' AS status,
          metadata->>'severity' AS severity,
          metadata->>'occurred_at' AS occurred_at
-       FROM semo.knowledge_base
+       FROM ${DB_SCHEMA}.knowledge_base
        WHERE domain = 'semicolony' AND key = 'incident'
          AND COALESCE(metadata->>'status', 'open') NOT IN ('resolved', 'postmortem', 'closed')
        ORDER BY metadata->>'occurred_at' DESC NULLS LAST
@@ -1228,7 +1229,7 @@ interface OrchestratorConfig {
   // ROUTE 가 없을 때 ACTION 라인을 파싱·실행할지 여부. Semi=true, Colony=false(순수 관찰자).
   canManageAgents?: boolean;
   // 2026-06-02 operator: base persona(SOUL) SoT 편집자. 현재 persona 를 프롬프트에 주입하고,
-  // 응답의 APPLY_PERSONA 블록을 라우터가 DB(semo.agent_personas)에 적용한다. 도구 없음.
+  // 응답의 APPLY_PERSONA 블록을 라우터가 DB(${DB_SCHEMA}.agent_personas)에 적용한다. 도구 없음.
   personaAdmin?: boolean;
   timeoutMs: number;
 }
@@ -1422,7 +1423,7 @@ async function dispatchToInbox(args: {
   const speakerId = msg.user;
   try {
     await pool.query(
-      `INSERT INTO semo.bot_commitments
+      `INSERT INTO ${DB_SCHEMA}.bot_commitments
          (id, bot_id, status, title, source_type, source_ref,
           session_owner, assigned_session, pipeline_context, runtime_source)
        VALUES ($1, $2, 'active', $3, 'slack-inbox', $4, $5, $6, $7, 'hermes-orchestrator')
@@ -1470,7 +1471,7 @@ async function dispatchToInbox(args: {
     // 안 하면 active 인 채 남아 24h 후 stale_auto 로만 reap → 그동안 다음 dispatch 가 막힘.
     try {
       await pool.query(
-        `UPDATE semo.bot_commitments
+        `UPDATE ${DB_SCHEMA}.bot_commitments
            SET status = 'failed',
                metadata = COALESCE(metadata, '{}'::jsonb)
                  || jsonb_build_object('fail_reason', 'inbox_write_failed', 'failed_at', NOW())
@@ -1713,7 +1714,7 @@ async function resolveSenderProfile(slackUserId: string): Promise<{
   if (!slackUserId) return { registered: false, contextLines: [] };
   try {
     const r = await pool.query<{ domain: string }>(
-      `SELECT domain FROM semo.knowledge_base
+      `SELECT domain FROM ${DB_SCHEMA}.knowledge_base
         WHERE key = 'slack-id' AND content = $1
         LIMIT 1`,
       [slackUserId],
@@ -1723,7 +1724,7 @@ async function resolveSenderProfile(slackUserId: string): Promise<{
     }
     const domain = r.rows[0].domain;
     const profile = await pool.query<{ key: string; sub_key: string; content: string }>(
-      `SELECT key, sub_key, content FROM semo.knowledge_base
+      `SELECT key, sub_key, content FROM ${DB_SCHEMA}.knowledge_base
         WHERE domain = $1 AND key IN ('nickname','role','memory','identity')
         LIMIT 10`,
       [domain],
@@ -1932,7 +1933,7 @@ async function maybeOnboardSender(args: {
   let domain = `team-${baseSlug}`;
   try {
     const exists = await pool.query<{ domain: string }>(
-      `SELECT domain FROM semo.knowledge_base WHERE domain = $1 LIMIT 1`,
+      `SELECT domain FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1 LIMIT 1`,
       [domain],
     );
     if (exists.rows.length > 0) {
@@ -1948,7 +1949,7 @@ async function maybeOnboardSender(args: {
 
     for (const [key, content] of upserts) {
       await pool.query(
-        `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by, updated_at)
+        `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, created_by, updated_at)
          VALUES ($1, $2, '', $3, $4, NOW())
          ON CONFLICT (domain, key, sub_key)
          DO UPDATE SET content = EXCLUDED.content, updated_at = NOW()`,
@@ -2450,7 +2451,7 @@ async function routeDirectSlackAppMessage(
   const commitmentId = `cmt-${policy.botId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   try {
     await pool.query(
-      `INSERT INTO semo.bot_commitments
+      `INSERT INTO ${DB_SCHEMA}.bot_commitments
          (id, bot_id, status, title, source_type, source_ref,
           session_owner, assigned_session, pipeline_context, runtime_source)
        VALUES ($1, $2, 'active', $3, 'slack-inbox', $4, $5, $6, $7, 'slack-router')
@@ -2653,7 +2654,7 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
   const commitmentId = `cmt-${botId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   try {
     await pool.query(
-      `INSERT INTO semo.bot_commitments
+      `INSERT INTO ${DB_SCHEMA}.bot_commitments
          (id, bot_id, status, title, source_type, source_ref,
           session_owner, assigned_session, pipeline_context, runtime_source)
        VALUES ($1, $2, 'active', $3, 'slack-inbox', $4, $5, $6, $7, 'slack-router')
@@ -2743,7 +2744,7 @@ async function start(): Promise<void> {
     let displayMeta: Map<string, BotDisplayMeta> | undefined;
     try {
       const kb = await pool.query<{ content: string }>(
-        `SELECT content FROM semo.knowledge_base
+        `SELECT content FROM ${DB_SCHEMA}.knowledge_base
           WHERE domain = 'semicolony' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '') LIMIT 1`,
       );
       if (kb.rows[0]?.content) displayMeta = parseBotIdsDisplayMeta(kb.rows[0].content);
@@ -2789,7 +2790,7 @@ async function start(): Promise<void> {
   const refreshCustomerOutboxBots = async (): Promise<void> => {
     try {
       const r = await pool.query<{ bot_id: string }>(
-        `SELECT bot_id FROM semo.bot_status WHERE config->>'audience' = 'customer'`,
+        `SELECT bot_id FROM ${DB_SCHEMA}.bot_status WHERE config->>'audience' = 'customer'`,
       );
       const added = outboxReader.addBots(r.rows.map((x) => x.bot_id));
       if (added.length) console.log(`[outbox] customer bots watched: ${added.join(', ')}`);

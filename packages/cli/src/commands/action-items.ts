@@ -1,7 +1,7 @@
 /**
  * semo action-items — 액션 아이템 CRUD (DB SoT)
  *
- * KB가 아닌 semo.action_items 테이블에 직접 읽기/쓰기.
+ * KB가 아닌 ${DB_SCHEMA}.action_items 테이블에 직접 읽기/쓰기.
  * 봇 스킬에서 `semo action-items create/list/update/complete` 로 호출.
  */
 
@@ -9,6 +9,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import type { Pool } from 'pg';
 import { getPool, closeConnection, isDbConnected } from '../database';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -53,7 +54,7 @@ async function resolveActionItemId(pool: Pool, input: string): Promise<string> {
     throw new Error(`'${input}' 는 유효한 UUID prefix가 아닙니다 (hex/hyphen만 허용)`);
   }
   const res = await pool.query(
-    `SELECT action_item_id FROM semo.action_items WHERE action_item_id::text LIKE $1`,
+    `SELECT action_item_id FROM ${DB_SCHEMA}.action_items WHERE action_item_id::text LIKE $1`,
     [`${input.toLowerCase()}%`],
   );
   if (res.rows.length === 0) {
@@ -179,7 +180,7 @@ export function registerActionItemsCommands(program: Command): void {
       try {
         const metadata = parseJsonOption(opts.metadata, '--metadata');
         const res = await pool.query(
-          `INSERT INTO semo.action_items
+          `INSERT INTO ${DB_SCHEMA}.action_items
             (owner_domain, target_domain, description, assignee, deadline, priority, source, related_url, metadata)
            VALUES ($1, $2, $3, $4, $5::date, $6, $7, $8, $9)
            RETURNING action_item_id, owner_domain, description, status`,
@@ -249,7 +250,7 @@ export function registerActionItemsCommands(program: Command): void {
                   to_char(deadline, 'YYYY-MM-DD') AS deadline,
                   status, priority, completed_at, metadata,
                   to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SSOF') AS created_at
-           FROM semo.action_items ${where}
+           FROM ${DB_SCHEMA}.action_items ${where}
            ORDER BY CASE status WHEN 'open' THEN 0 WHEN 'completed' THEN 1 ELSE 2 END, created_at DESC
            LIMIT $${idx}`,
           params,
@@ -357,7 +358,7 @@ export function registerActionItemsCommands(program: Command): void {
         const resolvedId = await resolveActionItemId(pool, id);
         params.push(resolvedId);
         const res = await pool.query(
-          `UPDATE semo.action_items SET ${sets.join(', ')} WHERE action_item_id = $${idx}
+          `UPDATE ${DB_SCHEMA}.action_items SET ${sets.join(', ')} WHERE action_item_id = $${idx}
            RETURNING action_item_id, status, description, metadata`,
           params,
         );
@@ -424,7 +425,7 @@ export function registerActionItemsCommands(program: Command): void {
           deadline: Date | null;
         }>(
           `SELECT action_item_id, owner_domain, target_domain, description, priority, deadline
-           FROM semo.action_items
+           FROM ${DB_SCHEMA}.action_items
            ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
            ORDER BY created_at DESC
            LIMIT $${params.length}`,
@@ -512,7 +513,7 @@ export function registerActionItemsCommands(program: Command): void {
         const resolvedId = await resolveActionItemId(pool, id);
         const currentRes = await pool.query(
           `SELECT description, owner_domain, target_domain
-           FROM semo.action_items
+           FROM ${DB_SCHEMA}.action_items
            WHERE action_item_id = $1`,
           [resolvedId],
         );
@@ -543,7 +544,7 @@ export function registerActionItemsCommands(program: Command): void {
           completion: completionEntry,
         };
         const res = await pool.query(
-          `UPDATE semo.action_items
+          `UPDATE ${DB_SCHEMA}.action_items
            SET status = 'completed',
                completed_at = $2::timestamptz,
                metadata = COALESCE(metadata, '{}'::jsonb)
@@ -554,12 +555,7 @@ export function registerActionItemsCommands(program: Command): void {
                     )
            WHERE action_item_id = $1
            RETURNING action_item_id, description, completed_at, metadata`,
-          [
-            resolvedId,
-            completedAt,
-            JSON.stringify(metadataPatch),
-            JSON.stringify(completionEntry),
-          ],
+          [resolvedId, completedAt, JSON.stringify(metadataPatch), JSON.stringify(completionEntry)],
         );
         if (res.rows.length === 0) {
           console.error(chalk.red(`아이템 ${id} 없음`));

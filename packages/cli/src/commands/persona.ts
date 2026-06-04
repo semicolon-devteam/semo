@@ -1,7 +1,7 @@
 /**
  * semo persona — 고객용 base 에이전트 행동(SOUL) SoT 관리.
  *
- * SoT = semo.agent_personas (마이그레이션 125). 프로토타입 hermes SOUL.md 와
+ * SoT = ${DB_SCHEMA}.agent_personas (마이그레이션 125). 프로토타입 hermes SOUL.md 와
  * 미래 고객 install 이 모두 여기서 resolve. operator(슬랙)가 컨펌 후 이 CLI 로 편집.
  *
  *   semo persona list                         — 등록된 persona 목록
@@ -17,6 +17,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { getPool, closeConnection } from '../database';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 interface PersonaRow {
   slug: string;
@@ -45,7 +46,7 @@ export function registerPersonaCommands(program: Command): void {
       try {
         const { rows } = await pool.query<PersonaRow>(
           `SELECT slug, display_name, version, status, updated_by, updated_at::text
-             FROM semo.agent_personas ORDER BY slug`,
+             FROM ${DB_SCHEMA}.agent_personas ORDER BY slug`,
         );
         if (rows.length === 0) {
           console.log('(등록된 persona 없음 — semo persona set 으로 seed)');
@@ -70,7 +71,7 @@ export function registerPersonaCommands(program: Command): void {
       try {
         const { rows } = await pool.query<PersonaRow>(
           `SELECT slug, display_name, soul_md, version, status, updated_by, updated_at::text
-             FROM semo.agent_personas WHERE slug = $1`,
+             FROM ${DB_SCHEMA}.agent_personas WHERE slug = $1`,
           [slug],
         );
         if (rows.length === 0) {
@@ -114,28 +115,28 @@ export function registerPersonaCommands(program: Command): void {
         try {
           await client.query('BEGIN');
           const existing = await client.query<{ version: number }>(
-            `SELECT version FROM semo.agent_personas WHERE slug = $1 FOR UPDATE`,
+            `SELECT version FROM ${DB_SCHEMA}.agent_personas WHERE slug = $1 FOR UPDATE`,
             [slug],
           );
           let version: number;
           if (existing.rows.length === 0) {
             version = 1;
             await client.query(
-              `INSERT INTO semo.agent_personas (slug, display_name, soul_md, version, updated_by)
+              `INSERT INTO ${DB_SCHEMA}.agent_personas (slug, display_name, soul_md, version, updated_by)
                VALUES ($1, $2, $3, 1, $4)`,
               [slug, options.displayName ?? slug, soul, options.by],
             );
           } else {
             version = existing.rows[0].version + 1;
             await client.query(
-              `UPDATE semo.agent_personas
+              `UPDATE ${DB_SCHEMA}.agent_personas
                   SET soul_md = $2, version = $3, updated_by = $4, updated_at = now()
                 WHERE slug = $1`,
               [slug, soul, version, options.by],
             );
           }
           await client.query(
-            `INSERT INTO semo.agent_persona_revisions (slug, version, soul_md, updated_by, note)
+            `INSERT INTO ${DB_SCHEMA}.agent_persona_revisions (slug, version, soul_md, updated_by, note)
              VALUES ($1, $2, $3, $4, $5)`,
             [slug, version, soul, options.by, options.note ?? null],
           );
@@ -164,7 +165,7 @@ export function registerPersonaCommands(program: Command): void {
           created_at: string;
         }>(
           `SELECT version, updated_by, note, created_at::text
-             FROM semo.agent_persona_revisions WHERE slug = $1 ORDER BY version DESC`,
+             FROM ${DB_SCHEMA}.agent_persona_revisions WHERE slug = $1 ORDER BY version DESC`,
           [slug],
         );
         if (rows.length === 0) {
@@ -193,7 +194,7 @@ export function registerPersonaCommands(program: Command): void {
       const pool = getPool();
       try {
         const { rows } = await pool.query<PersonaRow>(
-          `SELECT slug, soul_md FROM semo.agent_personas WHERE status = 'active'`,
+          `SELECT slug, soul_md FROM ${DB_SCHEMA}.agent_personas WHERE status = 'active'`,
         );
         let synced = 0;
         for (const r of rows) {

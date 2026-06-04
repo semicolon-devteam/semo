@@ -21,6 +21,7 @@ import chalk from 'chalk';
 import type { Pool, PoolClient } from 'pg';
 import { getPool, closeConnection, isDbConnected } from '../database';
 import { buildHermesProvisionPlan, ensureHermesProvisioned } from './hermes-provision.js';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 interface Delegation {
   to_bot_id: string;
@@ -132,10 +133,10 @@ async function allocateSeat(
   botId: string,
 ): Promise<{ seatId: string; configDir: string } | null> {
   const result = await client.query(
-    `UPDATE semo.bot_seats
+    `UPDATE ${DB_SCHEMA}.bot_seats
      SET current_bot_id = $1, allocated_at = NOW(), status = 'allocated', updated_at = NOW()
      WHERE seat_id = (
-       SELECT seat_id FROM semo.bot_seats
+       SELECT seat_id FROM ${DB_SCHEMA}.bot_seats
        WHERE status = 'available' AND current_bot_id IS NULL
        ORDER BY created_at
        LIMIT 1 FOR UPDATE SKIP LOCKED
@@ -149,7 +150,7 @@ async function allocateSeat(
 
 async function releaseSeat(client: PoolClient, botId: string): Promise<void> {
   await client.query(
-    `UPDATE semo.bot_seats
+    `UPDATE ${DB_SCHEMA}.bot_seats
      SET current_bot_id = NULL, allocated_at = NULL, status = 'available', updated_at = NOW()
      WHERE current_bot_id = $1`,
     [botId],
@@ -162,9 +163,9 @@ async function copyKbFromTemplate(
   templateBotId: string,
 ): Promise<number> {
   const result = await client.query(
-    `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by)
+    `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, metadata, created_by)
      SELECT $1, key, sub_key, content, metadata, 'bots-factory'
-     FROM semo.knowledge_base
+     FROM ${DB_SCHEMA}.knowledge_base
      WHERE domain = $2
        AND key IN ('identity','delegation','model-config','status','slack-profile','cron-schedule','tools','skills','kb-access')
      ON CONFLICT (domain, key, sub_key) DO NOTHING`,
@@ -235,12 +236,12 @@ async function seedBotKbEntries(client: PoolClient, input: CreateBotInput): Prom
   const entries = computeBotKbSeedEntries(input);
   for (const { key, content } of entries) {
     await client.query(
-      `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, version, created_at, updated_at)
+      `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, metadata, created_by, version, created_at, updated_at)
        VALUES ($1, $2, '', $3, '{}'::jsonb, 'semo-bots-factory', 1, NOW(), NOW())
        ON CONFLICT (domain, key, sub_key) DO UPDATE SET
          content = EXCLUDED.content,
          updated_at = NOW(),
-         version = semo.knowledge_base.version + 1`,
+         version = ${DB_SCHEMA}.knowledge_base.version + 1`,
       [input.botId, key, content],
     );
   }
@@ -310,7 +311,7 @@ async function createBot(pool: Pool, input: CreateBotInput): Promise<void> {
   await withTransaction(pool, async (client) => {
     // 1. bot_status 존재 여부 확인
     const existing = await client.query(
-      `SELECT bot_id, status FROM semo.bot_status WHERE bot_id = $1 FOR UPDATE`,
+      `SELECT bot_id, status FROM ${DB_SCHEMA}.bot_status WHERE bot_id = $1 FOR UPDATE`,
       [input.botId],
     );
     if (existing.rows.length > 0) {
@@ -334,7 +335,7 @@ async function createBot(pool: Pool, input: CreateBotInput): Promise<void> {
     const workspacePath = `~/.semo/workspaces/${input.botId}`;
     const runtimeConfig = buildBotRuntimeConfig(input);
     await client.query(
-      `INSERT INTO semo.bot_status (
+      `INSERT INTO ${DB_SCHEMA}.bot_status (
          bot_id, name, emoji, role, workspace_path, status,
          kb_domains, budget_per_message, slack_username, slack_icon_emoji,
          created_by_bot_id, template_bot_id, runtime_hint, projection_targets
@@ -358,7 +359,7 @@ async function createBot(pool: Pool, input: CreateBotInput): Promise<void> {
 
     // 4. ontology row
     await client.query(
-      `INSERT INTO semo.ontology (domain, entity_type, schema, description)
+      `INSERT INTO ${DB_SCHEMA}.ontology (domain, entity_type, schema, description)
        VALUES ($1, 'agents', '{}'::jsonb, $2)
        ON CONFLICT (domain) DO NOTHING`,
       [input.botId, `Agent Factory — ${input.role}`],
@@ -378,7 +379,7 @@ async function createBot(pool: Pool, input: CreateBotInput): Promise<void> {
     // 6. bot_delegation inserts
     for (const d of input.delegations) {
       await client.query(
-        `INSERT INTO semo.bot_delegation (
+        `INSERT INTO ${DB_SCHEMA}.bot_delegation (
            from_bot_id, to_bot_id, delegation_type, domains, method, channel,
            max_roundtrips, priority, is_active
          ) VALUES ('semobot',$1,$2,$3,$4,$5,$6,$7,TRUE)
@@ -432,7 +433,7 @@ async function createBot(pool: Pool, input: CreateBotInput): Promise<void> {
 async function deleteBot(pool: Pool, botId: string, force: boolean): Promise<void> {
   await withTransaction(pool, async (client) => {
     const row = await client.query(
-      `SELECT bot_id, status, created_by_bot_id FROM semo.bot_status WHERE bot_id = $1 FOR UPDATE`,
+      `SELECT bot_id, status, created_by_bot_id FROM ${DB_SCHEMA}.bot_status WHERE bot_id = $1 FOR UPDATE`,
       [botId],
     );
     if (row.rows.length === 0) {
@@ -444,30 +445,31 @@ async function deleteBot(pool: Pool, botId: string, force: boolean): Promise<voi
 
     if (force) {
       // 모든 관련 테이블 cascade 삭제
-      await client.query(`DELETE FROM semo.bot_delegation WHERE from_bot_id=$1 OR to_bot_id=$1`, [
-        botId,
-      ]);
-      await client.query(`DELETE FROM semo.knowledge_base WHERE domain=$1`, [botId]);
-      await client.query(`DELETE FROM semo.ontology WHERE domain=$1`, [botId]);
+      await client.query(
+        `DELETE FROM ${DB_SCHEMA}.bot_delegation WHERE from_bot_id=$1 OR to_bot_id=$1`,
+        [botId],
+      );
+      await client.query(`DELETE FROM ${DB_SCHEMA}.knowledge_base WHERE domain=$1`, [botId]);
+      await client.query(`DELETE FROM ${DB_SCHEMA}.ontology WHERE domain=$1`, [botId]);
       await releaseSeat(client, botId);
-      await client.query(`DELETE FROM semo.bot_status WHERE bot_id=$1`, [botId]);
+      await client.query(`DELETE FROM ${DB_SCHEMA}.bot_status WHERE bot_id=$1`, [botId]);
       console.log(chalk.yellow(`⚠ 봇 "${botId}" 강제 삭제 (cascade).`));
     } else {
       // soft delete
       await client.query(
-        `UPDATE semo.bot_status SET status='retired', synced_at=NOW() WHERE bot_id=$1`,
+        `UPDATE ${DB_SCHEMA}.bot_status SET status='retired', synced_at=NOW() WHERE bot_id=$1`,
         [botId],
       );
       await client.query(
-        `UPDATE semo.bot_delegation SET is_active=FALSE WHERE from_bot_id=$1 OR to_bot_id=$1`,
+        `UPDATE ${DB_SCHEMA}.bot_delegation SET is_active=FALSE WHERE from_bot_id=$1 OR to_bot_id=$1`,
         [botId],
       );
       // KB status 동기화 — 라우터가 'retired' 보고 라우팅 제외 가능 (loadActiveBotIds 가 1차 필터)
       await client.query(
-        `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, version, created_at, updated_at)
+        `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, metadata, created_by, version, created_at, updated_at)
          VALUES ($1, 'status', '', 'retired', '{}'::jsonb, 'semo-bots-factory', 1, NOW(), NOW())
          ON CONFLICT (domain, key, sub_key) DO UPDATE SET content='retired', updated_at=NOW(),
-           version = semo.knowledge_base.version + 1`,
+           version = ${DB_SCHEMA}.knowledge_base.version + 1`,
         [botId],
       );
       await releaseSeat(client, botId);
@@ -479,12 +481,13 @@ async function deleteBot(pool: Pool, botId: string, force: boolean): Promise<voi
 async function showBot(pool: Pool, botId: string): Promise<void> {
   const client = await pool.connect();
   try {
-    const result = await client.query(`SELECT * FROM semo.v_bot_factory_status WHERE bot_id = $1`, [
-      botId,
-    ]);
+    const result = await client.query(
+      `SELECT * FROM ${DB_SCHEMA}.v_bot_factory_status WHERE bot_id = $1`,
+      [botId],
+    );
     if (result.rows.length === 0) {
       const alias = await client.query(
-        `SELECT canonical_bot_id FROM semo.bot_id_aliases WHERE alias=$1`,
+        `SELECT canonical_bot_id FROM ${DB_SCHEMA}.bot_id_aliases WHERE alias=$1`,
         [botId],
       );
       if (alias.rows.length > 0) {
@@ -501,7 +504,7 @@ async function showBot(pool: Pool, botId: string): Promise<void> {
 
     const delegations = await client.query(
       `SELECT to_bot_id, delegation_type, domains, priority, is_active
-       FROM semo.bot_delegation WHERE from_bot_id = $1 ORDER BY priority`,
+       FROM ${DB_SCHEMA}.bot_delegation WHERE from_bot_id = $1 ORDER BY priority`,
       [botId],
     );
     console.log(chalk.cyan('\nDelegations:'));
@@ -517,15 +520,16 @@ async function upsertBotAlias(pool: Pool, alias: string, canonicalBotId: string)
 
   const client = await pool.connect();
   try {
-    const canonical = await client.query(`SELECT bot_id FROM semo.bot_status WHERE bot_id = $1`, [
-      normalizedCanonical,
-    ]);
+    const canonical = await client.query(
+      `SELECT bot_id FROM ${DB_SCHEMA}.bot_status WHERE bot_id = $1`,
+      [normalizedCanonical],
+    );
     if (canonical.rows.length === 0) {
       throw new Error(`canonical bot_id="${normalizedCanonical}" 없음`);
     }
 
     const result = await client.query(
-      `INSERT INTO semo.bot_id_aliases (alias, canonical_bot_id, retired_at)
+      `INSERT INTO ${DB_SCHEMA}.bot_id_aliases (alias, canonical_bot_id, retired_at)
        VALUES ($1, $2, NULL)
        ON CONFLICT (alias) DO UPDATE SET
          canonical_bot_id = EXCLUDED.canonical_bot_id,
@@ -550,7 +554,7 @@ async function retireBotAlias(pool: Pool, alias: string): Promise<void> {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      `UPDATE semo.bot_id_aliases SET retired_at = NOW() WHERE alias = $1 AND retired_at IS NULL`,
+      `UPDATE ${DB_SCHEMA}.bot_id_aliases SET retired_at = NOW() WHERE alias = $1 AND retired_at IS NULL`,
       [normalizedAlias],
     );
     if (result.rowCount === 0) {
@@ -567,7 +571,7 @@ async function restoreBotAlias(pool: Pool, alias: string): Promise<void> {
   const client = await pool.connect();
   try {
     const result = await client.query(
-      `UPDATE semo.bot_id_aliases SET retired_at = NULL WHERE alias = $1`,
+      `UPDATE ${DB_SCHEMA}.bot_id_aliases SET retired_at = NULL WHERE alias = $1`,
       [normalizedAlias],
     );
     if (result.rowCount === 0) {
@@ -584,7 +588,7 @@ async function listBotAliases(pool: Pool, showRetired = false): Promise<void> {
   try {
     const rows = await client.query(
       `SELECT alias, canonical_bot_id, retired_at, created_at
-       FROM semo.bot_id_aliases
+       FROM ${DB_SCHEMA}.bot_id_aliases
        WHERE retired_at ${showRetired ? 'IS NOT NULL' : 'IS NULL'}
        ORDER BY created_at DESC, alias`,
     );

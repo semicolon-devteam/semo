@@ -3,6 +3,7 @@ import type { EmbeddingProvider } from '@team-semicolon/semo-common';
 import type { KbStore } from '@team-semicolon/semo-kb-core';
 import { PgKbStore } from '@team-semicolon/semo-kb-pg';
 import type { KBItem } from '../types.js';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export interface KbService {
   get(domain: string, combinedKey: string): Promise<KBItem | null>;
@@ -87,7 +88,7 @@ export class PgKbService implements KbService {
     if (useLegacyKbStore()) {
       const sql = `
         SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at
-        FROM semo.knowledge_base
+        FROM ${DB_SCHEMA}.knowledge_base
         WHERE domain = $1 AND key = $2 AND sub_key = $3
       `;
       const res = await this.pool.query(sql, [domain, key, subKey]);
@@ -135,7 +136,7 @@ export class PgKbService implements KbService {
       const sql = `
         SELECT kb_id, domain, key, sub_key, content, created_by,
                ROUND((1 - (embedding <=> $1::vector))::numeric * 100, 1) AS similarity_pct
-        FROM semo.knowledge_base
+        FROM ${DB_SCHEMA}.knowledge_base
         ${where}
         ORDER BY embedding <=> $1::vector
         LIMIT $${idx}
@@ -172,12 +173,13 @@ export class PgKbService implements KbService {
     const { domain, content, createdBy, metadata } = input;
 
     if (useLegacyKbStore()) {
-      const domainCheck = await this.pool.query('SELECT 1 FROM semo.ontology WHERE domain = $1', [
-        domain,
-      ]);
+      const domainCheck = await this.pool.query(
+        `SELECT 1 FROM ${DB_SCHEMA}.ontology WHERE domain = $1`,
+        [domain],
+      );
       if (domainCheck.rows.length === 0) {
         const knownDomains = await this.pool.query(
-          'SELECT domain FROM semo.ontology ORDER BY domain',
+          `SELECT domain FROM ${DB_SCHEMA}.ontology ORDER BY domain`,
         );
         const known = knownDomains.rows.map((r: { domain: string }) => r.domain);
         throw new Error(
@@ -186,13 +188,13 @@ export class PgKbService implements KbService {
       }
 
       const typeResult = await this.pool.query(
-        'SELECT entity_type FROM semo.ontology WHERE domain = $1 AND entity_type IS NOT NULL',
+        `SELECT entity_type FROM ${DB_SCHEMA}.ontology WHERE domain = $1 AND entity_type IS NOT NULL`,
         [domain],
       );
       if (typeResult.rows.length > 0) {
         const entityType = typeResult.rows[0].entity_type;
         const schemaResult = await this.pool.query(
-          "SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source FROM semo.kb_type_schema WHERE type_key = $1",
+          `SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source FROM ${DB_SCHEMA}.kb_type_schema WHERE type_key = $1`,
           [entityType],
         );
         const schemas = schemaResult.rows as Array<{
@@ -220,15 +222,15 @@ export class PgKbService implements KbService {
       const metadataJson = metadata ? JSON.stringify(metadata) : null;
 
       const sql = metadataJson
-        ? `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by, embedding, metadata)
+        ? `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, created_by, embedding, metadata)
            VALUES ($1, $2, $3, $4, $5, $6::vector, $7::jsonb)
            ON CONFLICT (domain, key, sub_key) DO UPDATE SET
              content    = EXCLUDED.content,
              embedding  = EXCLUDED.embedding,
-             metadata   = COALESCE(semo.knowledge_base.metadata, '{}'::jsonb) || EXCLUDED.metadata,
+             metadata   = COALESCE(${DB_SCHEMA}.knowledge_base.metadata, '{}'::jsonb) || EXCLUDED.metadata,
              updated_at = NOW()
            RETURNING kb_id, domain, key, sub_key, content, metadata, created_by, updated_at`
-        : `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by, embedding)
+        : `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, created_by, embedding)
            VALUES ($1, $2, $3, $4, $5, $6::vector)
            ON CONFLICT (domain, key, sub_key) DO UPDATE SET
              content    = EXCLUDED.content,

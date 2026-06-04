@@ -1,10 +1,10 @@
 /**
  * semo bots — 봇 상태 관리
  *
- * Actual semo.bot_status schema:
+ * Actual ${DB_SCHEMA}.bot_status schema:
  *   bot_id, name, emoji, role, last_active, session_count, workspace_path, status, synced_at
  *
- * Actual semo.bot_sessions schema:
+ * Actual ${DB_SCHEMA}.bot_sessions schema:
  *   bot_id, session_key, label, kind, chat_type, last_activity, message_count, synced_at
  */
 
@@ -259,6 +259,7 @@ function getAllFileMtimes(dir: string, depth = 0): Date[] {
 // ============================================================
 
 import * as crypto from 'crypto';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 const BINARY_EXTS = new Set([
   '.png',
@@ -410,14 +411,14 @@ export async function syncWorkspaceFiles(
   let upserted = 0;
   for (const f of files) {
     const result = await client.query(
-      `INSERT INTO semo.bot_workspace_files (bot_id, file_path, content, file_size, file_hash, synced_at)
+      `INSERT INTO ${DB_SCHEMA}.bot_workspace_files (bot_id, file_path, content, file_size, file_hash, synced_at)
        VALUES ($1, $2, $3, $4, $5, NOW())
        ON CONFLICT (bot_id, file_path) DO UPDATE SET
          content   = EXCLUDED.content,
          file_size = EXCLUDED.file_size,
          file_hash = EXCLUDED.file_hash,
          synced_at = NOW()
-       WHERE semo.bot_workspace_files.file_hash IS DISTINCT FROM EXCLUDED.file_hash`,
+       WHERE ${DB_SCHEMA}.bot_workspace_files.file_hash IS DISTINCT FROM EXCLUDED.file_hash`,
       [botId, f.relPath, f.content, f.size, f.hash],
     );
     if (result.rowCount && result.rowCount > 0) {
@@ -427,14 +428,14 @@ export async function syncWorkspaceFiles(
 
   // Delete files in DB but not on disk (for this bot_id)
   const dbFiles = await client.query(
-    `SELECT file_path FROM semo.bot_workspace_files WHERE bot_id = $1`,
+    `SELECT file_path FROM ${DB_SCHEMA}.bot_workspace_files WHERE bot_id = $1`,
     [botId],
   );
   const diskPaths = new Set(files.map((f) => f.relPath));
   for (const row of dbFiles.rows as { file_path: string }[]) {
     if (!diskPaths.has(row.file_path)) {
       await client.query(
-        `DELETE FROM semo.bot_workspace_files WHERE bot_id = $1 AND file_path = $2`,
+        `DELETE FROM ${DB_SCHEMA}.bot_workspace_files WHERE bot_id = $1 AND file_path = $2`,
         [botId, row.file_path],
       );
     }
@@ -709,7 +710,9 @@ function listRenderableBotIds(): string[] {
 }
 
 export function registerBotsCommands(program: Command): void {
-  const botsCmd = program.command('bots').description('봇 상태 조회 및 관리 (semo.bot_status)');
+  const botsCmd = program
+    .command('bots')
+    .description(`봇 상태 조회 및 관리 (${DB_SCHEMA}.bot_status)`);
 
   // Agent Factory (create / delete / show) — SemoBot 진입점
   registerBotsFactoryCommands(botsCmd);
@@ -810,7 +813,7 @@ export function registerBotsCommands(program: Command): void {
       try {
         const pool = getPool();
         const r = await pool.query<{ bot_id: string; name: string | null; emoji: string | null }>(
-          `SELECT bot_id, name, emoji FROM semo.bot_status WHERE bot_id = ANY($1)`,
+          `SELECT bot_id, name, emoji FROM ${DB_SCHEMA}.bot_status WHERE bot_id = ANY($1)`,
           [botIds],
         );
         const dbMap = new Map(r.rows.map((row) => [row.bot_id, row]));
@@ -894,7 +897,7 @@ export function registerBotsCommands(program: Command): void {
           emoji: string | null;
           slack_icon_emoji: string | null;
         }>(
-          `SELECT name, slack_username, emoji, slack_icon_emoji FROM semo.bot_status WHERE bot_id = $1`,
+          `SELECT name, slack_username, emoji, slack_icon_emoji FROM ${DB_SCHEMA}.bot_status WHERE bot_id = $1`,
           [botId],
         );
         if (prev.rowCount === 0) {
@@ -927,7 +930,7 @@ export function registerBotsCommands(program: Command): void {
           }
         }
         const up = await client.query(
-          `UPDATE semo.bot_status SET ${sets.join(', ')}, synced_at = NOW() WHERE bot_id = $1
+          `UPDATE ${DB_SCHEMA}.bot_status SET ${sets.join(', ')}, synced_at = NOW() WHERE bot_id = $1
            RETURNING name, emoji, slack_username`,
           vals,
         );
@@ -1012,7 +1015,7 @@ export function registerBotsCommands(program: Command): void {
         if (await isDbConnected()) {
           try {
             const r = await getPool().query<{ config: Record<string, unknown> | null }>(
-              `SELECT config FROM semo.bot_status WHERE bot_id = $1`,
+              `SELECT config FROM ${DB_SCHEMA}.bot_status WHERE bot_id = $1`,
               [botId],
             );
             cfg = r.rows[0]?.config ?? {};
@@ -1154,7 +1157,7 @@ export function registerBotsCommands(program: Command): void {
              c.pipeline_context->>'thread_ts' AS thread_ts,
              c.title,
              c.created_at::text AS created_at
-           FROM semo.bot_commitments c
+           FROM ${DB_SCHEMA}.bot_commitments c
            WHERE c.pipeline_context->'routing_hint' IS NOT NULL
              AND c.created_at > NOW() - INTERVAL '${intervalSql}'
            ORDER BY c.created_at DESC`,
@@ -1277,9 +1280,9 @@ export function registerBotsCommands(program: Command): void {
       if (opts.bot) params.push(opts.bot);
       const r = await pool.query(
         `SELECT kb.domain, kb.key, kb.sub_key, kb.content
-         FROM semo.knowledge_base kb
-         JOIN semo.ontology o ON o.domain = kb.domain
-         JOIN semo.bot_status bs ON bs.bot_id = kb.domain
+         FROM ${DB_SCHEMA}.knowledge_base kb
+         JOIN ${DB_SCHEMA}.ontology o ON o.domain = kb.domain
+         JOIN ${DB_SCHEMA}.bot_status bs ON bs.bot_id = kb.domain
          WHERE o.entity_type = 'agents'
            AND kb.key = ANY($1::text[])
            AND kb.embedding IS NULL
@@ -1373,12 +1376,12 @@ export function registerBotsCommands(program: Command): void {
               WHEN agg.last_commit_at IS NULL                      THEN 'none'
               ELSE 'idle'
             END AS derived_status
-          FROM semo.bot_status bs
+          FROM ${DB_SCHEMA}.bot_status bs
           LEFT JOIN (
             SELECT bot_id,
                    MAX(updated_at) AS last_commit_at,
                    COUNT(*) FILTER (WHERE updated_at > NOW() - INTERVAL '24 hours') AS commit_count_24h
-            FROM semo.bot_commitments
+            FROM ${DB_SCHEMA}.bot_commitments
             GROUP BY bot_id
           ) agg ON agg.bot_id = bs.bot_id
         `;
@@ -1502,7 +1505,7 @@ export function registerBotsCommands(program: Command): void {
         let query = `
           SELECT bot_id, session_key, label, kind, chat_type,
                  last_activity::text, message_count
-          FROM semo.bot_sessions
+          FROM ${DB_SCHEMA}.bot_sessions
         `;
         const params: (string | number)[] = [];
         let idx = 1;
@@ -1552,7 +1555,7 @@ export function registerBotsCommands(program: Command): void {
   // ── semo bots sync ──────────────────────────────────────────
   botsCmd
     .command('sync')
-    .description('bot-workspaces/ 스캔 → semo.bot_status DB upsert + KB identity 동기화')
+    .description(`bot-workspaces/ 스캔 → ${DB_SCHEMA}.bot_status DB upsert + KB identity 동기화`)
     .option('--dry-run', '실제 upsert 없이 미리보기')
     .option('--skip-kb', 'KB identity 동기화 건너뛰기 (raw bot_status 만 갱신)')
     .action(async (options) => {
@@ -1604,20 +1607,20 @@ export function registerBotsCommands(program: Command): void {
           try {
             const detectedStatus = 'offline';
             await client.query(
-              `INSERT INTO semo.bot_status
+              `INSERT INTO ${DB_SCHEMA}.bot_status
                  (bot_id, name, emoji, role, status, last_active, workspace_path, synced_at)
                VALUES ($1, $2, $3, $4, $7, $5, $6, NOW())
                ON CONFLICT (bot_id) DO UPDATE SET
-                 name           = COALESCE(EXCLUDED.name, semo.bot_status.name),
-                 emoji          = COALESCE(EXCLUDED.emoji, semo.bot_status.emoji),
-                 role           = COALESCE(EXCLUDED.role, semo.bot_status.role),
+                 name           = COALESCE(EXCLUDED.name, ${DB_SCHEMA}.bot_status.name),
+                 emoji          = COALESCE(EXCLUDED.emoji, ${DB_SCHEMA}.bot_status.emoji),
+                 role           = COALESCE(EXCLUDED.role, ${DB_SCHEMA}.bot_status.role),
                  status         = EXCLUDED.status,
                  last_active    = CASE
                    WHEN EXCLUDED.last_active IS NOT NULL
-                     AND (semo.bot_status.last_active IS NULL
-                          OR EXCLUDED.last_active > semo.bot_status.last_active)
+                     AND (${DB_SCHEMA}.bot_status.last_active IS NULL
+                          OR EXCLUDED.last_active > ${DB_SCHEMA}.bot_status.last_active)
                    THEN EXCLUDED.last_active
-                   ELSE semo.bot_status.last_active
+                   ELSE ${DB_SCHEMA}.bot_status.last_active
                  END,
                  workspace_path = EXCLUDED.workspace_path,
                  synced_at      = NOW()`,
@@ -2015,7 +2018,7 @@ export function registerBotsCommands(program: Command): void {
         let query = `
           SELECT bot_id, job_id, name, schedule, enabled,
                  last_run::text, next_run::text, session_target, synced_at::text
-          FROM semo.bot_cron_jobs
+          FROM ${DB_SCHEMA}.bot_cron_jobs
         `;
         const params: string[] = [];
         if (options.bot) {
@@ -2306,7 +2309,7 @@ export function registerBotsCommands(program: Command): void {
         const pool = getPool();
         const client = await pool.connect();
         await client.query(
-          `INSERT INTO semo.bot_status (bot_id, status, synced_at)
+          `INSERT INTO ${DB_SCHEMA}.bot_status (bot_id, status, synced_at)
            VALUES ($1, $2, NOW())
            ON CONFLICT (bot_id) DO UPDATE SET
              status = EXCLUDED.status,

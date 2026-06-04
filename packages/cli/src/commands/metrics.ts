@@ -13,6 +13,7 @@ import { Command } from 'commander';
 import * as fs from 'fs';
 import * as os from 'os';
 import { getPool, closeConnection, isDbConnected } from '../database';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ─── Pricing (per 1M tokens, API-equivalent) ────────────────────────────────
 
@@ -224,7 +225,7 @@ export function registerMetricsCommands(program: Command): void {
         );
         try {
           await pool.query(
-            `INSERT INTO semo.bot_cost_log
+            `INSERT INTO ${DB_SCHEMA}.bot_cost_log
                (bot_id, cost_usd, model, input_tokens, output_tokens,
                 cache_read_tokens, cache_creation_tokens, num_turns,
                 session_id, message_id)
@@ -273,7 +274,7 @@ export function registerMetricsCommands(program: Command): void {
             `SELECT bot_id, month, query_count,
                     total_input_tokens, total_output_tokens,
                     total_cost_usd, avg_latency_ms
-             FROM semo.bot_cost_summary ${botFilter}
+             FROM ${DB_SCHEMA}.bot_cost_summary ${botFilter}
              ORDER BY month DESC, total_cost_usd DESC
              LIMIT 50`,
             params,
@@ -287,7 +288,7 @@ export function registerMetricsCommands(program: Command): void {
             `SELECT bot_id, day, query_count,
                     total_input_tokens, total_output_tokens,
                     total_cost_usd
-             FROM semo.bot_cost_daily
+             FROM ${DB_SCHEMA}.bot_cost_daily
              WHERE day >= CURRENT_DATE - $1::int ${botFilter}
              ORDER BY day DESC, total_cost_usd DESC`,
             params,

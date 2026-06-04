@@ -12,6 +12,7 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { createHmac, randomBytes } from 'crypto';
 import { getPool, closeConnection, isDbConnected } from '../database';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 const TOKEN_ENV_LIVE = 'live';
 const TOKEN_RANDOM_BYTES = 18;
@@ -137,7 +138,7 @@ export function registerCredentialCommands(program: Command): void {
       try {
         const pool = getPool();
         const res = await pool.query(
-          `INSERT INTO semo.agent_service_credentials
+          `INSERT INTO ${DB_SCHEMA}.agent_service_credentials
              (bot_id, service_domain, token_hash, token_prefix, scopes,
               expires_at, issued_by, metadata)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -244,7 +245,7 @@ export function registerCredentialCommands(program: Command): void {
           `SELECT id, bot_id, service_domain, token_prefix, scopes,
                   issued_at::text, expires_at::text, last_used_at::text,
                   revoked_at::text, revoked_reason, issued_by
-           FROM semo.agent_service_credentials
+           FROM ${DB_SCHEMA}.agent_service_credentials
            ${where}
            ORDER BY issued_at DESC
            LIMIT $${idx}`,
@@ -305,7 +306,7 @@ export function registerCredentialCommands(program: Command): void {
       try {
         const pool = getPool();
         const res = await pool.query(
-          `UPDATE semo.agent_service_credentials
+          `UPDATE ${DB_SCHEMA}.agent_service_credentials
              SET revoked_at = NOW(),
                  revoked_reason = $2
            WHERE id = $1 AND revoked_at IS NULL
@@ -354,7 +355,7 @@ export function registerCredentialCommands(program: Command): void {
 
         const existing = await client.query(
           `SELECT id, bot_id, service_domain, scopes, expires_at, issued_by, metadata
-             FROM semo.agent_service_credentials
+             FROM ${DB_SCHEMA}.agent_service_credentials
             WHERE id = $1 AND revoked_at IS NULL
             FOR UPDATE`,
           [id],
@@ -370,7 +371,7 @@ export function registerCredentialCommands(program: Command): void {
         const tokenHash = hashToken(plaintext, pepper);
 
         await client.query(
-          `UPDATE semo.agent_service_credentials
+          `UPDATE ${DB_SCHEMA}.agent_service_credentials
              SET revoked_at = NOW(),
                  revoked_reason = $2
            WHERE id = $1`,
@@ -378,7 +379,7 @@ export function registerCredentialCommands(program: Command): void {
         );
 
         const inserted = await client.query(
-          `INSERT INTO semo.agent_service_credentials
+          `INSERT INTO ${DB_SCHEMA}.agent_service_credentials
              (bot_id, service_domain, token_hash, token_prefix, scopes,
               expires_at, issued_by, metadata)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -451,7 +452,7 @@ export function registerCredentialCommands(program: Command): void {
           `SELECT id, bot_id, service_domain, token_prefix, scopes,
                   issued_at::text, expires_at::text, last_used_at::text,
                   revoked_at::text, issued_by
-             FROM semo.agent_service_credentials
+             FROM ${DB_SCHEMA}.agent_service_credentials
             WHERE token_hash = $1`,
           [tokenHash],
         );
@@ -494,9 +495,10 @@ export function registerCredentialCommands(program: Command): void {
         }
 
         await pool
-          .query(`UPDATE semo.agent_service_credentials SET last_used_at = NOW() WHERE id = $1`, [
-            row.id,
-          ])
+          .query(
+            `UPDATE ${DB_SCHEMA}.agent_service_credentials SET last_used_at = NOW() WHERE id = $1`,
+            [row.id],
+          )
           .catch(() => {
             console.error(chalk.yellow('⚠ last_used_at 업데이트 실패 (verify 결과는 valid)'));
           });

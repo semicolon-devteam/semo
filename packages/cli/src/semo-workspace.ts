@@ -12,6 +12,7 @@ import * as path from 'path';
 import * as os from 'os';
 import chalk from 'chalk';
 import { getPool, getActiveBotIds, getBotWorkspaceFiles, getDelegations } from './database';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ============================================================
 // Constants
@@ -138,7 +139,7 @@ export async function generateSoulMd(): Promise<void> {
     const pool = getPool();
     const result = await pool.query(
       `SELECT bot_id, name, emoji, role, status
-       FROM semo.bot_status
+       FROM ${DB_SCHEMA}.bot_status
        WHERE status != 'retired'
        ORDER BY bot_id`,
     );

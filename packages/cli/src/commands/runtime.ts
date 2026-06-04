@@ -17,6 +17,7 @@ import * as os from 'os';
 import { randomUUID } from 'crypto';
 import { getPool, closeConnection, isDbConnected } from '../database';
 import { buildHermesProvisionPlan, ensureHermesProvisioned } from './hermes-provision.js';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 interface CommonRuntime {
   ClaudeCodeAdapter: new (opts?: Record<string, unknown>) => HostAdapterLike;
@@ -148,7 +149,7 @@ async function loadPersonaEnvelope(botId: string): Promise<string | undefined> {
   const pool = getPool();
   try {
     const p = await pool.query<{ soul_md: string }>(
-      `SELECT soul_md FROM semo.agent_personas WHERE slug = $1 AND status = 'active' LIMIT 1`,
+      `SELECT soul_md FROM ${DB_SCHEMA}.agent_personas WHERE slug = $1 AND status = 'active' LIMIT 1`,
       [botId],
     );
     if (p.rows[0]?.soul_md) return p.rows[0].soul_md;
@@ -166,7 +167,7 @@ async function loadBotRecord(botId: string): Promise<BotRecord | null> {
   const pool = getPool();
   const r = await pool.query(
     `SELECT bot_id, config, workspace_path
-     FROM semo.bot_status WHERE bot_id = $1 LIMIT 1`,
+     FROM ${DB_SCHEMA}.bot_status WHERE bot_id = $1 LIMIT 1`,
     [botId],
   );
   return (r.rows[0] as BotRecord | undefined) ?? null;

@@ -4,13 +4,14 @@
  * 안전 패턴: operator hermes 는 도구 없이 대화만 한다(슬랙-트리거 셸 금지).
  * 라우터가 (1) 현재 persona 들을 프롬프트에 주입 → operator 가 diff 제안,
  * (2) 사용자가 컨펌하면 operator 가 APPLY_PERSONA 블록을 출력,
- * (3) 라우터가 그 블록을 파싱해 DB(semo.agent_personas) 갱신 + 프로토타입 hermes SOUL.md 동기화.
+ * (3) 라우터가 그 블록을 파싱해 DB(${DB_SCHEMA}.agent_personas) 갱신 + 프로토타입 hermes SOUL.md 동기화.
  *
  * 설계: docs/superpowers/specs/2026-06-02-agent-behavior-sot-and-propagation-design.md
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Pool } from 'pg';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export interface PersonaRow {
   slug: string;
@@ -22,7 +23,7 @@ export interface PersonaRow {
 export async function listActivePersonas(pool: Pool): Promise<PersonaRow[]> {
   const { rows } = await pool.query<PersonaRow>(
     `SELECT slug, display_name, soul_md, version
-       FROM semo.agent_personas WHERE status = 'active' ORDER BY slug`,
+       FROM ${DB_SCHEMA}.agent_personas WHERE status = 'active' ORDER BY slug`,
   );
   return rows;
 }
@@ -123,7 +124,7 @@ export async function applyPersona(
   try {
     await client.query('BEGIN');
     const existing = await client.query<{ version: number }>(
-      `SELECT version FROM semo.agent_personas WHERE slug = $1 FOR UPDATE`,
+      `SELECT version FROM ${DB_SCHEMA}.agent_personas WHERE slug = $1 FOR UPDATE`,
       [apply.slug],
     );
     if (existing.rows.length === 0) {
@@ -131,13 +132,13 @@ export async function applyPersona(
     }
     const version = existing.rows[0].version + 1;
     await client.query(
-      `UPDATE semo.agent_personas
+      `UPDATE ${DB_SCHEMA}.agent_personas
           SET soul_md = $2, version = $3, updated_by = $4, updated_at = now()
         WHERE slug = $1`,
       [apply.slug, apply.soul, version, by],
     );
     await client.query(
-      `INSERT INTO semo.agent_persona_revisions (slug, version, soul_md, updated_by, note)
+      `INSERT INTO ${DB_SCHEMA}.agent_persona_revisions (slug, version, soul_md, updated_by, note)
        VALUES ($1, $2, $3, $4, $5)`,
       [apply.slug, version, apply.soul, by, apply.note ?? null],
     );

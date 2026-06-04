@@ -37,6 +37,7 @@ import {
   getPool,
   isDbConnected,
 } from '../database';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 interface Delegation {
   to_bot_id: string;
@@ -724,7 +725,7 @@ async function loadAllowedProjectionDiffs(): Promise<string[]> {
   if (!(await isDbConnected())) return [];
   const result = await getPool().query(
     `SELECT content, metadata
-       FROM semo.knowledge_base
+       FROM ${DB_SCHEMA}.knowledge_base
       WHERE domain = 'semicolony'
         AND key = 'process'
         AND sub_key = 'agent-spec-projection-allowed-diffs'

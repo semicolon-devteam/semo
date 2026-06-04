@@ -27,6 +27,7 @@ import {
 } from '@team-semicolon/semo-common';
 
 import { getPool } from './database';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export {
   commitmentPatternId,
@@ -75,7 +76,7 @@ export async function claimPagedAlert(patternId: string): Promise<AlertClaim | n
 }
 
 /**
- * C5 dual-write: best-effort append to semo.commitment_events. Swallows errors
+ * C5 dual-write: best-effort append to ${DB_SCHEMA}.commitment_events. Swallows errors
  * during dual-write phase (bot_commitments remains read source). After flip to
  * event-source-of-truth this becomes load-bearing — caller policy will tighten.
  *

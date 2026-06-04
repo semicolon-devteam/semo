@@ -12,6 +12,7 @@ import ora from 'ora';
 import * as fs from 'fs';
 import * as path from 'path';
 import { getPool, closeConnection, isDbConnected } from '../database';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ============================================================
 // Migration runner
@@ -45,7 +46,7 @@ interface MigrationRecord {
 async function ensureMigrationsTable(): Promise<void> {
   const pool = getPool();
   await pool.query(`
-    CREATE TABLE IF NOT EXISTS semo.schema_migrations (
+    CREATE TABLE IF NOT EXISTS ${DB_SCHEMA}.schema_migrations (
       version TEXT PRIMARY KEY,
       applied_at TIMESTAMPTZ DEFAULT NOW()
     );
@@ -58,7 +59,7 @@ async function ensureMigrationsTable(): Promise<void> {
 async function getAppliedMigrations(): Promise<MigrationRecord[]> {
   const pool = getPool();
   const { rows } = await pool.query<MigrationRecord>(
-    `SELECT version, applied_at::text FROM semo.schema_migrations ORDER BY version`,
+    `SELECT version, applied_at::text FROM ${DB_SCHEMA}.schema_migrations ORDER BY version`,
   );
   return rows;
 }
@@ -87,7 +88,9 @@ async function runMigration(filename: string): Promise<void> {
   try {
     await client.query('BEGIN');
     await client.query(sql);
-    await client.query(`INSERT INTO semo.schema_migrations (version) VALUES ($1)`, [version]);
+    await client.query(`INSERT INTO ${DB_SCHEMA}.schema_migrations (version) VALUES ($1)`, [
+      version,
+    ]);
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK');

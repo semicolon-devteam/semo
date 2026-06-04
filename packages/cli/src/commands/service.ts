@@ -24,6 +24,7 @@ import {
   updateServiceProject,
   type MigrationResult,
 } from '../service-migrate';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export function registerServiceCommands(program: Command): void {
   const service = program
@@ -100,7 +101,7 @@ export function registerServiceCommands(program: Command): void {
 
             // KB 엔트리 수 조회
             const countResult = await pool.query(
-              'SELECT COUNT(*)::int as cnt FROM semo.knowledge_base WHERE domain = $1',
+              `SELECT COUNT(*)::int as cnt FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1`,
               [svc.domain],
             );
             const kbEntryCount = countResult.rows[0]?.cnt ?? 0;

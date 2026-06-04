@@ -3,7 +3,7 @@
  *
  * 설계: docs/superpowers/specs/2026-06-04-customer-dynamic-delegation-design.md
  *
- * 핵심: public.agent_installs(고객 마켓 설치) ↔ semo.bot_status(런타임 identity) 프로젝션.
+ * 핵심: public.agent_installs(고객 마켓 설치) ↔ ${DB_SCHEMA}.bot_status(런타임 identity) 프로젝션.
  *   프로젝션하면 기존 runtime serve / mailbox-supervisor / bot_commitments 워크큐 /
  *   대시보드 큐 / OutboxReader 가 변경 없이 customer 에이전트를 처리한다.
  *
@@ -15,6 +15,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { getPool } from '../database';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 function mailboxDir(botId: string): string {
   const base = process.env.SEMO_MAILBOX_DIR ?? path.join(os.homedir(), '.semo', 'mailbox');
@@ -128,7 +129,7 @@ async function loadInstall(installId: string): Promise<InstallRow | null> {
 }
 
 /**
- * agent_install → semo.bot_status + agent_personas 프로젝션. 멱등(ON CONFLICT).
+ * agent_install → ${DB_SCHEMA}.bot_status + agent_personas 프로젝션. 멱등(ON CONFLICT).
  * 반환: 런타임 식별자. 이걸로 `runtime serve --bot <botId>` 실행 가능.
  */
 export async function projectInstallToBotStatus(
@@ -155,12 +156,12 @@ export async function projectInstallToBotStatus(
   if (hostKind === 'ollama-cli') config.ollama_model = opts.ollamaModel ?? 'qwen2.5:0.5b';
 
   await pool.query(
-    `INSERT INTO semo.bot_status (bot_id, name, role, status, config)
+    `INSERT INTO ${DB_SCHEMA}.bot_status (bot_id, name, role, status, config)
      VALUES ($1, $2, $3, 'online', $4::jsonb)
      ON CONFLICT (bot_id) DO UPDATE
        SET name = EXCLUDED.name,
            role = EXCLUDED.role,
-           config = semo.bot_status.config || EXCLUDED.config,
+           config = ${DB_SCHEMA}.bot_status.config || EXCLUDED.config,
            synced_at = now()`,
     [botId, row.instance_name || row.display_name, row.role_label, JSON.stringify(config)],
   );
@@ -168,12 +169,12 @@ export async function projectInstallToBotStatus(
   const soul = resolveCustomerSoul(row);
   const nickname = row.instance_name || row.display_name; // 고객이 정한 닉네임 우선
   await pool.query(
-    `INSERT INTO semo.agent_personas (slug, display_name, soul_md, version, status, updated_by, created_at, updated_at)
+    `INSERT INTO ${DB_SCHEMA}.agent_personas (slug, display_name, soul_md, version, status, updated_by, created_at, updated_at)
      VALUES ($1, $2, $3, 1, 'active', 'customer-projection', now(), now())
      ON CONFLICT (slug) DO UPDATE
        SET display_name = EXCLUDED.display_name,
            soul_md = EXCLUDED.soul_md,
-           version = semo.agent_personas.version + 1,
+           version = ${DB_SCHEMA}.agent_personas.version + 1,
            updated_at = now()`,
     [botId, nickname, soul],
   );
@@ -391,7 +392,7 @@ export async function createPlainAgent(
   let notifiedAdmin = false;
   try {
     await pool.query(
-      `INSERT INTO semo.action_items (owner_domain, description, status, category, source, metadata, created_at, updated_at)
+      `INSERT INTO ${DB_SCHEMA}.action_items (owner_domain, description, status, category, source, metadata, created_at, updated_at)
        VALUES ('semo', $1, 'open', 'agent-library', 'customer-runtime', $2::jsonb, now(), now())`,
       [
         `[에이전트 라이브러리 검토] 테넌트 ${tenantSlug}에서 신규 에이전트 '${spec.displayName}'(${spec.agentSlug}) 자동 생성됨 — 라이브러리 등록 여부 판단 필요`,
@@ -436,7 +437,7 @@ export interface DelegationResult {
 export async function isAgentBusy(botId: string): Promise<{ busy: boolean; title?: string }> {
   const pool = getPool();
   const r = await pool.query<{ title: string }>(
-    `SELECT title FROM semo.bot_commitments WHERE bot_id = $1 AND status = 'active' ORDER BY created_at ASC LIMIT 1`,
+    `SELECT title FROM ${DB_SCHEMA}.bot_commitments WHERE bot_id = $1 AND status = 'active' ORDER BY created_at ASC LIMIT 1`,
     [botId],
   );
   return { busy: r.rows.length > 0, title: r.rows[0]?.title };
@@ -465,7 +466,7 @@ export async function dispatchToCustomerAgent(
   const pool = getPool();
   const commitmentId = `cmt-${botId}-${Date.now().toString(36)}-${randomUUID().slice(0, 4)}`;
   await pool.query(
-    `INSERT INTO semo.bot_commitments
+    `INSERT INTO ${DB_SCHEMA}.bot_commitments
        (id, bot_id, status, title, source_type, source_ref, pipeline_context, created_at, updated_at)
      VALUES ($1, $2, 'active', $3, 'customer-delegation', $4, $5::jsonb, now(), now())`,
     [
@@ -544,7 +545,7 @@ export function registerCustomerCommands(program: Command): void {
 
   cmd
     .command('project')
-    .description('agent_install → semo.bot_status 프로젝션 (런타임 실행 가능화)')
+    .description(`agent_install → ${DB_SCHEMA}.bot_status 프로젝션 (런타임 실행 가능화)`)
     .option('--install <id>', '특정 install id')
     .option('--tenant <slug>', '테넌트의 모든 active install 프로젝션')
     .option('--host-kind <kind>', '실행 호스트 (기본 ollama-cli)')

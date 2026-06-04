@@ -13,6 +13,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Pool, PoolClient } from 'pg';
 import { resolveBotWorkspace, SEMO_WORKSPACES } from '../paths';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export interface ScannedSkill {
   name: string;
@@ -213,7 +214,7 @@ function deduplicateSkills(skills: ScannedSkill[]): DeduplicatedSkill[] {
  */
 export async function getBotIds(pool: Pool): Promise<string[]> {
   try {
-    const result = await pool.query('SELECT bot_id FROM semo.bot_status ORDER BY bot_id');
+    const result = await pool.query(`SELECT bot_id FROM ${DB_SCHEMA}.bot_status ORDER BY bot_id`);
     if (result.rows.length > 0) {
       return result.rows.map((r: { bot_id: string }) => r.bot_id);
     }
@@ -254,7 +255,7 @@ export async function syncSkillsToDB(client: PoolClient, pool: Pool): Promise<Sk
     if (skill.referenceFiles) metadata.reference_files = skill.referenceFiles;
 
     await client.query(
-      `INSERT INTO semo.skill_definitions (name, prompt, package, metadata, is_active, office_id)
+      `INSERT INTO ${DB_SCHEMA}.skill_definitions (name, prompt, package, metadata, is_active, office_id)
        VALUES ($1, $2, $3, $4, true, NULL)
        ON CONFLICT (name, office_id) DO UPDATE SET
          prompt = EXCLUDED.prompt,

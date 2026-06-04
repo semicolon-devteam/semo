@@ -8,6 +8,7 @@
 import type { Pool } from 'pg';
 import chalk from 'chalk';
 import { kbGet, kbList, kbUpsert } from './kb';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ── Types ──
 
@@ -96,11 +97,11 @@ export async function getUnregisteredServices(
   // ontology service 도메인 중 KB pipeline/config가 없는 것
   const result = await pool.query(
     `SELECT o.domain, o.description, o.created_at::text
-     FROM semo.ontology o
+     FROM ${DB_SCHEMA}.ontology o
      WHERE o.entity_type = 'service'
        AND o.domain NOT LIKE 'e2e-%'
        AND NOT EXISTS (
-         SELECT 1 FROM semo.knowledge_base kb
+         SELECT 1 FROM ${DB_SCHEMA}.knowledge_base kb
          WHERE kb.domain = o.domain AND kb.key = 'pipeline' AND kb.sub_key = 'config'
        )
      ORDER BY o.domain`,
@@ -111,8 +112,8 @@ export async function getUnregisteredServices(
 export async function getRegisteredServices(pool: Pool): Promise<string[]> {
   const result = await pool.query(
     `SELECT kb.domain AS service_domain
-     FROM semo.knowledge_base kb
-     JOIN semo.ontology o ON o.domain = kb.domain AND o.entity_type = 'service'
+     FROM ${DB_SCHEMA}.knowledge_base kb
+     JOIN ${DB_SCHEMA}.ontology o ON o.domain = kb.domain AND o.entity_type = 'service'
      WHERE kb.key = 'pipeline' AND kb.sub_key = 'config'`,
   );
   return result.rows.map((r: { service_domain: string }) => r.service_domain);
@@ -127,7 +128,7 @@ export async function auditServiceKBEntries(
   // Fetch ALL KB entries for this domain
   const entriesResult = await pool.query(
     `SELECT key, sub_key, content
-     FROM semo.knowledge_base
+     FROM ${DB_SCHEMA}.knowledge_base
      WHERE domain = $1
      ORDER BY key, sub_key`,
     [domain],
@@ -143,7 +144,7 @@ export async function auditServiceKBEntries(
   // Fetch allowed keys from type schema
   const schemaResult = await pool.query(
     `SELECT scheme_key, COALESCE(source, 'manual') as source
-     FROM semo.kb_type_schema WHERE type_key = 'service'`,
+     FROM ${DB_SCHEMA}.kb_type_schema WHERE type_key = 'service'`,
   );
   const allowedKeys = new Set(schemaResult.rows.map((r: { scheme_key: string }) => r.scheme_key));
 
@@ -515,15 +516,16 @@ export async function updateServiceProject(
     try {
       await client.query('BEGIN');
 
-      const domainCheck = await client.query('SELECT 1 FROM semo.ontology WHERE domain = $1', [
-        domain,
-      ]);
+      const domainCheck = await client.query(
+        `SELECT 1 FROM ${DB_SCHEMA}.ontology WHERE domain = $1`,
+        [domain],
+      );
       if (domainCheck.rows.length === 0) {
         throw new Error(`도메인 '${domain}'은(는) 온톨로지에 등록되지 않았습니다.`);
       }
 
       await client.query(
-        `UPDATE semo.knowledge_base
+        `UPDATE ${DB_SCHEMA}.knowledge_base
          SET metadata = COALESCE(metadata, '{}'::jsonb) || $4::jsonb, updated_at = NOW()
          WHERE domain = $1 AND key = $2 AND sub_key = $3`,
         [domain, 'pipeline', 'config', JSON.stringify(patch)],
@@ -541,7 +543,7 @@ export async function updateServiceProject(
         params.push(updates.discord_channel || null);
       }
       await client.query(
-        `UPDATE semo.ontology SET ${setClauses.join(', ')} WHERE domain = $1`,
+        `UPDATE ${DB_SCHEMA}.ontology SET ${setClauses.join(', ')} WHERE domain = $1`,
         params,
       );
 
@@ -582,7 +584,7 @@ export async function diagnoseServiceStatus(pool: Pool, domain: string): Promise
   // 1. KB 도메인 존재 확인
   const ontoResult = await pool.query(
     `SELECT domain, description, created_at::text
-     FROM semo.ontology WHERE domain = $1 AND entity_type = 'service'`,
+     FROM ${DB_SCHEMA}.ontology WHERE domain = $1 AND entity_type = 'service'`,
     [domain],
   );
   const kbExists = ontoResult.rows.length > 0;
@@ -617,13 +619,13 @@ export async function diagnoseServiceStatus(pool: Pool, domain: string): Promise
 
   // KB 엔트리 목록
   const entriesResult = await pool.query(
-    `SELECT DISTINCT key FROM semo.knowledge_base WHERE domain = $1 ORDER BY key`,
+    `SELECT DISTINCT key FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1 ORDER BY key`,
     [domain],
   );
   const kbKeys = entriesResult.rows.map((r: { key: string }) => r.key);
 
   const countResult = await pool.query(
-    `SELECT COUNT(*)::int as cnt FROM semo.knowledge_base WHERE domain = $1`,
+    `SELECT COUNT(*)::int as cnt FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1`,
     [domain],
   );
   const kbEntryCount = countResult.rows[0]?.cnt ?? 0;
@@ -650,7 +652,7 @@ export async function diagnoseServiceStatus(pool: Pool, domain: string): Promise
 
   // KB status vs services status/lifecycle
   const statusEntry = await pool.query(
-    `SELECT content FROM semo.knowledge_base
+    `SELECT content FROM ${DB_SCHEMA}.knowledge_base
      WHERE domain = $1 AND key = 'status' AND (sub_key IS NULL OR sub_key = '')
      LIMIT 1`,
     [domain],
@@ -680,7 +682,7 @@ export async function diagnoseServiceStatus(pool: Pool, domain: string): Promise
 
   // KB po vs services owner_name
   const poEntry = await pool.query(
-    `SELECT content FROM semo.knowledge_base
+    `SELECT content FROM ${DB_SCHEMA}.knowledge_base
      WHERE domain = $1 AND key = 'po' AND (sub_key IS NULL OR sub_key = '')
      LIMIT 1`,
     [domain],

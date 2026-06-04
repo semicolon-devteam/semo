@@ -779,7 +779,7 @@ async function buildKbFirstBlock(): Promise<string> {
     // 1. 타입스키마: 타입별 scheme_key 목록
     const schemaRows = await pool.query(
       `SELECT type_key, scheme_key, required, scheme_description
-       FROM semo.kb_type_schema ORDER BY type_key, sort_order, scheme_key`,
+       FROM ${DB_SCHEMA}.kb_type_schema ORDER BY type_key, sort_order, scheme_key`,
     );
     const typeSchemas = new Map<
       string,
@@ -797,7 +797,7 @@ async function buildKbFirstBlock(): Promise<string> {
 
     // 2. 온톨로지: 엔티티 타입별 도메인 목록
     const ontoRows = await pool.query(
-      `SELECT entity_type, domain, description FROM semo.ontology ORDER BY entity_type, domain`,
+      `SELECT entity_type, domain, description FROM ${DB_SCHEMA}.ontology ORDER BY entity_type, domain`,
     );
     const entities = new Map<string, { domain: string; desc: string }[]>();
     for (const r of ontoRows.rows) {
@@ -1597,6 +1597,7 @@ import {
   generateEmbeddings,
   KBEntry,
 } from './kb';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // Re-implement readSyncState locally (simple file read)
 function readSyncState(cwd: string): {
@@ -1863,7 +1864,7 @@ kbCmd
       const pool = getPool();
       const client = await pool.connect();
 
-      let sql = 'SELECT kb_id, domain, key, sub_key, content FROM semo.knowledge_base WHERE 1=1';
+      let sql = `SELECT kb_id, domain, key, sub_key, content FROM ${DB_SCHEMA}.knowledge_base WHERE 1=1`;
       const params: string[] = [];
       let pIdx = 1;
       if (!options.force) sql += ' AND embedding IS NULL';
@@ -1922,7 +1923,7 @@ kbCmd
             continue;
           }
           await client.query(
-            'UPDATE semo.knowledge_base SET embedding = $1::vector WHERE kb_id = $2',
+            `UPDATE ${DB_SCHEMA}.knowledge_base SET embedding = $1::vector WHERE kb_id = $2`,
             [`[${emb.join(',')}]`, slice[j].kb_id],
           );
         }
@@ -2031,7 +2032,7 @@ kbCmd
       }
       const res = await pool.query(
         `SELECT history_id, kb_id, operation, changed_by, changed_at::text AS changed_at, kb_snapshot
-         FROM semo.knowledge_base_history
+         FROM ${DB_SCHEMA}.knowledge_base_history
          WHERE ${where}
          ORDER BY changed_at DESC
          LIMIT ${limit}`,
@@ -2651,7 +2652,7 @@ kbCmd
 
         // KB 엔트리 수 확인
         const countRes = await pool.query(
-          'SELECT COUNT(*)::int AS cnt FROM semo.knowledge_base WHERE domain = $1',
+          `SELECT COUNT(*)::int AS cnt FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1`,
           [options.domain],
         );
         const kbCount: number = countRes.rows[0].cnt;
@@ -2979,7 +2980,7 @@ ontoCmd
 
       // KB 엔트리 수 확인
       const countRes = await pool.query(
-        'SELECT COUNT(*)::int AS cnt FROM semo.knowledge_base WHERE domain = $1',
+        `SELECT COUNT(*)::int AS cnt FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1`,
         [domain],
       );
       const kbCount: number = countRes.rows[0].cnt;

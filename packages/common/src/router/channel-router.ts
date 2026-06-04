@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import type { RouteResult, ProjectContext } from '../slack/channel-types.js';
 import { loadRoutingConfig, type RoutingConfig, kbIntentMatch } from './kb-routing.js';
 import { resolveBotId } from './bot-alias.js';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 /**
  * Phase 3b-2: kb-intent 라우팅 confidence threshold.
@@ -129,7 +130,7 @@ export class Router {
     if (config.validBotIds.includes('incubator')) {
       try {
         const incResult = await this.pool.query(
-          `SELECT 1 FROM semo.incubator_sessions
+          `SELECT 1 FROM ${DB_SCHEMA}.incubator_sessions
            WHERE (channel = $1 OR discord_guild = $2) AND status = 'active' LIMIT 1`,
           [channelId, guildId || ''],
         );
@@ -267,8 +268,8 @@ export class Router {
                 kb.metadata->>'project_name' AS project_name,
                 (kb.metadata->>'current_phase')::int AS current_phase,
                 COALESCE((kb.metadata->>'infra_phase')::int, 0) AS infra_phase
-         FROM semo.ontology o
-         LEFT JOIN semo.knowledge_base kb ON kb.domain = o.domain AND kb.key = 'pipeline' AND kb.sub_key = 'config'
+         FROM ${DB_SCHEMA}.ontology o
+         LEFT JOIN ${DB_SCHEMA}.knowledge_base kb ON kb.domain = o.domain AND kb.key = 'pipeline' AND kb.sub_key = 'config'
          WHERE position($1 in o.slack_channel) > 0
             OR o.discord_channel = $1
          LIMIT 1`,
@@ -299,9 +300,9 @@ export class Router {
                 (kb.metadata->>'current_phase')::int AS current_phase,
                 COALESCE((kb.metadata->>'infra_phase')::int, 0) AS infra_phase,
                 COALESCE(o.entity_type, 'service') AS entity_type
-         FROM semo.incubator_sessions i
-         LEFT JOIN semo.knowledge_base kb ON kb.domain = i.service_id AND kb.key = 'pipeline' AND kb.sub_key = 'config'
-         LEFT JOIN semo.ontology o ON o.domain = kb.domain
+         FROM ${DB_SCHEMA}.incubator_sessions i
+         LEFT JOIN ${DB_SCHEMA}.knowledge_base kb ON kb.domain = i.service_id AND kb.key = 'pipeline' AND kb.sub_key = 'config'
+         LEFT JOIN ${DB_SCHEMA}.ontology o ON o.domain = kb.domain
          WHERE i.channel = $1 AND i.status = 'active'
          LIMIT 1`,
         [channelId],

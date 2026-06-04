@@ -9,6 +9,7 @@ import type { McpStdioServerConfig, McpServerConfig } from '@anthropic-ai/claude
 import type { Pool } from 'pg';
 import * as path from 'path';
 import * as os from 'os';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ── 타입 ──
 
@@ -194,7 +195,7 @@ export async function loadMcpAccessFromDb(pool: Pool): Promise<void> {
   try {
     const result = await pool.query(
       `SELECT bot_id, config->'mcp_access' AS mcp_access
-       FROM semo.bot_status
+       FROM ${DB_SCHEMA}.bot_status
        WHERE config->'mcp_access' IS NOT NULL
          AND jsonb_array_length(config->'mcp_access') > 0`,
     );
