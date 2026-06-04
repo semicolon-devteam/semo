@@ -256,7 +256,8 @@ function readKBFile(cwd: string, filename: string): KBEntry[] {
 /**
  * Pull KB entries from semo.knowledge_base to local .kb/
  */
-export async function kbPull(pool: Pool, domain?: string, cwd?: string): Promise<KBEntry[]> {
+export async function kbPull(pool: Pool, domainArg?: string, cwd?: string): Promise<KBEntry[]> {
+  const domain = domainArg ? canonicalKbDomain(domainArg) : domainArg;
   const client = await pool.connect();
   try {
     let query = `
@@ -492,10 +493,11 @@ export async function kbList(
  */
 export async function kbCount(
   pool: Pool,
-  domain: string,
+  domainArg: string,
   key?: string,
   where?: Record<string, unknown>,
 ): Promise<number> {
+  const domain = canonicalKbDomain(domainArg);
   const client = await pool.connect();
   try {
     const conditions: string[] = [`domain = $1`];
@@ -574,11 +576,12 @@ export async function kbUpdateMetadata(
  */
 export async function kbListByKeyPrefix(
   pool: Pool,
-  domain: string,
+  domainArg: string,
   key: string,
   subKeyPrefix: string,
   options?: { where?: Record<string, unknown>; orderBy?: string },
 ): Promise<KBEntry[]> {
+  const domain = canonicalKbDomain(domainArg);
   const client = await pool.connect();
   try {
     const conditions: string[] = [`domain = $1`, `key = $2`, `sub_key LIKE $3`];
@@ -625,11 +628,12 @@ export async function kbListByKeyPrefix(
  */
 export async function kbCountByKeyPrefix(
   pool: Pool,
-  domain: string,
+  domainArg: string,
   key: string,
   subKeyPrefix: string,
   where?: Record<string, unknown>,
 ): Promise<number> {
+  const domain = canonicalKbDomain(domainArg);
   const client = await pool.connect();
   try {
     const conditions: string[] = [`domain = $1`, `key = $2`, `sub_key LIKE $3`];
@@ -914,7 +918,8 @@ export async function ontoList(pool: Pool): Promise<OntologyDomain[]> {
 /**
  * Show ontology detail for a domain
  */
-export async function ontoShow(pool: Pool, domain: string): Promise<OntologyDomain | null> {
+export async function ontoShow(pool: Pool, domainArg: string): Promise<OntologyDomain | null> {
+  const domain = canonicalKbDomain(domainArg);
   const client = await pool.connect();
   try {
     const result = await client.query(
@@ -953,8 +958,9 @@ export async function ontoListTypes(pool: Pool): Promise<OntologyType[]> {
  */
 export async function ontoListChildren(
   pool: Pool,
-  parentDomain: string,
+  parentDomainArg: string,
 ): Promise<OntologyDomain[]> {
+  const parentDomain = canonicalKbDomain(parentDomainArg);
   const client = await pool.connect();
   try {
     const result = await client.query(
