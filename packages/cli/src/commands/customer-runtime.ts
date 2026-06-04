@@ -279,7 +279,10 @@ export async function resolveAgentForRequest(
   const bestPool = poolRes.rows
     .map((r) => ({ r, score: scoreAgent(r, intent) }))
     .sort((a, b) => b.score - a.score)[0];
-  if (bestPool && bestPool.score >= MATCH_THRESHOLD) {
+  // 테넌트 풀(이미 설치한 직원)은 키워드 1개 이상 적중(score>0)이면 해소 — 실 메시지는
+  // 단어가 많아 hits/length 비율이 낮으므로 MATCH_THRESHOLD(0.34)를 풀에 적용하면 대부분
+  // 매칭 실패한다. 풀은 "가장 잘 맞는 직원에게 라우팅"이 자연스러움(0적중이면 라이브러리로).
+  if (bestPool && bestPool.score > 0) {
     return {
       source: 'tenant-pool',
       score: bestPool.score,
