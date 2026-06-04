@@ -113,10 +113,19 @@ migration 008 승격, SEMO_RUNTIME_URL→serve 워커풀, agent_installs dispatc
 - **Phase 1 reviewclaw 카나리**(2026-06-04): `inbox → serve-worker → OpenClawAdapter → gpt-5.5 → outbox → (기존 OutboxReader) → Slack` 전체 루프 동작. 라이브 OpenClaw 게이트웨이 무손상, auth 무영향. 카나리 메시지 정확 응답.
 - **발견**: serve-worker 가 묵은 orphan 백로그를 드레인하면 stale 응답이 실채널로 게시됨 → `--max-message-age-ms` 가드 신설(검증: 2일전 메시지 consume=1/dispatch=0). reviewclaw 백로그(11건) 전체 freeze.
 
-**남은 활성화 (의도적·관측 하 수행 필요)**:
+**Stage B 활성화 — reviewclaw LIVE (2026-06-04)**:
 
-- 라이브 slack-router 가 supervisor 커밋(22:49) **이전(17:47) 기동** → 현재 `serve_worker_enabled` **inert**. Phase 1 auto-spawn 활성화 = **라이브 router 재기동(신코드)** 필요 — 전체 Slack 환경(Semi/Colony/operator) 영향 + Codex rebrand 세션과 동일 코드 경합 → 조율 후 단일 관측 단계로.
-- 활성화 절차: `serve_worker_enabled=true`(reviewclaw) + cmux pane 안에서 router 재기동(router-operations.md 준수) + 실 `@Semi→ROUTE:reviewclaw` 1건으로 auto-spawn→outbox→Slack 확인.
+- reviewclaw `host_kind=openclaw` + `serve_worker_enabled=true` 설정.
+- **standalone serve-worker 가동**: `~/.semo/scripts/reviewclaw-worker.sh` (forever-mode + `--max-message-age-ms 600000` + self-healing while-loop). PPID=1 완전 detach → 세션 무관 지속. serve-worker 는 cmux 무관이라 router-operations.md daemon 금지 대상 아님(routers 만 해당).
+- 검증: fresh 메시지 주입 → **워커가 자동 consume** → reviewclaw gpt-5.5 → outbox → 라이브 OutboxReader 가 Slack 포스팅. reviewclaw 게이트웨이 OAuth 무손상.
+- **reviewclaw 미처리(orphan) 버그 = 해소.** mailbox 에 라이브 consumer 가 생겼다.
+- 라이브 router 재기동 시 supervisor 가 reviewclaw 워커 auto-spawn 을 시도해도 advisory lock 이 중복을 막아 standalone↔supervisor 무충돌 인계(forward-compat).
+
+**다음(미완)**:
+
+- 영구화: reviewclaw 워커 부팅 생존(LaunchAgent) 승격 — 현재는 reboot 까지 지속.
+- Phase 3 나머지 6봇: 동일 패턴 봇별 점진. socket 직접멘션 disable 은 봇별 안정화 후 마지막.
+- 라이브 router 신코드 재기동(supervisor 정식 가동) — 전체 Slack 환경 영향이라 조율된 창에서.
 
 ## 결정 기록
 
