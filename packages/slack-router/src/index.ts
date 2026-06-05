@@ -2771,10 +2771,23 @@ async function start(): Promise<void> {
   for (const gateway of inboundSlacks) gateway.setMessageHandler(handleSlackMessage);
   console.log(`[slack-router] Inbound Slack apps: ${inboundSlacks.length}`);
 
-  // 4. Start Slack Socket Mode
-  await Promise.all(inboundSlacks.map((gateway) => gateway.start()));
+  // 4. Start Slack Socket Mode — resilient: 한 앱의 account_inactive/토큰 만료 등이
+  //    전체 라우터를 죽이지 않도록 allSettled. 실패 앱은 봇ID와 함께 로깅하고 건너뛴다.
+  //    (전부 실패할 때만 throw. 한 봇 Slack 앱 비활성 → 나머지 봇은 정상 가동.)
+  const startResults = await Promise.allSettled(inboundSlacks.map((gateway) => gateway.start()));
+  let inboundOk = 0;
+  startResults.forEach((r, i) => {
+    const id = inboundSlacks[i].getRouteBotId() || SEMO_PRIMARY_BOT_ID;
+    if (r.status === 'fulfilled') {
+      inboundOk++;
+    } else {
+      const reason = r.reason instanceof Error ? r.reason.message : String(r.reason);
+      console.error(`[slack-router] inbound Slack app FAILED — bot=${id}: ${reason}`);
+    }
+  });
+  if (inboundOk === 0) throw new Error('all inbound Slack apps failed to start');
   refreshOperatorMentionGuide();
-  console.log('[slack-router] Slack connected');
+  console.log(`[slack-router] Slack connected (${inboundOk}/${inboundSlacks.length} apps)`);
 
   // 5. Start outbox reader
   outboxReader.start();
