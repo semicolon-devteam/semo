@@ -68,10 +68,29 @@
 3. **서비스 재기동**: slack-router/discord-router/cron-poller/kb-gateway + 대시보드 재배포.
 4. **검증**: smoke를 semicolony 스키마 대상으로.
 
-### ⚠️ flip 전 반드시 해결할 갭 (신규 발견)
+### ✅ 마이그레이션 러너 schema-aware (갭 해소 — 2026-06-05, action-item f4829d5f 완료)
 
-- **마이그레이션 러너 갭**: `migrations/*.sql` 은 `semo.` **하드코딩**(편집 금지 원칙). flip 후 신규 마이그레이션은 stale `semo` 스키마에 적용돼 **두 스키마 divergence** 발생. → flip 하려면 (a) 마이그레이션 템플릿/러너를 schema-aware로, 또는 (b) 마이그레이션은 양 스키마 동시 적용하도록 손봐야 함. **이 갭 해결 전 flip 금지.**
-- 권고: cutover-prep(코드 schema-parameterized)은 **안전·완료**. flip 자체는 invisible(내부 비노출)·고조율이고 위 갭이 남아, **기본 `'semo'` 유지(= flip-ready standby)** 가 현 시점 합리적. `semicolony` 스키마는 검증된 standby로 보존.
+| 항목          | 내용                                                                                                                                                                                                                                                                                                                                                                                      | 커밋       |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------- |
+| 러너 retarget | `db migrate` 가 각 마이그 SQL 실행 전 `retargetSchemaSql(sql, DB_SCHEMA)` 로 `semo.` 한정자를 활성 스키마로 재작성. 기본 `'semo'` early-return no-op. negative-lookbehind `(?<![\w./])semo\.` 로 qualified ref(DDL/DML/함수본문/dynamic SQL)만 매치 — 경로형 `~/.semo.env`·NOTIFY `semo_kb_change`·데이터 `domain='semo'` 자동 배제. `CREATE/DROP SCHEMA semo` 도 retarget(fresh install) | `d1596921` |
+| opt-out 마커  | 옛 `semo` 를 **소스로 의도 참조**하는 cross-schema 마이그는 `-- @schema-retarget: off` 로 skip                                                                                                                                                                                                                                                                                            | `7f4838c0` |
+| 검증          | TDD 13 케이스 GREEN. 실코퍼스 130파일: default 'semo' no-op 동치 0깨짐, retarget(semicolony) 후 잔존 `semo.` 0, doc 027/031 보존, 001 CREATE SCHEMA→semicolony                                                                                                                                                                                                                            | —          |
+| 적대적 검증   | 3 렌즈 — historical 데이터 마이그(098-100/106 `SELECT FROM semo.<old>` 소스참조, 003/017/091 `table_schema='semo'` introspection)는 retarget 의미상 부적합하나 **이미 applied → flip 후 재실행 안 됨**                                                                                                                                                                                    | —          |
+
+**flip-safety lynchpin 확정**: `semo`/`semicolony` `schema_migrations` **134/134 동일**, 재실행 위험 버전 **0**, 디스크 .sql 중 semicolony 미적용 **0**. → flip 시 historical 마이그 0개 재실행, 신규 적용 0개(다음 신규 마이그부터 semicolony 에 적용). **라이브 flip 안전, 코드 블로커 없음.**
+
+### flip(활성화) 체크리스트 — 유지보수창에서
+
+1. (선결) `semo`/`semicolony` `schema_migrations` parity 재확인 + `semo db migrate --status` 2회(pending 0).
+2. delta 재동기: `node scripts/clone-schema-semo-to-semicolony.mjs --reset` (copy 이후 라이브 쓰기 반영).
+3. env flip: `SEMICOLONY_DB_SCHEMA=semicolony` (`~/.claude/semo/.env` + 대시보드 배포 env + 봇 env).
+4. 서비스 재기동(slack/discord-router·cron-poller·kb-gateway) + 대시보드 재배포.
+5. smoke를 semicolony 대상으로. 롤백 = env 한 줄 되돌림(`SEMICOLONY_DB_SCHEMA` 제거) + 재기동.
+
+### 권고
+
+- cutover-prep + 러너 schema-aware = **안전·완료**. flip 은 이제 **위 체크리스트만으로 실행 가능**(블로커 없음).
+- 단 flip 자체는 invisible(내부 비노출)·라이브 재기동 조율이므로, **기본 `'semo'` 유지(flip-ready standby)** 가 현 시점 합리적. `semicolony` 스키마·코드 경로·러너 모두 검증된 준비 상태로 보존.
 
 ## 5. 참조
 
