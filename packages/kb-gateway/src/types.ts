@@ -49,3 +49,32 @@ export interface ErrorResponse {
   error: string;
   detail?: string;
 }
+
+// ── 멀티테넌트 (SemiColony) ──────────────────────────────────────────────
+
+export type GatewayScope = 'tenant-local' | 'platform-global';
+
+/**
+ * 인증 후 요청에 부착되는 컨텍스트.
+ *  - kind='tenant'  : Bearer 자격증명(sck_...)으로 해석된 외부 Colony. tenantId/tenantSlug 보유.
+ *  - kind='internal': 기존 공유 HMAC 으로 인증된 내부 봇/CLI. botId 보유, platform-global 전체 접근.
+ */
+export interface TenantContext {
+  kind: 'tenant' | 'internal';
+  tenantId: string | null;
+  tenantSlug: string | null;
+  botId?: string;
+  scopes: string[];
+}
+
+export interface PersonaResolveRequest {
+  /** 해소할 에이전트 slug(botId). tenant 는 자기 prefix(ag-{slug}-)만 허용. 내부는 전체. */
+  slug?: string;
+}
+
+export interface PersonaResolveResponse {
+  slug: string;
+  display_name: string | null;
+  soul_md: string;
+  version: number;
+}

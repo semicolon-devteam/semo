@@ -256,6 +256,162 @@ export function scoreAgent(row: CandidateRow, intent: RequestIntent): number {
   return hits / intent.keywords.length;
 }
 
+export type ProductWorkItemKind = 'plan' | 'in-flight';
+
+export type ProductWorkItemStatus =
+  | 'planned'
+  | 'queued'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'expired'
+  | 'cancelled'
+  | 'unknown';
+
+export type ProductWorkItemSourceTable = 'action_items' | 'bot_commitments';
+
+export interface CommitmentWorkItemRow {
+  id: string;
+  bot_id: string;
+  status: string;
+  title: string;
+  description?: string | null;
+  source_type?: string | null;
+  source_ref?: string | null;
+  deadline_at?: Date | string | null;
+  created_at?: Date | string | null;
+  updated_at?: Date | string | null;
+  completed_at?: Date | string | null;
+  metadata?: unknown;
+}
+
+export interface ActionItemWorkItemRow {
+  action_item_id: string;
+  owner_domain: string;
+  target_domain?: string | null;
+  status: string;
+  description: string;
+  priority?: string | null;
+  category?: string | null;
+  source?: string | null;
+  related_url?: string | null;
+  deadline?: Date | string | null;
+  created_at?: Date | string | null;
+  updated_at?: Date | string | null;
+  completed_at?: Date | string | null;
+  metadata?: unknown;
+}
+
+export interface ProductWorkItem {
+  id: string;
+  kind: ProductWorkItemKind;
+  status: ProductWorkItemStatus;
+  title: string;
+  ownerId: string;
+  targetId: string | null;
+  sourceTable: ProductWorkItemSourceTable;
+  sourceStatus: string;
+  sourceType: string | null;
+  sourceRef: string | null;
+  description: string | null;
+  priority: string | null;
+  category: string | null;
+  deadlineAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  completedAt: string | null;
+  metadata: unknown;
+}
+
+function timestampText(value: Date | string | null | undefined): string | null {
+  if (!value) return null;
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+export function commitmentStatusToWorkItemStatus(status: string): ProductWorkItemStatus {
+  switch (status) {
+    case 'pending':
+      return 'queued';
+    case 'active':
+      return 'running';
+    case 'done':
+    case 'completed':
+      return 'completed';
+    case 'failed':
+      return 'failed';
+    case 'expired':
+    case 'stale_auto':
+      return 'expired';
+    case 'cancelled':
+    case 'canceled':
+      return 'cancelled';
+    default:
+      return 'unknown';
+  }
+}
+
+export function actionItemStatusToWorkItemStatus(status: string): ProductWorkItemStatus {
+  switch (status) {
+    case 'open':
+      return 'planned';
+    case 'completed':
+      return 'completed';
+    case 'cancelled':
+    case 'canceled':
+      return 'cancelled';
+    default:
+      return 'unknown';
+  }
+}
+
+/** bot_commitments는 에이전트가 실제 처리 중인 실행 큐로만 노출한다. */
+export function mapCommitmentToWorkItem(row: CommitmentWorkItemRow): ProductWorkItem {
+  return {
+    id: row.id,
+    kind: 'in-flight',
+    status: commitmentStatusToWorkItemStatus(row.status),
+    title: row.title,
+    ownerId: row.bot_id,
+    targetId: null,
+    sourceTable: 'bot_commitments',
+    sourceStatus: row.status,
+    sourceType: row.source_type ?? null,
+    sourceRef: row.source_ref ?? null,
+    description: row.description ?? null,
+    priority: null,
+    category: null,
+    deadlineAt: timestampText(row.deadline_at),
+    createdAt: timestampText(row.created_at),
+    updatedAt: timestampText(row.updated_at),
+    completedAt: timestampText(row.completed_at),
+    metadata: row.metadata ?? null,
+  };
+}
+
+/** action_items는 아직 실행 위임 전인 계획/할일로 노출한다. */
+export function mapActionItemToWorkItem(row: ActionItemWorkItemRow): ProductWorkItem {
+  return {
+    id: row.action_item_id,
+    kind: 'plan',
+    status: actionItemStatusToWorkItemStatus(row.status),
+    title: row.description,
+    ownerId: row.owner_domain,
+    targetId: row.target_domain ?? null,
+    sourceTable: 'action_items',
+    sourceStatus: row.status,
+    sourceType: row.source ?? null,
+    sourceRef: row.related_url ?? null,
+    description: row.description,
+    priority: row.priority ?? null,
+    category: row.category ?? null,
+    deadlineAt: timestampText(row.deadline),
+    createdAt: timestampText(row.created_at),
+    updatedAt: timestampText(row.updated_at),
+    completedAt: timestampText(row.completed_at),
+    metadata: row.metadata ?? null,
+  };
+}
+
 const MATCH_THRESHOLD = 0.34; // 키워드 3개 중 1개 이상
 
 /**
