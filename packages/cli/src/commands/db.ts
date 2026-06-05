@@ -29,11 +29,17 @@ const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA
  *   데이터 리터럴 `domain='semo'`/`'semobot'`/`table_schema='semo'`(점 없음)는 자동 배제.
  * - `CREATE|DROP SCHEMA ... semo` : bare 스키마명(fresh install 대상) 재작성.
  *
+ * opt-out: 옛 `semo` 를 **소스로 의도 참조**하는 cross-schema 데이터 마이그(예: 098~106 의
+ * `SELECT FROM semo.<old_table>`)는 첫 줄에 `-- @schema-retarget: off` 를 두면 retarget 을
+ * 건너뛴다. (현 라이브 DB 의 그런 historical 마이그는 이미 applied 라 flip 후 재실행되지 않아
+ * 무해하지만, 향후 신규 cross-schema 마이그를 위한 sanctioned escape hatch.)
+ *
  * 검증된 clone 스크립트(scripts/clone-schema-semo-to-semicolony.mjs)의 `rw()` 와 동치이되
  * negative-lookbehind 로 경로형 false-positive 까지 배제.
  */
 export function retargetSchemaSql(sql: string, schema: string): string {
   if (schema === 'semo') return sql;
+  if (/@schema-retarget:\s*off/i.test(sql)) return sql;
   let out = sql.replace(/(?<![\w./])semo\./g, `${schema}.`);
   out = out.replace(/\b(?:CREATE|DROP)\s+SCHEMA(?:\s+IF\s+(?:NOT\s+)?EXISTS)?\s+semo\b/gi, (m) =>
     m.replace(/\bsemo\b/, schema),

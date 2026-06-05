@@ -66,6 +66,18 @@ describe('retargetSchemaSql', () => {
     );
   });
 
+  it('opt-out 마커 `-- @schema-retarget: off` 가 있으면 target≠semo 라도 retarget 안 함', () => {
+    // 옛 semo 를 소스로 의도 참조하는 cross-schema 데이터 마이그용 escape hatch
+    const sql = '-- @schema-retarget: off\nINSERT INTO new_kb SELECT * FROM semo.service_features;';
+    expect(retargetSchemaSql(sql, 'semicolony')).toBe(sql);
+  });
+
+  it('마커가 없으면 정상 retarget', () => {
+    expect(retargetSchemaSql('SELECT * FROM semo.service_features;', 'semicolony')).toBe(
+      'SELECT * FROM semicolony.service_features;',
+    );
+  });
+
   it('semobot. (있다면) 은 semo. 로 오인 재작성하지 않음', () => {
     // semobot 는 bot key — 'semobot.' 안에 'semo' 가 들어있지만 점이 'semobot' 뒤
     expect(retargetSchemaSql("UPDATE x SET k='semobot.role';", 'semicolony')).toBe(
