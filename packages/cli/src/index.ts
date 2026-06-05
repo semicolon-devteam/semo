@@ -40,7 +40,7 @@ import { registerBotsCommands } from './commands/bots';
 import { registerGetCommands } from './commands/get';
 import { registerSessionsCommands } from './commands/sessions';
 import { registerDbCommands } from './commands/db';
-import { registerPersonaCommands } from './commands/persona';
+import { registerPersonaCommands, syncHermesPersonas } from './commands/persona';
 import { registerGuardCommands } from './commands/guard';
 import { registerMemoryCommands } from './commands/memory';
 import { registerTestCommands } from './commands/test';
@@ -444,6 +444,16 @@ program
       console.log(chalk.green('  ✓ semo/SOUL.md 생성됨 (오케스트레이터 페르소나)'));
     } catch (err) {
       console.log(chalk.yellow(`  ⚠ SOUL.md 생성 실패: ${err}`));
+    }
+    // 5b. DB agent_personas(SoT) → hermes 프로파일 SOUL.md 렌더 — Semi/Colony/Operator 행동을
+    //     이 환경에 반영(신규/기존 설치가 DB 수정사항을 자동 반영, portable).
+    try {
+      const n = await syncHermesPersonas({ quiet: true });
+      console.log(
+        chalk.green(`  ✓ base 에이전트 persona ${n}개 DB→hermes 동기화 (Semi/Colony/Operator)`),
+      );
+    } catch (err) {
+      console.log(chalk.yellow(`  ⚠ persona 동기화 실패: ${err}`));
     }
     generateMemoryMd();
     console.log(chalk.green('  ✓ semo/MEMORY.md 생성됨 (KB 인덱스)'));
