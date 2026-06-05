@@ -4,7 +4,26 @@ import {
   buildPersonaContextBlock,
   buildOperatorMentionGuide,
   shouldTriggerOperatorAdminRoute,
+  splitOperatorDetail,
 } from './operator-persona';
+
+describe('splitOperatorDetail', () => {
+  it('---DETAIL--- 로 결론/상세 분리', () => {
+    const text = ['결론', '1. 핵심만', '---DETAIL---', '- 확인된 사실', '- 원인 후보'].join('\n');
+    const r = splitOperatorDetail(text);
+    expect(r).not.toBeNull();
+    expect(r!.summary).toBe('결론\n1. 핵심만');
+    expect(r!.detail).toBe('- 확인된 사실\n- 원인 후보');
+  });
+
+  it('구분선 없으면 null', () => {
+    expect(splitOperatorDetail('그냥 결론만 있는 응답')).toBeNull();
+  });
+
+  it('상세가 비면 null (가짜 접힘 방지)', () => {
+    expect(splitOperatorDetail('결론\n---DETAIL---\n   ')).toBeNull();
+  });
+});
 
 describe('parseApplyPersona', () => {
   it('APPLY_PERSONA 블록을 파싱', () => {

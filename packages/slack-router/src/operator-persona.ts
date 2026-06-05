@@ -82,6 +82,21 @@ export function shouldTriggerOperatorAdminRoute(text: string, operatorMentionTok
   return /^(?:@?(?:operator|오퍼레이터))(?:\s|$|<)/i.test(trimmed);
 }
 
+/**
+ * operator 응답을 결론(summary)과 상세(detail)로 분리한다.
+ * 본문에 `---DETAIL---` 구분선이 있으면 그 뒤를 상세로 보고 분리, 없거나 상세가 비면 null.
+ * 라우터는 이 결과로 결론은 본문에, 상세는 "자세히 보기" 버튼(접힘)으로 렌더한다.
+ */
+export function splitOperatorDetail(text: string): { summary: string; detail: string } | null {
+  const marker = '---DETAIL---';
+  const idx = text.indexOf(marker);
+  if (idx === -1) return null;
+  const summary = text.slice(0, idx).trim();
+  const detail = text.slice(idx + marker.length).trim();
+  if (!detail) return null;
+  return { summary, detail };
+}
+
 export interface ParsedApply {
   slug: string;
   note?: string;

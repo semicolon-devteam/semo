@@ -16,7 +16,7 @@
 
 import * as path from 'path';
 import * as os from 'os';
-import { execFile } from 'node:child_process';
+import { execFile, execSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { Pool } from 'pg';
 
@@ -56,6 +56,7 @@ import {
   shouldTriggerOperatorAdminRoute,
   parseApplyPersona,
   applyPersona,
+  splitOperatorDetail,
 } from './operator-persona.js';
 import { parseApplyCodeTask, buildOperatorCodeGuide } from './operator-code-task.js';
 import { dispatchCodeTask, createDefaultDeps } from './operator-code-dispatch.js';
@@ -137,7 +138,18 @@ function isOperatorChannel(ch: string): boolean {
 // 설계: docs/superpowers/specs/2026-06-03-operator-code-change-capability-design.md
 const OPERATOR_CODE_ENABLED = process.env.OPERATOR_CODE_ENABLED === '1';
 const OPERATOR_CODE_BASE_BRANCH = process.env.OPERATOR_CODE_BASE_BRANCH || 'dev';
-const OPERATOR_CODE_REPO_ROOT = process.env.OPERATOR_CODE_REPO_ROOT || process.cwd();
+// 레포 루트 해석: env override > git rev-parse(파일시스템 위치 무관) > cwd.
+// 옛 ~/Desktop 경로 하드코딩/stale cwd 로 인한 `git worktree add` 실패를 방지한다.
+// (운영 환경에선 OPERATOR_CODE_REPO_ROOT 를 명시 설정하는 것을 권장.)
+function resolveOperatorRepoRoot(): string {
+  if (process.env.OPERATOR_CODE_REPO_ROOT) return process.env.OPERATOR_CODE_REPO_ROOT;
+  try {
+    return execSync('git rev-parse --show-toplevel', { encoding: 'utf-8' }).trim();
+  } catch {
+    return process.cwd();
+  }
+}
+const OPERATOR_CODE_REPO_ROOT = resolveOperatorRepoRoot();
 
 // 고객 동적 위임 (P3) — feature-flagged additive. off 면 기존 internal ROUTE 동작 불변.
 // 채널이 테넌트에 매핑되면 internal 봇 대신 customer 에이전트(agent_installs→bot_status 프로젝션)로 위임.
@@ -2221,13 +2233,20 @@ async function handleOrchestrator(
         }
         return;
       }
-      // APPLY 없음 → 제안/대화. 그대로 게시.
-      await slack.postAsBot(
-        cfg.botId,
-        msg.channel,
-        `${text}\n\n— ${cfg.botId} (${elapsed}s)`,
-        replyThreadTs,
-      );
+      // APPLY 없음 → 제안/대화. ---DETAIL--- 가 있으면 결론은 본문, 상세는 "자세히 보기" 버튼(접힘)으로.
+      const footer = `\n\n— ${cfg.botId} (${elapsed}s)`;
+      const split = splitOperatorDetail(text);
+      if (split) {
+        await slack.postWithDetail(
+          cfg.botId,
+          msg.channel,
+          `${split.summary}${footer}`,
+          split.detail,
+          replyThreadTs,
+        );
+      } else {
+        await slack.postAsBot(cfg.botId, msg.channel, `${text}${footer}`, replyThreadTs);
+      }
       console.log(
         `[${cfg.botId}] persona-admin proposal (${elapsed}s, endReason=${result.endReason})`,
       );
@@ -2490,6 +2509,8 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
     shouldTriggerOperatorAdminRoute(msg.text, operatorMentionToken)
   ) {
     await handleOrchestrator(msg, senderName, ORCHESTRATORS[OPERATOR_BOT_ID]);
+    // Operator: 위임/commitment 미사용 — 이 early return 으로 아래 slack-inbox commitment INSERT 경로를 건너뛴다.
+    // (Operator 는 자가완결 관리자이며 위임형 작업 추적 대상이 아니다.)
     return;
   }
 

@@ -205,6 +205,29 @@ export class SlackGateway {
                 /* update 실패해도 응답은 전달 */
               }
             }
+            continue;
+          }
+          // "자세히 보기" 버튼 → 저장된 상세를 같은 스레드에 펼친다.
+          const detailMatch = (action.action_id || '').match(/^semo_detail_(.+)$/);
+          if (detailMatch) {
+            const entry = this.pendingDetails.get(detailMatch[1]);
+            if (entry) {
+              try {
+                const web = getWebClientForBot(entry.botId);
+                const threadTs = body.message?.thread_ts || body.message?.ts;
+                for (const p of convertMarkdownToBlocks(entry.detail)) {
+                  await web.chat.postMessage({
+                    channel: body.channel?.id || '',
+                    text: p.text,
+                    ...(p.blocks.length > 0 && { blocks: p.blocks }),
+                    thread_ts: threadTs || undefined,
+                    unfurl_links: false,
+                  });
+                }
+              } catch (e) {
+                console.error('[slack] detail expand failed:', (e as Error).message);
+              }
+            }
           }
         }
       }
@@ -423,6 +446,58 @@ export class SlackGateway {
         channel,
         text: payload.text,
         ...(payload.blocks.length > 0 && { blocks: payload.blocks }),
+        thread_ts: threadTs || undefined,
+        unfurl_links: false,
+      });
+    }
+  }
+
+  // "자세히 보기" 접힘: 결론(summary)을 본문으로 게시하고, 상세(detail)는 버튼 클릭 시
+  // 같은 스레드에 펼친다. Slack 은 네이티브 접힘 섹션이 없으므로 actions 버튼으로 on-demand 노출한다.
+  private pendingDetails = new Map<string, { botId: string; detail: string }>();
+  private detailCounter = 0;
+
+  async postWithDetail(
+    botId: string,
+    channel: string,
+    summary: string,
+    detail: string,
+    threadTs?: string,
+  ): Promise<void> {
+    const web = getWebClientForBot(botId);
+    const id = `${++this.detailCounter}_${Date.now()}`;
+    // 메모리 캡 (best-effort) — 가장 오래된 항목부터 제거.
+    if (this.pendingDetails.size > 200) {
+      const oldest = this.pendingDetails.keys().next().value;
+      if (oldest) this.pendingDetails.delete(oldest);
+    }
+    this.pendingDetails.set(id, { botId, detail });
+
+    const payloads = convertMarkdownToBlocks(summary);
+    for (let i = 0; i < payloads.length; i++) {
+      const p = payloads[i];
+      const blocks: unknown[] = [...p.blocks];
+      if (i === payloads.length - 1) {
+        if (blocks.length === 0) {
+          blocks.push({ type: 'section', text: { type: 'mrkdwn', text: p.text || ' ' } });
+        }
+        blocks.push({
+          type: 'actions',
+          block_id: `semo_detail_${id}`,
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: '자세히 보기' },
+              action_id: `semo_detail_${id}`,
+              value: id,
+            },
+          ],
+        });
+      }
+      await web.chat.postMessage({
+        channel,
+        text: p.text,
+        ...(blocks.length > 0 && { blocks: blocks as never }),
         thread_ts: threadTs || undefined,
         unfurl_links: false,
       });
