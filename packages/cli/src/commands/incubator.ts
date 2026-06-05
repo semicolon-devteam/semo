@@ -16,6 +16,7 @@ import * as os from 'os';
 import { getPool, closeConnection } from '../database';
 import { ensureEnforcementHooks, ensureRulesSymlink } from '../semo-workspace';
 import { semoHome, claudeHome } from '../paths.js';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ============================================================
 // Paths (lazy — SEMO_HOME 런타임 변경 반영)
@@ -303,13 +304,13 @@ async function upsertSessionRecord(
 ): Promise<void> {
   const pool = getPool();
   await pool.query(
-    `INSERT INTO semo.incubator_sessions
+    `INSERT INTO ${DB_SCHEMA}.incubator_sessions
        (service_id, service_name, channel, session_dir, status)
      VALUES ($1, $2, $3, $4, 'active')
      ON CONFLICT (service_id) DO UPDATE SET
        status = 'active',
        session_dir = $4,
-       channel = COALESCE($3, semo.incubator_sessions.channel)`,
+       channel = COALESCE($3, ${DB_SCHEMA}.incubator_sessions.channel)`,
     [serviceId, serviceName, channel, sessionDir],
   );
 }
@@ -319,7 +320,7 @@ async function updateSessionStatus(
   status: 'active' | 'stopped' | 'archived',
 ): Promise<void> {
   const pool = getPool();
-  await pool.query(`UPDATE semo.incubator_sessions SET status = $2 WHERE service_id = $1`, [
+  await pool.query(`UPDATE ${DB_SCHEMA}.incubator_sessions SET status = $2 WHERE service_id = $1`, [
     serviceId,
     status,
   ]);
@@ -330,7 +331,7 @@ async function listSessions(): Promise<SessionRecord[]> {
   const result = await pool.query<SessionRecord>(
     `SELECT service_id, service_name, channel, session_dir, status,
             created_at::text
-     FROM semo.incubator_sessions
+     FROM ${DB_SCHEMA}.incubator_sessions
      ORDER BY created_at DESC`,
   );
   return result.rows;
@@ -341,7 +342,7 @@ async function getSession(serviceId: string): Promise<SessionRecord | null> {
   const result = await pool.query<SessionRecord>(
     `SELECT service_id, service_name, channel, session_dir, status,
             created_at::text
-     FROM semo.incubator_sessions
+     FROM ${DB_SCHEMA}.incubator_sessions
      WHERE service_id = $1`,
     [serviceId],
   );
@@ -668,7 +669,7 @@ export function registerIncubatorCommands(program: Command): void {
           // 1. 기존 등록 확인 (raw SQL — pipeline/config 는 schema 상 singleton 으로 등록되어 있어
           //    kbGet/kbUpsert 의 splitKey 검증을 피한다. service-migrate.ts 와 동일 패턴.)
           const existingRes = await pool.query(
-            `SELECT content, metadata FROM semo.knowledge_base
+            `SELECT content, metadata FROM ${DB_SCHEMA}.knowledge_base
              WHERE domain = $1 AND key = 'pipeline' AND sub_key = 'config'`,
             [options.domain],
           );
@@ -728,7 +729,7 @@ export function registerIncubatorCommands(program: Command): void {
           const embeddingStr = embedding ? `[${embedding.join(',')}]` : null;
           try {
             await pool.query(
-              `INSERT INTO semo.knowledge_base
+              `INSERT INTO ${DB_SCHEMA}.knowledge_base
                  (domain, key, sub_key, content, metadata, created_by, embedding)
                VALUES ($1, 'pipeline', 'config', $2, $3::jsonb, 'semo-incubator-cli', $4::vector)
                ON CONFLICT (domain, key, sub_key) DO UPDATE SET

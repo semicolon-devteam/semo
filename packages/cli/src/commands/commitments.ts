@@ -2,7 +2,7 @@
  * semo commitments — 봇 약속 추적 (Durable Task Tracking)
  *
  * 봇이 "~하겠습니다" 약속 후 세션 종료되어도 추적 가능하도록
- * semo.bot_commitments 테이블에 기록하고, 워치독이 overdue/stale 감지.
+ * ${DB_SCHEMA}.bot_commitments 테이블에 기록하고, 워치독이 overdue/stale 감지.
  */
 
 import { Command } from 'commander';
@@ -14,6 +14,7 @@ import {
   recordCommitmentEvent,
 } from '../commitment-escalation';
 import { projectCommitmentFromEvents } from '@team-semicolon/semo-common';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ─── ID 생성 ─────────────────────────────────────────────────────────────────
 
@@ -81,7 +82,7 @@ export function registerCommitmentsCommands(program: Command): void {
       try {
         const pool = getPool();
         await pool.query(
-          `INSERT INTO semo.bot_commitments
+          `INSERT INTO ${DB_SCHEMA}.bot_commitments
              (id, bot_id, status, title, description, source_type, source_ref, deadline_at, steps)
            VALUES ($1, $2, 'pending', $3, $4, $5, $6, $7, $8)`,
           [
@@ -148,7 +149,7 @@ export function registerCommitmentsCommands(program: Command): void {
 
         if (options.heartbeat) {
           const hbResult = await pool.query<{ bot_id: string; status: string }>(
-            `UPDATE semo.bot_commitments
+            `UPDATE ${DB_SCHEMA}.bot_commitments
              SET last_heartbeat_at = NOW(),
                  status = CASE WHEN status = 'pending' THEN 'active' ELSE status END
              WHERE id = $1
@@ -187,7 +188,7 @@ export function registerCommitmentsCommands(program: Command): void {
             title: string;
             status: string;
           }>(
-            `UPDATE semo.bot_commitments SET status = $1 WHERE id = $2 ${guard} RETURNING id, bot_id, title, status`,
+            `UPDATE ${DB_SCHEMA}.bot_commitments SET status = $1 WHERE id = $2 ${guard} RETURNING id, bot_id, title, status`,
             [targetStatus, id],
           );
           if (result.rowCount === 0) {
@@ -225,7 +226,7 @@ export function registerCommitmentsCommands(program: Command): void {
 
         if (options.stepDone) {
           const stepResult = await pool.query<{ bot_id: string }>(
-            `UPDATE semo.bot_commitments
+            `UPDATE ${DB_SCHEMA}.bot_commitments
              SET steps = (
                SELECT jsonb_agg(
                  CASE
@@ -273,7 +274,7 @@ export function registerCommitmentsCommands(program: Command): void {
       try {
         const pool = getPool();
         const result = await pool.query<{ id: string; bot_id: string; title: string }>(
-          `UPDATE semo.bot_commitments SET status = 'done' WHERE id = $1 AND status IN ('pending', 'active') RETURNING id, bot_id, title`,
+          `UPDATE ${DB_SCHEMA}.bot_commitments SET status = 'done' WHERE id = $1 AND status IN ('pending', 'active') RETURNING id, bot_id, title`,
           [id],
         );
         if (result.rowCount === 0) {
@@ -319,7 +320,7 @@ export function registerCommitmentsCommands(program: Command): void {
         const params = options.reason ? [id, options.reason] : [id];
 
         const result = await pool.query<{ id: string; bot_id: string; title: string }>(
-          `UPDATE semo.bot_commitments SET status = 'failed'${metadataUpdate} WHERE id = $1 AND status IN ('pending', 'active') RETURNING id, bot_id, title`,
+          `UPDATE ${DB_SCHEMA}.bot_commitments SET status = 'failed'${metadataUpdate} WHERE id = $1 AND status IN ('pending', 'active') RETURNING id, bot_id, title`,
           params,
         );
         if (result.rowCount === 0) {
@@ -394,7 +395,7 @@ export function registerCommitmentsCommands(program: Command): void {
           `SELECT id, bot_id, status, title, description, source_type, source_ref,
                   deadline_at::text, steps,
                   last_heartbeat_at::text, created_at::text, completed_at::text, metadata
-           FROM semo.bot_commitments
+           FROM ${DB_SCHEMA}.bot_commitments
            ${where}
            ORDER BY created_at DESC
            LIMIT $${paramIdx}`,
@@ -464,7 +465,7 @@ export function registerCommitmentsCommands(program: Command): void {
         const pool = getPool();
         // 이미 다른 세션이 점유 중이면 실패
         const result = await pool.query(
-          `UPDATE semo.bot_commitments
+          `UPDATE ${DB_SCHEMA}.bot_commitments
            SET assigned_session = $2,
                session_owner = $3,
                status = CASE WHEN status = 'pending' THEN 'active' ELSE status END,
@@ -508,7 +509,7 @@ export function registerCommitmentsCommands(program: Command): void {
       try {
         const pool = getPool();
         const result = await pool.query(
-          `UPDATE semo.bot_commitments
+          `UPDATE ${DB_SCHEMA}.bot_commitments
            SET assigned_session = NULL,
                session_owner = NULL,
                status = CASE WHEN status = 'active' THEN 'pending' ELSE status END,
@@ -553,7 +554,7 @@ export function registerCommitmentsCommands(program: Command): void {
         const result = await pool.query(
           `SELECT id, bot_id, status, title, assigned_session, session_owner,
                   updated_at::text, EXTRACT(EPOCH FROM NOW() - updated_at)/3600 AS hours_stale
-           FROM semo.bot_commitments
+           FROM ${DB_SCHEMA}.bot_commitments
            WHERE status IN ('pending', 'active')
              AND updated_at < NOW() - INTERVAL '1 hour' * $1
            ORDER BY updated_at ASC`,
@@ -623,7 +624,7 @@ export function registerCommitmentsCommands(program: Command): void {
                   deadline_at::text,
                   health, minutes_since_heartbeat, minutes_overdue,
                   steps, last_heartbeat_at::text, created_at::text, metadata
-           FROM semo.v_active_commitments
+           FROM ${DB_SCHEMA}.v_active_commitments
            ${whereClause}
            ORDER BY
              CASE health
@@ -719,7 +720,7 @@ export function registerCommitmentsCommands(program: Command): void {
                EXTRACT(EPOCH FROM NOW() - MIN(created_at) FILTER (WHERE status IN ('pending','active')))/3600,
                1
              )::text AS oldest_active_hours
-           FROM semo.bot_commitments
+           FROM ${DB_SCHEMA}.bot_commitments
            WHERE created_at > NOW() - INTERVAL '7 days'
            GROUP BY session_owner, status
            ORDER BY session_owner, status`,
@@ -798,7 +799,7 @@ export function registerCommitmentsCommands(program: Command): void {
           }
           const recent = await pool.query<{ commitment_id: string }>(
             `SELECT DISTINCT commitment_id
-             FROM semo.commitment_events
+             FROM ${DB_SCHEMA}.commitment_events
              WHERE ${where}
              ORDER BY commitment_id DESC
              LIMIT $1`,
@@ -832,7 +833,7 @@ export function registerCommitmentsCommands(program: Command): void {
             steps: Array<{ label: string; done: boolean }> | null;
           }>(
             `SELECT status, completed_at, last_heartbeat_at, metadata, steps
-             FROM semo.bot_commitments WHERE id = $1`,
+             FROM ${DB_SCHEMA}.bot_commitments WHERE id = $1`,
             [cid],
           );
           const actual = actualRes.rows[0];

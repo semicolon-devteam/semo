@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { query } from '@/lib/db';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export async function GET() {
   const supabase = await createClient();
@@ -37,7 +38,7 @@ export async function GET() {
   if (domains.length > 0) {
     const placeholders = domains.map((_, i) => `$${i + 1}`).join(',');
     const res = await query<{ domain: string; key: string; content: string }>(
-      `SELECT domain, key, content FROM semo.knowledge_base
+      `SELECT domain, key, content FROM ${DB_SCHEMA}.knowledge_base
        WHERE domain IN (${placeholders}) AND key IN ('nickname', 'real-name')`,
       domains,
     );

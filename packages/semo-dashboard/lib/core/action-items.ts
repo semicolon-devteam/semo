@@ -1,5 +1,6 @@
 import { query } from '../db';
 import type { ActionItem } from '@/types';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export interface ActionItemFilters {
   owner_domain?: string;
@@ -41,11 +42,11 @@ export async function listActionItems(filters: ActionItemFilters = {}): Promise<
               NULLIF(BTRIM(SPLIT_PART(SPLIT_PART(o_target.description, E'\n', 1), ' — ', 1)), ''),
               ai.target_domain
             ) AS target_label
-     FROM semo.action_items ai
-     JOIN semo.ontology o_owner ON ai.owner_domain = o_owner.domain
-     LEFT JOIN semo.knowledge_base nk ON nk.domain = ai.owner_domain AND nk.key = 'nickname'
-     LEFT JOIN semo.ontology o_target ON ai.target_domain = o_target.domain
-     LEFT JOIN semo.knowledge_base kb_pn ON kb_pn.domain = ai.target_domain AND kb_pn.key = 'pipeline' AND kb_pn.sub_key = 'config'
+     FROM ${DB_SCHEMA}.action_items ai
+     JOIN ${DB_SCHEMA}.ontology o_owner ON ai.owner_domain = o_owner.domain
+     LEFT JOIN ${DB_SCHEMA}.knowledge_base nk ON nk.domain = ai.owner_domain AND nk.key = 'nickname'
+     LEFT JOIN ${DB_SCHEMA}.ontology o_target ON ai.target_domain = o_target.domain
+     LEFT JOIN ${DB_SCHEMA}.knowledge_base kb_pn ON kb_pn.domain = ai.target_domain AND kb_pn.key = 'pipeline' AND kb_pn.sub_key = 'config'
      ${where}
      ORDER BY CASE ai.status WHEN 'open' THEN 0 WHEN 'completed' THEN 1 ELSE 2 END,
               ai.sort_order, ai.created_at DESC`,
@@ -70,7 +71,7 @@ export async function createActionItem(data: {
   runtime_source?: string | null;
 }): Promise<ActionItem> {
   const res = await query<ActionItem>(
-    `INSERT INTO semo.action_items
+    `INSERT INTO ${DB_SCHEMA}.action_items
        (owner_domain, target_domain, description, assignee, deadline, status, priority, category, source, related_url, sort_order, metadata, runtime_source)
      VALUES ($1, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11, $12, $13)
      RETURNING *`,
@@ -150,13 +151,15 @@ export async function updateActionItem(
   if (sets.length === 0) return null;
   params.push(itemId);
   const res = await query<ActionItem>(
-    `UPDATE semo.action_items SET ${sets.join(', ')} WHERE action_item_id = $${idx} RETURNING *`,
+    `UPDATE ${DB_SCHEMA}.action_items SET ${sets.join(', ')} WHERE action_item_id = $${idx} RETURNING *`,
     params,
   );
   return res.rows[0] ?? null;
 }
 
 export async function deleteActionItem(itemId: string): Promise<boolean> {
-  const res = await query('DELETE FROM semo.action_items WHERE action_item_id = $1', [itemId]);
+  const res = await query(`DELETE FROM ${DB_SCHEMA}.action_items WHERE action_item_id = $1`, [
+    itemId,
+  ]);
   return (res.rowCount ?? 0) > 0;
 }

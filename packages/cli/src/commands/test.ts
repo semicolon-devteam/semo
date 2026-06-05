@@ -22,6 +22,7 @@ import {
   runDeclarativeWorkspaceAudit,
   TestOutputLine as DeclarativeOutput,
 } from '../test-runners/workspace-audit';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ============================================================
 // Types
@@ -116,7 +117,7 @@ async function executeTestSuite(suite: TestSuite, triggeredBy: string): Promise<
 
   // Create run record
   await pool.query(
-    `INSERT INTO semo.test_runs (run_id, suite_id, triggered_by, started_at, status)
+    `INSERT INTO ${DB_SCHEMA}.test_runs (run_id, suite_id, triggered_by, started_at, status)
      VALUES ($1, $2, $3, $4, 'running')`,
     [runId, suite.suite_id, triggeredBy, startedAt.toISOString()],
   );
@@ -218,7 +219,7 @@ async function executeTestSuite(suite: TestSuite, triggeredBy: string): Promise<
         for (const c of cases) {
           if (c.type !== 'case') continue;
           await pool.query(
-            `INSERT INTO semo.test_results (run_id, case_id, suite_id, label, status, detail, duration_ms)
+            `INSERT INTO ${DB_SCHEMA}.test_results (run_id, case_id, suite_id, label, status, detail, duration_ms)
              VALUES ($1, $2, $3, $4, $5, $6, $7)`,
             [
               runId,
@@ -234,7 +235,7 @@ async function executeTestSuite(suite: TestSuite, triggeredBy: string): Promise<
 
         // Update run record
         await pool.query(
-          `UPDATE semo.test_runs
+          `UPDATE ${DB_SCHEMA}.test_runs
            SET finished_at = NOW(), total_pass = $1, total_fail = $2, total_warn = $3,
                status = $4, summary = $5
            WHERE run_id = $6`,
@@ -291,7 +292,7 @@ async function executeDeclarativeSuite(
 
     // Record to DB
     await pool.query(
-      `INSERT INTO semo.test_results (run_id, case_id, suite_id, label, status, detail)
+      `INSERT INTO ${DB_SCHEMA}.test_results (run_id, case_id, suite_id, label, status, detail)
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [
         runId,
@@ -310,7 +311,7 @@ async function executeDeclarativeSuite(
   const summary = `${pass} passed, ${fail} failed, ${warn} warn`;
 
   await pool.query(
-    `UPDATE semo.test_runs
+    `UPDATE ${DB_SCHEMA}.test_runs
      SET finished_at = NOW(), total_pass = $1, total_fail = $2, total_warn = $3,
          status = $4, summary = $5
      WHERE run_id = $6`,
@@ -341,9 +342,9 @@ export function registerTestCommands(program: Command): void {
                  r.total_pass AS last_pass,
                  r.total_fail AS last_fail,
                  r.total_warn AS last_warn
-          FROM semo.test_suites s
+          FROM ${DB_SCHEMA}.test_suites s
           LEFT JOIN LATERAL (
-            SELECT * FROM semo.test_runs
+            SELECT * FROM ${DB_SCHEMA}.test_runs
             WHERE suite_id = s.suite_id
             ORDER BY started_at DESC LIMIT 1
           ) r ON true
@@ -408,12 +409,12 @@ export function registerTestCommands(program: Command): void {
         if (suiteArg) {
           // Single suite
           const { rows } = await pool.query<TestSuite>(
-            'SELECT * FROM semo.test_suites WHERE suite_id = $1',
+            `SELECT * FROM ${DB_SCHEMA}.test_suites WHERE suite_id = $1`,
             [suiteArg],
           );
           if (rows.length === 0) {
             console.error(chalk.red(`스위트 '${suiteArg}'를 찾을 수 없습니다.`));
-            const allSuites = await pool.query('SELECT suite_id FROM semo.test_suites');
+            const allSuites = await pool.query(`SELECT suite_id FROM ${DB_SCHEMA}.test_suites`);
             console.log(
               chalk.gray(`등록된 스위트: ${allSuites.rows.map((r: any) => r.suite_id).join(', ')}`),
             );
@@ -424,7 +425,7 @@ export function registerTestCommands(program: Command): void {
           // All suites
           const where = options.all ? '' : 'WHERE enabled = true';
           const { rows } = await pool.query<TestSuite>(
-            `SELECT * FROM semo.test_suites ${where} ORDER BY suite_id`,
+            `SELECT * FROM ${DB_SCHEMA}.test_suites ${where} ORDER BY suite_id`,
           );
           suites = rows;
         }
@@ -521,8 +522,8 @@ export function registerTestCommands(program: Command): void {
             SELECT r.run_id, r.suite_id, s.name, r.triggered_by,
                    r.started_at::text, r.finished_at::text,
                    r.total_pass, r.total_fail, r.total_warn, r.status, r.summary
-            FROM semo.test_runs r
-            JOIN semo.test_suites s ON s.suite_id = r.suite_id
+            FROM ${DB_SCHEMA}.test_runs r
+            JOIN ${DB_SCHEMA}.test_suites s ON s.suite_id = r.suite_id
             WHERE r.suite_id = $1
             ORDER BY r.started_at DESC
             LIMIT $2
@@ -533,8 +534,8 @@ export function registerTestCommands(program: Command): void {
             SELECT r.run_id, r.suite_id, s.name, r.triggered_by,
                    r.started_at::text, r.finished_at::text,
                    r.total_pass, r.total_fail, r.total_warn, r.status, r.summary
-            FROM semo.test_runs r
-            JOIN semo.test_suites s ON s.suite_id = r.suite_id
+            FROM ${DB_SCHEMA}.test_runs r
+            JOIN ${DB_SCHEMA}.test_suites s ON s.suite_id = r.suite_id
             ORDER BY r.started_at DESC
             LIMIT $1
           `;

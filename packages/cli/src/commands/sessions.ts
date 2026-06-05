@@ -2,7 +2,7 @@
  * semo sessions — 세션 추적
  *
  * push: Claude Code 훅(SessionStart / Stop)에서 stdin으로 전달되는 JSON을 파싱해
- *       semo.bot_sessions 테이블에 upsert합니다.
+ *       ${DB_SCHEMA}.bot_sessions 테이블에 upsert합니다.
  *
  * sync: DB에서 봇 목록을 읽어 세션 데이터를 동기화합니다.
  *       (OpenClaw 게이트웨이는 2026-04-15 폐기됨)
@@ -17,6 +17,7 @@ import * as os from 'os';
 import { execSync } from 'child_process';
 import type { PoolClient } from 'pg';
 import { getPool, closeConnection, isDbConnected } from '../database';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ─── stdin reader ───────────────────────────────────────────────────────────
 
@@ -97,7 +98,7 @@ export function registerSessionsCommands(program: Command): void {
   // ── semo sessions push ────────────────────────────────────────────────────
   sessionsCmd
     .command('push')
-    .description('현재 세션을 semo.bot_sessions에 기록 (훅에서 호출)')
+    .description(`현재 세션을 ${DB_SCHEMA}.bot_sessions에 기록 (훅에서 호출)`)
     .requiredOption('--bot-id <id>', '봇 ID (e.g. workclaw)')
     .option('--event <type>', '이벤트 종류 (start|stop|heartbeat)', 'heartbeat')
     .option('--label <text>', '세션 라벨 (미지정 시 git 브랜치 자동 감지)')
@@ -130,7 +131,7 @@ export function registerSessionsCommands(program: Command): void {
 
         if (event === 'start') {
           await client.query(
-            `INSERT INTO semo.bot_sessions
+            `INSERT INTO ${DB_SCHEMA}.bot_sessions
                (bot_id, session_key, label, kind, chat_type, last_activity, message_count, synced_at)
              VALUES ($1, $2, $3, $4, 'claude-code', NOW(), 0, NOW())
              ON CONFLICT (bot_id, session_key) DO UPDATE SET
@@ -142,7 +143,7 @@ export function registerSessionsCommands(program: Command): void {
           // session_count는 trg_session_count 트리거가 자동 관리
         } else if (event === 'stop') {
           await client.query(
-            `UPDATE semo.bot_sessions
+            `UPDATE ${DB_SCHEMA}.bot_sessions
              SET last_activity = NOW(),
                  message_count = COALESCE($1, message_count),
                  synced_at     = NOW()
@@ -152,12 +153,12 @@ export function registerSessionsCommands(program: Command): void {
         } else {
           // heartbeat
           await client.query(
-            `INSERT INTO semo.bot_sessions
+            `INSERT INTO ${DB_SCHEMA}.bot_sessions
                (bot_id, session_key, label, kind, chat_type, last_activity, message_count, synced_at)
              VALUES ($1, $2, $3, $4, 'claude-code', NOW(), COALESCE($5, 0), NOW())
              ON CONFLICT (bot_id, session_key) DO UPDATE SET
                last_activity = NOW(),
-               message_count = COALESCE(EXCLUDED.message_count, semo.bot_sessions.message_count),
+               message_count = COALESCE(EXCLUDED.message_count, ${DB_SCHEMA}.bot_sessions.message_count),
                synced_at     = NOW()`,
             [botId, sessionKey, label, options.kind, messageCount ?? null],
           );
@@ -179,7 +180,7 @@ export function registerSessionsCommands(program: Command): void {
     .command('sync')
     .description('OpenClaw 게이트웨이에서 세션 읽어 DB upsert')
     .option('--bot-id <id>', '특정 봇만 동기화')
-    .option('--all', 'semo.bot_status의 모든 봇 동기화')
+    .option('--all', `${DB_SCHEMA}.bot_status의 모든 봇 동기화`)
     .action(async (options) => {
       const connected = await isDbConnected();
       if (!connected) {
@@ -196,7 +197,9 @@ export function registerSessionsCommands(program: Command): void {
         botIds = [options.botId];
       } else if (options.all) {
         try {
-          const r = await client.query('SELECT bot_id FROM semo.bot_status ORDER BY bot_id');
+          const r = await client.query(
+            `SELECT bot_id FROM ${DB_SCHEMA}.bot_status ORDER BY bot_id`,
+          );
           botIds = r.rows.map((row: any) => row.bot_id);
         } catch {
           const home = os.homedir();
@@ -261,7 +264,7 @@ export function registerSessionsCommands(program: Command): void {
         const result = await client.query(
           `SELECT bot_id, session_key, label, kind, chat_type,
                   last_activity::text, message_count
-           FROM semo.bot_sessions
+           FROM ${DB_SCHEMA}.bot_sessions
            ${where}
            ORDER BY last_activity DESC NULLS LAST
            LIMIT $${limitIdx}`,

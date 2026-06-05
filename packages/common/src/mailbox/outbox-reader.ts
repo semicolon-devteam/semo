@@ -25,7 +25,7 @@ export interface GatewayAdapter {
 
 export class OutboxReader {
   private readonly mailboxDir: string;
-  private readonly botIds: string[];
+  private botIds: string[];
   private readonly platform: 'slack' | 'discord';
   private readonly gateway: GatewayAdapter;
   /** P5-2d: optional projection emitter — 주입 시 reply 흐름이 emitter 로 분기. */
@@ -95,31 +95,7 @@ export class OutboxReader {
   start(): void {
     // fs.watch on each bot's outbox
     for (const botId of this.botIds) {
-      const outboxPath = path.join(this.mailboxDir, botId, 'outbox.jsonl');
-      this.ensureFile(outboxPath);
-      // Skip existing content on startup — only process new messages
-      try {
-        const skipBytes = fs.statSync(outboxPath).size;
-        if (skipBytes > 0) {
-          console.log(`[outbox] ${botId}: skipping ${skipBytes} existing bytes on startup`);
-        }
-        this.fileOffsets.set(botId, skipBytes);
-      } catch {
-        /* ignore */
-      }
-      try {
-        const watcher = fs.watch(outboxPath, { persistent: false }, () => {
-          this.processOutbox(botId).catch((err) =>
-            console.error(`[outbox] Error processing ${botId}:`, err),
-          );
-        });
-        watcher.on('error', (err) => {
-          console.warn(`[outbox] fs.watch error for ${botId}: ${(err as Error).message}`);
-        });
-        this.watchers.push(watcher);
-      } catch {
-        console.error(`[outbox] fs.watch failed for ${botId}`);
-      }
+      this.watchBot(botId);
     }
 
     // Fallback poll
@@ -130,10 +106,94 @@ export class OutboxReader {
     }, POLL_INTERVAL_MS);
   }
 
+  /** Set up fs.watch + offset for one bot's outbox (skip existing content). */
+  private watchBot(botId: string): void {
+    const outboxPath = path.join(this.mailboxDir, botId, 'outbox.jsonl');
+    this.ensureFile(outboxPath);
+    try {
+      const fileSize = fs.statSync(outboxPath).size;
+      // 영속 offset 이 있고 파일 크기 이하면 그 지점부터 재개(재기동 다운타임 유실 방지).
+      // 없거나(최초 기동) 파일이 그보다 작아졌으면(rotation) 보수적으로 기존 바이트 skip(double-post 방지).
+      const persisted = this.loadOffset(botId);
+      const startOffset = persisted != null && persisted <= fileSize ? persisted : fileSize;
+      if (startOffset < fileSize) {
+        console.log(
+          `[outbox] ${botId}: resuming from persisted offset ${startOffset} (file ${fileSize}, ${fileSize - startOffset} bytes pending)`,
+        );
+      } else if (fileSize > 0) {
+        console.log(`[outbox] ${botId}: skipping ${fileSize} existing bytes on startup`);
+      }
+      this.setOffset(botId, startOffset);
+    } catch {
+      /* ignore */
+    }
+    try {
+      const watcher = fs.watch(outboxPath, { persistent: false }, () => {
+        this.processOutbox(botId).catch((err) =>
+          console.error(`[outbox] Error processing ${botId}:`, err),
+        );
+      });
+      watcher.on('error', (err) => {
+        console.warn(`[outbox] fs.watch error for ${botId}: ${(err as Error).message}`);
+      });
+      this.watchers.push(watcher);
+    } catch {
+      console.error(`[outbox] fs.watch failed for ${botId}`);
+    }
+  }
+
+  /**
+   * 런타임에 watch 대상 봇 추가 (동적 customer 에이전트용). 이미 있는 봇은 무시.
+   * @returns 실제로 추가된 botId 들.
+   */
+  addBots(newIds: string[]): string[] {
+    const added: string[] = [];
+    for (const botId of newIds) {
+      if (this.botIds.includes(botId)) continue;
+      this.botIds.push(botId);
+      if (this.pollTimer) this.watchBot(botId); // start() 이후면 즉시 watch
+      added.push(botId);
+    }
+    return added;
+  }
+
   private ensureFile(filePath: string): void {
     const dir = path.dirname(filePath);
     fs.mkdirSync(dir, { recursive: true });
     if (!fs.existsSync(filePath)) fs.writeFileSync(filePath, '');
+  }
+
+  private offsetFilePath(botId: string): string {
+    // platform 별 네임스페이스 필수 — slack/discord 두 router 가 같은 mailboxDir 의
+    // 동일 outbox 를 각자 watch(타 플랫폼 메시지는 skip 하되 offset 은 전진)하므로,
+    // 공유 파일이면 서로 덮어써 cross-platform 유실/오프셋 오염이 발생한다.
+    return path.join(this.mailboxDir, botId, `.outbox-offset-${this.platform}`);
+  }
+
+  /**
+   * 읽기 offset 을 메모리 + 디스크에 기록(재기동 내구성).
+   * 영속 offset 이 있어야 slack-router 재기동 시 다운타임 중 append 된 reply 를
+   * skip(유실)하지 않고 그 지점부터 재개한다. offset 은 항상 'dispatch 시작한 지점'까지만
+   * 전진하므로(at-most-once, line 197) 재기동 후 double-post 는 발생하지 않는다.
+   */
+  private setOffset(botId: string, offset: number): void {
+    this.fileOffsets.set(botId, offset);
+    try {
+      fs.writeFileSync(this.offsetFilePath(botId), String(offset));
+    } catch {
+      /* best-effort — 실패해도 메모리 offset 으로 동작(재기동 내구성만 저하) */
+    }
+  }
+
+  /** 영속 offset 로드. 파일 없음/파싱 실패면 null. */
+  private loadOffset(botId: string): number | null {
+    try {
+      const raw = fs.readFileSync(this.offsetFilePath(botId), 'utf8').trim();
+      const n = Number(raw);
+      return Number.isFinite(n) && n >= 0 ? n : null;
+    } catch {
+      return null;
+    }
   }
 
   private async processOutbox(botId: string): Promise<void> {
@@ -163,7 +223,7 @@ export class OutboxReader {
 
     // File was truncated/rotated — reset offset
     if (fileSize < offset) {
-      this.fileOffsets.set(botId, 0);
+      this.setOffset(botId, 0);
       return;
     }
 
@@ -174,8 +234,8 @@ export class OutboxReader {
       `[outbox] ${botId}: new data detected (${fileSize - offset} bytes from offset ${offset})`,
     );
 
-    // Advance offset BEFORE reading to prevent duplicate processing
-    this.fileOffsets.set(botId, fileSize);
+    // Advance offset BEFORE reading to prevent duplicate processing (+ 디스크 영속 → 재기동 내구성)
+    this.setOffset(botId, fileSize);
 
     // Read only the new bytes
     const fd = fs.openSync(outboxPath, 'r');

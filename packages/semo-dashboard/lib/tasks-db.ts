@@ -1,5 +1,6 @@
 import { query } from '@/lib/db';
 import type { ActionItem } from '@/lib/shared-ui';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export type TaskStatus =
   | 'pending'
@@ -105,7 +106,7 @@ const TASK_SELECT = `
          END AS duration_ms,
          (
            SELECT COUNT(*)
-           FROM semo.action_items ai
+           FROM ${DB_SCHEMA}.action_items ai
            WHERE ai.status = 'open'
              AND (
                ai.metadata->>'related_task_id' = bc.id
@@ -117,7 +118,7 @@ const TASK_SELECT = `
            jsonb_array_length(CASE WHEN jsonb_typeof(bc.metadata->'artifacts') = 'array' THEN bc.metadata->'artifacts' ELSE '[]'::jsonb END),
            0
          ) AS artifact_count
-  FROM semo.bot_commitments bc`;
+  FROM ${DB_SCHEMA}.bot_commitments bc`;
 
 function toNumber(value: number | string | null | undefined): number {
   if (value == null) return 0;
@@ -249,7 +250,7 @@ export async function getTaskTimeline(taskId: string): Promise<TaskTimeline | nu
   const task = mapTask(row);
   const actionItems = await query<ActionItem>(
     `SELECT *
-     FROM semo.action_items ai
+     FROM ${DB_SCHEMA}.action_items ai
      WHERE ai.metadata->>'related_task_id' = $1
         OR ai.metadata->>'related_run_id' = $1
         OR ai.related_url ILIKE '%' || $1 || '%'

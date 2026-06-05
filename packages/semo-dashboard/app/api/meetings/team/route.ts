@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
 export interface TeamMember {
-  domain: string;   // KB domain e.g. "reus"
-  name: string;     // e.g. "전준영 (Reus)"
-  role: string;     // e.g. "프론트 리드/팀 리더"
+  domain: string; // KB domain e.g. "reus"
+  name: string; // e.g. "전준영 (Reus)"
+  role: string; // e.g. "프론트 리드/팀 리더"
 }
 
 /**
@@ -26,7 +27,7 @@ function parseTeamContent(content: string): { name: string; role: string } {
 export async function GET() {
   try {
     const result = await query<{ sub_key: string; content: string }>(
-      `SELECT sub_key, content FROM semo.knowledge_base
+      `SELECT sub_key, content FROM ${DB_SCHEMA}.knowledge_base
        WHERE domain = 'semicolon' AND key = 'team' AND sub_key != ''
        ORDER BY sub_key`,
     );

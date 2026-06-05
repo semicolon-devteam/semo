@@ -78,6 +78,11 @@ export interface OpenClawAdapterOptions {
   defaultThinking?: 'off' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
   /** dispatch 기본 timeout (ms). input.timeoutMs 우선. */
   defaultTimeoutMs?: number;
+  /**
+   * `--profile` override. 설정 시 input.botId 대신 이 프로필로 실행.
+   * (자체 openclaw 프로필이 없는 동적/고객 에이전트가 기존 web-capable 프로필을 빌려 실행.)
+   */
+  profileOverride?: string;
 }
 
 export class OpenClawAdapter implements HostAdapter {
@@ -89,12 +94,14 @@ export class OpenClawAdapter implements HostAdapter {
   private readonly defaultAgentName: string;
   private readonly defaultThinking?: OpenClawAdapterOptions['defaultThinking'];
   private readonly defaultTimeoutMs: number;
+  private readonly profileOverride?: string;
 
   constructor(options: OpenClawAdapterOptions = {}) {
     this.binaryPath = options.binaryPath ?? 'openclaw';
     this.workspaceParent = options.workspaceParent ?? os.homedir();
     this.defaultAgentName = options.defaultAgentName ?? 'main';
     this.defaultThinking = options.defaultThinking;
+    this.profileOverride = options.profileOverride;
     this.defaultTimeoutMs = options.defaultTimeoutMs ?? 600_000;
   }
 
@@ -205,7 +212,7 @@ export class OpenClawAdapter implements HostAdapter {
       '--log-level',
       'silent',
       '--profile',
-      input.botId,
+      this.profileOverride ?? input.botId,
       'agent',
       '--local',
       '--session-id',

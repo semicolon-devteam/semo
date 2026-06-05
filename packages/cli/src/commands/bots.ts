@@ -1,10 +1,10 @@
 /**
  * semo bots — 봇 상태 관리
  *
- * Actual semo.bot_status schema:
+ * Actual ${DB_SCHEMA}.bot_status schema:
  *   bot_id, name, emoji, role, last_active, session_count, workspace_path, status, synced_at
  *
- * Actual semo.bot_sessions schema:
+ * Actual ${DB_SCHEMA}.bot_sessions schema:
  *   bot_id, session_key, label, kind, chat_type, last_activity, message_count, synced_at
  */
 
@@ -14,6 +14,7 @@ import ora from 'ora';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { spawn, execSync } from 'child_process';
 import {
   getPool,
   closeConnection,
@@ -258,6 +259,7 @@ function getAllFileMtimes(dir: string, depth = 0): Date[] {
 // ============================================================
 
 import * as crypto from 'crypto';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 const BINARY_EXTS = new Set([
   '.png',
@@ -409,14 +411,14 @@ export async function syncWorkspaceFiles(
   let upserted = 0;
   for (const f of files) {
     const result = await client.query(
-      `INSERT INTO semo.bot_workspace_files (bot_id, file_path, content, file_size, file_hash, synced_at)
+      `INSERT INTO ${DB_SCHEMA}.bot_workspace_files (bot_id, file_path, content, file_size, file_hash, synced_at)
        VALUES ($1, $2, $3, $4, $5, NOW())
        ON CONFLICT (bot_id, file_path) DO UPDATE SET
          content   = EXCLUDED.content,
          file_size = EXCLUDED.file_size,
          file_hash = EXCLUDED.file_hash,
          synced_at = NOW()
-       WHERE semo.bot_workspace_files.file_hash IS DISTINCT FROM EXCLUDED.file_hash`,
+       WHERE ${DB_SCHEMA}.bot_workspace_files.file_hash IS DISTINCT FROM EXCLUDED.file_hash`,
       [botId, f.relPath, f.content, f.size, f.hash],
     );
     if (result.rowCount && result.rowCount > 0) {
@@ -426,14 +428,14 @@ export async function syncWorkspaceFiles(
 
   // Delete files in DB but not on disk (for this bot_id)
   const dbFiles = await client.query(
-    `SELECT file_path FROM semo.bot_workspace_files WHERE bot_id = $1`,
+    `SELECT file_path FROM ${DB_SCHEMA}.bot_workspace_files WHERE bot_id = $1`,
     [botId],
   );
   const diskPaths = new Set(files.map((f) => f.relPath));
   for (const row of dbFiles.rows as { file_path: string }[]) {
     if (!diskPaths.has(row.file_path)) {
       await client.query(
-        `DELETE FROM semo.bot_workspace_files WHERE bot_id = $1 AND file_path = $2`,
+        `DELETE FROM ${DB_SCHEMA}.bot_workspace_files WHERE bot_id = $1 AND file_path = $2`,
         [botId, row.file_path],
       );
     }
@@ -446,13 +448,678 @@ export async function syncWorkspaceFiles(
 // Command registration
 // ============================================================
 
+// ── 봇 프로필 캐시 정리 (DB-driven 전환 P0) ──────────────────────────────
+// 설계: docs/superpowers/specs/2026-06-04-db-driven-bot-architecture-design.md
+// 재생성 가능 캐시(.bak/completions/*-last-rendered/update-check/오래된 로그)만 대상.
+// SoT(openclaw.json/agent-spec/identity/cron) · 시크릿(auth/credential/device) · 메모리 · mailbox
+// · .openclaw/ 미러(auth 포함)는 **절대 미삭제**(이중 가드). dry-run 기본.
+interface CacheTarget {
+  path: string;
+  bytes: number;
+  kind: string;
+}
+
+function pathSizeBytes(p: string): number {
+  try {
+    const st = fs.statSync(p);
+    if (!st.isDirectory()) return st.size;
+    let total = 0;
+    for (const e of fs.readdirSync(p)) total += pathSizeBytes(path.join(p, e));
+    return total;
+  } catch {
+    return 0;
+  }
+}
+
+const CACHE_PROTECTED_SUBSTR = [
+  'identity',
+  'auth',
+  'credential',
+  'secret',
+  'memory',
+  'device',
+  '.openclaw/',
+  '/mailbox',
+  'cron/jobs.json',
+];
+function isCacheProtected(p: string): boolean {
+  const low = p.toLowerCase();
+  return CACHE_PROTECTED_SUBSTR.some((s) => low.includes(s.toLowerCase()));
+}
+
+function humanBytes(n: number): string {
+  if (n < 1024) return n + 'B';
+  if (n < 1048576) return (n / 1024).toFixed(1) + 'K';
+  if (n < 1073741824) return (n / 1048576).toFixed(1) + 'M';
+  return (n / 1073741824).toFixed(2) + 'G';
+}
+
+function classifyBotCacheTargets(botId: string): CacheTarget[] {
+  const profile = path.join(os.homedir(), `.openclaw-${botId}`);
+  if (!fs.existsSync(profile)) return [];
+  const out: CacheTarget[] = [];
+  let entries: string[] = [];
+  try {
+    entries = fs.readdirSync(profile);
+  } catch {
+    return [];
+  }
+  const push = (p: string, kind: string) => {
+    if (!isCacheProtected(p) && fs.existsSync(p))
+      out.push({ path: p, bytes: pathSizeBytes(p), kind });
+  };
+
+  // 1) config 백업 *.bak* — .last-good 과 가장 최근 1개는 안전망으로 보존
+  const baks = entries
+    .filter((e) => /\.bak($|[.\-])/.test(e) && !e.includes('last-good'))
+    .map((e) => {
+      let m = 0;
+      try {
+        m = fs.statSync(path.join(profile, e)).mtimeMs;
+      } catch {
+        /* ignore */
+      }
+      return { e, m };
+    })
+    .sort((a, b) => b.m - a.m);
+  baks.slice(1).forEach(({ e }) => push(path.join(profile, e), 'config-backup'));
+
+  // 2) *-last-rendered.json (렌더 아티팩트)
+  entries
+    .filter((e) => e.includes('last-rendered'))
+    .forEach((e) => push(path.join(profile, e), 'render-artifact'));
+
+  // 3) completions/ (쉘 자동완성 — 재생성)
+  push(path.join(profile, 'completions'), 'completions');
+
+  // 4) update-check.json (버전 체크 캐시)
+  push(path.join(profile, 'update-check.json'), 'version-cache');
+
+  // 5) logs/*.log 중 7일+ 오래된 것만
+  const logs = path.join(profile, 'logs');
+  if (fs.existsSync(logs)) {
+    const weekAgo = Date.now() - 7 * 86_400_000;
+    try {
+      for (const e of fs.readdirSync(logs)) {
+        const p = path.join(logs, e);
+        try {
+          const st = fs.statSync(p);
+          if (st.isFile() && /\.log(\.|$)/.test(e) && st.mtimeMs < weekAgo) {
+            push(p, 'old-log');
+          }
+        } catch {
+          /* ignore */
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return out.filter((t) => !isCacheProtected(t.path));
+}
+
+// ── DB-driven 식별자 렌더 (P1/P2) ──────────────────────────────────
+// bot_status(name/emoji) = SoT. OpenClaw 프로필 base openclaw.json 의 ui.assistant 를
+// DB 에서 머지 렌더(secrets/그 외 전부 보존). 단일 편집점은 `semo bots set`.
+//
+// emoji 포맷: DB 는 Slack 숏코드(:art:) 저장(slack_icon_emoji 와 동일 표현),
+// OpenClaw ui.assistant.avatar 는 유니코드. 매핑 없으면 기존 로컬 avatar 보존.
+const EMOJI_SHORTCODE_MAP: Record<string, string> = {
+  ':art:': '🎨',
+  ':chart_with_upwards_trend:': '📈',
+  ':shield:': '🛡️',
+  ':mag:': '🔍',
+  ':clipboard:': '📋',
+  ':brain:': '🧠',
+  ':hammer_and_wrench:': '🛠️',
+  ':robot_face:': '🤖',
+  ':gear:': '⚙️',
+  ':bust_in_silhouette:': '👤',
+  ':building_construction:': '🏗️',
+};
+function resolveEmoji(raw: string | null | undefined): string | undefined {
+  if (!raw) return undefined;
+  const t = raw.trim();
+  if (!t) return undefined;
+  if (t.startsWith(':') && t.endsWith(':')) return EMOJI_SHORTCODE_MAP[t]; // 매핑 없으면 undefined → 보존
+  return t; // 이미 유니코드
+}
+
+interface OpenclawAssistant {
+  name?: string;
+  avatar?: string;
+  [k: string]: unknown;
+}
+interface OpenclawConfigShape {
+  ui?: { assistant?: OpenclawAssistant; [k: string]: unknown };
+  [k: string]: unknown;
+}
+interface IdentityRenderResult {
+  botId: string;
+  profileExists: boolean;
+  nameChange?: { from: string | null; to: string };
+  avatarFill?: { to: string };
+  avatarDrift?: { local: string; db: string }; // 불일치 — render 는 변경 안 함(리포트만)
+  metaChange?: { from: string | null; to: string }; // agent-spec.meta.json displayName
+  changed: boolean;
+}
+
+interface AgentSpecMetaShape {
+  semo?: { displayName?: string; [k: string]: unknown };
+  [k: string]: unknown;
+}
+
+// base openclaw.json 에 식별자 머지. name=DB SoT(있으면). avatar 는 누락분만 채움(fill);
+// forceAvatar=true(=`set --emoji`)면 불일치도 덮어씀. secrets/그 외 키 전부 보존.
+function renderBotIdentity(
+  botId: string,
+  dbName: string | null,
+  dbEmoji: string | null,
+  opts: { apply: boolean; forceAvatar?: boolean },
+): IdentityRenderResult {
+  const ocPath = path.join(os.homedir(), `.openclaw-${botId}`, 'openclaw.json');
+  const res: IdentityRenderResult = {
+    botId,
+    profileExists: fs.existsSync(ocPath),
+    changed: false,
+  };
+  if (!res.profileExists) return res;
+  let oc: OpenclawConfigShape;
+  try {
+    oc = JSON.parse(fs.readFileSync(ocPath, 'utf8')) as OpenclawConfigShape;
+  } catch {
+    res.profileExists = false;
+    return res;
+  }
+  oc.ui = oc.ui ?? {};
+  oc.ui.assistant = oc.ui.assistant ?? {};
+  const cur = oc.ui.assistant;
+
+  if (dbName && cur.name !== dbName) {
+    res.nameChange = { from: cur.name ?? null, to: dbName };
+    cur.name = dbName;
+    res.changed = true;
+  }
+
+  const dbAvatar = resolveEmoji(dbEmoji);
+  if (dbAvatar) {
+    if (cur.avatar == null || cur.avatar === '') {
+      res.avatarFill = { to: dbAvatar };
+      cur.avatar = dbAvatar;
+      res.changed = true;
+    } else if (cur.avatar !== dbAvatar) {
+      if (opts.forceAvatar) {
+        res.avatarFill = { to: dbAvatar };
+        cur.avatar = dbAvatar;
+        res.changed = true;
+      } else {
+        res.avatarDrift = { local: cur.avatar, db: dbAvatar }; // 무단 변경 방지
+      }
+    }
+  }
+
+  // openclaw.json 쓰기 (name/avatar 변경 시). meta 변경은 아래에서 별도 게이트.
+  if (res.changed && opts.apply) {
+    let mode = 0o600;
+    try {
+      mode = fs.statSync(ocPath).mode & 0o777;
+    } catch {
+      /* keep default */
+    }
+    const tmp = ocPath + '.tmp-render';
+    fs.writeFileSync(tmp, JSON.stringify(oc, null, 2) + '\n', { mode });
+    fs.renameSync(tmp, ocPath); // atomic
+  }
+
+  // agent-spec.meta.json 의 displayName 도 DB name 으로 동기 (DB-rendered 메타 — 드리프트 방지).
+  // 이 블록이 openclaw.json 쓰기 뒤에 와야 meta-only 변경이 openclaw 쓰기를 잘못 트리거하지 않음.
+  if (dbName) {
+    const metaPath = path.join(os.homedir(), `.openclaw-${botId}`, 'agent-spec.meta.json');
+    if (fs.existsSync(metaPath)) {
+      try {
+        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf8')) as AgentSpecMetaShape;
+        meta.semo = meta.semo ?? {};
+        if (meta.semo.displayName !== dbName) {
+          res.metaChange = { from: meta.semo.displayName ?? null, to: dbName };
+          res.changed = true;
+          if (opts.apply) {
+            meta.semo.displayName = dbName;
+            const mtmp = metaPath + '.tmp-render';
+            fs.writeFileSync(mtmp, JSON.stringify(meta, null, 2) + '\n');
+            fs.renameSync(mtmp, metaPath);
+          }
+        }
+      } catch {
+        /* meta 파싱 실패 — skip */
+      }
+    }
+  }
+  return res;
+}
+
+// render/set 대상 봇 목록: 로컬 ~/.openclaw-* 프로필 ∩ DB bot_status (내부 봇).
+function listRenderableBotIds(): string[] {
+  try {
+    return fs
+      .readdirSync(os.homedir())
+      .filter((d) => d.startsWith('.openclaw-') && !d.includes('shared'))
+      .map((d) => d.replace(/^\.openclaw-/, ''));
+  } catch {
+    return [];
+  }
+}
+
 export function registerBotsCommands(program: Command): void {
-  const botsCmd = program.command('bots').description('봇 상태 조회 및 관리 (semo.bot_status)');
+  const botsCmd = program
+    .command('bots')
+    .description(`봇 상태 조회 및 관리 (${DB_SCHEMA}.bot_status)`);
 
   // Agent Factory (create / delete / show) — SemoBot 진입점
   registerBotsFactoryCommands(botsCmd);
   registerInboxPumpCommand(botsCmd);
   registerBotsServiceCommand(botsCmd);
+
+  // ── semo bots clean-cache (DB-driven 전환 P0) ──────────────────────
+  botsCmd
+    .command('clean-cache')
+    .description(
+      '봇 OpenClaw 프로필의 재생성 가능 캐시 정리 (dry-run 기본; --apply로 실삭제). SoT/시크릿/메모리/mailbox/.openclaw 미러는 절대 미삭제.',
+    )
+    .option('--bot <id>', '특정 봇')
+    .option('--all', '모든 ~/.openclaw-* 봇')
+    .option('--apply', '실제 삭제 (기본은 dry-run)')
+    .action(async (opts: { bot?: string; all?: boolean; apply?: boolean }) => {
+      let bots: string[] = [];
+      if (opts.bot) bots = [opts.bot];
+      else if (opts.all) {
+        try {
+          bots = fs
+            .readdirSync(os.homedir())
+            .filter((d) => d.startsWith('.openclaw-') && !d.includes('shared'))
+            .map((d) => d.replace(/^\.openclaw-/, ''));
+        } catch {
+          /* ignore */
+        }
+      } else {
+        console.error(chalk.red('✗ --bot <id> 또는 --all 필요'));
+        process.exit(1);
+      }
+      let grandTotal = 0;
+      let grandCount = 0;
+      for (const botId of bots) {
+        const targets = classifyBotCacheTargets(botId);
+        if (!targets.length) {
+          console.log(chalk.gray(`  ${botId}: 정리 대상 없음`));
+          continue;
+        }
+        const sum = targets.reduce((a, t) => a + t.bytes, 0);
+        grandTotal += sum;
+        grandCount += targets.length;
+        console.log(
+          chalk.cyan(
+            `\n${botId} — ${targets.length}건, ${humanBytes(sum)} ${opts.apply ? '삭제' : '(dry-run)'}`,
+          ),
+        );
+        const byKind: Record<string, { n: number; b: number }> = {};
+        for (const t of targets) {
+          (byKind[t.kind] ??= { n: 0, b: 0 }).n++;
+          byKind[t.kind].b += t.bytes;
+        }
+        for (const [k, v] of Object.entries(byKind)) {
+          console.log(`  ${k}: ${v.n}건 ${humanBytes(v.b)}`);
+        }
+        if (opts.apply) {
+          for (const t of targets) {
+            if (isCacheProtected(t.path)) continue; // 이중 가드
+            try {
+              fs.rmSync(t.path, { recursive: true, force: true });
+            } catch (e) {
+              console.warn(chalk.yellow(`  skip ${t.path}: ${(e as Error).message}`));
+            }
+          }
+        }
+      }
+      console.log(
+        chalk[opts.apply ? 'green' : 'yellow'](
+          `\n총 ${grandCount}건 ${humanBytes(grandTotal)} ${opts.apply ? '삭제 완료' : 'dry-run (--apply 로 실제 삭제)'}`,
+        ),
+      );
+      process.exit(0);
+    });
+
+  // ── semo bots render (DB 식별자 → OpenClaw 프로필, P1/P2) ───────────
+  botsCmd
+    .command('render')
+    .description(
+      'DB(bot_status) 식별자를 OpenClaw 프로필 openclaw.json 에 머지 렌더 (dry-run 기본; --apply). name=DB SoT, avatar 누락분 채움(불일치는 리포트만). secrets/그 외 config 전부 보존.',
+    )
+    .option('--bot <id>', '특정 봇')
+    .option('--all', '로컬 프로필 ∩ DB 내부 봇 전체')
+    .option('--apply', '실제 파일 수정 (기본은 dry-run)')
+    .action(async (opts: { bot?: string; all?: boolean; apply?: boolean }) => {
+      let botIds: string[] = [];
+      if (opts.bot) botIds = [opts.bot];
+      else if (opts.all) botIds = listRenderableBotIds();
+      else {
+        console.error(chalk.red('✗ --bot <id> 또는 --all 필요'));
+        process.exit(1);
+      }
+      const connected = await isDbConnected();
+      if (!connected) {
+        console.log(chalk.red('❌ DB 연결 실패'));
+        await closeConnection();
+        process.exit(1);
+      }
+      try {
+        const pool = getPool();
+        const r = await pool.query<{ bot_id: string; name: string | null; emoji: string | null }>(
+          `SELECT bot_id, name, emoji FROM ${DB_SCHEMA}.bot_status WHERE bot_id = ANY($1)`,
+          [botIds],
+        );
+        const dbMap = new Map(r.rows.map((row) => [row.bot_id, row]));
+        let changes = 0;
+        let drifts = 0;
+        for (const botId of botIds) {
+          const row = dbMap.get(botId);
+          if (!row) {
+            console.log(chalk.gray(`  ${botId}: DB bot_status 없음 — skip`));
+            continue;
+          }
+          const res = renderBotIdentity(botId, row.name, row.emoji, {
+            apply: !!opts.apply,
+          });
+          if (!res.profileExists) {
+            console.log(chalk.gray(`  ${botId}: 로컬 프로필 없음/파싱 실패 — skip`));
+            continue;
+          }
+          const parts: string[] = [];
+          if (res.nameChange)
+            parts.push(
+              `name ${JSON.stringify(res.nameChange.from)} → ${JSON.stringify(res.nameChange.to)}`,
+            );
+          if (res.avatarFill) parts.push(`avatar 채움 → ${res.avatarFill.to}`);
+          if (res.metaChange) parts.push(`meta.displayName → ${res.metaChange.to}`);
+          if (res.changed) changes++;
+          if (parts.length) {
+            console.log(
+              `  ${chalk.cyan(botId)}: ${parts.join(', ')} ${opts.apply ? chalk.green('[적용]') : chalk.yellow('(dry-run)')}`,
+            );
+          } else {
+            console.log(chalk.gray(`  ${botId}: 변경 없음 (이미 동기)`));
+          }
+          if (res.avatarDrift) {
+            drifts++;
+            console.log(
+              chalk.yellow(
+                `     ⚠ avatar 드리프트: 로컬 ${res.avatarDrift.local} ≠ DB ${res.avatarDrift.db} (render 는 변경 안 함; \`semo bots set ${botId} --emoji ...\` 로 확정)`,
+              ),
+            );
+          }
+        }
+        console.log(
+          chalk[opts.apply ? 'green' : 'yellow'](
+            `\n${changes}건 ${opts.apply ? '적용 완료' : 'dry-run (--apply 로 실제 수정)'}${drifts ? ` · 드리프트 ${drifts}건 미해결` : ''}`,
+          ),
+        );
+      } catch (err) {
+        console.log(chalk.red(`❌ 실패: ${err}`));
+        process.exit(1);
+      } finally {
+        await closeConnection();
+      }
+      process.exit(0);
+    });
+
+  // ── semo bots set (DB 식별자 수정 + 자동 재렌더, 단일 편집점) ────────
+  botsCmd
+    .command('set <bot_id>')
+    .description('DB(bot_status) 식별자 수정 후 자동 재렌더. 닉네임/이모지 변경은 이 명령 하나.')
+    .option('--name <name>', '표시 이름(닉네임)')
+    .option('--emoji <emoji>', 'emoji (Slack 숏코드 :x: 또는 유니코드)')
+    .action(async (botId: string, opts: { name?: string; emoji?: string }) => {
+      if (!opts.name && !opts.emoji) {
+        console.error(chalk.red('✗ --name 또는 --emoji 중 하나 이상 필요'));
+        process.exit(1);
+      }
+      const connected = await isDbConnected();
+      if (!connected) {
+        console.log(chalk.red('❌ DB 연결 실패'));
+        await closeConnection();
+        process.exit(1);
+      }
+      try {
+        const pool = getPool();
+        const client = await pool.connect();
+        // 기존 값 조회 — slack_username/slack_icon_emoji 동기 판단(의도적 분리는 보존).
+        const prev = await client.query<{
+          name: string | null;
+          slack_username: string | null;
+          emoji: string | null;
+          slack_icon_emoji: string | null;
+        }>(
+          `SELECT name, slack_username, emoji, slack_icon_emoji FROM ${DB_SCHEMA}.bot_status WHERE bot_id = $1`,
+          [botId],
+        );
+        if (prev.rowCount === 0) {
+          client.release();
+          console.log(chalk.red(`❌ bot_status 에 ${botId} 없음`));
+          process.exit(1);
+        }
+        const prevName = prev.rows[0].name;
+        const prevSlackU = prev.rows[0].slack_username;
+        const prevEmoji = prev.rows[0].emoji;
+        const prevSlackIcon = prev.rows[0].slack_icon_emoji;
+        const sets: string[] = [];
+        const vals: unknown[] = [botId];
+        if (opts.name) {
+          vals.push(opts.name);
+          sets.push(`name = $${vals.length}`);
+          // slack_username 이 기존 name 과 동기였거나 비어있으면 함께 갱신(Slack 표시명 = 식별자).
+          if (prevSlackU == null || prevSlackU === prevName) {
+            vals.push(opts.name);
+            sets.push(`slack_username = $${vals.length}`);
+          }
+        }
+        if (opts.emoji) {
+          vals.push(opts.emoji);
+          sets.push(`emoji = $${vals.length}`);
+          // slack_icon_emoji 가 기존 emoji 와 동기였거나 비어있으면 함께 갱신(분리된 경우 보존).
+          if (prevSlackIcon == null || prevSlackIcon === prevEmoji) {
+            vals.push(opts.emoji);
+            sets.push(`slack_icon_emoji = $${vals.length}`);
+          }
+        }
+        const up = await client.query(
+          `UPDATE ${DB_SCHEMA}.bot_status SET ${sets.join(', ')}, synced_at = NOW() WHERE bot_id = $1
+           RETURNING name, emoji, slack_username`,
+          vals,
+        );
+        client.release();
+        if (up.rowCount === 0) {
+          console.log(chalk.red(`❌ bot_status 에 ${botId} 없음`));
+          process.exit(1);
+        }
+        const { name, emoji, slack_username } = up.rows[0] as {
+          name: string | null;
+          emoji: string | null;
+          slack_username: string | null;
+        };
+        console.log(
+          chalk.green(
+            `✔ DB 업데이트: ${botId} name=${JSON.stringify(name)} emoji=${JSON.stringify(emoji)} slack_username=${JSON.stringify(slack_username)}`,
+          ),
+        );
+        // 자동 재렌더 (emoji 명시 시 드리프트도 덮어씀). meta.displayName 도 함께 동기.
+        const res = renderBotIdentity(botId, name, emoji, {
+          apply: true,
+          forceAvatar: !!opts.emoji,
+        });
+        if (!res.profileExists) {
+          console.log(chalk.yellow(`  로컬 프로필 없음 — DB 만 갱신됨 (런타임이 DB 읽으면 충분)`));
+        } else if (res.changed) {
+          const parts: string[] = [];
+          if (res.nameChange) parts.push(`name → ${res.nameChange.to}`);
+          if (res.avatarFill) parts.push(`avatar → ${res.avatarFill.to}`);
+          if (res.metaChange) parts.push(`meta.displayName → ${res.metaChange.to}`);
+          console.log(chalk.green(`  재렌더 적용: ${parts.join(', ')}`));
+        } else {
+          console.log(chalk.gray(`  로컬 이미 동기 — 재렌더 변경 없음`));
+        }
+      } catch (err) {
+        console.log(chalk.red(`❌ 실패: ${err}`));
+        process.exit(1);
+      } finally {
+        await closeConnection();
+      }
+      process.exit(0);
+    });
+
+  // ── semo bots worker (serve-worker durable 관리, P3 수렴 도구) ─────────
+  // reviewclaw 하드코딩 forever-loop 스크립트를 봇 무관하게 일반화. serve-worker 엔진
+  // (runtime serve)은 advisory lock 으로 봇당 1워커 보장 — 이 명령은 durable 래퍼만 관리.
+  botsCmd
+    .command('worker <bot_id>')
+    .description(
+      'serve-worker(mailbox→dispatch) durable 관리 — start/stop/status. config.serve_worker_enabled 봇의 워커를 봇 무관하게 기동(휘발성 /tmp 스크립트 대체).',
+    )
+    .option('--start', 'durable forever-loop 워커 기동 (detached)')
+    .option('--stop', '워커 정지 (래퍼 + serve 프로세스)')
+    .option(
+      '--max-message-age-ms <n>',
+      'stale-guard 임계값(ms). consumed-marker 가 재처리를 막으므로 이 값은 ancient orphan 드레인 전용 — 실 트래픽 드롭 방지 위해 기본 1h(60min=600000 아님). 0=off',
+      '3600000',
+    )
+    .action(
+      async (
+        botId: string,
+        opts: { start?: boolean; stop?: boolean; maxMessageAgeMs?: string },
+      ) => {
+        const repoRoot = process.cwd();
+        const entry = path.join(repoRoot, 'packages/cli/src/index.ts');
+        const scriptPath = path.join(os.homedir(), '.semo', 'scripts', `${botId}-worker.sh`);
+        const logPath = path.join(os.homedir(), '.semo', 'logs', `${botId}-worker.log`);
+        const matchPat = `runtime serve --bot ${botId}`;
+        const findServe = (): string[] => {
+          try {
+            return execSync(`pgrep -f ${JSON.stringify(matchPat)}`, { encoding: 'utf8' })
+              .trim()
+              .split('\n')
+              .filter(Boolean);
+          } catch {
+            return []; // pgrep no-match → exit 1
+          }
+        };
+
+        // config 조회 (serve_worker_enabled / host_kind)
+        let cfg: Record<string, unknown> = {};
+        if (await isDbConnected()) {
+          try {
+            const r = await getPool().query<{ config: Record<string, unknown> | null }>(
+              `SELECT config FROM ${DB_SCHEMA}.bot_status WHERE bot_id = $1`,
+              [botId],
+            );
+            cfg = r.rows[0]?.config ?? {};
+          } catch {
+            /* ignore */
+          }
+        }
+        const enabled = String(cfg.serve_worker_enabled ?? '') === 'true';
+        const hostKind = (cfg.host_kind as string) ?? 'claude-code';
+
+        if (opts.stop) {
+          const running = findServe();
+          try {
+            execSync(`pkill -f ${JSON.stringify(scriptPath)}`, { stdio: 'ignore' }); // 래퍼 먼저
+          } catch {
+            /* 래퍼 없을 수 있음 */
+          }
+          for (const pid of running) {
+            try {
+              process.kill(Number(pid), 'SIGTERM');
+            } catch {
+              /* ignore */
+            }
+          }
+          console.log(
+            running.length
+              ? chalk.green(`✔ ${botId} 워커 정지 (${running.length} serve proc + 래퍼)`)
+              : chalk.gray(`  ${botId}: 실행 중인 serve 없음 (래퍼만 정리 시도)`),
+          );
+          await closeConnection();
+          process.exit(0);
+        }
+
+        if (opts.start) {
+          if (!enabled) {
+            console.log(
+              chalk.yellow(
+                `⚠ ${botId}: config.serve_worker_enabled != 'true' — DB config 에서 먼저 활성화 필요.`,
+              ),
+            );
+            await closeConnection();
+            process.exit(1);
+          }
+          if (findServe().length) {
+            console.log(
+              chalk.gray(`  ${botId}: 이미 실행 중 (advisory lock 보유) — skip(중복 방지).`),
+            );
+            await closeConnection();
+            process.exit(0);
+          }
+          if (!fs.existsSync(entry)) {
+            console.log(
+              chalk.red(`✗ ${entry} 없음 — repo 루트에서 실행 필요 (현재 cwd=${repoRoot}).`),
+            );
+            await closeConnection();
+            process.exit(1);
+          }
+          const script =
+            [
+              '#!/bin/bash',
+              `cd ${JSON.stringify(repoRoot)}`,
+              'set -a && source ~/.claude/semo/.env && set +a',
+              'while true; do',
+              `  npx tsx packages/cli/src/index.ts runtime serve --bot ${botId} \\`,
+              `    --max-message-age-ms ${Number(opts.maxMessageAgeMs ?? 3600000)} --timeout-ms 120000 --interval-ms 3000`,
+              `  echo "[${botId}-worker $(date +%H:%M:%S)] serve exited, restart in 3s"`,
+              '  sleep 3',
+              'done',
+            ].join('\n') + '\n';
+          fs.mkdirSync(path.dirname(scriptPath), { recursive: true });
+          fs.mkdirSync(path.dirname(logPath), { recursive: true });
+          fs.writeFileSync(scriptPath, script, { mode: 0o755 });
+          const out = fs.openSync(logPath, 'a');
+          const child = spawn('bash', [scriptPath], {
+            detached: true,
+            stdio: ['ignore', out, out],
+          });
+          child.unref();
+          console.log(
+            chalk.green(
+              `✔ ${botId} serve-worker 기동 (host=${hostKind}, pid ${child.pid})\n  script: ${scriptPath}\n  log: ${logPath}`,
+            ),
+          );
+          await closeConnection();
+          process.exit(0);
+        }
+
+        // default: status
+        const running = findServe();
+        console.log(chalk.cyan(`${botId} serve-worker 상태`));
+        console.log(
+          `  config.serve_worker_enabled: ${enabled ? chalk.green('true') : chalk.gray(String(cfg.serve_worker_enabled ?? '(미설정)'))}`,
+        );
+        console.log(`  host_kind: ${hostKind}`);
+        console.log(
+          `  실행 중 serve proc: ${running.length ? chalk.green(running.join(', ')) : chalk.gray('없음')}`,
+        );
+        console.log(
+          `  durable script: ${fs.existsSync(scriptPath) ? scriptPath : chalk.gray('(미생성)')}`,
+        );
+        await closeConnection();
+        process.exit(0);
+      },
+    );
 
   // ── semo bots routing-audit ────────────────────────────────
   // S1 (Codex 권고): hint suggested_bot vs 최종 escalation target 불일치 추출.
@@ -490,7 +1157,7 @@ export function registerBotsCommands(program: Command): void {
              c.pipeline_context->>'thread_ts' AS thread_ts,
              c.title,
              c.created_at::text AS created_at
-           FROM semo.bot_commitments c
+           FROM ${DB_SCHEMA}.bot_commitments c
            WHERE c.pipeline_context->'routing_hint' IS NOT NULL
              AND c.created_at > NOW() - INTERVAL '${intervalSql}'
            ORDER BY c.created_at DESC`,
@@ -613,9 +1280,9 @@ export function registerBotsCommands(program: Command): void {
       if (opts.bot) params.push(opts.bot);
       const r = await pool.query(
         `SELECT kb.domain, kb.key, kb.sub_key, kb.content
-         FROM semo.knowledge_base kb
-         JOIN semo.ontology o ON o.domain = kb.domain
-         JOIN semo.bot_status bs ON bs.bot_id = kb.domain
+         FROM ${DB_SCHEMA}.knowledge_base kb
+         JOIN ${DB_SCHEMA}.ontology o ON o.domain = kb.domain
+         JOIN ${DB_SCHEMA}.bot_status bs ON bs.bot_id = kb.domain
          WHERE o.entity_type = 'agents'
            AND kb.key = ANY($1::text[])
            AND kb.embedding IS NULL
@@ -709,12 +1376,12 @@ export function registerBotsCommands(program: Command): void {
               WHEN agg.last_commit_at IS NULL                      THEN 'none'
               ELSE 'idle'
             END AS derived_status
-          FROM semo.bot_status bs
+          FROM ${DB_SCHEMA}.bot_status bs
           LEFT JOIN (
             SELECT bot_id,
                    MAX(updated_at) AS last_commit_at,
                    COUNT(*) FILTER (WHERE updated_at > NOW() - INTERVAL '24 hours') AS commit_count_24h
-            FROM semo.bot_commitments
+            FROM ${DB_SCHEMA}.bot_commitments
             GROUP BY bot_id
           ) agg ON agg.bot_id = bs.bot_id
         `;
@@ -838,7 +1505,7 @@ export function registerBotsCommands(program: Command): void {
         let query = `
           SELECT bot_id, session_key, label, kind, chat_type,
                  last_activity::text, message_count
-          FROM semo.bot_sessions
+          FROM ${DB_SCHEMA}.bot_sessions
         `;
         const params: (string | number)[] = [];
         let idx = 1;
@@ -888,7 +1555,7 @@ export function registerBotsCommands(program: Command): void {
   // ── semo bots sync ──────────────────────────────────────────
   botsCmd
     .command('sync')
-    .description('bot-workspaces/ 스캔 → semo.bot_status DB upsert + KB identity 동기화')
+    .description(`bot-workspaces/ 스캔 → ${DB_SCHEMA}.bot_status DB upsert + KB identity 동기화`)
     .option('--dry-run', '실제 upsert 없이 미리보기')
     .option('--skip-kb', 'KB identity 동기화 건너뛰기 (raw bot_status 만 갱신)')
     .action(async (options) => {
@@ -940,20 +1607,20 @@ export function registerBotsCommands(program: Command): void {
           try {
             const detectedStatus = 'offline';
             await client.query(
-              `INSERT INTO semo.bot_status
+              `INSERT INTO ${DB_SCHEMA}.bot_status
                  (bot_id, name, emoji, role, status, last_active, workspace_path, synced_at)
                VALUES ($1, $2, $3, $4, $7, $5, $6, NOW())
                ON CONFLICT (bot_id) DO UPDATE SET
-                 name           = COALESCE(EXCLUDED.name, semo.bot_status.name),
-                 emoji          = COALESCE(EXCLUDED.emoji, semo.bot_status.emoji),
-                 role           = COALESCE(EXCLUDED.role, semo.bot_status.role),
+                 name           = COALESCE(EXCLUDED.name, ${DB_SCHEMA}.bot_status.name),
+                 emoji          = COALESCE(EXCLUDED.emoji, ${DB_SCHEMA}.bot_status.emoji),
+                 role           = COALESCE(EXCLUDED.role, ${DB_SCHEMA}.bot_status.role),
                  status         = EXCLUDED.status,
                  last_active    = CASE
                    WHEN EXCLUDED.last_active IS NOT NULL
-                     AND (semo.bot_status.last_active IS NULL
-                          OR EXCLUDED.last_active > semo.bot_status.last_active)
+                     AND (${DB_SCHEMA}.bot_status.last_active IS NULL
+                          OR EXCLUDED.last_active > ${DB_SCHEMA}.bot_status.last_active)
                    THEN EXCLUDED.last_active
-                   ELSE semo.bot_status.last_active
+                   ELSE ${DB_SCHEMA}.bot_status.last_active
                  END,
                  workspace_path = EXCLUDED.workspace_path,
                  synced_at      = NOW()`,
@@ -1351,7 +2018,7 @@ export function registerBotsCommands(program: Command): void {
         let query = `
           SELECT bot_id, job_id, name, schedule, enabled,
                  last_run::text, next_run::text, session_target, synced_at::text
-          FROM semo.bot_cron_jobs
+          FROM ${DB_SCHEMA}.bot_cron_jobs
         `;
         const params: string[] = [];
         if (options.bot) {
@@ -1642,7 +2309,7 @@ export function registerBotsCommands(program: Command): void {
         const pool = getPool();
         const client = await pool.connect();
         await client.query(
-          `INSERT INTO semo.bot_status (bot_id, status, synced_at)
+          `INSERT INTO ${DB_SCHEMA}.bot_status (bot_id, status, synced_at)
            VALUES ($1, $2, NOW())
            ON CONFLICT (bot_id) DO UPDATE SET
              status = EXCLUDED.status,

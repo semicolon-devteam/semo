@@ -1,10 +1,11 @@
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 /**
  * ExecutionTarget 추상화 — 봇이 돌아가는 실행 환경의 공통 인터페이스.
  *
  * 현 구현체는 Claude Code 세션뿐이지만, on-device AI/다른 클라우드 LLM/엣지 등
  * 추가 타깃이 같은 인터페이스로 플러그인되도록 한다.
  *
- * Registry SoT: semo.bot_status.execution_target + target_config.
+ * Registry SoT: ${DB_SCHEMA}.bot_status.execution_target + target_config.
  */
 
 export type TargetKind =

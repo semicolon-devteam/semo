@@ -10,6 +10,7 @@ import { cookies } from 'next/headers';
 import { query } from '@/lib/db';
 import { createClient } from '@/lib/supabase/server';
 import { DEV_AUTH_COOKIE, devAuthCookieValid } from '@/lib/dev-auth';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 /**
  * 팀/dev 뷰어가 자체 테넌트 없을 때 보는 기본 데모 테넌트.
@@ -473,7 +474,7 @@ export async function getNudges(): Promise<NudgeItem[]> {
 
 // ─── KB 그래프(/my/knowledge) 실데이터 ────────────────────────────────
 // "가게 지식" 그래프는 테넌트의 agent_activity 에서 만든다(직원=허브, 활동 target=지식 노드,
-// 엣지=직원→지식). 고객 지식은 SEMO 내부 semo.knowledge_base 와 별개이므로 그쪽 스키마는
+// 엣지=직원→지식). 고객 지식은 SEMO 내부 ${DB_SCHEMA}.knowledge_base 와 별개이므로 그쪽 스키마는
 // 건드리지 않는다(공유 production KB 보호). react-force-graph-2d 가 이 shape 를 그대로 소비.
 
 export interface GraphNode {

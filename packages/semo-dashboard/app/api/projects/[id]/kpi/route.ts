@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProject, getServiceKPIData } from '@/lib/service';
 import { query } from '@/lib/db';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       updated_at: string;
     }>(
       `SELECT sub_key, content, metadata, updated_at::text
-       FROM semo.knowledge_base
+       FROM ${DB_SCHEMA}.knowledge_base
        WHERE domain = $1 AND key = 'incident' AND sub_key != ''
        ORDER BY COALESCE((metadata->>'occurred_at')::timestamptz, updated_at::timestamptz) DESC
        LIMIT $2`,

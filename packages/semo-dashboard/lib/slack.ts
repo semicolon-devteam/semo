@@ -8,6 +8,7 @@ import { query } from './db';
 import { getPhaseAssignee, getPhaseCc, PHASE_LABELS, INFRA_PHASE_LABELS } from './service-phases';
 import { getBotSlackProfiles } from './bot-profiles';
 import type { ServiceQAItem, ServiceInfraRequest } from '@/types';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 const SLACK_BOT_TOKEN = process.env.SLACK_BOT_TOKEN;
 const DASHBOARD_BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://semo.semi-colon.space';
@@ -116,7 +117,7 @@ export async function resolveServiceSlackContext(serviceId: string): Promise<Ser
       // KB fallback (마이그레이션 전 데이터 호환)
       if (!channelId && domain) {
         const kb = await query(
-          `SELECT content FROM semo.knowledge_base WHERE domain = $1 AND key = 'slack-channel' LIMIT 1`,
+          `SELECT content FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1 AND key = 'slack-channel' LIMIT 1`,
           [domain],
         );
         if (kb.rows.length > 0) {

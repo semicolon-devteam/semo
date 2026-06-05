@@ -20,6 +20,7 @@
 
 import { createHash } from 'node:crypto';
 import type { EscalationQueryable } from './commitment-pattern.js';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export type CommitmentEventType =
   | 'commitment_created'
@@ -100,7 +101,7 @@ export async function appendCommitmentEvent(
 ): Promise<boolean> {
   const key = deriveIdempotencyKey(input);
   const result = await queryable.query(
-    `INSERT INTO semo.commitment_events
+    `INSERT INTO ${DB_SCHEMA}.commitment_events
        (commitment_id, event_type, payload, occurred_at, bot_id,
         source_type, runtime_source, idempotency_key)
      VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, $8)
@@ -140,7 +141,7 @@ export async function projectCommitmentFromEvents(
 ): Promise<ProjectedCommitmentState> {
   const result = await queryable.query(
     `SELECT event_type, payload, occurred_at
-     FROM semo.commitment_events
+     FROM ${DB_SCHEMA}.commitment_events
      WHERE commitment_id = $1
      ORDER BY occurred_at ASC, event_id ASC`,
     [commitmentId],

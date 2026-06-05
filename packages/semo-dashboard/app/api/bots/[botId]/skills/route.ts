@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import type { BotSkill } from '@/types';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 interface SkillRow {
   name: string;
@@ -10,10 +11,7 @@ interface SkillRow {
   updated_at: string | null;
 }
 
-export async function GET(
-  _req: Request,
-  { params }: { params: Promise<{ botId: string }> }
-) {
+export async function GET(_req: Request, { params }: { params: Promise<{ botId: string }> }) {
   try {
     const { botId } = await params;
 
@@ -25,17 +23,17 @@ export async function GET(
     const wsSkills = new Map<string, { hasReferences: boolean }>();
     try {
       const wsResult = await query<{ file_path: string }>(
-        `SELECT file_path FROM semo.bot_workspace_files
+        `SELECT file_path FROM ${DB_SCHEMA}.bot_workspace_files
          WHERE bot_id = $1 AND file_path LIKE 'skills/%'`,
-        [botId]
+        [botId],
       );
       for (const row of wsResult.rows) {
         const parts = row.file_path.split('/');
         if (parts.length >= 3 && parts[2] === 'SKILL.md') {
           const skillName = parts[1];
           if (!wsSkills.has(skillName)) {
-            const hasReferences = wsResult.rows.some(r =>
-              r.file_path.startsWith(`skills/${skillName}/references/`)
+            const hasReferences = wsResult.rows.some((r) =>
+              r.file_path.startsWith(`skills/${skillName}/references/`),
             );
             wsSkills.set(skillName, { hasReferences });
           }
@@ -50,9 +48,9 @@ export async function GET(
     try {
       const result = await query<SkillRow>(
         `SELECT name, is_active, category, package, updated_at
-         FROM semo.skill_definitions
+         FROM ${DB_SCHEMA}.skill_definitions
          WHERE metadata->>'bot_id' = $1 AND office_id IS NULL`,
-        [botId]
+        [botId],
       );
       for (const row of result.rows) {
         // name format: "botId/skillName"

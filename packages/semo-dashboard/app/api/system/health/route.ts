@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // Force dynamic rendering — DB query at runtime.
 export const dynamic = 'force-dynamic';
@@ -15,7 +16,7 @@ export const dynamic = 'force-dynamic';
  *   - bot_status (online/offline)
  *   - bot_commitments runtime_source 분포 (24h)
  *   - bot_cron_jobs last_status / consecutive_failures
- *   - semo.host_signals 의 신선한 (≤5분) 스냅샷 — sidecar daemon 이 push (별 트랙)
+ *   - ${DB_SCHEMA}.host_signals 의 신선한 (≤5분) 스냅샷 — sidecar daemon 이 push (별 트랙)
  *
  * dashboard 자체는 host 파일에 접근 안 함 (OKE Docker pod 격리). host_signals 가
  * 비어있으면 host_signals 필드는 빈 객체로 응답 — v1 동작과 호환.
@@ -63,8 +64,8 @@ const OPENCLAW_DEFAULT = [
 async function loadOpenClawBotIds(): Promise<Set<string>> {
   try {
     const res = await query<{ metadata: { runtime_source?: Record<string, string> } | null }>(
-      `SELECT metadata FROM semo.knowledge_base
-       WHERE domain = 'semo' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '')
+      `SELECT metadata FROM ${DB_SCHEMA}.knowledge_base
+       WHERE domain = 'semicolony' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '')
        LIMIT 1`,
     );
     const map = res.rows[0]?.metadata?.runtime_source ?? {};
@@ -97,7 +98,7 @@ export async function GET() {
     const slackRouterBots = ['semiclaw-overflow', 'incubator', 'cron-poller', 'kb-sidekick'];
 
     const statusRes = await query<{ bot_id: string; status: 'online' | 'offline' }>(
-      `SELECT bot_id, status FROM semo.bot_status`,
+      `SELECT bot_id, status FROM ${DB_SCHEMA}.bot_status`,
     );
     const statusByBot = new Map(statusRes.rows.map((r) => [r.bot_id, r.status]));
 
@@ -109,7 +110,7 @@ export async function GET() {
       `SELECT runtime_source,
               COUNT(*)::text AS total,
               COUNT(*) FILTER (WHERE status = 'failed')::text AS failed
-       FROM semo.bot_commitments
+       FROM ${DB_SCHEMA}.bot_commitments
        WHERE created_at > NOW() - INTERVAL '24 hours'
        GROUP BY runtime_source`,
     );
@@ -166,7 +167,7 @@ export async function GET() {
                 COALESCE(payload, '{}'::jsonb) AS payload,
                 observed_at, recorded_at, expires_at,
                 EXTRACT(EPOCH FROM (NOW() - recorded_at))::text AS age_sec
-         FROM semo.host_signals
+         FROM ${DB_SCHEMA}.host_signals
          WHERE recorded_at > NOW() - INTERVAL '1 hour'
          ORDER BY recorded_at DESC`,
       );

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 import { getFileContent } from '@/lib/github';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ botId: 
 
     const result = await query<BotStatusRow>(
       `SELECT bot_id, name, emoji, role, last_active, session_count, workspace_path, status, synced_at
-       FROM semo.bot_status
+       FROM ${DB_SCHEMA}.bot_status
        WHERE bot_id = $1`,
       [botId],
     );

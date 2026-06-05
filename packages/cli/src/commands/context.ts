@@ -21,6 +21,7 @@ import { KBEntry, generateEmbeddings } from '../kb';
 import { syncSkillsToDB, getBotIds } from './skill-sync';
 import { syncGlobalCache } from '../global-cache';
 import { populateBotMirrors, ensureEnforcementHooks, ensureRulesSymlink } from '../semo-workspace';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ============================================================
 // Memory file mapping
@@ -70,7 +71,7 @@ function ensureMemoryDir(resolvedDir: string): string {
  */
 export async function getCronJobStats(pool: Pool): Promise<{ bots: number; jobs: number }> {
   const result = await pool.query(
-    `SELECT COUNT(DISTINCT bot_id)::int AS bots, COUNT(*)::int AS jobs FROM semo.bot_cron_jobs`,
+    `SELECT COUNT(DISTINCT bot_id)::int AS bots, COUNT(*)::int AS jobs FROM ${DB_SCHEMA}.bot_cron_jobs`,
   );
   const row = result.rows[0] as { bots: number; jobs: number };
   return { bots: row.bots, jobs: row.jobs };
@@ -343,7 +344,7 @@ export function registerContextCommands(program: Command): void {
   // ── semo context push ──────────────────────────────────────
   ctxCmd
     .command('push')
-    .description('.claude/memory/<domain>.md → Core DB (semo.knowledge_base)')
+    .description(`.claude/memory/<domain>.md → Core DB (${DB_SCHEMA}.knowledge_base)`)
     .option('--domain <name>', 'push할 도메인 (쉼표 구분 가능, 기본: decision)', 'decision')
     .option('--dry-run', '실제 push 없이 변경사항만 미리보기')
     .option(
@@ -409,7 +410,7 @@ export function registerContextCommands(program: Command): void {
 
       try {
         // Domain validation: check all domains against ontology
-        const ontologyResult = await client.query('SELECT domain FROM semo.ontology');
+        const ontologyResult = await client.query(`SELECT domain FROM ${DB_SCHEMA}.ontology`);
         const knownDomains = new Set(ontologyResult.rows.map((r: { domain: string }) => r.domain));
 
         const validEntries: KBEntry[] = [];
@@ -444,12 +445,12 @@ export function registerContextCommands(program: Command): void {
             const embeddingStr = embedding ? `[${embedding.join(',')}]` : null;
 
             await client.query(
-              `INSERT INTO semo.knowledge_base (domain, key, content, metadata, created_by, embedding)
+              `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, content, metadata, created_by, embedding)
                VALUES ($1, $2, $3, $4, $5, $6::vector)
                ON CONFLICT (domain, key) DO UPDATE SET
                  content = EXCLUDED.content,
                  metadata = EXCLUDED.metadata,
-                 embedding = COALESCE(EXCLUDED.embedding, semo.knowledge_base.embedding)`,
+                 embedding = COALESCE(EXCLUDED.embedding, ${DB_SCHEMA}.knowledge_base.embedding)`,
               [
                 entry.domain,
                 entry.key,

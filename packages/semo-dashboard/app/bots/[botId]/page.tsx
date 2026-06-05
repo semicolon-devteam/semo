@@ -11,6 +11,7 @@ import BotNav from '@/components/BotNav';
 import FilesTab from '@/components/files/FilesTab';
 import SkillsTab from '@/components/skills/SkillsTab';
 import AuditChecklist from '@/components/AuditChecklist';
+import CommitmentQueue from '@/components/agents/CommitmentQueue';
 import type { Session, CronJob, BotAudit, BotSkill } from '@/types';
 
 interface BotInfo {
@@ -33,7 +34,7 @@ interface KBItem {
   updated_at?: string;
 }
 
-type Tab = 'files' | 'skills' | 'sessions' | 'cron' | 'kb' | 'audit';
+type Tab = 'queue' | 'files' | 'skills' | 'sessions' | 'cron' | 'kb' | 'audit';
 
 const DOMAIN_ICONS: Record<string, string> = {
   team: '\u{1F465}',
@@ -58,7 +59,7 @@ export default function BotDetailPage() {
   const [kbItems, setKbItems] = useState<KBItem[]>([]);
   const [skills, setSkills] = useState<BotSkill[]>([]);
   const [audit, setAudit] = useState<BotAudit | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('files');
+  const [activeTab, setActiveTab] = useState<Tab>('queue');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -226,6 +227,7 @@ export default function BotDetailPage() {
       <div className="mt-6 border-b border-gray-200 dark:border-gray-700">
         <nav className="flex gap-6">
           {[
+            { key: 'queue' as Tab, label: '작업 큐' },
             { key: 'files' as Tab, label: '파일' },
             { key: 'skills' as Tab, label: `스킬 (${skills.length})` },
             { key: 'sessions' as Tab, label: `세션 (${sessions.length})` },
@@ -250,6 +252,8 @@ export default function BotDetailPage() {
 
       {/* Tab Content */}
       <div className="mt-6">
+        {activeTab === 'queue' && <CommitmentQueue botId={botId} />}
+
         {activeTab === 'files' && <FilesTab botId={botId} />}
 
         {activeTab === 'skills' && <SkillsTab botId={botId} />}

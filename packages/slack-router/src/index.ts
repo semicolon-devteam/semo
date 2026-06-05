@@ -46,6 +46,8 @@ import {
   type OutboxMessage,
 } from '@team-semicolon/semo-common';
 import { applySlackRouterPolicy, shouldHandleSemoBotNlp } from './router-policy.js';
+import { resolveReplyRelay } from './reply-relay.js';
+import { parseRouteResponse, type ParsedRoute } from './route-parse.js';
 import { buildConversationContextBlock } from './conversation-context.js';
 import {
   listActivePersonas,
@@ -57,6 +59,30 @@ import {
 } from './operator-persona.js';
 import { parseApplyCodeTask, buildOperatorCodeGuide } from './operator-code-task.js';
 import { dispatchCodeTask, createDefaultDeps } from './operator-code-dispatch.js';
+import {
+  buildInternalRoster,
+  buildRosterContextBlock,
+  parseBotIdsDisplayMeta,
+  isRoutable,
+  stripRouteSystemLines,
+  FALLBACK_ROSTER,
+  type ResolvedRoster,
+  type BotDisplayMeta,
+} from './semi-roster.js';
+import { MailboxSupervisor } from './mailbox-supervisor.js';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
+
+// Semi roster 데이터화 (계획: ~/.claude/plans/a-fluffy-grove.md). 단계적 롤아웃 flag.
+// SEMI_ROSTER_INJECTION: Semi 프롬프트에 internal roster 주입 on/off (기본 on, canary).
+// SEMI_ROUTE_VALIDATION: 'off' | 'log-only'(기본) | 'enforce'. enforce 시 roster 밖 ROUTE 차단.
+const SEMI_ROSTER_INJECTION =
+  process.env.SEMI_ROSTER_INJECTION !== '0' && process.env.SEMI_ROSTER_INJECTION !== 'false';
+const SEMI_ROUTE_VALIDATION = (process.env.SEMI_ROUTE_VALIDATION || 'log-only').toLowerCase(); // off|log-only|enforce
+let SEMI_INTERNAL_ROSTER: ResolvedRoster = {
+  entries: FALLBACK_ROSTER,
+  audience: 'internal',
+  source: 'internal-openclaw',
+};
 
 // Cmux ancestry guard — daemon(launchd/nohup) 화 감지 시 즉시 종료.
 // 배경: cmux nudge 는 cmux pane 자손 프로세스만 허용하므로 daemon 화되면 침묵 실패.
@@ -96,12 +122,36 @@ const COLONY_BOT_ID = process.env.COLONY_BOT_ID || 'colony';
 // 비어 있으면 operator 비활성(보안 기본값). 도구 없는 대화형 — APPLY_PERSONA 블록을 라우터가 적용.
 const OPERATOR_BOT_ID = process.env.OPERATOR_BOT_ID || 'operator';
 const OPERATOR_HERMES_PROFILE = process.env.OPERATOR_HERMES_PROFILE || 'semo-operator';
-const OPERATOR_ADMIN_CHANNEL = process.env.OPERATOR_ADMIN_CHANNEL || '';
+// OPERATOR_ADMIN_CHANNEL 은 콤마구분 다채널 지원(단일값도 호환). 빈값=operator 비활성.
+const OPERATOR_ADMIN_CHANNELS: Set<string> = new Set(
+  (process.env.OPERATOR_ADMIN_CHANNEL || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
+const OPERATOR_ADMIN_CHANNEL = [...OPERATOR_ADMIN_CHANNELS][0] || ''; // primary(하위호환)
+function isOperatorChannel(ch: string): boolean {
+  return OPERATOR_ADMIN_CHANNELS.has(ch);
+}
 // operator 코드-변경 위임 — auto-merge 가능한 PR 을 만드므로 명시적 opt-in(기본 off).
 // 설계: docs/superpowers/specs/2026-06-03-operator-code-change-capability-design.md
 const OPERATOR_CODE_ENABLED = process.env.OPERATOR_CODE_ENABLED === '1';
 const OPERATOR_CODE_BASE_BRANCH = process.env.OPERATOR_CODE_BASE_BRANCH || 'dev';
 const OPERATOR_CODE_REPO_ROOT = process.env.OPERATOR_CODE_REPO_ROOT || process.cwd();
+
+// 고객 동적 위임 (P3) — feature-flagged additive. off 면 기존 internal ROUTE 동작 불변.
+// 채널이 테넌트에 매핑되면 internal 봇 대신 customer 에이전트(agent_installs→bot_status 프로젝션)로 위임.
+const SEMI_CUSTOMER_DELEGATION = process.env.SEMI_CUSTOMER_DELEGATION === '1';
+// 채널→테넌트 매핑: JSON {"<channelId>":"<tenantSlug>"}. tenant_channels 적재 전 임시 override.
+const SEMI_CUSTOMER_CHANNELS: Record<string, string> = (() => {
+  try {
+    return JSON.parse(process.env.SEMI_CUSTOMER_CHANNELS || '{}');
+  } catch {
+    return {};
+  }
+})();
+// 고객 에이전트 결과를 원 스레드에 전달할 오케스트레이터(Slack 앱 보유). 기본 Semi.
+const CUSTOMER_RELAY_BOT_ID = process.env.SEMI_CUSTOMER_RELAY_BOT_ID || SEMI_BOT_ID;
 const COLONY_CONTEXT_MEMORY_ENABLED =
   process.env.COLONY_CONTEXT_MEMORY_ENABLED !== '0' &&
   process.env.COLONY_CONTEXT_MEMORY_ENABLED !== 'false';
@@ -128,6 +178,29 @@ const slack = new SlackGateway(SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SEMO_PRIMARY_BO
 const inboundSlacks: SlackGateway[] = [slack];
 const inboxWriter = new InboxWriter(MAILBOX_DIR);
 const busyDetector = new BusyDetector(MAILBOX_DIR);
+
+// mailbox-supervisor — opt-in 봇(config.serve_worker_enabled) inbox 도착 시 serve 워커 spawn(콜드스타트).
+// 라이브 OpenClaw 7봇은 플래그 없음 → 미관리(socket-mode 유지). 부팅 시 SERVE_WORKER_BOTS 로드.
+const mailboxSupervisor = new MailboxSupervisor({ cwd: process.cwd(), env: process.env });
+let SERVE_WORKER_BOTS: Set<string> = new Set();
+async function loadServeWorkerBots(): Promise<void> {
+  try {
+    const r = await pool.query<{ bot_id: string }>(
+      `SELECT bot_id FROM ${DB_SCHEMA}.bot_status WHERE (config->>'serve_worker_enabled') = 'true'`,
+    );
+    SERVE_WORKER_BOTS = new Set(r.rows.map((x) => x.bot_id));
+    console.log(`[supervisor] serve-worker bots=[${[...SERVE_WORKER_BOTS].join(',')}]`);
+  } catch (err) {
+    console.warn('[supervisor] serve-worker bots load failed:', (err as Error).message);
+  }
+}
+/** opt-in 봇이면 워커 보장(콜드스타트). 그 외(라이브 socket 봇)는 no-op. */
+function maybeSuperviseWorker(botId: string): void {
+  if (SERVE_WORKER_BOTS.has(botId)) {
+    const r = mailboxSupervisor.ensureWorker(botId);
+    if (r === 'spawned') console.log(`[supervisor] ensureWorker(${botId}) → spawned`);
+  }
+}
 
 function appTokenEnvKeyFor(botId: string): string {
   return `${botId.replace(/-/g, '_').toUpperCase()}_SLACK_APP_TOKEN`;
@@ -346,7 +419,7 @@ async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
   const targetStatus = isFailed ? 'failed' : 'done';
   try {
     const result = await pool.query<{ id: string; bot_id: string; title: string }>(
-      `UPDATE semo.bot_commitments
+      `UPDATE ${DB_SCHEMA}.bot_commitments
        SET status = $3,
            metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object(
              'completed_at', NOW()::text,
@@ -354,7 +427,7 @@ async function handleReplyPosted(msg: OutboxMessage): Promise<void> {
              'closed_by', 'slack-router-outbox-reply'
            )
        WHERE id = (
-         SELECT id FROM semo.bot_commitments
+         SELECT id FROM ${DB_SCHEMA}.bot_commitments
          WHERE bot_id = $1
            AND source_type = 'slack-inbox'
            AND source_ref = $2
@@ -432,35 +505,43 @@ const REPLY_WRAP_PERSONA = process.env.SEMO_REPLY_WRAP_PERSONA === '1';
 async function maybeWrapReplyPersona(
   msg: OutboxMessage,
 ): Promise<{ botId: string; text: string } | null> {
-  if (!REPLY_WRAP_PERSONA) return null;
+  // 봇 유형 특별처리 없이 "자체 Slack 토큰 보유" 단일 기준. 토큰 없는 봇(고객/serve-worker
+  // 전환 봇)은 항상 relay 필요. 토큰 있고 persona-wrap 옵트인도 아니면 relay/wrap 불필요.
+  const hasOwnToken = listBotsWithDedicatedToken().includes(msg.bot_id);
+  if (hasOwnToken && !REPLY_WRAP_PERSONA) return null;
   // commitment_id 가 outbox payload 에 없을 수 있으므로 channel/thread+bot_id 기반 lookup.
+  let pipelineContext: {
+    relay_as?: string;
+    routed_from?: string;
+    agent_display_name?: string;
+  } | null = null;
   try {
     const result = await pool.query<{ pipeline_context: string | null }>(
       `SELECT pipeline_context::text AS pipeline_context
-         FROM semo.bot_commitments
+         FROM ${DB_SCHEMA}.bot_commitments
         WHERE bot_id = $1
-          AND source_type = 'slack-inbox'
-          AND runtime_source = 'hermes-orchestrator'
           AND source_ref = $2
+          AND source_type IN ('slack-inbox', 'customer-delegation')
         ORDER BY created_at DESC
         LIMIT 1`,
       [msg.bot_id, `${msg.channel_id}:${msg.thread_id || ''}`],
     );
-    const row = result.rows[0];
-    if (!row?.pipeline_context) return null;
-    let ctx: { routed_from?: string };
-    try {
-      ctx = JSON.parse(row.pipeline_context);
-    } catch {
-      return null;
+    if (result.rows[0]?.pipeline_context) {
+      try {
+        pipelineContext = JSON.parse(result.rows[0].pipeline_context);
+      } catch {
+        /* keep null */
+      }
     }
-    if (!ctx.routed_from) return null;
-    const wrapped = `${msg.text}\n\n— ${ctx.routed_from} (executed by \`@${msg.bot_id}\`)`;
-    return { botId: ctx.routed_from, text: wrapped };
   } catch (err) {
     console.warn(`[outbox-wrap] commitment lookup failed: ${(err as Error).message}`);
-    return null;
+    // 고객 에이전트는 commitment 없어도 relay 되어야 하므로 계속 진행(pipelineContext=null).
   }
+  return resolveReplyRelay(msg, pipelineContext, {
+    relayBotId: CUSTOMER_RELAY_BOT_ID,
+    hasOwnSlackToken: hasOwnToken,
+    replyWrapPersona: REPLY_WRAP_PERSONA,
+  });
 }
 
 const outboxReader = new OutboxReader({
@@ -510,8 +591,8 @@ async function loadOpenClawBots(): Promise<{
   }
   try {
     const res = await pool.query(
-      `SELECT metadata FROM semo.knowledge_base
-       WHERE domain = 'semo' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '')
+      `SELECT metadata FROM ${DB_SCHEMA}.knowledge_base
+       WHERE domain = 'semicolony' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '')
        LIMIT 1`,
     );
     const meta = res.rows[0]?.metadata as
@@ -577,7 +658,7 @@ let incubatorChannels = new Set<string>();
 async function loadIncubatorChannels(): Promise<void> {
   try {
     const result = await pool.query(
-      `SELECT channel FROM semo.incubator_sessions WHERE status = 'active' AND channel IS NOT NULL AND channel != ''`,
+      `SELECT channel FROM ${DB_SCHEMA}.incubator_sessions WHERE status = 'active' AND channel IS NOT NULL AND channel != ''`,
     );
     incubatorChannels = new Set(result.rows.map((r: { channel: string }) => r.channel));
     console.log(`[router] Incubator channel filter: ${incubatorChannels.size} channels excluded`);
@@ -600,7 +681,7 @@ setInterval(() => loadIncubatorChannels().catch(() => {}), 5 * 60_000);
 async function reapStale(): Promise<void> {
   try {
     const commitRes = await pool.query<{ id: string; bot_id: string; title: string }>(
-      `UPDATE semo.bot_commitments
+      `UPDATE ${DB_SCHEMA}.bot_commitments
        SET status = 'failed',
            metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('fail_reason', 'stale_auto', 'reaped_at', NOW())
        WHERE status IN ('pending', 'active')
@@ -631,7 +712,7 @@ async function reapStale(): Promise<void> {
     }
 
     const sessRes = await pool.query(
-      `UPDATE semo.bot_sessions
+      `UPDATE ${DB_SCHEMA}.bot_sessions
        SET status = 'terminated', ended_at = NOW()
        WHERE status = 'active'
          AND COALESCE(ended_at, started_at) < NOW() - INTERVAL '24 hours'
@@ -679,7 +760,7 @@ async function scanAndPostEscalationAlerts(): Promise<void> {
       state: 'notified' | 'paged';
     }>(
       `SELECT pattern_id, state
-       FROM semo.commitment_pattern_health
+       FROM ${DB_SCHEMA}.commitment_pattern_health
        WHERE (state = 'notified' AND notified_at IS NULL)
           OR (state = 'paged' AND paged_at IS NULL)
        ORDER BY last_failure_at DESC
@@ -755,7 +836,7 @@ async function checkPollerHeartbeat(): Promise<void> {
     // 2026-05-06: cron-poller-tick 잡이 disabled 면 watchdog 자체를 skip.
     // OpenClaw 공존 운영 시 Architecture B cron-poller 는 deprecated 가능 — 이 분기로 noise 차단.
     const jobRes = await pool.query(
-      `SELECT enabled, last_run FROM semo.bot_cron_jobs
+      `SELECT enabled, last_run FROM ${DB_SCHEMA}.bot_cron_jobs
         WHERE bot_id = 'semiclaw' AND job_id = 'cron-poller-tick'`,
     );
     if (!jobRes.rows.length) return;
@@ -845,7 +926,7 @@ async function composeSemoBotStatus(): Promise<string> {
 
   try {
     const stateRes = await pool.query<{ state: string; n: string }>(
-      `SELECT state, COUNT(*)::text AS n FROM semo.commitment_pattern_health GROUP BY state`,
+      `SELECT state, COUNT(*)::text AS n FROM ${DB_SCHEMA}.commitment_pattern_health GROUP BY state`,
     );
     const counts = Object.fromEntries(stateRes.rows.map((r) => [r.state, r.n]));
     lines.push(
@@ -859,7 +940,7 @@ async function composeSemoBotStatus(): Promise<string> {
            WHERE enabled = true
              AND (last_run IS NULL OR last_run < NOW() - INTERVAL '1 day')
          )::text AS stale_count
-       FROM semo.bot_cron_jobs`,
+       FROM ${DB_SCHEMA}.bot_cron_jobs`,
     );
     const cron = cronRes.rows[0];
     lines.push(`• bot_cron_jobs: enabled=${cron.enabled_count}, stale_24h=${cron.stale_count}`);
@@ -869,7 +950,7 @@ async function composeSemoBotStatus(): Promise<string> {
          COUNT(*) FILTER (WHERE status IN ('pending', 'active'))::text AS active,
          COUNT(*) FILTER (WHERE status = 'done' AND completed_at >= NOW() - INTERVAL '24 hours')::text AS done24h,
          COUNT(*) FILTER (WHERE status = 'failed' AND completed_at >= NOW() - INTERVAL '24 hours')::text AS failed24h
-       FROM semo.bot_commitments`,
+       FROM ${DB_SCHEMA}.bot_commitments`,
     );
     const cmt = commitRes.rows[0];
     lines.push(
@@ -906,8 +987,8 @@ async function composeSemoBotIncident(slug: string | null): Promise<string> {
         updated_at: Date;
       }>(
         `SELECT sub_key, content, metadata, updated_at
-         FROM semo.knowledge_base
-         WHERE domain = 'semo' AND key = 'incident' AND sub_key = $1`,
+         FROM ${DB_SCHEMA}.knowledge_base
+         WHERE domain = 'semicolony' AND key = 'incident' AND sub_key = $1`,
         [slug],
       );
       if (rows.length === 0) {
@@ -944,8 +1025,8 @@ async function composeSemoBotIncident(slug: string | null): Promise<string> {
          metadata->>'status' AS status,
          metadata->>'severity' AS severity,
          metadata->>'occurred_at' AS occurred_at
-       FROM semo.knowledge_base
-       WHERE domain = 'semo' AND key = 'incident'
+       FROM ${DB_SCHEMA}.knowledge_base
+       WHERE domain = 'semicolony' AND key = 'incident'
          AND COALESCE(metadata->>'status', 'open') NOT IN ('resolved', 'postmortem', 'closed')
        ORDER BY metadata->>'occurred_at' DESC NULLS LAST
        LIMIT 10`,
@@ -1152,7 +1233,7 @@ interface OrchestratorConfig {
   // ROUTE 가 없을 때 ACTION 라인을 파싱·실행할지 여부. Semi=true, Colony=false(순수 관찰자).
   canManageAgents?: boolean;
   // 2026-06-02 operator: base persona(SOUL) SoT 편집자. 현재 persona 를 프롬프트에 주입하고,
-  // 응답의 APPLY_PERSONA 블록을 라우터가 DB(semo.agent_personas)에 적용한다. 도구 없음.
+  // 응답의 APPLY_PERSONA 블록을 라우터가 DB(${DB_SCHEMA}.agent_personas)에 적용한다. 도구 없음.
   personaAdmin?: boolean;
   timeoutMs: number;
 }
@@ -1179,8 +1260,8 @@ if (SEMO_PRIMARY_BOT_ID === SEMI_BOT_ID) {
     canManageAgents: false,
     timeoutMs: SEMI_HERMES_TIMEOUT_MS,
   };
-  // Operator — 관리 채널이 설정된 경우에만 활성. base persona(SOUL) SoT 편집 전용.
-  if (OPERATOR_ADMIN_CHANNEL) {
+  // Operator — 관리 채널이 1개 이상 설정된 경우에만 활성. base persona(SOUL) SoT 편집 전용.
+  if (OPERATOR_ADMIN_CHANNELS.size > 0) {
     ORCHESTRATORS[OPERATOR_BOT_ID] = {
       botId: OPERATOR_BOT_ID,
       hermesHome: SEMI_HERMES_HOME,
@@ -1241,12 +1322,7 @@ function refreshOperatorMentionGuide(): void {
   }
 }
 
-interface ParsedRoute {
-  kind: 'route';
-  bot: string | null;
-  reason: string | null;
-  handoff: string | null;
-}
+// ParsedRoute/RouteTarget/parseRouteResponse 는 ./route-parse.js (순수·테스트 가능)
 
 interface ParsedAction {
   kind: 'action';
@@ -1254,41 +1330,6 @@ interface ParsedAction {
   target: string | null;
   reason: string | null;
   handoff: string | null;
-}
-
-function parseRouteResponse(text: string): ParsedRoute {
-  const lines = text.split(/\r?\n/);
-  let bot: string | null = null;
-  let reason: string | null = null;
-  const handoffLines: string[] = [];
-  let handoffStarted = false;
-  for (const line of lines) {
-    const m = line.match(/^\s*(ROUTE|REASON|HANDOFF)\s*:\s*(.*)$/i);
-    if (!m) {
-      if (handoffStarted) handoffLines.push(line);
-      continue;
-    }
-    const tag = m[1].toUpperCase();
-    const value = m[2].trim();
-    if (tag === 'ROUTE') {
-      bot =
-        value
-          .replace(/[`@*<>]/g, '')
-          .split(/\s+/)[0]
-          ?.toLowerCase() || null;
-    } else if (tag === 'REASON') {
-      reason = value;
-    } else if (tag === 'HANDOFF') {
-      handoffStarted = true;
-      if (value) handoffLines.push(value);
-    }
-  }
-  return {
-    kind: 'route',
-    bot,
-    reason,
-    handoff: handoffLines.length > 0 ? handoffLines.join('\n').trim() : null,
-  };
 }
 
 function parseActionResponse(text: string): ParsedAction {
@@ -1346,7 +1387,7 @@ async function dispatchToInbox(args: {
   const speakerId = msg.user;
   try {
     await pool.query(
-      `INSERT INTO semo.bot_commitments
+      `INSERT INTO ${DB_SCHEMA}.bot_commitments
          (id, bot_id, status, title, source_type, source_ref,
           session_owner, assigned_session, pipeline_context, runtime_source)
        VALUES ($1, $2, 'active', $3, 'slack-inbox', $4, $5, $6, $7, 'hermes-orchestrator')
@@ -1386,6 +1427,7 @@ async function dispatchToInbox(args: {
       text: handoff,
       route_reason: `${fromBot}-orchestrator-dispatch`,
     });
+    maybeSuperviseWorker(toBot); // 콜드스타트: opt-in 봇이면 serve 워커 spawn
   } catch (err) {
     const e = err as Error;
     console.error(`[${fromBot}] inbox.write(${toBot}) failed:`, e.message);
@@ -1393,7 +1435,7 @@ async function dispatchToInbox(args: {
     // 안 하면 active 인 채 남아 24h 후 stale_auto 로만 reap → 그동안 다음 dispatch 가 막힘.
     try {
       await pool.query(
-        `UPDATE semo.bot_commitments
+        `UPDATE ${DB_SCHEMA}.bot_commitments
            SET status = 'failed',
                metadata = COALESCE(metadata, '{}'::jsonb)
                  || jsonb_build_object('fail_reason', 'inbox_write_failed', 'failed_at', NOW())
@@ -1412,6 +1454,123 @@ async function dispatchToInbox(args: {
 // 에이전트 관리 ACTION 후속 자동 실행 (2026-05-29 역할 재편 — Semi 가 수행).
 // - SEARCH_LIBRARY: semo kb search 결과를 Slack thread 에 게시
 // - CREATE:        semo bots create 실행 후 stdout/stderr 를 thread 에 게시
+/** 채널 → 테넌트 slug 해소. env override(SEMI_CUSTOMER_CHANNELS) 우선, 다음 public.tenant_channels. */
+async function resolveTenantForChannel(channelId: string): Promise<string | null> {
+  if (SEMI_CUSTOMER_CHANNELS[channelId]) return SEMI_CUSTOMER_CHANNELS[channelId];
+  try {
+    const r = await pool.query<{ slug: string }>(
+      `SELECT t.slug FROM public.tenant_channels tc JOIN public.tenants t ON t.id = tc.tenant_id
+       WHERE tc.external_workspace_id = $1 AND tc.status = 'active' LIMIT 1`,
+      [channelId],
+    );
+    return r.rows[0]?.slug ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** 요청 텍스트에서 매칭용 키워드 추출 (한/영 단어, 2자+, 상위 N). */
+function extractKeywords(text: string, max = 8): string[] {
+  const words = (text || '')
+    .toLowerCase()
+    .split(/[^a-z0-9가-힣]+/i)
+    .map((w) => w.trim())
+    .filter((w) => w.length >= 2);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const w of words) {
+    if (!seen.has(w)) {
+      seen.add(w);
+      out.push(w);
+    }
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+interface CustomerDelegationCtx {
+  tenantSlug: string;
+  msg: SlackMessage;
+  senderName: string;
+  handoff: string;
+  reason: string | null;
+  semiText: string;
+  elapsed: string;
+  botId: string;
+  replyThreadTs: string;
+}
+
+/** 고객 위임: `semo customer delegate` 호출 → 결과에 따라 Slack 응답. 처리하면 true(internal ROUTE 스킵). */
+async function delegateCustomerRequest(ctx: CustomerDelegationCtx): Promise<boolean> {
+  const requestText = ctx.handoff || ctx.msg.text || '';
+  const keywords = extractKeywords(`${ctx.msg.text || ''} ${ctx.reason || ''}`);
+  if (!keywords.length) return false;
+  try {
+    const { stdout } = await execFileP(
+      'semo',
+      [
+        'customer',
+        'delegate',
+        '--tenant',
+        ctx.tenantSlug,
+        '--keywords',
+        keywords.join(','),
+        '--text',
+        requestText.slice(0, 2000),
+        '--channel',
+        ctx.msg.channel,
+        '--thread',
+        ctx.replyThreadTs,
+        '--sender',
+        ctx.senderName,
+        '--relay-as',
+        CUSTOMER_RELAY_BOT_ID,
+      ],
+      { timeout: 60_000, env: process.env, maxBuffer: 8 * 1024 * 1024 },
+    );
+    const jsonStart = stdout.indexOf('{');
+    const result = jsonStart >= 0 ? JSON.parse(stdout.slice(jsonStart)) : null;
+    if (!result || result.status === 'no-agent') {
+      await slack.postAsBot(
+        ctx.botId,
+        ctx.msg.channel,
+        `${ctx.semiText}\n\n:information_source: 이 요청에 맞는 직원을 아직 못 찾았어요. 새 직원을 만들어 처리하도록 준비할게요.\n\n— ${ctx.botId} (${ctx.elapsed}s)`,
+        ctx.replyThreadTs,
+      );
+      return true;
+    }
+    const agentName = result.agent?.displayName || result.agent?.botId || '직원';
+    // 콜드스타트: 위임된 customer 에이전트 워커 spawn (없으면) → 실행 → outbox → 스레드 전달.
+    if (result.agent?.botId) {
+      const sp = mailboxSupervisor.ensureWorker(result.agent.botId);
+      if (sp === 'spawned')
+        console.log(`[supervisor] customer worker ${result.agent.botId} → spawned`);
+    }
+    if (result.status === 'busy') {
+      await slack.postAsBot(
+        ctx.botId,
+        ctx.msg.channel,
+        `${ctx.semiText}\n\n:hourglass_flowing_sand: \`${agentName}\` 가 이미 "${(result.busyTitle || '').slice(0, 40)}" 처리 중이라, 끝나면 바로 이 요청을 이어서 처리하고 결과를 알려드릴게요.\n\n— ${ctx.botId} (${ctx.elapsed}s, → \`${agentName}\`)`,
+        ctx.replyThreadTs,
+      );
+    } else {
+      await slack.postAsBot(
+        ctx.botId,
+        ctx.msg.channel,
+        `${ctx.semiText}\n\n:white_check_mark: \`${agentName}\` 에게 작업을 맡겼어요 — 끝나면 결과를 이 스레드에 알려드릴게요.\n\n— ${ctx.botId} (${ctx.elapsed}s, → \`${agentName}\`)`,
+        ctx.replyThreadTs,
+      );
+    }
+    console.log(
+      `[${ctx.botId}] customer-delegated tenant=${ctx.tenantSlug} status=${result.status} agent=${result.agent?.botId}`,
+    );
+    return true;
+  } catch (err) {
+    console.warn(`[${ctx.botId}] customer delegation failed:`, (err as Error).message);
+    return false; // 실패 시 internal ROUTE 로 fallthrough
+  }
+}
+
 async function executeAgentAction(
   parsed: ParsedAction,
   msg: SlackMessage,
@@ -1519,7 +1678,7 @@ async function resolveSenderProfile(slackUserId: string): Promise<{
   if (!slackUserId) return { registered: false, contextLines: [] };
   try {
     const r = await pool.query<{ domain: string }>(
-      `SELECT domain FROM semo.knowledge_base
+      `SELECT domain FROM ${DB_SCHEMA}.knowledge_base
         WHERE key = 'slack-id' AND content = $1
         LIMIT 1`,
       [slackUserId],
@@ -1529,7 +1688,7 @@ async function resolveSenderProfile(slackUserId: string): Promise<{
     }
     const domain = r.rows[0].domain;
     const profile = await pool.query<{ key: string; sub_key: string; content: string }>(
-      `SELECT key, sub_key, content FROM semo.knowledge_base
+      `SELECT key, sub_key, content FROM ${DB_SCHEMA}.knowledge_base
         WHERE domain = $1 AND key IN ('nickname','role','memory','identity')
         LIMIT 10`,
       [domain],
@@ -1738,7 +1897,7 @@ async function maybeOnboardSender(args: {
   let domain = `team-${baseSlug}`;
   try {
     const exists = await pool.query<{ domain: string }>(
-      `SELECT domain FROM semo.knowledge_base WHERE domain = $1 LIMIT 1`,
+      `SELECT domain FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1 LIMIT 1`,
       [domain],
     );
     if (exists.rows.length > 0) {
@@ -1754,7 +1913,7 @@ async function maybeOnboardSender(args: {
 
     for (const [key, content] of upserts) {
       await pool.query(
-        `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by, updated_at)
+        `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, created_by, updated_at)
          VALUES ($1, $2, '', $3, $4, NOW())
          ON CONFLICT (domain, key, sub_key)
          DO UPDATE SET content = EXCLUDED.content, updated_at = NOW()`,
@@ -1816,7 +1975,7 @@ async function handleOrchestrator(
 
   // operator(personaAdmin)는 지정 관리 채널 밖에서는 동작하지 않는다 — 전용 앱이 다른 채널에
   // 초대돼 route_bot_id=operator 로 들어와도 방어(채널 게이트는 모든 전달 경로에서 강제).
-  if (cfg.personaAdmin && OPERATOR_ADMIN_CHANNEL && msg.channel !== OPERATOR_ADMIN_CHANNEL) {
+  if (cfg.personaAdmin && OPERATOR_ADMIN_CHANNELS.size > 0 && !isOperatorChannel(msg.channel)) {
     await slack.postAsBot(
       cfg.botId,
       msg.channel,
@@ -1947,6 +2106,18 @@ async function handleOrchestrator(
     }
   }
 
+  // Semi: 라우팅 가능한 internal roster 를 프롬프트에 주입(SOUL.md 하드코딩 대체).
+  // routing 블록엔 internal 만 노출(One Agent Experience). 현재 컨텍스트 = 내부(프로토타입).
+  if (cfg.canManageAgents && SEMI_ROSTER_INJECTION) {
+    const block = buildRosterContextBlock(SEMI_INTERNAL_ROSTER);
+    if (block) {
+      promptWithContext = `${block}\n\n${promptWithContext}`;
+      console.log(
+        `[${cfg.botId}] roster injected(internal, ${SEMI_INTERNAL_ROSTER.entries.length})`,
+      );
+    }
+  }
+
   try {
     const session = await adapter.startSession({ botId: cfg.botId });
     const result = await adapter.dispatch({
@@ -2066,28 +2237,86 @@ async function handleOrchestrator(
     if (cfg.responseKind === 'route') {
       const parsed = parseRouteResponse(text);
 
-      // 1) ROUTE — 전문 작업을 해당 봇 inbox 에 dispatch (commitment INSERT → 완료 시 outbox reply 가 마감).
-      if (parsed.bot && parsed.handoff && parsed.bot !== cfg.botId) {
-        const dispatch = await dispatchToInbox({
-          fromBot: cfg.botId,
-          toBot: parsed.bot,
-          msg,
-          senderName,
-          handoff: parsed.handoff,
-          reason: parsed.reason,
-        });
-        let dispatchInfo = '';
-        if (dispatch.error) {
-          dispatchInfo = `\n:warning: dispatch failed: \`${dispatch.error.slice(0, 100)}\``;
-        } else if (dispatch.commitmentId) {
-          dispatchInfo = `\n:white_check_mark: \`@${parsed.bot}\` 에 작업 위임됨 — 끝나면 결과를 정리해 알려드릴게요. (commitment=\`${dispatch.commitmentId.slice(-8)}\`)`;
+      // 고객 위임 경로 (P3, feature-flagged) — 채널이 테넌트에 매핑되면 internal ROUTE 대신
+      // customer 에이전트로 위임(해소→생성→큐→실행→결과 스레드 전달). flag off 면 동작 불변.
+      if (
+        SEMI_CUSTOMER_DELEGATION &&
+        cfg.canManageAgents &&
+        parsed.handoff &&
+        parsed.bot !== cfg.botId
+      ) {
+        const tenantSlug = await resolveTenantForChannel(msg.channel);
+        if (tenantSlug) {
+          const handled = await delegateCustomerRequest({
+            tenantSlug,
+            msg,
+            senderName,
+            handoff: parsed.handoff,
+            reason: parsed.reason,
+            semiText: stripRouteSystemLines(text) || text,
+            elapsed,
+            botId: cfg.botId,
+            replyThreadTs,
+          });
+          if (handled) return;
         }
-        const footer = `\n\n— ${cfg.botId} (${elapsed}s, → \`@${parsed.bot}\`)${dispatchInfo}`;
-        await slack.postAsBot(cfg.botId, msg.channel, text + footer, replyThreadTs);
-        console.log(
-          `[${cfg.botId}] responded in ${elapsed}s; routed_to=${parsed.bot} dispatch=${dispatchInfo.includes('위임됨') ? 'ok' : 'fail'} (endReason=${result.endReason})`,
-        );
-        return;
+      }
+
+      // ROUTE fan-out — 한 응답의 모든 ROUTE 를 각각 dispatch (다중 위임 지원).
+      // roster 검증(Semi enforce)은 라우트별로 — 비대상 봇은 skip + 안내, 나머지는 dispatch.
+      const fanoutTargets = parsed.routes.filter((r) => r.bot && r.handoff && r.bot !== cfg.botId);
+      if (fanoutTargets.length > 0) {
+        const lines: string[] = [];
+        let dispatched = 0;
+        for (const r of fanoutTargets) {
+          if (cfg.canManageAgents && SEMI_ROUTE_VALIDATION !== 'off') {
+            const route = isRoutable(SEMI_INTERNAL_ROSTER, r.bot);
+            if (!route.ok) {
+              if (SEMI_ROUTE_VALIDATION === 'enforce') {
+                lines.push(`:information_source: \`@${r.bot}\` 는 라우팅 가능한 대상이 아니에요`);
+                console.warn(`[${cfg.botId}] route BLOCKED (${route.reason}): ${r.bot}`);
+                continue;
+              }
+              console.warn(
+                `[${cfg.botId}] route would-block (${route.reason}): ${r.bot} [log-only]`,
+              );
+            }
+          }
+          const dispatch = await dispatchToInbox({
+            fromBot: cfg.botId,
+            toBot: r.bot,
+            msg,
+            senderName,
+            handoff: r.handoff as string,
+            reason: r.reason,
+          });
+          if (dispatch.error) {
+            lines.push(`:warning: \`@${r.bot}\` dispatch 실패: \`${dispatch.error.slice(0, 80)}\``);
+          } else if (dispatch.commitmentId) {
+            dispatched++;
+            lines.push(
+              `:white_check_mark: \`@${r.bot}\` 위임됨 (commitment=\`${dispatch.commitmentId.slice(-8)}\`)`,
+            );
+          }
+        }
+        if (lines.length > 0) {
+          const cleaned = stripRouteSystemLines(text);
+          const head = cleaned ? cleaned + '\n\n' : '';
+          const tag =
+            fanoutTargets.length > 1
+              ? `→ ${dispatched}/${fanoutTargets.length}봇`
+              : `→ \`@${fanoutTargets[0].bot}\``;
+          await slack.postAsBot(
+            cfg.botId,
+            msg.channel,
+            `${head}${lines.join('\n')}\n\n— ${cfg.botId} (${elapsed}s, ${tag})`,
+            replyThreadTs,
+          );
+          console.log(
+            `[${cfg.botId}] fan-out ${dispatched}/${fanoutTargets.length} dispatched (endReason=${result.endReason})`,
+          );
+          return;
+        }
       }
 
       // 2) ROUTE 없음 + 에이전트 관리자(Semi) — 에이전트 찾기/생성 ACTION 시도.
@@ -2189,7 +2418,7 @@ async function routeDirectSlackAppMessage(
   const commitmentId = `cmt-${policy.botId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   try {
     await pool.query(
-      `INSERT INTO semo.bot_commitments
+      `INSERT INTO ${DB_SCHEMA}.bot_commitments
          (id, bot_id, status, title, source_type, source_ref,
           session_owner, assigned_session, pipeline_context, runtime_source)
        VALUES ($1, $2, 'active', $3, 'slack-inbox', $4, $5, $6, $7, 'slack-router')
@@ -2242,6 +2471,7 @@ async function routeDirectSlackAppMessage(
     thread_history: threadHistory,
   });
 
+  maybeSuperviseWorker(policy.botId); // 콜드스타트
   console.log(
     `[router] ${senderName} → ${policy.botId} (${policy.routeReason}, direct_app=${botId}) [${msgId.slice(0, 8)}]`,
   );
@@ -2255,8 +2485,8 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
   // 채널 게이트로 접근 제한하므로 route_bot_id 무관. Semi orchestrator 가 가로채기 전에 최우선 체크.
   if (
     ORCHESTRATORS[OPERATOR_BOT_ID] &&
-    OPERATOR_ADMIN_CHANNEL &&
-    msg.channel === OPERATOR_ADMIN_CHANNEL &&
+    OPERATOR_ADMIN_CHANNELS.size > 0 &&
+    isOperatorChannel(msg.channel) &&
     shouldTriggerOperatorAdminRoute(msg.text, operatorMentionToken)
   ) {
     await handleOrchestrator(msg, senderName, ORCHESTRATORS[OPERATOR_BOT_ID]);
@@ -2391,7 +2621,7 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
   const commitmentId = `cmt-${botId}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
   try {
     await pool.query(
-      `INSERT INTO semo.bot_commitments
+      `INSERT INTO ${DB_SCHEMA}.bot_commitments
          (id, bot_id, status, title, source_type, source_ref,
           session_owner, assigned_session, pipeline_context, runtime_source)
        VALUES ($1, $2, 'active', $3, 'slack-inbox', $4, $5, $6, $7, 'slack-router')
@@ -2451,6 +2681,7 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
     routing_hint: routingHint,
     thread_history: threadHistory,
   });
+  maybeSuperviseWorker(botId); // 콜드스타트
 
   console.log(
     `[router] ${senderName} → ${botId} (${routeReason}` +
@@ -2474,6 +2705,38 @@ async function start(): Promise<void> {
   console.log(
     `[openclaw-bots] source=${openclawSource} bots=[${[...openclawBots].sort().join(',')}]`,
   );
+
+  await loadServeWorkerBots(); // serve-worker(opt-in) 봇 먼저 로드 — roster 가 내부 serve-worker 봇 포함.
+
+  // Semi internal roster = OPENCLAW socket-mode 봇 ∪ serve-worker 전환 내부봇(~claw).
+  // cutover 후 OPENCLAW_BOTS 가 비어도 serve-worker 내부봇이 roster 유지 → Semi 가 ROUTE 가능.
+  // (ag-* 고객 에이전트는 internal roster 비포함 — delegateCustomerRequest 경로가 별도 처리)
+  try {
+    let displayMeta: Map<string, BotDisplayMeta> | undefined;
+    try {
+      const kb = await pool.query<{ content: string }>(
+        `SELECT content FROM ${DB_SCHEMA}.knowledge_base
+          WHERE domain = 'semicolony' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '') LIMIT 1`,
+      );
+      if (kb.rows[0]?.content) displayMeta = parseBotIdsDisplayMeta(kb.rows[0].content);
+    } catch {
+      /* 보조 메타 실패 — botId fallback */
+    }
+    const internalRosterIds = new Set<string>([
+      ...OPENCLAW_BOTS,
+      ...[...SERVE_WORKER_BOTS].filter((b) => !b.startsWith('ag-')),
+    ]);
+    const entries = buildInternalRoster(internalRosterIds, displayMeta);
+    if (entries.length > 0) {
+      SEMI_INTERNAL_ROSTER = { entries, audience: 'internal', source: 'internal-openclaw' };
+    }
+    console.log(
+      `[semi-roster] internal bots=[${entries.map((e) => e.botId).join(',')}] injection=${SEMI_ROSTER_INJECTION ? 'on' : 'off'} validation=${SEMI_ROUTE_VALIDATION}`,
+    );
+  } catch (err) {
+    console.warn('[semi-roster] build failed, using fallback:', (err as Error).message);
+  }
+
   buildHealthMonitor();
 
   // 2. Load routing config + incubator channel filter + initial stale reap
@@ -2496,6 +2759,21 @@ async function start(): Promise<void> {
   outboxReader.start();
   console.log('[slack-router] Outbox reader started');
 
+  // 고객 프로젝션 에이전트(ag-*) outbox watch — 결과를 원 스레드로 전달. 동적 생성(2-B) 반영 위해 주기 새로고침.
+  const refreshCustomerOutboxBots = async (): Promise<void> => {
+    try {
+      const r = await pool.query<{ bot_id: string }>(
+        `SELECT bot_id FROM ${DB_SCHEMA}.bot_status WHERE config->>'audience' = 'customer'`,
+      );
+      const added = outboxReader.addBots(r.rows.map((x) => x.bot_id));
+      if (added.length) console.log(`[outbox] customer bots watched: ${added.join(', ')}`);
+    } catch (err) {
+      console.warn('[outbox] customer bot refresh failed:', (err as Error).message);
+    }
+  };
+  await refreshCustomerOutboxBots();
+  setInterval(() => void refreshCustomerOutboxBots(), 60_000).unref();
+
   // 6. Start health monitor (대상이 있을 때만)
   if (healthMonitor) {
     healthMonitor.start();
@@ -2511,6 +2789,7 @@ async function start(): Promise<void> {
 
 async function shutdown(): Promise<void> {
   console.log('[slack-router] Shutting down...');
+  mailboxSupervisor.shutdown(); // 자식 serve 워커에 SIGTERM 전파(좀비 방지)
   healthMonitor?.stop();
   outboxReader.stop();
   await Promise.all(inboundSlacks.map((gateway) => gateway.stop().catch(() => {})));

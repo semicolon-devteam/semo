@@ -11,6 +11,7 @@
 import type { Pool } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 function splitKey(combinedKey: string): { key: string; subKey: string } {
   const idx = combinedKey.indexOf('/');
@@ -20,6 +21,28 @@ function splitKey(combinedKey: string): { key: string; subKey: string } {
 
 function combineKey(key: string, subKey: string): string {
   return subKey ? `${key}/${subKey}` : key;
+}
+
+// SEMO→semicolony 리브랜딩: legacy 플랫폼 도메인 'semo' 를 canonical 'semicolony' 로 정규화(alias).
+// `semo kb get/upsert/search/list semo …` (훅·스킬·봇이 쓰는 주 경로)와 PgKbStore 가 동일 canonical
+// 도메인으로 수렴 → dual-domain 정합성 유지. 구 'semo' 행은 frozen legacy.
+// rollback(코드 변경 없이): SEMO_PLATFORM_KB_DOMAIN=semo.
+const CANONICAL_KB_DOMAIN =
+  process.env.SEMICOLONY_PLATFORM_KB_DOMAIN ?? process.env.SEMO_PLATFORM_KB_DOMAIN ?? 'semicolony';
+let legacyKbDomainWarned = false;
+function canonicalKbDomain(domain: string): string {
+  if (domain === 'semo' && CANONICAL_KB_DOMAIN !== 'semo') {
+    if (!legacyKbDomainWarned && process.env.SEMICOLONY_SUPPRESS_DEPRECATION !== '1') {
+      legacyKbDomainWarned = true;
+      process.stderr.write(
+        "[semicolony] KB 도메인 'semo'는 'semicolony'로 리브랜딩됨(alias 자동변환). " +
+          "'semicolony' 사용 권장 · 미마이그레이션 DB면 'semo'로 자동 fallback. " +
+          'guide: packages/cli/MIGRATION-semo-to-semicolony.md\n',
+      );
+    }
+    return CANONICAL_KB_DOMAIN;
+  }
+  return domain;
 }
 
 const ORDER_ALLOWLIST = ['updated_at', 'created_at', 'key', 'sub_key', 'domain'];
@@ -244,15 +267,16 @@ function readKBFile(cwd: string, filename: string): KBEntry[] {
 // ============================================================
 
 /**
- * Pull KB entries from semo.knowledge_base to local .kb/
+ * Pull KB entries from ${DB_SCHEMA}.knowledge_base to local .kb/
  */
-export async function kbPull(pool: Pool, domain?: string, cwd?: string): Promise<KBEntry[]> {
+export async function kbPull(pool: Pool, domainArg?: string, cwd?: string): Promise<KBEntry[]> {
+  const domain = domainArg ? canonicalKbDomain(domainArg) : domainArg;
   const client = await pool.connect();
   try {
     let query = `
       SELECT domain, key, sub_key, content, metadata, created_by, version,
              created_at::text, updated_at::text
-      FROM semo.knowledge_base
+      FROM ${DB_SCHEMA}.knowledge_base
     `;
     const params: string[] = [];
     if (domain) {
@@ -294,7 +318,7 @@ export async function kbPush(
 
   try {
     // Domain validation: check all domains against ontology before transaction
-    const ontologyResult = await client.query('SELECT domain FROM semo.ontology');
+    const ontologyResult = await client.query(`SELECT domain FROM ${DB_SCHEMA}.ontology`);
     const knownDomains = new Set(ontologyResult.rows.map((r: { domain: string }) => r.domain));
     const invalidEntries: string[] = [];
     const validEntries: typeof entries = [];
@@ -323,7 +347,7 @@ export async function kbPush(
 
         const { key: flatKey, subKey } = splitKey(entry.key);
         await client.query(
-          `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, embedding)
+          `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, metadata, created_by, embedding)
            VALUES ($1, $2, $3, $4, $5, $6, $7::vector)
            ON CONFLICT (domain, key, sub_key) DO UPDATE SET
              content = EXCLUDED.content,
@@ -370,14 +394,14 @@ export async function kbStatus(pool: Pool): Promise<KBStatusInfo> {
   try {
     const sharedStats = await client.query(`
       SELECT domain, COUNT(*)::int as count
-      FROM semo.knowledge_base
+      FROM ${DB_SCHEMA}.knowledge_base
       GROUP BY domain ORDER BY domain
     `);
     const sharedTotal = await client.query(
-      `SELECT COUNT(*)::int as total FROM semo.knowledge_base`,
+      `SELECT COUNT(*)::int as total FROM ${DB_SCHEMA}.knowledge_base`,
     );
     const sharedLastUpdated = await client.query(
-      `SELECT MAX(updated_at)::text as last FROM semo.knowledge_base`,
+      `SELECT MAX(updated_at)::text as last FROM ${DB_SCHEMA}.knowledge_base`,
     );
 
     const sharedDomains: Record<string, number> = {};
@@ -412,13 +436,13 @@ export async function kbList(
     offset?: number;
   },
 ): Promise<KBEntry[]> {
+  if (options.domain) options = { ...options, domain: canonicalKbDomain(options.domain) };
   const client = await pool.connect();
   const limit = options.limit || 50;
   const offset = options.offset || 0;
 
   try {
-    let query =
-      'SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text FROM semo.knowledge_base';
+    let query = `SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text FROM ${DB_SCHEMA}.knowledge_base`;
     const params: (string | number)[] = [];
     const conditions: string[] = [];
     let paramIdx = 1;
@@ -481,10 +505,11 @@ export async function kbList(
  */
 export async function kbCount(
   pool: Pool,
-  domain: string,
+  domainArg: string,
   key?: string,
   where?: Record<string, unknown>,
 ): Promise<number> {
+  const domain = canonicalKbDomain(domainArg);
   const client = await pool.connect();
   try {
     const conditions: string[] = [`domain = $1`];
@@ -513,7 +538,7 @@ export async function kbCount(
     }
 
     const result = await client.query(
-      `SELECT COUNT(*)::int AS count FROM semo.knowledge_base WHERE ${conditions.join(' AND ')}`,
+      `SELECT COUNT(*)::int AS count FROM ${DB_SCHEMA}.knowledge_base WHERE ${conditions.join(' AND ')}`,
       params,
     );
     return result.rows[0].count;
@@ -528,22 +553,24 @@ export async function kbCount(
  */
 export async function kbUpdateMetadata(
   pool: Pool,
-  domain: string,
+  domainArg: string,
   rawKey: string,
   metadataPatch: Record<string, unknown>,
 ): Promise<KBEntry | null> {
+  const domain = canonicalKbDomain(domainArg);
   const { key, subKey } = splitKey(rawKey);
   const client = await pool.connect();
   try {
-    const domainCheck = await client.query('SELECT 1 FROM semo.ontology WHERE domain = $1', [
-      domain,
-    ]);
+    const domainCheck = await client.query(
+      `SELECT 1 FROM ${DB_SCHEMA}.ontology WHERE domain = $1`,
+      [domain],
+    );
     if (domainCheck.rows.length === 0) {
       throw new Error(`도메인 '${domain}'은(는) 온톨로지에 등록되지 않았습니다.`);
     }
 
     const result = await client.query(
-      `UPDATE semo.knowledge_base
+      `UPDATE ${DB_SCHEMA}.knowledge_base
        SET metadata = COALESCE(metadata, '{}'::jsonb) || $4::jsonb,
            updated_at = NOW()
        WHERE domain = $1 AND key = $2 AND sub_key = $3
@@ -562,11 +589,12 @@ export async function kbUpdateMetadata(
  */
 export async function kbListByKeyPrefix(
   pool: Pool,
-  domain: string,
+  domainArg: string,
   key: string,
   subKeyPrefix: string,
   options?: { where?: Record<string, unknown>; orderBy?: string },
 ): Promise<KBEntry[]> {
+  const domain = canonicalKbDomain(domainArg);
   const client = await pool.connect();
   try {
     const conditions: string[] = [`domain = $1`, `key = $2`, `sub_key LIKE $3`];
@@ -597,7 +625,7 @@ export async function kbListByKeyPrefix(
 
     const result = await client.query(
       `SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text
-       FROM semo.knowledge_base
+       FROM ${DB_SCHEMA}.knowledge_base
        WHERE ${conditions.join(' AND ')}
        ${orderClause}`,
       params,
@@ -613,11 +641,12 @@ export async function kbListByKeyPrefix(
  */
 export async function kbCountByKeyPrefix(
   pool: Pool,
-  domain: string,
+  domainArg: string,
   key: string,
   subKeyPrefix: string,
   where?: Record<string, unknown>,
 ): Promise<number> {
+  const domain = canonicalKbDomain(domainArg);
   const client = await pool.connect();
   try {
     const conditions: string[] = [`domain = $1`, `key = $2`, `sub_key LIKE $3`];
@@ -643,7 +672,7 @@ export async function kbCountByKeyPrefix(
     }
 
     const result = await client.query(
-      `SELECT COUNT(*)::int AS count FROM semo.knowledge_base WHERE ${conditions.join(' AND ')}`,
+      `SELECT COUNT(*)::int AS count FROM ${DB_SCHEMA}.knowledge_base WHERE ${conditions.join(' AND ')}`,
       params,
     );
     return result.rows[0].count;
@@ -688,8 +717,8 @@ export async function kbListByKeyAcrossDomains(
 
     const result = await client.query(
       `SELECT kb.domain, kb.key, kb.sub_key, kb.content, kb.metadata, kb.created_by, kb.version, kb.updated_at::text
-       FROM semo.knowledge_base kb
-       JOIN semo.ontology o ON o.domain = kb.domain
+       FROM ${DB_SCHEMA}.knowledge_base kb
+       JOIN ${DB_SCHEMA}.ontology o ON o.domain = kb.domain
        WHERE ${conditions.join(' AND ')}
        ORDER BY kb.domain`,
       params,
@@ -714,6 +743,7 @@ export async function kbSearch(
     minScore?: number;
   },
 ): Promise<KBEntry[]> {
+  if (options.domain) options = { ...options, domain: canonicalKbDomain(options.domain) };
   const client = await pool.connect();
   const limit = options.limit || 10;
   const mode = options.mode || 'hybrid';
@@ -738,7 +768,7 @@ export async function kbSearch(
         let sql = `
           SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text,
                  1 - (embedding <=> $1::vector) as score
-          FROM semo.knowledge_base
+          FROM ${DB_SCHEMA}.knowledge_base
           WHERE embedding IS NOT NULL
         `;
         const params: (string | number)[] = [embeddingStr];
@@ -803,7 +833,7 @@ export async function kbSearch(
       let textSql = `
         SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text,
                ${scoreExpr} as score
-        FROM semo.knowledge_base
+        FROM ${DB_SCHEMA}.knowledge_base
         WHERE ${whereClause}
       `;
 
@@ -856,7 +886,7 @@ export async function kbSearch(
     // Ultimate fallback: simple ILIKE
     let sql = `
       SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text
-      FROM semo.knowledge_base
+      FROM ${DB_SCHEMA}.knowledge_base
       WHERE content ILIKE $1 OR key ILIKE $1 OR sub_key ILIKE $1
     `;
     const params: (string | number)[] = [`%${query}%`];
@@ -890,7 +920,7 @@ export async function ontoList(pool: Pool): Promise<OntologyDomain[]> {
       SELECT domain, schema, description, version,
              service, entity_type, parent, tags,
              updated_at::text
-      FROM semo.ontology ORDER BY service NULLS FIRST, domain
+      FROM ${DB_SCHEMA}.ontology ORDER BY service NULLS FIRST, domain
     `);
     return result.rows;
   } finally {
@@ -901,14 +931,15 @@ export async function ontoList(pool: Pool): Promise<OntologyDomain[]> {
 /**
  * Show ontology detail for a domain
  */
-export async function ontoShow(pool: Pool, domain: string): Promise<OntologyDomain | null> {
+export async function ontoShow(pool: Pool, domainArg: string): Promise<OntologyDomain | null> {
+  const domain = canonicalKbDomain(domainArg);
   const client = await pool.connect();
   try {
     const result = await client.query(
       `SELECT domain, schema, description, version,
               service, entity_type, parent, tags,
               updated_at::text
-       FROM semo.ontology WHERE domain = $1`,
+       FROM ${DB_SCHEMA}.ontology WHERE domain = $1`,
       [domain],
     );
     return result.rows[0] || null;
@@ -925,7 +956,7 @@ export async function ontoListTypes(pool: Pool): Promise<OntologyType[]> {
   try {
     const result = await client.query(`
       SELECT type_key, schema, description, version
-      FROM semo.ontology_types ORDER BY type_key
+      FROM ${DB_SCHEMA}.ontology_types ORDER BY type_key
     `);
     return result.rows;
   } catch {
@@ -940,15 +971,16 @@ export async function ontoListTypes(pool: Pool): Promise<OntologyType[]> {
  */
 export async function ontoListChildren(
   pool: Pool,
-  parentDomain: string,
+  parentDomainArg: string,
 ): Promise<OntologyDomain[]> {
+  const parentDomain = canonicalKbDomain(parentDomainArg);
   const client = await pool.connect();
   try {
     const result = await client.query(
       `SELECT domain, schema, description, version,
               service, entity_type, parent, tags,
               updated_at::text
-       FROM semo.ontology WHERE parent = $1 ORDER BY domain`,
+       FROM ${DB_SCHEMA}.ontology WHERE parent = $1 ORDER BY domain`,
       [parentDomain],
     );
     return result.rows;
@@ -967,11 +999,11 @@ async function resolveServiceDomainsLocal(
 ): Promise<string[]> {
   try {
     const result = await client.query(
-      `SELECT domain FROM semo.ontology WHERE service = $1
+      `SELECT domain FROM ${DB_SCHEMA}.ontology WHERE service = $1
        UNION
-       SELECT domain FROM semo.ontology WHERE domain LIKE $2
+       SELECT domain FROM ${DB_SCHEMA}.ontology WHERE domain LIKE $2
        UNION
-       SELECT domain FROM semo.ontology WHERE domain = $1`,
+       SELECT domain FROM ${DB_SCHEMA}.ontology WHERE domain = $1`,
       [service, `${service}.%`],
     );
     return result.rows.map((r: { domain: string }) => r.domain);
@@ -998,7 +1030,7 @@ export async function ontoValidate(
     const client = await pool.connect();
     try {
       const result = await client.query(
-        `SELECT domain, key, content, metadata FROM semo.knowledge_base WHERE domain = $1`,
+        `SELECT domain, key, content, metadata FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1`,
         [domain],
       );
       entries = result.rows;
@@ -1074,7 +1106,7 @@ export async function kbDigest(
     let sql = `
       SELECT domain, key, sub_key, content, version, updated_at::text,
              CASE WHEN created_at > $1 THEN 'new' ELSE 'updated' END as change_type
-      FROM semo.knowledge_base
+      FROM ${DB_SCHEMA}.knowledge_base
       WHERE updated_at > $1 OR created_at > $1
     `;
     const params: (string | number)[] = [since];
@@ -1103,10 +1135,11 @@ export async function kbDigest(
  */
 export async function kbGet(
   pool: Pool,
-  domain: string,
+  domainArg: string,
   rawKey: string,
   rawSubKey?: string,
 ): Promise<KBEntry | null> {
+  const domain = canonicalKbDomain(domainArg);
   let key: string;
   let subKey: string;
   if (rawSubKey !== undefined) {
@@ -1120,13 +1153,16 @@ export async function kbGet(
 
   const client = await pool.connect();
   try {
-    const result = await client.query(
-      `SELECT domain, key, sub_key, content, metadata, created_by, version,
+    const sql = `SELECT domain, key, sub_key, content, metadata, created_by, version,
               created_at::text, updated_at::text
-       FROM semo.knowledge_base
-       WHERE domain = $1 AND key = $2 AND sub_key = $3`,
-      [domain, key, subKey],
-    );
+       FROM ${DB_SCHEMA}.knowledge_base
+       WHERE domain = $1 AND key = $2 AND sub_key = $3`;
+    let result = await client.query(sql, [domain, key, subKey]);
+    // backward-safe: canonical 도메인이 비고 legacy 로 alias 된 경우 원본으로 fallback
+    // → migration 127 미적용 DB/구 환경에서도 데이터를 찾는다.
+    if (result.rows.length === 0 && domain !== domainArg) {
+      result = await client.query(sql, [domainArg, key, subKey]);
+    }
     return result.rows[0] || null;
   } finally {
     client.release();
@@ -1157,7 +1193,7 @@ export async function kbDelete(
   const client = await pool.connect();
   try {
     const result = await client.query(
-      `DELETE FROM semo.knowledge_base
+      `DELETE FROM ${DB_SCHEMA}.knowledge_base
        WHERE domain = $1 AND key = $2 AND sub_key = $3
        RETURNING domain, key, sub_key, content, metadata, created_by, version,
                  created_at::text, updated_at::text`,
@@ -1187,6 +1223,8 @@ export async function kbUpsert(
     expect_version?: number;
   },
 ): Promise<{ success: boolean; error?: string; warnings?: string[] }> {
+  // SEMO→semicolony: 쓰기 도메인도 canonical 로 정규화 → 신규 KB 쓰기는 'semicolony' 로 수렴.
+  entry = { ...entry, domain: canonicalKbDomain(entry.domain) };
   let key: string;
   let subKey: string;
   if (entry.sub_key !== undefined) {
@@ -1201,11 +1239,12 @@ export async function kbUpsert(
   // Domain validation
   const client = await pool.connect();
   try {
-    const ontoCheck = await client.query('SELECT domain FROM semo.ontology WHERE domain = $1', [
-      entry.domain,
-    ]);
+    const ontoCheck = await client.query(
+      `SELECT domain FROM ${DB_SCHEMA}.ontology WHERE domain = $1`,
+      [entry.domain],
+    );
     if (ontoCheck.rows.length === 0) {
-      const known = await client.query('SELECT domain FROM semo.ontology ORDER BY domain');
+      const known = await client.query(`SELECT domain FROM ${DB_SCHEMA}.ontology ORDER BY domain`);
       const knownDomains = known.rows.map((r: { domain: string }) => r.domain);
       return {
         success: false,
@@ -1238,13 +1277,13 @@ export async function kbUpsert(
     const schemaClient = await pool.connect();
     try {
       const typeResult = await schemaClient.query(
-        'SELECT entity_type FROM semo.ontology WHERE domain = $1 AND entity_type IS NOT NULL',
+        `SELECT entity_type FROM ${DB_SCHEMA}.ontology WHERE domain = $1 AND entity_type IS NOT NULL`,
         [entry.domain],
       );
       if (typeResult.rows.length > 0) {
         const entityType = typeResult.rows[0].entity_type;
         const schemaResult = await schemaClient.query(
-          "SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source, scheme_description, value_hint, ref_type FROM semo.kb_type_schema WHERE type_key = $1 ORDER BY sort_order",
+          `SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source, scheme_description, value_hint, ref_type FROM ${DB_SCHEMA}.kb_type_schema WHERE type_key = $1 ORDER BY sort_order`,
           [entityType],
         );
         const schemas = schemaResult.rows as Array<{
@@ -1302,12 +1341,12 @@ export async function kbUpsert(
           // ref_type 검증: content가 참조 타입의 등록된 도메인인지 확인
           if (match.ref_type) {
             const refCheck = await schemaClient.query(
-              'SELECT domain FROM semo.ontology WHERE domain = $1 AND entity_type = $2',
+              `SELECT domain FROM ${DB_SCHEMA}.ontology WHERE domain = $1 AND entity_type = $2`,
               [entry.content.trim(), match.ref_type],
             );
             if (refCheck.rows.length === 0) {
               const existing = await schemaClient.query(
-                'SELECT domain FROM semo.ontology WHERE entity_type = $1 ORDER BY domain',
+                `SELECT domain FROM ${DB_SCHEMA}.ontology WHERE entity_type = $1 ORDER BY domain`,
                 [match.ref_type],
               );
               const domains = existing.rows.map((r: { domain: string }) => r.domain);
@@ -1410,7 +1449,7 @@ export async function kbUpsert(
       // Optimistic locking: version 불일치 시 실패
       // version/updated_at는 트리거(trg_kb_updated_at)가 자동 처리하므로 명시하지 않음
       const result = await writeClient.query(
-        `UPDATE semo.knowledge_base
+        `UPDATE ${DB_SCHEMA}.knowledge_base
          SET content = $1, metadata = $2, embedding = $3::vector
          WHERE domain = $4 AND key = $5 AND sub_key = $6 AND version = $7
          RETURNING version`,
@@ -1432,7 +1471,7 @@ export async function kbUpsert(
       }
     } else {
       await writeClient.query(
-        `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, embedding)
+        `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, metadata, created_by, embedding)
          VALUES ($1, $2, $3, $4, $5, $6, $7::vector)
          ON CONFLICT (domain, key, sub_key) DO UPDATE SET
            content = EXCLUDED.content,
@@ -1508,7 +1547,7 @@ export async function ontoListSchema(pool: Pool, typeKey: string): Promise<TypeS
     const result = await client.query(
       `SELECT type_key, scheme_key, scheme_description, required, value_hint, sort_order,
               COALESCE(key_type, 'singleton') as key_type, ref_type
-       FROM semo.kb_type_schema
+       FROM ${DB_SCHEMA}.kb_type_schema
        WHERE type_key = $1
        ORDER BY sort_order, scheme_key`,
       [typeKey],
@@ -1537,8 +1576,8 @@ export async function ontoRoutingTable(pool: Pool): Promise<RoutingEntry[]> {
         s.key_type,
         s.scheme_description,
         s.value_hint
-      FROM semo.ontology o
-      JOIN semo.kb_type_schema s ON s.type_key = o.entity_type
+      FROM ${DB_SCHEMA}.ontology o
+      JOIN ${DB_SCHEMA}.kb_type_schema s ON s.type_key = o.entity_type
       ORDER BY o.domain, s.sort_order
     `);
     return result.rows;
@@ -1556,7 +1595,7 @@ export async function ontoListServices(pool: Pool): Promise<ServiceInfo[]> {
     const result = await client.query(`
       SELECT service, COUNT(*)::int as domain_count,
              ARRAY_AGG(domain ORDER BY domain) as domains
-      FROM semo.ontology
+      FROM ${DB_SCHEMA}.ontology
       WHERE service IS NOT NULL
       GROUP BY service
       ORDER BY service
@@ -1579,14 +1618,14 @@ export async function ontoListInstances(pool: Pool): Promise<ServiceInstance[]> 
       SELECT o.domain, o.description, o.service, o.tags,
              COALESCE(
                (SELECT ARRAY_AGG(o2.domain ORDER BY o2.domain)
-                FROM semo.ontology o2
+                FROM ${DB_SCHEMA}.ontology o2
                 WHERE o2.service = o.service AND o2.domain != o.domain),
                '{}'
              ) as scoped_domains,
-             (SELECT COUNT(*)::int FROM semo.knowledge_base k
+             (SELECT COUNT(*)::int FROM ${DB_SCHEMA}.knowledge_base k
               WHERE k.domain = o.domain
                  OR k.domain LIKE o.service || '.%') as entry_count
-      FROM semo.ontology o
+      FROM ${DB_SCHEMA}.ontology o
       WHERE o.entity_type = 'service'
       ORDER BY o.domain
     `);
@@ -1623,7 +1662,7 @@ export interface OntoRegisterResult {
  *
  * 1. Validate entity_type exists in ontology_types
  * 2. Check domain doesn't already exist
- * 3. INSERT into semo.ontology
+ * 3. INSERT into ${DB_SCHEMA}.ontology
  * 4. If init_required (default true), create KB entries for required keys in kb_type_schema
  */
 export async function ontoRegister(
@@ -1634,12 +1673,12 @@ export async function ontoRegister(
   try {
     // 1. Validate entity_type
     const typeCheck = await client.query(
-      'SELECT type_key FROM semo.ontology_types WHERE type_key = $1',
+      `SELECT type_key FROM ${DB_SCHEMA}.ontology_types WHERE type_key = $1`,
       [opts.entity_type],
     );
     if (typeCheck.rows.length === 0) {
       const known = await client.query(
-        'SELECT type_key FROM semo.ontology_types ORDER BY type_key',
+        `SELECT type_key FROM ${DB_SCHEMA}.ontology_types ORDER BY type_key`,
       );
       const knownTypes = known.rows.map((r: { type_key: string }) => r.type_key);
       return {
@@ -1649,18 +1688,20 @@ export async function ontoRegister(
     }
 
     // 2. Check domain doesn't already exist
-    const existCheck = await client.query('SELECT domain FROM semo.ontology WHERE domain = $1', [
-      opts.domain,
-    ]);
+    const existCheck = await client.query(
+      `SELECT domain FROM ${DB_SCHEMA}.ontology WHERE domain = $1`,
+      [opts.domain],
+    );
     if (existCheck.rows.length > 0) {
       return { success: false, error: `도메인 '${opts.domain}'은(는) 이미 등록되어 있습니다.` };
     }
 
     // 2b. Validate parent domain exists (if provided)
     if (opts.parent) {
-      const parentCheck = await client.query('SELECT domain FROM semo.ontology WHERE domain = $1', [
-        opts.parent,
-      ]);
+      const parentCheck = await client.query(
+        `SELECT domain FROM ${DB_SCHEMA}.ontology WHERE domain = $1`,
+        [opts.parent],
+      );
       if (parentCheck.rows.length === 0) {
         return {
           success: false,
@@ -1671,7 +1712,7 @@ export async function ontoRegister(
 
     // 3. INSERT into ontology
     await client.query(
-      `INSERT INTO semo.ontology (domain, entity_type, description, service, parent, tags, schema)
+      `INSERT INTO ${DB_SCHEMA}.ontology (domain, entity_type, description, service, parent, tags, schema)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         opts.domain,
@@ -1691,7 +1732,7 @@ export async function ontoRegister(
     if (initRequired) {
       const schemaResult = await client.query(
         `SELECT scheme_key, scheme_description, COALESCE(key_type, 'singleton') as key_type, value_hint
-         FROM semo.kb_type_schema
+         FROM ${DB_SCHEMA}.kb_type_schema
          WHERE type_key = $1 AND required = true
          ORDER BY sort_order`,
         [opts.entity_type],
@@ -1708,7 +1749,7 @@ export async function ontoRegister(
 
         try {
           await client.query(
-            `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, embedding)
+            `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, metadata, created_by, embedding)
              VALUES ($1, $2, '', $3, '{}', 'semo-cli:onto-register', $4::vector)
              ON CONFLICT (domain, key, sub_key) DO NOTHING`,
             [opts.domain, s.scheme_key, placeholder, embeddingStr],
@@ -1750,7 +1791,7 @@ export async function ontoUnregister(
   try {
     // 1. Check domain exists
     const domainCheck = await client.query(
-      'SELECT domain, entity_type, service FROM semo.ontology WHERE domain = $1',
+      `SELECT domain, entity_type, service FROM ${DB_SCHEMA}.ontology WHERE domain = $1`,
       [domain],
     );
     if (domainCheck.rows.length === 0) {
@@ -1759,7 +1800,7 @@ export async function ontoUnregister(
 
     // 2. Count KB entries
     const countResult = await client.query(
-      'SELECT COUNT(*)::int AS cnt FROM semo.knowledge_base WHERE domain = $1',
+      `SELECT COUNT(*)::int AS cnt FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1`,
       [domain],
     );
     const entryCount: number = countResult.rows[0].cnt;
@@ -1777,13 +1818,14 @@ export async function ontoUnregister(
     try {
       let deletedEntries = 0;
       if (entryCount > 0) {
-        const delResult = await client.query('DELETE FROM semo.knowledge_base WHERE domain = $1', [
-          domain,
-        ]);
+        const delResult = await client.query(
+          `DELETE FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1`,
+          [domain],
+        );
         deletedEntries = delResult.rowCount ?? 0;
       }
 
-      await client.query('DELETE FROM semo.ontology WHERE domain = $1', [domain]);
+      await client.query(`DELETE FROM ${DB_SCHEMA}.ontology WHERE domain = $1`, [domain]);
       await client.query('COMMIT');
 
       return { success: true, deleted_entries: deletedEntries };
@@ -1824,13 +1866,13 @@ export async function ontoAddKey(
 
     // Check type exists
     const typeCheck = await client.query(
-      'SELECT DISTINCT type_key FROM semo.kb_type_schema WHERE type_key = $1',
+      `SELECT DISTINCT type_key FROM ${DB_SCHEMA}.kb_type_schema WHERE type_key = $1`,
       [opts.type_key],
     );
     if (typeCheck.rows.length === 0) {
       // Check if this type exists in ontology at all
       const ontoCheck = await client.query(
-        'SELECT DISTINCT entity_type FROM semo.ontology WHERE entity_type = $1',
+        `SELECT DISTINCT entity_type FROM ${DB_SCHEMA}.ontology WHERE entity_type = $1`,
         [opts.type_key],
       );
       if (ontoCheck.rows.length === 0) {
@@ -1840,7 +1882,7 @@ export async function ontoAddKey(
 
     // Check duplicate
     const dupCheck = await client.query(
-      'SELECT id FROM semo.kb_type_schema WHERE type_key = $1 AND scheme_key = $2',
+      `SELECT id FROM ${DB_SCHEMA}.kb_type_schema WHERE type_key = $1 AND scheme_key = $2`,
       [opts.type_key, opts.scheme_key],
     );
     if (dupCheck.rows.length > 0) {
@@ -1852,13 +1894,13 @@ export async function ontoAddKey(
 
     // Get max sort_order
     const maxOrder = await client.query(
-      'SELECT COALESCE(MAX(sort_order), 0) + 10 as next_order FROM semo.kb_type_schema WHERE type_key = $1',
+      `SELECT COALESCE(MAX(sort_order), 0) + 10 as next_order FROM ${DB_SCHEMA}.kb_type_schema WHERE type_key = $1`,
       [opts.type_key],
     );
     const sortOrder = maxOrder.rows[0].next_order;
 
     await client.query(
-      `INSERT INTO semo.kb_type_schema (type_key, scheme_key, scheme_description, key_type, required, value_hint, sort_order, ref_type)
+      `INSERT INTO ${DB_SCHEMA}.kb_type_schema (type_key, scheme_key, scheme_description, key_type, required, value_hint, sort_order, ref_type)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
       [
         opts.type_key,
@@ -1903,7 +1945,7 @@ export async function ontoCreateType(
   try {
     // 중복 확인
     const dupCheck = await client.query(
-      'SELECT type_key FROM semo.ontology_types WHERE type_key = $1',
+      `SELECT type_key FROM ${DB_SCHEMA}.ontology_types WHERE type_key = $1`,
       [opts.type_key],
     );
     if (dupCheck.rows.length > 0) {
@@ -1911,7 +1953,7 @@ export async function ontoCreateType(
     }
 
     await client.query(
-      `INSERT INTO semo.ontology_types (type_key, schema, description)
+      `INSERT INTO ${DB_SCHEMA}.ontology_types (type_key, schema, description)
        VALUES ($1, $2, $3)`,
       [opts.type_key, JSON.stringify(opts.schema || {}), opts.description || opts.type_key],
     );
@@ -1935,7 +1977,7 @@ export async function ontoRemoveKey(
   const client = await pool.connect();
   try {
     const result = await client.query(
-      'DELETE FROM semo.kb_type_schema WHERE type_key = $1 AND scheme_key = $2 RETURNING id',
+      `DELETE FROM ${DB_SCHEMA}.kb_type_schema WHERE type_key = $1 AND scheme_key = $2 RETURNING id`,
       [typeKey, schemeKey],
     );
     if (result.rows.length === 0) {
@@ -1966,17 +2008,19 @@ export async function ontoUpdateDomain(
 ): Promise<{ success: boolean; error?: string }> {
   const client = await pool.connect();
   try {
-    const exists = await client.query('SELECT domain FROM semo.ontology WHERE domain = $1', [
-      domain,
-    ]);
+    const exists = await client.query(
+      `SELECT domain FROM ${DB_SCHEMA}.ontology WHERE domain = $1`,
+      [domain],
+    );
     if (exists.rows.length === 0) {
       return { success: false, error: `도메인 '${domain}'은(는) 존재하지 않습니다.` };
     }
 
     if (updates.parent !== undefined && updates.parent !== null) {
-      const parentCheck = await client.query('SELECT domain FROM semo.ontology WHERE domain = $1', [
-        updates.parent,
-      ]);
+      const parentCheck = await client.query(
+        `SELECT domain FROM ${DB_SCHEMA}.ontology WHERE domain = $1`,
+        [updates.parent],
+      );
       if (parentCheck.rows.length === 0) {
         return {
           success: false,
@@ -2014,7 +2058,10 @@ export async function ontoUpdateDomain(
 
     sets.push(`version = COALESCE(version, 1) + 1`);
     params.push(domain);
-    await client.query(`UPDATE semo.ontology SET ${sets.join(', ')} WHERE domain = $${i}`, params);
+    await client.query(
+      `UPDATE ${DB_SCHEMA}.ontology SET ${sets.join(', ')} WHERE domain = $${i}`,
+      params,
+    );
     return { success: true };
   } catch (err) {
     return { success: false, error: String(err) };
@@ -2042,7 +2089,7 @@ export async function ontoUpdateKey(
   const client = await pool.connect();
   try {
     const exists = await client.query(
-      'SELECT id FROM semo.kb_type_schema WHERE type_key = $1 AND scheme_key = $2',
+      `SELECT id FROM ${DB_SCHEMA}.kb_type_schema WHERE type_key = $1 AND scheme_key = $2`,
       [typeKey, schemeKey],
     );
     if (exists.rows.length === 0) {
@@ -2082,7 +2129,7 @@ export async function ontoUpdateKey(
 
     params.push(typeKey, schemeKey);
     await client.query(
-      `UPDATE semo.kb_type_schema SET ${sets.join(', ')}
+      `UPDATE ${DB_SCHEMA}.kb_type_schema SET ${sets.join(', ')}
        WHERE type_key = $${i++} AND scheme_key = $${i}`,
       params,
     );

@@ -146,11 +146,11 @@ export async function createProject(data: {
  * 온톨로지에 도메인이 없으면 자동 등록 (service 타입)
  */
 async function ensureOntologyDomain(domain: string, projectName: string): Promise<void> {
-  const check = await query('SELECT 1 FROM semo.ontology WHERE domain = $1', [domain]);
+  const check = await query(`SELECT 1 FROM ${DB_SCHEMA}.ontology WHERE domain = $1`, [domain]);
   if (check.rows.length > 0) return;
 
   await query(
-    `INSERT INTO semo.ontology (domain, schema, entity_type, service, description, tags)
+    `INSERT INTO ${DB_SCHEMA}.ontology (domain, schema, entity_type, service, description, tags)
      VALUES ($1, '{}', 'service', $1, $2, $3)
      ON CONFLICT (domain) DO NOTHING`,
     [domain, `${projectName} — 서비스 프로젝트`, ['gfp', 'incubator']],
@@ -1349,6 +1349,7 @@ export {
   completeIteration,
   deleteIteration,
 } from './iterations';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ── Feature Discovery Sessions (KB-backed) ──
 

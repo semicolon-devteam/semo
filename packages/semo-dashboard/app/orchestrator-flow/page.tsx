@@ -6,8 +6,8 @@
  * - 미등록 사용자 도메인 (team-*) 최근 7일 카드.
  *
  * 데이터 소스:
- * - semo.bot_commitments (runtime_source = 'hermes-orchestrator')
- * - semo.knowledge_base (domain LIKE 'team-%' AND key='slack-id')
+ * - ${DB_SCHEMA}.bot_commitments (runtime_source = 'hermes-orchestrator')
+ * - ${DB_SCHEMA}.knowledge_base (domain LIKE 'team-%' AND key='slack-id')
  *
  * 실시간성: SSR (force-dynamic) + 향후 SWR polling 또는 SSE 로 진화 가능 (P2-C).
  *
@@ -16,6 +16,7 @@
 import { query } from '@/lib/db';
 import { LiveCommitmentBanner } from './LiveCommitmentBanner';
 import { PageBody, PageHeader, Card, Section, Avatar, Badge, Icon } from '@/components/ui/semo';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 const FLOW_META: Record<string, { label: string; emoji: string; color: string; bg: string }> = {
   active: {
@@ -56,7 +57,7 @@ async function loadOrchestratorCommitments(): Promise<OrchCommitmentRow[]> {
               pipeline_context::text AS pipeline_context,
               created_at::text AS created_at,
               completed_at::text AS completed_at
-         FROM semo.bot_commitments
+         FROM ${DB_SCHEMA}.bot_commitments
         WHERE runtime_source = 'hermes-orchestrator'
         ORDER BY created_at DESC
         LIMIT 50`,
@@ -74,16 +75,16 @@ async function loadOnboardingUsers(): Promise<NewUserDomainRow[]> {
     const res = await query<NewUserDomainRow>(
       `WITH new_domains AS (
          SELECT domain, MIN(created_at) AS created_at
-           FROM semo.knowledge_base
+           FROM ${DB_SCHEMA}.knowledge_base
           WHERE domain LIKE 'team-%'
             AND created_at > NOW() - INTERVAL '7 days'
           GROUP BY domain
        )
        SELECT
          nd.domain,
-         (SELECT content FROM semo.knowledge_base WHERE domain = nd.domain AND key = 'nickname' LIMIT 1) AS nickname,
-         (SELECT content FROM semo.knowledge_base WHERE domain = nd.domain AND key = 'role' LIMIT 1) AS role,
-         (SELECT content FROM semo.knowledge_base WHERE domain = nd.domain AND key = 'it-fluency' LIMIT 1) AS it_fluency,
+         (SELECT content FROM ${DB_SCHEMA}.knowledge_base WHERE domain = nd.domain AND key = 'nickname' LIMIT 1) AS nickname,
+         (SELECT content FROM ${DB_SCHEMA}.knowledge_base WHERE domain = nd.domain AND key = 'role' LIMIT 1) AS role,
+         (SELECT content FROM ${DB_SCHEMA}.knowledge_base WHERE domain = nd.domain AND key = 'it-fluency' LIMIT 1) AS it_fluency,
          nd.created_at::text AS created_at
        FROM new_domains nd
        ORDER BY nd.created_at DESC

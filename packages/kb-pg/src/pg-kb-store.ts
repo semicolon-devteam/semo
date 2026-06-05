@@ -11,6 +11,7 @@ import {
   type UpsertInput,
 } from '@team-semicolon/semo-kb-core';
 import type { EmbeddingProvider } from './embedding.js';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 type QueryRunner = Pick<Pool | PoolClient, 'query'>;
 
@@ -55,20 +56,49 @@ function rowToEntry(row: Row): KbEntry {
  * Phase 1a 어댑터: `get` / `search` 만 구현.
  * 쓰기/watch/transaction 은 Phase 1b/1c 에서 추가된다.
  */
+// SEMO→semicolony 리브랜딩: legacy 플랫폼 도메인 'semo' 를 canonical 'semicolony' 로 정규화(alias).
+// 모든 store read/write 가 단일 canonical 도메인으로 수렴 → `semo kb get/upsert semo …` (런타임 인자)
+// 와 하드코딩 store 접근이 모두 'semicolony' 행을 본다. 구 'semo' 행(376)은 frozen legacy.
+// rollback(코드 변경 없이): SEMO_PLATFORM_KB_DOMAIN=semo (또는 SEMICOLONY_PLATFORM_KB_DOMAIN=semo).
+const CANONICAL_PLATFORM_KB_DOMAIN =
+  process.env.SEMICOLONY_PLATFORM_KB_DOMAIN ?? process.env.SEMO_PLATFORM_KB_DOMAIN ?? 'semicolony';
+let legacyKbDomainWarned = false;
+function canonicalKbDomain(domain: string): string {
+  if (domain === 'semo' && CANONICAL_PLATFORM_KB_DOMAIN !== 'semo') {
+    if (!legacyKbDomainWarned && process.env.SEMICOLONY_SUPPRESS_DEPRECATION !== '1') {
+      legacyKbDomainWarned = true;
+      process.stderr.write(
+        "[semicolony] KB 도메인 'semo'는 'semicolony'로 리브랜딩됨(alias 자동변환). " +
+          "'semicolony' 사용 권장 · 미마이그레이션 DB면 'semo'로 자동 fallback. " +
+          'guide: packages/cli/MIGRATION-semo-to-semicolony.md\n',
+      );
+    }
+    return CANONICAL_PLATFORM_KB_DOMAIN;
+  }
+  return domain;
+}
+
 export class PgKbStore implements KbStore {
   constructor(
     private readonly pool: QueryRunner,
     private readonly embedding: EmbeddingProvider,
   ) {}
 
-  async get(domain: string, key: string, subKey?: string): Promise<KbEntry | null> {
+  async get(domainArg: string, key: string, subKey?: string): Promise<KbEntry | null> {
+    const domain = canonicalKbDomain(domainArg);
     const sql = `
       SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at
-      FROM semo.knowledge_base
+      FROM ${DB_SCHEMA}.knowledge_base
       WHERE domain = $1 AND key = $2 AND sub_key = $3
     `;
     const res = await this.pool.query(sql, [domain, key, subKey ?? '']);
-    const row = res.rows[0];
+    let row = res.rows[0];
+    // backward-safe: canonical 도메인이 비고(=migration 127 미적용 등) legacy 로 alias 된 경우
+    // 원본(legacy) 도메인으로 fallback 조회 → 구 환경/미마이그레이션 DB 에서도 데이터를 찾는다.
+    if (!row && domain !== domainArg) {
+      const fb = await this.pool.query(sql, [domainArg, key, subKey ?? '']);
+      row = fb.rows[0];
+    }
     if (!row) return null;
     return rowToEntry(row);
   }
@@ -83,7 +113,7 @@ export class PgKbStore implements KbStore {
 
     if (opts.domain) {
       conditions.push(`domain = $${idx++}`);
-      params.push(opts.domain);
+      params.push(canonicalKbDomain(opts.domain));
     }
     if (opts.createdBy) {
       conditions.push(`created_by = $${idx++}`);
@@ -94,7 +124,7 @@ export class PgKbStore implements KbStore {
     const sql = `
       SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at,
              ROUND((1 - (embedding <=> $1::vector))::numeric * 100, 1) AS similarity_pct
-      FROM semo.knowledge_base
+      FROM ${DB_SCHEMA}.knowledge_base
       ${where}
       ORDER BY embedding <=> $1::vector
       LIMIT $${idx}
@@ -108,7 +138,8 @@ export class PgKbStore implements KbStore {
   }
 
   async upsert(input: UpsertInput): Promise<KbEntry> {
-    const { domain, key, subKey, content, createdBy, metadata } = input;
+    const { key, subKey, content, createdBy, metadata } = input;
+    const domain = canonicalKbDomain(input.domain);
     const subKeyVal = subKey ?? '';
 
     await this.validateOntology(domain);
@@ -120,15 +151,15 @@ export class PgKbStore implements KbStore {
     const metadataJson = metadata ? JSON.stringify(metadata) : null;
 
     const sql = metadataJson
-      ? `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by, embedding, metadata)
+      ? `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, created_by, embedding, metadata)
          VALUES ($1, $2, $3, $4, $5, $6::vector, $7::jsonb)
          ON CONFLICT (domain, key, sub_key) DO UPDATE SET
            content    = EXCLUDED.content,
            embedding  = EXCLUDED.embedding,
-           metadata   = COALESCE(semo.knowledge_base.metadata, '{}'::jsonb) || EXCLUDED.metadata,
+           metadata   = COALESCE(${DB_SCHEMA}.knowledge_base.metadata, '{}'::jsonb) || EXCLUDED.metadata,
            updated_at = NOW()
          RETURNING kb_id, domain, key, sub_key, content, metadata, created_by, updated_at`
-      : `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, created_by, embedding)
+      : `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, created_by, embedding)
          VALUES ($1, $2, $3, $4, $5, $6::vector)
          ON CONFLICT (domain, key, sub_key) DO UPDATE SET
            content    = EXCLUDED.content,
@@ -145,20 +176,22 @@ export class PgKbStore implements KbStore {
   }
 
   async delete(input: DeleteInput): Promise<void> {
-    const { domain, key, subKey } = input;
+    const { key, subKey } = input;
+    const domain = canonicalKbDomain(input.domain);
     await this.pool.query(
-      'DELETE FROM semo.knowledge_base WHERE domain = $1 AND key = $2 AND sub_key = $3',
+      `DELETE FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1 AND key = $2 AND sub_key = $3`,
       [domain, key, subKey ?? ''],
     );
   }
 
   private async validateOntology(domain: string): Promise<void> {
-    const domainCheck = await this.pool.query('SELECT 1 FROM semo.ontology WHERE domain = $1', [
-      domain,
-    ]);
+    const domainCheck = await this.pool.query(
+      `SELECT 1 FROM ${DB_SCHEMA}.ontology WHERE domain = $1`,
+      [domain],
+    );
     if (domainCheck.rows.length === 0) {
       const knownDomains = await this.pool.query(
-        'SELECT domain FROM semo.ontology ORDER BY domain',
+        `SELECT domain FROM ${DB_SCHEMA}.ontology ORDER BY domain`,
       );
       const known = knownDomains.rows.map((r: { domain: string }) => r.domain);
       throw new Error(
@@ -173,14 +206,14 @@ export class PgKbStore implements KbStore {
     createdBy: string | undefined,
   ): Promise<void> {
     const typeResult = await this.pool.query(
-      'SELECT entity_type FROM semo.ontology WHERE domain = $1 AND entity_type IS NOT NULL',
+      `SELECT entity_type FROM ${DB_SCHEMA}.ontology WHERE domain = $1 AND entity_type IS NOT NULL`,
       [domain],
     );
     if (typeResult.rows.length === 0) return;
 
     const entityType = typeResult.rows[0].entity_type;
     const schemaResult = await this.pool.query(
-      "SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source FROM semo.kb_type_schema WHERE type_key = $1",
+      `SELECT scheme_key, COALESCE(key_type, 'singleton') as key_type, COALESCE(source, 'manual') as source FROM ${DB_SCHEMA}.kb_type_schema WHERE type_key = $1`,
       [entityType],
     );
     const schemas = schemaResult.rows as Array<{
@@ -286,7 +319,7 @@ export class PgKbStore implements KbStore {
     let idx = 1;
     if (opts.domain) {
       conds.push(`domain = $${idx++}`);
-      params.push(opts.domain);
+      params.push(canonicalKbDomain(opts.domain));
     }
     if (opts.key) {
       conds.push(`key = $${idx++}`);
@@ -309,7 +342,7 @@ export class PgKbStore implements KbStore {
     const offset = Math.max(0, opts.offset ?? 0);
     const sql = `
       SELECT kb_id, domain, key, sub_key, content, metadata, created_by, updated_at
-        FROM semo.knowledge_base
+        FROM ${DB_SCHEMA}.knowledge_base
        ${whereSql}
        ORDER BY ${orderCol} ${orderDir} NULLS LAST
        LIMIT ${limit} OFFSET ${offset}
@@ -326,7 +359,7 @@ export class PgKbStore implements KbStore {
     let idx = 1;
     if (opts.domain) {
       conds.push(`domain = $${idx++}`);
-      params.push(opts.domain);
+      params.push(canonicalKbDomain(opts.domain));
     }
     if (opts.key) {
       conds.push(`key = $${idx++}`);
@@ -345,7 +378,7 @@ export class PgKbStore implements KbStore {
       params.push(opts.createdBy);
     }
     const whereSql = conds.length > 0 ? `WHERE ${conds.join(' AND ')}` : '';
-    const sql = `SELECT COUNT(*)::int AS cnt FROM semo.knowledge_base ${whereSql}`;
+    const sql = `SELECT COUNT(*)::int AS cnt FROM ${DB_SCHEMA}.knowledge_base ${whereSql}`;
     const res = await this.pool.query<{ cnt: number }>(sql, params);
     return res.rows[0]?.cnt ?? 0;
   }
@@ -353,7 +386,7 @@ export class PgKbStore implements KbStore {
   async listDomains(): Promise<KbDomainSummary[]> {
     const sql = `
       SELECT domain, COUNT(*)::int AS cnt, MAX(updated_at) AS last_updated_at
-        FROM semo.knowledge_base
+        FROM ${DB_SCHEMA}.knowledge_base
        GROUP BY domain
        ORDER BY domain
     `;

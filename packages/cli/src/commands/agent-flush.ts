@@ -21,6 +21,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { getPool, closeConnection, isDbConnected } from '../database';
 import { recordCommitmentFailure, recordCommitmentSuccess } from '../commitment-escalation';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ─── Sidecar helpers ─────────────────────────────────────────────────────────
 
@@ -152,7 +153,7 @@ export function registerAgentFlushCommands(program: Command): void {
       try {
         const pool = getPool();
         await pool.query(
-          `INSERT INTO semo.bot_commitments
+          `INSERT INTO ${DB_SCHEMA}.bot_commitments
              (id, bot_id, status, title, source_type, assigned_session, session_owner, pipeline_context)
            VALUES ($1, $2, 'active', $3, 'claude-code-local', $4, $5, $6)`,
           [id, botId, title, sessionKey, owner, JSON.stringify(pipelineContext)],
@@ -193,7 +194,7 @@ export function registerAgentFlushCommands(program: Command): void {
         if (entries.length > 0) {
           const ids = entries.map((e) => e.id);
           const result = await pool.query(
-            `UPDATE semo.bot_commitments
+            `UPDATE ${DB_SCHEMA}.bot_commitments
              SET status = 'done'
              WHERE id = ANY($1::text[]) AND status IN ('pending', 'active')
              RETURNING id, bot_id, title`,
@@ -212,7 +213,7 @@ export function registerAgentFlushCommands(program: Command): void {
           // — 봇 Stop 훅이 살아있는 외부 작업을 조기 마감하는 것을 방지
           const sessionKey = parentSessionId ? localSessionKey(parentSessionId) : '';
           const result = await pool.query<{ id: string; bot_id: string; title: string }>(
-            `UPDATE semo.bot_commitments
+            `UPDATE ${DB_SCHEMA}.bot_commitments
              SET status = 'done'
              WHERE bot_id = $1
                AND status IN ('pending', 'active')
@@ -255,7 +256,7 @@ export function registerAgentFlushCommands(program: Command): void {
       try {
         const pool = getPool();
         await pool.query(
-          `INSERT INTO semo.bot_sessions
+          `INSERT INTO ${DB_SCHEMA}.bot_sessions
              (bot_id, session_key, kind, chat_type, owner, environment, status, started_at)
            VALUES ('semiclaw', $1, 'main', 'claude-code', $2, 'claude-code-local', 'active', NOW())
            ON CONFLICT (bot_id, session_key) DO UPDATE
@@ -293,7 +294,7 @@ export function registerAgentFlushCommands(program: Command): void {
         if (entries.length > 0) {
           const ids = entries.map((e) => e.id);
           const orphanResult = await pool.query<{ id: string; bot_id: string; title: string }>(
-            `UPDATE semo.bot_commitments
+            `UPDATE ${DB_SCHEMA}.bot_commitments
              SET status = 'failed',
                  metadata = COALESCE(metadata, '{}'::jsonb) || jsonb_build_object('fail_reason', 'session-end-orphan')
              WHERE id = ANY($1::text[]) AND status IN ('pending', 'active')
@@ -309,7 +310,7 @@ export function registerAgentFlushCommands(program: Command): void {
 
         // 2. 세션 terminated
         await pool.query(
-          `UPDATE semo.bot_sessions
+          `UPDATE ${DB_SCHEMA}.bot_sessions
            SET status = 'terminated', ended_at = NOW()
            WHERE bot_id = 'semiclaw' AND session_key = $1`,
           [sessionKey],

@@ -9,7 +9,7 @@
  *   - skill_definitions (prompt as content)
  *   - agent_definitions (persona_prompt as content)
  *   - command_definitions (prompt as content)
- *   - semo.skills / semo.agents / semo.commands 는 하위 호환 뷰
+ *   - ${DB_SCHEMA}.skills / ${DB_SCHEMA}.agents / ${DB_SCHEMA}.commands 는 하위 호환 뷰
  */
 
 import type { Pool, PoolClient } from 'pg';
@@ -17,6 +17,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { parseEnvContent } from './env-parser';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ~/.claude/semo/.env 자동 로드 — LaunchAgent / Claude Code 앱 / cron 등
 // 인터랙티브 쉘이 아닌 환경에서 환경변수를 공급한다.
@@ -374,7 +375,7 @@ export async function getActiveSkills(officeId?: string | null): Promise<Skill[]
              metadata->'reference_files' AS reference_files,
              category, package, is_active, is_required, install_order, version,
              office_id
-      FROM semo.skill_definitions
+      FROM ${DB_SCHEMA}.skill_definitions
       WHERE is_active = true
         AND (office_id IS NULL OR ($1::uuid IS NOT NULL AND office_id = $1::uuid))
       ORDER BY CASE WHEN office_id IS NOT NULL THEN 0 ELSE 1 END, install_order`,
@@ -423,7 +424,7 @@ export async function getActiveSkillsForBot(
               sd.category, sd.package, sd.is_active, sd.is_required,
               sd.install_order, sd.version,
               sd.office_id
-       FROM semo.skill_definitions sd
+       FROM ${DB_SCHEMA}.skill_definitions sd
        WHERE sd.is_active = true
          AND (sd.office_id IS NULL OR ($2::uuid IS NOT NULL AND sd.office_id = $2::uuid))
          AND (NOT sd.metadata ? 'bot_ids' OR sd.metadata->'bot_ids' ? $1)
@@ -532,7 +533,7 @@ export async function getBotStatusProjection(botId: string): Promise<BotStatusPr
               slack_username, slack_icon_emoji,
               derived_from, reply_as,
               is_helper, skip_projection_targets
-       FROM semo.bot_status
+       FROM ${DB_SCHEMA}.bot_status
        WHERE bot_id = $1
        LIMIT 1`,
       [botId],
@@ -559,7 +560,7 @@ export async function getPackages(layer?: string): Promise<Package[]> {
     let query = `
       SELECT id, name, display_name, description, layer, package_type,
              version, is_active, is_required, install_order
-      FROM semo.packages
+      FROM ${DB_SCHEMA}.packages
       WHERE is_active = true
     `;
     const params: string[] = [];
@@ -605,7 +606,7 @@ export async function getDelegations(botId?: string): Promise<BotDelegation[]> {
     let query = `
       SELECT id, from_bot_id, to_bot_id, delegation_type,
              domains, method, channel, max_roundtrips, priority, is_active
-      FROM semo.bot_delegation
+      FROM ${DB_SCHEMA}.bot_delegation
       WHERE is_active = true
     `;
     const params: string[] = [];
@@ -633,7 +634,7 @@ export async function getProtocol(): Promise<BotProtocol[]> {
   try {
     const result = await getPool().query(`
       SELECT id, key, value, description
-      FROM semo.bot_protocol
+      FROM ${DB_SCHEMA}.bot_protocol
       ORDER BY key
     `);
     return result.rows;
@@ -679,7 +680,7 @@ export async function getActiveBotIds(): Promise<string[]> {
 
   try {
     const result = await getPool().query(
-      `SELECT bot_id FROM semo.bot_status WHERE status != 'retired' ORDER BY bot_id`,
+      `SELECT bot_id FROM ${DB_SCHEMA}.bot_status WHERE status != 'retired' ORDER BY bot_id`,
     );
     return result.rows.map((r: { bot_id: string }) => r.bot_id);
   } catch {
@@ -696,7 +697,7 @@ export async function getBotWorkspaceFiles(botId: string): Promise<BotWorkspaceF
 
   try {
     const result = await getPool().query(
-      `SELECT file_path, content FROM semo.bot_workspace_files WHERE bot_id = $1 ORDER BY file_path`,
+      `SELECT file_path, content FROM ${DB_SCHEMA}.bot_workspace_files WHERE bot_id = $1 ORDER BY file_path`,
       [botId],
     );
     return result.rows;

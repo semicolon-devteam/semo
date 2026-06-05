@@ -24,6 +24,7 @@ import type { Pool, PoolClient } from 'pg';
  */
 export type EscalationQueryable = Pick<Pool | PoolClient, 'query'>;
 import { createHash } from 'node:crypto';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export type EscalationState = 'none' | 'notified' | 'paged';
 
@@ -120,11 +121,11 @@ export async function recordCommitmentFailure(
     }>(
       `WITH old AS (
          SELECT state, consecutive_failures
-         FROM semo.commitment_pattern_health
+         FROM ${DB_SCHEMA}.commitment_pattern_health
          WHERE pattern_id = $1
        ),
        upserted AS (
-         INSERT INTO semo.commitment_pattern_health
+         INSERT INTO ${DB_SCHEMA}.commitment_pattern_health
            (pattern_id, bot_id, title_prefix, consecutive_failures,
             last_failure_at, state, state_changed_at)
          VALUES ($1, $2, $3, 1, NOW(),
@@ -133,21 +134,21 @@ export async function recordCommitmentFailure(
                 ELSE 'none' END,
            NOW())
          ON CONFLICT (pattern_id) DO UPDATE SET
-           consecutive_failures = semo.commitment_pattern_health.consecutive_failures + 1,
+           consecutive_failures = ${DB_SCHEMA}.commitment_pattern_health.consecutive_failures + 1,
            last_failure_at = NOW(),
            state = CASE
-             WHEN semo.commitment_pattern_health.consecutive_failures + 1 >= $5 THEN 'paged'
-             WHEN semo.commitment_pattern_health.consecutive_failures + 1 >= $4 THEN 'notified'
-             ELSE semo.commitment_pattern_health.state
+             WHEN ${DB_SCHEMA}.commitment_pattern_health.consecutive_failures + 1 >= $5 THEN 'paged'
+             WHEN ${DB_SCHEMA}.commitment_pattern_health.consecutive_failures + 1 >= $4 THEN 'notified'
+             ELSE ${DB_SCHEMA}.commitment_pattern_health.state
            END,
            state_changed_at = CASE
              WHEN (CASE
-                     WHEN semo.commitment_pattern_health.consecutive_failures + 1 >= $5 THEN 'paged'
-                     WHEN semo.commitment_pattern_health.consecutive_failures + 1 >= $4 THEN 'notified'
-                     ELSE semo.commitment_pattern_health.state
-                   END) IS DISTINCT FROM semo.commitment_pattern_health.state
+                     WHEN ${DB_SCHEMA}.commitment_pattern_health.consecutive_failures + 1 >= $5 THEN 'paged'
+                     WHEN ${DB_SCHEMA}.commitment_pattern_health.consecutive_failures + 1 >= $4 THEN 'notified'
+                     ELSE ${DB_SCHEMA}.commitment_pattern_health.state
+                   END) IS DISTINCT FROM ${DB_SCHEMA}.commitment_pattern_health.state
                THEN NOW()
-             ELSE semo.commitment_pattern_health.state_changed_at
+             ELSE ${DB_SCHEMA}.commitment_pattern_health.state_changed_at
            END
          RETURNING pattern_id, consecutive_failures, state
        )
@@ -200,10 +201,10 @@ export async function recordCommitmentSuccess(
       prev_state: EscalationState;
     }>(
       `WITH old AS (
-         SELECT state FROM semo.commitment_pattern_health WHERE pattern_id = $1
+         SELECT state FROM ${DB_SCHEMA}.commitment_pattern_health WHERE pattern_id = $1
        ),
        updated AS (
-         UPDATE semo.commitment_pattern_health SET
+         UPDATE ${DB_SCHEMA}.commitment_pattern_health SET
            consecutive_failures = 0,
            last_success_at = NOW(),
            state_changed_at = CASE WHEN state <> 'none' THEN NOW() ELSE state_changed_at END,
@@ -255,7 +256,7 @@ async function claimAlert(
   const claimColumn = state === 'notified' ? 'notified_at' : 'paged_at';
   try {
     const { rows } = await pool.query<AlertClaim>(
-      `UPDATE semo.commitment_pattern_health
+      `UPDATE ${DB_SCHEMA}.commitment_pattern_health
        SET ${claimColumn} = NOW(),
            updated_at = NOW()
        WHERE pattern_id = $1

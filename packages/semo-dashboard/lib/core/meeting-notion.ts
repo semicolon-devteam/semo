@@ -8,6 +8,7 @@
 import { query } from '../db';
 import type { Meeting } from './meeting';
 import type { MeetingAnalysis } from './meeting-generate';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 const NOTION_API_BASE = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
@@ -237,7 +238,7 @@ export async function updateNotionSync(
 ): Promise<void> {
   if (result) {
     await query(
-      `UPDATE semo.meetings
+      `UPDATE ${DB_SCHEMA}.meetings
        SET notion_page_id = $2, notion_url = $3,
            notion_sync_status = 'synced', notion_sync_error = NULL,
            updated_at = NOW()
@@ -246,7 +247,7 @@ export async function updateNotionSync(
     );
   } else {
     await query(
-      `UPDATE semo.meetings
+      `UPDATE ${DB_SCHEMA}.meetings
        SET notion_sync_status = 'failed', notion_sync_error = $2,
            updated_at = NOW()
        WHERE meeting_id = $1`,

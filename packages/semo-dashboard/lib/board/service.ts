@@ -6,6 +6,7 @@ import type {
   BoardAttachmentMeta,
   UploadAttachmentInput,
 } from './types';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export type { UploadAttachmentInput } from './types';
 
@@ -17,7 +18,7 @@ const ATTACHMENT_META_COLUMNS = `id, post_id, file_name, mime_type, size_bytes, 
 export async function listCategories(): Promise<BoardCategory[]> {
   const res = await query<BoardCategory>(
     `SELECT slug, label, sort_order, is_public_allowed, created_at
-       FROM semo.board_categories
+       FROM ${DB_SCHEMA}.board_categories
       ORDER BY sort_order, slug`,
   );
   return res.rows;
@@ -70,10 +71,10 @@ export async function listPosts(
                   'mime_type', a.mime_type, 'size_bytes', a.size_bytes,
                   'created_at', a.created_at
                 ) ORDER BY a.created_at)
-                FROM semo.board_attachments a WHERE a.post_id = p.id),
+                FROM ${DB_SCHEMA}.board_attachments a WHERE a.post_id = p.id),
               '[]'::json
             ) AS attachments
-       FROM semo.board_posts p
+       FROM ${DB_SCHEMA}.board_posts p
        ${where}
       ORDER BY p.created_at DESC
       LIMIT ${limit} OFFSET ${offset}`,
@@ -97,7 +98,7 @@ export async function getPost(
     `SELECT ${POST_COLUMNS.split(',')
       .map((c) => `p.${c.trim()}`)
       .join(', ')}
-       FROM semo.board_posts p
+       FROM ${DB_SCHEMA}.board_posts p
       WHERE ${conds.join(' AND ')}
       LIMIT 1`,
     [id],
@@ -105,7 +106,7 @@ export async function getPost(
   if (!res.rows.length) return null;
 
   const attachments = await query<BoardAttachmentMeta>(
-    `SELECT ${ATTACHMENT_META_COLUMNS} FROM semo.board_attachments
+    `SELECT ${ATTACHMENT_META_COLUMNS} FROM ${DB_SCHEMA}.board_attachments
       WHERE post_id = $1
       ORDER BY created_at`,
     [id],
@@ -128,7 +129,7 @@ export interface CreatePostInput {
 export async function createPost(input: CreatePostInput): Promise<BoardPostWithAttachments> {
   return transaction(async (client) => {
     const postRes = await client.query<BoardPost>(
-      `INSERT INTO semo.board_posts
+      `INSERT INTO ${DB_SCHEMA}.board_posts
          (title, description, category_slug, uploader_id, uploader_email,
           uploader_name_snapshot, is_public)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -148,7 +149,7 @@ export async function createPost(input: CreatePostInput): Promise<BoardPostWithA
     const attachments: BoardAttachmentMeta[] = [];
     for (const a of input.attachments) {
       const aRes = await client.query<BoardAttachmentMeta>(
-        `INSERT INTO semo.board_attachments
+        `INSERT INTO ${DB_SCHEMA}.board_attachments
            (post_id, file_name, mime_type, size_bytes, file_data)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING ${ATTACHMENT_META_COLUMNS}`,
@@ -181,7 +182,7 @@ export async function updatePost(id: string, input: UpdatePostInput): Promise<Bo
   }
   if (!sets.length) {
     const res = await query<BoardPost>(
-      `SELECT ${POST_COLUMNS} FROM semo.board_posts WHERE id = $${idx}`,
+      `SELECT ${POST_COLUMNS} FROM ${DB_SCHEMA}.board_posts WHERE id = $${idx}`,
       [...params, id],
     );
     return res.rows[0] ?? null;
@@ -190,14 +191,14 @@ export async function updatePost(id: string, input: UpdatePostInput): Promise<Bo
   params.push(id);
 
   const res = await query<BoardPost>(
-    `UPDATE semo.board_posts SET ${sets.join(', ')} WHERE id = $${idx} RETURNING ${POST_COLUMNS}`,
+    `UPDATE ${DB_SCHEMA}.board_posts SET ${sets.join(', ')} WHERE id = $${idx} RETURNING ${POST_COLUMNS}`,
     params,
   );
   return res.rows[0] ?? null;
 }
 
 export async function deletePost(id: string): Promise<boolean> {
-  const res = await query(`DELETE FROM semo.board_posts WHERE id = $1`, [id]);
+  const res = await query(`DELETE FROM ${DB_SCHEMA}.board_posts WHERE id = $1`, [id]);
   return (res.rowCount ?? 0) > 0;
 }
 
@@ -210,7 +211,7 @@ export async function appendAttachments(
     const out: BoardAttachmentMeta[] = [];
     for (const a of attachments) {
       const res = await client.query<BoardAttachmentMeta>(
-        `INSERT INTO semo.board_attachments
+        `INSERT INTO ${DB_SCHEMA}.board_attachments
            (post_id, file_name, mime_type, size_bytes, file_data)
          VALUES ($1, $2, $3, $4, $5)
          RETURNING ${ATTACHMENT_META_COLUMNS}`,
@@ -218,16 +219,18 @@ export async function appendAttachments(
       );
       out.push(res.rows[0]);
     }
-    await client.query(`UPDATE semo.board_posts SET updated_at = NOW() WHERE id = $1`, [postId]);
+    await client.query(`UPDATE ${DB_SCHEMA}.board_posts SET updated_at = NOW() WHERE id = $1`, [
+      postId,
+    ]);
     return out;
   });
 }
 
 export async function deleteAttachment(attachmentId: string, postId: string): Promise<boolean> {
-  const res = await query(`DELETE FROM semo.board_attachments WHERE id = $1 AND post_id = $2`, [
-    attachmentId,
-    postId,
-  ]);
+  const res = await query(
+    `DELETE FROM ${DB_SCHEMA}.board_attachments WHERE id = $1 AND post_id = $2`,
+    [attachmentId, postId],
+  );
   return (res.rowCount ?? 0) > 0;
 }
 
@@ -244,8 +247,8 @@ export async function getAttachmentBinary(attachmentId: string): Promise<Attachm
   const res = await query<AttachmentBinary>(
     `SELECT a.file_name, a.mime_type, a.size_bytes, a.file_data,
             p.is_public, p.is_hidden
-       FROM semo.board_attachments a
-       JOIN semo.board_posts p ON p.id = a.post_id
+       FROM ${DB_SCHEMA}.board_attachments a
+       JOIN ${DB_SCHEMA}.board_posts p ON p.id = a.post_id
       WHERE a.id = $1
       LIMIT 1`,
     [attachmentId],

@@ -37,6 +37,7 @@ import {
   getPool,
   isDbConnected,
 } from '../database';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 interface Delegation {
   to_bot_id: string;
@@ -306,7 +307,10 @@ async function renderAgent(options: {
   openclawHomeDir?: string;
   force?: boolean;
   quiet?: boolean;
-}): Promise<{ spec: unknown; artifacts: Array<{ path: string; content: string; target: string }> }> {
+}): Promise<{
+  spec: unknown;
+  artifacts: Array<{ path: string; content: string; target: string }>;
+}> {
   const { spec, artifacts } = await loadRenderedAgent(options);
 
   if (options.quiet) {
@@ -332,7 +336,11 @@ async function renderAgent(options: {
 }
 
 function backupPath(filePath: string): string {
-  const stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\..+$/, '').replace('T', '-');
+  const stamp = new Date()
+    .toISOString()
+    .replace(/[-:]/g, '')
+    .replace(/\..+$/, '')
+    .replace('T', '-');
   return `${filePath}.bak-${stamp}`;
 }
 
@@ -365,11 +373,7 @@ function writeLastRenderedManifest(filePath: string, content: string): void {
   fs.writeFileSync(file, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
-function writeArtifactSafely(
-  filePath: string,
-  content: string,
-  options: { force: boolean },
-): void {
+function writeArtifactSafely(filePath: string, content: string, options: { force: boolean }): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
   if (!fs.existsSync(filePath)) {
     fs.writeFileSync(filePath, content);
@@ -592,7 +596,10 @@ async function loadRenderedAgent(options: {
   mailboxDir?: string;
   codexSkillsDir?: string;
   openclawHomeDir?: string;
-}): Promise<{ spec: unknown; artifacts: Array<{ path: string; content: string; target: string }> }> {
+}): Promise<{
+  spec: unknown;
+  artifacts: Array<{ path: string; content: string; target: string }>;
+}> {
   const connected = await isDbConnected();
   if (!connected) {
     throw new Error(
@@ -612,7 +619,13 @@ async function loadRenderedAgent(options: {
     throw new Error(`agent_definitions 에 "${sourceBotId}" 없음`);
   }
 
-  const legacyAgentPath = path.join(os.homedir(), '.claude', 'agents', sourceBotId, `${sourceBotId}.md`);
+  const legacyAgentPath = path.join(
+    os.homedir(),
+    '.claude',
+    'agents',
+    sourceBotId,
+    `${sourceBotId}.md`,
+  );
   const usesLegacyAgentFile = fs.existsSync(legacyAgentPath);
   const agentContent = usesLegacyAgentFile
     ? fs.readFileSync(legacyAgentPath, 'utf8')
@@ -712,8 +725,8 @@ async function loadAllowedProjectionDiffs(): Promise<string[]> {
   if (!(await isDbConnected())) return [];
   const result = await getPool().query(
     `SELECT content, metadata
-       FROM semo.knowledge_base
-      WHERE domain = 'semo'
+       FROM ${DB_SCHEMA}.knowledge_base
+      WHERE domain = 'semicolony'
         AND key = 'process'
         AND sub_key = 'agent-spec-projection-allowed-diffs'
       LIMIT 1`,
@@ -744,7 +757,10 @@ async function loadAllowedProjectionDiffs(): Promise<string[]> {
   return [...allowed];
 }
 
-function isAllowedDiff(row: Omit<ProjectionDiffRow, 'allowed'>, allowedPatterns: string[]): boolean {
+function isAllowedDiff(
+  row: Omit<ProjectionDiffRow, 'allowed'>,
+  allowedPatterns: string[],
+): boolean {
   const candidates = [
     row.path,
     `${row.botId}/${row.path}`,
@@ -781,14 +797,7 @@ async function diffAgents(options: {
   const legacyScript = path.resolve(options.legacyScript);
   const legacy = spawnSync(
     process.execPath,
-    [
-      legacyScript,
-      '--all',
-      '--session-dir',
-      legacySessionDir,
-      '--mailbox-dir',
-      sharedMailboxDir,
-    ],
+    [legacyScript, '--all', '--session-dir', legacySessionDir, '--mailbox-dir', sharedMailboxDir],
     {
       cwd: options.semoRoot ?? process.cwd(),
       encoding: 'utf8',
@@ -934,9 +943,9 @@ async function doctorAgents(options: {
         ? chalk.green
         : row.status === 'stale-generated'
           ? chalk.cyan
-        : row.status === 'missing'
-          ? chalk.yellow
-          : chalk.red;
+          : row.status === 'missing'
+            ? chalk.yellow
+            : chalk.red;
     console.log(`${color(row.status.padEnd(8))} ${row.botId} ${row.target} ${row.path}`);
   }
   if (rows.some((r) => r.status === 'drift')) process.exitCode = 2;
@@ -1011,7 +1020,11 @@ export function registerAgentFactoryCommands(program: Command): void {
     .command('render')
     .description('Team AgentSpec 렌더링 (ClaudeCode/Codex/OpenClaw artifacts)')
     .requiredOption('--id <botId>', '봇 ID')
-    .option('--targets <csv>', 'claude-code,codex-skill,openclaw', 'claude-code,codex-skill,openclaw')
+    .option(
+      '--targets <csv>',
+      'claude-code,codex-skill,openclaw',
+      'claude-code,codex-skill,openclaw',
+    )
     .option('--semo-root <path>', 'SEMO repo root')
     .option('--session-dir <path>', 'ClaudeCode session dir')
     .option('--mailbox-dir <path>', 'SEMO mailbox dir')
@@ -1083,11 +1096,7 @@ export function registerAgentFactoryCommands(program: Command): void {
     .command('diff')
     .description('legacy generate-bot-env 출력과 AgentSpec renderer 출력 byte diff')
     .requiredOption('--ids <csv>', '비교할 봇 ID 목록')
-    .option(
-      '--legacy-script <path>',
-      'legacy generator script',
-      'scripts/generate-bot-env.js',
-    )
+    .option('--legacy-script <path>', 'legacy generator script', 'scripts/generate-bot-env.js')
     .option('--semo-root <path>', 'SEMO repo root')
     .option('--json', 'JSON 출력')
     .option('--keep-tmp', 'diff tmpdir 삭제하지 않기')

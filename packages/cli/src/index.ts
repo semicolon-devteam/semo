@@ -40,7 +40,7 @@ import { registerBotsCommands } from './commands/bots';
 import { registerGetCommands } from './commands/get';
 import { registerSessionsCommands } from './commands/sessions';
 import { registerDbCommands } from './commands/db';
-import { registerPersonaCommands } from './commands/persona';
+import { registerPersonaCommands, syncHermesPersonas } from './commands/persona';
 import { registerGuardCommands } from './commands/guard';
 import { registerMemoryCommands } from './commands/memory';
 import { registerTestCommands } from './commands/test';
@@ -61,6 +61,7 @@ import { registerTopologyCommand } from './commands/topology';
 import { registerModelsCommands } from './commands/models';
 import { registerExecCommand } from './commands/exec';
 import { registerRuntimeCommands } from './commands/runtime';
+import { registerCustomerCommands } from './commands/customer-runtime';
 import { registerHostSignalsCommands } from './commands/host-signals';
 import { registerMigrateSqliteCommand } from './commands/migrate-sqlite.js';
 import { registerUpdateCommand } from './commands/update.js';
@@ -213,8 +214,9 @@ const isWindows =
 const program = new Command();
 
 program
-  .name('semo')
-  .description('SEMO CLI - AI Agent Orchestration Framework')
+  // SEMO→semicolony 리브랜딩: 표준 이름은 semicolony. `semo`/`semo-cli` 는 무기한 호환 bin alias.
+  .name('semicolony')
+  .description('semicolony CLI - AI Agent Orchestration Framework')
   .version(VERSION, '-V, --version', '버전 번호만 출력');
 
 // === version 명령어 (상세 버전 정보) ===
@@ -442,6 +444,16 @@ program
       console.log(chalk.green('  ✓ semo/SOUL.md 생성됨 (오케스트레이터 페르소나)'));
     } catch (err) {
       console.log(chalk.yellow(`  ⚠ SOUL.md 생성 실패: ${err}`));
+    }
+    // 5b. DB agent_personas(SoT) → hermes 프로파일 SOUL.md 렌더 — Semi/Colony/Operator 행동을
+    //     이 환경에 반영(신규/기존 설치가 DB 수정사항을 자동 반영, portable).
+    try {
+      const n = await syncHermesPersonas({ quiet: true });
+      console.log(
+        chalk.green(`  ✓ base 에이전트 persona ${n}개 DB→hermes 동기화 (Semi/Colony/Operator)`),
+      );
+    } catch (err) {
+      console.log(chalk.yellow(`  ⚠ persona 동기화 실패: ${err}`));
     }
     generateMemoryMd();
     console.log(chalk.green('  ✓ semo/MEMORY.md 생성됨 (KB 인덱스)'));
@@ -777,7 +789,7 @@ async function buildKbFirstBlock(): Promise<string> {
     // 1. 타입스키마: 타입별 scheme_key 목록
     const schemaRows = await pool.query(
       `SELECT type_key, scheme_key, required, scheme_description
-       FROM semo.kb_type_schema ORDER BY type_key, sort_order, scheme_key`,
+       FROM ${DB_SCHEMA}.kb_type_schema ORDER BY type_key, sort_order, scheme_key`,
     );
     const typeSchemas = new Map<
       string,
@@ -795,7 +807,7 @@ async function buildKbFirstBlock(): Promise<string> {
 
     // 2. 온톨로지: 엔티티 타입별 도메인 목록
     const ontoRows = await pool.query(
-      `SELECT entity_type, domain, description FROM semo.ontology ORDER BY entity_type, domain`,
+      `SELECT entity_type, domain, description FROM ${DB_SCHEMA}.ontology ORDER BY entity_type, domain`,
     );
     const entities = new Map<string, { domain: string; desc: string }[]>();
     for (const r of ontoRows.rows) {
@@ -1479,6 +1491,7 @@ registerModelsCommands(modelsCmd);
 // === exec 명령어 (ExecutionTarget 단발 dispatch smoke test) ===
 registerExecCommand(program);
 registerRuntimeCommands(program);
+registerCustomerCommands(program);
 registerHostSignalsCommands(program);
 registerMigrateSqliteCommand(program);
 registerUpdateCommand(program);
@@ -1594,6 +1607,7 @@ import {
   generateEmbeddings,
   KBEntry,
 } from './kb';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // Re-implement readSyncState locally (simple file read)
 function readSyncState(cwd: string): {
@@ -1860,7 +1874,7 @@ kbCmd
       const pool = getPool();
       const client = await pool.connect();
 
-      let sql = 'SELECT kb_id, domain, key, sub_key, content FROM semo.knowledge_base WHERE 1=1';
+      let sql = `SELECT kb_id, domain, key, sub_key, content FROM ${DB_SCHEMA}.knowledge_base WHERE 1=1`;
       const params: string[] = [];
       let pIdx = 1;
       if (!options.force) sql += ' AND embedding IS NULL';
@@ -1919,7 +1933,7 @@ kbCmd
             continue;
           }
           await client.query(
-            'UPDATE semo.knowledge_base SET embedding = $1::vector WHERE kb_id = $2',
+            `UPDATE ${DB_SCHEMA}.knowledge_base SET embedding = $1::vector WHERE kb_id = $2`,
             [`[${emb.join(',')}]`, slice[j].kb_id],
           );
         }
@@ -2028,7 +2042,7 @@ kbCmd
       }
       const res = await pool.query(
         `SELECT history_id, kb_id, operation, changed_by, changed_at::text AS changed_at, kb_snapshot
-         FROM semo.knowledge_base_history
+         FROM ${DB_SCHEMA}.knowledge_base_history
          WHERE ${where}
          ORDER BY changed_at DESC
          LIMIT ${limit}`,
@@ -2648,7 +2662,7 @@ kbCmd
 
         // KB 엔트리 수 확인
         const countRes = await pool.query(
-          'SELECT COUNT(*)::int AS cnt FROM semo.knowledge_base WHERE domain = $1',
+          `SELECT COUNT(*)::int AS cnt FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1`,
           [options.domain],
         );
         const kbCount: number = countRes.rows[0].cnt;
@@ -2976,7 +2990,7 @@ ontoCmd
 
       // KB 엔트리 수 확인
       const countRes = await pool.query(
-        'SELECT COUNT(*)::int AS cnt FROM semo.knowledge_base WHERE domain = $1',
+        `SELECT COUNT(*)::int AS cnt FROM ${DB_SCHEMA}.knowledge_base WHERE domain = $1`,
         [domain],
       );
       const kbCount: number = countRes.rows[0].cnt;

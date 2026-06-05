@@ -1,9 +1,11 @@
 import * as path from 'path';
-import * as os from 'os';
+import { envDual, resolveSemoHome } from './env.js';
 
-const SEMO_ROOT = path.join(os.homedir(), '.semo');
-const sessionsDir = process.env.SEMO_SESSION_DIR ?? path.join(SEMO_ROOT, 'sessions');
-const mailboxDir = process.env.SEMO_MAILBOX_DIR ?? path.join(SEMO_ROOT, 'mailbox');
+// SEMO→semicolony 호환: 홈/세션/메일박스 모두 dual-read (SEMICOLONY_* > SEMO_* > default).
+// Phase 0 단계 default 는 ~/.semo 라 동작 불변.
+const SEMO_ROOT = resolveSemoHome();
+const sessionsDir = envDual('SESSION_DIR') ?? path.join(SEMO_ROOT, 'sessions');
+const mailboxDir = envDual('MAILBOX_DIR') ?? path.join(SEMO_ROOT, 'mailbox');
 const workspacesDir = path.join(SEMO_ROOT, 'workspaces');
 
 export const SEMO_PATHS = {
@@ -19,6 +21,9 @@ export const SEMO_PATHS = {
   botMailbox: (botId: string) => path.join(mailboxDir, botId),
   botWorkspace: (botId: string) => path.join(workspacesDir, botId),
 } as const;
+
+/** SEMO→semicolony 리브랜딩 alias. 신규 코드는 SEMICOLONY_PATHS 를 쓰도록 점진 전환. */
+export const SEMICOLONY_PATHS = SEMO_PATHS;
 
 export function resolveBotWorkspace(botId: string): string {
   return path.join(workspacesDir, botId);

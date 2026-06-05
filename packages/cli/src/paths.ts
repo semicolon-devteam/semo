@@ -19,7 +19,8 @@ import * as os from 'os';
 import * as fs from 'fs';
 
 export function semoHome(): string {
-  return process.env.SEMO_HOME || path.join(os.homedir(), '.semo');
+  // SEMO→semicolony 호환: SEMICOLONY_HOME > SEMO_HOME > ~/.semo (Phase 0 default 불변).
+  return process.env.SEMICOLONY_HOME || process.env.SEMO_HOME || path.join(os.homedir(), '.semo');
 }
 
 export function claudeHome(): string {

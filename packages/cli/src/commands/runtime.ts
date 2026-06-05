@@ -17,6 +17,7 @@ import * as os from 'os';
 import { randomUUID } from 'crypto';
 import { getPool, closeConnection, isDbConnected } from '../database';
 import { buildHermesProvisionPlan, ensureHermesProvisioned } from './hermes-provision.js';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 interface CommonRuntime {
   ClaudeCodeAdapter: new (opts?: Record<string, unknown>) => HostAdapterLike;
@@ -44,6 +45,7 @@ interface HostAdapterLike {
     botId: string;
     session: { hostSessionId: string; rolloutPath?: string };
     prompt: string;
+    personaEnvelope?: string;
     timeoutMs?: number;
     context?: Record<string, unknown>;
   }): Promise<{
@@ -139,11 +141,33 @@ function semoMailboxDir(): string {
   return process.env.SEMO_MAILBOX_DIR ?? path.join(os.homedir(), '.semo', 'mailbox');
 }
 
+/**
+ * 동적 에이전트 personaEnvelope 로드 — agent_personas.soul_md 우선, 없으면 agent_definitions.persona_prompt.
+ * 둘 다 없으면 undefined(envelope 없이 base profile 행동으로 fallback).
+ */
+async function loadPersonaEnvelope(botId: string): Promise<string | undefined> {
+  const pool = getPool();
+  try {
+    const p = await pool.query<{ soul_md: string }>(
+      `SELECT soul_md FROM ${DB_SCHEMA}.agent_personas WHERE slug = $1 AND status = 'active' LIMIT 1`,
+      [botId],
+    );
+    if (p.rows[0]?.soul_md) return p.rows[0].soul_md;
+    const d = await pool.query<{ persona_prompt: string }>(
+      `SELECT persona_prompt FROM semo.agent_definitions WHERE name = $1 LIMIT 1`,
+      [botId],
+    );
+    return d.rows[0]?.persona_prompt || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function loadBotRecord(botId: string): Promise<BotRecord | null> {
   const pool = getPool();
   const r = await pool.query(
     `SELECT bot_id, config, workspace_path
-     FROM semo.bot_status WHERE bot_id = $1 LIMIT 1`,
+     FROM ${DB_SCHEMA}.bot_status WHERE bot_id = $1 LIMIT 1`,
     [botId],
   );
   return (r.rows[0] as BotRecord | undefined) ?? null;
@@ -173,11 +197,16 @@ function buildAdapterFromHostKind(
       return new m.ClaudeCodeAdapter(ctorOpts);
     case 'codex-cli':
       return new m.CodexCliAdapter(ctorOpts);
-    case 'openclaw':
+    case 'openclaw': {
       if (opts.openclawBinary) ctorOpts.binaryPath = opts.openclawBinary;
+      // 자체 openclaw 프로필이 없는 동적/고객 에이전트는 config.openclaw_profile 로 기존 프로필 차용.
+      const ocProfile = (bot.config as Record<string, unknown> | undefined)?.openclaw_profile;
+      if (typeof ocProfile === 'string' && ocProfile) ctorOpts.profileOverride = ocProfile;
       // bot.config.openclaw_workspace 의 부모 디렉토리를 workspaceParent 로 (~/.openclaw-{bot} 패턴 유지).
       return new m.OpenClawAdapter(ctorOpts);
+    }
     case 'ollama-cli':
+      ctorOpts.model = (bot.config as Record<string, unknown> | undefined)?.ollama_model;
       return new m.OllamaCliAdapter(ctorOpts);
     case 'hermes-cli':
       if (opts.hermesBinary) ctorOpts.binaryPath = opts.hermesBinary;
@@ -435,6 +464,16 @@ export function registerRuntimeCommands(program: Command): void {
     .requiredOption('--bot <id>', '봇 식별자 (bot_status.bot_id)')
     .option('--interval-ms <n>', '폴링 주기 ms', '5000')
     .option('--once', '한 번만 처리하고 종료 (테스트용)')
+    .option(
+      '--idle-exit-ms <n>',
+      'forever 모드에서 이 시간(ms) 동안 새 메시지가 없으면 종료 (ephemeral 워커; 0=비활성)',
+      '0',
+    )
+    .option(
+      '--max-message-age-ms <n>',
+      'inbox 메시지가 이 나이(ms)보다 오래됐으면 dispatch 없이 consumed 처리 (stale 백로그 드레인 방지; 0=비활성)',
+      '0',
+    )
     .option('--openclaw-binary <path>', 'openclaw 바이너리 절대경로 (PATH 미등록 환경)')
     .option('--hermes-binary <path>', 'hermes 바이너리 절대경로 (PATH 미등록 환경)')
     .option('--hermes-home <path>', 'Hermes HERMES_HOME 격리 디렉토리')
@@ -459,6 +498,8 @@ export function registerRuntimeCommands(program: Command): void {
         bot: string;
         intervalMs: string;
         once?: boolean;
+        idleExitMs?: string;
+        maxMessageAgeMs?: string;
         openclawBinary?: string;
         hermesBinary?: string;
         hermesHome?: string;
@@ -492,6 +533,35 @@ export function registerRuntimeCommands(program: Command): void {
           await closeConnection();
           process.exit(1);
         }
+
+        // 봇당 워커 1 보장 (Codex #4: migration 089 는 동시성 보장 아님 → 별도 claim lock).
+        // 전용 connection 에 session-level advisory lock 을 잡고 워커 생애 동안 유지(에이전트별 순차 큐).
+        // 다른 워커가 이미 점유 중이면 즉시 종료(중복 워커·경쟁 방지). 프로세스 종료 시 자동 해제.
+        const lockClient = await getPool().connect();
+        const lockKey = `semo-serve:${opts.bot}`;
+        const lockRes = await lockClient.query<{ locked: boolean }>(
+          `SELECT pg_try_advisory_lock(hashtext($1)) AS locked`,
+          [lockKey],
+        );
+        if (!lockRes.rows[0]?.locked) {
+          console.error(chalk.yellow(`⏭  '${opts.bot}' 워커가 이미 실행 중 — 종료(중복 방지).`));
+          lockClient.release();
+          await closeConnection();
+          process.exit(0);
+        }
+        const releaseLock = () => {
+          try {
+            lockClient.release();
+          } catch {
+            /* 종료 경로 — 무시 */
+          }
+        };
+        process.once('exit', releaseLock);
+        process.once('SIGTERM', () => {
+          releaseLock();
+          process.exit(0);
+        });
+
         const hostKind = bot.config?.host_kind ?? 'claude-code';
         if (hostKind === 'hermes-cli' || hostKind === 'hermes-desktop') {
           const plan = buildHermesProvisionPlan({
@@ -507,6 +577,20 @@ export function registerRuntimeCommands(program: Command): void {
           opts.hermesHome = plan.home ?? undefined;
           opts.hermesProfile = plan.profile;
         }
+
+        // 동적 에이전트: DB 정의(agent_personas.soul_md / agent_definitions.persona_prompt)를
+        // personaEnvelope 로 로드해 dispatch 시 in-band 주입(per-agent profile 불필요).
+        // config.use_persona_envelope 인 봇만 — 기존 profile-기반 봇(Semi/Colony)은 자기 SOUL.md 사용(무변).
+        let dynamicPersonaEnvelope: string | undefined;
+        if ((bot.config as Record<string, unknown> | undefined)?.use_persona_envelope) {
+          dynamicPersonaEnvelope = await loadPersonaEnvelope(opts.bot);
+          console.log(
+            chalk.dim(
+              `[serve] persona envelope ${dynamicPersonaEnvelope ? `loaded (${dynamicPersonaEnvelope.length} chars)` : 'not found in DB'}`,
+            ),
+          );
+        }
+
         const m = await loadCommon();
         const adapter = buildAdapterFromHostKind(m, hostKind, bot, {
           openclawBinary: opts.openclawBinary,
@@ -545,6 +629,8 @@ export function registerRuntimeCommands(program: Command): void {
 
         const intervalMs = Math.max(1000, Number(opts.intervalMs));
         const timeoutMs = Math.max(5000, Number(opts.timeoutMs));
+        const idleExitMs = Math.max(0, Number(opts.idleExitMs ?? 0));
+        const maxMessageAgeMs = Math.max(0, Number(opts.maxMessageAgeMs ?? 0));
         const sessionTtlMs = Math.max(0, Number(opts.sessionTtlMs));
         if (opts.resetSessionMap && fs.existsSync(sessionMapPath)) fs.unlinkSync(sessionMapPath);
 
@@ -553,7 +639,12 @@ export function registerRuntimeCommands(program: Command): void {
         console.log(`  host_kind:  ${chalk.green(hostKind)} (${probe.detail ?? 'ok'})`);
         console.log(`  mailbox:    ${chalk.gray(mboxDir)}`);
         console.log(`  interval:   ${intervalMs}ms`);
-        console.log(`  mode:       ${opts.once ? 'once' : 'forever'}\n`);
+        console.log(
+          `  mode:       ${opts.once ? 'once' : idleExitMs > 0 ? `ephemeral(idle-exit ${idleExitMs}ms)` : 'forever'}`,
+        );
+        console.log(
+          `  stale-guard: ${maxMessageAgeMs > 0 ? `${maxMessageAgeMs}ms 초과 메시지 skip` : 'off'}\n`,
+        );
 
         let stopRequested = false;
         const onShutdown = (signal: string) => {
@@ -569,16 +660,33 @@ export function registerRuntimeCommands(program: Command): void {
 
         let totalProcessed = 0;
         let totalErrors = 0;
+        let totalStaleSkipped = 0;
+        let lastActivityAt = Date.now();
 
         while (!stopRequested) {
           fs.writeFileSync(heartbeatPath, new Date().toISOString());
           try {
             const newMessages = readNewInboxMessages(inboxPath, consumedPath);
+            if (newMessages.length > 0) lastActivityAt = Date.now();
             for (const msg of newMessages) {
               if (stopRequested) break;
               if (msg.type !== 'message') {
                 appendConsumed(consumedPath, msg.id);
                 continue;
+              }
+              // stale 가드: 너무 오래된 메시지는 dispatch 없이 소비 (orphan 백로그 드레인 → 실채널 노이즈 방지).
+              if (maxMessageAgeMs > 0 && typeof msg.timestamp === 'string') {
+                const msgTs = Date.parse(msg.timestamp);
+                if (Number.isFinite(msgTs) && Date.now() - msgTs > maxMessageAgeMs) {
+                  appendConsumed(consumedPath, msg.id);
+                  totalStaleSkipped++;
+                  console.log(
+                    chalk.yellow(
+                      `[serve] stale skip ${msg.id.slice(0, 8)} (age ${Math.round((Date.now() - msgTs) / 1000)}s > ${Math.round(maxMessageAgeMs / 1000)}s)`,
+                    ),
+                  );
+                  continue;
+                }
               }
               const t0 = Date.now();
               process.stdout.write(
@@ -596,7 +704,10 @@ export function registerRuntimeCommands(program: Command): void {
                 const r = await adapter.dispatch({
                   botId: opts.bot,
                   session,
-                  prompt: composePrompt(msg),
+                  // 동적 에이전트 행동 envelope 를 프롬프트에 prepend (adapter-agnostic — ollama/codex 등 모두 적용).
+                  prompt: dynamicPersonaEnvelope
+                    ? `# 당신의 정체성·행동 정의 (아래 에이전트로서 응답한다)\n${dynamicPersonaEnvelope}\n\n---\n\n${composePrompt(msg)}`
+                    : composePrompt(msg),
                   timeoutMs,
                   context: { runtimeSessionReused: sessionReused, runtimeSessionKey: sessionKey },
                 });
@@ -678,11 +789,21 @@ export function registerRuntimeCommands(program: Command): void {
             console.error(chalk.red(`[serve] poll error: ${(err as Error).message}`));
           }
           if (opts.once) break;
+          // ephemeral 워커: idle 이 idleExitMs 를 넘으면 큐가 빈 것으로 보고 종료
+          // (supervisor 가 새 inbox 도착 시 재spawn). 처리 직후엔 lastActivityAt 갱신되어 즉시 종료 안 함.
+          if (idleExitMs > 0 && Date.now() - lastActivityAt >= idleExitMs) {
+            console.log(
+              chalk.gray(`\n[serve] idle ${idleExitMs}ms 초과 — 큐 비어 종료(ephemeral).`),
+            );
+            break;
+          }
           await sleep(intervalMs);
         }
 
         console.log(
-          chalk.gray(`\n[serve] 종료. processed=${totalProcessed}, errors=${totalErrors}`),
+          chalk.gray(
+            `\n[serve] 종료. processed=${totalProcessed}, errors=${totalErrors}, staleSkipped=${totalStaleSkipped}`,
+          ),
         );
         await closeConnection();
         process.exit(0);

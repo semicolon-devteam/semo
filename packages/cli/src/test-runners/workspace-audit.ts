@@ -12,6 +12,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { resolveBotWorkspace } from '../paths';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ============================================================
 // Types
@@ -349,14 +350,14 @@ export async function runDeclarativeWorkspaceAudit(pool: Pool): Promise<TestOutp
   const { rows: rules } = await pool.query<WorkspaceRule>(
     `SELECT path_pattern, entry_type, level, severity, category,
             bot_scope, bot_ids, symlink_target, content_rules, description
-     FROM semo.bot_workspace_standard
+     FROM ${DB_SCHEMA}.bot_workspace_standard
      WHERE spec_version = '2.0'
      ORDER BY category, level DESC, path_pattern`,
   );
 
   // 2. Load bot list from DB
   const { rows: bots } = await pool.query<{ bot_id: string }>(
-    `SELECT DISTINCT bot_id FROM semo.bot_status WHERE bot_id != 'shared' ORDER BY bot_id`,
+    `SELECT DISTINCT bot_id FROM ${DB_SCHEMA}.bot_status WHERE bot_id != 'shared' ORDER BY bot_id`,
   );
 
   const results: TestOutputLine[] = [];

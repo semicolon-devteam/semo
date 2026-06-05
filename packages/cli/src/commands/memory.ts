@@ -15,6 +15,7 @@ import * as crypto from 'crypto';
 import { getPool, closeConnection } from '../database';
 import { resolveBotWorkspace } from '../paths';
 import { generateEmbedding } from '../kb';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ============================================================
 // Types
@@ -179,7 +180,7 @@ async function syncMemories(
       const client = await pool.connect();
       try {
         await client.query(
-          `INSERT INTO semo.knowledge_base (domain, key, sub_key, content, metadata, created_by, embedding)
+          `INSERT INTO ${DB_SCHEMA}.knowledge_base (domain, key, sub_key, content, metadata, created_by, embedding)
            VALUES ($1, $2, $3, $4, $5, $6, $7::vector)
            ON CONFLICT (domain, key, sub_key) DO UPDATE SET
              content = EXCLUDED.content,

@@ -1,7 +1,7 @@
 /**
  * Bot ID Alias Resolution
  *
- * bot_id는 불변(immutable). 표시명 변경은 semo.bot_id_aliases 테이블로 해결한다.
+ * bot_id는 불변(immutable). 표시명 변경은 ${DB_SCHEMA}.bot_id_aliases 테이블로 해결한다.
  * 예: 한 봇의 표시명이 바뀌어도 기존 inbox/메일박스/FK 를 유지하기 위해 alias 행을
  * 추가하고 입력 별칭을 canonical 로 변환한다.
  *
@@ -16,6 +16,7 @@
  */
 
 import { Pool } from 'pg';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export type BotAliasMap = Map<string, string>;
 
@@ -28,7 +29,7 @@ export async function loadBotAliases(pool: Pool): Promise<BotAliasMap> {
   try {
     const result = await pool.query(
       `SELECT alias, canonical_bot_id
-       FROM semo.bot_id_aliases
+       FROM ${DB_SCHEMA}.bot_id_aliases
        WHERE retired_at IS NULL`,
     );
     for (const row of result.rows) {

@@ -1,7 +1,7 @@
 /**
  * semo cron — 크론잡 관리 (DB-first)
  *
- * semo.bot_cron_jobs 테이블이 SoT. 파일 의존 없이 DB 직접 CRUD.
+ * ${DB_SCHEMA}.bot_cron_jobs 테이블이 SoT. 파일 의존 없이 DB 직접 CRUD.
  *
  * Subcommands:
  *   semo cron list            — DB 크론잡 목록 + deploy_status
@@ -28,6 +28,7 @@ import {
   recordCommitmentSuccess,
   appendCommitmentEvent,
 } from '@team-semicolon/semo-common';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 const CRON_TZ = 'Asia/Seoul';
 const POLLER_JOB_ID = 'cron-poller-tick';
@@ -201,7 +202,7 @@ async function cronList(opts: { bot?: string; enabledOnly?: boolean; format?: st
     const result = await pool.query<CronJobRow>(
       `SELECT bot_id, job_id, name, schedule, enabled, last_run, next_run,
               session_target, payload, trigger_id, deploy_status, last_deploy_at
-       FROM semo.bot_cron_jobs ${where}
+       FROM ${DB_SCHEMA}.bot_cron_jobs ${where}
        ORDER BY bot_id, name`,
       params,
     );
@@ -282,7 +283,7 @@ async function cronExport(opts: { bot?: string }) {
 
     const result = await pool.query<CronJobRow>(
       `SELECT bot_id, job_id, name, schedule, enabled, payload, trigger_id, deploy_status
-       FROM semo.bot_cron_jobs
+       FROM ${DB_SCHEMA}.bot_cron_jobs
        WHERE ${conditions.join(' AND ')}
        ORDER BY bot_id, name`,
       params,
@@ -350,7 +351,7 @@ async function cronBackfillNextRun(opts: { dryRun?: boolean }) {
     schedule: Record<string, unknown>;
   }>(
     `SELECT bot_id, job_id, name, schedule
-       FROM semo.bot_cron_jobs
+       FROM ${DB_SCHEMA}.bot_cron_jobs
       WHERE enabled = TRUE AND next_run IS NULL`,
   );
   const rows = res.rows;
@@ -373,7 +374,7 @@ async function cronBackfillNextRun(opts: { dryRun?: boolean }) {
         console.log(`  [dry] ${row.bot_id}/${row.job_id} → ${next.toISOString()}`);
       } else {
         await pool.query(
-          `UPDATE semo.bot_cron_jobs SET next_run = $1, synced_at = NOW()
+          `UPDATE ${DB_SCHEMA}.bot_cron_jobs SET next_run = $1, synced_at = NOW()
             WHERE bot_id = $2 AND job_id = $3`,
           [next, row.bot_id, row.job_id],
         );
@@ -415,7 +416,7 @@ async function cronTick(opts: { dryRun?: boolean; limit?: number; json?: boolean
     const selectRes = await client.query<CronJobRow>(
       `SELECT bot_id, job_id, name, schedule, enabled, last_run, next_run,
               session_target, payload, trigger_id, deploy_status, last_deploy_at
-         FROM semo.bot_cron_jobs
+         FROM ${DB_SCHEMA}.bot_cron_jobs
         WHERE enabled = TRUE
           AND job_id <> $1
           AND (next_run IS NULL OR next_run <= NOW())
@@ -434,7 +435,7 @@ async function cronTick(opts: { dryRun?: boolean; limit?: number; json?: boolean
         params.push(r.bot_id, r.job_id);
       });
       await client.query(
-        `UPDATE semo.bot_cron_jobs SET last_run = NOW(), synced_at = NOW()
+        `UPDATE ${DB_SCHEMA}.bot_cron_jobs SET last_run = NOW(), synced_at = NOW()
           WHERE (bot_id, job_id) IN (${values.join(',')})`,
         params,
       );
@@ -456,7 +457,7 @@ async function cronTick(opts: { dryRun?: boolean; limit?: number; json?: boolean
         const next = computeNextRun(row.schedule, now);
         if (next) {
           await pool.query(
-            `UPDATE semo.bot_cron_jobs SET next_run = $1 WHERE bot_id = $2 AND job_id = $3`,
+            `UPDATE ${DB_SCHEMA}.bot_cron_jobs SET next_run = $1 WHERE bot_id = $2 AND job_id = $3`,
             [next, row.bot_id, row.job_id],
           );
         }
@@ -529,7 +530,7 @@ async function cronMarkRun(opts: {
     await client.query('BEGIN');
 
     const jobRes = await client.query<{ name: string; schedule: Record<string, unknown> }>(
-      `SELECT name, schedule FROM semo.bot_cron_jobs
+      `SELECT name, schedule FROM ${DB_SCHEMA}.bot_cron_jobs
        WHERE bot_id = $1 AND job_id = $2
        FOR UPDATE`,
       [opts.botId, opts.jobId],
@@ -572,7 +573,7 @@ async function cronMarkRun(opts: {
 
     const commitmentTitle = `cron: ${job.name}`;
     await client.query(
-      `INSERT INTO semo.bot_commitments
+      `INSERT INTO ${DB_SCHEMA}.bot_commitments
          (id, bot_id, status, title, description,
           source_type, source_ref,
           assigned_session, session_owner,
@@ -638,14 +639,14 @@ async function cronMarkRun(opts: {
     let consecutiveFailures = 0;
     if (opts.status === 'skipped') {
       const cur = await client.query<{ consecutive_failures: number }>(
-        `SELECT consecutive_failures FROM semo.bot_cron_jobs
+        `SELECT consecutive_failures FROM ${DB_SCHEMA}.bot_cron_jobs
          WHERE bot_id = $1 AND job_id = $2`,
         [opts.botId, opts.jobId],
       );
       consecutiveFailures = cur.rows[0]?.consecutive_failures ?? 0;
     } else {
       const rollup = await client.query<{ consecutive_failures: number }>(
-        `UPDATE semo.bot_cron_jobs
+        `UPDATE ${DB_SCHEMA}.bot_cron_jobs
             SET last_run = $1::timestamptz,
                 last_status = $2,
                 last_error = LEFT($3, 500),
@@ -687,7 +688,7 @@ async function cronMarkDeployed(opts: { jobId: string; triggerId: string }) {
 
   try {
     const result = await pool.query(
-      `UPDATE semo.bot_cron_jobs
+      `UPDATE ${DB_SCHEMA}.bot_cron_jobs
        SET trigger_id = $1, deploy_status = 'deployed', last_deploy_at = NOW()
        WHERE job_id = $2
        RETURNING bot_id, name`,
@@ -746,7 +747,7 @@ async function cronCreate(opts: {
     }
 
     const result = await pool.query(
-      `INSERT INTO semo.bot_cron_jobs
+      `INSERT INTO ${DB_SCHEMA}.bot_cron_jobs
          (bot_id, job_id, name, schedule, enabled, session_target, payload, synced_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
        RETURNING job_id`,
@@ -822,7 +823,7 @@ async function cronUpdate(opts: {
     params.push(opts.jobId);
 
     const result = await pool.query(
-      `UPDATE semo.bot_cron_jobs SET ${sets.join(', ')} WHERE job_id = $${idx} RETURNING bot_id, name`,
+      `UPDATE ${DB_SCHEMA}.bot_cron_jobs SET ${sets.join(', ')} WHERE job_id = $${idx} RETURNING bot_id, name`,
       params,
     );
 
@@ -846,7 +847,7 @@ async function cronDelete(opts: { jobId: string }) {
 
   try {
     const result = await pool.query(
-      `DELETE FROM semo.bot_cron_jobs WHERE job_id = $1 RETURNING bot_id, name`,
+      `DELETE FROM ${DB_SCHEMA}.bot_cron_jobs WHERE job_id = $1 RETURNING bot_id, name`,
       [opts.jobId],
     );
 
@@ -870,7 +871,7 @@ async function cronToggle(jobId: string, enabled: boolean) {
 
   try {
     const result = await pool.query(
-      `UPDATE semo.bot_cron_jobs SET enabled = $1, synced_at = NOW() WHERE job_id = $2 RETURNING bot_id, name`,
+      `UPDATE ${DB_SCHEMA}.bot_cron_jobs SET enabled = $1, synced_at = NOW() WHERE job_id = $2 RETURNING bot_id, name`,
       [enabled, jobId],
     );
 
@@ -971,15 +972,15 @@ async function cronImport(opts: { file: string; bot?: string; dryRun?: boolean }
           (job.state?.nextRunAtMs ? new Date(job.state.nextRunAtMs as number).toISOString() : null);
 
         const result = await client.query(
-          `INSERT INTO semo.bot_cron_jobs
+          `INSERT INTO ${DB_SCHEMA}.bot_cron_jobs
              (bot_id, job_id, name, schedule, enabled, last_run, next_run, session_target, payload, synced_at)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
            ON CONFLICT (bot_id, job_id) DO UPDATE SET
              name = EXCLUDED.name,
              schedule = EXCLUDED.schedule,
              enabled = EXCLUDED.enabled,
-             last_run = COALESCE(EXCLUDED.last_run, semo.bot_cron_jobs.last_run),
-             next_run = COALESCE(EXCLUDED.next_run, semo.bot_cron_jobs.next_run),
+             last_run = COALESCE(EXCLUDED.last_run, ${DB_SCHEMA}.bot_cron_jobs.last_run),
+             next_run = COALESCE(EXCLUDED.next_run, ${DB_SCHEMA}.bot_cron_jobs.next_run),
              session_target = EXCLUDED.session_target,
              payload = EXCLUDED.payload,
              synced_at = NOW()

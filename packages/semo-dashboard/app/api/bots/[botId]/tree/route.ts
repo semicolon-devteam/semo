@@ -2,13 +2,11 @@ import { NextResponse } from 'next/server';
 import { getBotFiles } from '@/lib/github';
 import { query } from '@/lib/db';
 import type { FileTreeEntry } from '@/types';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(
-  req: Request,
-  { params }: { params: Promise<{ botId: string }> }
-) {
+export async function GET(req: Request, { params }: { params: Promise<{ botId: string }> }) {
   try {
     const { botId } = await params;
 
@@ -30,9 +28,9 @@ export async function GET(
     try {
       const prefix = subpath ? `${subpath}/` : '';
       const result = await query<{ file_path: string; file_size: number }>(
-        `SELECT file_path, file_size FROM semo.bot_workspace_files
+        `SELECT file_path, file_size FROM ${DB_SCHEMA}.bot_workspace_files
          WHERE bot_id = $1 AND file_path LIKE $2`,
-        [botId, `${prefix}%`]
+        [botId, `${prefix}%`],
       );
 
       if (result.rows.length > 0) {
@@ -71,7 +69,7 @@ export async function GET(
       // Fallback to GitHub API
       try {
         const ghFiles = await getBotFiles(botId, subpath);
-        entries = ghFiles.map(f => ({
+        entries = ghFiles.map((f) => ({
           name: f.name,
           path: subpath ? `${subpath}/${f.name}` : f.name,
           type: f.type === 'dir' ? 'directory' : 'file',

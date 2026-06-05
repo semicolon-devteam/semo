@@ -7,6 +7,7 @@
 
 import { Pool } from 'pg';
 import { loadBotAliases, type BotAliasMap } from './bot-alias.js';
+const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // ── Interfaces ──
 
@@ -191,7 +192,7 @@ export async function loadRoutingConfig(pool: Pool): Promise<RoutingConfig> {
   let validBotIds: string[];
   try {
     const botResult = await pool.query(
-      `SELECT bot_id FROM semo.bot_status WHERE status != 'retired' ORDER BY bot_id`,
+      `SELECT bot_id FROM ${DB_SCHEMA}.bot_status WHERE status != 'retired' ORDER BY bot_id`,
     );
     validBotIds = botResult.rows.map((r) => r.bot_id);
     if (validBotIds.length === 0) validBotIds = [...FALLBACK_BOT_IDS];
@@ -207,8 +208,8 @@ export async function loadRoutingConfig(pool: Pool): Promise<RoutingConfig> {
     // role 키 외에 identity/delegation 안에도 "### GFP Phase 담당" 표 둘 수 있도록 multiple 키 허용.
     const kbResult = await pool.query(
       `SELECT kb.domain AS bot_id, kb.content
-       FROM semo.knowledge_base kb
-       JOIN semo.ontology o ON o.domain = kb.domain AND o.entity_type = 'agents'
+       FROM ${DB_SCHEMA}.knowledge_base kb
+       JOIN ${DB_SCHEMA}.ontology o ON o.domain = kb.domain AND o.entity_type = 'agents'
        WHERE kb.key IN ('role', 'identity', 'delegation') AND (kb.sub_key = '' OR kb.sub_key IS NULL)`,
     );
     for (const row of kbResult.rows) {
@@ -236,7 +237,7 @@ export async function loadRoutingConfig(pool: Pool): Promise<RoutingConfig> {
   try {
     const delResult = await pool.query(
       `SELECT to_bot_id, domains, metadata
-       FROM semo.bot_delegation
+       FROM ${DB_SCHEMA}.bot_delegation
        WHERE from_bot_id = 'orchestrator' AND delegation_type = 'routing' AND is_active = true
        ORDER BY COALESCE((metadata->>'order')::int, 999)`,
     );
@@ -257,7 +258,7 @@ export async function loadRoutingConfig(pool: Pool): Promise<RoutingConfig> {
   try {
     const skillResult = await pool.query(
       `SELECT to_bot_id, domains, metadata
-       FROM semo.bot_delegation
+       FROM ${DB_SCHEMA}.bot_delegation
        WHERE from_bot_id = 'orchestrator' AND delegation_type = 'skill-routing' AND is_active = true
        ORDER BY id`,
     );
@@ -286,9 +287,9 @@ export async function loadRoutingConfig(pool: Pool): Promise<RoutingConfig> {
   try {
     const intentResult = await pool.query(
       `SELECT kb.domain AS bot_id, kb.content
-       FROM semo.knowledge_base kb
-       JOIN semo.ontology o ON o.domain = kb.domain
-       JOIN semo.bot_status bs ON bs.bot_id = kb.domain
+       FROM ${DB_SCHEMA}.knowledge_base kb
+       JOIN ${DB_SCHEMA}.ontology o ON o.domain = kb.domain
+       JOIN ${DB_SCHEMA}.bot_status bs ON bs.bot_id = kb.domain
        WHERE o.entity_type = 'agents'
          AND kb.key = 'delegation'
          AND (kb.sub_key = '' OR kb.sub_key IS NULL)
