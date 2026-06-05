@@ -15,6 +15,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { getPool } from '../database';
+import { ensureTenantGatewayCredential } from './gateway-credentials';
 const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 function mailboxDir(botId: string): string {
@@ -488,6 +489,8 @@ export interface CreatedAgent extends ProjectedAgent {
   listingId: string;
   installId: string;
   notifiedAdmin: boolean;
+  /** Colony 가 KB 게이트웨이를 호출할 자격증명. created=true 면 token 을 Colony env(SEMICOLONY_API_KEY)로 주입. */
+  gatewayKey?: { created: boolean; token?: string };
 }
 
 /**
@@ -568,7 +571,17 @@ export async function createPlainAgent(
     /* action_items 스키마 상이 시 무시 — 생성 자체는 성공 */
   }
 
-  return { ...projected, listingId, installId, notifiedAdmin };
+  // Colony 가 중앙 KB 게이트웨이를 호출할 자격증명 보장(테넌트당 활성 키 없으면 발급).
+  // 단일-DB-접근 불변식: Colony 는 이 키로만 게이트웨이를 통해 KB/persona 에 접근한다.
+  // 실패해도 에이전트 생성은 성공으로 본다(후속 `semo gateway issue-key` 수동 발급 가능).
+  let gatewayKey: { created: boolean; token?: string } | undefined;
+  try {
+    gatewayKey = await ensureTenantGatewayCredential(tenantSlug, { issuedBy: 'customer-runtime' });
+  } catch {
+    /* 게이트웨이 자격증명 발급 실패 — 생성 자체는 성공 */
+  }
+
+  return { ...projected, listingId, installId, notifiedAdmin, gatewayKey };
 }
 
 // ── 위임 오케스트레이션 (Semi 가 호출할 핵심 로직) ───────────────────────────

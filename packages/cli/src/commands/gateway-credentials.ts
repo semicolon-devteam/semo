@@ -75,6 +75,73 @@ function printToken(token: string, prefix: string, slug: string): void {
   console.log(chalk.gray(`  Colony env: export SEMICOLONY_API_KEY=${token}\n`));
 }
 
+export interface IssueCredentialResult {
+  id: string;
+  token: string; // 평문 — 1회만 노출
+  tokenPrefix: string;
+  scopes: string[];
+}
+
+/** 테넌트에 새 자격증명 발급(평문 토큰 반환). CLI·provisioning 공용 issuance 단일 경로. */
+export async function issueGatewayCredentialForTenant(opts: {
+  tenantId: string;
+  tenantSlug: string;
+  scopes?: string[];
+  issuedBy?: string;
+  expiresDays?: string | number;
+}): Promise<IssueCredentialResult> {
+  const pool = getPool();
+  const scopes = opts.scopes && opts.scopes.length ? opts.scopes : DEFAULT_SCOPES;
+  const { token, tokenHash, tokenPrefix } = generateTenantToken(opts.tenantSlug);
+  const hasExpiry = opts.expiresDays != null && String(opts.expiresDays).length > 0;
+  const sql = `
+    INSERT INTO ${DB_SCHEMA}.gateway_credentials
+      (tenant_id, tenant_slug, token_hash, token_prefix, scopes, issued_by, expires_at)
+    VALUES ($1, $2, $3, $4, $5, $6, ${hasExpiry ? `now() + ($7 || ' days')::interval` : 'NULL'})
+    RETURNING id`;
+  const params = hasExpiry
+    ? [
+        opts.tenantId,
+        opts.tenantSlug,
+        tokenHash,
+        tokenPrefix,
+        scopes,
+        opts.issuedBy ?? 'cli',
+        String(opts.expiresDays),
+      ]
+    : [opts.tenantId, opts.tenantSlug, tokenHash, tokenPrefix, scopes, opts.issuedBy ?? 'cli'];
+  const { rows } = await pool.query<{ id: string }>(sql, params);
+  return { id: rows[0].id, token, tokenPrefix, scopes };
+}
+
+/**
+ * 테넌트에 활성 자격증명이 없으면 발급(idempotent). provisioning(고객 install)용.
+ * @returns created=false → 기존 활성 키 존재(평문 없음). created=true → 신규 token 반환(Colony env 주입용).
+ */
+export async function ensureTenantGatewayCredential(
+  tenantSlug: string,
+  opts: { scopes?: string[]; issuedBy?: string } = {},
+): Promise<{ created: boolean; token?: string; tokenPrefix?: string }> {
+  const pool = getPool();
+  const t = await pool.query<{ id: string }>(`SELECT id FROM public.tenants WHERE slug = $1`, [
+    tenantSlug,
+  ]);
+  const tenantId = t.rows[0]?.id;
+  if (!tenantId) throw new Error(`tenant not found: ${tenantSlug}`);
+  const active = await pool.query<{ n: number }>(
+    `SELECT count(*)::int n FROM ${DB_SCHEMA}.gateway_credentials WHERE tenant_id = $1 AND status = 'active'`,
+    [tenantId],
+  );
+  if ((active.rows[0]?.n ?? 0) > 0) return { created: false };
+  const r = await issueGatewayCredentialForTenant({
+    tenantId,
+    tenantSlug,
+    scopes: opts.scopes,
+    issuedBy: opts.issuedBy ?? 'provisioning',
+  });
+  return { created: true, token: r.token, tokenPrefix: r.tokenPrefix };
+}
+
 export function registerGatewayCommands(program: Command): void {
   const gw = program
     .command('gateway')
@@ -91,26 +158,15 @@ export function registerGatewayCommands(program: Command): void {
         try {
           const tenant = await resolveTenant(opts.tenant);
           const scopes = parseScopes(opts.scopes);
-          const { token, tokenHash, tokenPrefix } = generateTenantToken(tenant.slug);
-          const sql = `
-          INSERT INTO ${DB_SCHEMA}.gateway_credentials
-            (tenant_id, tenant_slug, token_hash, token_prefix, scopes, issued_by, expires_at)
-          VALUES ($1, $2, $3, $4, $5, $6, ${opts.expiresDays ? `now() + ($7 || ' days')::interval` : 'NULL'})
-          RETURNING id`;
-          const insertParams = opts.expiresDays
-            ? [
-                tenant.id,
-                tenant.slug,
-                tokenHash,
-                tokenPrefix,
-                scopes,
-                opts.issuedBy,
-                opts.expiresDays,
-              ]
-            : [tenant.id, tenant.slug, tokenHash, tokenPrefix, scopes, opts.issuedBy];
-          const { rows } = await getPool().query<{ id: string }>(sql, insertParams);
+          const { id, token, tokenPrefix } = await issueGatewayCredentialForTenant({
+            tenantId: tenant.id,
+            tenantSlug: tenant.slug,
+            scopes,
+            issuedBy: opts.issuedBy,
+            expiresDays: opts.expiresDays,
+          });
           printToken(token, tokenPrefix, tenant.slug);
-          console.log(chalk.gray(`  id=${rows[0].id}  scopes=[${scopes.join(', ')}]`));
+          console.log(chalk.gray(`  id=${id}  scopes=[${scopes.join(', ')}]`));
         } catch (err) {
           console.error(chalk.red(`❌ ${err instanceof Error ? err.message : String(err)}`));
           process.exitCode = 1;

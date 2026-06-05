@@ -1,7 +1,7 @@
 # SemiColony 멀티테넌트 KB 게이트웨이 — 설계 & 스캐폴딩
 
 - **날짜**: 2026-06-05
-- **상태**: Phase 1 스캐폴딩 (코드/마이그 작성·검증 완료, 라이브 적용·배포 대기)
+- **상태**: Phase 1 완료 — 마이그 라이브 적용 + e2e 13/13 라이브 검증 + provisioning wiring 포함. (이미지 배포만 대기)
 - **결정 SoT(KB)**:
   - `semicolony/decision/semicolony-kb-access-via-multitenant-api-gateway` (원 결정)
   - `semicolony/decision/semicolony-gateway-tenancy-auth-persona-resolved` (3 오픈포인트 확정)
@@ -127,6 +127,21 @@ adversarial verify 가 정확히 기각. VERIFIED 항목: 해시 일치(CLI sha2
 - `/kb/search` tenant 분기: 클라이언트 `domain` 무시 명시.
 
 검증 후: kb-gateway vitest **40/40**, tsc 클린.
+
+## 10. 라이브 적용·검증 (2026-06-05)
+
+- **마이그 적용**: `semo db migrate`(레포 소스 경유) 로 128+129 라이브 적용. `knowledge_base`에 tenant_id/scope,
+  `gateway_credentials` 테이블, CHECK 2종, `idx_kb_tenant`, `ontology_types`에 `tenant-kb` 시드 확인.
+  (※ `ontology.entity_type → ontology_types` FK 때문에 `tenant-kb` 타입 시드를 129 에 추가.)
+- **E2E 라이브 13/13 PASS** (실 appdb, 2 테스트 테넌트, 임베딩 실제 호출, 종료 후 잔여 0):
+  upsert→t-{slug}+tenant_id+scope / get 격리(B는 A키 404) / search 격리(B는 A행 제외) / client domain 무시 /
+  persona 자기 OK·교차 404 / read-only scope 403 / invalid bearer 401 / revoke 즉시 401.
+- **CLI 라이브**: `gateway issue-key/list-keys/revoke-key` 동작 확인.
+- **provisioning wiring**: `issueGatewayCredentialForTenant` + `ensureTenantGatewayCredential`(idempotent) 추가,
+  `createPlainAgent` 가 install 시 자동 ensure(실패해도 생성은 성공). ensure idempotency 라이브 PASS.
+  → CreatedAgent.gatewayKey.token 을 Colony env `SEMICOLONY_API_KEY` 로 주입(provisioning 스크립트가 사용).
+- **Dockerfile**: `packages/kb-gateway/Dockerfile`(모노레포 컨텍스트) + `Dockerfile.dockerignore` 작성.
+  ⚠️ 이 환경은 Docker 데몬 미가동이라 빌드 검증 미수행 — 배포 파이프라인에서 빌드 필요.
 
 ## 8. 운영 메모 (환경 사고, 2026-06-05)
 

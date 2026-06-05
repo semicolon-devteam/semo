@@ -14,6 +14,16 @@
 --   → 여기엔 트랜잭션 구문을 넣지 않는다. `public.` 은 retarget 대상이 아니므로 appdb 공용 스키마 그대로 유지.
 
 -- ============================================================
+-- 0) ontology_types: 'tenant-kb' 타입 등록
+--    ontology.entity_type → ontology_types.type_key FK 가 있으므로, 게이트웨이가 런타임에
+--    per-tenant 도메인(t-{slug})을 ontology 에 등록하려면 이 타입이 먼저 존재해야 한다.
+--    팀 서비스 카탈로그 타입(service/module/agents…)과 분리된 고객 KB 전용 타입.
+-- ============================================================
+INSERT INTO semo.ontology_types (type_key, schema, description)
+VALUES ('tenant-kb', '{}'::jsonb, '고객(Colony) 테넌트 KB 네임스페이스 — per-tenant 도메인 t-{slug}')
+ON CONFLICT (type_key) DO NOTHING;
+
+-- ============================================================
 -- 1) knowledge_base: 테넌트 스코프 (가산적·비파괴, 128 패턴 동형)
 -- ============================================================
 ALTER TABLE semo.knowledge_base

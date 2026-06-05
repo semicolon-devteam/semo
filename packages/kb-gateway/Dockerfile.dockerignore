@@ -1,0 +1,11 @@
+# kb-gateway 빌드 컨텍스트(=레포 루트)에서 제외 — 이미지 슬림화/빌드 가속.
+# (참고: docker build 는 -f packages/kb-gateway/Dockerfile . 로 루트에서 실행)
+**/node_modules
+**/dist
+**/.git
+**/.tmp
+**/*.log
+**/__tests__
+**/*.test.ts
+**/coverage
+.semo
