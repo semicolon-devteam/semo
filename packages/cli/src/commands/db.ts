@@ -19,6 +19,29 @@ const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA
 // ============================================================
 
 /**
+ * 마이그레이션 SQL 의 `semo.` 스키마 한정자를 활성 스키마로 재작성한다.
+ *
+ * flip(`SEMICOLONY_DB_SCHEMA=semicolony`) 후 신규 마이그레이션이 stale `semo` 가 아니라
+ * 활성 스키마에 적용되도록 한다(두 스키마 divergence 방지). 기본 `'semo'` 면 완전 no-op.
+ *
+ * - `(?<![\w./])semo\.` : qualified ref(DDL/DML/함수본문 $$..$$/dynamic SQL `'semo.x'`)만 매치.
+ *   경로형 doc 문자열 `~/.semo.env`(앞이 `.`)·NOTIFY 채널 `semo_kb_change`(점 없음)·
+ *   데이터 리터럴 `domain='semo'`/`'semobot'`/`table_schema='semo'`(점 없음)는 자동 배제.
+ * - `CREATE|DROP SCHEMA ... semo` : bare 스키마명(fresh install 대상) 재작성.
+ *
+ * 검증된 clone 스크립트(scripts/clone-schema-semo-to-semicolony.mjs)의 `rw()` 와 동치이되
+ * negative-lookbehind 로 경로형 false-positive 까지 배제.
+ */
+export function retargetSchemaSql(sql: string, schema: string): string {
+  if (schema === 'semo') return sql;
+  let out = sql.replace(/(?<![\w./])semo\./g, `${schema}.`);
+  out = out.replace(/\b(?:CREATE|DROP)\s+SCHEMA(?:\s+IF\s+(?:NOT\s+)?EXISTS)?\s+semo\b/gi, (m) =>
+    m.replace(/\bsemo\b/, schema),
+  );
+  return out;
+}
+
+/**
  * migrations/ 디렉토리 위치 — 번들/unbundled 양쪽 호환.
  *
  * unbundled (tsc 산출물): dist/commands/db.js → __dirname = dist/commands → ../../ = pkg root → ../../migrations
@@ -82,7 +105,8 @@ async function runMigration(filename: string): Promise<void> {
   const pool = getPool();
   const client = await pool.connect();
   const filePath = path.join(MIGRATIONS_DIR, filename);
-  const sql = fs.readFileSync(filePath, 'utf-8');
+  // `semo.` 한정자를 활성 스키마로 retarget (기본 'semo' 면 no-op). flip 후 divergence 방지.
+  const sql = retargetSchemaSql(fs.readFileSync(filePath, 'utf-8'), DB_SCHEMA);
   const version = filename.replace(/\.sql$/, '');
 
   try {
