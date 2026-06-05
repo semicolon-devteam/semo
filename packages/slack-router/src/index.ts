@@ -122,7 +122,17 @@ const COLONY_BOT_ID = process.env.COLONY_BOT_ID || 'colony';
 // 비어 있으면 operator 비활성(보안 기본값). 도구 없는 대화형 — APPLY_PERSONA 블록을 라우터가 적용.
 const OPERATOR_BOT_ID = process.env.OPERATOR_BOT_ID || 'operator';
 const OPERATOR_HERMES_PROFILE = process.env.OPERATOR_HERMES_PROFILE || 'semo-operator';
-const OPERATOR_ADMIN_CHANNEL = process.env.OPERATOR_ADMIN_CHANNEL || '';
+// OPERATOR_ADMIN_CHANNEL 은 콤마구분 다채널 지원(단일값도 호환). 빈값=operator 비활성.
+const OPERATOR_ADMIN_CHANNELS: Set<string> = new Set(
+  (process.env.OPERATOR_ADMIN_CHANNEL || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean),
+);
+const OPERATOR_ADMIN_CHANNEL = [...OPERATOR_ADMIN_CHANNELS][0] || ''; // primary(하위호환)
+function isOperatorChannel(ch: string): boolean {
+  return OPERATOR_ADMIN_CHANNELS.has(ch);
+}
 // operator 코드-변경 위임 — auto-merge 가능한 PR 을 만드므로 명시적 opt-in(기본 off).
 // 설계: docs/superpowers/specs/2026-06-03-operator-code-change-capability-design.md
 const OPERATOR_CODE_ENABLED = process.env.OPERATOR_CODE_ENABLED === '1';
@@ -1250,8 +1260,8 @@ if (SEMO_PRIMARY_BOT_ID === SEMI_BOT_ID) {
     canManageAgents: false,
     timeoutMs: SEMI_HERMES_TIMEOUT_MS,
   };
-  // Operator — 관리 채널이 설정된 경우에만 활성. base persona(SOUL) SoT 편집 전용.
-  if (OPERATOR_ADMIN_CHANNEL) {
+  // Operator — 관리 채널이 1개 이상 설정된 경우에만 활성. base persona(SOUL) SoT 편집 전용.
+  if (OPERATOR_ADMIN_CHANNELS.size > 0) {
     ORCHESTRATORS[OPERATOR_BOT_ID] = {
       botId: OPERATOR_BOT_ID,
       hermesHome: SEMI_HERMES_HOME,
@@ -1965,7 +1975,7 @@ async function handleOrchestrator(
 
   // operator(personaAdmin)는 지정 관리 채널 밖에서는 동작하지 않는다 — 전용 앱이 다른 채널에
   // 초대돼 route_bot_id=operator 로 들어와도 방어(채널 게이트는 모든 전달 경로에서 강제).
-  if (cfg.personaAdmin && OPERATOR_ADMIN_CHANNEL && msg.channel !== OPERATOR_ADMIN_CHANNEL) {
+  if (cfg.personaAdmin && OPERATOR_ADMIN_CHANNELS.size > 0 && !isOperatorChannel(msg.channel)) {
     await slack.postAsBot(
       cfg.botId,
       msg.channel,
@@ -2475,8 +2485,8 @@ async function handleSlackMessage(msg: SlackMessage, senderName: string): Promis
   // 채널 게이트로 접근 제한하므로 route_bot_id 무관. Semi orchestrator 가 가로채기 전에 최우선 체크.
   if (
     ORCHESTRATORS[OPERATOR_BOT_ID] &&
-    OPERATOR_ADMIN_CHANNEL &&
-    msg.channel === OPERATOR_ADMIN_CHANNEL &&
+    OPERATOR_ADMIN_CHANNELS.size > 0 &&
+    isOperatorChannel(msg.channel) &&
     shouldTriggerOperatorAdminRoute(msg.text, operatorMentionToken)
   ) {
     await handleOrchestrator(msg, senderName, ORCHESTRATORS[OPERATOR_BOT_ID]);
