@@ -1,7 +1,7 @@
 /**
  * semo-workspace — ~/.claude/semo/ 디렉토리 관리
  *
- * OpenClaw 봇 워크스페이스 스키마를 로컬에 미러링하여
+ * 봇 워크스페이스 스키마(DB SoT: bot_status/agent_personas)를 로컬에 미러링하여
  * 로컬 Claude Code 세션이 봇 환경과 동형(isomorphic) 구조로 동작하게 한다.
  *
  * v4.5.0: onboarding/init 통합 — 글로벌 단일 설정
@@ -339,13 +339,13 @@ ${kbFirstBlock}
 ## 3자 동기화 규칙 (NON-NEGOTIABLE)
 
 > 모든 SEMO 프로젝트의 변경은 3자 동기화 관점에서 평가되어야 한다.
-> 3자 = **소스코드** ↔ **KB 포함 DB** ↔ **OpenClaw 봇 워크스페이스 로컬 파일**
+> 3자 = **소스코드** ↔ **KB 포함 DB** ↔ **봇 로컬 파일** (DB → 로컬 미러)
 
 | 축 | 위치 | 예시 |
 |----|------|------|
 | **소스코드** | 각 프로젝트 레포 | API 라우트, 타입, 마이그레이션 |
 | **KB 포함 DB** | semo-kb (PostgreSQL + 벡터 임베딩) | 프로세스, 봇 역할, 온톨로지 |
-| **봇 로컬 파일** | \`~/.semo/workspaces/{botId}/\` + \`~/.claude/semo/\` | SOUL.md, skills/, memory/ |
+| **봇 로컬 파일** | \`~/.claude/semo/\` + \`~/.claude/semo/bots/{botId}/\` (DB→로컬 미러) | SOUL.md, skills/, memory/ |
 
 **변경 시 체크리스트**:
 1. **소스코드 변경** → KB와 봇 파일에 반영할 내용이 있는가?
