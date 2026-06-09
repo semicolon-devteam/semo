@@ -21,6 +21,7 @@
 1. **그라운딩 = KB(속성·정책) + 온톨로지(관계)**. 관계 단독 금지. (속성은 KB, 관계는 entity_relations — 둘을 합쳐 컨텍스트)
 2. **에이전트는 지식 밖을 단정하지 않는다** — 누락은 "확인 후 안내". (응대문구뿐 아니라 모든 모듈 공통 안전규칙)
 3. 추출(T0.2)은 통제 어휘 강제 + **confidence 보정/few-shot 필요**(LLM이 관계 오매핑·과소확신 경향). 관계 enum에 카탈로그 관계(in_category/has_variant)가 contains_item과 혼동되지 않게 추출 프롬프트 가드.
+   - ✅ **v3 수정 검증(`e0-extraction-quality-v3.mjs`)**: 어휘+설명 제시 + 규칙(카탈로그=in_category, 주문관계 금지; 속성=KB) + few-shot 2개 → 8/8 valid 어휘, 무효 0, **카탈로그 contains_item 오용=false(v1=true)**, confidence 전부 ≥0.85. 추출 품질 레슨 닫힘.
 
 ## 입증 vs 잔여
 
