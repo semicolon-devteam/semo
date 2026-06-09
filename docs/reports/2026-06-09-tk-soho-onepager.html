@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>소상공인 AI 업무 시스템 — 1장 요약</title>
+<style>
+  :root{
+    --ink:#0f1222;--ink2:#3a3f56;--muted:#727892;--line:#e7e9f0;--bg:#fff;--soft:#f6f7fb;--softer:#fafbfe;
+    --brand:#5b4ef0;--brand2:#8b5cf6;--brandsoft:#efecff;--brandline:#ded7ff;
+    --green:#0f9d6b;--greensoft:#e6f6ef;--greenline:#c7ebd9;
+    --amber:#c2870b;--ambersoft:#fcf3df;--amberline:#f2e3bc;
+    --orange:#d9601a;--orangesoft:#fdeee2;--red:#d23b4e;--redsoft:#fcebed;--redline:#f3d2d7;
+    --blue:#2f72d6;--bluesoft:#e7f0fb;
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{font-family:'Apple SD Gothic Neo','Pretendard',-apple-system,system-ui,sans-serif;color:var(--ink);font-size:10px;line-height:1.42;-webkit-font-smoothing:antialiased;}
+  .sheet{width:186mm;margin:0 auto;padding:0;}
+  h1,h2,h3{margin:0;line-height:1.2;letter-spacing:-0.01em;} p{margin:0;}
+
+  /* header */
+  .head{display:flex;align-items:center;gap:11px;padding:13px 16px;border-radius:14px;background:linear-gradient(135deg,#1c1940 0%,#3a2da8 60%,#5b4ef0 100%);color:#fff;position:relative;overflow:hidden;}
+  .head::after{content:"";position:absolute;right:-50px;top:-60px;width:190px;height:190px;background:radial-gradient(circle,rgba(139,92,246,.55),transparent 65%);}
+  .mark{flex:0 0 auto;display:flex;align-items:center;gap:8px;z-index:1;}
+  .mark .glyph{width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:15px;}
+  .mark .wm{font-size:12px;font-weight:800;letter-spacing:-.01em;line-height:1.05;} .mark .wm span{display:block;font-size:8px;font-weight:600;color:#c7c2ff;letter-spacing:.06em;}
+  .head .tt{z-index:1;flex:1;} .head .kick{font-size:8px;letter-spacing:.18em;text-transform:uppercase;color:#c7c2ff;font-weight:700;}
+  .head h1{font-size:17px;font-weight:800;margin:2px 0 0;} .head .when{z-index:1;text-align:right;font-size:8.5px;color:#cfcaf5;line-height:1.5;} .head .when b{color:#fff;}
+
+  /* verdict */
+  .verdict{margin-top:9px;background:var(--brandsoft);border:1px solid var(--brandline);border-radius:12px;padding:9px 13px;display:flex;gap:10px;align-items:center;}
+  .verdict .dot{flex:0 0 auto;width:26px;height:26px;border-radius:8px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;}
+  .verdict .t{font-size:10px;line-height:1.45;} .verdict .t b{color:var(--brand);}
+
+  /* two-layer diagram */
+  .diagram{margin-top:9px;display:grid;grid-template-columns:1fr 30px 1fr;gap:0;align-items:stretch;}
+  .layer{border-radius:12px;padding:10px 12px;border:1px solid;}
+  .layer.brain{background:var(--bluesoft);border-color:#cfe0f6;} .layer.hand{background:var(--greensoft);border-color:var(--greenline);}
+  .layer .lh{display:flex;align-items:center;gap:7px;margin-bottom:5px;}
+  .layer .ico{width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;}
+  .layer.brain .ico{background:var(--blue);} .layer.hand .ico{background:var(--green);}
+  .layer .lh .nm{font-size:11px;font-weight:800;} .layer.brain .nm{color:var(--blue);} .layer.hand .nm{color:var(--green);}
+  .layer .lh .loc{font-size:8px;font-weight:700;margin-left:auto;border-radius:999px;padding:2px 7px;}
+  .layer.brain .loc{background:#fff;color:var(--blue);border:1px solid #cfe0f6;} .layer.hand .loc{background:#fff;color:var(--green);border:1px solid var(--greenline);}
+  .layer .desc{font-size:9px;color:var(--ink2);line-height:1.4;}
+  .layer .tags{margin-top:5px;display:flex;flex-wrap:wrap;gap:4px;}
+  .layer .tag{font-size:8px;font-weight:600;border-radius:6px;padding:2px 6px;background:#fff;}
+  .layer.brain .tag{color:var(--blue);border:1px solid #d8e4f7;} .layer.hand .tag{color:var(--green);border:1px solid #cdeadd;}
+  .conn{display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--muted);}
+  .conn .line{width:1px;flex:1;background:repeating-linear-gradient(to bottom,var(--muted) 0 3px,transparent 3px 6px);}
+  .conn .ar{font-size:13px;color:var(--brand);font-weight:800;}
+
+  /* section title */
+  .row{display:grid;gap:9px;margin-top:9px;}
+  .row.r2{grid-template-columns:1.05fr 0.95fr;} .row.r3{grid-template-columns:1fr 1fr 1fr;}
+  .box{border:1px solid var(--line);border-radius:12px;padding:9px 12px;background:#fff;}
+  .box .bh{display:flex;align-items:center;gap:7px;margin-bottom:6px;}
+  .box .bh .tab{width:4px;height:14px;border-radius:3px;background:var(--brand);}
+  .box .bh h2{font-size:11px;font-weight:800;} .box .bh .n{font-size:8px;color:var(--muted);font-weight:600;margin-left:auto;}
+
+  /* spec list */
+  .spec{list-style:none;margin:0;padding:0;}
+  .spec li{display:flex;gap:7px;padding:3.5px 0;border-top:1px dashed var(--line);font-size:9px;line-height:1.35;}
+  .spec li:first-child{border-top:none;padding-top:0;}
+  .spec .k{flex:0 0 60px;font-weight:800;color:var(--ink);}
+  .spec .v{color:var(--ink2);} .spec .v b{color:var(--ink);font-weight:700;}
+  .chip{display:inline-block;background:var(--soft);color:var(--ink2);border-radius:6px;padding:1px 6px;font-size:8px;font-weight:600;margin:1px 2px 0 0;}
+  .chip.h{background:var(--greensoft);color:var(--green);font-weight:700;}
+
+  /* differentiator */
+  .diff{background:linear-gradient(135deg,#f4f1ff,#efecff);border:1px solid var(--brandline);border-radius:12px;padding:10px 13px;}
+  .diff .lab{font-size:8px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--brand);}
+  .diff .big{font-size:12.5px;font-weight:800;margin:3px 0 4px;line-height:1.35;} .diff .big b{color:var(--brand);}
+  .diff .vs{display:flex;gap:8px;margin-top:6px;font-size:8.5px;}
+  .diff .vs .c{flex:1;border-radius:8px;padding:6px 8px;line-height:1.35;}
+  .diff .vs .no{background:#fff;border:1px solid var(--line);color:var(--muted);} .diff .vs .no b{color:var(--ink2);}
+  .diff .vs .yes{background:#fff;border:1px solid var(--brandline);color:var(--ink2);} .diff .vs .yes b{color:var(--brand);}
+
+  /* gauge */
+  .gaugewrap{display:flex;align-items:center;gap:14px;}
+  .gaugewrap .cap{font-size:8.5px;color:var(--muted);line-height:1.4;}
+  .gaugewrap .cap b{color:var(--ink);font-weight:700;}
+
+  /* timeline */
+  .phase{display:flex;gap:9px;align-items:flex-start;padding:5px 0;border-top:1px dashed var(--line);}
+  .phase:first-child{border-top:none;padding-top:0;}
+  .phase .num{flex:0 0 auto;width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:11px;}
+  .phase.p1 .num{background:var(--green);} .phase.p2 .num{background:var(--orange);}
+  .phase .pb h3{font-size:9.5px;font-weight:800;} .phase .pb .wn{font-size:8px;color:var(--muted);font-weight:600;}
+  .phase .pb .ds{font-size:8.5px;color:var(--ink2);margin-top:1px;}
+
+  /* price */
+  .price{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;}
+  .price .amt{font-size:20px;font-weight:800;color:var(--brand);letter-spacing:-.02em;}
+  .price .unit{font-size:9px;color:var(--ink2);font-weight:600;}
+  .price .goal{margin-left:auto;font-size:8.5px;font-weight:700;color:var(--green);background:var(--greensoft);border:1px solid var(--greenline);border-radius:999px;padding:2px 8px;}
+  .pmeta{margin-top:5px;font-size:8.5px;color:var(--ink2);line-height:1.45;} .pmeta b{color:var(--ink);font-weight:700;}
+
+  /* risks */
+  .risk{border:1px solid var(--redline);background:var(--redsoft);border-radius:10px;padding:7px 9px;}
+  .risk h3{font-size:9px;font-weight:800;color:var(--red);margin-bottom:2px;}
+  .risk p{font-size:8.2px;color:var(--ink2);line-height:1.38;}
+
+  .foot{margin-top:9px;padding-top:7px;border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:7.8px;}
+  .foot .wmf{font-weight:800;color:var(--brand);}
+
+  @page{size:A4;margin:9mm 8mm;}
+  @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}.sheet{width:auto;}}
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <!-- HEADER -->
+  <div class="head">
+    <div class="mark">
+      <div class="glyph">S</div>
+      <div class="wm">SemiColony<span>SOHO AI WORKER</span></div>
+    </div>
+    <div class="tt">
+      <div class="kick">사업 의사결정 1장 요약 · 발표용</div>
+      <h1>소상공인용 AI 업무 시스템 — 1차 사양</h1>
+    </div>
+    <div class="when">작성 <b>2026-06-09</b><br>대상 <b>태권님</b><br>상태 <b>1차 사양 잠금</b></div>
+  </div>
+
+  <!-- VERDICT -->
+  <div class="verdict">
+    <div class="dot">✓</div>
+    <div class="t"><b>한 줄 결론 —</b> 제품은 <b>2층 구조</b>(두뇌=중앙 / 손=고객 PC)이고, 진짜 경쟁력 = <b>「그 가게를 아는 지식(온톨로지)」 × 「실제 일을 하는 손」 × 「콘텐츠+컨시어지+설치대행」</b>. 두뇌의 핵심은 <b>가게별 지식을 자동으로 키우는 온톨로지</b>, 손은 그 지식으로 <b>로그인 필요한 진짜 작업(커머스 등록·메일·예약)</b>을 고객 본인 계정으로 실행. 둘 다 1차 포함.</div>
+  </div>
+
+  <!-- TWO-LAYER DIAGRAM -->
+  <div class="diagram">
+    <div class="layer brain">
+      <div class="lh"><div class="ico">🧠</div><div class="nm">두뇌</div><div class="loc">중앙 서버</div></div>
+      <div class="desc"><b>★ 가게별 지식(온톨로지)</b>을 구조화해 보관하고 <b>쓸수록 자동으로 키움</b>(전담 에이전트). 이 지식 위에서 콘텐츠 작성·분석. 모델 키는 <b>서버에만</b>.</div>
+      <div class="tags"><span class="tag" style="font-weight:700">★ 가게별 온톨로지</span><span class="tag">콘텐츠 작성</span><span class="tag">분석·리포트</span><span class="tag">중앙 대시보드</span></div>
+    </div>
+    <div class="conn"><div class="line"></div><div class="ar">↔</div><div class="line"></div></div>
+    <div class="layer hand">
+      <div class="lh"><div class="ico">🖐</div><div class="nm">손</div><div class="loc">고객 PC</div></div>
+      <div class="desc">로그인이 필요한 실제 작업. <b>고객 본인 계정·세션</b>으로 안전하게 실행. (Mac 네이티브 + 웹 자동화)</div>
+      <div class="tags"><span class="tag">커머스 상품등록</span><span class="tag">메일 발송</span><span class="tag">예약 처리</span></div>
+    </div>
+  </div>
+
+  <!-- ROW: SPEC + DIFFERENTIATOR -->
+  <div class="row r2">
+    <div class="box">
+      <div class="bh"><div class="tab"></div><h2>1차 사양 (잠금)</h2><div class="n">v4 확정</div></div>
+      <ul class="spec">
+        <li><span class="k">★ 지식</span><span class="v"><b>가게별 온톨로지</b> — 상품·정책·말투 구조화 + 자동 성장(Colony). 전 기능의 ‘그 가게를 아는’ 토대</span></li>
+        <li><span class="k">콘텐츠 5</span><span class="v">브랜드 세팅 · 상세페이지 글 · SNS 홍보 · 포스터 문구 · 고객응대 문구</span></li>
+        <li><span class="k">손 2-bet</span><span class="v"><span class="chip h">① 스마트스토어 자동등록</span><span class="chip h">② 시장가 조사</span> <b>둘 중 하나만 성공해도 1차 성공</b></span></li>
+        <li><span class="k">이미지</span><span class="v">컨시어지 방식 — 고객 요청 → 우리 팀이 직접 제작 → 전달</span></li>
+        <li><span class="k">채널</span><span class="v">1차 = <b>중앙 대시보드</b> (카톡 손님응대는 2차)</span></li>
+        <li><span class="k">파일럿</span><span class="v">3업종 동시 · <b>주얼리 우선</b> (주얼리 / 바이크정비 / 건기식*)</span></li>
+        <li><span class="k">승인</span><span class="v">간편 자동승인 · 단 <b>결제·되돌릴 수 없는 작업</b>만 별도 동의+기록</span></li>
+      </ul>
+    </div>
+
+    <div class="diff">
+      <div class="lab">핵심 차별점 (해자)</div>
+      <div class="big">"그냥 ChatGPT"가 아닙니다 —<br><b>내 가게를 ‘알고’ + 직접 등록까지</b> 합니다.</div>
+      <div class="vs">
+        <div class="c no">일반 AI 엔진<br><b>내 가게를 모름</b> + 글만 써주고 끝. 매번 다시 설명, 복붙은 사장님 몫.</div>
+        <div class="c yes">우리 제품<br><b>가게 지식(온톨로지)으로</b> 쓰고 + <b>실제 스토어 등록까지</b>. 쓸수록 똑똑해짐.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW: TIMELINE + READINESS GAUGE -->
+  <div class="row r2">
+    <div class="box">
+      <div class="bh"><div class="tab" style="background:var(--green)"></div><h2>일정</h2><div class="n">단계별</div></div>
+      <div class="phase p1">
+        <div class="num">1</div>
+        <div class="pb">
+          <h3>1차 — 콘텐츠 5 + 손 2-bet + 컨시어지 이미지</h3>
+          <div class="wn">약 4~6주 · 주얼리 우선 · 3업종 동시</div>
+          <div class="ds">손 2개 중 1개만 성공해도 1차 성공으로 판정.</div>
+        </div>
+      </div>
+      <div class="phase p2">
+        <div class="num">2</div>
+        <div class="pb">
+          <h3>2차 — 자료관리·자동화 + 카톡·결제</h3>
+          <div class="wn">약 6~10주 · 난이도 상</div>
+          <div class="ds">주문·재고·정산 자동화, 손님 응대 채널(카톡) 확장.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="box">
+      <div class="bh"><div class="tab" style="background:var(--brand)"></div><h2>1차 준비도</h2><div class="n">현재 기준</div></div>
+      <div class="gaugewrap">
+        <svg width="84" height="84" viewBox="0 0 84 84">
+          <circle cx="42" cy="42" r="33" fill="none" stroke="#e9e7fb" stroke-width="11"/>
+          <circle cx="42" cy="42" r="33" fill="none" stroke="#5b4ef0" stroke-width="11" stroke-linecap="round"
+                  stroke-dasharray="207.3" stroke-dashoffset="64.3" transform="rotate(-90 42 42)"/>
+          <text x="42" y="40" text-anchor="middle" font-size="20" font-weight="800" fill="#5b4ef0">69%</text>
+          <text x="42" y="54" text-anchor="middle" font-size="7.5" fill="#727892" font-weight="600">준비 완료</text>
+        </svg>
+        <div class="cap">
+          <b>두뇌(중앙)</b>는 이미 작동 — 고객사별 안전 분리 검증 완료.<br>
+          남은 핵심은 <b>손 E2E 1건</b>(시장가 조사 먼저 → 스마트스토어 등록)과 가격·결제 경로 확정.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW: PRICE + RISKS -->
+  <div class="row r2">
+    <div class="box">
+      <div class="bh"><div class="tab" style="background:var(--green)"></div><h2>가격</h2><div class="n">월 구독</div></div>
+      <div class="price">
+        <span class="amt">10~20만원</span><span class="unit">/ 월 구독</span>
+        <span class="goal">목표 ~30만원</span>
+      </div>
+      <div class="pmeta">"손"이 실제 일을 끝내 주는 가치로 <b>월 30만원</b>까지 정당화하는 것이 목표.<br>실제 원가는 <b>컨시어지 인건비 + 설치·지원</b>에 있어, 결제 경로 확보가 매출의 전제.</div>
+    </div>
+
+    <div class="box">
+      <div class="bh"><div class="tab" style="background:var(--red)"></div><h2>꼭 짚을 리스크 3</h2></div>
+      <div class="row r3" style="margin-top:0;gap:7px;">
+        <div class="risk"><h3>① 모델 계정 정책</h3><p>다계정 동적 구독은 약관 위반·정지 위험. 정식 API/고객 계정 + 폴백 체인으로 정리해야 제품이 안 흔들림.</p></div>
+        <div class="risk"><h3>② 컨시어지 확장 한계</h3><p>이미지·설치 지원은 사람 노동. 1차 베타엔 OK, 수요 검증 후 자동화 전환 필수.</p></div>
+        <div class="risk"><h3>③ 결제 경로</h3><p>기능 완성도와 무관하게 결제부터 있어야 매출 발생. 가격 구조 확정이 선행.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span><span class="wmf">SemiColony</span> · 소상공인 AI 업무 시스템 1차 사양 요약 · 2026-06-09</span>
+    <span>* 건기식은 식약처 광고규제 가드레일 적용 · SoT: KB semicolony/decision/soho-installable-product-direction-2026-06-09 v4</span>
+  </div>
+
+</div>
+</body>
+</html>

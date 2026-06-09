@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>소상공인 AI 업무 시스템 — 사업 검토 보고 v2</title>
+<style>
+  :root{
+    --ink:#0f1222;--ink2:#3a3f56;--muted:#727892;--line:#e7e9f0;--bg:#fff;--soft:#f6f7fb;--softer:#fafbfe;
+    --brand:#5b4ef0;--brand2:#8b5cf6;--brandsoft:#efecff;
+    --green:#0f9d6b;--greensoft:#e6f6ef;--amber:#c2870b;--ambersoft:#fcf3df;
+    --orange:#d9601a;--orangesoft:#fdeee2;--red:#d23b4e;--redsoft:#fcebed;
+    --blue:#2f72d6;--bluesoft:#e7f0fb;--slate:#5a6275;--slatesoft:#eef0f5;
+  }
+  *{box-sizing:border-box;} html,body{margin:0;padding:0;}
+  body{font-family:'Apple SD Gothic Neo','Pretendard',-apple-system,system-ui,sans-serif;color:var(--ink);font-size:13px;line-height:1.62;-webkit-font-smoothing:antialiased;}
+  .page{max-width:980px;margin:0 auto;padding:0 30px;}
+  h1,h2,h3{margin:0;line-height:1.25;letter-spacing:-0.01em;} p{margin:0 0 8px;}
+
+  .hero{background:linear-gradient(135deg,#171a35 0%,#2b2160 55%,#4b3bd6 100%);color:#fff;border-radius:0 0 26px 26px;padding:42px 44px 36px;position:relative;overflow:hidden;}
+  .hero::after{content:"";position:absolute;right:-80px;top:-90px;width:300px;height:300px;background:radial-gradient(circle,rgba(139,92,246,.5),transparent 65%);}
+  .hero .kicker{font-size:11.5px;letter-spacing:.2em;text-transform:uppercase;color:#c7c2ff;font-weight:700;}
+  .hero h1{font-size:27px;font-weight:800;margin:11px 0 6px;}
+  .hero .sub{font-size:13.5px;color:#dad8f6;max-width:710px;}
+  .hero .meta{margin-top:18px;display:flex;gap:22px;font-size:11.5px;color:#b9b6e6;flex-wrap:wrap;} .hero .meta b{color:#fff;font-weight:600;}
+  .pill{display:inline-block;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:2px 11px;font-size:11px;font-weight:700;color:#fff;margin-top:14px;}
+
+  .verdict{margin:22px 44px 0;background:var(--brandsoft);border:1px solid #ded7ff;border-radius:16px;padding:17px 22px;display:flex;gap:15px;align-items:flex-start;}
+  .verdict .dot{flex:0 0 auto;width:36px;height:36px;border-radius:11px;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:800;}
+  .verdict .t{font-size:13.5px;} .verdict .t b{color:var(--brand);}
+
+  section{margin-top:28px;} .sec-h{display:flex;align-items:center;gap:11px;margin-bottom:13px;}
+  .sec-h .tab{width:6px;height:22px;border-radius:4px;background:var(--brand);}
+  .sec-h h2{font-size:18px;font-weight:800;} .sec-h .n{font-size:11.5px;color:var(--muted);font-weight:600;margin-left:auto;}
+  .lead{font-size:12.5px;color:var(--ink2);margin-bottom:12px;}
+
+  .chartcard{border:1px solid var(--line);border-radius:15px;padding:16px 18px;background:#fff;break-inside:avoid;}
+  .chartcard .ct{font-size:13px;font-weight:800;margin-bottom:3px;} .chartcard .cs{font-size:11px;color:var(--muted);margin-bottom:10px;}
+  .twocol{display:grid;grid-template-columns:1fr 1fr;gap:13px;}
+  .gauge-wrap{display:flex;gap:18px;align-items:center;justify-content:center;} .gauge{text-align:center;} .gauge .lab{font-size:11.5px;color:var(--ink2);font-weight:600;margin-top:2px;} .gauge .cap{font-size:10px;color:var(--muted);}
+
+  .quad{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .qcard{border-radius:15px;padding:15px 17px;border:1px solid var(--line);break-inside:avoid;}
+  .qcard.done{background:var(--greensoft);border-color:#c7ebd9;} .qcard.poss{background:var(--ambersoft);border-color:#f2e3bc;}
+  .qcard.need{background:var(--orangesoft);border-color:#f6d6bf;} .qcard.fix{background:var(--bluesoft);border-color:#cfe0f6;}
+  .qcard h3{font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:8px;}
+  .qcard.done h3{color:var(--green);} .qcard.poss h3{color:var(--amber);} .qcard.need h3{color:var(--orange);} .qcard.fix h3{color:var(--blue);}
+  .qcard ul{margin:8px 0 0;padding-left:17px;color:var(--ink2);font-size:11.5px;line-height:1.5;} .qcard li{margin-bottom:3px;}
+
+  .b{display:inline-block;padding:2px 9px;border-radius:999px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+  .b.done{background:var(--greensoft);color:var(--green);} .b.part{background:var(--ambersoft);color:var(--amber);} .b.need{background:var(--orangesoft);color:var(--orange);}
+  .ef{font-size:10px;color:var(--muted);font-weight:600;}
+
+  table{width:100%;border-collapse:collapse;font-size:12px;border:1px solid var(--line);border-radius:12px;overflow:hidden;}
+  thead th{background:#21243f;color:#fff;font-weight:700;text-align:left;padding:9px 11px;font-size:11.5px;}
+  tbody td{padding:9px 11px;border-top:1px solid var(--line);vertical-align:top;} tbody tr:nth-child(even){background:var(--softer);}
+  td .lab{font-weight:700;}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+  .card{border:1px solid var(--line);border-radius:13px;padding:13px 15px;background:var(--softer);break-inside:avoid;}
+  .card h3{font-size:12.5px;font-weight:800;margin-bottom:3px;} .card .why{font-size:11.5px;color:var(--ink2);}
+  .card.ok{border-left:4px solid var(--green);} .card.warn{border-left:4px solid var(--orange);}
+
+  .phase{display:flex;gap:14px;border:1px solid var(--line);border-radius:14px;padding:13px 16px;break-inside:avoid;background:#fff;margin-bottom:10px;}
+  .phase .num{flex:0 0 auto;width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;font-size:14px;}
+  .phase.p1 .num{background:var(--green);} .phase.p2 .num{background:var(--orange);}
+  .phase .body h3{font-size:13px;font-weight:800;} .phase .body .when{font-size:11px;color:var(--muted);font-weight:600;}
+  .phase .mods{margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;} .chip{background:var(--slatesoft);color:var(--slate);border-radius:7px;padding:2px 8px;font-size:10.5px;font-weight:600;}
+
+  .steps{counter-reset:s;margin:8px 0 0;padding:0;list-style:none;}
+  .steps li{counter-increment:s;position:relative;padding:6px 0 6px 30px;font-size:12px;border-top:1px dashed var(--line);} .steps li:first-child{border-top:none;}
+  .steps li::before{content:counter(s);position:absolute;left:0;top:6px;width:20px;height:20px;border-radius:6px;background:var(--brand);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;}
+
+  .checklist{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .ci{border:1px solid var(--line);border-radius:11px;padding:10px 13px;background:#fff;break-inside:avoid;font-size:11.5px;}
+  .ci .tag{display:inline-block;font-size:9.5px;font-weight:800;border-radius:5px;padding:1px 6px;margin-bottom:4px;}
+  .ci .tag.c{background:var(--bluesoft);color:var(--blue);} .ci .tag.s{background:var(--brandsoft);color:var(--brand);}
+  .ci b{font-weight:700;}
+
+  .risks{display:grid;grid-template-columns:1fr 1fr 1fr;gap:11px;}
+  .risk{border:1px solid #f3d2d7;background:#fdf6f7;border-radius:13px;padding:12px 15px;break-inside:avoid;}
+  .risk h3{font-size:12px;font-weight:800;color:var(--red);} .risk p{font-size:11px;color:var(--ink2);margin:5px 0 0;}
+
+  .legend{display:flex;gap:13px;flex-wrap:wrap;margin:2px 0 13px;font-size:11px;color:var(--muted);}
+  .legend span{display:inline-flex;align-items:center;gap:5px;} .sw{width:11px;height:11px;border-radius:3px;display:inline-block;}
+  .note{font-size:10.5px;color:var(--muted);margin-top:8px;}
+  .foot{margin:30px 0 24px;padding-top:13px;border-top:1px solid var(--line);display:flex;justify-content:space-between;color:var(--muted);font-size:10.5px;}
+  @page{size:A4;margin:12mm 0;}
+  @media print{*{-webkit-print-color-adjust:exact;print-color-adjust:exact;}section{break-inside:avoid-page;}}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="kicker">사업 검토 보고 · 태권님 공유용 · v4 (차별점 보강)</div>
+  <h1>소상공인용 AI 업무 시스템 — 1차 사양 확정</h1>
+  <div class="sub">태권님 제안(설치형 AI 업무 도우미)을 현재 시스템에 대보고, 검토·합의를 거쳐 1차 사양을 잠갔습니다. 제품은 "두뇌(중앙)+손(고객PC)" 2층 구조이며, <b>핵심 해자는 「가게별 지식(온톨로지)」</b>입니다. 사업 의사결정용 요약 + 1차 실행 그림 + 남은 검증.</div>
+  <div class="pill">v4: 해자=가게별 온톨로지×손×운영대행 · 2층 구조 · 월 구독 · 손 2-bet · 온톨로지 자동성장(Colony) 1차 포함</div>
+  <div class="meta"><span>작성 <b>2026-06-09</b></span><span>검토 <b>현재 시스템 실측 + 방향성 문서 + 태권님 Q&A</b></span><span>1차 <b>주얼리·공방·소품·음식</b></span></div>
+</div>
+
+<div class="verdict">
+  <div class="dot">✓</div>
+  <div class="t"><b>한 줄 결론 —</b> 제품은 <b>2층 구조</b>(두뇌=중앙 / 손=고객PC)이고, <b>진짜 경쟁력(해자) = 「가게별 지식(온톨로지)」 × 「제품화된 손」 × 「콘텐츠+컨시어지+설치대행」</b>입니다.
+  범용 AI 에이전트(예: 챗봇 엔진)와의 결정적 차이는 — <b>그 가게를 ‘아는’ AI</b>(상품·정책·말투를 구조화해 *쓸수록 똑똑해지는* 지식)와, <b>그 지식으로 실제 일을 ‘하는’ 손</b>입니다. 둘 다 1차에 포함.
+  <b>1차 = 가게별 온톨로지(자동성장) + 콘텐츠 5 + 손 2-bet + 컨시어지 이미지, 월 구독 10~20만(목표 30만), 주얼리 우선·3업종 동시.</b> 4~6주 목표.</div>
+</div>
+
+<div class="page">
+
+  <!-- 확정된 방향 -->
+  <section>
+    <div class="sec-h"><div class="tab" style="background:var(--blue)"></div><h2>1차 검토에서 확정된 방향</h2><div class="n">2026-06-09</div></div>
+    <div class="quad">
+      <div class="qcard fix">
+        <h3><span>📍</span> 데이터 · 두뇌 = 중앙 (+ 가게별 지식)</h3>
+        <ul>
+          <li>모든 고객 자료는 <b>중앙 저장소</b>에 — 우리가 만들던 ‘백엔드 서버’가 그 통로(이미 작동, 고객사별 안전 분리)</li>
+          <li><b>★ 가게별 지식(온톨로지)</b> — AI가 그 가게의 상품·정책·말투를 구조화해 보관하고, <b>쓸수록 자동으로 키움</b>(전담 에이전트 Colony). 모든 기능의 ‘그 가게를 아는’ 토대.</li>
+          <li><b>관리화면(대시보드)도 중앙 1개</b> — 로그인해서 자료·AI직원·지식그래프·결제 확인</li>
+        </ul>
+      </div>
+      <div class="qcard fix">
+        <h3><span>💻</span> 에이전트 실행 = 당분간 고객 PC</h3>
+        <ul>
+          <li>AI가 파일을 만들고 다루려면 ‘작업 공간(폴더)’이 필요 → <b>중앙 실행환경 완성 전까지 고객 PC가 그 역할</b></li>
+          <li><b>임시 전략</b>임을 명시 — 고객 늘면 ‘클라우드 작업공간’으로 전환</li>
+          <li>단, <b>키·요청·결과는 중앙 경유</b>로 설계(아래 ‘보완 4가지’)</li>
+        </ul>
+      </div>
+      <div class="qcard fix">
+        <h3><span>💬</span> 1차 채널 = 대시보드(카톡 X)</h3>
+        <ul>
+          <li>1차 5기능은 <b>사장님이 대시보드에서 받아 직접 활용</b> → 카톡 연동 불필요</li>
+          <li>고객 응대 문구도 <b>AI 생성 → 사장님 검토·수정·발송</b>(반자동)</li>
+          <li>손님 자동응대(카톡)는 2차로 분리</li>
+        </ul>
+      </div>
+      <div class="qcard fix">
+        <h3><span>🎨</span> 1차 이미지 = 컨시어지(사람 손)</h3>
+        <ul>
+          <li>고객 요청 → 우리 DB 적재 + 슬랙 알림 → <b>우리 팀이 직접 생성해 전달</b></li>
+          <li>이미지 파이프라인 구축 0으로 빠르게 시작(똑똑한 우회)</li>
+          <li><b>리스크 인지</b>: 사람 손 = 확장 한계 + 상업용 라이선스 확인 필요</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 1차 아키텍처 다이어그램 -->
+  <section>
+    <div class="sec-h"><div class="tab"></div><h2>1차 구조 한 장 요약</h2><div class="n">이미 되는 것 + 남은 것</div></div>
+    <div class="chartcard">
+      <svg width="900" height="300" viewBox="0 0 900 300" font-family="'Apple SD Gothic Neo',sans-serif">
+        <!-- customer PC box -->
+        <rect x="20" y="60" width="220" height="120" rx="12" fill="#fafbfe" stroke="#cfd3e0"/>
+        <text x="130" y="84" text-anchor="middle" font-size="12.5" font-weight="800" fill="#0f1222">고객 PC (임시 실행)</text>
+        <text x="130" y="106" text-anchor="middle" font-size="10.5" fill="#3a3f56">Slack + AI에이전트</text>
+        <text x="130" y="123" text-anchor="middle" font-size="10.5" fill="#3a3f56">작업 폴더(파일 생성)</text>
+        <text x="130" y="146" text-anchor="middle" font-size="9.5" fill="#727892">※ 항상 켜짐 회피 = 중앙 큐 폴링</text>
+        <text x="130" y="162" text-anchor="middle" font-size="9.5" fill="#727892">※ 우리 키는 두지 않음</text>
+        <!-- arrow to gateway -->
+        <line x1="240" y1="120" x2="335" y2="120" stroke="#5b4ef0" stroke-width="2.5" marker-end="url(#ar)"/>
+        <text x="287" y="111" text-anchor="middle" font-size="9.5" fill="#5b4ef0" font-weight="700">보안토큰</text>
+        <!-- central gateway -->
+        <rect x="335" y="60" width="210" height="120" rx="12" fill="#efecff" stroke="#c7bdff"/>
+        <text x="440" y="86" text-anchor="middle" font-size="12.5" font-weight="800" fill="#5b4ef0">중앙 백엔드(게이트웨이)</text>
+        <text x="440" y="107" text-anchor="middle" font-size="10.5" fill="#3a3f56">키·요청·KB 단일 통로</text>
+        <text x="440" y="124" text-anchor="middle" font-size="10" fill="#0f9d6b" font-weight="700">✓ 이미 작동</text>
+        <text x="440" y="142" text-anchor="middle" font-size="9.5" fill="#d9601a">남은 것: 외부 공개+보안(TLS)</text>
+        <!-- arrow to db -->
+        <line x1="545" y1="120" x2="640" y2="120" stroke="#5b4ef0" stroke-width="2.5" marker-end="url(#ar)"/>
+        <!-- central db + dashboard -->
+        <rect x="640" y="40" width="230" height="75" rx="12" fill="#e6f6ef" stroke="#bfe6d3"/>
+        <text x="755" y="66" text-anchor="middle" font-size="12" font-weight="800" fill="#0f9d6b">중앙 저장소(appdb·KB)</text>
+        <text x="755" y="86" text-anchor="middle" font-size="10" fill="#3a3f56">고객사별 안전 분리</text>
+        <text x="755" y="103" text-anchor="middle" font-size="9.5" fill="#0f9d6b">✓ 검증 완료</text>
+        <rect x="640" y="125" width="230" height="70" rx="12" fill="#e7f0fb" stroke="#cfe0f6"/>
+        <text x="755" y="150" text-anchor="middle" font-size="12" font-weight="800" fill="#2f72d6">중앙 대시보드(로그인)</text>
+        <text x="755" y="169" text-anchor="middle" font-size="10" fill="#3a3f56">자료·AI직원·결제·산출물</text>
+        <text x="755" y="185" text-anchor="middle" font-size="9.5" fill="#d9601a">남은 것: 실데이터 연결·결제</text>
+        <!-- customer browser -->
+        <rect x="640" y="220" width="230" height="46" rx="10" fill="#fafbfe" stroke="#cfd3e0"/>
+        <text x="755" y="240" text-anchor="middle" font-size="11" font-weight="700" fill="#0f1222">고객 브라우저</text>
+        <text x="755" y="256" text-anchor="middle" font-size="9.5" fill="#727892">로그인 → 대시보드</text>
+        <line x1="755" y1="220" x2="755" y2="197" stroke="#2f72d6" stroke-width="2" marker-end="url(#ar)"/>
+        <!-- concierge -->
+        <rect x="20" y="220" width="525" height="50" rx="10" fill="#fcf3df" stroke="#f0e0b5"/>
+        <text x="34" y="240" font-size="11" font-weight="800" fill="#c2870b">🎨 컨시어지 이미지</text>
+        <text x="34" y="257" font-size="10" fill="#3a3f56">고객 요청 → 중앙 DB 적재 + 우리 슬랙 알림 → 우리 팀 직접 생성 → 산출물 중앙 저장 → 대시보드 전달</text>
+        <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#5b4ef0"/></marker></defs>
+      </svg>
+      <div class="note">핵심: <b>이미 되는 것</b> = 중앙 저장소·백엔드(게이트웨이)·고객사별 분리·AI의 정보 읽기/쓰기. <b>남은 것</b> = 백엔드 외부 공개(보안), 대시보드 실데이터·결제, 콘텐츠 5기능, 모델 계정 정책.</div>
+    </div>
+  </section>
+
+  <!-- 보완 4가지 -->
+  <section>
+    <div class="sec-h"><div class="tab" style="background:var(--orange)"></div><h2>PC 설치, 이렇게 보완해야 합니다 (검토 의견)</h2></div>
+    <div class="grid2">
+      <div class="card warn"><h3>1. 산출물은 중앙으로도 보내기</h3><div class="why">AI가 만든 글·포스터가 고객 PC 폴더에만 있으면 <b>중앙 대시보드에서 못 보여줌</b>. 결과물을 중앙에도 올려 대시보드에서 보고·다운로드.</div></div>
+      <div class="card warn"><h3>2. 우리 키는 PC에 두지 않기</h3><div class="why">모델 키를 고객 PC에 깔면 모든 PC에 키를 뿌리는 셈(유출 위험). <b>모델·이미지·KB 호출은 전부 중앙 경유</b>(키는 서버에만). → 모델 권한 리스크도 동시 해소.</div></div>
+      <div class="card warn"><h3>3. ‘항상 켜짐’ 회피 = 중앙 큐</h3><div class="why">대시보드에서 작업 걸었는데 PC가 꺼져 있으면 실패. <b>중앙에 요청 큐</b>를 두고 PC가 켜질 때 받아 처리(이미 우리 구조에 있음).</div></div>
+      <div class="card warn"><h3>4. 결국은 ‘클라우드 작업공간’</h3><div class="why">“클라우드 샌드박스를 못 만든다”는 <b>아직 안 만든 것</b>에 가까움. 관리형 서비스(E2B·Modal·Fly 등)로 고객별 격리 작업공간 제공이 정공법 → v2에서 PC 의존 제거.</div></div>
+    </div>
+  </section>
+
+  <!-- 준비도 게이지 -->
+  <section>
+    <div class="sec-h"><div class="tab"></div><h2>전체 준비도</h2><div class="n">숫자 요약</div></div>
+    <div class="twocol">
+      <div class="chartcard">
+        <div class="ct">엔진·기반 vs 고객 제품</div>
+        <div class="cs">엔진은 거의 완성, 고객이 쓰는 제품 표면은 초기</div>
+        <div class="gauge-wrap">
+          <div class="gauge">
+            <svg width="150" height="120" viewBox="0 0 150 120"><circle cx="75" cy="70" r="48" fill="none" stroke="#eceef4" stroke-width="16"/><circle cx="75" cy="70" r="48" fill="none" stroke="#0f9d6b" stroke-width="16" stroke-linecap="round" stroke-dasharray="256 302" transform="rotate(-90 75 70)"/><text x="75" y="66" text-anchor="middle" font-size="26" font-weight="800" fill="#0f9d6b">85%</text><text x="75" y="84" text-anchor="middle" font-size="9.5" fill="#727892">완성</text></svg>
+            <div class="lab">엔진 · 기반</div><div class="cap">중앙 저장·분리·실행 부품</div>
+          </div>
+          <div class="gauge">
+            <svg width="150" height="120" viewBox="0 0 150 120"><circle cx="75" cy="70" r="48" fill="none" stroke="#eceef4" stroke-width="16"/><circle cx="75" cy="70" r="48" fill="none" stroke="#d9601a" stroke-width="16" stroke-linecap="round" stroke-dasharray="85 302" transform="rotate(-90 75 70)"/><text x="75" y="66" text-anchor="middle" font-size="26" font-weight="800" fill="#d9601a">28%</text><text x="75" y="84" text-anchor="middle" font-size="9.5" fill="#727892">완성</text></svg>
+            <div class="lab">고객 제품 표면</div><div class="cap">대시보드 실데이터·결제·채널</div>
+          </div>
+        </div>
+      </div>
+      <div class="chartcard">
+        <div class="ct">11개 기능, 현재 상태</div>
+        <div class="cs">‘새로 만들어야’가 절반 가까이 — 단 1차는 ‘바로 가능’ 쪽</div>
+        <div class="gauge-wrap" style="gap:24px;">
+          <svg width="150" height="130" viewBox="0 0 150 130"><g transform="translate(65,65)"><circle r="46" fill="none" stroke="#c2870b" stroke-width="22" stroke-dasharray="131 289" transform="rotate(-90)"/><circle r="46" fill="none" stroke="#d9601a" stroke-width="22" stroke-dasharray="105 289" stroke-dashoffset="-131" transform="rotate(-90)"/><circle r="46" fill="none" stroke="#2f72d6" stroke-width="22" stroke-dasharray="53 289" stroke-dashoffset="-236" transform="rotate(-90)"/><text y="-2" text-anchor="middle" font-size="22" font-weight="800" fill="#0f1222">11</text><text y="14" text-anchor="middle" font-size="9" fill="#727892">개 기능</text></g></svg>
+          <div style="font-size:11.5px;line-height:1.9">
+            <div><i class="sw" style="background:#c2870b"></i> <b>5</b> 바로 만들 수 있음</div>
+            <div><i class="sw" style="background:#d9601a"></i> <b>4</b> 새로 만들어야 함</div>
+            <div><i class="sw" style="background:#2f72d6"></i> <b>2</b> 절반쯤 와 있음</div>
+          </div>
+        </div>
+        <div class="note">※ ‘바로 가능’ 5개가 곧 1차 묶음.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 가치 vs 난이도 -->
+  <section>
+    <div class="sec-h"><div class="tab"></div><h2>어디부터 — 가치 vs 개발 난이도</h2><div class="n">우선순위</div></div>
+    <div class="chartcard">
+      <svg width="900" height="430" viewBox="0 0 900 430" font-family="'Apple SD Gothic Neo',sans-serif">
+        <rect x="90" y="40" width="375" height="180" fill="#e6f6ef"/><rect x="465" y="40" width="375" height="180" fill="#e7f0fb"/>
+        <rect x="90" y="220" width="375" height="180" fill="#fafbfe"/><rect x="465" y="220" width="375" height="180" fill="#fcf3df"/>
+        <line x1="90" y1="40" x2="90" y2="400" stroke="#cfd3e0" stroke-width="1.5"/><line x1="90" y1="400" x2="840" y2="400" stroke="#cfd3e0" stroke-width="1.5"/>
+        <line x1="465" y1="40" x2="465" y2="400" stroke="#cfd3e0" stroke-dasharray="4 4"/><line x1="90" y1="220" x2="840" y2="220" stroke="#cfd3e0" stroke-dasharray="4 4"/>
+        <text x="60" y="50" font-size="11" fill="#727892">높음</text><text x="60" y="398" font-size="11" fill="#727892">낮음</text>
+        <text x="35" y="230" font-size="12" font-weight="700" fill="#3a3f56" transform="rotate(-90 35 230)" text-anchor="middle">고객 체감 가치</text>
+        <text x="95" y="420" font-size="11" fill="#727892">쉬움</text><text x="800" y="420" font-size="11" fill="#727892">어려움</text>
+        <text x="465" y="420" font-size="12" font-weight="700" fill="#3a3f56" text-anchor="middle">개발 난이도</text>
+        <text x="105" y="62" font-size="12" font-weight="800" fill="#0f9d6b">⚡ 빠른 승부수 (1차)</text>
+        <text x="660" y="62" font-size="12" font-weight="800" fill="#2f72d6">🏗 전략 투자 (2차)</text>
+        <text x="700" y="392" font-size="11.5" font-weight="700" fill="#c2870b">후순위</text>
+        <circle cx="352" cy="94" r="8" fill="#0f9d6b"/><text x="364" y="92" font-size="11" font-weight="700">상세페이지 글</text>
+        <circle cx="452" cy="96" r="8" fill="#0f9d6b"/><text x="352" y="113" font-size="11" font-weight="700">SNS·홍보 콘텐츠</text>
+        <circle cx="470" cy="120" r="8" fill="#0f9d6b"/><text x="482" y="124" font-size="11" font-weight="700">고객 응대 문구</text>
+        <circle cx="300" cy="150" r="8" fill="#0f9d6b"/><text x="178" y="154" font-size="11" font-weight="700">브랜드 기초 세팅</text>
+        <circle cx="430" cy="186" r="8" fill="#16b07d"/><text x="296" y="190" font-size="11" font-weight="700">포스터·카드뉴스 문구</text>
+        <circle cx="735" cy="86" r="8" fill="#2f72d6"/><text x="610" y="84" font-size="11" font-weight="700">주문·예약 관리</text>
+        <circle cx="630" cy="120" r="8" fill="#2f72d6"/><text x="538" y="116" font-size="11" font-weight="700">매출·마진 분석</text>
+        <circle cx="690" cy="170" r="8" fill="#2f72d6"/><text x="704" y="174" font-size="11" font-weight="700">재고·발주</text>
+        <circle cx="540" cy="205" r="8" fill="#8b8fa3"/><text x="430" y="210" font-size="11" font-weight="700">상품정보 입력</text>
+        <circle cx="735" cy="250" r="8" fill="#c2870b"/><text x="610" y="254" font-size="11" font-weight="700">엑셀/주문파일 정리</text>
+      </svg>
+      <div class="legend" style="margin-top:6px"><span><i class="sw" style="background:#0f9d6b"></i> 1차(글·홍보물)</span><span><i class="sw" style="background:#2f72d6"></i> 2차(자료관리)</span><span><i class="sw" style="background:#c2870b"></i> 후순위</span></div>
+    </div>
+  </section>
+
+  <!-- API 비용 -->
+  <section>
+    <div class="sec-h"><div class="tab" style="background:var(--green)"></div><h2>AI 사용 비용 — 마진 방어선</h2><div class="n">러프 추정</div></div>
+    <div class="lead">정식 API(종량제) 기준, 고객 1명 월 비용 추정입니다. <b>결론: 토큰비는 마진 위협이 아닙니다.</b></div>
+    <div class="twocol">
+      <div class="chartcard">
+        <table>
+          <thead><tr><th>사용량</th><th>월 사용량(대략)</th><th>중급 모델</th><th>고급 모델</th></tr></thead>
+          <tbody>
+            <tr><td><span class="lab">일반</span></td><td>입력 0.5M / 출력 0.2M</td><td><b style="color:#0f9d6b">~₩2천</b></td><td>~₩6천</td></tr>
+            <tr><td><span class="lab">헤비(3×)</span></td><td>입력 1.5M / 출력 0.6M</td><td>~₩6천</td><td><b style="color:#d9601a">~₩1.8만</b></td></tr>
+          </tbody>
+        </table>
+        <div class="note">가정: 응대문구 월 200건 + 상세/홍보/포스터 포함. 실데이터 없는 추정, 단가 변동. 환율 ₩1,350/$.</div>
+      </div>
+      <div class="chartcard" style="display:flex;flex-direction:column;justify-content:center;">
+        <div class="ct" style="color:var(--red)">⚠ 진짜 비용 & 리스크는 다른 데 있음</div>
+        <ul style="margin:8px 0 0;padding-left:18px;font-size:11.5px;color:var(--ink2);line-height:1.6">
+          <li><b>실제 원가</b> = 컨시어지 인건비(이미지) + 화이트글러브 설치·지원</li>
+          <li><b>피해야 할 것</b>: ChatGPT 다계정 동적 구독 — 약관 위반·계정 밴 시 서비스 전체 정지</li>
+          <li><b>권장</b>: 정식 API 또는 고객 본인 계정 로그인. 아끼는 월 몇천 원보다 밴 손실이 큼</li>
+          <li><b>가격 구조 확정 필요</b>: 10~20만이 1회성인지 월구독인지에 따라 마진 그림이 완전히 달라짐</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11기능 표 -->
+  <section>
+    <div class="sec-h"><div class="tab"></div><h2>11개 기능, 하나씩</h2><div class="n">상태·난이도</div></div>
+    <div class="legend"><span><span class="b done">이미 됨</span></span><span><span class="b part">바로 가능</span></span><span><span class="b need">새로 제작</span></span></div>
+    <table>
+      <thead><tr><th style="width:23%">기능</th><th style="width:12%">상태</th><th style="width:10%">난이도</th><th>쉽게 풀면</th></tr></thead>
+      <tbody>
+        <tr><td><span class="lab">상품정보 입력</span></td><td><span class="b need">새로 제작</span></td><td><span class="ef">중상</span></td><td>가격·원가·재고·사진 담는 자료 틀이 없음. 입력칸부터 신규.</td></tr>
+        <tr><td><span class="lab">상세페이지 글 생성</span></td><td><span class="b part">바로 가능</span></td><td><span class="ef">중</span></td><td>기존 글 작성 부품을 제품용으로 손보면 됨.</td></tr>
+        <tr><td><span class="lab">SNS·홍보 콘텐츠</span></td><td><span class="b part">절반</span></td><td><span class="ef">중</span></td><td>홍보 담당 AI 직원 + 글 부품 보유. 인스타/해시태그 양식만 추가.</td></tr>
+        <tr><td><span class="lab">포스터·카드뉴스 문구</span></td><td><span class="b part">바로 가능</span></td><td><span class="ef">중</span></td><td>문구 양식만(이미지 비주얼은 1차 컨시어지).</td></tr>
+        <tr><td><span class="lab">고객 응대 문구</span></td><td><span class="b part">절반</span></td><td><span class="ef">중</span></td><td>응대 담당 AI 직원+말투 설정 보유. 생성→사장님 검토·발송.</td></tr>
+        <tr><td><span class="lab">주문·예약 관리 화면</span></td><td><span class="b need">새로 제작</span></td><td><span class="ef">상</span></td><td>주문·예약 자료 틀 없음. 현황 화면·판매처 연동 신규.</td></tr>
+        <tr><td><span class="lab">엑셀/주문파일 정리</span></td><td><span class="b need">새로 제작</span></td><td><span class="ef">상</span></td><td>파일 읽어 정리 기능 자체가 없음. 가장 손 많이 감.</td></tr>
+        <tr><td><span class="lab">재고·발주 체크</span></td><td><span class="b need">새로 제작</span></td><td><span class="ef">상</span></td><td>재고 담당 AI 직원 설계만. 재고 틀·발주 승인 신규.</td></tr>
+        <tr><td><span class="lab">매출·마진 분석</span></td><td><span class="b part">절반</span></td><td><span class="ef">상</span></td><td>매출 담당 AI 직원 설계 있음. 비용 자료 틀·계산 신규.</td></tr>
+        <tr><td><span class="lab">브랜드 기초 세팅</span></td><td><span class="b part">바로 가능</span></td><td><span class="ef">중</span></td><td>브랜드 톤·컬러 설정 자산 보유. 입력 마법사만 추가.</td></tr>
+        <tr><td><span class="lab">운영 관리 화면</span></td><td><span class="b part">절반</span></td><td><span class="ef">중</span></td><td>중앙 대시보드 시제품 존재. 실제 자료 연결만.</td></tr>
+      </tbody>
+    </table>
+    <div class="note">※ AI 직원은 역할로만 표기(응대 담당·재고 담당 등). 애칭은 사업 확정 후 정리.</div>
+  </section>
+
+  <!-- 로드맵 -->
+  <section>
+    <div class="sec-h"><div class="tab"></div><h2>추천 진행안</h2><div class="n">단계·일정</div></div>
+    <div class="chartcard" style="margin-bottom:13px">
+      <div class="ct">전체 일정 (대략)</div>
+      <svg width="900" height="150" viewBox="0 0 900 150" font-family="'Apple SD Gothic Neo',sans-serif" font-size="11">
+        <line x1="120" y1="118" x2="860" y2="118" stroke="#cfd3e0"/>
+        <g fill="#9aa0b2" font-size="10" text-anchor="middle"><text x="120" y="135">0주</text><text x="305" y="135">4주</text><text x="490" y="135">8주</text><text x="675" y="135">12주</text><text x="860" y="135">16주</text></g>
+        <g stroke="#eef0f5"><line x1="305" y1="20" x2="305" y2="118"/><line x1="490" y1="20" x2="490" y2="118"/><line x1="675" y1="20" x2="675" y2="118"/></g>
+        <rect x="120" y="34" width="277" height="26" rx="7" fill="#0f9d6b"/><text x="132" y="51" fill="#fff" font-weight="700" font-size="11.5">1차 · 글·홍보물 + 컨시어지 이미지 (4~6주)</text>
+        <rect x="397" y="70" width="463" height="26" rx="7" fill="#d9601a"/><text x="409" y="87" fill="#fff" font-weight="700" font-size="11.5">2차 · 자료관리·주문/재고/정산 + 카톡·결제 (6~10주)</text>
+        <circle cx="460" cy="83" r="4" fill="#fff" stroke="#d9601a" stroke-width="2"/>
+      </svg>
+    </div>
+    <div class="phase p1"><div class="num">1</div><div class="body"><h3>1차 — 콘텐츠 5 + 손 2-bet + 컨시어지 (주얼리 우선·3업종 동시)</h3><div class="when">약 4~6주 · 월 구독 10~20만(목표 30만) · 손 2개 중 1개만 성공해도 OK</div><div class="mods"><span class="chip" style="background:#efecff;color:#5b4ef0">🧠 가게별 온톨로지(자동성장)</span><span class="chip">브랜드 세팅</span><span class="chip">상세페이지 글</span><span class="chip">SNS·홍보</span><span class="chip">포스터 문구</span><span class="chip">응대 문구</span><span class="chip" style="background:#e6f6ef;color:#0f9d6b">🖐 스마트스토어 자동등록</span><span class="chip" style="background:#e6f6ef;color:#0f9d6b">🖐 시장가 조사(무인증)</span><span class="chip">+ 컨시어지 이미지</span></div></div></div>
+    <div class="phase p2"><div class="num">2</div><div class="body"><h3>2차 — 자료관리·자동화</h3><div class="when">약 6~10주 · 난이도 상</div><div class="mods"><span class="chip">상품정보 입력</span><span class="chip">주문·예약</span><span class="chip">재고·발주</span><span class="chip">매출·마진</span><span class="chip">엑셀 정리</span><span class="chip">+ 카톡</span><span class="chip">+ 결제</span></div></div></div>
+    <ol class="steps">
+      <li><b>사업 결정 동결</b> — 가격 구조 · 모델 계정 정책 · 1차 업종 (아래 체크리스트)</li>
+      <li><b>중앙 백엔드 외부 공개 + 보안(TLS)</b> + 고객 PC에서 왕복 검증</li>
+      <li><b>글·홍보물 5기능</b> 제작 → 판매 가능한 1차 상품</li>
+      <li><b>중앙 대시보드</b> 로그인·실데이터·산출물 다운로드 연결</li>
+      <li><b>결제·요금제</b> 붙이기(유료 전환)</li>
+      <li><b>자료 관리 틀 + 판매처 연동 + 카톡</b> (2차)</li>
+      <li><b>클라우드 작업공간 전환</b>(PC 의존 제거) → 업종 확장</li>
+    </ol>
+  </section>
+
+  <!-- CLARIFY / SPIKE -->
+  <section>
+    <div class="sec-h"><div class="tab" style="background:var(--brand)"></div><h2>확정 요약 & 남은 검증</h2><div class="n">2026-06-09 잠금</div></div>
+    <div class="checklist">
+      <div class="ci"><span class="tag" style="background:var(--greensoft);color:var(--green)">확정</span><br><b>가격</b>: 월 구독 10~20만(목표 30만)</div>
+      <div class="ci"><span class="tag" style="background:var(--greensoft);color:var(--green)">확정</span><br><b>1차 범위</b>: 콘텐츠 5 + 손 2-bet + 컨시어지 이미지</div>
+      <div class="ci"><span class="tag" style="background:var(--greensoft);color:var(--green)">확정</span><br><b>손 = 고객 PC</b>: 웹작업 Playwright(Win/Mac), 네이티브만 cua-driver(Mac)</div>
+      <div class="ci"><span class="tag" style="background:var(--greensoft);color:var(--green)">확정</span><br><b>크리덴셜</b>: 에이전트 전용 브라우저 프로필(세션 영속)+OS 키체인 (.env 평문 지양)</div>
+      <div class="ci"><span class="tag" style="background:var(--greensoft);color:var(--green)">확정</span><br><b>승인</b>: YOLO식(고객이 편의레벨 선택)·책임 고객. 단 결제/비가역만 책임동의+감사로그</div>
+      <div class="ci"><span class="tag" style="background:var(--greensoft);color:var(--green)">확정</span><br><b>산출물</b>: 게시용=중앙(대시보드 다운로드)·민감=로컬/고객클라우드·메타 항상 DB</div>
+      <div class="ci"><span class="tag" style="background:var(--greensoft);color:var(--green)">확정</span><br><b>모델 계정</b>: 다계정 기본 + 폴백체인(고객계정→오픈웨이트)+헬스모니터</div>
+      <div class="ci"><span class="tag" style="background:var(--greensoft);color:var(--green)">확정</span><br><b>파일럿</b>: 3업종 동시·주얼리 우선(주얼리/바이크정비/건기식)</div>
+      <div class="ci"><span class="tag s">검증 S0 ★</span><br><b>손 E2E</b>: 시장가 조사(무인증·먼저) + 스마트스토어 1건 등록(인증·세션영속+승인게이트)</div>
+      <div class="ci"><span class="tag s">검증</span><br><b>인프라</b>: 게이트웨이 외부공개+TLS · 콘텐츠 1기능 E2E · 결제(월구독+웹훅) · 산출물 중앙저장</div>
+      <div class="ci"><span class="tag" style="background:var(--orangesoft);color:var(--orange)">준비</span><br><b>법무</b>: 손님 개인정보 처리·동의 UX(D2) · 건기식 식약처 광고규제 가드레일</div>
+      <div class="ci"><span class="tag" style="background:var(--orangesoft);color:var(--orange)">준비</span><br><b>운영</b>: 컨시어지 담당·SLA · 무제한 이미지툴 상업 라이선스</div>
+    </div>
+  </section>
+
+  <!-- RISKS -->
+  <section>
+    <div class="sec-h"><div class="tab" style="background:var(--red)"></div><h2>꼭 짚을 리스크</h2></div>
+    <div class="risks">
+      <div class="risk"><h3>⚠ 모델 계정 정책</h3><p>ChatGPT 다계정 동적 구독은 약관 위반·밴 리스크. 정식 API/고객 계정으로 정리해야 제품이 안 흔들림.</p></div>
+      <div class="risk"><h3>⚠ 사람 손(컨시어지)의 확장 한계</h3><p>이미지·화이트글러브 설치는 사람 노동. 1차 베타엔 OK, 수요 검증 후 자동화/클라우드 전환 필수.</p></div>
+      <div class="risk"><h3>⚠ 결제 없으면 매출 0</h3><p>기능 완성도와 무관하게 결제 경로부터 있어야 함. 가격 구조(C1) 먼저.</p></div>
+    </div>
+  </section>
+
+  <div class="foot"><span>소상공인 AI 업무 시스템 · 사업 검토 보고 v2 (태권님 공유용)</span><span>2026-06-09 · 실측 + 방향성 문서 + Q&A 기반</span></div>
+</div>
+</body>
+</html>

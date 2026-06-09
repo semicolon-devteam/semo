@@ -1,0 +1,79 @@
+{
+  "poc": "market-scan (손-안전베팅 시장가 조사)",
+  "query": "실버 반지",
+  "source": "fixture(fallback)",
+  "fellBackToFixture": true,
+  "startedAt": "2026-06-09T13:47:32.233Z",
+  "finishedAt": "2026-06-09T13:47:43.218Z",
+  "sessionPersistence": {
+    "userDataDir": "/Users/reus/Library/Mobile Documents/com~apple~CloudDocs/Desktop/데스크탑 - JeonJunyeong의 Mac mini/Sources/semicolon/projects/semo/docs/reports/poc/pw-profile",
+    "profileFilesBefore": 54,
+    "profileFilesAfter": 197,
+    "visitCookieCount": 2,
+    "note": "userDataDir 가 재실행 사이 디스크에 보존되고, poc_visit_count 쿠키가 누적되면 세션 영속 입증"
+  },
+  "pageMeta": {
+    "title": "실버 반지 : 시장가 조사 fixture (정적)",
+    "url": "file:///Users/reus/Library/Mobile Documents/com~apple~CloudDocs/Desktop/데스크탑 - JeonJunyeong의 Mac mini/Sources/semicolon/projects/semo/docs/reports/poc/fixtures/shopping-fixture.html",
+    "blocked": false
+  },
+  "naverDiag": {
+    "title": "",
+    "url": "https://search.shopping.naver.com/search/all?query=%EC%8B%A4%EB%B2%84%20%EB%B0%98%EC%A7%80",
+    "blocked": false,
+    "extracted": 0,
+    "bodyTextPreview": "NAVER\n보안 확인을 완료해 주세요.\n\n이 절차는 귀하가 실제 사용자임을 확인하여 계정을 안전하게 보호하고 스팸을 방지하는 데 도움이 됩니다.\n\n해당 영수증은 가상으로 제작된 것으로 실제 영수증 사진이 아닙니다.\n\n영수증의 가게 위치는 고지길 [?] 입니다. (빈 칸을 채워주세요)\n\n새로고침\n확인\n이용약관 개인정보처리방침 책임의 한계와 법적고지 회원정보 고객센터\nundefined\n Copyright © NAVER Corp. All Rights Reserved."
+  },
+  "aggregate": {
+    "count": 8,
+    "priced": 8,
+    "avg": 25600,
+    "min": 7500,
+    "max": 52000,
+    "median": 21950,
+    "currency": "KRW"
+  },
+  "sampleItems": [
+    {
+      "title": "925 실버 데일리 반지 심플 은반지",
+      "priceText": "12,800원",
+      "price": 12800
+    },
+    {
+      "title": "실버925 커플링 남녀 세트 반지",
+      "priceText": "28,000원",
+      "price": 28000
+    },
+    {
+      "title": "은 반지 여성 가는 레이어드 링",
+      "priceText": "9,900원",
+      "price": 9900
+    },
+    {
+      "title": "실버 큐빅 반지 화려한 웨딩 스타일",
+      "priceText": "45,500원",
+      "price": 45500
+    },
+    {
+      "title": "순은 실버바 반지 두꺼운 시그넷",
+      "priceText": "33,200원",
+      "price": 33200
+    },
+    {
+      "title": "실버 오픈링 프리사이즈 데일리",
+      "priceText": "7,500원",
+      "price": 7500
+    },
+    {
+      "title": "925 실버 탄생석 반지 맞춤 제작",
+      "priceText": "52,000원",
+      "price": 52000
+    },
+    {
+      "title": "실버 트위스트 꼬임 반지 유니크",
+      "priceText": "15,900원",
+      "price": 15900
+    }
+  ],
+  "totalExtracted": 8
+}
