@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
+import { openClawBotsFromRuntimeSourceMap } from '@/lib/bot-team-model';
 const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 // Force dynamic rendering — DB query at runtime.
@@ -51,16 +52,6 @@ interface HostSignalRow {
 
 const HOST_SIGNAL_FRESHNESS_SEC = 300; // 5분 — sidecar 가 1~2분 주기로 push 한다고 가정하면 충분
 
-const OPENCLAW_DEFAULT = [
-  'semiclaw',
-  'planclaw',
-  'designclaw',
-  'workclaw',
-  'reviewclaw',
-  'infraclaw',
-  'growthclaw',
-];
-
 async function loadOpenClawBotIds(): Promise<Set<string>> {
   try {
     const res = await query<{ metadata: { runtime_source?: Record<string, string> } | null }>(
@@ -68,15 +59,10 @@ async function loadOpenClawBotIds(): Promise<Set<string>> {
        WHERE domain = 'semicolony' AND key = 'bot-ids' AND (sub_key IS NULL OR sub_key = '')
        LIMIT 1`,
     );
-    const map = res.rows[0]?.metadata?.runtime_source ?? {};
-    const list = Object.entries(map)
-      .filter(([, v]) => v === 'openclaw')
-      .map(([k]) => k);
-    if (list.length) return new Set(list);
+    return new Set(openClawBotsFromRuntimeSourceMap(res.rows[0]?.metadata?.runtime_source));
   } catch {
-    /* fall through */
+    return new Set(openClawBotsFromRuntimeSourceMap(undefined));
   }
-  return new Set(OPENCLAW_DEFAULT);
 }
 
 function computeGroupStatus(input: {

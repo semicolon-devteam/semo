@@ -12,5 +12,12 @@
     "declaration": true
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.test.ts",
+    "src/**/* 2.ts",
+    "src/**/* 2.tsx",
+    "src/**/* 2.mts"
+  ]
 }

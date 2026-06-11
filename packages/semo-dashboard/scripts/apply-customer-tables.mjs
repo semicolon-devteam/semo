@@ -1,5 +1,5 @@
-// Applies migrations/010_customer_tables.sql to the local appdb and seeds a demo
-// tenant (정민 카페) + the canonical 7 Customer agent listings + installs + activity.
+// Applies customer/tenant dashboard migrations to the local appdb and seeds demo
+// tenants plus internal Semicolony installs.
 // Idempotent. Local dev DB only (DATABASE_URL = localhost/appdb).
 //
 //   cd packages/semo-dashboard && node scripts/apply-customer-tables.mjs
@@ -399,8 +399,20 @@ const c = new Client({ connectionString: url });
       fs.readFileSync(path.join(process.cwd(), 'migrations/015_channel_google.sql'), 'utf8'),
     );
 
+    // ── Internal Semicolony tenant installs (017) ──────────────────
+    // Semicolon/Semicolony itself is modeled as a tenant, and internal
+    // agents are installed through the same agent_listings -> agent_installs
+    // path as customer agents.
+    await c.query(
+      fs.readFileSync(
+        path.join(process.cwd(), 'migrations/017_internal_agent_installs.sql'),
+        'utf8',
+      ),
+    );
+
     const counts = await c.query(
       `select (select count(*) from public.agent_listings where audience='customer') listings,
+              (select count(*) from public.agent_listings where audience='internal') internal_listings,
               (select count(*) from public.tenants) tenants,
               (select count(*) from public.agent_installs) installs,
               (select count(*) from public.agent_activity) activity,

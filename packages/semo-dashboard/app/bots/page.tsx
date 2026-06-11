@@ -5,6 +5,7 @@ import { getItem } from '@/lib/kb';
 import RuntimeSourceChart from '@/components/RuntimeSourceChart';
 import SystemHealthBanner from '@/components/SystemHealthBanner';
 import { PageBody, PageHeader, Card, Badge } from '@/components/ui/semo';
+import { splitBotRowsForTeamDashboard } from '@/lib/bot-team-model';
 const DB_SCHEMA = process.env.SEMICOLONY_DB_SCHEMA ?? process.env.SEMO_DB_SCHEMA ?? 'semo';
 
 const AVATAR_COLORS = [
@@ -17,7 +18,8 @@ const AVATAR_COLORS = [
   'var(--agent-rose)',
 ];
 
-function relTime(iso: string): string {
+function relTime(iso: string | null): string {
+  if (!iso) return '-';
   const d = new Date(iso).getTime();
   if (isNaN(d)) return '-';
   const diff = Date.now() - d;
@@ -29,10 +31,19 @@ function relTime(iso: string): string {
   return `${Math.floor(h / 24)}일 전`;
 }
 
+type BotWithConfig = Bot & { config: Record<string, unknown> | null };
+
+function audienceLabel(config: Record<string, unknown> | null): string | null {
+  if (config?.audience === 'internal') return '내부';
+  if (config?.audience === 'customer') return '고객';
+  return null;
+}
+
 /** 봇 상태 카드 — 고객 screen-team AgentCard 미감 이식. */
-function BotStatusCard({ bot, idx }: { bot: Bot; idx: number }) {
+function BotStatusCard({ bot, idx }: { bot: BotWithConfig; idx: number }) {
   const online = bot.status === 'online';
   const color = AVATAR_COLORS[idx % AVATAR_COLORS.length];
+  const audience = audienceLabel(bot.config);
   // 봇 이모지는 KB 에 :shortcode: (슬랙형)로 저장될 수 있음 → 유니코드면 그대로, 아니면 이름 이니셜.
   const emoji = bot.emoji && !bot.emoji.includes(':') ? bot.emoji : bot.name?.[0] || '\u{1F916}';
   return (
@@ -82,7 +93,10 @@ function BotStatusCard({ bot, idx }: { bot: Bot; idx: number }) {
           </div>
           <div style={{ fontSize: 12, color: 'var(--semo-fg-3)', marginTop: 2 }}>{bot.role}</div>
         </div>
-        <Badge tone={online ? 'success' : 'neutral'}>{online ? '온라인' : '오프라인'}</Badge>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
+          {audience ? <Badge tone="neutral">{audience}</Badge> : null}
+          <Badge tone={online ? 'success' : 'neutral'}>{online ? '온라인' : '오프라인'}</Badge>
+        </div>
       </div>
       <div
         style={{
@@ -133,6 +147,7 @@ interface BotStatusRow {
   session_count: number;
   workspace_path: string;
   status: 'online' | 'offline';
+  config: Record<string, unknown> | null;
 }
 
 function parseIdentityContent(
@@ -172,15 +187,15 @@ async function enrichBotMetadata(
   return { name: botId, emoji: '', role: 'Bot' };
 }
 
-async function getBots(): Promise<Bot[]> {
+async function getBots(): Promise<BotWithConfig[]> {
   const result = await query<BotStatusRow>(`
-    SELECT bot_id, name, emoji, role, last_active, session_count, workspace_path, status
+    SELECT bot_id, name, emoji, role, last_active, session_count, workspace_path, status, config
     FROM ${DB_SCHEMA}.bot_status
     ORDER BY bot_id
   `);
 
   return Promise.all(
-    result.rows.map(async (row): Promise<Bot> => {
+    result.rows.map(async (row): Promise<BotWithConfig> => {
       let { name, emoji, role } = row;
 
       if (!name || !emoji || !role) {
@@ -196,16 +211,44 @@ async function getBots(): Promise<Bot[]> {
         emoji: emoji || '',
         role: role || 'Bot',
         status: row.status || 'offline',
-        lastActive: row.last_active || new Date().toISOString(),
+        lastActive: row.last_active,
         sessionCount: row.session_count || 0,
         workspacePath: row.workspace_path || `~/.semo/workspaces/${row.bot_id}`,
+        config: row.config,
       };
     }),
   );
 }
 
+function BotSection({
+  title,
+  description,
+  bots,
+  startIndex = 0,
+}: {
+  title: string;
+  description: string;
+  bots: BotWithConfig[];
+  startIndex?: number;
+}) {
+  if (bots.length === 0) return null;
+  return (
+    <section style={{ display: 'grid', gap: 12 }}>
+      <div>
+        <h2 style={{ fontSize: 16, fontWeight: 800, color: 'var(--semo-fg-1)' }}>{title}</h2>
+        <p style={{ marginTop: 2, fontSize: 12, color: 'var(--semo-fg-3)' }}>{description}</p>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {bots.map((bot, i) => (
+          <BotStatusCard key={bot.id} bot={bot} idx={startIndex + i} />
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default async function BotsPage() {
-  let bots: Bot[] = [];
+  let bots: BotWithConfig[] = [];
   let error = false;
 
   try {
@@ -214,6 +257,7 @@ export default async function BotsPage() {
     console.error('Failed to fetch bots:', e);
     error = true;
   }
+  const split = splitBotRowsForTeamDashboard(bots);
 
   return (
     <PageBody>
@@ -232,10 +276,24 @@ export default async function BotsPage() {
             등록된 봇이 없습니다.
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {bots.map((bot, i) => (
-              <BotStatusCard key={bot.id} bot={bot} idx={i} />
-            ))}
+          <div style={{ display: 'grid', gap: 28 }}>
+            <BotSection
+              title="설치 에이전트"
+              description="agent_installs에서 bot_status로 투영된 내부/고객 에이전트입니다."
+              bots={split.installedAgents}
+            />
+            <BotSection
+              title="런타임 서비스"
+              description="router, poller, system persona처럼 에이전트 설치가 아닌 운영 서비스입니다."
+              bots={split.runtimeServices}
+              startIndex={split.installedAgents.length}
+            />
+            <BotSection
+              title="Legacy / 전환 대기"
+              description="아직 agent_install projection으로 흡수되지 않은 기존 bot_status 행입니다."
+              bots={split.legacyAgents}
+              startIndex={split.installedAgents.length + split.runtimeServices.length}
+            />
           </div>
         )}
       </div>
