@@ -1,1 +1,26 @@
-npm run lint && npx tsc --noEmit --project packages/cli/tsconfig.json
+# Pre-push: 전체 lint + cli tsc 는 CI(pr-quality-gate.yml, 동일 명령)가 수행한다.
+# 로컬에서는 "이번에 새로 푸시되는 커밋"에 packages/cli 변경이 있을 때만 tsc 를 돌린다.
+# 문서·매니페스트·기타 패키지 푸시는 즉시 통과. 강제 우회: git push --no-verify
+#
+# git 은 pre-push 에 "<local_ref> <local_sha> <remote_ref> <remote_sha>" 를 stdin 으로 준다.
+zero="0000000000000000000000000000000000000000"
+base=""
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -z "$local_sha" ] && continue
+  if [ "$remote_sha" = "$zero" ] || [ -z "$remote_sha" ]; then
+    # 원격에 아직 없는 브랜치 → origin/main 분기점부터 비교
+    base="$(git merge-base "$local_sha" origin/main 2>/dev/null)"
+  else
+    base="$remote_sha"   # 기존 원격 브랜치 → 새로 올라가는 델타만
+  fi
+done
+
+# stdin 이 비었을 때(수동 실행 등) 폴백
+[ -z "$base" ] && base="$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse HEAD~1 2>/dev/null)"
+
+if [ -n "$base" ] && git diff --name-only "$base" HEAD 2>/dev/null | grep -q '^packages/cli/'; then
+  echo "▶ pre-push: packages/cli 변경 감지 → tsc 타입체크 (lint은 CI에서 수행)"
+  npx tsc --noEmit --project packages/cli/tsconfig.json
+else
+  echo "▶ pre-push: cli 변경 없음 → 로컬 검사 스킵 (lint·tsc는 CI pr-quality-gate가 수행)"
+fi
