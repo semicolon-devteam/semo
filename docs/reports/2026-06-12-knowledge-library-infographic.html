@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>SemiColony 지식 도서관 — 한눈에 보는 설계 보고서</title>
+<style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+:root{
+  --ink:#1B2129; --ink2:#3A424C; --soft:#6B7480; --line:#E3E0D8;
+  --paper:#F6F4EE; --white:#fff;
+  --cobalt:#2C6FE8; --cobalt-d:#173C8F; --cobalt-w:#EAF1FD;
+  --green:#15936B; --green-w:#E2F4EC;
+  --red:#D8453B; --red-w:#FBE8E6;
+  --amber:#E0902A; --amber-w:#FBEEDA;
+  --teal:#0E9C8E; --teal-w:#E1F3F0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Pretendard',sans-serif;color:var(--ink);-webkit-font-smoothing:antialiased;word-break:keep-all;}
+@page{ size:A4 landscape; margin:0; }
+.page{ width:297mm; height:209.5mm; padding:14mm 16mm; background:var(--paper); position:relative;
+  page-break-after:always; display:flex; flex-direction:column; overflow:hidden; }
+.page:last-child{page-break-after:auto;}
+.eyebrow{font-size:11pt;font-weight:800;letter-spacing:.05em;color:var(--cobalt);text-transform:uppercase;}
+h1{font-size:30pt;font-weight:800;letter-spacing:-.02em;line-height:1.1;margin:6px 0 2px;}
+h2{font-size:23pt;font-weight:800;letter-spacing:-.02em;line-height:1.12;margin:2px 0;}
+.sub{font-size:13pt;color:var(--ink2);line-height:1.5;}
+.pnum{position:absolute;bottom:8mm;right:16mm;font-size:10pt;color:var(--soft);}
+.foot{position:absolute;bottom:8mm;left:16mm;font-size:10pt;color:var(--soft);font-weight:700;}
+.foot b{color:var(--cobalt);}
+.row{display:flex;gap:16px;}
+.col{flex:1;}
+.fill{flex:1;display:flex;flex-direction:column;justify-content:center;}
+.card{background:var(--white);border:1px solid var(--line);border-radius:16px;padding:20px 22px;box-shadow:0 10px 26px -22px rgba(0,0,0,.35);}
+.badge{display:inline-block;font-size:10pt;font-weight:800;padding:3px 11px;border-radius:999px;}
+.b-green{background:var(--green-w);color:var(--green);}
+.b-red{background:var(--red-w);color:var(--red);}
+.b-cobalt{background:var(--cobalt-w);color:var(--cobalt-d);}
+.b-amber{background:var(--amber-w);color:#9a6512;}
+.big{font-size:40pt;font-weight:800;letter-spacing:-.02em;line-height:1;}
+.emoji{font-size:30pt;line-height:1;}
+.tag{font-size:10.5pt;color:var(--soft);}
+.note{font-size:10.5pt;color:var(--soft);line-height:1.45;}
+table{width:100%;border-collapse:collapse;font-size:12pt;}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle;}
+th{font-size:10.5pt;color:var(--soft);font-weight:800;text-transform:uppercase;letter-spacing:.03em;}
+.center{text-align:center;}
+.arrow{display:flex;align-items:center;justify-content:center;font-size:22pt;color:var(--soft);font-weight:800;}
+ul.clean{list-style:none;display:flex;flex-direction:column;gap:9px;}
+ul.clean li{display:flex;gap:10px;font-size:12pt;line-height:1.4;color:var(--ink2);}
+.chk{flex:none;font-weight:900;}
+.hl{background:linear-gradient(transparent 60%, #fde9a8 60%);font-weight:800;color:var(--ink);}
+</style>
+</head>
+<body>
+
+<!-- ===== COVER ===== -->
+<section class="page" style="background:var(--ink);color:#fff;justify-content:center;">
+  <div class="eyebrow" style="color:#8FB4F4;">SemiColony · 설계 보고서 (비기술자용)</div>
+  <h1 style="font-size:46pt;color:#fff;margin-top:14px;">우리 "지식 도서관"<br>어떻게 지을 것인가</h1>
+  <p class="sub" style="color:rgba(255,255,255,.82);max-width:60ch;margin-top:16px;font-size:15pt;">
+    KB·온톨로지·벡터DB… 흩어진 용어를 <b style="color:#fff;">"지식 도서관"</b> 하나로 통일하고,
+    <b style="color:#fff;">Colony를 그 도서관의 "사서"</b>로 세우는 그림 — 그림으로 한 번에.</p>
+  <div style="display:flex;gap:28px;margin-top:34px;">
+    <div><div class="big" style="color:#8FB4F4;">📚</div><div style="color:rgba(255,255,255,.7);margin-top:6px;font-size:11pt;">우리가 파는 핵심 = 지식</div></div>
+    <div><div class="big" style="color:#8FB4F4;">👩‍🏫</div><div style="color:rgba(255,255,255,.7);margin-top:6px;font-size:11pt;">Colony = 사서</div></div>
+    <div><div class="big" style="color:#8FB4F4;">🗑️</div><div style="color:rgba(255,255,255,.7);margin-top:6px;font-size:11pt;">첫 임무 = 낡은 책 빼기</div></div>
+  </div>
+  <div class="foot" style="color:rgba(255,255,255,.5);">semicolony · 2026-06-12</div>
+  <div class="pnum" style="color:rgba(255,255,255,.5);">표지</div>
+</section>
+
+<!-- ===== P1: 문제 ===== -->
+<section class="page">
+  <div class="eyebrow">01 · 왜 "도서관"인가</div>
+  <h1>문제는 "책장 없는 도서관"</h1>
+  <p class="sub" style="margin-top:6px;">AI에게 지식을 일기 쓰듯 계속 쌓기만 하면, 일주일만 지나도 못 찾고 <b>오히려 더 멍청해집니다.</b></p>
+  <div class="fill">
+    <div class="row" style="align-items:stretch;">
+      <div class="card col" style="border-color:var(--red);">
+        <span class="badge b-red">😵 지금 흔한 AI 메모리</span>
+        <div style="display:flex;align-items:center;gap:14px;margin:16px 0;">
+          <svg width="150" height="120" viewBox="0 0 150 120">
+            <g transform="translate(8,8)">
+              <rect x="10" y="70" width="120" height="16" rx="2" fill="#cdd2d8" transform="rotate(-6 70 78)"/>
+              <rect x="6" y="55" width="120" height="16" rx="2" fill="#d7dbe0" transform="rotate(4 66 63)"/>
+              <rect x="14" y="40" width="120" height="16" rx="2" fill="#cdd2d8" transform="rotate(-3 74 48)"/>
+              <rect x="4" y="26" width="120" height="16" rx="2" fill="#e0a59f" transform="rotate(7 64 34)"/>
+              <rect x="16" y="12" width="120" height="16" rx="2" fill="#d7dbe0" transform="rotate(-5 76 20)"/>
+            </g>
+          </svg>
+          <div class="note" style="font-size:11.5pt;">책(지식)만 마구 쌓인<br><b style="color:var(--red);">정리 안 된 더미</b></div>
+        </div>
+        <ul class="clean" style="font-size:11.5pt;">
+          <li><span class="chk" style="color:var(--red);">✗</span>같은 내용·모순된 내용이 계속 중복으로 쌓임</li>
+          <li><span class="chk" style="color:var(--red);">✗</span>옛날 정보(지난 마감·없어진 상품)가 안 빠짐</li>
+          <li><span class="chk" style="color:var(--red);">✗</span>찾을 때 통째로 뒤져야 함 → 느리고 틀림</li>
+        </ul>
+      </div>
+      <div class="arrow">→</div>
+      <div class="card col" style="border-color:var(--green);">
+        <span class="badge b-green">📚 제대로 된 도서관</span>
+        <div style="display:flex;align-items:center;gap:14px;margin:16px 0;">
+          <svg width="150" height="120" viewBox="0 0 150 120">
+            <g transform="translate(10,10)">
+              <rect x="0" y="0" width="130" height="100" rx="4" fill="#fff" stroke="#bcc2c9"/>
+              <line x1="0" y1="34" x2="130" y2="34" stroke="#bcc2c9"/><line x1="0" y1="67" x2="130" y2="67" stroke="#bcc2c9"/>
+              <g fill="#2C6FE8"><rect x="8" y="8" width="9" height="22" rx="1"/><rect x="20" y="8" width="9" height="22" rx="1"/><rect x="32" y="10" width="9" height="20" rx="1" fill="#0E9C8E"/><rect x="44" y="8" width="9" height="22" rx="1"/></g>
+              <g fill="#0E9C8E"><rect x="8" y="41" width="9" height="22" rx="1"/><rect x="20" y="43" width="9" height="20" rx="1" fill="#2C6FE8"/><rect x="32" y="41" width="9" height="22" rx="1"/></g>
+              <g fill="#2C6FE8"><rect x="8" y="74" width="9" height="22" rx="1"/><rect x="20" y="74" width="9" height="22" rx="1" fill="#E0902A"/><rect x="32" y="76" width="9" height="20" rx="1"/></g>
+            </g>
+          </svg>
+          <div class="note" style="font-size:11.5pt;">분류·정렬된<br><b style="color:var(--green);">책장(서가)</b></div>
+        </div>
+        <ul class="clean" style="font-size:11.5pt;">
+          <li><span class="chk" style="color:var(--green);">✓</span>정해진 자리(청구기호)에 한 권씩</li>
+          <li><span class="chk" style="color:var(--green);">✓</span>의미로 찾고, 낡은 책은 빼고</li>
+          <li><span class="chk" style="color:var(--green);">✓</span>원하는 한 권만 정확히 꺼냄</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note center" style="margin-top:18px;font-size:12pt;">핵심: 도서관의 가치는 "책"이 아니라 <span class="hl">수많은 책 중 원하는 걸 찾게 해주는 정리 시스템</span>입니다.</p>
+  </div>
+  <div class="foot"><b>semicolony</b> 지식 도서관</div><div class="pnum">1</div>
+</section>
+
+<!-- ===== P2: 현 위치 ===== -->
+<section class="page">
+  <div class="eyebrow">02 · 우리 도서관의 현 위치</div>
+  <h1>골격은 업계 최상위, "시간표"만 비었다</h1>
+  <p class="sub" style="margin-top:6px;">경쟁 시스템들과 같은 잣대로 비교하면 — 우리는 <b>정리(책장)가 가장 잘 된 쪽</b>입니다.</p>
+  <div class="fill">
+    <div class="row">
+      <div class="card col"><span class="badge b-amber">A. 자동·느슨형</span>
+        <div class="tag" style="margin:8px 0;">mem0 · supermemory</div>
+        <div style="font-size:18pt;font-weight:800;">★★★☆☆</div>
+        <div class="note" style="margin-top:6px;">LLM이 알아서 정리. 편하지만 <b>출처·정확도 약함</b></div></div>
+      <div class="card col"><span class="badge b-teal" style="background:var(--teal-w);color:#0a6e64;">B. 시간 그래프형</span>
+        <div class="tag" style="margin:8px 0;">Zep · Graphiti</div>
+        <div style="font-size:18pt;font-weight:800;color:var(--teal);">★★★★☆</div>
+        <div class="note" style="margin-top:6px;"><b>"언제 참인지" 시간표가 강함</b> ← 우리가 배울 곳</div></div>
+      <div class="card col" style="border:2px solid var(--cobalt);">
+        <span class="badge b-cobalt">C. 분류 서고형 — 우리</span>
+        <div class="tag" style="margin:8px 0;">SemiColony · Memori</div>
+        <div style="font-size:18pt;font-weight:800;color:var(--cobalt);">★★★★½</div>
+        <div class="note" style="margin-top:6px;">정확한 자리·기록·검증 <b>최상위</b>. 단 <b style="color:var(--red);">시간표만 빔</b></div></div>
+    </div>
+    <div class="card" style="margin-top:16px;background:var(--cobalt-w);border-color:var(--cobalt);">
+      <div class="row" style="align-items:center;">
+        <div style="flex:none;font-size:34pt;">🏆</div>
+        <div class="col">
+          <div style="font-size:14pt;font-weight:800;color:var(--cobalt-d);">한 줄 요약</div>
+          <div class="sub" style="font-size:12.5pt;">대부분의 오픈소스는 "자동·느슨형(A)"에 베팅했는데, <b>우리는 드물게 "분류 서고형(C)"</b>이고 그 분야 <b>최상위</b>입니다.
+          빠진 건 단 하나 — <span class="hl">"이 정보가 언제부터 언제까지 맞는지"라는 시간표</span>.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><b>semicolony</b> 지식 도서관</div><div class="pnum">2</div>
+</section>
+
+<!-- ===== P3: 용어 사전 ===== -->
+<section class="page">
+  <div class="eyebrow">03 · 용어 통일 — "지식 도서관" 사전</div>
+  <h1>어려운 IT 용어 → 도서관 말로</h1>
+  <p class="sub" style="margin-top:6px;">앞으로 이 말들로 통일합니다. (괄호 = 기존 기술용어)</p>
+  <div class="fill">
+    <div class="row" style="flex-wrap:wrap;gap:12px;">
+      <div class="card" style="flex:1 1 30%;"><span class="emoji">📚</span><div style="font-weight:800;font-size:13pt;margin-top:6px;">지식 도서관</div><div class="note">우리 지식 저장소 전체 <span class="tag">(KB)</span></div></div>
+      <div class="card" style="flex:1 1 30%;"><span class="emoji">🗄️</span><div style="font-weight:800;font-size:13pt;margin-top:6px;">서가·책장</div><div class="note">분류 규칙·칸 <span class="tag">(온톨로지)</span></div></div>
+      <div class="card" style="flex:1 1 30%;"><span class="emoji">📖</span><div style="font-weight:800;font-size:13pt;margin-top:6px;">장서(책 한 권)</div><div class="note">지식 한 건 <span class="tag">(KB 항목)</span></div></div>
+      <div class="card" style="flex:1 1 30%;"><span class="emoji">🏷️</span><div style="font-weight:800;font-size:13pt;margin-top:6px;">청구기호</div><div class="note">정확한 자리 주소 <span class="tag">(key 주소)</span></div></div>
+      <div class="card" style="flex:1 1 30%;"><span class="emoji">🔍</span><div style="font-weight:800;font-size:13pt;margin-top:6px;">주제검색</div><div class="note">의미로 찾기 <span class="tag">(벡터/RAG)</span></div></div>
+      <div class="card" style="flex:1 1 30%;"><span class="emoji">🔗</span><div style="font-weight:800;font-size:13pt;margin-top:6px;">상호참조 카드</div><div class="note">"A는 B다" 연결 <span class="tag">(관계)</span></div></div>
+      <div class="card" style="flex:1 1 30%;"><span class="emoji">🧾</span><div style="font-weight:800;font-size:13pt;margin-top:6px;">대출·수정 이력</div><div class="note">누가·언제 고쳤나 <span class="tag">(감사이력)</span></div></div>
+      <div class="card" style="flex:1 1 30%;border-color:var(--red);"><span class="emoji">🗑️</span><div style="font-weight:800;font-size:13pt;margin-top:6px;">폐가·제적 <span class="badge b-red" style="font-size:8pt;">빈칸</span></div><div class="note">낡은 책 빼기 <span class="tag">(미구현)</span></div></div>
+      <div class="card" style="flex:1 1 30%;border:2px solid var(--cobalt);"><span class="emoji">👩‍🏫</span><div style="font-weight:800;font-size:13pt;margin-top:6px;">사서 = Colony</div><div class="note">도서관을 돌보는 담당</div></div>
+    </div>
+  </div>
+  <div class="foot"><b>semicolony</b> 지식 도서관</div><div class="pnum">3</div>
+</section>
+
+<!-- ===== P4: 사서 6직무 ===== -->
+<section class="page">
+  <div class="eyebrow">04 · 사서가 할 일 6가지</div>
+  <h1>5개는 이미 자동, "낡은 책 빼기"만 비었다</h1>
+  <p class="sub" style="margin-top:6px;">그래서 <b>Colony 사서의 첫 임무가 자동으로 정해집니다.</b></p>
+  <div class="fill">
+    <table>
+      <thead><tr><th style="width:22%;">사서 직무</th><th style="width:48%;">설명</th><th>지금 상태</th></tr></thead>
+      <tbody>
+        <tr><td>📥 수서 (들이기)</td><td>새 지식을 받아들이기</td><td><span class="badge b-amber">사람이 수동</span></td></tr>
+        <tr><td>🗂️ 정리·분류</td><td>정해진 칸에 분류</td><td><span class="badge b-green">✓ 자동(규칙)</span></td></tr>
+        <tr><td>📚 배가 (꽂기)</td><td>정확한 자리에 한 권씩</td><td><span class="badge b-green">✓ 자동(주소)</span></td></tr>
+        <tr style="background:var(--red-w);"><td><b>🗑️ 폐가·제적</b></td><td><b>낡은·틀린 책을 서가에서 빼기</b></td><td><span class="badge b-red">✗ 비어있음</span></td></tr>
+        <tr><td>🔍 참고봉사 (검색)</td><td>물으면 맞는 책 찾아주기</td><td><span class="badge b-green">✓ 자동</span></td></tr>
+        <tr><td>🧾 보존</td><td>수정 기록·되돌리기</td><td><span class="badge b-green">✓ 자동</span></td></tr>
+      </tbody>
+    </table>
+    <div class="card" style="margin-top:16px;background:var(--cobalt-w);border-color:var(--cobalt);">
+      <div class="row" style="align-items:center;"><div style="flex:none;font-size:30pt;">👉</div>
+      <div class="sub" style="font-size:13pt;">다른 5개는 컴퓨터가 규칙으로 이미 자동 처리합니다. <b>"무엇이 최신이고 무엇을 뺄까"</b>는 판단이 필요해 규칙으로 안 됩니다 →
+      <span class="hl">바로 그 자리가 사람·에이전트(사서)가 필요한 단 하나의 칸</span>이고, Colony가 맡습니다.</div></div>
+    </div>
+  </div>
+  <div class="foot"><b>semicolony</b> 지식 도서관</div><div class="pnum">4</div>
+</section>
+
+<!-- ===== P5: 무엇을 지을까 ===== -->
+<section class="page">
+  <div class="eyebrow">05 · 결정 — 어떻게 지을까</div>
+  <h1>"재건축" 아니라 "증축"</h1>
+  <p class="sub" style="margin-top:6px;">잘 지은 골격은 그대로 두고, <b>빠진 3가지를 옆에 붙입니다.</b> (Codex 2차 검토도 같은 결론)</p>
+  <div class="fill">
+    <div class="row" style="align-items:center;">
+      <div class="card col" style="border-color:var(--red);">
+        <span class="badge b-red">전 (지금)</span>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">
+          <div style="background:#eceae3;border:1px solid var(--line);border-radius:8px;padding:14px;">
+            <div style="font-weight:800;">📖 "가게 소개" 책 한 권</div>
+            <div class="note">소재·주문제작·배송·관리법·가격… <b>전부 한 권에 뒤섞임</b></div>
+          </div>
+        </div>
+        <div class="note" style="margin-top:10px;color:var(--red);">→ 한 줄 찾으려 책 통째로 뒤짐</div>
+      </div>
+      <div class="arrow">⇒</div>
+      <div class="card col" style="border:2px solid var(--green);">
+        <span class="badge b-green">후 (증축)</span>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:7px;">
+          <div style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 12px;"><b>📖 문서 책</b> <span class="tag">— 그대로 유지(골격)</span></div>
+          <div style="background:var(--teal-w);border:1px solid var(--teal);border-radius:8px;padding:9px 12px;"><b>🗂️ 낱장 사실카드</b> <span class="tag">— [소재=925][주문제작=가능] 따로</span></div>
+          <div style="background:var(--cobalt-w);border:1px solid var(--cobalt);border-radius:8px;padding:9px 12px;"><b>🔗 연결선</b> <span class="tag">— 사실들끼리 잇기</span></div>
+          <div style="background:var(--amber-w);border:1px solid var(--amber);border-radius:8px;padding:9px 12px;"><b>📅 날짜표</b> <span class="tag">— "언제부터~언제까지 맞다"</span></div>
+        </div>
+      </div>
+    </div>
+    <p class="note center" style="margin-top:16px;font-size:12pt;">왜 증축? 우리 도서관 골격은 이미 <b>업계 최상위(★★★★½)</b>라, 갈아엎으면 멀쩡한 자산이 깨집니다. <span class="hl">붙이는 게 가장 싸고 안전</span>합니다.</p>
+  </div>
+  <div class="foot"><b>semicolony</b> 지식 도서관</div><div class="pnum">5</div>
+</section>
+
+<!-- ===== P6: Colony 사서가 일하는 법 ===== -->
+<section class="page">
+  <div class="eyebrow">06 · Colony 사서가 일하는 법</div>
+  <h1>"제안하는 사서" — 멋대로 꽂거나 버리지 않는다</h1>
+  <p class="sub" style="margin-top:6px;">AI가 자동으로 다 하면 틀린 걸 영구히 잘못 꽂는 사고가 납니다. 그래서 <b>승인 문</b>을 둡니다.</p>
+  <div class="fill center">
+    <div class="row" style="align-items:stretch;justify-content:center;">
+      <div class="card col" style="max-width:170px;"><span class="emoji">💬</span><div style="font-weight:800;margin-top:8px;">①  수집</div><div class="note">채팅·대화에서 지식 후보를 모음</div></div>
+      <div class="arrow">→</div>
+      <div class="card col" style="max-width:170px;border-color:var(--amber);"><span class="emoji">📝</span><div style="font-weight:800;margin-top:8px;">②  제안</div><div class="note">"이거 넣을까요?" 근거와 함께 <b>제안만</b></div></div>
+      <div class="arrow" style="color:var(--cobalt);">🚪</div>
+      <div class="card col" style="max-width:170px;border-color:var(--cobalt);"><span class="emoji">🧑‍⚖️</span><div style="font-weight:800;margin-top:8px;">③  사람 승인</div><div class="note">사장님/팀이 승인한 것만 통과</div></div>
+      <div class="arrow">→</div>
+      <div class="card col" style="max-width:170px;border-color:var(--green);"><span class="emoji">📚</span><div style="font-weight:800;margin-top:8px;">④  열람</div><div class="note">승인된 것만 <b>실제 검색·응대</b>에 사용</div></div>
+    </div>
+    <div class="card" style="margin-top:20px;text-align:left;background:var(--green-w);border-color:var(--green);">
+      <div class="sub" style="font-size:12.5pt;"><b>사서의 1순위 = 폐가(낡은 책 빼기).</b> 단 Colony도 <b>"이건 낡았으니 뺄까요?"</b> 제안하고, 자동으로 영구 삭제하진 않습니다. (가격·법규처럼 민감한 건 반드시 승인 / 내부 회의록 같은 건 그냥 기록)</div>
+    </div>
+  </div>
+  <div class="foot"><b>semicolony</b> 지식 도서관</div><div class="pnum">6</div>
+</section>
+
+<!-- ===== P7: 똑똑한 검색 ===== -->
+<section class="page">
+  <div class="eyebrow">07 · "Attention(똑똑한 검색)" 아이디어</div>
+  <h1>물어보면, 관련된 것만 똑똑하게 끌어온다</h1>
+  <p class="sub" style="margin-top:6px;">사장님 아이디어("Attention 적용")의 좋은 본질 = <b>키워드 매칭이 아니라 '관련도 + 연결'로 찾기.</b> 4단계로 구현합니다.</p>
+  <div class="fill">
+    <div class="row" style="align-items:stretch;">
+      <div class="card col"><div class="badge b-cobalt">1단계</div><div style="font-weight:800;margin-top:8px;font-size:13pt;">후보 찾기</div><div class="note">의미가 비슷한 사실들을 1차로 추림 <span class="tag">(이미 보유 ✓)</span></div></div>
+      <div class="arrow">→</div>
+      <div class="card col"><div class="badge b-cobalt">2단계</div><div style="font-weight:800;margin-top:8px;font-size:13pt;">연결 확장</div><div class="note">연결선 1~2칸만 따라가 관련 사실 추가</div></div>
+      <div class="arrow">→</div>
+      <div class="card col"><div class="badge b-cobalt">3단계</div><div style="font-weight:800;margin-top:8px;font-size:13pt;">재정렬</div><div class="note">최신·근거·권위 순으로 다시 줄세움</div></div>
+      <div class="arrow">→</div>
+      <div class="card col"><div class="badge b-cobalt">4단계</div><div style="font-weight:800;margin-top:8px;font-size:13pt;">정리해 전달</div><div class="note">중복·모순 빼고 핵심만 AI에게</div></div>
+    </div>
+    <div class="card" style="margin-top:16px;background:var(--amber-w);border-color:var(--amber);">
+      <div class="sub" style="font-size:12pt;"><b>바로잡을 오해 한 가지:</b> "AI의 Attention을 도서관 전체에 직접 돌린다"는 불가능합니다(책이 수백만 권이라). 정확히는 <span class="hl">위 검색이 'AI가 볼 책을 골라주는' 역할</span>이고, 그 절반(의미로 찾기)은 우리가 이미 갖고 있습니다. 빠진 건 <b>연결(2단계)과 낱장 사실(정밀도)</b>.</div>
+    </div>
+  </div>
+  <div class="foot"><b>semicolony</b> 지식 도서관</div><div class="pnum">7</div>
+</section>
+
+<!-- ===== P8: Codex 리뷰 ===== -->
+<section class="page">
+  <div class="eyebrow">08 · 제3자(Codex) 교차 검토 결과</div>
+  <h1>다른 AI에게 받은 2차 의견</h1>
+  <p class="sub" style="margin-top:6px;">"대체로 동의, 단 안전하게" — 채택할 것과 피할 것을 분명히 갈라줬습니다.</p>
+  <div class="fill">
+    <div class="row">
+      <div class="card col" style="border:2px solid var(--green);">
+        <span class="badge b-green" style="font-size:12pt;">✅ 채택</span>
+        <ul class="clean" style="margin-top:12px;font-size:11.5pt;">
+          <li><span class="chk" style="color:var(--green);">✓</span>잘 지은 분류 도서관 <b>그대로 유지</b></li>
+          <li><span class="chk" style="color:var(--green);">✓</span>낱장 사실은 <b>옆에 붙이기(증축)</b></li>
+          <li><span class="chk" style="color:var(--green);">✓</span>"언제부터~까지" <b>날짜표</b> 추가</li>
+          <li><span class="chk" style="color:var(--green);">✓</span>Colony = <b>제안하는 사서</b></li>
+          <li><span class="chk" style="color:var(--green);">✓</span>검색은 기본 "현재"만 + 옵션으로 옛것·시점조회</li>
+        </ul>
+      </div>
+      <div class="card col" style="border:2px solid var(--red);">
+        <span class="badge b-red" style="font-size:12pt;">⛔ 피할 것</span>
+        <ul class="clean" style="margin-top:12px;font-size:11.5pt;">
+          <li><span class="chk" style="color:var(--red);">✗</span>도서관 <b>전면 재건축</b></li>
+          <li><span class="chk" style="color:var(--red);">✗</span>AI가 <b>멋대로 만든 지식을 정본으로</b></li>
+          <li><span class="chk" style="color:var(--red);">✗</span>연결(관계)만 보고 답하기 <span class="tag">(거짓단정 위험)</span></li>
+          <li><span class="chk" style="color:var(--red);">✗</span>모든 글쓰기에 승인 문 <span class="tag">(운영 막힘)</span></li>
+        </ul>
+      </div>
+    </div>
+    <div class="card" style="margin-top:14px;background:var(--cobalt-w);border-color:var(--cobalt);">
+      <div class="sub" style="font-size:12.5pt;"><b>가장 큰 경고 = "신뢰 붕괴".</b> 소상공인은 한 번 틀린 답을 받으면 떠납니다. 그래서 <span class="hl">모르면 "확인 후 안내", 근거 없이 단정 금지</span>가 정확도·비용보다 중요합니다.</div>
+    </div>
+  </div>
+  <div class="foot"><b>semicolony</b> · Codex 교차검토</div><div class="pnum">8</div>
+</section>
+
+<!-- ===== P9: 로드맵 ===== -->
+<section class="page" style="background:var(--ink);color:#fff;">
+  <div class="eyebrow" style="color:#8FB4F4;">09 · 다음 단계</div>
+  <h1 style="color:#fff;">증축 순서 (안전한 길)</h1>
+  <p class="sub" style="color:rgba(255,255,255,.82);margin-top:6px;">한꺼번에 안 하고, 한 칸씩.</p>
+  <div class="fill">
+    <div class="row" style="flex-wrap:wrap;gap:12px;">
+      <div class="card col" style="flex:1 1 30%;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18);color:#fff;"><div class="big" style="font-size:22pt;color:#8FB4F4;">1</div><div style="margin-top:6px;font-weight:700;">기존 사용처 점검 + 안전망(테스트) 고정</div></div>
+      <div class="card col" style="flex:1 1 30%;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18);color:#fff;"><div class="big" style="font-size:22pt;color:#8FB4F4;">2</div><div style="margin-top:6px;font-weight:700;">"낡은 책 빼기"(폐가) + 검색 기본=현재</div></div>
+      <div class="card col" style="flex:1 1 30%;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18);color:#fff;"><div class="big" style="font-size:22pt;color:#8FB4F4;">3</div><div style="margin-top:6px;font-weight:700;">낱장 사실카드 서랍 추가(날짜표 포함)</div></div>
+      <div class="card col" style="flex:1 1 30%;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18);color:#fff;"><div class="big" style="font-size:22pt;color:#8FB4F4;">4</div><div style="margin-top:6px;font-weight:700;">승인된 것만 검색에 노출(읽기 먼저)</div></div>
+      <div class="card col" style="flex:1 1 30%;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18);color:#fff;"><div class="big" style="font-size:22pt;color:#8FB4F4;">5</div><div style="margin-top:6px;font-weight:700;">Colony 사서 = 제안 전용으로 연결</div></div>
+      <div class="card col" style="flex:1 1 30%;background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18);color:#fff;"><div class="big" style="font-size:22pt;color:#8FB4F4;">6·7</div><div style="margin-top:6px;font-weight:700;">한 가게부터 시범 적용 → 비교 → 정리</div></div>
+    </div>
+    <div style="margin-top:22px;padding:18px 24px;background:rgba(44,111,232,.18);border:1px solid #8FB4F4;border-radius:14px;">
+      <div class="sub" style="color:#fff;font-size:13.5pt;">🎯 <b>한 줄 결론:</b> 우리는 이미 <b>업계 최고 수준의 분류 도서관</b>을 지어놨다. 이제 <b>Colony 사서</b>를 들여 <b>낡은 책을 빼고(시간표)</b>, 지식을 <b>낱장으로 정밀하게</b> 만들면 — "쓸수록 똑똑해지는 도서관"이 된다.</div>
+    </div>
+  </div>
+  <div class="foot" style="color:rgba(255,255,255,.5);"><b style="color:#8FB4F4;">semicolony</b> 지식 도서관</div><div class="pnum" style="color:rgba(255,255,255,.5);">9</div>
+</section>
+
+</body>
+</html>
