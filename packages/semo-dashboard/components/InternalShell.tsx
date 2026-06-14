@@ -230,7 +230,7 @@ function SidebarBody({ pathname, onNav }: { pathname: string; onNav?: () => void
               letterSpacing: '-0.02em',
             }}
           >
-            SEMO
+            SemiColony
           </div>
           <div style={{ fontSize: 11, color: 'var(--semo-fg-3)' }}>세미콜론 팀 · 운영팀</div>
         </div>

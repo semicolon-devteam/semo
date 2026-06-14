@@ -108,7 +108,7 @@ export default function OnboardingPage() {
     <div className="flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-8 shadow-sm dark:border-gray-700 dark:bg-gray-800">
         <h1 className="mb-2 text-center text-2xl font-bold text-gray-900 dark:text-white">
-          SEMO 대시보드 가입
+          SemiColony 대시보드 가입
         </h1>
         <p className="mb-8 text-center text-sm text-gray-500 dark:text-gray-400">
           {step === 'role' ? '어떤 유형의 사용자인가요?' : '본인 정보를 선택해주세요.'}

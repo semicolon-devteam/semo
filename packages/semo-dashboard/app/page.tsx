@@ -1267,7 +1267,7 @@ function WhySection() {
     <section className="lp-section" id="benefits">
       <div className="lp-container">
         <SectionHead
-          eyebrow="왜 SEMO 인가요"
+          eyebrow="왜 SemiColony 인가요"
           title="‘도구’가 아니라, 진짜 ‘팀원’이에요"
           lead="버튼을 배우는 프로그램이 아니라, 일을 맡기는 팀원이에요. 그래서 다릅니다."
         />
@@ -1447,7 +1447,7 @@ function Nav() {
       <div className="lp-container lp-nav__inner">
         <a className="lp-brand" href="#top">
           <span className="lp-brand__mark">;</span>
-          <span className="lp-brand__name">SEMO</span>
+          <span className="lp-brand__name">SemiColony</span>
         </a>
         <div className="lp-nav__links">
           <a className="lp-nav__link" href="#employees">
@@ -1457,7 +1457,7 @@ function Nav() {
             사용법
           </a>
           <a className="lp-nav__link" href="#benefits">
-            왜 SEMO
+            왜 SemiColony
           </a>
           <a className="lp-nav__link" href="#try">
             요금
@@ -1535,7 +1535,7 @@ function Footer() {
         <div className="lp-footer__top">
           <a className="lp-brand" href="#top">
             <span className="lp-brand__mark">;</span>
-            <span className="lp-brand__name">SEMO</span>
+            <span className="lp-brand__name">SemiColony</span>
           </a>
           <div className="lp-footer__links">
             <Link className="lp-footer__link" href={DEMO}>
@@ -1553,7 +1553,7 @@ function Footer() {
           </div>
         </div>
         <div className="lp-footer__legal">
-          <span>© 2026 SEMO</span>
+          <span>© 2026 SemiColony</span>
           <span>·</span>
           <span>사장님 대신 일하는 AI 직원</span>
         </div>

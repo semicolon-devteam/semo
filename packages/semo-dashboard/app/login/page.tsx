@@ -20,8 +20,8 @@ export default function LoginPage() {
       <div className="w-full max-w-sm mx-auto">
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-8">
           <div className="flex flex-col items-center mb-8">
-            <Image src="/logo.png" alt="SEMO" width={48} height={48} className="mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">SEMO 대시보드</h1>
+            <Image src="/logo.png" alt="SemiColony" width={48} height={48} className="mb-4" />
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">SemiColony 대시보드</h1>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               로그인하여 대시보드에 접속하세요
             </p>

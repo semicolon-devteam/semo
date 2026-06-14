@@ -63,7 +63,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       `**우선순위**: ${priority || 'normal'}`,
       '',
       `---`,
-      `> 이 이슈는 SEMO 서비스 대시보드에서 자동 생성되었습니다.`,
+      `> 이 이슈는 SemiColony 서비스 대시보드에서 자동 생성되었습니다.`,
       `> 서비스: ${project.project_name} (${project.service_domain})`,
       `> Feature ID: ${feature_id}`,
     ]

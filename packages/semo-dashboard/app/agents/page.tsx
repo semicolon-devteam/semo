@@ -37,7 +37,7 @@ export default async function AgentsPage() {
           </p>
           <h1 className="text-3xl font-bold text-gray-950 dark:text-white">Agent Operations</h1>
           <p className="mt-2 max-w-3xl text-gray-600 dark:text-gray-400">
-            SEMO 내부 오케스트레이터와 하위 에이전트들의 상태, 런타임 출처, 진행 중 작업, 최근
+            SemiColony 내부 오케스트레이터와 하위 에이전트들의 상태, 런타임 출처, 진행 중 작업, 최근
             실패를 한 화면에서 확인합니다.
           </p>
         </div>

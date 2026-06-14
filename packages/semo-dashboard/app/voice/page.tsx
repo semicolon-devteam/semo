@@ -189,7 +189,7 @@ export default function VoicePage() {
           className="w-full border-0"
           style={{ height: '680px' }}
           allow="microphone"
-          title="SEMO Voice Softphone"
+          title="SemiColony Voice Softphone"
         />
       </div>
 

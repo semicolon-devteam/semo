@@ -122,8 +122,8 @@ export default function GlobalNav() {
               href="/"
               className="flex items-center gap-2 text-xl font-bold text-gray-900 dark:text-white"
             >
-              <Image src="/logo.png" alt="SEMO" width={28} height={28} />
-              SEMO
+              <Image src="/logo.png" alt="SemiColony" width={28} height={28} />
+              SemiColony
             </Link>
             {/* Desktop menu */}
             <div className="hidden md:flex gap-1">

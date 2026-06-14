@@ -363,7 +363,7 @@ function Sidebar({ mode, active, workspace }) {
           <div style={{
             fontSize: 14, fontWeight: 700, color: 'var(--semo-fg-1)',
             letterSpacing: '-0.01em',
-          }}>SEMO</div>
+          }}>SemiColony</div>
         </div>
       </div>
 
