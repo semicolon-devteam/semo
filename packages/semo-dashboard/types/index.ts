@@ -5,7 +5,7 @@ export interface Bot {
   emoji: string;
   role: string;
   status: 'online' | 'offline';
-  lastActive: string;
+  lastActive: string | null;
   sessionCount: number;
   workspacePath: string;
 }

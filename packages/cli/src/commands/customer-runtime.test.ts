@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   customerBotId,
+  installBotId,
   buildCustomerSoul,
+  buildInstallRuntimeConfig,
+  buildInstallSoul,
   scoreAgent,
   mapActionItemToWorkItem,
   mapCommitmentToWorkItem,
@@ -12,6 +15,10 @@ import {
 describe('customerBotId', () => {
   it('테넌트+에이전트로 안정적 bot_id 생성', () => {
     expect(customerBotId('jeongmin-cafe', 'jumuni')).toBe('ag-jeongmin-cafe-jumuni');
+  });
+
+  it('generic install bot_id도 customer와 같은 규약을 사용한다', () => {
+    expect(installBotId('team-semicolon', 'operator')).toBe('ag-team-semicolon-operator');
   });
 });
 
@@ -44,6 +51,53 @@ describe('buildCustomerSoul', () => {
     });
     expect(soul).toContain('봇');
     expect(soul).toContain('직원'); // role_label null → 기본 '직원'
+  });
+});
+
+describe('install projection model', () => {
+  const internalInstall = {
+    install_id: 'install-operator',
+    tenant_id: 'tenant-internal',
+    tenant_slug: 'team-semicolon',
+    tenant_type: 'team',
+    listing_id: 'listing-operator',
+    agent_slug: 'operator',
+    audience: 'internal',
+  };
+
+  it('internal install projection keeps audience/scope instead of forcing customer', () => {
+    expect(buildInstallRuntimeConfig(internalInstall, { hostKind: 'hermes-cli' })).toMatchObject({
+      host_kind: 'hermes-cli',
+      audience: 'internal',
+      tenant_id: 'tenant-internal',
+      tenant_slug: 'team-semicolon',
+      tenant_type: 'team',
+      listing_id: 'listing-operator',
+      install_id: 'install-operator',
+      agent_slug: 'operator',
+      serve_worker_enabled: 'true',
+      use_persona_envelope: true,
+    });
+  });
+
+  it('internal install soul says internal operations, not customer request handling', () => {
+    const soul = buildInstallSoul({
+      ...internalInstall,
+      instance_name: 'Operator',
+      tenant_display_name: 'Semicolon',
+      display_name: 'Operator',
+      role_label: '운영 자동화 에이전트',
+      bio: '런타임과 운영 이슈를 처리한다',
+      short_desc: null,
+      dept: '운영',
+      skills: ['runtime', 'ops'],
+      persona_template: null,
+      persona_override: null,
+    });
+
+    expect(soul).toContain('Operator');
+    expect(soul).toContain('내부 운영 요청');
+    expect(soul).not.toContain('고객 요청');
   });
 });
 

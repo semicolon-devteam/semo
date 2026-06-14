@@ -1,11 +1,11 @@
 /**
- * customer-runtime — 고객(테넌트) 에이전트를 기존 serve-worker 엔진으로 실행 가능하게 잇는 브릿지.
+ * customer-runtime — 설치된(테넌트) 에이전트를 기존 serve-worker 엔진으로 실행 가능하게 잇는 브릿지.
  *
  * 설계: docs/superpowers/specs/2026-06-04-customer-dynamic-delegation-design.md
  *
- * 핵심: public.agent_installs(고객 마켓 설치) ↔ ${DB_SCHEMA}.bot_status(런타임 identity) 프로젝션.
+ * 핵심: public.agent_installs(마켓/내부 설치) ↔ ${DB_SCHEMA}.bot_status(런타임 identity) 프로젝션.
  *   프로젝션하면 기존 runtime serve / mailbox-supervisor / bot_commitments 워크큐 /
- *   대시보드 큐 / OutboxReader 가 변경 없이 customer 에이전트를 처리한다.
+ *   대시보드 큐 / OutboxReader 가 변경 없이 설치 에이전트를 처리한다.
  *
  * 해소(resolve): 요청 → 테넌트 풀 → 라이브러리 → none(2-B 생성).
  */
@@ -30,27 +30,36 @@ export interface ProjectedAgent {
   displayName: string;
   roleLabel: string | null;
   hostKind: string;
+  audience: InstallAudience;
 }
 
 export interface ProjectOptions {
   /** 실행 호스트. MVP 기본 ollama-cli(무인증·프로필 불필요). 실배포는 web 가능 호스트로 override. */
   hostKind?: string;
   ollamaModel?: string;
+  audience?: InstallAudience;
 }
 
-/** customer 에이전트의 런타임 bot_id 규약 — 테넌트+에이전트로 안정적·가독. */
-export function customerBotId(tenantSlug: string, agentSlug: string): string {
+export type InstallAudience = 'customer' | 'internal';
+
+/** 설치 에이전트의 런타임 bot_id 규약 — 테넌트+에이전트로 안정적·가독. */
+export function installBotId(tenantSlug: string, agentSlug: string): string {
   return `ag-${tenantSlug}-${agentSlug}`;
 }
 
-interface InstallRow {
+/** @deprecated customer 전용 명칭. 신규 코드는 installBotId 를 사용. */
+export const customerBotId = installBotId;
+
+export interface InstallRow {
   install_id: string;
   instance_name: string | null;
   tenant_id: string;
   tenant_slug: string;
   tenant_display_name: string | null;
+  tenant_type: string | null;
   listing_id: string;
   agent_slug: string;
+  audience: InstallAudience;
   display_name: string;
   role_label: string | null;
   bio: string | null;
@@ -71,10 +80,10 @@ function fillPlaceholders(text: string, row: InstallRow): string {
 }
 
 /**
- * 설치된 customer 에이전트의 런타임 soul 해소:
+ * 설치된 에이전트의 런타임 soul 해소:
  * 고객 override > 라이브러리 persona_template > listing 메타 합성. (커스터마이즈 우선)
  */
-export function resolveCustomerSoul(row: InstallRow): string {
+export function buildInstallSoul(row: InstallRow): string {
   if (row.persona_override && row.persona_override.trim()) {
     return fillPlaceholders(row.persona_override, row);
   }
@@ -83,6 +92,9 @@ export function resolveCustomerSoul(row: InstallRow): string {
   }
   return buildCustomerSoul(row);
 }
+
+/** @deprecated customer 전용 명칭. 신규 코드는 buildInstallSoul 을 사용. */
+export const resolveCustomerSoul = buildInstallSoul;
 
 function skillsText(skills: unknown): string {
   if (Array.isArray(skills)) return skills.map((s) => String(s)).join(', ');
@@ -98,15 +110,17 @@ export function buildCustomerSoul(row: {
   short_desc: string | null;
   dept: string | null;
   tenant_slug: string;
+  audience?: InstallAudience;
   skills: unknown;
 }): string {
   const skills = skillsText(row.skills);
   const intro = row.bio || row.short_desc || '';
+  const requestScope = row.audience === 'internal' ? '내부 운영 요청' : '고객 요청';
   return [
     `당신은 "${row.display_name}"(${row.role_label || '직원'})${row.dept ? ` · ${row.dept}` : ''}.`,
     intro,
     skills ? `보유 스킬: ${skills}.` : '',
-    `테넌트 "${row.tenant_slug}"의 직원으로서 고객 요청을 정확하고 친절하게 처리하고, 결과를 간결히 보고한다.`,
+    `테넌트 "${row.tenant_slug}"의 직원으로서 ${requestScope}을 정확하고 친절하게 처리하고, 결과를 간결히 보고한다.`,
     `요청 범위를 벗어나는 일은 하지 않으며, 확인이 필요하면 명확히 묻는다.`,
   ]
     .filter(Boolean)
@@ -118,7 +132,8 @@ async function loadInstall(installId: string): Promise<InstallRow | null> {
   const r = await pool.query<InstallRow>(
     `SELECT i.id AS install_id, i.instance_name, i.persona_override,
             t.id AS tenant_id, t.slug AS tenant_slug, t.display_name AS tenant_display_name,
-            l.id AS listing_id, l.agent_slug, l.display_name, l.role_label,
+            t.tenant_type,
+            l.id AS listing_id, l.agent_slug, l.audience, l.display_name, l.role_label,
             l.bio, l.short_desc, l.dept, l.skills, l.persona_template
      FROM public.agent_installs i
      JOIN public.tenants t ON t.id = i.tenant_id
@@ -127,6 +142,40 @@ async function loadInstall(installId: string): Promise<InstallRow | null> {
     [installId],
   );
   return r.rows[0] ?? null;
+}
+
+export function defaultHostKindForAudience(audience: InstallAudience): string {
+  return audience === 'internal' ? 'hermes-cli' : 'ollama-cli';
+}
+
+export function buildInstallRuntimeConfig(
+  row: Pick<
+    InstallRow,
+    | 'install_id'
+    | 'tenant_id'
+    | 'tenant_slug'
+    | 'tenant_type'
+    | 'listing_id'
+    | 'agent_slug'
+    | 'audience'
+  >,
+  opts: ProjectOptions = {},
+): Record<string, unknown> {
+  const hostKind = opts.hostKind ?? defaultHostKindForAudience(row.audience);
+  const config: Record<string, unknown> = {
+    host_kind: hostKind,
+    audience: row.audience,
+    tenant_id: row.tenant_id,
+    tenant_slug: row.tenant_slug,
+    tenant_type: row.tenant_type,
+    listing_id: row.listing_id,
+    install_id: row.install_id,
+    agent_slug: row.agent_slug,
+    serve_worker_enabled: 'true',
+    use_persona_envelope: true,
+  };
+  if (hostKind === 'ollama-cli') config.ollama_model = opts.ollamaModel ?? 'qwen2.5:0.5b';
+  return config;
 }
 
 /**
@@ -141,24 +190,13 @@ export async function projectInstallToBotStatus(
   const row = await loadInstall(installId);
   if (!row) return null;
 
-  const botId = customerBotId(row.tenant_slug, row.agent_slug);
-  const hostKind = opts.hostKind ?? 'ollama-cli';
-  const config: Record<string, unknown> = {
-    host_kind: hostKind,
-    audience: 'customer',
-    tenant_id: row.tenant_id,
-    tenant_slug: row.tenant_slug,
-    listing_id: row.listing_id,
-    install_id: row.install_id,
-    agent_slug: row.agent_slug,
-    serve_worker_enabled: 'true',
-    use_persona_envelope: true,
-  };
-  if (hostKind === 'ollama-cli') config.ollama_model = opts.ollamaModel ?? 'qwen2.5:0.5b';
+  const botId = installBotId(row.tenant_slug, row.agent_slug);
+  const config = buildInstallRuntimeConfig(row, opts);
+  const hostKind = String(config.host_kind);
 
   await pool.query(
     `INSERT INTO ${DB_SCHEMA}.bot_status (bot_id, name, role, status, config)
-     VALUES ($1, $2, $3, 'online', $4::jsonb)
+     VALUES ($1, $2, $3, 'offline', $4::jsonb)
      ON CONFLICT (bot_id) DO UPDATE
        SET name = EXCLUDED.name,
            role = EXCLUDED.role,
@@ -167,17 +205,17 @@ export async function projectInstallToBotStatus(
     [botId, row.instance_name || row.display_name, row.role_label, JSON.stringify(config)],
   );
 
-  const soul = resolveCustomerSoul(row);
+  const soul = buildInstallSoul(row);
   const nickname = row.instance_name || row.display_name; // 고객이 정한 닉네임 우선
   await pool.query(
     `INSERT INTO ${DB_SCHEMA}.agent_personas (slug, display_name, soul_md, version, status, updated_by, created_at, updated_at)
-     VALUES ($1, $2, $3, 1, 'active', 'customer-projection', now(), now())
+     VALUES ($1, $2, $3, 1, 'active', $4, now(), now())
      ON CONFLICT (slug) DO UPDATE
        SET display_name = EXCLUDED.display_name,
            soul_md = EXCLUDED.soul_md,
            version = ${DB_SCHEMA}.agent_personas.version + 1,
            updated_at = now()`,
-    [botId, nickname, soul],
+    [botId, nickname, soul, `${row.audience}-install-projection`],
   );
 
   return {
@@ -187,6 +225,7 @@ export async function projectInstallToBotStatus(
     displayName: nickname,
     roleLabel: row.role_label,
     hostKind,
+    audience: row.audience,
   };
 }
 
@@ -199,8 +238,11 @@ export async function projectAllActiveInstalls(
   const r = await pool.query<{ id: string }>(
     `SELECT i.id FROM public.agent_installs i
      JOIN public.tenants t ON t.id = i.tenant_id
-     WHERE i.install_status = 'active' AND ($1::text IS NULL OR t.slug = $1)`,
-    [tenantSlug ?? null],
+     JOIN public.agent_listings l ON l.id = i.listing_id
+     WHERE i.install_status = 'active'
+       AND ($1::text IS NULL OR t.slug = $1)
+       AND ($2::text IS NULL OR l.audience = $2)`,
+    [tenantSlug ?? null, opts.audience ?? null],
   );
   const out: ProjectedAgent[] = [];
   for (const { id } of r.rows) {
@@ -723,16 +765,26 @@ export function registerCustomerCommands(program: Command): void {
     .description(`agent_install → ${DB_SCHEMA}.bot_status 프로젝션 (런타임 실행 가능화)`)
     .option('--install <id>', '특정 install id')
     .option('--tenant <slug>', '테넌트의 모든 active install 프로젝션')
+    .option('--audience <audience>', '테넌트 projection 대상 audience 필터 (customer|internal)')
     .option('--host-kind <kind>', '실행 호스트 (기본 ollama-cli)')
     .option('--ollama-model <m>', 'ollama 모델 (기본 qwen2.5:0.5b)')
     .action(
       async (opts: {
         install?: string;
         tenant?: string;
+        audience?: InstallAudience;
         hostKind?: string;
         ollamaModel?: string;
       }) => {
-        const projOpts = { hostKind: opts.hostKind, ollamaModel: opts.ollamaModel };
+        if (opts.audience && opts.audience !== 'customer' && opts.audience !== 'internal') {
+          console.error('✗ --audience must be customer or internal');
+          process.exit(1);
+        }
+        const projOpts = {
+          hostKind: opts.hostKind,
+          ollamaModel: opts.ollamaModel,
+          audience: opts.audience,
+        };
         if (opts.install) {
           const p = await projectInstallToBotStatus(opts.install, projOpts);
           console.log(

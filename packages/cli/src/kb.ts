@@ -741,12 +741,17 @@ export async function kbSearch(
     limit?: number;
     mode?: 'semantic' | 'text' | 'hybrid';
     minScore?: number;
+    includeSuperseded?: boolean;
   },
 ): Promise<KBEntry[]> {
   if (options.domain) options = { ...options, domain: canonicalKbDomain(options.domain) };
   const client = await pool.connect();
   const limit = options.limit || 10;
   const mode = options.mode || 'hybrid';
+  // 검색 계약(D4, spec 2026-06-12): 기본은 현행 유효 장서(is_latest)만 반환.
+  // includeSuperseded=true 면 폐가(superseded) 포함. 기존 데이터는 전부 is_latest=true 라 기본 동작 불변.
+  // ⚠️ 132 마이그(is_latest 컬럼) 적용된 DB에서만 동작 — 미적용 DB 배포 금지.
+  const currentFilter = options.includeSuperseded ? '' : ' AND is_latest';
 
   // Resolve service → domain list for filtering
   let serviceDomains: string[] | null = null;
@@ -769,7 +774,7 @@ export async function kbSearch(
           SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text,
                  1 - (embedding <=> $1::vector) as score
           FROM ${DB_SCHEMA}.knowledge_base
-          WHERE embedding IS NOT NULL
+          WHERE embedding IS NOT NULL${currentFilter}
         `;
         const params: (string | number)[] = [embeddingStr];
         let paramIdx = 2;
@@ -834,7 +839,7 @@ export async function kbSearch(
         SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text,
                ${scoreExpr} as score
         FROM ${DB_SCHEMA}.knowledge_base
-        WHERE ${whereClause}
+        WHERE (${whereClause})${currentFilter}
       `;
 
       if (options.domain) {
@@ -887,7 +892,7 @@ export async function kbSearch(
     let sql = `
       SELECT domain, key, sub_key, content, metadata, created_by, version, updated_at::text
       FROM ${DB_SCHEMA}.knowledge_base
-      WHERE content ILIKE $1 OR key ILIKE $1 OR sub_key ILIKE $1
+      WHERE (content ILIKE $1 OR key ILIKE $1 OR sub_key ILIKE $1)${currentFilter}
     `;
     const params: (string | number)[] = [`%${query}%`];
     let paramIdx = 2;

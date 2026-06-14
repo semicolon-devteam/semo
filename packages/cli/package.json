@@ -9,8 +9,8 @@
     "semo-cli": "dist/bundle.js"
   },
   "scripts": {
-    "build": "tsc && node scripts/bundle.mjs && rm -rf dist/templates && cp -r src/templates dist/templates && xattr -cr dist/ 2>/dev/null || true",
-    "build:tsc": "tsc",
+    "build": "tsc --noEmit && node scripts/bundle.mjs && rm -rf dist/templates && cp -r src/templates dist/templates && xattr -cr dist/ 2>/dev/null || true",
+    "build:tsc": "tsc --noEmit",
     "bundle": "node scripts/bundle.mjs",
     "start": "node dist/bundle.js",
     "dev": "ts-node src/index.ts",
