@@ -474,7 +474,7 @@ export async function getNudges(): Promise<NudgeItem[]> {
 
 // ─── KB 그래프(/my/knowledge) 실데이터 ────────────────────────────────
 // "가게 지식" 그래프는 테넌트의 agent_activity 에서 만든다(직원=허브, 활동 target=지식 노드,
-// 엣지=직원→지식). 고객 지식은 SEMO 내부 ${DB_SCHEMA}.knowledge_base 와 별개이므로 그쪽 스키마는
+// 엣지=직원→지식). 고객 지식은 SemiColony 내부 ${DB_SCHEMA}.knowledge_base 와 별개이므로 그쪽 스키마는
 // 건드리지 않는다(공유 production KB 보호). react-force-graph-2d 가 이 shape 를 그대로 소비.
 
 export interface GraphNode {
@@ -597,9 +597,9 @@ export interface BillingData {
 }
 
 const USAGE_LABELS: Record<string, string> = {
-  ai_responses: 'AI 응대',
-  kb_storage_mb: '가게 지식 용량',
-  employees: '채용 중인 직원',
+  ai_responses: '이번 달 먹이',
+  kb_storage_mb: '지식도서관 용량',
+  employees: '일하는 에이전트',
 };
 
 /** 테넌트 결제 현황. 비거나 오류면 null(화면이 mock 폴백). */

@@ -7,51 +7,51 @@ import { Icon, Eyebrow, Card, Section, Badge, Button, Progress, SegTab, AppShell
 
 const PLANS = [
   {
-    id: 'free', name: 'Free', price: 0, period: '',
-    blurb: '처음 둘러보기',
-    color: 'var(--semo-surface)',
-    items: [
-      ['동시 채용 가능',     '1명'],
-      ['월간 AI 사용량',     '300건'],
-      ['가게 지식 용량',     '50MB'],
-      ['우선 지원',         false],
-      ['내 봇 라이브러리 공유', false],
-    ],
-  },
-  {
-    id: 'starter', name: 'Starter', price: 29000, period: '월', current: true,
-    blurb: '1인 사장님의 시작',
+    id: 'taste', name: 'Taste', price: 100000, period: '월', current: true,
+    blurb: '에이전트 팀을 가볍게 경험',
     color: 'var(--semo-cream)',
     items: [
-      ['동시 채용 가능',     '3명'],
-      ['월간 AI 사용량',     '5,000건'],
-      ['가게 지식 용량',     '500MB'],
-      ['우선 지원',         '이메일'],
-      ['내 봇 라이브러리 공유', false],
+      ['월 제공 먹이',       '800개'],
+      ['초기 에이전트 팀',   '최소 구성'],
+      ['지식도서관 용량',    '500MB'],
+      ['승인형 자동화',      true],
+      ['직접 커스텀 지원',   false],
     ],
   },
   {
-    id: 'pro', name: 'Pro', price: 79000, period: '월', recommended: true,
-    blurb: '직원이 더 필요한 가게',
+    id: 'core', name: 'Core', price: 300000, period: '월', recommended: true,
+    blurb: '실제로 유용하게 쓰는 주력 플랜',
     color: 'var(--semo-primary-08)',
     items: [
-      ['동시 채용 가능',     '7명'],
-      ['월간 AI 사용량',     '25,000건'],
-      ['가게 지식 용량',     '5GB'],
-      ['우선 지원',         '카톡 채널'],
-      ['내 봇 라이브러리 공유', true],
+      ['월 제공 먹이',       '3,000개'],
+      ['초기 에이전트 팀',   '전체 기능'],
+      ['지식도서관 용량',    '5GB'],
+      ['모든 자동화 기능',   true],
+      ['외부 연동 추가 과금', '별도'],
     ],
   },
   {
-    id: 'business', name: 'Business', price: 199000, period: '월',
-    blurb: '여러 매장·팀 운영',
+    id: 'deep', name: 'Deep', price: 500000, period: '월',
+    blurb: '깊은 사용과 운영 지원',
     color: 'var(--semo-surface)',
     items: [
-      ['동시 채용 가능',     '제한 없음'],
-      ['월간 AI 사용량',     '제한 없음'],
-      ['가게 지식 용량',     '50GB'],
-      ['우선 지원',         '전담 매니저'],
-      ['내 봇 라이브러리 공유', true],
+      ['월 제공 먹이',       '6,000개'],
+      ['초기 에이전트 팀',   '전체 기능'],
+      ['지식도서관 용량',    '20GB'],
+      ['비즈니스아워 특별 대응', true],
+      ['직접 커스텀 지원',   true],
+    ],
+  },
+  {
+    id: 'install', name: 'Install', price: 0, period: '별도',
+    blurb: '고객 환경 설치형',
+    color: 'var(--semo-surface)',
+    items: [
+      ['설치형 계약',       '별도 견적'],
+      ['고객 인프라 배포',   true],
+      ['지식도서관 Export', true],
+      ['보안·운영 협의',    true],
+      ['월 먹이',           '계약별'],
     ],
   },
 ];
@@ -78,8 +78,9 @@ function toTier(p) {
 }
 
 function fmtUsageSub(m) {
+  if (m.metric === 'ai_responses') return `${m.used.toLocaleString()} / ${m.limit != null ? m.limit.toLocaleString() : '∞'}개`;
   if (m.metric === 'kb_storage_mb') return `${m.used} / ${m.limit ?? '∞'}MB`;
-  if (m.metric === 'employees') return `${m.used} / ${m.limit ?? '∞'}명`;
+  if (m.metric === 'employees') return `${m.used} / ${m.limit ?? '∞'}마리`;
   return `${m.used.toLocaleString()} / ${m.limit != null ? m.limit.toLocaleString() : '∞'}`;
 }
 
@@ -92,16 +93,16 @@ function fmtDate(iso) {
 function ScreenPlan({ billing }) {
   const hasReal = billing && Array.isArray(billing.plans) && billing.plans.length > 0;
   const plans = hasReal ? billing.plans.map(toTier) : PLANS;
-  const current = plans.find((p) => p.current) || plans.find((p) => p.id === 'starter') || plans[1];
+  const current = plans.find((p) => p.current) || plans.find((p) => p.id === 'taste') || plans[0];
   const usage = hasReal && billing.usage.length ? billing.usage : null;
   const invoices = hasReal && billing.invoices.length ? billing.invoices : null;
   const pm = hasReal ? billing.paymentMethod : null;
   const nextBilling = hasReal ? fmtDate(billing.nextBillingAt) : '6월 28일';
-  const priceLabel = current && current.price ? `₩${current.price.toLocaleString()}` : '₩29,000';
+  const priceLabel = current && current.price ? `₩${current.price.toLocaleString()}` : '별도 계약';
 
   return (
-    <AppShell mode="customer" active="plan" title="요금제"
-              subtitle={`${current?.name || 'Starter'} · 다음 결제일 ${nextBilling || '6월 28일'}`}>
+    <AppShell mode="customer" active="plan" title="요금제·먹이"
+              subtitle={`${current?.name || 'Taste'} · 다음 결제일 ${nextBilling || '6월 28일'}`}>
       <div style={{
         height: '100%', overflow: 'hidden',
         padding: '28px 32px',
@@ -120,13 +121,13 @@ function ScreenPlan({ billing }) {
                   margin: '6px 0 4px',
                   fontSize: 30, fontWeight: 700,
                   color: 'var(--semo-fg-1)', letterSpacing: '-0.02em',
-                }}>{current?.name || 'Starter'} <span style={{ color: 'var(--semo-fg-3)', fontWeight: 500, fontSize: 18 }}>· 월 {priceLabel}</span></h2>
+                }}>{current?.name || 'Taste'} <span style={{ color: 'var(--semo-fg-3)', fontWeight: 500, fontSize: 18 }}>· 월 {priceLabel}</span></h2>
                 <div style={{ fontSize: 13, color: 'var(--semo-fg-3)' }}>
                   다음 결제: {nextBilling || '6월 28일'}
                   {pm?.brand ? ` · ${pm.brand} ${pm.last4 || ''}로 끝나는 카드` : ' · 카드 신한 4242로 끝나는 카드'}
                 </div>
               </div>
-              <Button variant="primary" iconRight="arrow-right">Pro 로 업그레이드</Button>
+              <Button variant="primary" iconRight="arrow-right">Core 로 업그레이드</Button>
             </div>
             <div style={{
               display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 18, marginTop: 22,
@@ -144,9 +145,9 @@ function ScreenPlan({ billing }) {
                 ))
               ) : (
                 <>
-                  <Progress label="AI 응대" sub="1,240 / 5,000" value={1240} max={5000}/>
-                  <Progress label="가게 지식 용량" sub="124 / 500MB" value={124} max={500}/>
-                  <Progress label="채용 중인 직원" sub="3 / 3명" value={3} max={3} warning/>
+                  <Progress label="이번 달 먹이" sub="240 / 800개" value={240} max={800}/>
+                  <Progress label="지식도서관 용량" sub="124 / 500MB" value={124} max={500}/>
+                  <Progress label="일하는 에이전트" sub="3 / 7마리" value={3} max={7}/>
                 </>
               )}
             </div>
@@ -160,13 +161,13 @@ function ScreenPlan({ billing }) {
               display: 'flex', alignItems: 'center', gap: 8,
             }}>
               <Icon name="warn" size={14} color="var(--semo-warning)"/>
-              직원 채용 한도에 도달했어요. 더 많은 직원을 데려오려면 Pro 로 올려주세요.
+              Taste 플랜은 최소 팀 기준 1~2주 안에 먹이가 대부분 소진되도록 설계돼요. 계속 쓰려면 Core 를 추천합니다.
             </div>
           </Card>
 
           {/* Plan tiers */}
           <Section eyebrow="Compare" title="플랜 비교"
-                   hint="언제든 업·다운그레이드 가능. 다운그레이드는 다음 결제일에 적용돼요."
+                   hint="기능 차등은 작게 두고, 플랜별 월 먹이 제공량과 지원 깊이로 조절합니다."
                    action={<SegTab value="monthly" options={[
                      { value: 'monthly', label: '월간' },
                      { value: 'yearly',  label: '연간 -20%' },
@@ -188,9 +189,9 @@ function ScreenPlan({ billing }) {
                     return [ym, inv.label, `₩${inv.amountKrw.toLocaleString()}`, statusLabel, tone];
                   })
                 : [
-                    ['2026-05', '5월 청구서', '₩29,000', '결제 완료', 'success'],
-                    ['2026-04', '4월 청구서', '₩29,000', '결제 완료', 'success'],
-                    ['2026-03', '3월 청구서', '₩0', 'Free 사용 중', 'neutral'],
+                    ['2026-05', '5월 청구서', '₩100,000', '결제 완료', 'success'],
+                    ['2026-04', '4월 청구서', '₩100,000', '결제 완료', 'success'],
+                    ['2026-03', '파일럿 청구서', '₩100,000', '결제 완료', 'success'],
                   ]
               ).map((row, i, a) => (
                 <div key={i} style={{
@@ -270,7 +271,7 @@ function ScreenPlan({ billing }) {
               letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10,
             }}>사업자등록증</div>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--semo-fg-1)' }}>
-              정민 카페
+              현대 인테리어
             </div>
             <div className="semo-num" style={{ fontSize: 12, color: 'var(--semo-fg-3)', marginTop: 2 }}>
               123-45-67890 · 개인사업자
@@ -290,10 +291,10 @@ function ScreenPlan({ billing }) {
               }}><Icon name="sparkles" size={16} stroke={2}/></div>
               <div>
                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--semo-fg-1)' }}>
-                  연간 결제로 -20%
+                  Core 이상부터 전체 기능 오픈
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--semo-fg-3)', marginTop: 4, lineHeight: 1.5 }}>
-                  Starter 연간 결제 시 월 ₩23,200 — 한 달치 절약돼요.
+                  Deep 플랜은 비즈니스아워 특별 대응과 직접 커스텀 지원이 포함돼요.
                 </div>
               </div>
             </div>
@@ -307,6 +308,11 @@ function ScreenPlan({ billing }) {
 function PlanTier({ plan }) {
   const isCurrent = plan.current;
   const isRec = plan.recommended;
+  const priceText = plan.id === 'install'
+    ? '별도 계약'
+    : plan.price === 0
+      ? '무료'
+      : `₩${plan.price.toLocaleString()}`;
   return (
     <div style={{
       background: plan.color,
@@ -340,9 +346,9 @@ function PlanTier({ plan }) {
         <span className="semo-num" style={{
           fontSize: 28, fontWeight: 700, color: 'var(--semo-fg-1)', letterSpacing: '-0.02em',
         }}>
-          {plan.price === 0 ? '무료' : `₩${plan.price.toLocaleString()}`}
+          {priceText}
         </span>
-        {plan.period && (
+        {plan.period && plan.id !== 'install' && (
           <span style={{ fontSize: 13, color: 'var(--semo-fg-3)', marginLeft: 4 }}>
             / {plan.period}
           </span>
@@ -369,7 +375,7 @@ function PlanTier({ plan }) {
         full
         size="md"
         style={isCurrent ? { color: 'var(--semo-fg-3)' } : null}>
-        {isCurrent ? '현재 플랜' : (plan.price === 0 ? '다운그레이드' : '이 플랜으로 변경')}
+        {isCurrent ? '현재 플랜' : (plan.id === 'install' ? '상담 요청' : '이 플랜으로 변경')}
       </Button>
     </div>
   );

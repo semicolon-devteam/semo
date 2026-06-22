@@ -20,14 +20,14 @@ const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), { ssr: false 
  */
 
 const KB_CATEGORIES = [
-  { id: 'menu',     label: '메뉴',       color: 'var(--agent-peach)',    n: 14, enabled: true },
-  { id: 'guest',    label: '손님·단골',   color: 'var(--agent-butter)',   n: 18, enabled: true },
-  { id: 'cs',       label: '응대·CS',     color: 'var(--semo-primary)',   n: 11, enabled: true },
-  { id: 'biz',      label: '매출·재무',   color: 'var(--agent-sky)',      n: 12, enabled: true },
-  { id: 'mkt',      label: '마케팅',     color: 'var(--agent-lavender)', n: 9,  enabled: true },
-  { id: 'inv',      label: '재고·발주',   color: 'var(--agent-coral)',    n: 8,  enabled: false },
-  { id: 'ops',      label: '운영',       color: 'var(--agent-mint)',     n: 7,  enabled: true },
-  { id: 'meet',     label: '미팅·일정',   color: 'var(--agent-rose)',     n: 6,  enabled: true },
+  { id: 'customer', label: '고객·문의',     color: 'var(--agent-peach)',    n: 14, enabled: true },
+  { id: 'quote',    label: '견적·제안',     color: 'var(--agent-sky)',      n: 18, enabled: true },
+  { id: 'cs',       label: '응대 기준',      color: 'var(--semo-primary)',   n: 11, enabled: true },
+  { id: 'work',     label: '시공·일정',     color: 'var(--agent-rose)',     n: 12, enabled: true },
+  { id: 'portfolio', label: '후기·포트폴리오', color: 'var(--agent-lavender)', n: 9,  enabled: true },
+  { id: 'money',    label: '재정·정산',     color: 'var(--agent-mint)',     n: 8,  enabled: false },
+  { id: 'ops',      label: '운영 프로필',    color: 'var(--agent-coral)',    n: 7,  enabled: true },
+  { id: 'decision', label: '의사결정',      color: 'var(--agent-butter)',   n: 6,  enabled: true },
 ];
 
 /* Deterministic PRNG so the graph looks identical each render */
@@ -102,19 +102,19 @@ function ScreenKnowledge({ mode: initialMode = '2d', graph, demo = false }) {
   // 신규 가입자(실 테넌트, 지식 0) → 빈 상태. 데모는 시드 활동에서 그래프가 생성됨.
   if (!demo && (!graph || !Array.isArray(graph.nodes) || graph.nodes.length === 0)) {
     return (
-      <AppShell mode="customer" active="knowledge" title="가게 지식" subtitle="그래프">
+      <AppShell mode="customer" active="knowledge" title="지식도서관" subtitle="Colony">
         <EmptyState
           icon="network"
           title="아직 쌓인 지식이 없어요"
-          sub="직원들이 일하면서 단골·메뉴·응대 같은 가게 지식을 채우면 여기 그래프로 이어져요."
-          ctaLabel="직원 채용하기"
+          sub="에이전트들이 일하면서 문의·견적·응대 기준 같은 맥락을 채우면 Colony가 그래프로 이어줘요."
+          ctaLabel="에이전트 켜기"
           ctaTo="/library"
         />
       </AppShell>
     );
   }
   return (
-    <AppShell mode="customer" active="knowledge" title="가게 지식"
+    <AppShell mode="customer" active="knowledge" title="지식도서관"
               subtitle={`그래프 · ${mode === '3d' ? '3D 뷰' : '2D 뷰'}`}>
       <div style={{
         height: '100%', display: 'grid',
@@ -141,7 +141,7 @@ function KBFilterRail() {
     }}>
       <div style={{ position: 'relative' }}>
         <Icon name="search" size={15} style={{ position: 'absolute', left: 10, top: 9 }} color="var(--semo-fg-3)"/>
-        <input placeholder="가게 지식 검색…" style={{
+        <input placeholder="지식도서관 검색…" style={{
           width: '100%', padding: '8px 10px 8px 32px',
           fontSize: 13,
           background: 'var(--semo-surface)',
@@ -227,7 +227,7 @@ function KBFilterRail() {
           이번 주에 8개 추가
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--semo-fg-3)', marginTop: 4, lineHeight: 1.5 }}>
-          노드를 더블클릭하면 같은 카테고리만 골라볼 수 있어요.
+          업무 중 생긴 결정과 맥락을 Colony가 노드로 정리해요.
         </div>
       </div>
     </div>
@@ -239,7 +239,7 @@ function KBCanvas({ mode, onMode, graph }) {
   const W = 720, H = 560;
   const nodes = buildKBNodes(W, H);
   const edges = buildKBEdges(nodes);
-  const selectedId = 'guest-0';
+  const selectedId = 'customer-0';
   const selected = nodes.find(n => n.id === selectedId);
 
   // 실데이터 그래프(있으면) → react-force-graph 로 렌더. 없으면 SVG mock.
@@ -331,13 +331,13 @@ function KBCanvas({ mode, onMode, graph }) {
           boxShadow: 'var(--semo-shadow-1)',
           fontSize: 11.5, color: 'var(--semo-fg-3)',
         }}>
-          <LegendChip color="var(--agent-peach)"    label="메뉴"/>
-          <LegendChip color="var(--agent-butter)"   label="손님·단골"/>
+          <LegendChip color="var(--agent-peach)"    label="고객"/>
+          <LegendChip color="var(--agent-sky)"      label="견적"/>
           <LegendChip color="var(--semo-primary)"   label="응대"/>
-          <LegendChip color="var(--agent-sky)"      label="재무"/>
-          <LegendChip color="var(--agent-lavender)" label="마케팅"/>
-          <LegendChip color="var(--agent-mint)"     label="운영"/>
-          <LegendChip color="var(--agent-rose)"     label="미팅"/>
+          <LegendChip color="var(--agent-rose)"     label="일정"/>
+          <LegendChip color="var(--agent-lavender)" label="후기"/>
+          <LegendChip color="var(--agent-mint)"     label="정산"/>
+          <LegendChip color="var(--agent-butter)"   label="결정"/>
         </div>
         <div style={{
           fontSize: 11, color: 'var(--semo-fg-muted)',
@@ -529,17 +529,17 @@ function KBDetailPanel() {
           width: 8, height: 8, borderRadius: '50%',
           background: 'var(--agent-butter)',
         }}/>
-        손님·단골 · KB ID #G017
+        고객·문의 · KB ID #Q017
       </div>
 
       <div>
         <h2 style={{
           margin: '0 0 6px', fontSize: 22, fontWeight: 700,
           color: 'var(--semo-fg-1)', letterSpacing: '-0.01em',
-        }}>김미영 (단골)</h2>
+        }}>김미영 님 · 욕실 코킹 재시공 문의</h2>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           <Badge tone="cream">5월 28일 갱신</Badge>
-          <Badge tone="ai">단골이 +12회 수정</Badge>
+          <Badge tone="ai">다람 +12회 수정</Badge>
         </div>
       </div>
 
@@ -550,29 +550,29 @@ function KBDetailPanel() {
         border: '1px solid var(--semo-line-soft)',
         display: 'grid', gap: 10,
       }}>
-        <KBField label="첫 방문" value="2023년 11월"/>
-        <KBField label="누적 방문" value="48회"/>
-        <KBField label="평균 객단가" value="₩9,500"/>
-        <KBField label="좋아하는 메뉴" value="더치 라떼, 베이글"/>
+        <KBField label="첫 문의" value="2025년 11월"/>
+        <KBField label="누적 의뢰" value="3회"/>
+        <KBField label="최근 견적" value="₩180,000~₩240,000"/>
+        <KBField label="선호 응대" value="빠른 전화 확인"/>
       </div>
 
       <div style={{ fontSize: 13.5, color: 'var(--semo-fg-2)', lineHeight: 1.65 }}>
-        김미영 님은 매주 화·목 오전에 들르시는 단골이에요. 따뜻한 음료를 선호하시고,
-        시그니처 메뉴 추천을 좋아하세요. 4월에 케이크 컴플레인이 1회 있었고
-        주문이가 사과 + 무료 음료로 해결했어요.
+        김미영 님은 작년 욕실 실리콘 보수 이후 두 번 더 문의한 고객이에요.
+        사진을 먼저 보내고 빠르게 전화로 확정하는 편이며, 야간 방문은 추가 출장비를
+        사전에 명확히 안내해야 합니다.
       </div>
 
       <div>
         <div style={{
           fontSize: 11, fontWeight: 600, color: 'var(--semo-fg-3)',
           letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8,
-        }}>관련된 가게 지식</div>
+        }}>관련된 지식도서관 노드</div>
         <div style={{ display: 'grid', gap: 6 }}>
           {[
-            ['메뉴 — 더치 라떼',        'var(--agent-peach)'],
-            ['응대 — 단골 인사 톤',      'var(--semo-primary)'],
-            ['응대 — 환불 정책',         'var(--semo-primary)'],
-            ['마케팅 — 재방문 쿠폰',    'var(--agent-lavender)'],
+            ['견적 — 욕실 코킹 기본 단가',        'var(--agent-sky)'],
+            ['응대 — 사진 먼저 요청하는 톤',      'var(--semo-primary)'],
+            ['운영 — 야간 방문 추가 출장비',      'var(--agent-coral)'],
+            ['후속 — 시공 후 사진 요청 문구',     'var(--agent-lavender)'],
           ].map(([t, c]) => (
             <div key={t} style={{
               display: 'flex', alignItems: 'center', gap: 8,
@@ -594,7 +594,7 @@ function KBDetailPanel() {
         <div style={{
           fontSize: 11, fontWeight: 600, color: 'var(--semo-fg-3)',
           letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8,
-        }}>이 노드를 채운 직원</div>
+        }}>이 노드를 채운 에이전트</div>
         <div style={{ display: 'flex', gap: 10 }}>
           <ContribAgent agent={dangol} count={12}/>
           <ContribAgent agent={jumuni} count={5}/>

@@ -7,15 +7,15 @@ import { LIBRARY_EXTRA } from './screen-library';
  * screen-mobile.jsx — Customer mobile screens (Home / Team / Library).
  *
  * Designed at 320×660 inside PhoneFrame. Bottom tab bar:
- * 홈 · 직원 · 지식 · 채용 · 더보기.
+ * 홈 · 에이전트 · 지식 · 추가 · 더보기.
  */
 
 function MobileTabBar({ active }) {
   const tabs = [
     { id: 'home',  label: '홈',     icon: 'home' },
-    { id: 'team',  label: '직원',    icon: 'users' },
+    { id: 'team',  label: '에이전트', icon: 'users' },
     { id: 'kb',    label: '지식',    icon: 'network' },
-    { id: 'lib',   label: '채용',    icon: 'store' },
+    { id: 'lib',   label: '추가',    icon: 'store' },
     { id: 'more',  label: '더보기',  icon: 'more' },
   ];
   return (
@@ -96,17 +96,17 @@ function ScreenMobileHome() {
             fontSize: 13.5, color: 'var(--semo-fg-3)',
             lineHeight: 1.5, marginTop: -8,
           }}>
-            오늘 직원들이 이런 일을 했어요.
+            오늘 에이전트들이 이런 일을 했어요.
           </div>
 
           {/* 3 stat tiles */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <MobileStat icon="message" label="오늘 응대" value="36건" delta="+12%"/>
-            <MobileStat icon="up"      label="어제 매출" value="₩412k" delta="+8%"/>
+            <MobileStat icon="message" label="오늘 문의" value="14건" delta="+12%"/>
+            <MobileStat icon="up"      label="견적 초안" value="6건" delta="+8%"/>
           </div>
-          <MobileStat full icon="network" label="이번 주 새 가게 지식"
+          <MobileStat full icon="network" label="이번 주 새 지식도서관 노드"
                       value="8건의 새 노드 · 23개 연결" delta={null}
-                      hint="3명의 직원이 함께 채웠어요"/>
+                      hint="Colony가 에이전트 업무 맥락을 정리했어요"/>
 
           {/* 사장님이 해주셔야 할 일 */}
           <div style={{
@@ -122,7 +122,7 @@ function ScreenMobileHome() {
                 3건 확인이 필요해요
               </div>
               <div style={{ fontSize: 12, color: 'var(--semo-fg-3)', marginTop: 2, lineHeight: 1.4 }}>
-                환불 응대 · 게시물 검토 · 우유 발주
+                문의 답변 · 견적 초안 · 후기 게시
               </div>
             </div>
             <Icon name="chevron-right" size={16} color="var(--semo-fg-3)"/>
@@ -134,19 +134,19 @@ function ScreenMobileHome() {
             letterSpacing: '0.06em', textTransform: 'uppercase',
             marginTop: 4,
           }}>방금 전</div>
-          <MobileFeedItem agent={jumuni} verb="카톡 문의에 답했어요"
-                          target="단골 김미영 님" time="2분 전" status="working"/>
-          <MobileFeedItem agent={dangol} verb="단골을 알아봤어요"
-                          target="박지호 5번째 방문" time="8분 전"/>
+          <MobileFeedItem agent={jumuni} verb="새 문의를 문진했어요"
+                          target="싱크대 상판 보수" time="2분 전" status="working"/>
+          <MobileFeedItem agent={dangol} verb="이전 고객 맥락을 찾았어요"
+                          target="욕실 코킹 재문의" time="8분 전"/>
 
           <div style={{
             fontSize: 11, color: 'var(--semo-fg-3)', fontWeight: 700,
             letterSpacing: '0.06em', textTransform: 'uppercase',
           }}>오전 9시 ~</div>
-          <MobileFeedItem agent={hwegye} verb="매출 리포트를 만들었어요"
-                          target="5월 4주차" time="9:32"/>
-          <MobileFeedItem agent={chaewo} verb="우유 발주 초안을 만들었어요"
-                          target="저지방 2팩" time="8:47"/>
+          <MobileFeedItem agent={hwegye} verb="견적·입금 리포트를 만들었어요"
+                          target="이번 주 요약" time="9:32"/>
+          <MobileFeedItem agent={chaewo} verb="방문 체크리스트를 만들었어요"
+                          target="마포 욕실 코킹" time="8:47"/>
         </div>
 
         <MobileTabBar active="home"/>
@@ -217,33 +217,33 @@ function ScreenMobileTeam() {
   const list = [
     { agent: AGENT_BY_ID['jumuni'],      state: 'working', metric: '오늘 12건 응대' },
     { agent: AGENT_BY_ID['hwegyedo-ri'],  state: 'working', metric: '정산 62% 진행 중' },
-    { agent: AGENT_BY_ID['algorim-i'],    state: 'working', metric: '게시물 4개 작성' },
-    { agent: AGENT_BY_ID['chae-wo'],      state: 'idle',    metric: '발주 3건' },
-    { agent: AGENT_BY_ID['sem-i'],        state: 'idle',    metric: '인사이트 1건' },
-    { agent: AGENT_BY_ID['dangol-i'],     state: 'idle',    metric: '단골 47명 관리' },
+    { agent: AGENT_BY_ID['algorim-i'],    state: 'working', metric: '후기 게시물 4개 작성' },
+    { agent: AGENT_BY_ID['chae-wo'],      state: 'idle',    metric: '체크리스트 3건' },
+    { agent: AGENT_BY_ID['sem-i'],        state: 'idle',    metric: '견적 초안 1건' },
+    { agent: AGENT_BY_ID['dangol-i'],     state: 'idle',    metric: '후속관리 47명' },
     { agent: AGENT_BY_ID['bi-seo'],       state: 'resting', metric: '쉬는 중' },
   ];
   return (
-    <PhoneFrame label="모바일 · 내 직원">
+    <PhoneFrame label="모바일 · 내 에이전트">
       <div style={{
         background: 'var(--semo-bg)',
         flex: 1, display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
       }}>
         <MobileTopbar
-          subtitle="7명 채용 중"
-          title="내 직원"
+          subtitle="7마리 근무 중"
+          title="내 에이전트"
           action={<button style={{
             padding: '6px 12px', borderRadius: 'var(--r-full)',
             background: 'var(--semo-primary)', color: '#fff',
             fontSize: 12, fontWeight: 600,
             display: 'inline-flex', alignItems: 'center', gap: 4,
-          }}><Icon name="plus" size={13} stroke={2.2}/>채용</button>}/>
+          }}><Icon name="plus" size={13} stroke={2.2}/>추가</button>}/>
 
         {/* filter chips */}
         <div style={{ padding: '0 18px 12px', display: 'flex', gap: 6,
                       flexShrink: 0, overflow: 'hidden' }}>
-          {['전체 7', '일하는 중 3', '응대', '회계', '마케팅'].map((t, i) => (
+          {['전체 7', '일하는 중 3', '응대', '견적', '후속'].map((t, i) => (
             <button key={t} style={{
               padding: '6px 12px', fontSize: 12, fontWeight: 600,
               borderRadius: 'var(--r-full)',
@@ -303,15 +303,15 @@ function MobileTeamRow({ agent, state, metric }) {
 /* ── Library ──────────────────────────────────────────────────────── */
 function ScreenMobileLibrary() {
   return (
-    <PhoneFrame label="모바일 · 채용">
+    <PhoneFrame label="모바일 · 에이전트">
       <div style={{
         background: 'var(--semo-bg)',
         flex: 1, display: 'flex', flexDirection: 'column',
         overflow: 'hidden',
       }}>
         <MobileTopbar
-          subtitle="120+ 직원"
-          title="새 직원을 만나보세요"/>
+          subtitle="120+ 에이전트"
+          title="필요한 에이전트를 켜보세요"/>
 
         <div style={{ padding: '0 18px 10px', flexShrink: 0 }}>
           <div style={{ position: 'relative' }}>
@@ -344,12 +344,12 @@ function ScreenMobileLibrary() {
                 Today&apos;s pick
               </div>
               <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--semo-fg-1)', marginTop: 4 }}>
-                주문이
+                토키
               </div>
               <div style={{ fontSize: 12, color: 'var(--semo-fg-2)', marginTop: 1 }}>
-                카톡 응대를 도와드려요
+                문의 응대와 문진을 도와드려요
               </div>
-              <Badge tone="primary" style={{ marginTop: 8 }}>Starter 에서 무료</Badge>
+              <Badge tone="primary" style={{ marginTop: 8 }}>Taste에서 사용 가능</Badge>
             </div>
             <BotAvatar agent={AGENT_BY_ID['jumuni']} size={72}/>
           </div>
@@ -360,7 +360,7 @@ function ScreenMobileLibrary() {
             fontSize: 11, color: 'var(--semo-fg-3)', fontWeight: 700,
             letterSpacing: '0.06em', textTransform: 'uppercase',
             marginBottom: 10, marginTop: 8,
-          }}>응대·CS 직원</div>
+          }}>응대·후속관리 에이전트</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             {[
               AGENT_BY_ID['dangol-i'],
@@ -409,8 +409,8 @@ function MobileLibraryCard({ agent }) {
           </span>
           <span style={{
             fontSize: 10, fontWeight: 600,
-            color: agent.priceTier === 'Starter' ? 'var(--semo-primary)' :
-                   agent.priceTier === 'Pro' ? 'var(--semo-ai)' : 'var(--semo-warning)',
+            color: agent.priceTier === 'Taste' ? 'var(--semo-primary)' :
+                   agent.priceTier === 'Core' ? 'var(--semo-ai)' : 'var(--semo-warning)',
           }}>{agent.priceTier}</span>
         </div>
       </div>

@@ -7,7 +7,7 @@ import TenantSwitcher from './TenantSwitcher';
 import { useTenantInfo } from './CustomerChrome';
 
 /*
- * components.jsx — SEMO shared UI atoms + chrome.
+ * components.jsx — SemiColony shared UI atoms + chrome.
  *
  * Exports (to window):
  *   Icon — single lucide-style SVG component with curated names
@@ -304,10 +304,10 @@ function SegTab({ value, onChange, options }) {
  * ────────────────────────────────────────────────────────────────── */
 const NAV_CUSTOMER = [
   { id: 'home',      label: '홈',         hint: '오늘',         icon: 'home',    href: '/dashboard' },
-  { id: 'team',      label: '내 직원',     hint: '7명',          icon: 'users',   href: '/dashboard/team' },
-  { id: 'knowledge', label: '가게 지식',   hint: 'KB',           icon: 'network', href: '/dashboard/knowledge' },
-  { id: 'library',   label: '채용',       hint: '120+ 직원',    icon: 'store',   href: '/dashboard/library' },
-  { id: 'plan',      label: '요금제',     hint: 'Starter',     icon: 'card',    href: '/dashboard/plan' },
+  { id: 'team',      label: '내 에이전트', hint: '7마리',        icon: 'users',   href: '/dashboard/team' },
+  { id: 'knowledge', label: '지식도서관',   hint: 'Colony',      icon: 'network', href: '/dashboard/knowledge' },
+  { id: 'library',   label: '에이전트',     hint: '120+ 팀원',    icon: 'store',   href: '/dashboard/library' },
+  { id: 'plan',      label: '요금제·먹이', hint: 'Taste',       icon: 'card',    href: '/dashboard/plan' },
 ];
 const NAV_PROVIDER = [
   { id: 'tenants',   label: '구독자',           icon: 'building',  href: '/dashboard/provider' },
@@ -325,9 +325,9 @@ function Sidebar({ mode, active, workspace }) {
   const tenant = useTenantInfo();
   const effectiveWorkspace = workspace || tenant.tenantDisplayName || (isProvider ? '세미콜론 팀' : '내 가게');
   const effectiveInitial = effectiveWorkspace?.[0] ?? '나';
-  // 내 직원·요금제 hint 를 실 테넌트 데이터로 덮어쓰기 (NAV_CUSTOMER 는 static, 여기서 가공).
+  // 내 에이전트·요금제 hint 를 실 테넌트 데이터로 덮어쓰기 (NAV_CUSTOMER 는 static, 여기서 가공).
   const customerNav = NAV_CUSTOMER.map((n) => {
-    if (n.id === 'team') return { ...n, hint: `${tenant.agentCount || 0}명` };
+    if (n.id === 'team') return { ...n, hint: `${tenant.agentCount || 0}마리` };
     if (n.id === 'plan' && tenant.planSlug) {
       return { ...n, hint: tenant.planSlug[0].toUpperCase() + tenant.planSlug.slice(1) };
     }
@@ -363,7 +363,7 @@ function Sidebar({ mode, active, workspace }) {
           <div style={{
             fontSize: 14, fontWeight: 700, color: 'var(--semo-fg-1)',
             letterSpacing: '-0.01em',
-          }}>SEMO</div>
+          }}>SemiColony</div>
         </div>
       </div>
 
@@ -390,7 +390,7 @@ function Sidebar({ mode, active, workspace }) {
             {effectiveWorkspace}
           </div>
           <div style={{ fontSize: 11, color: 'var(--semo-fg-3)' }}>
-            {isProvider ? 'Provider · admin' : 'Customer'}
+            {isProvider ? 'Provider · admin' : 'Owner workspace'}
           </div>
         </div>
         <Icon name="chevron-down" size={14} color="var(--semo-fg-3)"/>
@@ -473,7 +473,7 @@ function Topbar({ title, subtitle, action, search = true }) {
           fontSize: 13, fontWeight: 500,
         }}>
           <Icon name="search" size={15} color="var(--semo-fg-3)"/>
-          <span style={{ flex: 1, textAlign: 'left' }}>가게 지식, 직원, 활동 검색…</span>
+          <span style={{ flex: 1, textAlign: 'left' }}>지식도서관, 에이전트, 활동 검색…</span>
           <kbd style={{
             background: 'var(--semo-surface)',
             border: '1px solid var(--semo-line)',
@@ -569,7 +569,7 @@ function ActivityFeedItem({ agent, verb, target, detail, time, isAI = true, stat
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {isAI && <span className="semo-ai-chip">
             <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor'}}/>
-            AI 가 한 일
+            에이전트가 한 일
           </span>}
           <span style={{ fontSize: 12, color: 'var(--semo-fg-muted)' }}>{time}</span>
         </div>

@@ -10,7 +10,7 @@ import {
  *
  * The brief's promise: "메인페이지는 Pasted text 요소들을 모아서 요약해
  * 보여주는 대시보드" — so this screen IS the summary of everything in
- * SEMO: every bot, every KB entry, every nudge, every plan signal,
+ * SemiColony: every bot, every KB entry, every nudge, every plan signal,
  * linked together in one scrollable canvas.
  */
 
@@ -20,11 +20,11 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false, personaVM }
   const cp = {
     eyebrow: vmHome.eyebrow ?? 'Today · 오전 9:47',
     greetingTitle: vmHome.greetingTitle ?? '안녕하세요 정민 사장님.',
-    greetingSubtitle: vmHome.greetingSubtitle ?? '오늘 직원들이 이런 일을 했어요.',
+    greetingSubtitle: vmHome.greetingSubtitle ?? '오늘 에이전트들이 이런 일을 했어요.',
     feedTitle: vmHome.feedTitle ?? '활동 피드',
-    nudgeTitle: vmHome.nudgeTitle ?? '오늘 사장님이 해주셔야 할 일',
-    workingTitle: vmHome.workingTitle ?? '지금 일하고 있어요',
-    weekKB: vmHome.weekKB ?? '이번 주 가게 지식',
+    nudgeTitle: vmHome.nudgeTitle ?? '승인이 필요한 일',
+    workingTitle: vmHome.workingTitle ?? '지금 일하는 에이전트',
+    weekKB: vmHome.weekKB ?? '이번 주 Colony 지식도서관',
   };
   const jumuni = AGENT_BY_ID['jumuni'];
   const dangol = AGENT_BY_ID['dangol-i'];
@@ -34,15 +34,15 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false, personaVM }
   const semi   = AGENT_BY_ID['sem-i'];
   const biseo  = AGENT_BY_ID['bi-seo'];
 
-  // 신규 가입자(실 테넌트, 직원 0) → 남의 가게 mock 대신 빈 상태. 데모는 시드가 있어 해당 없음.
+  // 신규 가입자(실 테넌트, 에이전트 0) → 남의 가게 mock 대신 빈 상태. 데모는 시드가 있어 해당 없음.
   if (!demo && (!agents || agents.length === 0)) {
     return (
       <AppShell mode="customer" active="home" title="홈" subtitle="환영합니다" onModeToggle={null}>
         <EmptyState
           icon="users"
-          title="아직 직원이 없어요"
-          sub="첫 AI 직원을 채용하면 오늘 한 일·가게 지식·매출 인사이트가 여기 모여요."
-          ctaLabel="첫 직원 채용하기"
+          title="아직 에이전트가 없어요"
+          sub="첫 에이전트 팀을 켜면 오늘 한 일·승인 대기·지식도서관 업데이트가 여기 모여요."
+          ctaLabel="첫 에이전트 켜기"
           ctaTo="/library"
         />
       </AppShell>
@@ -103,26 +103,26 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false, personaVM }
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
               <StatCardWithChart
-                label="오늘 응대"
-                value={stats ? `${stats.todayResponses}건` : '36건'}
+                label="오늘 문의 응대"
+                value={stats ? `${stats.todayResponses}건` : '14건'}
                 delta={+12}
-                hint={hasWorking ? `${working.map((a) => a.name).slice(0, 2).join(' · ')}` : '주문이 · 단골이'}
+                hint={hasWorking ? `${working.map((a) => a.name).slice(0, 2).join(' · ')}` : '토키 · 다람'}
                 ai
-                chart={<MiniBarChart data={[14, 18, 12, 22, 19, 28, 36]} width={140} height={32}/>}
+                chart={<MiniBarChart data={[3, 5, 4, 8, 9, 12, 14]} width={140} height={32}/>}
               />
               <StatCardWithChart
-                label="어제 매출"
-                value="₩412,000"
+                label="견적 초안"
+                value="6건"
                 delta={+8}
-                hint="셈이가 분석함"
+                hint="견적이가 준비"
                 ai
-                chart={<MiniLineChart data={[320, 280, 360, 410, 340, 412]} width={140} height={32}/>}
+                chart={<MiniLineChart data={[1, 2, 2, 3, 4, 6]} width={140} height={32}/>}
               />
               <StatCardWithChart
-                label="새 가게 지식"
+                label="새 지식도서관 노드"
                 value={stats ? `${stats.newKnowledge}건` : '8건'}
                 delta={null}
-                hint="3명이 함께 채움"
+                hint="Colony가 정리"
                 ai
                 chart={<KBSpark/>}
               />
@@ -146,7 +146,7 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false, personaVM }
               <div style={{ display: 'flex', gap: 6 }}>
                 <SegTab value="all" options={[
                   { value: 'all',    label: '전체' },
-                  { value: 'ai',     label: 'AI 가 한 일' },
+                  { value: 'ai',     label: '에이전트가 한 일' },
                   { value: 'wait',   label: '내 결정 대기' },
                 ]}/>
               </div>
@@ -173,17 +173,17 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false, personaVM }
                 <FeedGroup label="방금 전">
                   <ActivityFeedItem
                     agent={jumuni}
-                    verb="카카오톡 문의에 답했어요"
-                    target="단골 김미영 님"
-                    detail="시그니처 메뉴 '더치 라떼' 추천 + 단골 할인 안내. 답변 만족도 ★★★★★"
+                    verb="새 문의를 받고 1차 문진을 마쳤어요"
+                    target="영등포 싱크대 상판 보수"
+                    detail="사진 3장, 희망 일정, 예산 범위를 확인했고 콜백 후보 시간을 잡아뒀어요."
                     time="2분 전"
                     status="working"
                   />
                   <ActivityFeedItem
                     agent={dangol}
-                    verb="단골 손님을 알아봤어요"
-                    target="이번 달 5번째 방문"
-                    detail="박지호 님이 오후 2시쯤 오실 예정. 평소 따뜻한 아메리카노 + 베이글."
+                    verb="이전 고객 맥락을 찾아냈어요"
+                    target="지난 욕실 실리콘 시공 고객"
+                    detail="작년 11월 방문, 빠른 답변 선호, 문자보다 전화 응답률이 높았어요."
                     time="8분 전"
                   />
                 </FeedGroup>
@@ -191,23 +191,23 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false, personaVM }
                 <FeedGroup label="오전 9시 ~">
                   <ActivityFeedItem
                     agent={hwegye}
-                    verb="5월 4주차 매출 리포트를 만들었어요"
-                    target="가게 지식에 저장"
-                    detail="총 매출 ₩2,148,000 (+15%). 화요일 매출이 평균 대비 22% 높았어요."
+                    verb="이번 주 견적·입금 리포트를 만들었어요"
+                    target="Colony 지식도서관에 저장"
+                    detail="견적 6건, 확정 2건, 입금 확인 1건. 다음 주 화·목 저녁 문의 전환율이 높았어요."
                     time="9:32"
                   />
                   <ActivityFeedItem
                     agent={algorim}
-                    verb="인스타 게시물 초안을 만들었어요"
-                    target="'신메뉴 더치 라떼'"
-                    detail="해시태그 7개 + 사진 3장 후보. 게시 전에 한 번 검토해주세요."
+                    verb="시공 후기 게시물 초안을 만들었어요"
+                    target="'상가 바닥 보수 전후'"
+                    detail="전후 사진 4장, 고객 후기 1개, 블로그용 문단과 인스타 문구를 나눠뒀어요."
                     time="9:14"
                   />
                   <ActivityFeedItem
                     agent={chaewo}
-                    verb="우유 재고 부족을 알렸어요"
-                    target="발주 초안 준비됨"
-                    detail="저지방 우유 2팩 남음 · 내일 오전 소진 예상. 평소 거래처에 자동 발주서 작성 완료."
+                    verb="내일 방문 체크리스트를 만들었어요"
+                    target="마포 욕실 코킹 재시공"
+                    detail="실리콘, 커터, 보양테이프, 고객 주차 안내까지 준비 항목으로 묶었어요."
                     time="8:47"
                   />
                 </FeedGroup>
@@ -215,16 +215,16 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false, personaVM }
                 <FeedGroup label="어제" last>
                   <ActivityFeedItem
                     agent={semi}
-                    verb="어제의 인사이트를 만들었어요"
-                    target="'오후 3-5시가 가장 한가해요'"
-                    detail="이 시간대에 단골 할인 알림을 보내면 매출 +18% 효과 예상."
+                    verb="견적 기준을 업데이트했어요"
+                    target="'야간 긴급 방문은 최소 출장비 별도'"
+                    detail="어제 승인한 응대 기준을 운영 프로필에 반영할지 확인 대기 중이에요."
                     time="어제 18:00"
                   />
                   <ActivityFeedItem
                     agent={biseo}
-                    verb="세무사 미팅 일정을 잡았어요"
+                    verb="현장 방문 일정을 정리했어요"
                     target="6월 3일 14:00"
-                    detail="장소: 강남구 역삼동 사무실. Google 캘린더에 추가됨."
+                    detail="장소, 주차, 고객 요청사항을 캘린더와 지식도서관에 함께 저장했어요."
                     time="어제 16:22"
                   />
                 </FeedGroup>
@@ -267,23 +267,23 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false, personaVM }
                 <>
                   <NudgeItem
                     agent={jumuni}
-                    title="단골 김미영 님 환불 요청"
-                    detail="어제 케이크 상태가 이상하다고 하셨어요. 주문이가 답변 초안을 만들어뒀어요."
-                    primary="승인하고 응대"
+                    title="토키가 문의 답변 승인을 요청했어요"
+                    detail="영등포 싱크대 상판 보수 문의에 1차 답변을 보낼까요? 예상 먹이 5개."
+                    primary="승인하고 발송"
                     secondary="내가 답하기"
                   />
                   <NudgeItem
-                    agent={algorim}
-                    title="신메뉴 게시물 검토"
-                    detail="알리미가 인스타용 초안 1개를 준비했어요."
-                    primary="미리보기"
+                    agent={semi}
+                    title="견적이가 견적 범위 확인을 요청했어요"
+                    detail="사진 기준 18만~28만 원 안내 초안입니다. 발송 전 사장님 승인이 필요해요. 예상 먹이 10개."
+                    primary="견적 초안 보기"
                     secondary="수정 요청"
                   />
                   <NudgeItem
-                    agent={chaewo}
-                    title="우유 발주 (저지방 2팩)"
-                    detail="평소 거래처로 자동 발주 가능."
-                    primary="발주하기"
+                    agent={algorim}
+                    title="키키가 후기 게시 승인을 기다려요"
+                    detail="고객 동의 문구와 전후 사진 4장을 채널별 포맷으로 정리했어요. 예상 먹이 12개."
+                    primary="미리보기"
                     secondary="나중에"
                   />
                 </>
@@ -311,9 +311,9 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false, personaVM }
                 ))
               ) : (
                 <>
-                  <WorkingRow agent={jumuni} task="카카오톡 응대 중" detail="3개 대화"/>
-                  <WorkingRow agent={hwegye} task="오늘 매출 정산 중" detail="62%" progress={62}/>
-                  <WorkingRow agent={algorim} task="SNS 모니터링 중" detail="대기"/>
+                  <WorkingRow agent={jumuni} task="새 문의 문진 중" detail="3개 대화"/>
+                  <WorkingRow agent={semi} task="견적 초안 작성 중" detail="62%" progress={62}/>
+                  <WorkingRow agent={algorim} task="후기·사진 정리 중" detail="대기"/>
                 </>
               )}
             </Card>
@@ -347,13 +347,13 @@ function ScreenHome({ agents, activity, stats, nudges, demo = false, personaVM }
           {/* Plan signal */}
           <Card padding={16} accent>
             <Progress
-              label="응대 사용량"
-              sub="1,240 / 5,000"
-              value={1240} max={5000}/>
+              label="이번 달 먹이"
+              sub="240 / 800 먹이"
+              value={240} max={800}/>
             <div style={{
               fontSize: 12, color: 'var(--semo-fg-3)', marginTop: 10, lineHeight: 1.5,
             }}>
-              이번 달 한도 25% 사용 중. Starter 플랜 · 매월 1일 갱신.
+              이번 달 먹이 30% 사용 중. Taste 플랜 · 매월 1일 충전.
             </div>
           </Card>
         </aside>

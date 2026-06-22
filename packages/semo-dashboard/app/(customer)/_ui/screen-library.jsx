@@ -5,35 +5,35 @@ import { AGENT_BY_ID, BotAvatar } from './agents';
 import { Icon, Eyebrow, Badge, Button, AppShell } from './components';
 
 /*
- * screen-library.jsx — Customer Library (직원 채용, §4.3).
+ * screen-library.jsx — Customer Library (에이전트 추가, §4.3).
  *
  * Three artboard states:
  *   ScreenLibraryList   — Netflix-style horizontal carousels
- *   ScreenLibraryDetail — agent profile + reviews + 채용하기
+ *   ScreenLibraryDetail — agent profile + reviews + 에이전트 켜기
  *   ScreenLibraryRecruit— detail screen with 3-step recruit modal
  */
 
 const LIBRARY_EXTRA = [
   /* synthetic library entries beyond the 7 employed agents,
    * so the carousels feel populated */
-  { id: 'l1',  name: '메뉴짓기', role: '메뉴 기획 직원',   dept: '메뉴',
+  { id: 'l1',  name: '몽치', species: '곰', animalKind: 'otter', role: '내부 문서 매니저',   dept: '문서',
     color: 'var(--agent-peach)', accent: '#E07A3B', accessoryKind: 'chart',
-    priceTier: 'Pro', rating: 4.6, employers: 392 },
-  { id: 'l2',  name: '리뷰리',   role: '리뷰 모니터 직원', dept: 'CS',
+    priceTier: 'Core', rating: 4.6, employers: 392 },
+  { id: 'l2',  name: '리뷰리', species: '고양이', animalKind: 'fox', role: '리뷰 모니터 매니저', dept: '후기',
     color: 'var(--agent-butter)', accent: '#B27418', accessoryKind: 'heart',
-    priceTier: 'Starter', rating: 4.7, employers: 612 },
-  { id: 'l3',  name: '예약지기', role: '예약·노쇼 관리',   dept: 'CS',
+    priceTier: 'Taste', rating: 4.7, employers: 612 },
+  { id: 'l3',  name: '예약지기', species: '강아지', animalKind: 'dog', role: '예약·콜백 관리',   dept: '일정',
     color: 'var(--agent-rose)',  accent: '#C66095', accessoryKind: 'clock',
-    priceTier: 'Starter', rating: 4.5, employers: 281 },
-  { id: 'l4',  name: '광고지기', role: '광고 운영 직원',   dept: '마케팅',
+    priceTier: 'Taste', rating: 4.5, employers: 281 },
+  { id: 'l4',  name: '광고지기', species: '여우', animalKind: 'fox', role: '광고 운영 매니저',   dept: '마케팅',
     color: 'var(--agent-lavender)', accent: '#6E5BD1', accessoryKind: 'megaphone',
-    priceTier: 'Business', rating: 4.4, employers: 132 },
-  { id: 'l5',  name: '발주이',   role: '식자재 발주 직원', dept: '재고',
+    priceTier: 'Deep', rating: 4.4, employers: 132 },
+  { id: 'l5',  name: '발주이', species: '비버', animalKind: 'beaver', role: '자재·발주 매니저', dept: '운영',
     color: 'var(--agent-coral)', accent: '#D9543F', accessoryKind: 'box',
-    priceTier: 'Pro', rating: 4.8, employers: 423 },
-  { id: 'l6',  name: '세무도리', role: '세금·정산 보조',   dept: '회계',
+    priceTier: 'Core', rating: 4.8, employers: 423 },
+  { id: 'l6',  name: '세무도리', species: '부엉이', animalKind: 'owl', role: '세금·정산 보조',   dept: '재정',
     color: 'var(--agent-mint)',  accent: '#2E9670', accessoryKind: 'calc',
-    priceTier: 'Pro', rating: 4.9, employers: 188 },
+    priceTier: 'Core', rating: 4.9, employers: 188 },
 ];
 
 function libraryCard(a) {
@@ -53,27 +53,27 @@ function libraryCard(a) {
 const ROWS = [
   {
     eyebrow: 'Picked for you',
-    title: '카페 사장님께 추천하는 직원',
+    title: '수요가 몰리는 사장님께 추천하는 에이전트',
     items: ['jumuni', 'dangol-i', 'algorim-i', 'l2', 'sem-i', 'hwegyedo-ri'],
   },
   {
-    eyebrow: 'Customer Care',
-    title: '응대·CS 직원',
+    eyebrow: 'Front Office',
+    title: '응대·예약·견적 에이전트',
     items: ['jumuni', 'dangol-i', 'l2', 'l3', 'bi-seo'],
   },
   {
-    eyebrow: 'Numbers',
-    title: '회계·분석 직원',
+    eyebrow: 'Back Office',
+    title: '운영·정산 에이전트',
     items: ['hwegyedo-ri', 'l6', 'sem-i'],
   },
   {
-    eyebrow: 'Marketing',
-    title: '마케팅·SNS 직원',
+    eyebrow: 'Portfolio',
+    title: '후기·포트폴리오 에이전트',
     items: ['algorim-i', 'l4', 'l2'],
   },
   {
     eyebrow: 'Made by Customers',
-    title: '사장님들이 직접 만든 직원',
+    title: '사장님들이 직접 만든 에이전트',
     items: ['l5', 'l1', 'l3'],
     isCommunity: true,
   },
@@ -88,29 +88,29 @@ function ScreenLibraryList({ listings }) {
   // 실데이터(승인된 카탈로그) → id 인덱스. 정본 7봇은 실데이터로, 합성 l1~l6 은 mock 폴백.
   const realById = Object.fromEntries((listings || []).map((a) => [a.id, a]));
   const resolve = (id) => realById[id] || getLibAgent(id);
-  const subtitle = listings && listings.length ? `${listings.length}+ 직원이 일하고 있어요` : '120+ 직원이 일하고 있어요';
+  const subtitle = listings && listings.length ? `${listings.length}+ 에이전트가 일하고 있어요` : '120+ 에이전트가 일하고 있어요';
   return (
-    <AppShell mode="customer" active="library" title="채용"
+    <AppShell mode="customer" active="library" title="에이전트"
               subtitle={subtitle}
-              topAction={<Button variant="cream" icon="plus">내 봇 공유하기</Button>}>
+              topAction={<Button variant="cream" icon="plus">내 에이전트 공유하기</Button>}>
       <div style={{ height: '100%', overflow: 'hidden', display: 'grid', gridTemplateRows: 'auto 1fr' }}>
         {/* Hero */}
         <div style={{
           padding: '28px 32px 16px',
           background: 'linear-gradient(180deg, var(--semo-bg) 0%, var(--semo-bg) 70%, var(--semo-bg-soft) 100%)',
         }}>
-          <Eyebrow>Hire</Eyebrow>
+          <Eyebrow>Agent Library</Eyebrow>
           <h1 style={{
             margin: '6px 0 12px', fontSize: 32, fontWeight: 700,
             color: 'var(--semo-fg-1)', letterSpacing: '-0.02em', lineHeight: 1.15,
-          }}>새 직원을 만나보세요</h1>
+          }}>필요한 에이전트를 켜보세요</h1>
 
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <div style={{
               position: 'relative', flex: 1, maxWidth: 480,
             }}>
               <Icon name="search" size={16} style={{ position: 'absolute', left: 12, top: 12 }} color="var(--semo-fg-3)"/>
-              <input placeholder="원하는 일을 검색하세요 — 예: 매출 리포트, 카톡 응대"
+              <input placeholder="원하는 일을 검색하세요 — 예: 견적 초안, 문의 응대, 후기 정리"
                      style={{
                        width: '100%',
                        padding: '10px 12px 10px 38px',
@@ -122,14 +122,14 @@ function ScreenLibraryList({ listings }) {
                      }}/>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
-              {['전체', '카페', '미용실', '쇼핑몰', '컨설턴트', '음식점'].map((t, i) => (
+              {['전체', '응대', '견적', '일정', '후기', '정산'].map((t, i) => (
                 <button key={t} style={{
                   padding: '6px 14px',
                   fontSize: 13, fontWeight: 600,
                   borderRadius: 'var(--r-full)',
-                  background: i === 1 ? 'var(--semo-fg-1)' : 'var(--semo-surface)',
-                  color: i === 1 ? 'var(--semo-bg)' : 'var(--semo-fg-2)',
-                  border: `1px solid ${i === 1 ? 'var(--semo-fg-1)' : 'var(--semo-line)'}`,
+                  background: i === 0 ? 'var(--semo-fg-1)' : 'var(--semo-surface)',
+                  color: i === 0 ? 'var(--semo-bg)' : 'var(--semo-fg-2)',
+                  border: `1px solid ${i === 0 ? 'var(--semo-fg-1)' : 'var(--semo-line)'}`,
                 }}>{t}</button>
               ))}
             </div>
@@ -244,10 +244,10 @@ function LibraryCard({ agent, primary, community }) {
           marginTop: 2,
         }}>
           <span className="semo-num" style={{ fontSize: 11, color: 'var(--semo-fg-3)' }}>
-            {agent.employers}명 채용 중
+            {agent.employers}곳에서 사용 중
           </span>
-          <Badge tone={agent.priceTier === 'Starter' ? 'primary' :
-                       agent.priceTier === 'Pro' ? 'ai' : 'warning'}>
+          <Badge tone={agent.priceTier === 'Taste' ? 'primary' :
+                       agent.priceTier === 'Core' ? 'ai' : 'warning'}>
             {agent.priceTier}
           </Badge>
         </div>
@@ -258,7 +258,7 @@ function LibraryCard({ agent, primary, community }) {
 
 /* ─── Detail view ─────────────────────────────────────────────────── */
 function ScreenLibraryDetail({ recruitOpen = false, step = 1, slug, agent }) {
-  // 실데이터(agent prop) 우선, 없으면 slug→mock, 그래도 없으면 주문이 mock.
+  // 실데이터(agent prop) 우선, 없으면 slug→mock, 그래도 없으면 토키 mock.
   const a = agent || (slug && AGENT_BY_ID[slug]) || AGENT_BY_ID['jumuni'];
   const [open, setOpen] = React.useState(recruitOpen);
   const [curStep, setCurStep] = React.useState(step);
@@ -266,7 +266,7 @@ function ScreenLibraryDetail({ recruitOpen = false, step = 1, slug, agent }) {
   const pathname = usePathname();
   const base = pathname && pathname.startsWith('/demo') ? '/demo' : '/dashboard';
 
-  // 채용 마법사 마지막 단계 → 실제 install. 데모 테넌트는 API 가 저장 거부(가입 유도).
+  // 에이전트 추가 마법사 마지막 단계 → 실제 install. 데모 테넌트는 API 가 저장 거부(가입 유도).
   async function hire() {
     if (hiring) return;
     setHiring(true);
@@ -281,17 +281,17 @@ function ScreenLibraryDetail({ recruitOpen = false, step = 1, slug, agent }) {
         window.location.href = `${base}/team`;
         return;
       }
-      window.alert(j.message || '채용에 실패했어요. 잠시 후 다시 시도해주세요.');
+      window.alert(j.message || '에이전트 추가에 실패했어요. 잠시 후 다시 시도해주세요.');
       setOpen(false);
     } catch {
-      window.alert('채용 요청 중 문제가 발생했어요.');
+      window.alert('에이전트 추가 요청 중 문제가 발생했어요.');
     } finally {
       setHiring(false);
     }
   }
 
   return (
-    <AppShell mode="customer" active="library" title="채용" subtitle={a.name}>
+    <AppShell mode="customer" active="library" title="에이전트" subtitle={a.name}>
       <div style={{ height: '100%', overflow: 'hidden', position: 'relative' }}>
         {/* Detail content */}
         <div style={{
@@ -324,7 +324,7 @@ function ScreenLibraryDetail({ recruitOpen = false, step = 1, slug, agent }) {
             }}>
               <Stat2 label="평점" value={`★ ${a.rating}`}/>
               <div style={{ width: 1, background: 'rgba(0,0,0,0.10)' }}/>
-              <Stat2 label="채용 중" value={`${a.employers}명`}/>
+              <Stat2 label="사용 중" value={`${a.employers}곳`}/>
               <div style={{ width: 1, background: 'rgba(0,0,0,0.10)' }}/>
               <Stat2 label="플랜" value={a.priceTier}/>
             </div>
@@ -403,7 +403,7 @@ function ScreenLibraryDetail({ recruitOpen = false, step = 1, slug, agent }) {
                   marginTop: 12, fontSize: 12, color: 'var(--semo-fg-3)',
                   lineHeight: 1.5,
                 }}>
-                  채용 시 권한 연결 안내를 받으실 수 있어요. 연결 정보는 사장님 가게에만 사용돼요.
+                  에이전트를 켤 때 자동 처리·승인 후 실행·초안 작성 범위를 먼저 확인해요.
                 </div>
               </div>
             </div>
@@ -413,7 +413,7 @@ function ScreenLibraryDetail({ recruitOpen = false, step = 1, slug, agent }) {
               <div style={{
                 fontSize: 11, fontWeight: 600, color: 'var(--semo-fg-3)',
                 letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 10,
-              }}>다른 사장님들의 후기 ({a.employers}명)</div>
+              }}>다른 사장님들의 후기 ({a.employers}곳)</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <Review name="현지 (베이커리)"
                         text="새벽에 문의 들어와도 다음 날 아침에 깔끔히 정리돼 있어서 좋아요. 단골 알아보는 정확도가 무서울 정도."
@@ -436,12 +436,12 @@ function ScreenLibraryDetail({ recruitOpen = false, step = 1, slug, agent }) {
               <div>
                 <div style={{ fontSize: 13, color: 'var(--semo-fg-3)' }}>현재 플랜에 포함</div>
                 <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--semo-fg-1)' }}>
-                  Starter 플랜에서 무료로 채용 가능
+                  현재 플랜에서 바로 켤 수 있어요 · 업무별 먹이 소모는 승인 후 적용
                 </div>
               </div>
               <Button size="lg" variant="primary" iconRight="arrow-right"
                       onClick={() => { setCurStep(1); setOpen(true); }}>
-                채용하기
+                에이전트 켜기
               </Button>
             </div>
           </div>
@@ -590,7 +590,7 @@ function RecruitStep1({ agent }) {
         <label style={{ fontSize: 13, fontWeight: 600, color: 'var(--semo-fg-2)' }}>
           사장님 가게에서 부를 이름을 정해주세요
         </label>
-        <input defaultValue="우리 주문이" style={{
+        <input defaultValue={`우리 ${agent.name}`} style={{
           width: '100%', marginTop: 8,
           padding: '12px 14px', fontSize: 15,
           background: 'var(--semo-surface)',
@@ -599,7 +599,7 @@ function RecruitStep1({ agent }) {
           outline: 'none', boxShadow: 'var(--semo-glow-primary)',
         }}/>
         <div style={{ fontSize: 12, color: 'var(--semo-fg-3)', marginTop: 8, lineHeight: 1.5 }}>
-          예시: 우리 주문이, 카운터지기, 정민이. 손님들이 직접 보는 이름은 아니에요.
+          예시: 우리 {agent.name}, 현장지기, 정민팀 막내. 손님들이 직접 보는 이름은 아니에요.
         </div>
       </div>
     </div>
@@ -610,8 +610,8 @@ function RecruitStep2({ agent }) {
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       <div style={{ fontSize: 13, color: 'var(--semo-fg-2)', lineHeight: 1.55 }}>
-        주문이가 일하려면 아래 도구에 연결해야 해요.
-        연결 정보는 사장님 가게 안에서만 사용돼요.
+        {agent.name}가 일하려면 아래 도구와 권한 범위를 확인해야 해요.
+        연결 정보는 사장님 전용 VM과 지식도서관 안에서만 사용돼요.
       </div>
       {agent.integrations.map((t, i) => (
         <div key={t} style={{
@@ -630,7 +630,7 @@ function RecruitStep2({ agent }) {
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--semo-fg-1)' }}>{t}</div>
             <div style={{ fontSize: 12, color: 'var(--semo-fg-3)' }}>
-              {i < 2 ? '카카오 비즈니스 계정으로 1분 안에 연결' : '나중에 연결해도 돼요'}
+              {i < 2 ? '연결 후 자동 처리·승인 후 실행 범위를 고를 수 있어요' : '나중에 연결해도 돼요'}
             </div>
           </div>
           {i < 2 ?
@@ -650,7 +650,7 @@ function RecruitStep3({ agent }) {
         <BotAvatar agent={agent} size={120} state="working"/>
       </div>
       <div>
-        <div style={{ fontSize: 12, color: 'var(--semo-fg-3)' }}>주문이 첫 인사</div>
+        <div style={{ fontSize: 12, color: 'var(--semo-fg-3)' }}>{agent.name} 첫 인사</div>
         <div style={{
           margin: '10px auto 0', maxWidth: 420,
           padding: '14px 18px',
@@ -661,10 +661,10 @@ function RecruitStep3({ agent }) {
           fontSize: 14, color: 'var(--semo-fg-2)',
           lineHeight: 1.65, textAlign: 'left',
         }}>
-          안녕하세요 사장님! 저는 <strong>우리 주문이</strong>예요.
-          오늘부터 카카오톡 응대를 도와드릴게요.
-          처음엔 답변을 다 보여드릴 테니, 마음에 들면 알려주세요.
-          금방 사장님 스타일에 맞춰갈게요.
+          안녕하세요 사장님! 저는 <strong>우리 {agent.name}</strong>예요.
+          오늘부터 {agent.role}로 일할게요. 업무 하나당 먹이 {agent.feedPerTask || 6}개 정도를 쓰고,
+          처음엔 중요한 실행 전에 꼭 승인 요청을 올릴게요.
+          사장님 방식이 쌓일수록 Colony 지식도서관도 같이 똑똑해져요.
         </div>
       </div>
     </div>
