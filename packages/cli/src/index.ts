@@ -81,6 +81,7 @@ import { registerRouterCommand } from './commands/router';
 import { registerDeployCommand } from './commands/deploy';
 import { registerDashboardCommand } from './commands/dashboard';
 import { registerDevTenantCommand } from './commands/dev-tenant.js';
+import { registerColonyMemoryCommands } from './commands/colony-memory';
 import { syncGlobalCache } from './global-cache';
 import {
   ensureSemoDir,
@@ -1540,6 +1541,7 @@ registerDeployCommand(program);
 // === dashboard — Personal 대시보드 로컬 기동 ===
 registerDashboardCommand(program);
 registerDevTenantCommand(program);
+registerColonyMemoryCommands(program);
 
 configCmd
   .command('env')

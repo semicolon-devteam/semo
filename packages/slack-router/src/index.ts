@@ -46,6 +46,11 @@ import {
   type OutboxMessage,
 } from '@team-semicolon/semo-common';
 import { applySlackRouterPolicy, shouldHandleSemoBotNlp } from './router-policy.js';
+import {
+  resolveDedicatedInboundSlackApps,
+  summarizeInboundGatewayStart,
+  type InboundGatewayStartResult,
+} from './slack-app-policy.js';
 import { resolveReplyRelay } from './reply-relay.js';
 import { parseRouteResponse, type ParsedRoute } from './route-parse.js';
 import { buildConversationContextBlock } from './conversation-context.js';
@@ -176,6 +181,7 @@ const pool = new Pool({ connectionString: DATABASE_URL });
 const router = new Router(pool);
 const slack = new SlackGateway(SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SEMO_PRIMARY_BOT_ID);
 const inboundSlacks: SlackGateway[] = [slack];
+const inboundSlackBotIds: string[] = [SEMO_PRIMARY_BOT_ID || 'primary'];
 const inboxWriter = new InboxWriter(MAILBOX_DIR);
 const busyDetector = new BusyDetector(MAILBOX_DIR);
 
@@ -206,15 +212,25 @@ function appTokenEnvKeyFor(botId: string): string {
   return `${botId.replace(/-/g, '_').toUpperCase()}_SLACK_APP_TOKEN`;
 }
 
-function buildDedicatedInboundSlackGateways(): SlackGateway[] {
-  return listBotsWithDedicatedToken()
-    .filter((botId) => botId !== 'slack' && botId !== 'semobot' && !OPENCLAW_BOTS.has(botId))
-    .flatMap((botId) => {
-      const botToken = process.env[`${botId.replace(/-/g, '_').toUpperCase()}_SLACK_BOT_TOKEN`];
-      const appToken = process.env[appTokenEnvKeyFor(botId)];
-      if (!botToken || !appToken) return [];
-      return [new SlackGateway(botToken, appToken, botId)];
-    });
+function buildDedicatedInboundSlackGateways(): Array<{ botId: string; gateway: SlackGateway }> {
+  const decision = resolveDedicatedInboundSlackApps({
+    tokenBotIds: listBotsWithDedicatedToken(),
+    primaryBotId: SEMO_PRIMARY_BOT_ID,
+    openclawBotIds: OPENCLAW_BOTS,
+    allowedBotIdsRaw: process.env.SEMO_DEDICATED_INBOUND_BOTS,
+  });
+  if (decision.enabledBotIds.length || decision.skipped.length) {
+    console.log(
+      `[slack-router] Dedicated inbound policy enabled=[${decision.enabledBotIds.join(',')}] ` +
+        `skipped=[${decision.skipped.map((s) => `${s.botId}:${s.reason}`).join(',')}]`,
+    );
+  }
+  return decision.enabledBotIds.flatMap((botId) => {
+    const botToken = process.env[`${botId.replace(/-/g, '_').toUpperCase()}_SLACK_BOT_TOKEN`];
+    const appToken = process.env[appTokenEnvKeyFor(botId)];
+    if (!botToken || !appToken) return [];
+    return [{ botId, gateway: new SlackGateway(botToken, appToken, botId) }];
+  });
 }
 
 /**
@@ -2746,14 +2762,34 @@ async function start(): Promise<void> {
   console.log('[slack-router] Config loaded (routing + incubator)');
 
   // 3. Set message handler
-  inboundSlacks.push(...buildDedicatedInboundSlackGateways());
+  const dedicatedInboundSlacks = buildDedicatedInboundSlackGateways();
+  inboundSlacks.push(...dedicatedInboundSlacks.map((x) => x.gateway));
+  inboundSlackBotIds.push(...dedicatedInboundSlacks.map((x) => x.botId));
   for (const gateway of inboundSlacks) gateway.setMessageHandler(handleSlackMessage);
   console.log(`[slack-router] Inbound Slack apps: ${inboundSlacks.length}`);
 
   // 4. Start Slack Socket Mode
-  await Promise.all(inboundSlacks.map((gateway) => gateway.start()));
+  const startResults = await Promise.allSettled(inboundSlacks.map((gateway) => gateway.start()));
+  const startSummary = summarizeInboundGatewayStart(
+    startResults.map((result, index): InboundGatewayStartResult => {
+      const botId = inboundSlackBotIds[index] || `app-${index}`;
+      return result.status === 'fulfilled'
+        ? { botId, status: 'fulfilled' }
+        : { botId, status: 'rejected', reason: result.reason };
+    }),
+  );
+  for (const failed of startSummary.failed) {
+    console.warn(
+      `[slack-router] Inbound Slack app skipped after startup failure: ${failed.botId} (${failed.message})`,
+    );
+  }
+  if (startSummary.shouldThrow) {
+    throw new Error(
+      `All inbound Slack apps failed to start: ${startSummary.failed.map((f) => `${f.botId}=${f.message}`).join(', ')}`,
+    );
+  }
   refreshOperatorMentionGuide();
-  console.log('[slack-router] Slack connected');
+  console.log(`[slack-router] Slack connected (${startSummary.startedBotIds.join(',')})`);
 
   // 5. Start outbox reader
   outboxReader.start();
